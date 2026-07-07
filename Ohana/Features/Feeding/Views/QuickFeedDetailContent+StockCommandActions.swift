@@ -15,30 +15,34 @@ extension QuickFeedDetailContent {
             draftStore.inputError = l.tr(zh: "请输入有效金额，或留空。", en: "Enter a valid amount or leave it blank.", de: "Gültigen Betrag eingeben oder leer lassen.")
             return
         }
-        let result = commandExecutor.saveStock(
-            pet: pet,
-            brand: draftStore.stockBrandText,
-            totalGrams: totalGrams,
-            purchaseDate: draftStore.stockHasPurchaseDate ? draftStore.stockPurchaseDate : nil,
-            openDate: draftStore.stockHasOpenDate ? draftStore.stockOpenDate : nil,
-            foodKind: draftStore.selectedStockFoodKind,
-            calculationMode: draftStore.stockCalculationMode,
-            reminderEnabled: draftStore.stockReminderEnabled,
-            reminderAdvanceDays: draftStore.stockReminderAdvanceDays,
-            executorId: currentUserId,
-            allEvents: allEvents,
-            recordToUpdate: draftStore.editingFoodRecord,
-            previousExpenseId: previousExpenseId,
-            expenseAmount: expenseAmount,
-            expensePayerId: draftStore.stockExpensePayerId,
-            expenseDate: draftStore.stockHasPurchaseDate ? draftStore.stockPurchaseDate : Date(),
-            expenseNote: stockExpenseNote()
-        )
-        reloadFeedSnapshots()
-        scheduleStockReminders(result.stockReminders)
-        draftStore.editingFoodRecord = nil
-        dismissInlineFeedSheet()
-        triggerToast(l.tr(zh: "余粮已更新", en: "Stock updated", de: "Vorrat aktualisiert"), tint: stockTint)
+        do {
+            let result = try commandExecutor.saveStock(
+                pet: pet,
+                brand: draftStore.stockBrandText,
+                totalGrams: totalGrams,
+                purchaseDate: draftStore.stockHasPurchaseDate ? draftStore.stockPurchaseDate : nil,
+                openDate: draftStore.stockHasOpenDate ? draftStore.stockOpenDate : nil,
+                foodKind: draftStore.selectedStockFoodKind,
+                calculationMode: draftStore.stockCalculationMode,
+                reminderEnabled: draftStore.stockReminderEnabled,
+                reminderAdvanceDays: draftStore.stockReminderAdvanceDays,
+                executorId: currentUserId,
+                allEvents: allEvents,
+                recordToUpdate: draftStore.editingFoodRecord,
+                previousExpenseId: previousExpenseId,
+                expenseAmount: expenseAmount,
+                expensePayerId: draftStore.stockExpensePayerId,
+                expenseDate: draftStore.stockHasPurchaseDate ? draftStore.stockPurchaseDate : Date(),
+                expenseNote: stockExpenseNote()
+            )
+            reloadFeedSnapshots()
+            scheduleStockReminders(result.stockReminders)
+            draftStore.editingFoodRecord = nil
+            dismissInlineFeedSheet()
+            triggerToast(l.tr(zh: "余粮已更新", en: "Stock updated", de: "Vorrat aktualisiert"), tint: stockTint)
+        } catch {
+            handleFeedCommandFailure(error, command: .feedStock(petID: pet.id, action: draftStore.editingFoodRecord == nil ? "create" : "update"))
+        }
     }
 
     func configureStockExpenseFields(for record: PetFoodRecord?) {
@@ -63,14 +67,18 @@ extension QuickFeedDetailContent {
     }
 
     func saveStockReminderSettings() {
-        let result = commandExecutor.saveStockReminderSettings(
-            pet: pet,
-            enabled: draftStore.stockReminderEnabled,
-            advanceDays: draftStore.stockReminderAdvanceDays,
-            allEvents: allEvents
-        )
-        scheduleStockReminders(result.stockReminders)
-        triggerToast(l.tr(zh: "余粮提醒已更新", en: "Stock reminder updated", de: "Vorratserinnerung aktualisiert"), tint: stockTint)
+        do {
+            let result = try commandExecutor.saveStockReminderSettings(
+                pet: pet,
+                enabled: draftStore.stockReminderEnabled,
+                advanceDays: draftStore.stockReminderAdvanceDays,
+                allEvents: allEvents
+            )
+            scheduleStockReminders(result.stockReminders)
+            triggerToast(l.tr(zh: "余粮提醒已更新", en: "Stock reminder updated", de: "Vorratserinnerung aktualisiert"), tint: stockTint)
+        } catch {
+            handleFeedCommandFailure(error, command: .feedStock(petID: pet.id, action: "reminder_settings"))
+        }
     }
 
     func correctStock(_ record: PetFoodRecord) {
@@ -79,16 +87,20 @@ extension QuickFeedDetailContent {
             draftStore.inputError = l.tr(zh: "请输入有效余量。", en: "Enter valid remaining stock.", de: "Gültigen Restbestand eingeben.")
             return
         }
-        let result = commandExecutor.correctStock(
-            pet: pet,
-            record: record,
-            remainingGrams: grams,
-            allEvents: allEvents
-        )
-        reloadFeedSnapshots()
-        prepareStockCorrectionText()
-        scheduleStockReminders(result.stockReminders)
-        triggerToast(l.tr(zh: "余量已修正", en: "Stock corrected", de: "Vorrat korrigiert"), tint: stockTint)
+        do {
+            let result = try commandExecutor.correctStock(
+                pet: pet,
+                record: record,
+                remainingGrams: grams,
+                allEvents: allEvents
+            )
+            reloadFeedSnapshots()
+            prepareStockCorrectionText()
+            scheduleStockReminders(result.stockReminders)
+            triggerToast(l.tr(zh: "余量已修正", en: "Stock corrected", de: "Vorrat korrigiert"), tint: stockTint)
+        } catch {
+            handleFeedCommandFailure(error, command: .feedStock(petID: pet.id, action: "correct"))
+        }
     }
 
     func beginEditingFeedLog(id: UUID) {
@@ -120,46 +132,58 @@ extension QuickFeedDetailContent {
             triggerToast(l.tr(zh: "记录已不存在", en: "Log no longer exists", de: "Eintrag existiert nicht mehr"), tint: Color.goYellow)
             return
         }
-        let result = commandExecutor.updateLog(
-            log,
-            grams: grams,
-            date: draftStore.editFeedLogDate,
-            pet: pet,
-            allEvents: allEvents
-        )
-        reloadFeedSnapshots()
-        scheduleStockReminders(result.stockReminders)
-        draftStore.editingFeedLogId = nil
-        closeActiveFeedSheet()
-        triggerToast(l.tr(zh: "记录已更新", en: "Log updated", de: "Eintrag aktualisiert"), tint: mainFoodTint)
+        do {
+            let result = try commandExecutor.updateLog(
+                log,
+                grams: grams,
+                date: draftStore.editFeedLogDate,
+                pet: pet,
+                allEvents: allEvents
+            )
+            reloadFeedSnapshots()
+            scheduleStockReminders(result.stockReminders)
+            draftStore.editingFeedLogId = nil
+            closeActiveFeedSheet()
+            triggerToast(l.tr(zh: "记录已更新", en: "Log updated", de: "Eintrag aktualisiert"), tint: mainFoodTint)
+        } catch {
+            handleFeedCommandFailure(error, command: .feedLog(petID: pet.id, source: "update"))
+        }
     }
 
     func deleteFeedLog(id: UUID) {
-        if draftStore.editingFeedLogId == id { draftStore.editingFeedLogId = nil }
         guard let log = commandExecutor.feedLog(id: id) else {
             triggerToast(l.tr(zh: "记录已不存在", en: "Log no longer exists", de: "Eintrag existiert nicht mehr"), tint: Color.goYellow)
             return
         }
-        let result = commandExecutor.deleteLog(
-            log,
-            pet: pet,
-            allEvents: allEvents
-        )
-        reloadFeedSnapshots()
-        scheduleStockReminders(result.stockReminders)
-        triggerToast(l.tr(zh: "记录已删除", en: "Log deleted", de: "Eintrag gelöscht"), tint: Color.goRed)
+        do {
+            let result = try commandExecutor.deleteLog(
+                log,
+                pet: pet,
+                allEvents: allEvents
+            )
+            if draftStore.editingFeedLogId == id { draftStore.editingFeedLogId = nil }
+            reloadFeedSnapshots()
+            scheduleStockReminders(result.stockReminders)
+            triggerToast(l.tr(zh: "记录已删除", en: "Log deleted", de: "Eintrag gelöscht"), tint: Color.goRed)
+        } catch {
+            handleFeedCommandFailure(error, command: .feedLog(petID: pet.id, source: "delete"))
+        }
     }
 
     func deleteFoodRecord(_ record: PetFoodRecord) {
-        if draftStore.editingFoodRecord?.id == record.id { draftStore.editingFoodRecord = nil }
-        let result = commandExecutor.deleteFoodRecord(
-            record,
-            pet: pet,
-            allEvents: allEvents
-        )
-        reloadFeedSnapshots()
-        prepareStockCorrectionText()
-        scheduleStockReminders(result.stockReminders)
-        triggerToast(l.tr(zh: "补粮记录已删除", en: "Stock record deleted", de: "Vorratseintrag gelöscht"), tint: Color.goRed)
+        do {
+            let result = try commandExecutor.deleteFoodRecord(
+                record,
+                pet: pet,
+                allEvents: allEvents
+            )
+            if draftStore.editingFoodRecord?.id == record.id { draftStore.editingFoodRecord = nil }
+            reloadFeedSnapshots()
+            prepareStockCorrectionText()
+            scheduleStockReminders(result.stockReminders)
+            triggerToast(l.tr(zh: "补粮记录已删除", en: "Stock record deleted", de: "Vorratseintrag gelöscht"), tint: Color.goRed)
+        } catch {
+            handleFeedCommandFailure(error, command: .feedStock(petID: pet.id, action: "delete_record"))
+        }
     }
 }

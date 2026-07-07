@@ -15,7 +15,7 @@ struct InsuranceExpenseLedgerTests {
         context.insert(human)
         try context.save()
 
-        let result = InsurancePolicyCommandService.savePolicy(
+        let result = try InsurancePolicyCommandService.savePolicy(
             existing: nil,
             pet: pet,
             input: InsurancePolicySaveCommandInput(
@@ -75,7 +75,7 @@ struct InsuranceExpenseLedgerTests {
         context.insert(insurance)
         try context.save()
 
-        let result = InsurancePolicyCommandService.createClaim(
+        let result = try InsurancePolicyCommandService.createClaim(
             insurance: insurance,
             pet: pet,
             input: InsuranceClaimCommandInput(
@@ -129,7 +129,7 @@ struct InsuranceExpenseLedgerTests {
         try context.save()
 
         let approvedAt = makeDate(year: 2026, month: 6, day: 9)
-        let first = InsurancePolicyCommandService.updateClaimStatus(
+        let first = try InsurancePolicyCommandService.updateClaimStatus(
             claim,
             to: .approved,
             insurance: insurance,
@@ -138,7 +138,7 @@ struct InsuranceExpenseLedgerTests {
             approvedAt: approvedAt,
             executorId: human.id.uuidString
         )
-        let second = InsurancePolicyCommandService.updateClaimStatus(
+        let second = try InsurancePolicyCommandService.updateClaimStatus(
             claim,
             to: .approved,
             insurance: insurance,

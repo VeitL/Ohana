@@ -190,11 +190,18 @@ struct PetExpenseDashboardContent: View {
                 commandQueue.enqueue(
                     .expenseDelete(entityID: pet.id, entityKind: EntityKind.pet.rawValue, recordID: log.id)
                 ) {
-                    DashboardRecordCommandExecutor(context: modelContext, services: appServices).deletePetExpense(
-                        log,
-                        pet: pet,
-                        note: "dashboard.expense.delete.\(EntityKind.pet.rawValue)"
-                    )
+                    do {
+                        try DashboardRecordCommandExecutor(context: modelContext, services: appServices).deletePetExpense(
+                            log,
+                            pet: pet,
+                            note: "dashboard.expense.delete.\(EntityKind.pet.rawValue)"
+                        )
+                    } catch {
+                        appServices.domainRevisions.publishFailure(
+                            command: .expenseDelete(entityID: pet.id, entityKind: EntityKind.pet.rawValue, recordID: log.id),
+                            error: error
+                        )
+                    }
                 }
             } label: {
                 Image(systemName: "trash").accessibilityHidden(true)

@@ -93,6 +93,16 @@ extension QuickWaterDetailSheet {
         }
     }
 
+    func handleWaterCommandFailure(_ error: Error, command: DomainCommand) {
+        appServices.domainRevisions.publishFailure(command: command, error: error)
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        showSaveConfirmation(l.tr(
+            zh: "保存失败，请重试",
+            en: "Save failed. Please try again.",
+            de: "Speichern fehlgeschlagen. Bitte erneut versuchen."
+        ))
+    }
+
     func rebuildWaterSnapshot(force: Bool = false) {
         guard force || waterSnapshotRefreshTask == nil else { return }
         performWaterModeUpdatesWithoutAnimation {
@@ -266,25 +276,31 @@ extension QuickWaterDetailSheet {
             scope: "quickCare.water",
             candidates: sameSpeciesWaterPets
         )
-        let result = commandExecutor.saveWaterPlan(
-            pet: pet,
-            targets: selectedWaterTargets,
-            times: waterPlanTimes,
-            count: waterPlanCount,
-            allEvents: latestAllEvents()
-        )
-        waterPlanTimes = result.normalizedTimes
-        optimisticWaterPlanEvents = result.optimisticPlanEvents
-        scheduleWaterReminders(
-            result.reminders,
-            delayMilliseconds: waterPlanPostSaveReminderDelayMilliseconds,
-            requiresReminderMode: true
-        )
-        scheduleWaterSnapshotRefresh(milliseconds: waterPlanPostSaveSnapshotDelayMilliseconds)
-        scheduleWaterPlanMaintenance(delayMilliseconds: waterPlanPostSaveMaintenanceDelayMilliseconds)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        setActiveWaterMode(.reminder)
-        showSaveConfirmation(result.targetCount > 1 ? localizedSharedWaterPlanSaved(result.targetCount) : l.tr(zh: "已保存喂水计划", en: "Water plan saved", de: "Trinkplan gespeichert"))
+        do {
+            let result = try commandExecutor.saveWaterPlan(
+                pet: pet,
+                targets: selectedWaterTargets,
+                times: waterPlanTimes,
+                count: waterPlanCount,
+                allEvents: latestAllEvents()
+            )
+            waterPlanTimes = result.normalizedTimes
+            optimisticWaterPlanEvents = result.optimisticPlanEvents
+            scheduleWaterReminders(
+                result.reminders,
+                delayMilliseconds: waterPlanPostSaveReminderDelayMilliseconds,
+                requiresReminderMode: true
+            )
+            scheduleWaterSnapshotRefresh(milliseconds: waterPlanPostSaveSnapshotDelayMilliseconds)
+            scheduleWaterPlanMaintenance(delayMilliseconds: waterPlanPostSaveMaintenanceDelayMilliseconds)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            setActiveWaterMode(.reminder)
+            showSaveConfirmation(result.targetCount > 1 ? localizedSharedWaterPlanSaved(result.targetCount) : l.tr(zh: "已保存喂水计划", en: "Water plan saved", de: "Trinkplan gespeichert"))
+        } catch {
+            optimisticWaterPlanEvents = []
+            handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "save_drink"))
+            scheduleWaterSnapshotRefresh(milliseconds: waterPlanPostSaveSnapshotDelayMilliseconds, syncModeAfterRefresh: true)
+        }
         isSavingWaterPlan = false
         waterPlanSaveTask = nil
     }
@@ -295,11 +311,16 @@ extension QuickWaterDetailSheet {
         commitWaterModeSideEffects(.manual)
         beginWaterModeVisualTransition(to: .manual) {
             scheduleSettledWaterModeMaintenance(for: .manual) {
-                commandExecutor.deactivateWaterPlanReminders(
-                    pet: pet,
-                    allEvents: latestAllEvents()
-                )
-                showSaveConfirmation(l.tr(zh: "已切换到手动喂水", en: "Switched to manual water logging", de: "Auf manuelles Trinken umgestellt"))
+                do {
+                    try commandExecutor.deactivateWaterPlanReminders(
+                        pet: pet,
+                        allEvents: latestAllEvents()
+                    )
+                    showSaveConfirmation(l.tr(zh: "已切换到手动喂水", en: "Switched to manual water logging", de: "Auf manuelles Trinken umgestellt"))
+                } catch {
+                    handleWaterCommandFailure(error, command: .waterMode(petID: pet.id, mode: WaterOperatingMode.manual.rawValue))
+                    scheduleWaterSnapshotRefresh(milliseconds: 80, syncModeAfterRefresh: true)
+                }
             }
         }
     }
@@ -313,8 +334,9 @@ extension QuickWaterDetailSheet {
         commitWaterModeSideEffects(.reminder)
         beginWaterModeVisualTransition(to: .reminder) {
             scheduleSettledWaterModeMaintenance(for: .reminder) {
-                ensureUpcomingWaterPlanReminders()
-                showSaveConfirmation(l.tr(zh: "已切换到喂水计划", en: "Switched to water plan", de: "Auf Trinkplan umgestellt"))
+                if ensureUpcomingWaterPlanReminders(showFailure: true) {
+                    showSaveConfirmation(l.tr(zh: "已切换到喂水计划", en: "Switched to water plan", de: "Auf Trinkplan umgestellt"))
+                }
             }
         }
     }
@@ -326,8 +348,13 @@ extension QuickWaterDetailSheet {
         commitWaterModeSideEffects(.manual)
         beginWaterModeVisualTransition(to: .manual, commitWhenUnchanged: true) {
             scheduleSettledWaterModeMaintenance(for: .manual) {
-                commandExecutor.deleteWaterPlan(pet: pet, allEvents: latestAllEvents())
-                showSaveConfirmation(l.tr(zh: "已删除喂水计划", en: "Water plan deleted", de: "Trinkplan gelöscht"))
+                do {
+                    try commandExecutor.deleteWaterPlan(pet: pet, allEvents: latestAllEvents())
+                    showSaveConfirmation(l.tr(zh: "已删除喂水计划", en: "Water plan deleted", de: "Trinkplan gelöscht"))
+                } catch {
+                    handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "delete_drink"))
+                    scheduleWaterSnapshotRefresh(milliseconds: 80, syncModeAfterRefresh: true)
+                }
             }
         }
     }
@@ -473,7 +500,7 @@ extension QuickWaterDetailSheet {
                 return
             }
             performWaterModeUpdatesWithoutAnimation {
-                ensureUpcomingWaterPlanReminders()
+                _ = ensureUpcomingWaterPlanReminders(showFailure: false)
             }
             scheduleWaterSnapshotRefresh(milliseconds: 80)
             waterPlanMaintenanceTask = nil
@@ -488,10 +515,24 @@ extension QuickWaterDetailSheet {
         }
     }
 
-    func ensureUpcomingWaterPlanReminders() {
-        guard !isAquatic else { return }
-        let reminders = commandExecutor.ensureUpcomingWaterPlanReminders(pet: pet, allEvents: latestAllEvents())
-        scheduleWaterReminders(reminders, delayMilliseconds: 480, requiresReminderMode: true)
+    @discardableResult
+    func ensureUpcomingWaterPlanReminders(showFailure: Bool = false) -> Bool {
+        guard !isAquatic else { return true }
+        do {
+            let reminders = try commandExecutor.ensureUpcomingWaterPlanReminders(pet: pet, allEvents: latestAllEvents())
+            scheduleWaterReminders(reminders, delayMilliseconds: 480, requiresReminderMode: true)
+            return true
+        } catch {
+            if showFailure {
+                handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "ensure_drink_reminders"))
+            } else {
+                appServices.domainRevisions.publishFailure(
+                    command: .waterPlan(petID: pet.id, action: "ensure_drink_reminders"),
+                    error: error
+                )
+            }
+            return false
+        }
     }
 
     func latestAllEvents() -> [Event] {
@@ -722,7 +763,6 @@ extension QuickWaterDetailSheet {
             return
         }
         guard scheduleDeferredWaterAction({ deleteLogBusiness(id: logId) }) else { return }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     func deleteLogBusiness(id: UUID) {
@@ -733,13 +773,22 @@ extension QuickWaterDetailSheet {
             )
             return
         }
-        switch commandExecutor.deleteLog(log) {
-        case .waterChange:
-            saveWaterChangePlanToCalendar(toast: l.tr(zh: "已更新换水周期", en: "Water change cycle updated", de: "Wasserwechselzyklus aktualisiert"))
-        case .filterClean:
-            syncFilterPlan(showToast: false)
-        case .other:
-            break
+        do {
+            switch try commandExecutor.deleteLog(log) {
+            case .waterChange:
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                saveWaterChangePlanToCalendar(toast: l.tr(zh: "已更新换水周期", en: "Water change cycle updated", de: "Wasserwechselzyklus aktualisiert"))
+            case .filterClean:
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                syncFilterPlan(showToast: false)
+            case .other:
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+        } catch {
+            appServices.domainRevisions.publishFailure(
+                command: .waterLog(petID: pet.id, source: "delete"),
+                error: error
+            )
         }
     }
 

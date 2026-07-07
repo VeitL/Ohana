@@ -17,6 +17,7 @@ enum StreakManager {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
         let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
+        var shouldConsumeShield = false
 
         let checkedInToday = hasCheckIn(pet: pet, on: today, context: context)
 
@@ -44,7 +45,7 @@ enum StreakManager {
                         // 保护盾消耗：streak 继续（+1），不重置
                         pet.currentStreak += 1
                         pet.lastCheckInDate = Date()
-                        UserDefaults.standard.removeObject(forKey: shieldKey)
+                        shouldConsumeShield = true
                     } else {
                         pet.currentStreak = 1
                         pet.lastCheckInDate = Date()
@@ -61,7 +62,14 @@ enum StreakManager {
             }
         }
 
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return
+        }
+        if shouldConsumeShield {
+            UserDefaults.standard.removeObject(forKey: "shop_streakShieldExpiry")
+        }
     }
 
     private static func hasCheckIn(pet: Pet, on day: Date, context: ModelContext) -> Bool {

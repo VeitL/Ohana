@@ -157,6 +157,7 @@ extension SettingsView {
         #if DEBUG
             let timestamp = Int(Date().timeIntervalSince1970)
             let seedCount = SettingsDebugTools.plantBaselineSeedCount
+            var createdPlantIDs: [UUID] = []
             for index in 0 ..< seedCount {
                 let plant = Plant(
                     name: seedCount == 1 ? "Codex Pothos \(timestamp)" : "Codex Pothos \(timestamp)-\(index + 1)",
@@ -179,14 +180,21 @@ extension SettingsView {
                 )
                 plant.notes = "Seeded by UI tests"
                 modelContext.insert(plant)
-                PlantUnlockPolicy.noteExistingPlantData()
+                createdPlantIDs.append(plant.id)
+            }
+            let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+            guard saveResult.didSave else {
+                modelContext.rollback()
+                return
+            }
+            PlantUnlockPolicy.noteExistingPlantData()
+            for plantID in createdPlantIDs {
                 appServices.domainRevisions.publishMemberCreation(
-                    entityID: plant.id,
+                    entityID: plantID,
                     kind: EntityKind.plant.rawValue,
                     note: "settings.plant.uiTestShortcut"
                 )
             }
-            modelContext.safeSave()
         #endif
     }
 

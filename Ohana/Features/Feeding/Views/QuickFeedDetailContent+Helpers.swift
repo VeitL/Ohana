@@ -367,8 +367,12 @@ extension QuickFeedDetailContent {
 
     func setMainFoodKind(_ foodKind: FeedFoodKind) {
         guard pet.mainFoodKind != foodKind else { return }
-        commandExecutor.setMainFoodKind(pet: pet, foodKind: foodKind)
-        UISelectionFeedbackGenerator().selectionChanged()
+        do {
+            try commandExecutor.setMainFoodKind(pet: pet, foodKind: foodKind)
+            UISelectionFeedbackGenerator().selectionChanged()
+        } catch {
+            handleFeedCommandFailure(error, command: .feedSettings(petID: pet.id))
+        }
     }
 
     func feedLogDisplayGrams(for log: PetCareLog) -> Double {

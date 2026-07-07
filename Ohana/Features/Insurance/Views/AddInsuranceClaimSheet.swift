@@ -304,15 +304,19 @@ struct AddInsuranceClaimSheet: View {
             action: "create"
         )
 
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(command) {
-            InsuranceCommandExecutor(context: modelContext, services: appServices).createClaim(
-                insurance: insurance,
-                pet: pet,
-                input: input,
-                note: "insurance.claim.create"
-            )
-            dismiss()
+            do {
+                try InsuranceCommandExecutor(context: modelContext, services: appServices).createClaim(
+                    insurance: insurance,
+                    pet: pet,
+                    input: input,
+                    note: "insurance.claim.create"
+                )
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                dismiss()
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 }

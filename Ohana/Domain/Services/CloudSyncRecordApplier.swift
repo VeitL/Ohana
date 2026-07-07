@@ -125,7 +125,7 @@ nonisolated enum CloudSyncRecordApplier {
             syncedAt: Date()
         )
         if !outcome.notificationIdsToCancel.isEmpty {
-            try context.save()
+            try saveCloudSyncApplyChanges(context: context)
             DomainRehydrateEffectsDispatcher.cancelNotifications(outcome.notificationIdsToCancel)
         }
         return result
@@ -986,7 +986,7 @@ nonisolated enum CloudSyncRecordApplier {
             }
         case String(describing: SharedCareSession.self):
             if let model = try fetchSharedCareSession(id: localRecordUUID, context: context) {
-                SharedCareSessionMaintenance.deleteCascade(
+                try SharedCareSessionMaintenance.deleteCascade(
                     model,
                     context: context,
                     deletedByHumanId: deletedByHumanId,
@@ -1035,7 +1035,7 @@ nonisolated enum CloudSyncRecordApplier {
             deletedByHumanId: deletedByHumanId
         )
         guard didDelete, !stockReminderPets.isEmpty else { return }
-        context.safeSave()
+        guard saveCloudSyncDeletionChanges(context: context) else { return }
         FeedingPlanWriter.rebuildFoodStockReminders(
             pets: stockReminderPets,
             context: context,
@@ -1217,6 +1217,39 @@ nonisolated enum CloudSyncRecordApplier {
             return nil
         }
         return try fetchPet(id: petId, context: context)
+    }
+
+    private static func saveCloudSyncApplyChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw CloudSyncRecordApplyPersistenceError.persistenceFailed(saveResult.errorDescription)
+        }
+    }
+
+    @discardableResult
+    private static func saveCloudSyncDeletionChanges(context: ModelContext) -> Bool {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
+        return true
+    }
+}
+
+enum CloudSyncRecordApplyPersistenceError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(message):
+            message ?? String(
+                localized: "cloud.sync.apply.persistence.failed",
+                defaultValue: "Unable to save cloud sync changes.",
+                comment: "Shown when applying a cloud sync record cannot be saved."
+            )
+        }
     }
 }
 

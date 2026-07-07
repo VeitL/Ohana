@@ -1554,7 +1554,7 @@ struct PlantLaunchTests {
         context.insert(event)
         try context.save()
 
-        let result = CalendarEventCommandService.toggleCompletion(
+        let result = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: now,
             pets: [],
@@ -1595,7 +1595,7 @@ struct PlantLaunchTests {
         context.insert(event)
         try context.save()
 
-        let result = CalendarEventCommandService.toggleCompletion(
+        let result = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: now,
             pets: [],
@@ -1898,7 +1898,7 @@ struct PlantLaunchTests {
         )
         TodayFocusEconomyService.resetDailyCompletionMarker(userKey: userKey, date: now)
 
-        CalendarEventCommandService.toggleCompletion(
+        try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: now,
             pets: [],

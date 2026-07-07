@@ -91,7 +91,7 @@ extension OasisUpgradeRewardService {
         critter.lastStateRefreshAt = Date()
         context.insert(actionLog(for: critter, action: .levelUpgrade, xpDelta: 0))
         refreshLifecycleState(for: critter, now: Date())
-        try context.save()
+        try saveRewardChanges(context: context)
         return true
     }
 

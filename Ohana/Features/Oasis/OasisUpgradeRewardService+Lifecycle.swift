@@ -27,7 +27,7 @@ extension OasisUpgradeRewardService {
         }
 
         if lifecycleFingerprint(for: critter) != before, let context {
-            context.safeSave()
+            _ = saveRewardChangesIfNeeded(context: context)
         }
     }
 
@@ -147,7 +147,7 @@ extension OasisUpgradeRewardService {
         critter.lastStateRefreshAt = now
         critter.lastGentlePromptAt = now
         context.insert(actionLog(for: critter, action: .rescue, xpDelta: xpDelta))
-        try context.save()
+        try saveRewardChanges(context: context)
         return OasisCritterInteractionOutcome(
             success: true,
             action: .rescue,

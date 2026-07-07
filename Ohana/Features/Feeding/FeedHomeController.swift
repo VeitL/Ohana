@@ -320,9 +320,9 @@ enum FeedHomePerformance {
     private static let logger = Logger(subsystem: "Ohana", category: "FeedHome")
 
     @discardableResult
-    static func measure<T>(_ name: String, _ body: () -> T) -> T {
+    static func measure<T>(_ name: String, _ body: () throws -> T) rethrows -> T {
         let startedAt = CFAbsoluteTimeGetCurrent()
-        let result = body()
+        let result = try body()
         let elapsed = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000
         logger.debug("\(name, privacy: .private) \(String(format: "%.1f", elapsed), privacy: .public)ms")
         return result

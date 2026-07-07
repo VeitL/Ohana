@@ -38,6 +38,20 @@ struct CalendarEventPlanCommandResult: Equatable {
     let scheduledReminderSync: Bool
 }
 
+enum CalendarCommandError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(reason):
+            if let reason, !reason.isEmpty {
+                return "日历保存失败：\(reason)"
+            }
+            return "日历保存失败，请稍后重试。"
+        }
+    }
+}
+
 enum CalendarEventPlanCommandService {
     private static let maxReminderOccurrences = 500
 
@@ -48,7 +62,7 @@ enum CalendarEventPlanCommandService {
         context: ModelContext,
         scheduleNotifications: Bool = true,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
-    ) -> CalendarEventPlanCommandResult? {
+    ) throws -> CalendarEventPlanCommandResult? {
         guard !input.cleanTitle.isEmpty else { return nil }
         let intent = DomainScheduleCreateIntent(
             title: input.cleanTitle,
@@ -75,7 +89,7 @@ enum CalendarEventPlanCommandService {
         )
         let event = writeResult.event
         let createdReminders = writeResult.reminders
-        context.safeSave()
+        try saveCalendarChanges(context: context)
 
         let shouldScheduleReminders = scheduleNotifications && !createdReminders.isEmpty
         if shouldScheduleReminders {
@@ -106,7 +120,7 @@ enum CalendarEventPlanCommandService {
         scheduleNotifications: Bool = true,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
         now: Date = Date()
-    ) -> CalendarEventPlanCommandResult? {
+    ) throws -> CalendarEventPlanCommandResult? {
         guard !input.cleanTitle.isEmpty else { return nil }
         let intent = DomainScheduleCreateIntent(
             title: input.cleanTitle,
@@ -165,7 +179,7 @@ enum CalendarEventPlanCommandService {
         } else {
             createdReminders = []
         }
-        context.safeSave()
+        try saveCalendarChanges(context: context)
 
         let shouldScheduleReminders = scheduleNotifications && !createdReminders.isEmpty
         if shouldScheduleReminders {
@@ -257,6 +271,15 @@ enum CalendarEventPlanCommandService {
              .medication, .petMedication, .petMedicationDose, .insurancePremium,
              .none:
             .care
+        }
+    }
+
+    @MainActor
+    static func saveCalendarChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw CalendarCommandError.persistenceFailed(saveResult.errorDescription)
         }
     }
 }
@@ -450,7 +473,7 @@ enum CalendarEventCommandService {
         now: Date = Date(),
         reminderCompletion providedReminderCompletion: ReminderCompleting? = nil,
         schedulePlantCareNotifications: Bool = true
-    ) -> CalendarEventCompletionResult {
+    ) throws -> CalendarEventCompletionResult {
         let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         let affectedSubjectIDs = affectedSubjectIDs(for: event, context: context)
@@ -578,7 +601,7 @@ enum CalendarEventCommandService {
             }
         }
         if remindersToSync.isEmpty {
-            context.safeSave()
+            try CalendarEventPlanCommandService.saveCalendarChanges(context: context)
         }
 
         return CalendarEventCompletionResult(
@@ -618,7 +641,7 @@ enum CalendarEventCommandService {
         occurrenceDate: Date,
         scope: CalendarEventDeletionScope,
         context: ModelContext
-    ) -> CalendarEventDeletionOutcome {
+    ) throws -> CalendarEventDeletionOutcome {
         let outcome: CalendarEventDeletionOutcome
         switch scope {
         case .wholeEvent:
@@ -629,7 +652,7 @@ enum CalendarEventCommandService {
         case .thisAndFuture:
             outcome = deleteThisAndFuture(event: event, occurrenceDate: occurrenceDate, context: context)
         }
-        context.safeSave()
+        try CalendarEventPlanCommandService.saveCalendarChanges(context: context)
         return outcome
     }
 
@@ -772,9 +795,9 @@ struct CalendarCommandExecutor {
     }
 
     @discardableResult
-    func createEvent(input: CalendarEventPlanCommandInput) -> CalendarEventPlanCommandResult? {
+    func createEvent(input: CalendarEventPlanCommandInput) throws -> CalendarEventPlanCommandResult? {
         let command = DomainCommand.calendarEventPlan(eventID: nil)
-        guard let result = CalendarEventPlanCommandService.createEvent(
+        guard let result = try CalendarEventPlanCommandService.createEvent(
             input: input,
             context: context,
             reminderScheduling: reminderScheduling
@@ -797,9 +820,9 @@ struct CalendarCommandExecutor {
     }
 
     @discardableResult
-    func updateEvent(event: Event, input: CalendarEventPlanCommandInput) -> CalendarEventPlanCommandResult? {
+    func updateEvent(event: Event, input: CalendarEventPlanCommandInput) throws -> CalendarEventPlanCommandResult? {
         let command = DomainCommand.calendarEventPlan(eventID: event.id)
-        guard let result = CalendarEventPlanCommandService.updateEvent(
+        guard let result = try CalendarEventPlanCommandService.updateEvent(
             event: event,
             input: input,
             context: context,
@@ -829,8 +852,8 @@ struct CalendarCommandExecutor {
         pets: [Pet],
         executorId: String?,
         note: String
-    ) -> CalendarEventCompletionResult {
-        let result = CalendarEventCommandService.toggleCompletion(
+    ) throws -> CalendarEventCompletionResult {
+        let result = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: occurrenceDate,
             pets: pets,
@@ -848,8 +871,8 @@ struct CalendarCommandExecutor {
         occurrenceDate: Date,
         scope: CalendarEventDeletionScope,
         note: String
-    ) -> CalendarEventDeletionOutcome {
-        let outcome = CalendarEventCommandService.delete(
+    ) throws -> CalendarEventDeletionOutcome {
+        let outcome = try CalendarEventCommandService.delete(
             event: event,
             occurrenceDate: occurrenceDate,
             scope: scope,

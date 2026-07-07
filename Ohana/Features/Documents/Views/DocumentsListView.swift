@@ -115,11 +115,15 @@ struct DocumentsListContentView: View {
                 if let target = deleteDocument {
                     let command = DomainCommand.petDocumentDelete(petID: pet.id, documentID: target.id)
                     commandQueue.enqueue(command) {
-                        PetDocumentCommandExecutor(context: modelContext, services: appServices).deleteDocument(
-                            target,
-                            pet: pet,
-                            note: "petDocument.delete"
-                        )
+                        do {
+                            try PetDocumentCommandExecutor(context: modelContext, services: appServices).deleteDocument(
+                                target,
+                                pet: pet,
+                                note: "petDocument.delete"
+                            )
+                        } catch {
+                            appServices.domainRevisions.publishFailure(command: command, error: error)
+                        }
                     }
                 }
                 deleteDocument = nil
@@ -138,11 +142,15 @@ struct DocumentsListContentView: View {
                         action: "delete"
                     )
                     commandQueue.enqueue(command) {
-                        InsuranceCommandExecutor(context: modelContext, services: appServices).deletePolicy(
-                            target,
-                            pet: pet,
-                            note: "insurance.policy.delete"
-                        )
+                        do {
+                            try InsuranceCommandExecutor(context: modelContext, services: appServices).deletePolicy(
+                                target,
+                                pet: pet,
+                                note: "insurance.policy.delete"
+                            )
+                        } catch {
+                            appServices.domainRevisions.publishFailure(command: command, error: error)
+                        }
                     }
                 }
                 deleteInsurance = nil

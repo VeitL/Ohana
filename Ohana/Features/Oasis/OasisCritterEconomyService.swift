@@ -10,11 +10,14 @@ import SwiftData
 
 enum OasisRewardWriteError: LocalizedError {
     case coconutAwardFailed
+    case persistenceFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .coconutAwardFailed:
             "Oasis coconut reward could not be saved."
+        case let .persistenceFailed(message):
+            "Oasis reward changes could not be saved: \(message)"
         }
     }
 }
@@ -205,7 +208,7 @@ enum OasisCritterEconomyService {
                 save: false,
                 writeDefaults: false
             )
-            try context.save()
+            try saveCritterEconomyChanges(context: context)
             EconomyDailyBudgetStore.commit(
                 result,
                 householdKey: householdKey,
@@ -275,7 +278,7 @@ enum OasisCritterEconomyService {
                 occurredAt: occurredAt,
                 postsRewardFeedback: postsRewardFeedback
             )
-            try context.save()
+            try saveCritterEconomyChanges(context: context)
             return awarded
         } catch {
             context.rollback()
@@ -284,6 +287,14 @@ enum OasisCritterEconomyService {
                 OhanaLog.error("[OasisCritterEconomyService] special award failed: \(error.localizedDescription)", category: "Oasis")
             #endif
             return nil
+        }
+    }
+
+    private static func saveCritterEconomyChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw OasisRewardWriteError.persistenceFailed(saveResult.errorDescription ?? "Unknown save failure")
         }
     }
 

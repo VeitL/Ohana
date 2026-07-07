@@ -125,12 +125,16 @@ struct DocumentDetailSheet: View {
             Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
                 let command = DomainCommand.petDocumentDelete(petID: pet.id, documentID: doc.id)
                 commandQueue.enqueue(command) {
-                    PetDocumentCommandExecutor(context: modelContext, services: appServices).deleteDocument(
-                        doc,
-                        pet: pet,
-                        note: "petDocument.delete"
-                    )
-                    dismiss()
+                    do {
+                        try PetDocumentCommandExecutor(context: modelContext, services: appServices).deleteDocument(
+                            doc,
+                            pet: pet,
+                            note: "petDocument.delete"
+                        )
+                        dismiss()
+                    } catch {
+                        appServices.domainRevisions.publishFailure(command: command, error: error)
+                    }
                 }
             }
         } message: {

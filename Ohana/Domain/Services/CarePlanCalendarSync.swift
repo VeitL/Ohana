@@ -122,8 +122,9 @@ enum CarePlanCalendarSync {
             return
         }
         tombstoneAndDelete(ev, context: context)
-        UserDefaults.standard.removeObject(forKey: key)
-        context.safeSave()
+        if saveCalendarSyncChanges(context: context) {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
     }
 
     static func suppressDefaultPlan(kind: String, pet: Pet, context: ModelContext) {
@@ -318,7 +319,7 @@ enum CarePlanCalendarSync {
             }
         }
         if didDelete {
-            context.safeSave()
+            _ = saveCalendarSyncChanges(context: context)
         }
     }
 
@@ -395,7 +396,7 @@ enum CarePlanCalendarSync {
             ) else { return .none }
             DomainScheduleWriter.updateEvent(ev, intent: createIntent, mutation: mutation)
             if saveChanges {
-                _ = context.safeSaveResult(publishFailureEvent: true)
+                _ = saveCalendarSyncChanges(context: context)
             }
             return .none
         }
@@ -405,8 +406,7 @@ enum CarePlanCalendarSync {
         ) else { return .none }
         let ev = DomainScheduleWriter.createEvent(plan: plan, context: context).event
         if saveChanges {
-            let saveResult = context.safeSaveResult(publishFailureEvent: true)
-            if saveResult.didSave {
+            if saveCalendarSyncChanges(context: context) {
                 UserDefaults.standard.set(ev.id.uuidString, forKey: key)
             }
         } else {
@@ -475,8 +475,7 @@ enum CarePlanCalendarSync {
                     context: context
                 )
             }
-            context.safeSave()
-            return ev
+            return saveCalendarSyncChanges(context: context) ? ev : nil
         }
 
         guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(
@@ -484,9 +483,19 @@ enum CarePlanCalendarSync {
             context: context
         ) else { return nil }
         let ev = DomainScheduleWriter.createEvent(plan: plan, context: context).event
+        guard saveCalendarSyncChanges(context: context) else { return nil }
         UserDefaults.standard.set(ev.id.uuidString, forKey: key)
-        context.safeSave()
         return ev
+    }
+
+    @discardableResult
+    private static func saveCalendarSyncChanges(context: ModelContext) -> Bool {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
+        return true
     }
 
     private static func morningReminderDate(on date: Date) -> Date {

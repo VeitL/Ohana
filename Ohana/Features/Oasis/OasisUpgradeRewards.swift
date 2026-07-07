@@ -24,4 +24,35 @@ enum OasisUpgradeRewardService {
     static let oldAgeDeathDays = 210
     static let riskToCriticalHours = 72
     static let criticalToDeathHours = 72
+
+    static func saveRewardChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw OasisRewardPersistenceError.saveFailed(saveResult.errorDescription ?? "Unknown save failure")
+        }
+    }
+
+    static func saveRewardChangesIfNeeded(context: ModelContext) -> Bool {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
+        return true
+    }
+
+    enum OasisRewardPersistenceError: LocalizedError {
+        case saveFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case let .saveFailed(message):
+                String(
+                    localized: "oasis.reward.persistence.failed",
+                    defaultValue: "Unable to save Oasis reward changes: \(message)"
+                )
+            }
+        }
+    }
 }

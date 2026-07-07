@@ -39,7 +39,7 @@ extension OasisUpgradeRewardService {
 
         if inserted > 0 {
             do {
-                try context.save()
+                try saveRewardChanges(context: context)
             } catch {
                 insertedCoconuts.forEach { context.delete($0) } // derived-state: allow rollback of unsaved local upgrade coconuts before persistence
                 throw error
@@ -155,7 +155,7 @@ extension OasisUpgradeRewardService {
         }
 
         do {
-            try context.save()
+            try saveRewardChanges(context: context)
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: questManager)

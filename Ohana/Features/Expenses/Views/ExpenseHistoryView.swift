@@ -576,11 +576,15 @@ struct ExpenseHistoryContentView: View {
                     recordID: log.id
                 )
                 commandQueue.enqueue(command) {
-                    DashboardRecordCommandExecutor(context: modelContext, services: appServices).deletePetExpense(
-                        log,
-                        pet: pet,
-                        note: "dashboard.expense.delete.\(EntityKind.pet.rawValue)"
-                    )
+                    do {
+                        try DashboardRecordCommandExecutor(context: modelContext, services: appServices).deletePetExpense(
+                            log,
+                            pet: pet,
+                            note: "dashboard.expense.delete.\(EntityKind.pet.rawValue)"
+                        )
+                    } catch {
+                        appServices.domainRevisions.publishFailure(command: command, error: error)
+                    }
                 }
             } label: {
                 Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control

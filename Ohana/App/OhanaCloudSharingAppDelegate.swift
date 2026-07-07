@@ -80,7 +80,7 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
                         "Cloud sync staged \(summary.stagedRecordCount) local records after accepting household share",
                         category: "CloudSync"
                     )
-                    try context.save()
+                    try Self.saveCloudShareAcceptanceChanges(context: context)
 
                     cloudSync?.setEnabled(true)
                     cloudSync?.setDatabaseScope(
@@ -177,6 +177,29 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
             OhanaLog.warning(
                 "Cloud sync paused after iCloud account changed: \(reason).",
                 category: "CloudSync"
+            )
+        }
+    }
+
+    private static func saveCloudShareAcceptanceChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw OhanaCloudSharingPersistenceError.persistenceFailed(saveResult.errorDescription)
+        }
+    }
+}
+
+enum OhanaCloudSharingPersistenceError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(message):
+            message ?? String(
+                localized: "cloud.share.accept.persistence.failed",
+                defaultValue: "Unable to save the accepted shared household.",
+                comment: "Shown when accepting a shared CloudKit household cannot be saved."
             )
         }
     }

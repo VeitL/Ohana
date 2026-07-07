@@ -181,7 +181,11 @@ extension QuickFeedDetailContent {
         }
     }
 
-    func triggerToast(_ message: String, tint: Color) {
+    func triggerToast(
+        _ message: String,
+        tint: Color,
+        feedback: UINotificationFeedbackGenerator.FeedbackType = .success
+    ) {
         toastTask?.cancel()
         let route = QuickFeedOverlayRoute.toast(message: message, tint: tint)
         withAnimation(GoMotion.feedback) {
@@ -197,7 +201,21 @@ extension QuickFeedDetailContent {
                 toastTask = nil
             }
         }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        UINotificationFeedbackGenerator().notificationOccurred(feedback)
+    }
+
+    func handleFeedCommandFailure(_ error: Error, command: DomainCommand) {
+        appServices.domainRevisions.publishFailure(command: command, error: error)
+        draftStore.inputError = error.localizedDescription
+        triggerToast(
+            l.tr(
+                zh: "保存失败，请重试",
+                en: "Save failed. Please try again.",
+                de: "Speichern fehlgeschlagen. Bitte erneut versuchen."
+            ),
+            tint: Color.goRed,
+            feedback: .error
+        )
     }
 
     func showTreatSavedCelebration() {

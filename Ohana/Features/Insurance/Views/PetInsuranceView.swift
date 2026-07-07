@@ -238,11 +238,15 @@ struct PetInsuranceContentView: View {
         )
         OhanaFeedback.light()
         commandQueue.enqueue(command) {
-            InsuranceCommandExecutor(context: modelContext, services: appServices).deletePolicy(
-                insurance,
-                pet: pet,
-                note: "insurance.policy.delete"
-            )
+            do {
+                try InsuranceCommandExecutor(context: modelContext, services: appServices).deletePolicy(
+                    insurance,
+                    pet: pet,
+                    note: "insurance.policy.delete"
+                )
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 

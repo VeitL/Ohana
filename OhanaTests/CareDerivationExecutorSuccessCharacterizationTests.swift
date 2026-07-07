@@ -105,7 +105,7 @@ struct CareDerivationExecutorSuccessCharacterizationTests {
 
         let economyState = resetEconomyState(context: context, memberID: human.id, petIDs: [pet.id])
         defer { restoreEconomyState(economyState) }
-        let result = CalendarEventCommandService.toggleCompletion(
+        let result = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: occurrenceDate,
             pets: [pet],
@@ -188,7 +188,7 @@ struct CareDerivationExecutorSuccessCharacterizationTests {
             context: context,
             questManager: questManager
         ))
-        let weight = WeightCommandService.recordPetWeight(
+        let weight = try WeightCommandService.recordPetWeight(
             pet: pet,
             weight: 4.2,
             date: fixedDate(hour: 11),

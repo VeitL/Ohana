@@ -56,7 +56,10 @@ enum MediaAttachmentPresenceBackfillService {
         result.documentAttachmentChanges = backfillDocumentAttachmentPresence(context: context)
 
         if result.didChange {
-            context.safeSave()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            if !saveResult.didSave {
+                context.rollback()
+            }
         }
         return result
     }

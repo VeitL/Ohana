@@ -63,6 +63,28 @@ struct SharedCareLegacyNoteMaintenanceResult: Equatable {
     let cleanup: SharedCareLegacyNoteCleanupResult
 }
 
+enum SharedCareSessionMaintenanceError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(reason):
+            if let reason, !reason.isEmpty {
+                return L10n().tr(
+                    zh: "保存共同照护记录失败：\(reason)",
+                    en: "Failed to save shared care records: \(reason)",
+                    de: "Gemeinsame Pflegeeinträge konnten nicht gespeichert werden: \(reason)"
+                )
+            }
+            return L10n().tr(
+                zh: "保存共同照护记录失败，请重试。",
+                en: "Failed to save shared care records. Please try again.",
+                de: "Gemeinsame Pflegeeinträge konnten nicht gespeichert werden. Bitte erneut versuchen."
+            )
+        }
+    }
+}
+
 struct SharedCareLegacyOrphanNoteDiagnostic: Equatable {
     let sourceModelName: String
     let recordID: UUID
@@ -135,7 +157,7 @@ nonisolated enum SharedCareSessionMaintenance {
         context: ModelContext,
         deletedByHumanId: String? = nil,
         deletedAt: Date = Date()
-    ) -> SharedCareSessionDeleteResult {
+    ) throws -> SharedCareSessionDeleteResult {
         let sessionUUID = session.id
         let sessionID = session.id.uuidString
         let careLogs = fetchCareLogs(sessionID: sessionID, context: context)
@@ -179,9 +201,8 @@ nonisolated enum SharedCareSessionMaintenance {
             context.delete(log)
         }
         context.delete(session)
-        context.safeSave()
         markDeletedSharedSessionState(sessionID: sessionUUID, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        context.safeSave()
+        try saveSharedCareChanges(context: context)
         FeedingPlanWriter.rebuildFoodStockReminders(pets: stockReminderPets, context: context, now: deletedAt)
 
         return SharedCareSessionDeleteResult(
@@ -418,7 +439,7 @@ nonisolated enum SharedCareSessionMaintenance {
             !changedExpenseLogs.isEmpty ||
             !changedWalkLogs.isEmpty ||
             !changedLedgerEvents.isEmpty {
-            context.safeSave()
+            _ = saveSharedCareMaintenanceChanges(context: context)
         }
 
         return SharedCareLegacyNoteCleanupResult(
@@ -434,6 +455,26 @@ nonisolated enum SharedCareSessionMaintenance {
             skippedOrphanWalkLogIDs: scan.skippedOrphanWalkLogIDs,
             skippedOrphanLedgerEventIDs: scan.skippedOrphanLedgerEventIDs
         )
+    }
+
+    @discardableResult
+    private static func saveSharedCareChanges(context: ModelContext) throws -> ModelContextSaveResult {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw SharedCareSessionMaintenanceError.persistenceFailed(saveResult.errorDescription)
+        }
+        return saveResult
+    }
+
+    @discardableResult
+    private static func saveSharedCareMaintenanceChanges(context: ModelContext) -> Bool {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
+        return true
     }
 
     static func reconcile(_ session: SharedCareSession, context: ModelContext, reconciledAt: Date = Date()) {

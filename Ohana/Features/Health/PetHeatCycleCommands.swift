@@ -48,7 +48,11 @@ enum PetHeatCycleCommandService {
             expectedDeliveryDate: input.expectedDeliveryDate,
             context: context
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return nil
+        }
 
         return PetHeatCycleCommandResult(
             subjectID: pet.id,

@@ -385,11 +385,15 @@ struct HumanWeightHistoryView: View {
                     recordID: log.id
                 )
                 commandQueue.enqueue(command) {
-                    DashboardRecordCommandExecutor(context: modelContext, services: appServices).deleteHumanWeight(
-                        log,
-                        human: human,
-                        note: "dashboard.weight.delete.\(EntityKind.human.rawValue)"
-                    )
+                    do {
+                        try DashboardRecordCommandExecutor(context: modelContext, services: appServices).deleteHumanWeight(
+                            log,
+                            human: human,
+                            note: "dashboard.weight.delete.\(EntityKind.human.rawValue)"
+                        )
+                    } catch {
+                        appServices.domainRevisions.publishFailure(command: command, error: error)
+                    }
                 }
             } label: {
                 Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
@@ -406,22 +410,26 @@ struct HumanWeightHistoryView: View {
         let executorId = activeHumanIdStr.isEmpty ? nil : activeHumanIdStr
         let savedDate = inlineWeightRecordDate
         let command = DomainCommand.weightEntry(entityID: human.id, entityKind: EntityKind.human.rawValue)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        withAnimation(GoMotion.feedback) {
-            newWeightText = ""
-            newWeightDate = Date()
-            includesWeightTime = false
-            isInlineWeightComposerVisible = false
-        }
         commandQueue.enqueue(command) {
-            DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordHumanWeight(
-                human: human,
-                weight: value,
-                date: savedDate,
-                executorId: executorId,
-                command: command,
-                note: "dashboard.weight.entry"
-            )
+            do {
+                try DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordHumanWeight(
+                    human: human,
+                    weight: value,
+                    date: savedDate,
+                    executorId: executorId,
+                    command: command,
+                    note: "dashboard.weight.entry"
+                )
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                withAnimation(GoMotion.feedback) {
+                    newWeightText = ""
+                    newWeightDate = Date()
+                    includesWeightTime = false
+                    isInlineWeightComposerVisible = false
+                }
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 

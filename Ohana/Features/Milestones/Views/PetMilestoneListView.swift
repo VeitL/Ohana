@@ -80,11 +80,16 @@ struct PetMilestoneListContentView: View {
 
     // MARK: - 自动生成里程碑（生日、到家日、最重/最轻体重）
     private func seedSystemMilestones() {
-        commandQueue.enqueue(.petMilestoneSeed(petID: pet.id)) {
-            PetMilestoneCommandExecutor(context: modelContext, services: appServices).seedSystemMilestones(
-                for: pet,
-                note: "petMilestone.seed"
-            )
+        let command = DomainCommand.petMilestoneSeed(petID: pet.id)
+        commandQueue.enqueue(command) {
+            do {
+                try PetMilestoneCommandExecutor(context: modelContext, services: appServices).seedSystemMilestones(
+                    for: pet,
+                    note: "petMilestone.seed"
+                )
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 
@@ -413,20 +418,27 @@ struct PetMilestoneListContentView: View {
                     location: newLocation
                 )
                 commandQueue.enqueue(.petMilestoneRecord(petID: pet.id)) {
-                    PetMilestoneCommandExecutor(context: modelContext, services: appServices).createMilestone(
-                        input: input,
-                        pet: pet,
-                        note: "petMilestone.record"
-                    )
+                    do {
+                        try PetMilestoneCommandExecutor(context: modelContext, services: appServices).createMilestone(
+                            input: input,
+                            pet: pet,
+                            note: "petMilestone.record"
+                        )
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        newTitle = ""
+                        newEmoji = "🎉"
+                        newNotes = ""
+                        newLocation = ""
+                        newPhotoData = nil
+                        newPhotoItem = nil
+                        showAddSheet = false
+                    } catch {
+                        appServices.domainRevisions.publishFailure(
+                            command: .petMilestoneRecord(petID: pet.id),
+                            error: error
+                        )
+                    }
                 }
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                newTitle = ""
-                newEmoji = "🎉"
-                newNotes = ""
-                newLocation = ""
-                newPhotoData = nil
-                newPhotoItem = nil
-                showAddSheet = false
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark").font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -788,14 +800,19 @@ private struct MilestoneDetailSheet: View {
             .alert(l.tr(zh: "删除里程碑？", en: "Delete milestone?", de: "Meilenstein löschen?"), isPresented: $showingDeleteAlert) {
                 Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
                 Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
-                    commandQueue.enqueue(.petMilestoneDelete(petID: pet.id, milestoneID: milestone.id)) {
-                        PetMilestoneCommandExecutor(context: modelContext, services: appServices).deleteMilestone(
-                            milestone,
-                            pet: pet,
-                            note: "petMilestone.delete"
-                        )
+                    let command = DomainCommand.petMilestoneDelete(petID: pet.id, milestoneID: milestone.id)
+                    commandQueue.enqueue(command) {
+                        do {
+                            try PetMilestoneCommandExecutor(context: modelContext, services: appServices).deleteMilestone(
+                                milestone,
+                                pet: pet,
+                                note: "petMilestone.delete"
+                            )
+                            dismiss()
+                        } catch {
+                            appServices.domainRevisions.publishFailure(command: command, error: error)
+                        }
                     }
-                    dismiss()
                 }
             } message: {
                 Text(l.tr(zh: "「\(milestone.title)」将被永久删除。", en: "\"\(milestone.title)\" will be permanently deleted.", de: "\"\(milestone.title)\" wird dauerhaft gelöscht."))

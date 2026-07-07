@@ -61,7 +61,10 @@ enum MemberThemeColorMaintenanceService {
         }
 
         if didChange {
-            context.safeSave()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            if !saveResult.didSave {
+                context.rollback()
+            }
         }
     }
 }

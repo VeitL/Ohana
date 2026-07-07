@@ -137,7 +137,7 @@ extension QuestManager {
                 updatesProjection: true,
                 projectionManager: self
             )
-            try context.save()
+            try saveStreakRewardChanges(context: context)
             postEconomyFeedback(
                 result,
                 type: .general(humanReward: awarded, petReward: 0, emoji: "🔥", title: title),
@@ -153,6 +153,28 @@ extension QuestManager {
                 OhanaLog.error("[QuestManager] streak milestone save failed: \(error.localizedDescription)", category: "Economy")
             #endif
             return 0
+        }
+    }
+
+    private func saveStreakRewardChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            throw StreakRewardPersistenceError.persistenceFailed(saveResult.errorDescription)
+        }
+    }
+}
+
+enum StreakRewardPersistenceError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(message):
+            message ?? String(
+                localized: "streak.reward.persistence.failed",
+                defaultValue: "Unable to save the streak reward.",
+                comment: "Shown when a streak reward cannot be saved."
+            )
         }
     }
 }

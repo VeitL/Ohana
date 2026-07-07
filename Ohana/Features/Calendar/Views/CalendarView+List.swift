@@ -497,14 +497,22 @@ extension CalendarView {
 
     func toggleEventCompletion(_ event: Event, occurrenceDate: Date) {
         let executor = CalendarCommandExecutor(context: modelContext, services: appServices)
-        executor.toggleCompletion(
-            event: event,
-            occurrenceDate: occurrenceDate,
-            pets: pets,
-            executorId: appServices.activeHumanSelection.currentHumanId,
-            note: "calendar.event.completion.toggle"
+        let command = DomainCommand.calendarEventCompletion(
+            eventID: event.id,
+            isCompleted: !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         )
-        schedulePreparedCalendarSnapshotRebuild(force: true)
+        do {
+            try executor.toggleCompletion(
+                event: event,
+                occurrenceDate: occurrenceDate,
+                pets: pets,
+                executorId: appServices.activeHumanSelection.currentHumanId,
+                note: "calendar.event.completion.toggle"
+            )
+            schedulePreparedCalendarSnapshotRebuild(force: true)
+        } catch {
+            appServices.domainRevisions.publishFailure(command: command, error: error)
+        }
     }
 
     func openRelatedDestination(for event: Event) -> Bool {

@@ -80,7 +80,7 @@ enum ShopPurchaseRecordStore {
             CloudSyncMutationRecorder.markModified(record, context: context, modifiedAt: now)
             inserted += 1
         }
-        try context.save()
+        try saveRecordStoreChanges(context: context)
         defaults.set(true, forKey: legacyMigrationDefaultsKey)
         return inserted
     }
@@ -107,5 +107,28 @@ enum ShopPurchaseRecordStore {
 
     private nonisolated static func shouldPersistOwnership(for item: ShopItem) -> Bool {
         !item.isConsumable && item.id != AppIconCatalog.defaultItemId
+    }
+
+    private static func saveRecordStoreChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw ShopPurchaseRecordStoreError.persistenceFailed(saveResult.errorDescription)
+        }
+    }
+}
+
+enum ShopPurchaseRecordStoreError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(message):
+            message ?? String(
+                localized: "shop.purchase.record.persistence.failed",
+                defaultValue: "Unable to save shop purchase records.",
+                comment: "Shown when shop purchase ownership persistence fails."
+            )
+        }
     }
 }

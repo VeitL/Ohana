@@ -532,15 +532,21 @@ struct ProtectionDocumentContentPopup: View {
                 clearsAttachment: false,
                 attachments: attachments
             )
-            commandQueue.enqueue(.petDocumentUpdate(petID: pet.id, documentID: existing.id)) {
-                PetDocumentCommandExecutor(context: modelContext, services: appServices).updateDocument(
-                    existing,
-                    pet: pet,
-                    input: input,
-                    note: "petDocument.update"
-                )
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                close()
+            let command = DomainCommand.petDocumentUpdate(petID: pet.id, documentID: existing.id)
+            commandQueue.enqueue(command) {
+                do {
+                    try PetDocumentCommandExecutor(context: modelContext, services: appServices).updateDocument(
+                        existing,
+                        pet: pet,
+                        input: input,
+                        note: "petDocument.update"
+                    )
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    close()
+                } catch {
+                    isSaving = false
+                    appServices.domainRevisions.publishFailure(command: command, error: error)
+                }
             }
             return
         }
@@ -557,14 +563,20 @@ struct ProtectionDocumentContentPopup: View {
             documentNumber: "",
             attachments: attachments
         )
-        commandQueue.enqueue(.petDocumentCreate(petID: pet.id, category: category.rawValue)) {
-            PetDocumentCommandExecutor(context: modelContext, services: appServices).createDocument(
-                input: input,
-                pet: pet,
-                note: "petDocument.create"
-            )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            close()
+        let command = DomainCommand.petDocumentCreate(petID: pet.id, category: category.rawValue)
+        commandQueue.enqueue(command) {
+            do {
+                try PetDocumentCommandExecutor(context: modelContext, services: appServices).createDocument(
+                    input: input,
+                    pet: pet,
+                    note: "petDocument.create"
+                )
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                close()
+            } catch {
+                isSaving = false
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 

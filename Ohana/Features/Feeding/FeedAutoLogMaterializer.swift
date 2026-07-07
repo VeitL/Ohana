@@ -73,7 +73,9 @@ enum FeedAutoLogMaterializer {
         }
 
         if inserted > 0 {
-            context.safeSave()
+            guard FeedCommandPersistence.saveDerived(context: context) else {
+                return 0
+            }
         }
         return inserted
     }

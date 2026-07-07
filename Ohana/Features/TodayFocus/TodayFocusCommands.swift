@@ -38,7 +38,7 @@ enum TodayFocusCommandService {
         on date: Date,
         context: ModelContext,
         executorId: String? = nil
-    ) -> TodayFocusEventCompletionCommandResult {
+    ) throws -> TodayFocusEventCompletionCommandResult {
         let wasOccurrenceComplete = event.isOccurrenceMarkedComplete(on: date)
         let wasCompleted = event.isCompleted
         var completionResult: CalendarEventCompletionResult?
@@ -54,7 +54,7 @@ enum TodayFocusCommandService {
                     allowsDerivedEffects: false
                 )
             }
-            completionResult = CalendarEventCommandService.toggleCompletion(
+            completionResult = try CalendarEventCommandService.toggleCompletion(
                 event: event,
                 occurrenceDate: date,
                 pets: pet.map { [$0] } ?? [],

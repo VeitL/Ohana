@@ -144,11 +144,22 @@ struct HumanWeightDashboardContent: View {
                                         recordID: log.id
                                     )
                                 ) {
-                                    DashboardRecordCommandExecutor(context: modelContext, services: appServices).deleteHumanWeight(
-                                        log,
-                                        human: human,
-                                        note: "dashboard.weight.delete.\(EntityKind.human.rawValue)"
-                                    )
+                                    do {
+                                        try DashboardRecordCommandExecutor(context: modelContext, services: appServices).deleteHumanWeight(
+                                            log,
+                                            human: human,
+                                            note: "dashboard.weight.delete.\(EntityKind.human.rawValue)"
+                                        )
+                                    } catch {
+                                        appServices.domainRevisions.publishFailure(
+                                            command: .weightDelete(
+                                                entityID: human.id,
+                                                entityKind: EntityKind.human.rawValue,
+                                                recordID: log.id
+                                            ),
+                                            error: error
+                                        )
+                                    }
                                 }
                             } label: {
                                 Image(systemName: "trash").accessibilityHidden(true)

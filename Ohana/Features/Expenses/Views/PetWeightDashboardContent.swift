@@ -258,11 +258,22 @@ struct PetWeightDashboardContent: View {
                         .weightDelete(entityID: pet.id, entityKind: EntityKind.pet.rawValue, recordID: legacyLogId)
                     ) {
                         guard let log = legacyWeightDeleteLogs.first(where: { $0.id == legacyLogId }) else { return }
-                        DashboardRecordCommandExecutor(context: modelContext, services: appServices).deletePetWeight(
-                            log,
-                            pet: pet,
-                            note: "dashboard.weight.delete.\(EntityKind.pet.rawValue)"
-                        )
+                        do {
+                            try DashboardRecordCommandExecutor(context: modelContext, services: appServices).deletePetWeight(
+                                log,
+                                pet: pet,
+                                note: "dashboard.weight.delete.\(EntityKind.pet.rawValue)"
+                            )
+                        } catch {
+                            appServices.domainRevisions.publishFailure(
+                                command: .weightDelete(
+                                    entityID: pet.id,
+                                    entityKind: EntityKind.pet.rawValue,
+                                    recordID: legacyLogId
+                                ),
+                                error: error
+                            )
+                        }
                     }
                 } label: {
                     Image(systemName: "trash").accessibilityHidden(true)

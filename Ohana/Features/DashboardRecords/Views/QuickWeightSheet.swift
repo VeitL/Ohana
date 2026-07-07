@@ -161,18 +161,22 @@ struct QuickWeightSheet: View {
         guard let v = parsedWeight, v > 0 else { return }
         let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
         let command = DomainCommand.quickWeight(petID: pet.id)
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        didSave = true
         commandQueue.enqueue(command) {
-            DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordPetWeight(
-                pet: pet,
-                weight: v,
-                date: recordDate,
-                executorId: executorId,
-                command: command,
-                note: "quick.weight"
-            )
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
+            do {
+                try DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordPetWeight(
+                    pet: pet,
+                    weight: v,
+                    date: recordDate,
+                    executorId: executorId,
+                    command: command,
+                    note: "quick.weight"
+                )
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                didSave = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 }

@@ -259,13 +259,14 @@ extension QuestManager {
                 context: context
             )
         }
-        do {
-            try context.save()
-        } catch {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
             OhanaLog.warning(
-                "[QuestManager] failed to save reward auto-completed reminders: \(error.localizedDescription)",
+                "[QuestManager] failed to save reward auto-completed reminders: \(saveResult.errorDescription ?? "Unknown save failure")",
                 category: "Economy"
             )
+            return
         }
     }
 

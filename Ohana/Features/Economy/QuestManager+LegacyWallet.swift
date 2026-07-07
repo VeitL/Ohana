@@ -377,13 +377,31 @@ extension QuestManager {
                     projectionManager: self
                 )
             }
-            try context.save()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            guard saveResult.didSave else {
+                context.rollback()
+                throw QuestLegacyWalletPersistenceError.saveFailed(saveResult.errorDescription ?? "Unknown save failure")
+            }
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: self)
             #if DEBUG
                 OhanaLog.error("[QuestManager] legacy award wallet write failed: \(error.localizedDescription)", category: "Economy")
             #endif
+        }
+    }
+
+    private enum QuestLegacyWalletPersistenceError: LocalizedError {
+        case saveFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case let .saveFailed(message):
+                String(
+                    localized: "quest.legacy.wallet.persistence.failed",
+                    defaultValue: "Unable to save legacy wallet reward changes: \(message)"
+                )
+            }
         }
     }
 

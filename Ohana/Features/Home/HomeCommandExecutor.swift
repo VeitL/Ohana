@@ -479,16 +479,23 @@ struct HomeCommandExecutor {
 
     @discardableResult
     func completeTodayFocusEvent(_ event: Event, on date: Date = Date(), executorId: String? = nil) -> Bool {
-        let result = todayFocus.completeEvent(event, on: date, context: modelContext, executorId: resolvedExecutorId(executorId))
+        let command = DomainCommand.todayFocus(entityID: event.id, action: "eventComplete")
+        let result: TodayFocusEventCompletionCommandResult
+        do {
+            result = try todayFocus.completeEvent(event, on: date, context: modelContext, executorId: resolvedExecutorId(executorId))
+        } catch {
+            revisions.publishFailure(command: command, error: error)
+            return false
+        }
         guard result.didChange, result.allowsDerivedEffects else {
             publishNoop(
-                .todayFocus(entityID: result.eventID, action: "eventComplete"),
+                command,
                 note: "home.todayFocusEvent.noop"
             )
             return false
         }
         publishMutation(
-            .todayFocus(entityID: result.eventID, action: "eventComplete"),
+            command,
             event: event,
             note: "home.todayFocusEvent"
         )

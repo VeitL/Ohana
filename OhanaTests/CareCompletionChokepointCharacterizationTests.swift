@@ -433,7 +433,7 @@ struct CareCompletionChokepointCharacterizationTests {
         context.insert(pet)
         try context.save()
 
-        let document = PetDocumentCommandService.createDocument(
+        let document = try PetDocumentCommandService.createDocument(
             input: PetDocumentCreateCommandInput(
                 title: "Passport",
                 category: .passport,
@@ -449,7 +449,7 @@ struct CareCompletionChokepointCharacterizationTests {
             pet: pet,
             context: context
         )
-        let insurance = InsurancePolicyCommandService.savePolicy(
+        let insurance = try InsurancePolicyCommandService.savePolicy(
             existing: nil,
             pet: pet,
             input: InsurancePolicySaveCommandInput(
@@ -508,7 +508,7 @@ struct CareCompletionChokepointCharacterizationTests {
         context.insert(human)
         try context.save()
 
-        let weight = WeightCommandService.recordHumanWeight(
+        let weight = try WeightCommandService.recordHumanWeight(
             human: human,
             weight: 62,
             date: Date(timeIntervalSince1970: 2000),
@@ -764,7 +764,7 @@ struct CareCompletionChokepointCharacterizationTests {
         resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman], pets: [pet])
         let missingExecutorID = UUID().uuidString
 
-        let result = CalendarEventCommandService.toggleCompletion(
+        let result = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: occurrenceDate,
             pets: [pet],
@@ -900,7 +900,7 @@ struct CareCompletionChokepointCharacterizationTests {
         defer { state.restore() }
         resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman, executor], pets: [pet])
 
-        _ = WeightCommandService.recordPetWeight(
+        _ = try WeightCommandService.recordPetWeight(
             pet: pet,
             weight: 4.2,
             date: Date(timeIntervalSince1970: 2000),
@@ -962,7 +962,7 @@ struct CareCompletionChokepointCharacterizationTests {
         defer { state.restore() }
         resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [deceasedPet])
 
-        let result = CalendarEventCommandService.toggleCompletion(
+        let result = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: occurrenceDate,
             pets: [deceasedPet],
@@ -1003,7 +1003,7 @@ struct CareCompletionChokepointCharacterizationTests {
         defer { state.restore() }
         resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [deceasedPet])
 
-        let first = CalendarEventCommandService.toggleCompletion(
+        let first = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: occurrenceDate,
             pets: [deceasedPet],
@@ -1011,7 +1011,7 @@ struct CareCompletionChokepointCharacterizationTests {
             executorId: human.id.uuidString,
             now: operationDate
         )
-        let second = CalendarEventCommandService.toggleCompletion(
+        let second = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: occurrenceDate,
             pets: [deceasedPet],
@@ -1062,7 +1062,7 @@ struct CareCompletionChokepointCharacterizationTests {
         context.insert(legacyFactOnlyLog)
         try context.save()
 
-        let result = CalendarEventCommandService.toggleCompletion(
+        let result = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: occurrenceDate,
             pets: [deceasedPet],

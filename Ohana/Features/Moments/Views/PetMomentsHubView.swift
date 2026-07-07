@@ -483,17 +483,28 @@ struct PetMomentsHubView: View {
             return
         }
 
-        let result = SharedCareSessionMaintenance.deleteCascade(
-            session,
-            context: modelContext,
-            deletedByHumanId: activeHumanId.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-        )
-        appServices.domainRevisions.publishSharedCareSessionDelete(
-            result,
-            sourcePetID: pet.id,
-            note: "petMoments.sharedSession.delete"
-        )
-        pendingSharedSessionDelete = nil
+        do {
+            let result = try SharedCareSessionMaintenance.deleteCascade(
+                session,
+                context: modelContext,
+                deletedByHumanId: activeHumanId.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            )
+            appServices.domainRevisions.publishSharedCareSessionDelete(
+                result,
+                sourcePetID: pet.id,
+                note: "petMoments.sharedSession.delete"
+            )
+            pendingSharedSessionDelete = nil
+        } catch {
+            appServices.domainRevisions.publishFailure(
+                command: .command(
+                    "sharedCare",
+                    "deleteSession",
+                    ["sessionID": pending.id.uuidString]
+                ),
+                error: error
+            )
+        }
     }
 
     @ViewBuilder

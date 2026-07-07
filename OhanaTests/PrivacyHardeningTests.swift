@@ -67,7 +67,7 @@ struct PrivacyHardeningTests {
         context.insert(pet)
         try context.save()
 
-        PetDocumentCommandService.createDocument(
+        try PetDocumentCommandService.createDocument(
             input: PetDocumentCreateCommandInput(
                 title: "Vaccine proof",
                 category: .vaccine,
@@ -106,7 +106,7 @@ struct PrivacyHardeningTests {
         context.insert(pet)
         try context.save()
 
-        PetPhotoAlbumCommandService.createPhotos(
+        try PetPhotoAlbumCommandService.createPhotos(
             data: [jpegWithGPS],
             pet: pet,
             context: context,

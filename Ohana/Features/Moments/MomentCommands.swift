@@ -123,7 +123,7 @@ enum MomentCommandService {
                         save: false
                     )
                 }
-                try context.save()
+                try saveMomentChanges(context: context)
             } catch {
                 context.rollback()
                 questManager.wallet.refreshQuestProjection(context: context, manager: questManager)
@@ -133,10 +133,37 @@ enum MomentCommandService {
                 return MomentCommandResult(savedLogIDs: [], coconutDelta: 0)
             }
         } else {
-            context.safeSave()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            guard saveResult.didSave else {
+                context.rollback()
+                return MomentCommandResult(savedLogIDs: [], coconutDelta: 0)
+            }
         }
 
         return MomentCommandResult(savedLogIDs: savedLogs.map(\.id), coconutDelta: coconutDelta)
+    }
+
+    @MainActor
+    private static func saveMomentChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            throw MomentCommandPersistenceError.persistenceFailed(saveResult.errorDescription)
+        }
+    }
+}
+
+enum MomentCommandPersistenceError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(message):
+            message ?? String(
+                localized: "moment.command.persistence.failed",
+                defaultValue: "Unable to save the moment.",
+                comment: "Shown when a pet moment cannot be saved."
+            )
+        }
     }
 }
 

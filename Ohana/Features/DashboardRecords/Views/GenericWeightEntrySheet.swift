@@ -610,7 +610,6 @@ struct GenericWeightEntrySheet: View {
     private func save() {
         guard !isSaving, let weight = parsedWeight, weight > 0 else { return }
         isSaving = true
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
         let savedDate = recordDate
         let savedUnit = weightUnit
@@ -620,35 +619,47 @@ struct GenericWeightEntrySheet: View {
         case let .pet(pet):
             let command = DomainCommand.weightEntry(entityID: pet.id, entityKind: "pet")
             commandQueue.enqueue(command) {
-                let result = DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordPetWeight(
-                    pet: pet,
-                    weight: weight,
-                    date: savedDate,
-                    executorId: executorId,
-                    weightUnit: savedUnit,
-                    bcsScore: savedBcs,
-                    awardsReward: true,
-                    command: command,
-                    note: "weight.entry"
-                )
-                onRewarded?(result.coconutDelta)
-                onSaved?()
-                closeSheet()
+                do {
+                    let result = try DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordPetWeight(
+                        pet: pet,
+                        weight: weight,
+                        date: savedDate,
+                        executorId: executorId,
+                        weightUnit: savedUnit,
+                        bcsScore: savedBcs,
+                        awardsReward: true,
+                        command: command,
+                        note: "weight.entry"
+                    )
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onRewarded?(result.coconutDelta)
+                    onSaved?()
+                    closeSheet()
+                } catch {
+                    isSaving = false
+                    appServices.domainRevisions.publishFailure(command: command, error: error)
+                }
             }
         case let .human(human):
             let command = DomainCommand.weightEntry(entityID: human.id, entityKind: "human")
             commandQueue.enqueue(command) {
-                let result = DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordHumanWeight(
-                    human: human,
-                    weight: weight,
-                    date: savedDate,
-                    executorId: executorId,
-                    command: command,
-                    note: "weight.entry"
-                )
-                onRewarded?(result.coconutDelta)
-                onSaved?()
-                closeSheet()
+                do {
+                    let result = try DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordHumanWeight(
+                        human: human,
+                        weight: weight,
+                        date: savedDate,
+                        executorId: executorId,
+                        command: command,
+                        note: "weight.entry"
+                    )
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onRewarded?(result.coconutDelta)
+                    onSaved?()
+                    closeSheet()
+                } catch {
+                    isSaving = false
+                    appServices.domainRevisions.publishFailure(command: command, error: error)
+                }
             }
         }
     }

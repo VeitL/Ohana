@@ -222,7 +222,7 @@ struct EconomyBackdateSettlementTests {
             actionKey: "feed"
         ).count
 
-        let completed = CalendarEventCommandService.toggleCompletion(
+        let completed = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: historicalDate,
             pets: [pet],

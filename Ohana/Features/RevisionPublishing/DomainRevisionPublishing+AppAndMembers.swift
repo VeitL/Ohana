@@ -137,7 +137,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .petCardAppearance(petID: result.petID, action: result.action),
                 affectedEntityIDs: [result.petID],
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didApply,
                 note: note
             )
         )

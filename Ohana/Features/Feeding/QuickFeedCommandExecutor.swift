@@ -289,8 +289,8 @@ struct QuickFeedCommandExecutor {
         kind: FeedRuleKind,
         draft: FeedPlanDraft,
         allEvents: [Event]
-    ) -> SaveFeedPlanCommandResult {
-        let result = SaveFeedPlanCommand.run(
+    ) throws -> SaveFeedPlanCommandResult {
+        let result = try SaveFeedPlanCommand.run(
             pet: pet,
             targets: targets,
             kind: kind,
@@ -307,8 +307,8 @@ struct QuickFeedCommandExecutor {
         return result
     }
 
-    func switchToManual(pet: Pet, allEvents: [Event]) {
-        let didChange = SwitchFeedModeCommand.switchToManual(
+    func switchToManual(pet: Pet, allEvents: [Event]) throws {
+        let didChange = try SwitchFeedModeCommand.switchToManual(
             pet: pet,
             allEvents: allEvents,
             context: context
@@ -324,8 +324,8 @@ struct QuickFeedCommandExecutor {
         pet: Pet,
         kind: FeedRuleKind,
         allEvents: [Event]
-    ) -> SwitchFeedModeCommandResult {
-        let result = SwitchFeedModeCommand.activateExistingRule(
+    ) throws -> SwitchFeedModeCommandResult {
+        let result = try SwitchFeedModeCommand.activateExistingRule(
             pet: pet,
             kind: kind,
             allEvents: allEvents,
@@ -357,8 +357,8 @@ struct QuickFeedCommandExecutor {
         kind: FeedRuleKind,
         activeMode: FeedOperatingMode,
         allEvents: [Event]
-    ) -> DeleteFeedPlanCommandResult {
-        let result = DeleteFeedPlanCommand.run(
+    ) throws -> DeleteFeedPlanCommandResult {
+        let result = try DeleteFeedPlanCommand.run(
             pet: pet,
             kind: kind,
             activeMode: activeMode,
@@ -392,8 +392,8 @@ struct QuickFeedCommandExecutor {
         expensePayerId: String?,
         expenseDate: Date,
         expenseNote: String
-    ) -> SaveFoodStockCommandResult {
-        let result = SaveFoodStockCommand.run(
+    ) throws -> SaveFoodStockCommandResult {
+        let result = try SaveFoodStockCommand.run(
             pet: pet,
             brand: brand,
             totalGrams: totalGrams,
@@ -428,8 +428,8 @@ struct QuickFeedCommandExecutor {
         enabled: Bool,
         advanceDays: Int,
         allEvents: [Event]
-    ) -> FeedStockCommandResult {
-        let result = StockReminderSettingsCommand.run(
+    ) throws -> FeedStockCommandResult {
+        let result = try StockReminderSettingsCommand.run(
             pet: pet,
             enabled: enabled,
             advanceDays: advanceDays,
@@ -450,8 +450,8 @@ struct QuickFeedCommandExecutor {
         record: PetFoodRecord,
         remainingGrams: Double,
         allEvents: [Event]
-    ) -> FeedStockCommandResult {
-        let result = CorrectStockCommand.run(
+    ) throws -> FeedStockCommandResult {
+        let result = try CorrectStockCommand.run(
             pet: pet,
             record: record,
             remainingGrams: remainingGrams,
@@ -473,8 +473,8 @@ struct QuickFeedCommandExecutor {
         date: Date,
         pet: Pet,
         allEvents: [Event]
-    ) -> FeedStockCommandResult {
-        let result = FeedRecordCommand.updateLog(
+    ) throws -> FeedStockCommandResult {
+        let result = try FeedRecordCommand.updateLog(
             log,
             grams: grams,
             date: date,
@@ -490,8 +490,8 @@ struct QuickFeedCommandExecutor {
         return result
     }
 
-    func deleteLog(_ log: PetCareLog, pet: Pet, allEvents: [Event]) -> FeedStockCommandResult {
-        let result = FeedRecordCommand.deleteLog(
+    func deleteLog(_ log: PetCareLog, pet: Pet, allEvents: [Event]) throws -> FeedStockCommandResult {
+        let result = try FeedRecordCommand.deleteLog(
             log,
             pet: pet,
             allEvents: allEvents,
@@ -505,8 +505,8 @@ struct QuickFeedCommandExecutor {
         return result
     }
 
-    func deleteFoodRecord(_ record: PetFoodRecord, pet: Pet, allEvents: [Event]) -> FeedStockCommandResult {
-        let result = FeedRecordCommand.deleteFoodRecord(
+    func deleteFoodRecord(_ record: PetFoodRecord, pet: Pet, allEvents: [Event]) throws -> FeedStockCommandResult {
+        let result = try FeedRecordCommand.deleteFoodRecord(
             record,
             pet: pet,
             allEvents: allEvents,
@@ -537,13 +537,24 @@ struct QuickFeedCommandExecutor {
     }
 
     func ensureUpcomingPlanReminders(pet: Pet, allEvents: [Event], now: Date = Date(), calendar: Calendar = .current) -> [Reminder] {
-        FeedMaintenanceCommand.ensureUpcomingPlanReminders(
-            pet: pet,
-            allEvents: allEvents,
-            context: context,
-            now: now,
-            calendar: calendar
-        )
+        do {
+            return try FeedMaintenanceCommand.ensureUpcomingPlanReminders(
+                pet: pet,
+                allEvents: allEvents,
+                context: context,
+                now: now,
+                calendar: calendar
+            )
+        } catch {
+            derivations.derive(
+                .noOp(
+                    command: .feedMaintenance(petID: pet.id, action: "ensure_plan_reminders"),
+                    affectedEntityIDs: [pet.id],
+                    note: error.localizedDescription
+                )
+            )
+            return []
+        }
     }
 
     func reminder(for event: Event, scheduledAt: Date, existing: Reminder?) -> Reminder {
@@ -567,9 +578,9 @@ struct QuickFeedCommandExecutor {
         return reminder
     }
 
-    func setMainFoodKind(pet: Pet, foodKind: FeedFoodKind) {
+    func setMainFoodKind(pet: Pet, foodKind: FeedFoodKind) throws {
         let previousKind = pet.mainFoodKind
-        let didChange = SetMainFoodKindCommand.run(pet: pet, foodKind: foodKind, context: context)
+        let didChange = try SetMainFoodKindCommand.run(pet: pet, foodKind: foodKind, context: context)
         deriveFeedMutation(
             .feedSettings(petID: pet.id),
             pets: [pet],

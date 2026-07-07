@@ -60,7 +60,7 @@ enum AppResetService {
     ) throws {
         let preservedDefaults = preservedDefaultValues(in: defaults, options: options)
         try deleteAllPersistentModels(in: context)
-        try context.save()
+        try saveResetChanges(context: context)
 
         resetLocalDefaults(defaults, preservedValues: preservedDefaults)
         if options.cleanUpAutomaticBackups {
@@ -190,6 +190,14 @@ enum AppResetService {
             || resetDefaultPrefixes.contains { key.hasPrefix($0) }
     }
 
+    private static func saveResetChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw AppResetPersistenceError.persistenceFailed(saveResult.errorDescription)
+        }
+    }
+
     private static let exactResetDefaultKeys: Set<String> = [
         "bountyTasks",
         "celebratedMilestoneDays",
@@ -258,4 +266,19 @@ enum AppResetService {
         "waterReminder_",
         "water_operating_mode_"
     ]
+}
+
+enum AppResetPersistenceError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(message):
+            message ?? String(
+                localized: "app.reset.persistence.failed",
+                defaultValue: "Unable to reset local data.",
+                comment: "Shown when app reset cannot save the delete-all operation."
+            )
+        }
+    }
 }

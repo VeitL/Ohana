@@ -27,7 +27,7 @@ struct RecurringFindingsRepairTests {
             petID: pet.id
         )
 
-        _ = WeightCommandService.recordPetWeight(
+        _ = try WeightCommandService.recordPetWeight(
             pet: pet,
             weight: 4.2,
             date: Date(timeIntervalSince1970: 1_800_000_001),
@@ -129,7 +129,7 @@ struct RecurringFindingsRepairTests {
             petID: pet.id
         )
 
-        let result = PetMilestoneCommandService.createMilestone(
+        let result = try PetMilestoneCommandService.createMilestone(
             input: PetMilestoneCommandInput(
                 date: Date(timeIntervalSince1970: 1_800_000_004),
                 title: "First beach day",
@@ -164,7 +164,7 @@ struct RecurringFindingsRepairTests {
         context.insert(reminder)
         try context.save()
 
-        _ = CalendarEventCommandService.delete(
+        _ = try CalendarEventCommandService.delete(
             event: event,
             occurrenceDate: event.startDate,
             scope: CalendarEventDeletionScope.wholeEvent,
@@ -207,8 +207,8 @@ struct RecurringFindingsRepairTests {
         _ = PetCareTrackingCommandService.deleteCareLog(careLog, pet: pet, context: context)
         _ = PetPottyCommandService.deletePottyLog(pottyLog, pet: pet, context: context)
         _ = PetHygieneCommandService.delete(hygieneLog, pet: pet, context: context)
-        _ = DashboardRecordCommandService.deletePetExpense(expenseLog, pet: pet, context: context)
-        _ = DashboardRecordCommandService.deletePetWeight(weightLog, pet: pet, context: context)
+        _ = try DashboardRecordCommandService.deletePetExpense(expenseLog, pet: pet, context: context)
+        _ = try DashboardRecordCommandService.deletePetWeight(weightLog, pet: pet, context: context)
 
         for ledger in [careLedger, pottyLedger, hygieneLedger, expenseLedger, weightLedger] {
             #expect(try cloudSyncState(entityName: String(describing: CareLedgerEvent.self), id: ledger.id, context: context)?.isDeletionTombstone == true)
@@ -280,7 +280,7 @@ struct RecurringFindingsRepairTests {
             petID: pet.id
         )
 
-        let completed = CalendarEventCommandService.toggleCompletion(
+        let completed = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: now,
             pets: [pet],
@@ -302,7 +302,7 @@ struct RecurringFindingsRepairTests {
         #expect(positiveEntries.contains { $0.ownerId == human.id.uuidString })
         #expect(budgetEvents.isEmpty == false)
 
-        let reopened = CalendarEventCommandService.toggleCompletion(
+        let reopened = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: now,
             pets: [pet],

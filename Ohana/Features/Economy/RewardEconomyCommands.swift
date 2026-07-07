@@ -8,6 +8,37 @@
 import Foundation
 import SwiftData
 
+private enum RewardEconomyPersistenceError: LocalizedError {
+    case saveFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .saveFailed(message):
+            String(
+                localized: "reward.economy.persistence.failed",
+                defaultValue: "Unable to save reward economy changes: \(message)"
+            )
+        }
+    }
+}
+
+private func saveRewardEconomyChanges(context: ModelContext) throws {
+    let saveResult = context.safeSaveResult(publishFailureEvent: true)
+    guard saveResult.didSave else {
+        context.rollback()
+        throw RewardEconomyPersistenceError.saveFailed(saveResult.errorDescription ?? "Unknown save failure")
+    }
+}
+
+private func saveRewardEconomyChangesIfNeeded(context: ModelContext) -> Bool {
+    let saveResult = context.safeSaveResult(publishFailureEvent: true)
+    guard saveResult.didSave else {
+        context.rollback()
+        return false
+    }
+    return true
+}
+
 enum PetBondVaultUnlockFailure: Equatable {
     case alreadyUnlocked
     case insufficientBalance
@@ -27,12 +58,20 @@ struct PetBondVaultUnlockCommandResult: Equatable {
 struct PetCardAppearanceCommandResult: Equatable {
     let petID: UUID
     let action: String
+    let didApply: Bool
+
+    init(petID: UUID, action: String, didApply: Bool = true) {
+        self.petID = petID
+        self.action = action
+        self.didApply = didApply
+    }
 }
 
 enum Avatar2DUpgradeFailure: Equatable {
     case missingProfile
     case noPass
     case memberInactive
+    case persistenceFailed
 }
 
 struct Avatar2DUpgradeCommandResult: Equatable {
@@ -155,7 +194,7 @@ enum AchievementRewardCommandService {
                 updatesProjection: true,
                 projectionManager: questManager
             )
-            try context.save()
+            try saveRewardEconomyChanges(context: context)
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: questManager)
@@ -442,7 +481,7 @@ enum ShopPurchaseCommandService {
                 transactionKey: transactionKey,
                 context: context
             )
-            try context.save()
+            try saveRewardEconomyChanges(context: context)
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: providedQuestManager)
@@ -581,7 +620,7 @@ enum PetBondVaultUnlockCommandService {
                 updatesProjection: true,
                 projectionManager: providedQuestManager ?? QuestManager()
             )
-            try context.save()
+            try saveRewardEconomyChanges(context: context)
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: providedQuestManager)
@@ -630,12 +669,14 @@ enum PetCardAppearanceCommandService {
         context: ModelContext
     ) -> PetCardAppearanceCommandResult {
         guard MemberLifecycleGate.disposition(pet: pet, writeKind: .presentationPreference).writesContent else {
-            return PetCardAppearanceCommandResult(petID: pet.id, action: "enablePopout")
+            return PetCardAppearanceCommandResult(petID: pet.id, action: "enablePopout", didApply: false)
         }
         pet.updateCardPopoutImageData(imageData)
         pet.cardPopoutSourceRaw = sourceRaw
         pet.cardStyleRaw = "popout"
-        context.safeSave()
+        guard saveRewardEconomyChangesIfNeeded(context: context) else {
+            return PetCardAppearanceCommandResult(petID: pet.id, action: "enablePopout", didApply: false)
+        }
         return PetCardAppearanceCommandResult(petID: pet.id, action: "enablePopout")
     }
 
@@ -646,10 +687,12 @@ enum PetCardAppearanceCommandService {
         context: ModelContext
     ) -> PetCardAppearanceCommandResult {
         guard MemberLifecycleGate.disposition(pet: pet, writeKind: .presentationPreference).writesContent else {
-            return PetCardAppearanceCommandResult(petID: pet.id, action: "restoreClassic")
+            return PetCardAppearanceCommandResult(petID: pet.id, action: "restoreClassic", didApply: false)
         }
         pet.cardStyleRaw = "classic"
-        context.safeSave()
+        guard saveRewardEconomyChangesIfNeeded(context: context) else {
+            return PetCardAppearanceCommandResult(petID: pet.id, action: "restoreClassic", didApply: false)
+        }
         return PetCardAppearanceCommandResult(petID: pet.id, action: "restoreClassic")
     }
 }
@@ -685,7 +728,7 @@ enum Avatar2DUpgradeCommandService {
                 failure: .missingProfile
             )
         }
-        guard Avatar2DAccess.consumeExtraPass() else {
+        guard Avatar2DAccess.extraPassCount > 0 else {
             return Avatar2DUpgradeCommandResult(
                 entityID: human.id,
                 kind: EntityKind.human.rawValue,
@@ -696,7 +739,15 @@ enum Avatar2DUpgradeCommandService {
 
         human.updateAvatarImageData(data)
         human.avatarEmoji = HumanGenderIdentity.fallbackAvatarEmoji(for: avatarGender)
-        context.safeSave()
+        guard saveRewardEconomyChangesIfNeeded(context: context) else {
+            return Avatar2DUpgradeCommandResult(
+                entityID: human.id,
+                kind: EntityKind.human.rawValue,
+                didUpgrade: false,
+                failure: .persistenceFailed
+            )
+        }
+        Avatar2DAccess.consumeExtraPass()
         return Avatar2DUpgradeCommandResult(
             entityID: human.id,
             kind: EntityKind.human.rawValue,
@@ -733,7 +784,7 @@ enum Avatar2DUpgradeCommandService {
                 failure: .missingProfile
             )
         }
-        guard Avatar2DAccess.consumeExtraPass() else {
+        guard Avatar2DAccess.extraPassCount > 0 else {
             return Avatar2DUpgradeCommandResult(
                 entityID: pet.id,
                 kind: EntityKind.pet.rawValue,
@@ -743,7 +794,15 @@ enum Avatar2DUpgradeCommandService {
         }
 
         pet.updateAvatarImageData(data)
-        context.safeSave()
+        guard saveRewardEconomyChangesIfNeeded(context: context) else {
+            return Avatar2DUpgradeCommandResult(
+                entityID: pet.id,
+                kind: EntityKind.pet.rawValue,
+                didUpgrade: false,
+                failure: .persistenceFailed
+            )
+        }
+        Avatar2DAccess.consumeExtraPass()
         return Avatar2DUpgradeCommandResult(
             entityID: pet.id,
             kind: EntityKind.pet.rawValue,

@@ -838,7 +838,7 @@ enum GachaDrawService {
                 updatesProjection: true,
                 projectionManager: projectionManager
             )
-            try context.save()
+            try saveDrawChanges(context: context)
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: projectionManager)
@@ -851,6 +851,28 @@ enum GachaDrawService {
             ownedItem: owned,
             log: log
         )
+    }
+
+    private static func saveDrawChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw GachaDrawPersistenceError.saveFailed(saveResult.errorDescription ?? "Unknown save failure")
+        }
+    }
+
+    private enum GachaDrawPersistenceError: LocalizedError {
+        case saveFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case let .saveFailed(message):
+                String(
+                    localized: "gacha.draw.persistence.failed",
+                    defaultValue: "Unable to save gacha draw changes: \(message)"
+                )
+            }
+        }
     }
 
     static func roll(

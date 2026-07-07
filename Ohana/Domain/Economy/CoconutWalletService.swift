@@ -25,6 +25,37 @@ enum CoconutWalletError: LocalizedError {
     }
 }
 
+private enum CoconutWalletPersistenceError: LocalizedError {
+    case saveFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .saveFailed(message):
+            String(
+                localized: "coconut.wallet.persistence.failed",
+                defaultValue: "Unable to save coconut wallet changes: \(message)"
+            )
+        }
+    }
+}
+
+nonisolated private func saveWalletChanges(context: ModelContext) throws {
+    let saveResult = context.safeSaveResult(publishFailureEvent: true)
+    guard saveResult.didSave else {
+        context.rollback()
+        throw CoconutWalletPersistenceError.saveFailed(saveResult.errorDescription ?? "Unknown save failure")
+    }
+}
+
+nonisolated private func saveWalletChangesIfNeeded(context: ModelContext) -> Bool {
+    let saveResult = context.safeSaveResult(publishFailureEvent: true)
+    guard saveResult.didSave else {
+        context.rollback()
+        return false
+    }
+    return true
+}
+
 struct CoconutWalletReconciliationSummary: Equatable {
     let correctedAccountCount: Int
     let createdAccountCount: Int
@@ -392,7 +423,7 @@ enum CoconutWalletService {
         CloudSyncMutationRecorder.markModified(createdEntries, context: context)
 
         if save {
-            try context.save()
+            try saveWalletChanges(context: context)
         }
         if updatesProjection {
             projectionManager?.recordWalletProjection(
@@ -582,7 +613,9 @@ enum CoconutWalletService {
             createdAccountCount: createdCount
         )
         if saveChanges && summary.didChange {
-            context.safeSave()
+            guard saveWalletChangesIfNeeded(context: context) else {
+                return .init(correctedAccountCount: 0, createdAccountCount: 0)
+            }
         }
         return summary
     }
@@ -1018,9 +1051,9 @@ enum CoconutEconomyBootstrapService {
             updatesProjection: false
         )
 
-        try context.save()
+        try saveWalletChanges(context: context)
         try importLegacyHistory(legacyLogs, humans: humans, pets: pets, context: context)
-        try context.save()
+        try saveWalletChanges(context: context)
         CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
     }
 

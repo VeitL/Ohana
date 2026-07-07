@@ -207,7 +207,11 @@ final class PetWalkingManager {
     func discardRecoveryCheckpoint(_ checkpoint: PetWalkLog, modelContext: ModelContext) {
         guard WalkRecoveryCheckpoint.isCheckpoint(checkpoint) else { return }
         modelContext.delete(checkpoint) // derived-state: allow recovery checkpoint cleanup; checkpoint is not a care fact and has no reward/reminder cascade
-        modelContext.safeSave()
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            modelContext.rollback()
+            return
+        }
         if activeRecoveryCheckpointID == checkpoint.id {
             activeRecoveryCheckpointID = nil
             activeWalkModelContext = nil
@@ -690,7 +694,10 @@ final class PetWalkingManager {
         for checkpoint in stale {
             modelContext.delete(checkpoint) // derived-state: allow stale recovery checkpoint replacement before a new walk starts
         }
-        modelContext.safeSave()
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+        if !saveResult.didSave {
+            modelContext.rollback()
+        }
     }
 
     private func routeData(from locations: [CLLocation]) -> Data? {
@@ -796,7 +803,10 @@ final class PetWalkingManager {
             // F2: SwiftData 模型必须在 MainActor 上写入
             DispatchQueue.main.async {
                 walkLog.mapSnapshotData = jpegData
-                modelContext.safeSave()
+                let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+                if !saveResult.didSave {
+                    modelContext.rollback()
+                }
             }
         }
     }

@@ -73,6 +73,9 @@ actor SwiftDataMediaBlobLoader {
 
     private func persistRepairIfNeeded(_ didRepair: Bool) {
         guard didRepair else { return }
-        modelContext.safeSave()
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+        if !saveResult.didSave {
+            modelContext.rollback()
+        }
     }
 }

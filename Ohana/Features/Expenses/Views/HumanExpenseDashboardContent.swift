@@ -172,11 +172,22 @@ struct HumanExpenseDashboardContent: View {
                                         recordID: log.id
                                     )
                                 ) {
-                                    DashboardRecordCommandExecutor(context: modelContext, services: appServices).deleteHumanExpense(
-                                        log,
-                                        human: human,
-                                        note: "dashboard.expense.delete.\(EntityKind.human.rawValue)"
-                                    )
+                                    do {
+                                        try DashboardRecordCommandExecutor(context: modelContext, services: appServices).deleteHumanExpense(
+                                            log,
+                                            human: human,
+                                            note: "dashboard.expense.delete.\(EntityKind.human.rawValue)"
+                                        )
+                                    } catch {
+                                        appServices.domainRevisions.publishFailure(
+                                            command: .expenseDelete(
+                                                entityID: human.id,
+                                                entityKind: EntityKind.human.rawValue,
+                                                recordID: log.id
+                                            ),
+                                            error: error
+                                        )
+                                    }
                                 }
                             } label: {
                                 Image(systemName: "trash").accessibilityHidden(true)

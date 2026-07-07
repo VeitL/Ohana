@@ -24,6 +24,20 @@ struct PetPhotoAlbumDeleteResult: Equatable {
     let photoID: UUID
 }
 
+enum PetPhotoAlbumCommandError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(reason):
+            if let reason, !reason.isEmpty {
+                return "照片保存失败：\(reason)"
+            }
+            return "照片保存失败，请稍后重试。"
+        }
+    }
+}
+
 enum PetPhotoAlbumCommandService {
     @discardableResult
     @MainActor
@@ -32,7 +46,7 @@ enum PetPhotoAlbumCommandService {
         pet: Pet,
         context: ModelContext,
         date: Date = Date()
-    ) -> PetPhotoAlbumCreateResult {
+    ) throws -> PetPhotoAlbumCreateResult {
         guard !payloads.isEmpty else {
             return PetPhotoAlbumCreateResult(petID: pet.id, photoIDs: [])
         }
@@ -63,7 +77,7 @@ enum PetPhotoAlbumCommandService {
         guard !logs.isEmpty else {
             return PetPhotoAlbumCreateResult(petID: pet.id, photoIDs: [])
         }
-        context.safeSave()
+        try savePhotoAlbumChanges(context: context)
         return PetPhotoAlbumCreateResult(petID: pet.id, photoIDs: logs.map(\.id))
     }
 
@@ -74,7 +88,7 @@ enum PetPhotoAlbumCommandService {
         photo: PetPhotoLog,
         pet: Pet,
         context: ModelContext
-    ) -> PetPhotoAlbumUpdateResult {
+    ) throws -> PetPhotoAlbumUpdateResult {
         guard MemberLifecycleGate.disposition(pet: pet, writeKind: .memorial).writesContent else {
             return PetPhotoAlbumUpdateResult(petID: pet.id, photoID: photo.id, didChange: false)
         }
@@ -82,7 +96,7 @@ enum PetPhotoAlbumCommandService {
         let didChange = photo.note != cleanNote
         photo.note = cleanNote
         if didChange {
-            context.safeSave()
+            try savePhotoAlbumChanges(context: context)
         }
         return PetPhotoAlbumUpdateResult(petID: pet.id, photoID: photo.id, didChange: didChange)
     }
@@ -93,14 +107,23 @@ enum PetPhotoAlbumCommandService {
         _ photo: PetPhotoLog,
         pet: Pet,
         context: ModelContext
-    ) -> PetPhotoAlbumDeleteResult {
+    ) throws -> PetPhotoAlbumDeleteResult {
         guard MemberLifecycleGate.disposition(pet: pet, writeKind: .memorial).writesContent else {
             return PetPhotoAlbumDeleteResult(petID: pet.id, photoID: photo.id)
         }
         let photoID = photo.id
         PhysicalDeletionService.deletePetScopedRecord(photo, pet: pet, context: context)
-        context.safeSave()
+        try savePhotoAlbumChanges(context: context)
         return PetPhotoAlbumDeleteResult(petID: pet.id, photoID: photoID)
+    }
+
+    @MainActor
+    private static func savePhotoAlbumChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw PetPhotoAlbumCommandError.persistenceFailed(saveResult.errorDescription)
+        }
     }
 }
 
@@ -132,8 +155,8 @@ struct PetPhotoAlbumCommandExecutor {
         pet: Pet,
         date: Date = Date(),
         note: String
-    ) -> PetPhotoAlbumCreateResult {
-        let result = PetPhotoAlbumCommandService.createPhotos(
+    ) throws -> PetPhotoAlbumCreateResult {
+        let result = try PetPhotoAlbumCommandService.createPhotos(
             data: payloads,
             pet: pet,
             context: context,
@@ -149,8 +172,8 @@ struct PetPhotoAlbumCommandExecutor {
         photo: PetPhotoLog,
         pet: Pet,
         note: String
-    ) -> PetPhotoAlbumUpdateResult {
-        let result = PetPhotoAlbumCommandService.updateNote(
+    ) throws -> PetPhotoAlbumUpdateResult {
+        let result = try PetPhotoAlbumCommandService.updateNote(
             noteText,
             photo: photo,
             pet: pet,
@@ -165,8 +188,8 @@ struct PetPhotoAlbumCommandExecutor {
         _ photo: PetPhotoLog,
         pet: Pet,
         note: String
-    ) -> PetPhotoAlbumDeleteResult {
-        let result = PetPhotoAlbumCommandService.deletePhoto(photo, pet: pet, context: context)
+    ) throws -> PetPhotoAlbumDeleteResult {
+        let result = try PetPhotoAlbumCommandService.deletePhoto(photo, pet: pet, context: context)
         revisions.publishPetPhotoDelete(result, note: note)
         return result
     }

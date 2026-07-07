@@ -105,7 +105,7 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
             humans: humans
         )
         guard !contributions.isEmpty else {
-            try context.save()
+            try saveFulfillmentChanges(context: context)
             return true
         }
 
@@ -134,7 +134,7 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
             )
         }
         guard !refundDeltas.isEmpty else {
-            try context.save()
+            try saveFulfillmentChanges(context: context)
             return true
         }
         try services.coconutWallet.apply(
@@ -145,7 +145,7 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
             updatesProjection: true,
             projectionManager: services.questManager
         )
-        try context.save()
+        try saveFulfillmentChanges(context: context)
         return true
     }
 
@@ -165,5 +165,28 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
             return []
         }
         return [ShopPurchaseFundingContribution(humanID: humanID, amount: item.cost)]
+    }
+
+    private func saveFulfillmentChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw ShopPurchaseFulfillmentError.persistenceFailed(saveResult.errorDescription)
+        }
+    }
+}
+
+enum ShopPurchaseFulfillmentError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(message):
+            message ?? String(
+                localized: "shop.purchase.fulfillment.persistence.failed",
+                defaultValue: "Unable to save the shop purchase update.",
+                comment: "Shown when a shop purchase fulfillment or refund fails to save."
+            )
+        }
     }
 }

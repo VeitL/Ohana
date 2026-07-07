@@ -321,14 +321,18 @@ struct InsurancePolicyDetailSheet: View {
         )
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(command) {
-            InsuranceCommandExecutor(context: modelContext, services: appServices).updateClaimStatus(
-                claim,
-                to: status,
-                insurance: insurance,
-                pet: pet,
-                executorId: activeExecutorID(),
-                note: "insurance.claim.status"
-            )
+            do {
+                try InsuranceCommandExecutor(context: modelContext, services: appServices).updateClaimStatus(
+                    claim,
+                    to: status,
+                    insurance: insurance,
+                    pet: pet,
+                    executorId: activeExecutorID(),
+                    note: "insurance.claim.status"
+                )
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
             pendingClaimIDs.remove(claim.id)
         }
     }
@@ -345,12 +349,16 @@ struct InsurancePolicyDetailSheet: View {
 
         OhanaFeedback.light()
         commandQueue.enqueue(command) {
-            InsuranceCommandExecutor(context: modelContext, services: appServices).deleteClaim(
-                claim,
-                insurance: insurance,
-                pet: pet,
-                note: "insurance.claim.delete"
-            )
+            do {
+                try InsuranceCommandExecutor(context: modelContext, services: appServices).deleteClaim(
+                    claim,
+                    insurance: insurance,
+                    pet: pet,
+                    note: "insurance.claim.delete"
+                )
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
             pendingClaimIDs.remove(claim.id)
         }
     }
@@ -366,12 +374,16 @@ struct InsurancePolicyDetailSheet: View {
 
         OhanaFeedback.light()
         commandQueue.enqueue(command) {
-            InsuranceCommandExecutor(context: modelContext, services: appServices).setPolicyActive(
-                insurance,
-                isActive: isActive,
-                pet: pet,
-                note: "insurance.policy.active"
-            )
+            do {
+                try InsuranceCommandExecutor(context: modelContext, services: appServices).setPolicyActive(
+                    insurance,
+                    isActive: isActive,
+                    pet: pet,
+                    note: "insurance.policy.active"
+                )
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
             pendingPolicyCommand = false
         }
     }
@@ -387,13 +399,17 @@ struct InsurancePolicyDetailSheet: View {
 
         OhanaFeedback.light()
         commandQueue.enqueue(command) {
-            InsuranceCommandExecutor(context: modelContext, services: appServices).deletePolicy(
-                insurance,
-                pet: pet,
-                note: "insurance.policy.delete"
-            )
+            do {
+                try InsuranceCommandExecutor(context: modelContext, services: appServices).deletePolicy(
+                    insurance,
+                    pet: pet,
+                    note: "insurance.policy.delete"
+                )
+                dismiss()
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
             pendingPolicyCommand = false
-            dismiss()
         }
     }
 
@@ -641,15 +657,19 @@ private struct InsuranceClaimPopup: View {
             action: "create"
         )
 
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(command) {
-            InsuranceCommandExecutor(context: modelContext, services: appServices).createClaim(
-                insurance: insurance,
-                pet: pet,
-                input: input,
-                note: "insurance.claim.create"
-            )
-            close()
+            do {
+                try InsuranceCommandExecutor(context: modelContext, services: appServices).createClaim(
+                    insurance: insurance,
+                    pet: pet,
+                    input: input,
+                    note: "insurance.claim.create"
+                )
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                close()
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 }

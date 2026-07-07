@@ -61,7 +61,7 @@ extension OasisUpgradeRewardService {
                 fragmentDelta: -cost.fragments,
                 xpDelta: 0
             ))
-            try context.save()
+            try saveRewardChanges(context: context)
             wallet.refreshQuestProjection(context: context, manager: questManager)
         } catch {
             context.rollback()
@@ -143,7 +143,7 @@ extension OasisUpgradeRewardService {
                 noteEn: "Awakened a companion with fragments.",
                 noteDe: "Begleiter mit Fragmenten geweckt."
             ))
-            try context.save()
+            try saveRewardChanges(context: context)
             wallet.refreshQuestProjection(context: context, manager: questManager)
             return critter
         } catch {
@@ -166,7 +166,7 @@ extension OasisUpgradeRewardService {
             }
         }
         context.insert(actionLog(for: critter, action: .feature))
-        try context.save()
+        try saveRewardChanges(context: context)
     }
 
     static func clearFeatured(_ critter: OasisElectronicPet, context: ModelContext) throws {
@@ -174,7 +174,7 @@ extension OasisUpgradeRewardService {
         guard critter.lifeState != .dead else { return }
         critter.isFeaturedOnOasis = false
         context.insert(actionLog(for: critter, action: .feature))
-        try context.save()
+        try saveRewardChanges(context: context)
     }
 
     static func rewardFeaturedCritterFromCare(type: QuestManager.OhanaActionType, context: ModelContext) {
@@ -209,7 +209,7 @@ extension OasisUpgradeRewardService {
             action: .careEcho,
             xpDelta: xpDelta
         ))
-        context.safeSave()
+        _ = saveRewardChangesIfNeeded(context: context)
     }
 
     static func careEchoGain(for type: QuestManager.OhanaActionType) -> (xp: Int, bond: Int, mood: Int, health: Int) {

@@ -105,13 +105,18 @@ struct PetPhotoAlbumView: View {
                     payloads.append(data)
                 }
             }
-            let result = PetPhotoAlbumCommandExecutor(context: modelContext, services: services).createPhotos(
-                data: payloads,
-                pet: pet,
-                note: "petPhoto.create"
-            )
-            if !result.photoIDs.isEmpty {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            let command = DomainCommand.petPhotoCreate(petID: pet.id)
+            do {
+                let result = try PetPhotoAlbumCommandExecutor(context: modelContext, services: services).createPhotos(
+                    data: payloads,
+                    pet: pet,
+                    note: "petPhoto.create"
+                )
+                if !result.photoIDs.isEmpty {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+            } catch {
+                services.domainRevisions.publishFailure(command: command, error: error)
             }
         }
     }
@@ -218,11 +223,15 @@ struct PetPhotoAlbumView: View {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(command) {
             guard let photoLog = photoLog(for: photo) else { return }
-            PetPhotoAlbumCommandExecutor(context: modelContext, services: appServices).deletePhoto(
-                photoLog,
-                pet: pet,
-                note: "petPhoto.delete"
-            )
+            do {
+                try PetPhotoAlbumCommandExecutor(context: modelContext, services: appServices).deletePhoto(
+                    photoLog,
+                    pet: pet,
+                    note: "petPhoto.delete"
+                )
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 
@@ -416,12 +425,16 @@ private struct PhotoDetailSheet: View {
         displayedNote = cleanNote
         commandQueue.enqueue(command) {
             guard let photoLog else { return }
-            PetPhotoAlbumCommandExecutor(context: modelContext, services: appServices).updateNote(
-                cleanNote,
-                photo: photoLog,
-                pet: pet,
-                note: "petPhoto.updateNote"
-            )
+            do {
+                try PetPhotoAlbumCommandExecutor(context: modelContext, services: appServices).updateNote(
+                    cleanNote,
+                    photo: photoLog,
+                    pet: pet,
+                    note: "petPhoto.updateNote"
+                )
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 

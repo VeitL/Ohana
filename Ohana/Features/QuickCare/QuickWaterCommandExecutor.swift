@@ -36,6 +36,20 @@ enum QuickWaterDeletedLogKind {
     case other
 }
 
+enum QuickWaterCommandError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(reason):
+            if let reason, !reason.isEmpty {
+                return "饮水记录保存失败：\(reason)"
+            }
+            return "饮水记录保存失败，请稍后重试。"
+        }
+    }
+}
+
 @MainActor
 private func fetchQuickWaterModelsOrLog<T: PersistentModel>(
     _ descriptor: FetchDescriptor<T>,
@@ -230,14 +244,14 @@ struct QuickWaterCommandExecutor {
         times: [Date],
         count: Int,
         allEvents: [Event]
-    ) -> QuickWaterPlanSaveResult {
+    ) throws -> QuickWaterPlanSaveResult {
         let normalized = WaterPlanWriter.normalizedTimes(times, count: count)
         var latestEvents = allEvents
         var reminders: [Reminder] = []
         var writableTargets: [Pet] = []
         for target in targets {
             let targetIsWritable = canWriteActiveWaterData(for: target)
-            let created = WaterPlanWriter.replacePlan(
+            let created = try WaterPlanWriter.replacePlan(
                 pet: target,
                 times: normalized,
                 allEvents: latestEvents,
@@ -247,10 +261,10 @@ struct QuickWaterCommandExecutor {
             let replacedEventIds = Set(WaterPlanWriter.planEvents(pet: target, allEvents: latestEvents).map(\.id))
             latestEvents = latestEvents
                 .filter { !replacedEventIds.contains($0.id) } + created.compactMap(\.event)
-            if targetIsWritable {
-                WaterOperatingMode.set(target.id, mode: .reminder)
-                writableTargets.append(target)
-            }
+            if targetIsWritable { writableTargets.append(target) }
+        }
+        for target in writableTargets {
+            WaterOperatingMode.set(target.id, mode: .reminder)
         }
         deriveWaterMutation(
             .waterPlan(petID: pet.id, action: "save_drink"),
@@ -286,25 +300,25 @@ struct QuickWaterCommandExecutor {
         )
     }
 
-    func deactivateWaterPlanReminders(pet: Pet, allEvents: [Event]) {
-        WaterPlanWriter.deactivateReminderOperations(
+    func deactivateWaterPlanReminders(pet: Pet, allEvents: [Event]) throws {
+        try WaterPlanWriter.deactivateReminderOperations(
             pet: pet,
             allEvents: allEvents,
             context: context
         )
     }
 
-    func deleteWaterPlan(pet: Pet, allEvents: [Event]) {
-        WaterPlanWriter.deletePlan(pet: pet, allEvents: allEvents, context: context)
+    func deleteWaterPlan(pet: Pet, allEvents: [Event]) throws {
+        try WaterPlanWriter.deletePlan(pet: pet, allEvents: allEvents, context: context)
         deriveWaterMutation(.waterPlan(petID: pet.id, action: "delete_drink"), pets: [pet])
     }
 
-    func ensureUpcomingWaterPlanReminders(pet: Pet, allEvents: [Event]) -> [Reminder] {
+    func ensureUpcomingWaterPlanReminders(pet: Pet, allEvents: [Event]) throws -> [Reminder] {
         guard WaterRuleState(pet: pet, allEvents: allEvents).operatingMode == .reminder else {
-            deactivateWaterPlanReminders(pet: pet, allEvents: allEvents)
+            try deactivateWaterPlanReminders(pet: pet, allEvents: allEvents)
             return []
         }
-        return WaterPlanWriter.ensureUpcomingReminders(pet: pet, allEvents: allEvents, context: context)
+        return try WaterPlanWriter.ensureUpcomingReminders(pet: pet, allEvents: allEvents, context: context)
     }
 
     func scheduleReminders(_ reminders: [Reminder], requestPermission: Bool) async {
@@ -566,7 +580,7 @@ struct QuickWaterCommandExecutor {
         return QuickWaterCareResult(didRecord: true, allowsDerivedEffects: true, reminders: reminders)
     }
 
-    func deleteLog(_ log: PetCareLog) -> QuickWaterDeletedLogKind {
+    func deleteLog(_ log: PetCareLog) throws -> QuickWaterDeletedLogKind {
         let kind: QuickWaterDeletedLogKind = if log.type == CareType.waterChange.rawValue {
             .waterChange
         } else if log.type == CareType.filterClean.rawValue {
@@ -577,7 +591,7 @@ struct QuickWaterCommandExecutor {
         let pet = log.pet
         CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context)
         context.delete(log)
-        context.safeSave()
+        try saveQuickWaterChanges()
         if let pet {
             deriveWaterMutation(.waterLog(petID: pet.id, source: "delete"), pets: [pet], note: "\(kind)")
         }
@@ -651,6 +665,14 @@ struct QuickWaterCommandExecutor {
                 note: note
             )
         )
+    }
+
+    private func saveQuickWaterChanges() throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw QuickWaterCommandError.persistenceFailed(saveResult.errorDescription)
+        }
     }
 
     private func canWriteActiveWaterData(for pet: Pet) -> Bool {

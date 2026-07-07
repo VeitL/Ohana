@@ -1407,7 +1407,7 @@ struct HomeCommandExecutorTests {
 
         let executor = PetCareCommandExecutor(context: context, revisionCenter: revisionCenter)
         let beforeRevision = revisionCenter.homeRevision.value
-        let result = executor.deletePottyLog(log, pet: first, note: "test.pet.potty.delete.unclaimed")
+        let result = try executor.deletePottyLog(log, pet: first, note: "test.pet.potty.delete.unclaimed")
 
         #expect(result.didDelete)
         #expect(result.didPersist)
@@ -1452,7 +1452,7 @@ struct HomeCommandExecutorTests {
         #expect(mutation.note == "test.pet.care.record")
 
         let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
-        let deletedCare = executor.deleteCareLog(
+        let deletedCare = try executor.deleteCareLog(
             careLog,
             pet: pet,
             note: "test.pet.care.delete"
@@ -1476,7 +1476,7 @@ struct HomeCommandExecutorTests {
         CareLedgerService.recordPetPotty(log: potty, pet: pet, source: .service, context: context)
         try context.save()
 
-        let deletedPotty = executor.deletePottyLog(
+        let deletedPotty = try executor.deletePottyLog(
             potty,
             pet: pet,
             note: "test.pet.potty.delete"
@@ -1515,7 +1515,7 @@ struct HomeCommandExecutorTests {
         let beforeDeleteRevision = revisionCenter.homeRevision.value
         let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
 
-        let delete = executor.deleteCareLog(careLog, pet: other, note: "test.pet.care.delete.wrongPet")
+        let delete = try executor.deleteCareLog(careLog, pet: other, note: "test.pet.care.delete.wrongPet")
 
         #expect(delete.didDelete == false)
         #expect(delete.didPersist)
@@ -1537,7 +1537,7 @@ struct HomeCommandExecutorTests {
         try context.save()
         let beforePottyDeleteRevision = revisionCenter.homeRevision.value
 
-        let pottyDelete = executor.deletePottyLog(
+        let pottyDelete = try executor.deletePottyLog(
             pottyLog,
             pet: other,
             note: "test.pet.potty.delete.wrongPet"
@@ -1696,7 +1696,7 @@ struct HomeCommandExecutorTests {
         let claimDate = makeDate(year: 2026, month: 6, day: 8)
         let incidentDate = makeDate(year: 2026, month: 6, day: 7)
         let relatedExpenseLogId = UUID().uuidString
-        let result = InsurancePolicyCommandService.createClaim(
+        let result = try InsurancePolicyCommandService.createClaim(
             insurance: insurance,
             pet: pet,
             input: InsuranceClaimCommandInput(
@@ -1764,7 +1764,7 @@ struct HomeCommandExecutorTests {
         try context.save()
 
         let approvedAt = makeDate(year: 2026, month: 6, day: 9)
-        let first = InsurancePolicyCommandService.updateClaimStatus(
+        let first = try InsurancePolicyCommandService.updateClaimStatus(
             claim,
             to: .approved,
             insurance: insurance,
@@ -1773,7 +1773,7 @@ struct HomeCommandExecutorTests {
             approvedAt: approvedAt,
             executorId: executorHuman.id.uuidString
         )
-        let second = InsurancePolicyCommandService.updateClaimStatus(
+        let second = try InsurancePolicyCommandService.updateClaimStatus(
             claim,
             to: .approved,
             insurance: insurance,
@@ -1815,19 +1815,19 @@ struct HomeCommandExecutorTests {
         let policyID = insurance.id
         let claimID = claim.id
         let petID = pet.id
-        let inactive = InsurancePolicyCommandService.setPolicyActive(
+        let inactive = try InsurancePolicyCommandService.setPolicyActive(
             insurance,
             isActive: false,
             pet: pet,
             context: context
         )
-        let deletedClaim = InsurancePolicyCommandService.deleteClaim(
+        let deletedClaim = try InsurancePolicyCommandService.deleteClaim(
             claim,
             insurance: insurance,
             pet: pet,
             context: context
         )
-        let deletedPolicy = InsurancePolicyCommandService.deletePolicy(
+        let deletedPolicy = try InsurancePolicyCommandService.deletePolicy(
             insurance,
             pet: pet,
             context: context
@@ -1856,7 +1856,7 @@ struct HomeCommandExecutorTests {
         context.insert(pet)
         try context.save()
 
-        let result = InsurancePolicyCommandService.savePolicy(
+        let result = try InsurancePolicyCommandService.savePolicy(
             existing: nil,
             pet: pet,
             input: InsurancePolicySaveCommandInput(
@@ -1913,7 +1913,7 @@ struct HomeCommandExecutorTests {
         context.insert(insurance)
         try context.save()
 
-        let result = InsurancePolicyCommandService.savePolicy(
+        let result = try InsurancePolicyCommandService.savePolicy(
             existing: insurance,
             pet: pet,
             input: InsurancePolicySaveCommandInput(
@@ -2092,7 +2092,7 @@ struct HomeCommandExecutorTests {
         #expect(recordMutation.affectedEntityIDs == [pet.id, recorded.result.logID])
         #expect(recordMutation.note == "test.hygiene.record")
 
-        let deleted = executor.delete(recorded.log, pet: pet, note: "test.hygiene.delete")
+        let deleted = try executor.delete(recorded.log, pet: pet, note: "test.hygiene.delete")
         let deleteMutation = try #require(revisionCenter.lastMutation)
         #expect(deleted.logID == recorded.result.logID)
         #expect(deleteMutation.command == .petHygieneDelete(petID: pet.id, recordID: recorded.result.logID))
@@ -2427,7 +2427,7 @@ struct HomeCommandExecutorTests {
         context.insert(event)
         try context.save()
 
-        let result = TodayFocusCommandService.completeEvent(event, on: occurrence, context: context)
+        let result = try TodayFocusCommandService.completeEvent(event, on: occurrence, context: context)
 
         #expect(result.eventID == event.id)
         #expect(result.isCompleted == true)
@@ -2446,7 +2446,7 @@ struct HomeCommandExecutorTests {
         context.insert(event)
         try context.save()
 
-        let result = TodayFocusCommandService.completeEvent(event, on: start, context: context)
+        let result = try TodayFocusCommandService.completeEvent(event, on: start, context: context)
 
         #expect(result.eventID == event.id)
         #expect(result.isCompleted == true)
@@ -4684,7 +4684,7 @@ struct HomeCommandExecutorTests {
         context.insert(pet)
         try context.save()
 
-        let createResult = PetPhotoAlbumCommandService.createPhotos(
+        let createResult = try PetPhotoAlbumCommandService.createPhotos(
             data: [Data([1, 2, 3]), Data([4, 5, 6])],
             pet: pet,
             context: context,
@@ -4699,7 +4699,7 @@ struct HomeCommandExecutorTests {
         #expect(logs.allSatisfy { $0.pet?.id == pet.id })
 
         let photo = try #require(logs.first)
-        let updateResult = PetPhotoAlbumCommandService.updateNote(
+        let updateResult = try PetPhotoAlbumCommandService.updateNote(
             "  beach day  ",
             photo: photo,
             pet: pet,
@@ -4710,7 +4710,7 @@ struct HomeCommandExecutorTests {
         #expect(updateResult.didChange == true)
         #expect(photo.note == "beach day")
 
-        let deleteResult = PetPhotoAlbumCommandService.deletePhoto(photo, pet: pet, context: context)
+        let deleteResult = try PetPhotoAlbumCommandService.deletePhoto(photo, pet: pet, context: context)
 
         logs = try context.fetch(FetchDescriptor<PetPhotoLog>())
         #expect(deleteResult.petID == pet.id)
@@ -4731,7 +4731,7 @@ struct HomeCommandExecutorTests {
 
         let executor = PetPhotoAlbumCommandExecutor(context: context, revisionCenter: revisionCenter)
         let beforeRevision = revisionCenter.homeRevision.value
-        let created = executor.createPhotos(
+        let created = try executor.createPhotos(
             data: [Data([1, 2, 3])],
             pet: pet,
             date: makeDate(year: 2026, month: 6, day: 8, hour: 8, minute: 0),
@@ -4744,14 +4744,14 @@ struct HomeCommandExecutorTests {
         #expect(createMutation.affectedEntityIDs == [pet.id, photo.id])
         #expect(createMutation.note == "test.photo.create")
 
-        let updated = executor.updateNote("  beach day  ", photo: photo, pet: pet, note: "test.photo.update")
+        let updated = try executor.updateNote("  beach day  ", photo: photo, pet: pet, note: "test.photo.update")
         let updateMutation = try #require(revisionCenter.lastMutation)
         #expect(updated.didChange == true)
         #expect(photo.note == "beach day")
         #expect(updateMutation.command == .petPhotoUpdate(petID: pet.id, photoID: photo.id))
         #expect(updateMutation.note == "test.photo.update")
 
-        let deleted = executor.deletePhoto(photo, pet: pet, note: "test.photo.delete")
+        let deleted = try executor.deletePhoto(photo, pet: pet, note: "test.photo.delete")
         let deleteMutation = try #require(revisionCenter.lastMutation)
         #expect(deleted.photoID == photo.id)
         let photos = try context.fetch(FetchDescriptor<PetPhotoLog>())
@@ -4772,7 +4772,7 @@ struct HomeCommandExecutorTests {
         try context.save()
 
         let date = Date(timeIntervalSince1970: 1_800_000_000)
-        let result = WeightCommandService.recordPetWeight(
+        let result = try WeightCommandService.recordPetWeight(
             pet: pet,
             weight: 8.4,
             date: date,
@@ -4800,7 +4800,7 @@ struct HomeCommandExecutorTests {
         try context.save()
 
         let date = Date(timeIntervalSince1970: 1_800_000_000)
-        let result = WeightCommandService.recordPetWeight(
+        let result = try WeightCommandService.recordPetWeight(
             pet: pet,
             weight: 8.4,
             date: date,
@@ -4856,7 +4856,7 @@ struct HomeCommandExecutorTests {
         EconomyDailyBudgetStore.resetAll()
         let questManager = QuestManager()
         let date = Date(timeIntervalSince1970: 1_800_000_000)
-        let result = WeightCommandService.recordHumanWeight(
+        let result = try WeightCommandService.recordHumanWeight(
             human: human,
             weight: 62.5,
             date: date,
@@ -5630,7 +5630,7 @@ struct HomeCommandExecutorTests {
         #expect(mutation.note == "test.human.note")
 
         let rawNote = try #require(human.notes.components(separatedBy: "\n\n").last)
-        let deletedNote = executor.deleteNote(human: human, rawString: rawNote)
+        let deletedNote = try executor.deleteNote(human: human, rawString: rawNote)
         mutation = try #require(revisionCenter.lastMutation)
         #expect(deletedNote.didDelete == true)
         #expect(deletedNote.didPersist)
@@ -5713,7 +5713,7 @@ struct HomeCommandExecutorTests {
         ))
         #expect(mutation.note == "human.medication.dose.ledger")
 
-        let deleted = executor.deleteMedicationPlan(
+        let deleted = try executor.deleteMedicationPlan(
             human: human,
             medication: medication,
             scheduleReminders: false,
@@ -5796,7 +5796,7 @@ struct HomeCommandExecutorTests {
             status: .taken,
             now: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0)
         )
-        let deletion = executor.deleteMedicationPlan(
+        let deletion = try executor.deleteMedicationPlan(
             human: human,
             medication: medication,
             scheduleReminders: false,
@@ -6032,7 +6032,7 @@ struct HomeCommandExecutorTests {
         #expect(activationMutation.affectedEntityIDs.contains(removedEventID))
         #expect(activationMutation.note == "test.pet.medication.activation")
 
-        let deleted = executor.deletePlan(
+        let deleted = try executor.deletePlan(
             pet: pet,
             medication: medication,
             userDefaults: defaults,
@@ -6593,7 +6593,7 @@ struct HomeCommandExecutorTests {
         ))
         #expect(mutation.note == "test.report.update")
 
-        let deleteResult = executor.deleteReport(report, human: human, note: "test.report.delete")
+        let deleteResult = try executor.deleteReport(report, human: human, note: "test.report.delete")
         mutation = try #require(revisionCenter.lastMutation)
         reports = try context.fetch(FetchDescriptor<HumanHealthReport>())
         #expect(deleteResult.reportID == createResult.reportID)
@@ -6919,7 +6919,7 @@ struct HomeCommandExecutorTests {
             assigneeId: executorHuman.id.uuidString
         )
 
-        let result = try #require(CalendarEventPlanCommandService.createEvent(
+        let result = try #require(try CalendarEventPlanCommandService.createEvent(
             input: input,
             context: context,
             scheduleNotifications: false
@@ -6963,7 +6963,7 @@ struct HomeCommandExecutorTests {
             assigneeId: nil
         )
 
-        let result = try #require(CalendarEventPlanCommandService.createEvent(
+        let result = try #require(try CalendarEventPlanCommandService.createEvent(
             input: input,
             context: context,
             scheduleNotifications: false
@@ -6996,7 +6996,7 @@ struct HomeCommandExecutorTests {
             assigneeId: nil
         )
 
-        let result = try #require(CalendarEventPlanCommandService.createEvent(
+        let result = try #require(try CalendarEventPlanCommandService.createEvent(
             input: input,
             context: context,
             scheduleNotifications: false
@@ -7037,7 +7037,7 @@ struct HomeCommandExecutorTests {
             assigneeId: nil
         )
 
-        let result = CalendarEventPlanCommandService.createEvent(
+        let result = try CalendarEventPlanCommandService.createEvent(
             input: input,
             context: context,
             scheduleNotifications: false
@@ -7068,7 +7068,7 @@ struct HomeCommandExecutorTests {
         context.insert(event)
         try context.save()
 
-        let completed = CalendarEventCommandService.toggleCompletion(
+        let completed = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: now,
             pets: [pet],
@@ -7084,7 +7084,7 @@ struct HomeCommandExecutorTests {
         #expect(careLogs.first?.careType == .feeding)
         #expect(careLogs.first?.pet?.id == pet.id)
 
-        let reopened = CalendarEventCommandService.toggleCompletion(
+        let reopened = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: now,
             pets: [pet],
@@ -7134,7 +7134,7 @@ struct HomeCommandExecutorTests {
         let beforeRevision = revisionCenter.homeRevision.value
         let missingExecutorID = UUID().uuidString
 
-        let result = executor.toggleCompletion(
+        let result = try executor.toggleCompletion(
             event: event,
             occurrenceDate: occurrence,
             pets: [pet],
@@ -7176,7 +7176,7 @@ struct HomeCommandExecutorTests {
         context.insert(event)
         try context.save()
 
-        let outcome = CalendarEventCommandService.delete(
+        let outcome = try CalendarEventCommandService.delete(
             event: event,
             occurrenceDate: occurrence,
             scope: .singleOccurrence,
@@ -7211,7 +7211,7 @@ struct HomeCommandExecutorTests {
         context.insert(event)
         try context.save()
 
-        let outcome = CalendarEventCommandService.delete(
+        let outcome = try CalendarEventCommandService.delete(
             event: event,
             occurrenceDate: occurrence,
             scope: .thisAndFuture,
@@ -7259,7 +7259,7 @@ struct HomeCommandExecutorTests {
         #expect(createMutation.affectedEntityIDs.contains(human.id))
         #expect(createMutation.note == "calendar.event.created")
 
-        let completed = executor.toggleCompletion(
+        let completed = try executor.toggleCompletion(
             event: event,
             occurrenceDate: start,
             pets: [],
@@ -7275,7 +7275,7 @@ struct HomeCommandExecutorTests {
         #expect(completionMutation.affectedEntityIDs.contains(human.id))
         #expect(completionMutation.note == "test.calendar.complete")
 
-        let deletion = executor.delete(
+        let deletion = try executor.delete(
             event: event,
             occurrenceDate: start,
             scope: .wholeEvent,
@@ -7306,7 +7306,7 @@ struct HomeCommandExecutorTests {
         let executor = DashboardRecordCommandExecutor(context: context, revisionCenter: revisionCenter)
         let beforeRevision = revisionCenter.homeRevision.value
         let weightCommand = DomainCommand.weightEntry(entityID: pet.id, entityKind: EntityKind.pet.rawValue)
-        let weight = executor.recordPetWeight(
+        let weight = try executor.recordPetWeight(
             pet: pet,
             weight: 4.2,
             date: makeDate(year: 2026, month: 6, day: 10, hour: 8, minute: 30),
@@ -7325,7 +7325,7 @@ struct HomeCommandExecutorTests {
         #expect(weightMutation.note == "test.dashboard.weight")
 
         let petWeightLog = try #require(try context.fetch(FetchDescriptor<PetWeightLog>()).first)
-        let deleteWeight = executor.deletePetWeight(petWeightLog, pet: pet, note: "test.dashboard.weight.delete")
+        let deleteWeight = try executor.deletePetWeight(petWeightLog, pet: pet, note: "test.dashboard.weight.delete")
         let weightDeleteMutation = try #require(revisionCenter.lastMutation)
         #expect(deleteWeight.recordID == weight.logID)
         #expect(weightDeleteMutation.command == .weightDelete(
@@ -7474,7 +7474,7 @@ struct HomeCommandExecutorTests {
             documentNumber: "P-1",
             attachments: []
         )
-        let created = executor.createDocument(input: input, pet: pet, note: "test.document.create")
+        let created = try executor.createDocument(input: input, pet: pet, note: "test.document.create")
         let createMutation = try #require(revisionCenter.lastMutation)
         let document = try #require(try context.fetch(FetchDescriptor<PetDocument>()).first)
 
@@ -7496,14 +7496,14 @@ struct HomeCommandExecutorTests {
             attachmentData: nil,
             clearsAttachment: false
         )
-        let updated = executor.updateDocument(document, pet: pet, input: updateInput, note: "test.document.update")
+        let updated = try executor.updateDocument(document, pet: pet, input: updateInput, note: "test.document.update")
         let updateMutation = try #require(revisionCenter.lastMutation)
         #expect(updated.documentID == document.id)
         #expect(document.title == "Passport updated")
         #expect(updateMutation.command == .petDocumentUpdate(petID: pet.id, documentID: document.id))
         #expect(updateMutation.note == "test.document.update")
 
-        let deleted = executor.deleteDocument(document, pet: pet, note: "test.document.delete")
+        let deleted = try executor.deleteDocument(document, pet: pet, note: "test.document.delete")
         let deleteMutation = try #require(revisionCenter.lastMutation)
         #expect(deleted.documentID == document.id)
         let documents = try context.fetch(FetchDescriptor<PetDocument>())
@@ -7525,7 +7525,7 @@ struct HomeCommandExecutorTests {
 
         let executor = InsuranceCommandExecutor(context: context, revisionCenter: revisionCenter)
         let beforeRevision = revisionCenter.homeRevision.value
-        let created = executor.savePolicy(
+        let created = try executor.savePolicy(
             existing: nil,
             pet: pet,
             input: InsurancePolicySaveCommandInput(
@@ -7555,7 +7555,7 @@ struct HomeCommandExecutorTests {
         #expect(createMutation.affectedEntityIDs == [pet.id, policy.id])
         #expect(createMutation.note == "test.insurance.policy.create")
 
-        let deactivated = executor.setPolicyActive(
+        let deactivated = try executor.setPolicyActive(
             policy,
             isActive: false,
             pet: pet,
@@ -7567,7 +7567,7 @@ struct HomeCommandExecutorTests {
         #expect(deactivateMutation.command == .insurancePolicy(petID: pet.id, policyID: policy.id, action: "deactivate"))
         #expect(deactivateMutation.note == "test.insurance.policy.deactivate")
 
-        let claim = executor.createClaim(
+        let claim = try executor.createClaim(
             insurance: policy,
             pet: pet,
             input: InsuranceClaimCommandInput(
@@ -7595,7 +7595,7 @@ struct HomeCommandExecutorTests {
         #expect(claimMutation.affectedEntityIDs.contains(claim.claimID))
         #expect(claimMutation.note == "test.insurance.claim.create")
 
-        let deleted = executor.deleteClaim(
+        let deleted = try executor.deleteClaim(
             claimModel,
             insurance: policy,
             pet: pet,
@@ -7689,7 +7689,7 @@ struct HomeCommandExecutorTests {
         #expect(heatMutation.note == "test.health.heat")
 
         let healthLog = try #require(try context.fetch(FetchDescriptor<PetHealthLog>()).first)
-        let deletedHealth = executor.deleteHealthLog(healthLog, pet: pet, note: "test.health.delete.health")
+        let deletedHealth = try executor.deleteHealthLog(healthLog, pet: pet, note: "test.health.delete.health")
         let deleteHealthMutation = try #require(revisionCenter.lastMutation)
         #expect(deletedHealth.recordID == health.logID)
         #expect(deletedHealth.didPersist)
@@ -7698,7 +7698,7 @@ struct HomeCommandExecutorTests {
         #expect(deleteHealthMutation.note == "test.health.delete.health")
 
         let symptomLog = try #require(try context.fetch(FetchDescriptor<SymptomLog>()).first)
-        let deletedSymptom = executor.deleteSymptomLog(symptomLog, pet: pet, note: "test.health.delete.symptom")
+        let deletedSymptom = try executor.deleteSymptomLog(symptomLog, pet: pet, note: "test.health.delete.symptom")
         let deleteSymptomMutation = try #require(revisionCenter.lastMutation)
         #expect(deletedSymptom.recordID == symptom.logID)
         #expect(deletedSymptom.didPersist)
@@ -7707,7 +7707,7 @@ struct HomeCommandExecutorTests {
         #expect(deleteSymptomMutation.note == "test.health.delete.symptom")
 
         let heatLog = try #require(try context.fetch(FetchDescriptor<HeatCycleLog>()).first)
-        let deletedHeat = executor.deleteHeatCycleLog(heatLog, pet: pet, note: "test.health.delete.heat")
+        let deletedHeat = try executor.deleteHeatCycleLog(heatLog, pet: pet, note: "test.health.delete.heat")
         let deleteHeatMutation = try #require(revisionCenter.lastMutation)
         #expect(deletedHeat.recordID == heat.logID)
         #expect(deletedHeat.didPersist)
@@ -7993,7 +7993,7 @@ struct HomeCommandExecutorTests {
         context.insert(unrelatedLedger)
         try context.save()
 
-        let result = DashboardRecordCommandService.deletePetWeight(log, pet: pet, context: context)
+        let result = try DashboardRecordCommandService.deletePetWeight(log, pet: pet, context: context)
 
         let remainingLogs = try context.fetch(FetchDescriptor<PetWeightLog>())
         let remainingLedgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
@@ -8050,7 +8050,7 @@ struct HomeCommandExecutorTests {
         context.insert(unrelatedLedger)
         try context.save()
 
-        let result = DashboardRecordCommandService.deleteHumanExpense(log, human: human, context: context)
+        let result = try DashboardRecordCommandService.deleteHumanExpense(log, human: human, context: context)
 
         let remainingExpenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
         let remainingLedgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
@@ -8087,8 +8087,8 @@ struct HomeCommandExecutorTests {
         context.insert(weight)
         try context.save()
 
-        let first = PetMilestoneCommandService.seedSystemMilestones(for: pet, context: context)
-        let second = PetMilestoneCommandService.seedSystemMilestones(for: pet, context: context)
+        let first = try PetMilestoneCommandService.seedSystemMilestones(for: pet, context: context)
+        let second = try PetMilestoneCommandService.seedSystemMilestones(for: pet, context: context)
 
         let milestones = try context.fetch(FetchDescriptor<PetMilestone>())
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
@@ -8129,7 +8129,7 @@ struct HomeCommandExecutorTests {
         context.insert(pet)
         try context.save()
 
-        let createResult = PetMilestoneCommandService.createMilestone(
+        let createResult = try PetMilestoneCommandService.createMilestone(
             input: PetMilestoneCommandInput(
                 date: makeDate(year: 2026, month: 6, day: 8),
                 title: " First beach day ",
@@ -8178,7 +8178,7 @@ struct HomeCommandExecutorTests {
         context.insert(unrelatedLedger)
         try context.save()
 
-        let deleteResult = PetMilestoneCommandService.deleteMilestone(
+        let deleteResult = try PetMilestoneCommandService.deleteMilestone(
             createdMilestone,
             pet: pet,
             context: context
@@ -8218,14 +8218,14 @@ struct HomeCommandExecutorTests {
 
         let executor = PetMilestoneCommandExecutor(context: context, revisionCenter: revisionCenter)
         let beforeRevision = revisionCenter.homeRevision.value
-        let seeded = executor.seedSystemMilestones(for: pet, note: "test.milestone.seed")
+        let seeded = try executor.seedSystemMilestones(for: pet, note: "test.milestone.seed")
         let seedMutation = try #require(revisionCenter.lastMutation)
         #expect(seeded.milestoneIDs.count == 2)
         #expect(seedMutation.command == .petMilestoneSeed(petID: pet.id))
         #expect(seedMutation.affectedEntityIDs.contains(pet.id))
         #expect(seedMutation.note == "test.milestone.seed")
 
-        let created = executor.createMilestone(
+        let created = try executor.createMilestone(
             input: PetMilestoneCommandInput(
                 date: makeDate(year: 2026, month: 6, day: 8),
                 title: " First beach day ",
@@ -8246,7 +8246,7 @@ struct HomeCommandExecutorTests {
         #expect(recordMutation.affectedEntityIDs == [pet.id, createdID])
         #expect(recordMutation.note == "test.milestone.record")
 
-        let deleted = executor.deleteMilestone(createdMilestone, pet: pet, note: "test.milestone.delete")
+        let deleted = try executor.deleteMilestone(createdMilestone, pet: pet, note: "test.milestone.delete")
         let deleteMutation = try #require(revisionCenter.lastMutation)
         #expect(deleted.milestoneID == createdID)
         #expect(deleteMutation.command == .petMilestoneDelete(petID: pet.id, milestoneID: createdID))
@@ -8258,6 +8258,15 @@ struct HomeCommandExecutorTests {
 
     @MainActor
     @Test func petDocumentCommandServiceCreatesExpenseLedgerAndPassportSync() throws {
+        let commandSource = try source(
+            "Ohana/Features/Documents/PetDocumentCommands.swift",
+            rootURL: repositoryRootURL()
+        )
+        #expect(commandSource.contains("PetDocumentCommandError"))
+        #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(commandSource.contains("context.rollback()"))
+        #expect(!commandSource.contains("context.safeSave()"))
+
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
@@ -8266,7 +8275,7 @@ struct HomeCommandExecutorTests {
         context.insert(human)
         try context.save()
 
-        let result = PetDocumentCommandService.createDocument(
+        let result = try PetDocumentCommandService.createDocument(
             input: PetDocumentCreateCommandInput(
                 title: " Passport ",
                 category: .passport,
@@ -8343,7 +8352,7 @@ struct HomeCommandExecutorTests {
         context.insert(unrelatedLedger)
         try context.save()
 
-        let updateResult = PetDocumentCommandService.updateDocument(
+        let updateResult = try PetDocumentCommandService.updateDocument(
             document,
             pet: pet,
             input: PetDocumentUpdateCommandInput(
@@ -8370,7 +8379,7 @@ struct HomeCommandExecutorTests {
         #expect(document.legacyAttachmentState == .absent)
         #expect(document.legacyAttachmentSignature.isEmpty)
 
-        let deleteResult = PetDocumentCommandService.deleteDocument(document, pet: pet, context: context)
+        let deleteResult = try PetDocumentCommandService.deleteDocument(document, pet: pet, context: context)
 
         let documents = try context.fetch(FetchDescriptor<PetDocument>())
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
@@ -8394,7 +8403,7 @@ struct HomeCommandExecutorTests {
         context.insert(document)
         try context.save()
 
-        let result = PetDocumentCommandService.updateDocument(
+        let result = try PetDocumentCommandService.updateDocument(
             document,
             pet: pet,
             input: PetDocumentUpdateCommandInput(

@@ -171,7 +171,7 @@ struct LegacyBountyCommandExecutor {
                     context: context,
                     occurredAt: occurredAt
                 )
-                try context.save()
+                try saveLegacyBountyReward(context: context)
             } catch {
                 rewardError = error
             }
@@ -204,5 +204,27 @@ struct LegacyBountyCommandExecutor {
         guard let raw = BountyTask.encode(tasks) else { return nil }
         revisions.publishLegacyBounty(taskID: taskID, action: action, note: note)
         return raw
+    }
+
+    private func saveLegacyBountyReward(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            throw LegacyBountyPersistenceError.persistenceFailed(saveResult.errorDescription)
+        }
+    }
+}
+
+enum LegacyBountyPersistenceError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(message):
+            message ?? String(
+                localized: "legacy.bounty.persistence.failed",
+                defaultValue: "Unable to save the family task reward.",
+                comment: "Shown when a legacy family task reward cannot be saved."
+            )
+        }
     }
 }

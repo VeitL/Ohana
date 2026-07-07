@@ -433,7 +433,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             )
             rehydrateNotificationIdsToCancel.append(contentsOf: result.notificationIdsToCancel)
         }
-        try context.save()
+        try saveRestoreCheckpoint(context: context)
 
         for dto in backup.reminders {
             let result = try DomainScheduleRehydrateWriter.upsertReminder(
@@ -557,7 +557,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 context: context
             )
         }
-        try context.save()
+        try saveRestoreCheckpoint(context: context)
 
         for dto in backup.petDocumentAttachments ?? [] {
             try DomainMemberContentRehydrateWriter.insertPetDocumentAttachmentIfNeeded(
@@ -735,7 +735,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 context: context
             )
         }
-        try context.save()
+        try saveRestoreCheckpoint(context: context)
         SharedCareSessionMaintenance.cleanLegacyNoteMetadata(context: context)
         DomainRehydrateEffectsDispatcher.cancelNotifications(rehydrateNotificationIdsToCancel)
 
@@ -967,5 +967,28 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         return itemID.hasPrefix("appicon_") ||
             itemID.hasPrefix("fx_") ||
             itemID.hasPrefix("title_")
+    }
+
+    private func saveRestoreCheckpoint(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw DataBackupRestorePersistenceError.persistenceFailed(saveResult.errorDescription)
+        }
+    }
+}
+
+enum DataBackupRestorePersistenceError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(message):
+            message ?? String(
+                localized: "backup.restore.persistence.failed",
+                defaultValue: "Unable to save restored data.",
+                comment: "Shown when restoring a backup cannot save restored data."
+            )
+        }
     }
 }

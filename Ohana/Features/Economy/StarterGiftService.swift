@@ -161,7 +161,7 @@ enum StarterGiftService {
                 updatesProjection: true,
                 projectionManager: projectionManager
             )
-            try context.save()
+            try saveStarterGiftChanges(context: context)
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: projectionManager)
@@ -175,6 +175,14 @@ enum StarterGiftService {
         defaults.set(false, forKey: StarterGiftStorageKey.pending)
         AppPerformanceMonitor.shared.record("starter_gift_claimed", valueMS: 0, note: "amount=\(giftAmount)")
         return .claimed(humanID: human.id, amount: giftAmount)
+    }
+
+    @MainActor
+    private static func saveStarterGiftChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            throw StarterGiftPersistenceError.persistenceFailed(saveResult.errorDescription)
+        }
     }
 
     @MainActor
@@ -255,5 +263,20 @@ enum StarterGiftService {
             en: "Starter coconut gift",
             de: "Starter-Kokosgeschenk"
         )
+    }
+}
+
+enum StarterGiftPersistenceError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(message):
+            message ?? String(
+                localized: "starter.gift.persistence.failed",
+                defaultValue: "Unable to save the starter gift.",
+                comment: "Shown when the first-run starter gift cannot be saved."
+            )
+        }
     }
 }

@@ -413,7 +413,8 @@ enum EconomyDailyBudgetStore {
         let household = normalizedUserKey(householdKey)
         let member = normalizedUserKey(memberKey)
         let objects = normalizedCareObjectKeys(careObjectKeys)
-        if writeDefaults {
+        let shouldWriteDefaultsAfterSave = writeDefaults && context != nil && save
+        let writeUsageDefaults = {
             increment(householdStorageKey(householdKey: household, metric: "xp", date: date), by: result.growthXP)
             increment(householdStorageKey(householdKey: household, metric: "coconut", date: date), by: result.totalCoconuts)
             increment(householdStorageKey(householdKey: household, metric: "lucky", date: date), by: result.luckyCoconuts)
@@ -426,7 +427,10 @@ enum EconomyDailyBudgetStore {
                 increment(careObjectStorageKey(householdKey: household, careObjectKey: objectKey, metric: "coconut", date: date), by: amount)
             }
         }
-        persistUsage(
+        if writeDefaults && !shouldWriteDefaultsAfterSave {
+            writeUsageDefaults()
+        }
+        let didPersistUsage = persistUsage(
             result,
             householdKey: household,
             memberKey: member,
@@ -435,6 +439,9 @@ enum EconomyDailyBudgetStore {
             context: context,
             save: save
         )
+        if shouldWriteDefaultsAfterSave && didPersistUsage {
+            writeUsageDefaults()
+        }
     }
 
     static func reset(userKey: String, date: Date = Date()) {
@@ -473,7 +480,7 @@ enum EconomyDailyBudgetStore {
                     context.delete(event)
                 }
                 if !events.isEmpty {
-                    try context.save()
+                    guard saveEconomyBudgetChanges(context: context) else { return }
                 }
             } catch {
                 OhanaLog.error(
@@ -509,7 +516,7 @@ enum EconomyDailyBudgetStore {
                 context.delete(event)
             }
             if !oldEvents.isEmpty {
-                try context.save()
+                guard saveEconomyBudgetChanges(context: context) else { return 0 }
             }
             defaults.set(todayKey, forKey: usagePruneDayKey)
             return oldEvents.count
@@ -662,6 +669,7 @@ enum EconomyDailyBudgetStore {
         })
     }
 
+    @discardableResult
     private static func persistUsage(
         _ result: EconomyRewardResult,
         householdKey: String,
@@ -670,9 +678,9 @@ enum EconomyDailyBudgetStore {
         date: Date,
         context: ModelContext?,
         save: Bool
-    ) {
+    ) -> Bool {
         guard result.growthXP > 0 || result.totalCoconuts > 0 || result.luckyCoconuts > 0,
-              let context else { return }
+              let context else { return true }
 
         let day = dayKey(for: date)
         let now = Date()
@@ -734,8 +742,21 @@ enum EconomyDailyBudgetStore {
             )
         }
         if save {
-            context.safeSave()
+            return saveEconomyBudgetChanges(context: context)
         }
+        return true
+    }
+
+    private static func saveEconomyBudgetChanges(context: ModelContext) -> Bool {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            #if DEBUG
+                OhanaLog.error("[EconomyDailyBudgetStore] save failed: \(saveResult.errorDescription ?? "Unknown save failure")", category: "Economy")
+            #endif
+            return false
+        }
+        return true
     }
 
     private static func distribute(_ total: Int, across keys: [String]) -> [String: Int] {

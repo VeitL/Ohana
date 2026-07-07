@@ -54,7 +54,11 @@ enum ReminderMaintenanceService {
         }
 
         reminderScheduling.compensate(reminders: reminders, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: false)
+        }
         return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: true)
     }
 }

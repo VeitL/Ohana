@@ -7,6 +7,28 @@ import Foundation
 import SwiftData
 import UIKit
 
+private enum QuestAwardPersistenceError: LocalizedError {
+    case saveFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .saveFailed(message):
+            String(
+                localized: "quest.award.persistence.failed",
+                defaultValue: "Unable to save quest reward changes: \(message)"
+            )
+        }
+    }
+}
+
+private func saveQuestAwardChanges(context: ModelContext) throws {
+    let saveResult = context.safeSaveResult(publishFailureEvent: true)
+    guard saveResult.didSave else {
+        context.rollback()
+        throw QuestAwardPersistenceError.saveFailed(saveResult.errorDescription ?? "Unknown save failure")
+    }
+}
+
 extension QuestManager {
     // MARK: - 核心分发方法（新版，接受 OhanaActionType）
     /// - Parameters:
@@ -125,7 +147,7 @@ extension QuestManager {
                 save: false,
                 writeDefaults: false
             )
-            try context.save()
+            try saveQuestAwardChanges(context: context)
             EconomyDailyBudgetStore.commit(
                 result,
                 householdKey: budgetKeys.household,
@@ -270,7 +292,7 @@ extension QuestManager {
                 save: false,
                 writeDefaults: false
             )
-            try context.save()
+            try saveQuestAwardChanges(context: context)
             EconomyDailyBudgetStore.commit(
                 result,
                 householdKey: budgetKeys.household,

@@ -220,13 +220,13 @@ enum WaterPlanWriter {
         context: ModelContext,
         now: Date = Date(),
         calendar: Calendar = .current
-    ) -> [Reminder] {
+    ) throws -> [Reminder] {
         guard canWriteActiveWaterPlan(for: pet) else {
-            deletePlan(pet: pet, allEvents: allEvents, context: context)
+            try deletePlan(pet: pet, allEvents: allEvents, context: context)
             return []
         }
         CarePlanCalendarSync.suppressDefaultPlan(kind: "drink", pet: pet, context: context)
-        deletePlan(pet: pet, allEvents: allEvents, context: context, save: false)
+        try deletePlan(pet: pet, allEvents: allEvents, context: context, save: false)
 
         var createdReminders: [Reminder] = []
         for time in normalizedTimes(times, count: times.count, now: now, calendar: calendar) {
@@ -249,7 +249,7 @@ enum WaterPlanWriter {
             createdReminders.append(contentsOf: createUpcomingReminders(for: event, context: context, now: now, calendar: calendar))
         }
 
-        context.safeSave()
+        try saveWaterPlanChanges(context: context)
         return createdReminders
     }
 
@@ -259,7 +259,7 @@ enum WaterPlanWriter {
         allEvents: [Event],
         context: ModelContext,
         save: Bool = true
-    ) {
+    ) throws {
         var didDelete = false
         for event in planEvents(pet: pet, allEvents: allEvents) {
             if deleteEvent(event, context: context).didDelete {
@@ -267,7 +267,7 @@ enum WaterPlanWriter {
             }
         }
         if save, didDelete {
-            context.safeSave()
+            try saveWaterPlanChanges(context: context)
         }
     }
 
@@ -277,7 +277,7 @@ enum WaterPlanWriter {
         allEvents: [Event],
         context: ModelContext,
         now: Date = Date()
-    ) {
+    ) throws {
         var didChange = false
         for event in planEvents(pet: pet, allEvents: allEvents) {
             let pendingReminders = event.reminders.filter(\.isPending)
@@ -298,7 +298,7 @@ enum WaterPlanWriter {
             }
         }
         if didChange {
-            context.safeSave()
+            try saveWaterPlanChanges(context: context)
         }
     }
 
@@ -310,9 +310,9 @@ enum WaterPlanWriter {
         context: ModelContext,
         now: Date = Date(),
         calendar: Calendar = .current
-    ) -> [Reminder] {
+    ) throws -> [Reminder] {
         guard canWriteActiveWaterPlan(for: pet) else {
-            deletePlan(pet: pet, allEvents: allEvents, context: context)
+            try deletePlan(pet: pet, allEvents: allEvents, context: context)
             return []
         }
         var created: [Reminder] = []
@@ -320,9 +320,19 @@ enum WaterPlanWriter {
             created.append(contentsOf: createUpcomingReminders(for: event, context: context, now: now, calendar: calendar))
         }
         if !created.isEmpty {
-            context.safeSave()
+            try saveWaterPlanChanges(context: context)
         }
         return created
+    }
+
+    @discardableResult
+    private static func saveWaterPlanChanges(context: ModelContext) throws -> ModelContextSaveResult {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw QuickWaterCommandError.persistenceFailed(saveResult.errorDescription)
+        }
+        return saveResult
     }
 
     nonisolated static func planEvents(pet: Pet, allEvents: [Event]) -> [Event] {

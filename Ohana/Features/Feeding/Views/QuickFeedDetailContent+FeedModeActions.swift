@@ -33,31 +33,36 @@ extension QuickFeedDetailContent {
 
         feedPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: feedPlanSaveDelayMilliseconds) {
             let sourceEvents = latestAllEvents()
-            let result = FeedHomePerformance.measure("plan.save") {
-                commandExecutor.savePlan(
-                    pet: pet,
-                    targets: targets,
-                    kind: kind,
-                    draft: draft,
-                    allEvents: sourceEvents
-                )
-            }
-            runtimeState.latestAllEventsOverride = result.events
+            do {
+                let result = try FeedHomePerformance.measure("plan.save") {
+                    try commandExecutor.savePlan(
+                        pet: pet,
+                        targets: targets,
+                        kind: kind,
+                        draft: draft,
+                        allEvents: sourceEvents
+                    )
+                }
+                runtimeState.latestAllEventsOverride = result.events
 
-            if kind == .manualReminder {
-                scheduleReminders(result.planReminders)
+                if kind == .manualReminder {
+                    scheduleReminders(result.planReminders)
+                }
+                scheduleStockReminders(result.stockReminders)
+                var refreshRequest: QuickFeedRefreshRequest = [
+                    .reloadSnapshots,
+                    .syncDisplayedMode,
+                    .forceDisplayedMode
+                ]
+                if kind == .manualReminder {
+                    refreshRequest.insert(.ensurePlanReminders)
+                }
+                scheduleDeferredFeedRefresh(refreshRequest, milliseconds: feedPlanPostSaveRefreshDelayMilliseconds)
+                triggerToast(feedPlanSavedMessage(kind: kind, targetCount: result.targetCount), tint: savingTint)
+            } catch {
+                handleFeedCommandFailure(error, command: .feedPlan(petID: pet.id, action: "save_\(kind.rawValue)"))
+                scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode, .forceDisplayedMode])
             }
-            scheduleStockReminders(result.stockReminders)
-            var refreshRequest: QuickFeedRefreshRequest = [
-                .reloadSnapshots,
-                .syncDisplayedMode,
-                .forceDisplayedMode
-            ]
-            if kind == .manualReminder {
-                refreshRequest.insert(.ensurePlanReminders)
-            }
-            scheduleDeferredFeedRefresh(refreshRequest, milliseconds: feedPlanPostSaveRefreshDelayMilliseconds)
-            triggerToast(feedPlanSavedMessage(kind: kind, targetCount: result.targetCount), tint: savingTint)
             draftStore.isSavingFeedPlan = false
             feedPlanSaveTask = nil
         }
@@ -214,37 +219,42 @@ extension QuickFeedDetailContent {
 
     func runSettledFeedModeMaintenance(for mode: FeedOperatingMode) {
         let currentEvents = latestAllEvents()
-        switch mode {
-        case .manual:
-            commandExecutor.switchToManual(
-                pet: pet,
-                allEvents: currentEvents
-            )
-        case .manualReminder:
-            let result = commandExecutor.activateExistingRule(
-                pet: pet,
-                kind: .manualReminder,
-                allEvents: currentEvents
-            )
-            switch result {
-            case let .switched(reminders):
-                scheduleReminders(reminders)
-            case .missingPlan:
-                commandExecutor.setFeedMode(.manual, pet: pet)
-                feedHomeController.setModeImmediately(.manual, pet: pet)
-            case .noOp:
-                break
+        do {
+            switch mode {
+            case .manual:
+                try commandExecutor.switchToManual(
+                    pet: pet,
+                    allEvents: currentEvents
+                )
+            case .manualReminder:
+                let result = try commandExecutor.activateExistingRule(
+                    pet: pet,
+                    kind: .manualReminder,
+                    allEvents: currentEvents
+                )
+                switch result {
+                case let .switched(reminders):
+                    scheduleReminders(reminders)
+                case .missingPlan:
+                    commandExecutor.setFeedMode(.manual, pet: pet)
+                    feedHomeController.setModeImmediately(.manual, pet: pet)
+                case .noOp:
+                    break
+                }
+            case .autoFeeder:
+                let result = try commandExecutor.activateExistingRule(
+                    pet: pet,
+                    kind: .autoFeeder,
+                    allEvents: currentEvents
+                )
+                if case .missingPlan = result {
+                    commandExecutor.setFeedMode(.manual, pet: pet)
+                    feedHomeController.setModeImmediately(.manual, pet: pet)
+                }
             }
-        case .autoFeeder:
-            let result = commandExecutor.activateExistingRule(
-                pet: pet,
-                kind: .autoFeeder,
-                allEvents: currentEvents
-            )
-            if case .missingPlan = result {
-                commandExecutor.setFeedMode(.manual, pet: pet)
-                feedHomeController.setModeImmediately(.manual, pet: pet)
-            }
+        } catch {
+            handleFeedCommandFailure(error, command: .feedMode(petID: pet.id, mode: mode.rawValue))
+            feedHomeController.setModeImmediately(FeedOperatingMode.resolved(pet: pet, allEvents: currentEvents), pet: pet)
         }
     }
 
@@ -271,21 +281,26 @@ extension QuickFeedDetailContent {
         UISelectionFeedbackGenerator().selectionChanged()
 
         feedPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: feedPlanSaveDelayMilliseconds) {
-            let result = FeedHomePerformance.measure("plan.delete") {
-                commandExecutor.deletePlan(
-                    pet: pet,
-                    kind: kind,
-                    activeMode: activeFeedingMode,
-                    allEvents: latestAllEvents()
-                )
+            do {
+                let result = try FeedHomePerformance.measure("plan.delete") {
+                    try commandExecutor.deletePlan(
+                        pet: pet,
+                        kind: kind,
+                        activeMode: activeFeedingMode,
+                        allEvents: latestAllEvents()
+                    )
+                }
+                runtimeState.latestAllEventsOverride = latestAllEvents()
+                scheduleStockReminders(result.stockReminders)
+                if result.shouldSwitchToManual {
+                    setActiveFeedMode(.manual)
+                }
+                scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode])
+                triggerToast(l.tr(zh: "计划已删除", en: "Plan deleted", de: "Plan gelöscht"), tint: Color.goRed)
+            } catch {
+                handleFeedCommandFailure(error, command: .feedPlan(petID: pet.id, action: "delete_\(kind.rawValue)"))
+                scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode])
             }
-            runtimeState.latestAllEventsOverride = latestAllEvents()
-            scheduleStockReminders(result.stockReminders)
-            if result.shouldSwitchToManual {
-                setActiveFeedMode(.manual)
-            }
-            scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode])
-            triggerToast(l.tr(zh: "计划已删除", en: "Plan deleted", de: "Plan gelöscht"), tint: Color.goRed)
             draftStore.isSavingFeedPlan = false
             feedPlanSaveTask = nil
         }

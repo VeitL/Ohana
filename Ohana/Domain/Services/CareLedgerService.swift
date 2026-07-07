@@ -146,7 +146,10 @@ final nonisolated class CareLedgerService {
         context.insert(event)
         markModifiedForCloudSync(event, context: context, modifiedAt: occurredAt)
         if save {
-            context.safeSave()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            if !saveResult.didSave {
+                context.rollback()
+            }
         }
         return event
     }

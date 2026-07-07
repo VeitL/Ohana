@@ -174,7 +174,7 @@ extension OasisUpgradeRewardService {
         critter.lastStateRefreshAt = Date()
         refreshLifecycleState(for: critter, now: Date())
         do {
-            try context.save()
+            try saveRewardChanges(context: context)
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: questManager)

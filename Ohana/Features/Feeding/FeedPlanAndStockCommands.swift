@@ -6,6 +6,55 @@
 import Foundation
 import SwiftData
 
+enum FeedCommandPersistenceError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(reason):
+            if let reason, !reason.isEmpty {
+                return L10n().tr(
+                    zh: "保存喂食数据失败：\(reason)",
+                    en: "Failed to save feeding data: \(reason)",
+                    de: "Fütterungsdaten konnten nicht gespeichert werden: \(reason)"
+                )
+            }
+            return L10n().tr(
+                zh: "保存喂食数据失败，请重试。",
+                en: "Failed to save feeding data. Please try again.",
+                de: "Fütterungsdaten konnten nicht gespeichert werden. Bitte erneut versuchen."
+            )
+        }
+    }
+}
+
+enum FeedCommandPersistence {
+    @discardableResult
+    nonisolated static func save(
+        context: ModelContext,
+        rollbackOnFailure: Bool = true
+    ) throws -> ModelContextSaveResult {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            if rollbackOnFailure {
+                context.rollback()
+            }
+            throw FeedCommandPersistenceError.persistenceFailed(saveResult.errorDescription)
+        }
+        return saveResult
+    }
+
+    @discardableResult
+    nonisolated static func saveDerived(context: ModelContext) -> Bool {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
+        return true
+    }
+}
+
 struct TreatFeedCommandResult {
     let grams: Double
     let didRecord: Bool
@@ -57,7 +106,7 @@ enum SaveFeedPlanCommand {
         draft: FeedPlanDraft,
         allEvents: [Event],
         context: ModelContext
-    ) -> SaveFeedPlanCommandResult {
+    ) throws -> SaveFeedPlanCommandResult {
         let normalizedTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
         guard !normalizedTargets.isEmpty else {
             return SaveFeedPlanCommandResult(
@@ -76,7 +125,7 @@ enum SaveFeedPlanCommand {
         var stockReminders: [Reminder] = []
 
         for target in normalizedTargets {
-            let result = FeedingPlanWriter.replacePlan(
+            let result = try FeedingPlanWriter.replacePlan(
                 pet: target,
                 draft: draft,
                 allEvents: latestEvents,
@@ -94,7 +143,7 @@ enum SaveFeedPlanCommand {
                 } + result.events
 
             if kind == .manualReminder {
-                FeedingPlanWriter.deletePlan(
+                try FeedingPlanWriter.deletePlan(
                     pet: target,
                     kind: .autoFeeder,
                     allEvents: latestEvents,
@@ -103,12 +152,10 @@ enum SaveFeedPlanCommand {
                 latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: latestEvents)
             }
 
-            SetFeedModeCommand.run(targetMode, pet: target)
-
             if kind == .manualReminder {
                 planReminders.append(contentsOf: result.reminders)
             } else {
-                FeedingPlanWriter.deactivateManualReminderOperations(
+                try FeedingPlanWriter.deactivateManualReminderOperations(
                     pet: target,
                     allEvents: latestEvents,
                     context: context
@@ -119,6 +166,7 @@ enum SaveFeedPlanCommand {
                     context: context
                 )
             }
+            SetFeedModeCommand.run(targetMode, pet: target)
             stockReminders.append(contentsOf: FeedingPlanWriter.rebuildFoodStockReminders(
                 pet: target,
                 allEvents: latestEvents,
@@ -200,12 +248,12 @@ enum SaveFoodStockCommand {
         expenseDate: Date,
         expenseNote: String,
         careLedger providedCareLedger: CareLedgerRecording? = nil
-    ) -> SaveFoodStockCommandResult {
+    ) throws -> SaveFoodStockCommandResult {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return .noOp
         }
         let careLedger = providedCareLedger ?? CareLedgerService()
-        let savedRecord = FeedingPlanWriter.saveFoodPurchase(
+        let savedRecord = try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: brand,
             totalGrams: totalGrams,
@@ -228,7 +276,7 @@ enum SaveFoodStockCommand {
             context: context,
             logPrefix: "SaveFoodStockCommand"
         )
-        syncExpenseIfNeeded(
+        try syncExpenseIfNeeded(
             pet: pet,
             record: savedRecord,
             previousExpenseId: previousExpenseId,
@@ -262,7 +310,7 @@ enum SaveFoodStockCommand {
         note: String,
         context: ModelContext,
         careLedger: CareLedgerRecording
-    ) {
+    ) throws {
         if let amount, amount > 0 {
             let existingExpense = previousExpenseId.flatMap { FeedStockExpenseLink.fetchExpense(id: $0, context: context) }
             let actor = CareFactWritePolicy.executorResolution(
@@ -295,8 +343,8 @@ enum SaveFoodStockCommand {
             )
             FeedStockExpenseLink.applyExpenseLink(to: record, expenseId: expense.id)
             CloudSyncMutationRecorder.markModified(record, context: context, modifiedAt: date)
-            context.safeSave()
-            syncExpenseLedger(
+            try FeedCommandPersistence.save(context: context)
+            try syncExpenseLedger(
                 expense: expense,
                 pet: pet,
                 note: note,
@@ -307,7 +355,7 @@ enum SaveFoodStockCommand {
         } else if let previousExpenseId {
             FeedStockExpenseLink.applyExpenseLink(to: record, expenseId: previousExpenseId)
             CloudSyncMutationRecorder.markModified(record, context: context)
-            context.safeSave()
+            try FeedCommandPersistence.save(context: context)
         }
     }
 
@@ -319,7 +367,8 @@ enum SaveFoodStockCommand {
         context: ModelContext,
         careLedger: CareLedgerRecording,
         write: AuthorizedDomainCareFactWrite
-    ) {
+    ) throws {
+        var saveFailure: Error?
         DomainCareFactEffectsDispatcher.run(plan: write) { actor in
             if let ledger = existingExpenseLedger(expenseID: expense.id, context: context) {
                 ledger.occurredAt = expense.date
@@ -342,7 +391,11 @@ enum SaveFoodStockCommand {
                 ledger.privacyFieldRaw = nil
                 ledger.metadataJSON = ""
                 CloudSyncMutationRecorder.markModified(ledger, context: context, modifiedAt: expense.date)
-                context.safeSave()
+                do {
+                    try FeedCommandPersistence.save(context: context)
+                } catch {
+                    saveFailure = error
+                }
                 return
             }
 
@@ -369,6 +422,9 @@ enum SaveFoodStockCommand {
                 context: context,
                 save: true
             )
+        }
+        if let saveFailure {
+            throw saveFailure
         }
     }
 
@@ -459,7 +515,7 @@ enum StockReminderSettingsCommand {
         advanceDays: Int,
         allEvents: [Event],
         context: ModelContext
-    ) -> FeedStockCommandResult {
+    ) throws -> FeedStockCommandResult {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return .noOp
         }
@@ -469,7 +525,7 @@ enum StockReminderSettingsCommand {
         pet.foodReminderEnabled = enabled
         pet.foodReminderAdvanceDays = advanceDays
         CloudSyncMutationRecorder.markModified(pet, context: context)
-        context.safeSave()
+        try FeedCommandPersistence.save(context: context)
         return FeedStockCommandResult(
             stockReminders: FeedingPlanWriter.rebuildFoodStockReminders(
                 pet: pet,
@@ -488,11 +544,11 @@ enum CorrectStockCommand {
         remainingGrams: Double,
         allEvents: [Event],
         context: ModelContext
-    ) -> FeedStockCommandResult {
+    ) throws -> FeedStockCommandResult {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return .noOp
         }
-        _ = FeedingPlanWriter.correctFoodStock(
+        _ = try FeedingPlanWriter.correctFoodStock(
             record: record,
             remainingGrams: remainingGrams,
             allEvents: allEvents,
@@ -518,7 +574,7 @@ enum FeedRecordCommand {
         pet: Pet,
         allEvents: [Event],
         context: ModelContext
-    ) -> FeedStockCommandResult {
+    ) throws -> FeedStockCommandResult {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return .noOp
         }
@@ -531,7 +587,7 @@ enum FeedRecordCommand {
             context: context,
             reconciledAt: date
         )
-        context.safeSave()
+        try FeedCommandPersistence.save(context: context)
         return FeedStockCommandResult(
             stockReminders: FeedingPlanWriter.rebuildFoodStockReminders(
                 pet: pet,
@@ -547,7 +603,7 @@ enum FeedRecordCommand {
         pet: Pet,
         allEvents: [Event],
         context: ModelContext
-    ) -> FeedStockCommandResult {
+    ) throws -> FeedStockCommandResult {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return .noOp
         }
@@ -567,13 +623,13 @@ enum FeedRecordCommand {
         pet: Pet,
         allEvents: [Event],
         context: ModelContext
-    ) -> FeedStockCommandResult {
+    ) throws -> FeedStockCommandResult {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return .noOp
         }
         CloudSyncMutationRecorder.markDeleted(record, pet: pet, context: context)
         context.delete(record)
-        context.safeSave()
+        try FeedCommandPersistence.save(context: context)
         return FeedStockCommandResult(
             stockReminders: FeedingPlanWriter.rebuildFoodStockReminders(
                 pet: pet,
@@ -610,11 +666,11 @@ enum DeleteFeedPlanCommand {
         activeMode: FeedOperatingMode,
         allEvents: [Event],
         context: ModelContext
-    ) -> DeleteFeedPlanCommandResult {
+    ) throws -> DeleteFeedPlanCommandResult {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return .noOp
         }
-        FeedingPlanWriter.deletePlan(pet: pet, kind: kind, allEvents: allEvents, context: context)
+        try FeedingPlanWriter.deletePlan(pet: pet, kind: kind, allEvents: allEvents, context: context)
         let refreshedEvents = FeedCommandFetch.latestEvents(context: context, fallback: allEvents)
         return DeleteFeedPlanCommandResult(
             shouldSwitchToManual: (kind == .manualReminder && activeMode == .manualReminder) ||
@@ -632,14 +688,14 @@ enum DeleteFeedPlanCommand {
 enum SetMainFoodKindCommand {
     @discardableResult
     @MainActor
-    static func run(pet: Pet, foodKind: FeedFoodKind, context: ModelContext) -> Bool {
+    static func run(pet: Pet, foodKind: FeedFoodKind, context: ModelContext) throws -> Bool {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return false
         }
         guard pet.mainFoodKind != foodKind else { return false }
         pet.mainFoodKind = foodKind
         CloudSyncMutationRecorder.markModified(pet, context: context)
-        context.safeSave()
+        try FeedCommandPersistence.save(context: context)
         return true
     }
 }
@@ -687,12 +743,12 @@ enum FeedMaintenanceCommand {
         context: ModelContext,
         now: Date = Date(),
         calendar: Calendar = .current
-    ) -> [Reminder] {
+    ) throws -> [Reminder] {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return []
         }
         guard FeedOperatingMode.resolved(pet: pet, allEvents: allEvents) == .manualReminder else {
-            FeedingPlanWriter.deactivateManualReminderOperations(
+            try FeedingPlanWriter.deactivateManualReminderOperations(
                 pet: pet,
                 allEvents: allEvents,
                 context: context,
@@ -700,7 +756,7 @@ enum FeedMaintenanceCommand {
             )
             return []
         }
-        return FeedingPlanWriter.ensureUpcomingManualReminders(
+        return try FeedingPlanWriter.ensureUpcomingManualReminders(
             pet: pet,
             allEvents: allEvents,
             context: context,
@@ -726,7 +782,9 @@ enum FeedMaintenanceCommand {
         else {
             return DomainScheduleWriter.makeUnpersistedReminder(event: event, scheduledAt: scheduledAt)
         }
-        context.safeSave()
+        guard FeedCommandPersistence.saveDerived(context: context) else {
+            return DomainScheduleWriter.makeUnpersistedReminder(event: event, scheduledAt: scheduledAt)
+        }
         return created
     }
 }
@@ -744,22 +802,22 @@ enum SwitchFeedModeCommand {
         pet: Pet,
         allEvents: [Event],
         context: ModelContext
-    ) -> Bool {
+    ) throws -> Bool {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return false
         }
-        SetFeedModeCommand.run(.manual, pet: pet)
-        FeedingPlanWriter.deactivateManualReminderOperations(
+        try FeedingPlanWriter.deactivateManualReminderOperations(
             pet: pet,
             allEvents: allEvents,
             context: context
         )
-        FeedingPlanWriter.deletePlan(
+        try FeedingPlanWriter.deletePlan(
             pet: pet,
             kind: .autoFeeder,
             allEvents: allEvents,
             context: context
         )
+        SetFeedModeCommand.run(.manual, pet: pet)
         return true
     }
 
@@ -769,7 +827,7 @@ enum SwitchFeedModeCommand {
         kind: FeedRuleKind,
         allEvents: [Event],
         context: ModelContext
-    ) -> SwitchFeedModeCommandResult {
+    ) throws -> SwitchFeedModeCommandResult {
         guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
             return .noOp
         }
@@ -777,23 +835,23 @@ enum SwitchFeedModeCommand {
         let targetEvents = FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: allEvents)
         guard !targetEvents.isEmpty else { return .missingPlan }
 
-        SetFeedModeCommand.run(targetMode, pet: pet)
         switch kind {
         case .manualReminder:
-            FeedingPlanWriter.deletePlan(
+            try FeedingPlanWriter.deletePlan(
                 pet: pet,
                 kind: .autoFeeder,
                 allEvents: allEvents,
                 context: context
             )
-            let reminders = FeedingPlanWriter.ensureUpcomingManualReminders(
+            let reminders = try FeedingPlanWriter.ensureUpcomingManualReminders(
                 pet: pet,
                 allEvents: targetEvents,
                 context: context
             )
+            SetFeedModeCommand.run(targetMode, pet: pet)
             return .switched(remindersToSchedule: reminders)
         case .autoFeeder:
-            FeedingPlanWriter.deactivateManualReminderOperations(
+            try FeedingPlanWriter.deactivateManualReminderOperations(
                 pet: pet,
                 allEvents: allEvents,
                 context: context
@@ -803,6 +861,7 @@ enum SwitchFeedModeCommand {
                 allEvents: targetEvents,
                 context: context
             )
+            SetFeedModeCommand.run(targetMode, pet: pet)
             return .switched(remindersToSchedule: [])
         }
     }

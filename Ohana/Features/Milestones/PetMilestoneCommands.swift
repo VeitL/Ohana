@@ -46,13 +46,27 @@ struct PetMilestoneDeleteCommandResult: Equatable {
     let removedLedgerEventIDs: [UUID]
 }
 
+enum PetMilestoneCommandError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(reason):
+            if let reason, !reason.isEmpty {
+                return "里程碑保存失败：\(reason)"
+            }
+            return "里程碑保存失败，请稍后重试。"
+        }
+    }
+}
+
 enum PetMilestoneCommandService {
     @discardableResult
     @MainActor
     static func seedSystemMilestones(
         for pet: Pet,
         context: ModelContext
-    ) -> PetMilestoneCommandResult {
+    ) throws -> PetMilestoneCommandResult {
         var existingTitles = Set(pet.milestones.map(\.title))
         var created: [PetMilestone] = []
 
@@ -100,7 +114,7 @@ enum PetMilestoneCommandService {
         }
 
         if !created.isEmpty {
-            context.safeSave()
+            try saveMilestoneChanges(context: context)
         }
         return PetMilestoneCommandResult(
             petID: pet.id,
@@ -116,7 +130,7 @@ enum PetMilestoneCommandService {
         pet: Pet,
         context: ModelContext,
         questManager providedQuestManager: QuestManager? = nil
-    ) -> PetMilestoneCommandResult {
+    ) throws -> PetMilestoneCommandResult {
         let questManager = providedQuestManager ?? QuestManager()
         let title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else {
@@ -143,7 +157,7 @@ enum PetMilestoneCommandService {
             location: input.location,
             context: context
         )
-        context.safeSave()
+        try saveMilestoneChanges(context: context)
 
         guard write.allowsDerivedEffects else {
             return PetMilestoneCommandResult(
@@ -185,19 +199,28 @@ enum PetMilestoneCommandService {
         _ milestone: PetMilestone,
         pet: Pet,
         context: ModelContext
-    ) -> PetMilestoneDeleteCommandResult {
+    ) throws -> PetMilestoneDeleteCommandResult {
         guard MemberWritePolicy.disposition(pet: pet, intent: .memorialContent).writesContent else {
             return PetMilestoneDeleteCommandResult(petID: pet.id, milestoneID: milestone.id, removedLedgerEventIDs: [])
         }
         let milestoneID = milestone.id
         let removedLedgerEventIDs = ledgerEvents(for: milestone, context: context).map(\.id)
         PhysicalDeletionService.deletePetScopedRecord(milestone, pet: pet, context: context)
-        context.safeSave()
+        try saveMilestoneChanges(context: context)
         return PetMilestoneDeleteCommandResult(
             petID: pet.id,
             milestoneID: milestoneID,
             removedLedgerEventIDs: removedLedgerEventIDs
         )
+    }
+
+    @MainActor
+    private static func saveMilestoneChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw PetMilestoneCommandError.persistenceFailed(saveResult.errorDescription)
+        }
     }
 
     @MainActor
@@ -243,8 +266,8 @@ struct PetMilestoneCommandExecutor {
     }
 
     @discardableResult
-    func seedSystemMilestones(for pet: Pet, note: String) -> PetMilestoneCommandResult {
-        let result = PetMilestoneCommandService.seedSystemMilestones(for: pet, context: context)
+    func seedSystemMilestones(for pet: Pet, note: String) throws -> PetMilestoneCommandResult {
+        let result = try PetMilestoneCommandService.seedSystemMilestones(for: pet, context: context)
         revisions.publishPetMilestoneSeed(result, note: note)
         return result
     }
@@ -254,8 +277,8 @@ struct PetMilestoneCommandExecutor {
         input: PetMilestoneCommandInput,
         pet: Pet,
         note: String
-    ) -> PetMilestoneCommandResult {
-        let result = PetMilestoneCommandService.createMilestone(input: input, pet: pet, context: context)
+    ) throws -> PetMilestoneCommandResult {
+        let result = try PetMilestoneCommandService.createMilestone(input: input, pet: pet, context: context)
         revisions.publishPetMilestoneRecord(result, note: note)
         return result
     }
@@ -265,8 +288,8 @@ struct PetMilestoneCommandExecutor {
         _ milestone: PetMilestone,
         pet: Pet,
         note: String
-    ) -> PetMilestoneDeleteCommandResult {
-        let result = PetMilestoneCommandService.deleteMilestone(milestone, pet: pet, context: context)
+    ) throws -> PetMilestoneDeleteCommandResult {
+        let result = try PetMilestoneCommandService.deleteMilestone(milestone, pet: pet, context: context)
         revisions.publishPetMilestoneDelete(result, note: note)
         return result
     }

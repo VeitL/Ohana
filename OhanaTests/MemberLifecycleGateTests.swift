@@ -105,7 +105,7 @@ struct MemberLifecycleGateTests {
         context.insert(human)
         try context.save()
 
-        let petPlan = CalendarEventPlanCommandService.createEvent(
+        let petPlan = try CalendarEventPlanCommandService.createEvent(
             input: CalendarEventPlanCommandInput(
                 title: "Vet visit",
                 startDate: Date(timeIntervalSince1970: 1_800_000_200),
@@ -121,7 +121,7 @@ struct MemberLifecycleGateTests {
             context: context,
             scheduleNotifications: false
         )
-        let humanPlan = CalendarEventPlanCommandService.createEvent(
+        let humanPlan = try CalendarEventPlanCommandService.createEvent(
             input: CalendarEventPlanCommandInput(
                 title: "Check in",
                 startDate: Date(timeIntervalSince1970: 1_800_000_300),
@@ -137,7 +137,7 @@ struct MemberLifecycleGateTests {
             context: context,
             scheduleNotifications: false
         )
-        let deceasedAssigneePlan = CalendarEventPlanCommandService.createEvent(
+        let deceasedAssigneePlan = try CalendarEventPlanCommandService.createEvent(
             input: CalendarEventPlanCommandInput(
                 title: "Assigned task",
                 startDate: Date(timeIntervalSince1970: 1_800_000_350),
@@ -194,7 +194,7 @@ struct MemberLifecycleGateTests {
         }
         try context.save()
 
-        let petPlan = CalendarEventPlanCommandService.createEvent(
+        let petPlan = try CalendarEventPlanCommandService.createEvent(
             input: CalendarEventPlanCommandInput(
                 title: "Vet visit",
                 startDate: Date(timeIntervalSince1970: 1_800_000_600),
@@ -210,7 +210,7 @@ struct MemberLifecycleGateTests {
             context: context,
             scheduleNotifications: false
         )
-        let humanPlan = CalendarEventPlanCommandService.createEvent(
+        let humanPlan = try CalendarEventPlanCommandService.createEvent(
             input: CalendarEventPlanCommandInput(
                 title: "Check in",
                 startDate: Date(timeIntervalSince1970: 1_800_000_700),
@@ -239,7 +239,7 @@ struct MemberLifecycleGateTests {
         let missingPetID = UUID()
         let missingHumanID = UUID()
 
-        let petPlan = CalendarEventPlanCommandService.createEvent(
+        let petPlan = try CalendarEventPlanCommandService.createEvent(
             input: CalendarEventPlanCommandInput(
                 title: "Vet visit",
                 startDate: Date(timeIntervalSince1970: 1_800_000_710),
@@ -255,7 +255,7 @@ struct MemberLifecycleGateTests {
             context: context,
             scheduleNotifications: false
         )
-        let humanPlan = CalendarEventPlanCommandService.createEvent(
+        let humanPlan = try CalendarEventPlanCommandService.createEvent(
             input: CalendarEventPlanCommandInput(
                 title: "Check in",
                 startDate: Date(timeIntervalSince1970: 1_800_000_720),
@@ -271,7 +271,7 @@ struct MemberLifecycleGateTests {
             context: context,
             scheduleNotifications: false
         )
-        let invalidPetPlan = CalendarEventPlanCommandService.createEvent(
+        let invalidPetPlan = try CalendarEventPlanCommandService.createEvent(
             input: CalendarEventPlanCommandInput(
                 title: "Bad target",
                 startDate: Date(timeIntervalSince1970: 1_800_000_730),
@@ -287,7 +287,7 @@ struct MemberLifecycleGateTests {
             context: context,
             scheduleNotifications: false
         )
-        let missingAssigneePlan = CalendarEventPlanCommandService.createEvent(
+        let missingAssigneePlan = try CalendarEventPlanCommandService.createEvent(
             input: CalendarEventPlanCommandInput(
                 title: "Missing assignee",
                 startDate: Date(timeIntervalSince1970: 1_800_000_740),
@@ -490,7 +490,7 @@ struct MemberLifecycleGateTests {
         context.insert(pet)
         try context.save()
 
-        let result = CalendarEventPlanCommandService.createEvent(
+        let result = try CalendarEventPlanCommandService.createEvent(
             input: CalendarEventPlanCommandInput(
                 title: "Momo day",
                 startDate: Date(timeIntervalSince1970: 1_800_002_200),
@@ -1684,7 +1684,7 @@ struct MemberLifecycleGateTests {
             reminderLeadMinutes: 15,
             assigneeId: nil
         )
-        let result = try #require(CalendarEventPlanCommandService.createEvent(
+        let result = try #require(try CalendarEventPlanCommandService.createEvent(
             input: input,
             context: context,
             scheduleNotifications: false
@@ -1724,7 +1724,7 @@ struct MemberLifecycleGateTests {
         context.insert(reminder)
         try context.save()
 
-        let completion = CalendarEventCommandService.toggleCompletion(
+        let completion = try CalendarEventCommandService.toggleCompletion(
             event: event,
             occurrenceDate: event.startDate,
             pets: [pet],
@@ -4186,7 +4186,7 @@ struct MemberLifecycleGateTests {
         context.insert(pet)
         try context.save()
 
-        let result = PetPhotoAlbumCommandService.createPhotos(
+        let result = try PetPhotoAlbumCommandService.createPhotos(
             data: [Data([1, 2, 3])],
             pet: pet,
             context: context,

@@ -16,7 +16,7 @@ protocol TodayFocusManaging {
     ) -> [IslandQuest]
 
     func quest(_ quest: IslandQuest, matchesCompletedEntity entityId: UUID) -> Bool
-    func completeEvent(_ event: Event, on date: Date, context: ModelContext, executorId: String?) -> TodayFocusEventCompletionCommandResult
+    func completeEvent(_ event: Event, on date: Date, context: ModelContext, executorId: String?) throws -> TodayFocusEventCompletionCommandResult
     func awardDailyCompletionIfNeeded(
         context: ModelContext,
         executorId: String?,
@@ -80,8 +80,8 @@ final class StaticTodayFocusManager: TodayFocusManaging {
         TodayFocusService.quest(quest, matchesCompletedEntity: entityId)
     }
 
-    func completeEvent(_ event: Event, on date: Date, context: ModelContext, executorId: String?) -> TodayFocusEventCompletionCommandResult {
-        TodayFocusCommandService.completeEvent(event, on: date, context: context, executorId: executorId)
+    func completeEvent(_ event: Event, on date: Date, context: ModelContext, executorId: String?) throws -> TodayFocusEventCompletionCommandResult {
+        try TodayFocusCommandService.completeEvent(event, on: date, context: context, executorId: executorId)
     }
 
     func awardDailyCompletionIfNeeded(

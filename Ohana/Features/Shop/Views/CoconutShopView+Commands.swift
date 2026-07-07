@@ -86,6 +86,8 @@ extension CoconutShopView {
             return l.tr(zh: "只有接收人可以确认。", en: "Only the receiver can confirm.", de: "Nur der Empfänger kann bestätigen.")
         case .memberInactive:
             return l.tr(zh: "纪念成员不能进行货币兑换。", en: "Memorial members cannot use cash exchange.", de: "Gedenkmitglieder können den Geldtausch nicht verwenden.")
+        case let .persistenceFailed(message):
+            return message ?? l.tr(zh: "兑换保存失败，请重试。", en: "Could not save the exchange. Please try again.", de: "Der Tausch konnte nicht gespeichert werden. Bitte versuche es erneut.")
         }
     }
 
@@ -549,6 +551,8 @@ extension CoconutShopView {
                 l.tr(zh: "当前没有可用的 2.5D 头像券。", en: "No 2.5D avatar pass available.", de: "Kein 2,5D-Avatarpass verfügbar.")
             case .memberInactive:
                 l.tr(zh: "纪念成员不能再升级头像。", en: "Memorial members cannot upgrade avatars.", de: "Gedenkmitglieder können Avatare nicht mehr aktualisieren.")
+            case .persistenceFailed:
+                l.tr(zh: "头像保存失败，请稍后重试。", en: "Could not save the avatar. Try again in a moment.", de: "Der Avatar konnte nicht gespeichert werden. Versuche es gleich erneut.")
             }
             showToast(message, icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
             return

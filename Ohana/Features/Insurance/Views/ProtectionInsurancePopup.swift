@@ -353,16 +353,20 @@ struct ProtectionInsurancePopup: View {
             executorId: appServices.activeHumanSelection.currentHumanId
         )
         isSaving = true
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(command) {
-            InsuranceCommandExecutor(context: modelContext, services: appServices).savePolicy(
-                existing: existing,
-                pet: pet,
-                input: input,
-                note: existing == nil ? "insurance.policy.create" : "insurance.policy.update"
-            )
+            do {
+                try InsuranceCommandExecutor(context: modelContext, services: appServices).savePolicy(
+                    existing: existing,
+                    pet: pet,
+                    input: input,
+                    note: existing == nil ? "insurance.policy.create" : "insurance.policy.update"
+                )
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                close()
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
             isSaving = false
-            close()
         }
     }
 }

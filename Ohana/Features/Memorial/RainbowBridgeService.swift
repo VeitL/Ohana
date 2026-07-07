@@ -19,14 +19,12 @@ struct RainbowBridgeService {
         pet.passedAwayDate = date
         MemberLifecycleActiveScheduleCleanup.removeFutureSchedules(for: pet, passedAwayAt: date, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: date)
-        context.safeSave()
     }
 
     /// 撤销离世标记（误操作恢复）
     func undoPassedAway(pet: Pet, context: ModelContext) {
         pet.passedAwayDate = nil
         CloudSyncMutationRecorder.markModified(pet, context: context)
-        context.safeSave()
     }
 }
 
@@ -74,9 +72,7 @@ enum MemberLifecycleActiveScheduleCleanup {
                 }
             }
         }
-        if didDelete {
-            context.safeSave()
-        }
+        _ = didDelete
     }
 
     @MainActor

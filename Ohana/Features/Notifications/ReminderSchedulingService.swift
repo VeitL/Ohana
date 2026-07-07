@@ -167,10 +167,10 @@ enum ReminderSchedulingService {
                 actorId: nil,
                 source: .service,
                 context: context,
-                save: true
+                save: false
             )
         }
-        context.safeSave()
+        _ = saveReminderSchedulingChanges(context: context)
     }
 
     @MainActor
@@ -206,7 +206,7 @@ enum ReminderSchedulingService {
             }
         }
         if didChange {
-            context.safeSave()
+            _ = saveReminderSchedulingChanges(context: context)
         }
         return kept
     }
@@ -243,8 +243,11 @@ enum ReminderSchedulingService {
             privacyFieldRaw: nil,
             metadataJSON: result.metadataJSON,
             context: context,
-            save: save
+            save: false
         )
+        if save {
+            _ = saveReminderSchedulingChanges(context: context)
+        }
     }
 
     @MainActor
@@ -292,7 +295,7 @@ enum ReminderSchedulingService {
         var knownNotificationIds = await OhanaNotifications.current.pendingNotificationIds()
         for (index, reminder) in orderedReminders.enumerated() {
             guard !Task.isCancelled else {
-                context.safeSave()
+                _ = saveReminderSchedulingChanges(context: context)
                 return
             }
             if let summary = plantBatchCareSummaryByReminderID[reminder.id],
@@ -333,7 +336,18 @@ enum ReminderSchedulingService {
                 await Task.yield()
             }
         }
-        context.safeSave()
+        _ = saveReminderSchedulingChanges(context: context)
+    }
+
+    @MainActor
+    @discardableResult
+    private static func saveReminderSchedulingChanges(context: ModelContext) -> Bool {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
+        return true
     }
 
     private static func schedulingClassification(

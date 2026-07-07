@@ -25,12 +25,12 @@ enum FeedingPlanWriter {
         feedPlanGroupId: String = "",
         now: Date = Date(),
         calendar: Calendar = .current
-    ) -> FeedingPlanWriteResult {
+    ) throws -> FeedingPlanWriteResult {
         guard canWriteActiveFeedData(for: pet) else {
             return FeedingPlanWriteResult(events: [], reminders: [])
         }
         CarePlanCalendarSync.suppressDefaultPlan(kind: "feed", pet: pet, context: context)
-        deletePlan(pet: pet, kind: draft.kind, allEvents: allEvents, context: context, save: false)
+        try deletePlan(pet: pet, kind: draft.kind, allEvents: allEvents, context: context, save: false)
 
         let meals = FeedPlanDraft.normalizedMeals(draft.meals, count: draft.dailyCount, now: now, calendar: calendar)
         var createdEvents: [Event] = []
@@ -70,7 +70,7 @@ enum FeedingPlanWriter {
             CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: now)
         }
 
-        context.safeSave()
+        try FeedCommandPersistence.save(context: context)
         return FeedingPlanWriteResult(events: createdEvents, reminders: createdReminders)
     }
 
@@ -81,7 +81,7 @@ enum FeedingPlanWriter {
         allEvents: [Event],
         context: ModelContext,
         save: Bool = true
-    ) {
+    ) throws {
         guard canWriteActiveFeedData(for: pet) else { return }
         var didDelete = false
         for event in planEvents(pet: pet, kind: kind, allEvents: allEvents) {
@@ -90,7 +90,7 @@ enum FeedingPlanWriter {
             }
         }
         if save, didDelete {
-            context.safeSave()
+            try FeedCommandPersistence.save(context: context)
         }
     }
 
@@ -100,7 +100,7 @@ enum FeedingPlanWriter {
         allEvents: [Event],
         context: ModelContext,
         now: Date = Date()
-    ) {
+    ) throws {
         guard canWriteActiveFeedData(for: pet) else { return }
         var didChange = false
         for event in planEvents(pet: pet, kind: .manualReminder, allEvents: allEvents) {
@@ -122,7 +122,7 @@ enum FeedingPlanWriter {
             }
         }
         if didChange {
-            context.safeSave()
+            try FeedCommandPersistence.save(context: context)
         }
     }
 
@@ -131,11 +131,11 @@ enum FeedingPlanWriter {
         pet: Pet,
         allEvents: [Event],
         context: ModelContext
-    ) {
+    ) throws {
         guard canWriteActiveFeedData(for: pet) else { return }
         CarePlanCalendarSync.suppressDefaultPlan(kind: "feed", pet: pet, context: context)
-        deletePlan(pet: pet, kind: .manualReminder, allEvents: allEvents, context: context)
-        deletePlan(pet: pet, kind: .autoFeeder, allEvents: allEvents, context: context)
+        try deletePlan(pet: pet, kind: .manualReminder, allEvents: allEvents, context: context)
+        try deletePlan(pet: pet, kind: .autoFeeder, allEvents: allEvents, context: context)
     }
 
     @MainActor
@@ -146,14 +146,14 @@ enum FeedingPlanWriter {
         context: ModelContext,
         now: Date = Date(),
         calendar: Calendar = .current
-    ) -> [Reminder] {
+    ) throws -> [Reminder] {
         guard canWriteActiveFeedData(for: pet) else { return [] }
         var created: [Reminder] = []
         for event in planEvents(pet: pet, kind: .manualReminder, allEvents: allEvents) {
             created.append(contentsOf: createUpcomingManualReminders(for: event, context: context, now: now, calendar: calendar))
         }
         if !created.isEmpty {
-            context.safeSave()
+            try FeedCommandPersistence.save(context: context)
         }
         return created
     }
@@ -191,7 +191,7 @@ enum FeedingPlanWriter {
         now: Date = Date(),
         calendar: Calendar = .current,
         rebuildReminder: Bool = true
-    ) -> PetFoodRecord {
+    ) throws -> PetFoodRecord {
         guard canWriteActiveFeedData(for: pet) else {
             return recordToUpdate ?? PetFoodRecord(executorId: executorId)
         }
@@ -235,7 +235,7 @@ enum FeedingPlanWriter {
         }
         CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: now)
         CloudSyncMutationRecorder.markModified(record, context: context, modifiedAt: finalOpenDate)
-        context.safeSave()
+        try FeedCommandPersistence.save(context: context)
 
         if rebuildReminder {
             _ = rebuildFoodStockReminder(
@@ -269,12 +269,12 @@ enum FeedingPlanWriter {
         now: Date = Date(),
         calendar: Calendar = .current,
         rebuildReminder: Bool = true
-    ) -> Reminder? {
+    ) throws -> Reminder? {
         guard let pet = record.pet, canWriteActiveFeedData(for: pet) else { return nil }
         record.remainingCorrectionGrams = max(0, remainingGrams)
         record.remainingCorrectionDate = now
         CloudSyncMutationRecorder.markModified(record, context: context, modifiedAt: now)
-        context.safeSave()
+        try FeedCommandPersistence.save(context: context)
         guard rebuildReminder else { return nil }
         return rebuildFoodStockReminder(pet: pet, allEvents: allEvents, context: context, now: now, calendar: calendar)
     }
@@ -328,7 +328,7 @@ enum FeedingPlanWriter {
         }
 
         guard pet.foodReminderEnabled else {
-            context.safeSave()
+            _ = FeedCommandPersistence.saveDerived(context: context)
             return []
         }
 
@@ -368,7 +368,9 @@ enum FeedingPlanWriter {
                 reminders.append(reminder)
             }
         }
-        context.safeSave()
+        guard FeedCommandPersistence.saveDerived(context: context) else {
+            return []
+        }
         return reminders
     }
 

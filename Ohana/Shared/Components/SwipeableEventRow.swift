@@ -404,26 +404,39 @@ struct SwipeableEventRow: View {
         isTriggerred = true
         withAnimation(GoMotion.page) { offsetX = 800 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-            CalendarCommandExecutor(context: modelContext, services: appServices).delete(
-                event: event,
-                occurrenceDate: occurrenceDate,
-                scope: .wholeEvent,
-                note: "calendar.event.delete.row"
+            let command = DomainCommand.calendarEventDeletion(
+                eventID: event.id,
+                scope: CalendarEventDeletionScope.wholeEvent.revisionActionKey
             )
-            onDelete()
+            do {
+                try CalendarCommandExecutor(context: modelContext, services: appServices).delete(
+                    event: event,
+                    occurrenceDate: occurrenceDate,
+                    scope: .wholeEvent,
+                    note: "calendar.event.delete.row"
+                )
+                onDelete()
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
             isTriggerred = false
             withAnimation(GoMotion.feedback) { offsetX = 0 }
         }
     }
 
     private func deleteEvent(scope: CalendarEventDeletionScope) {
-        CalendarCommandExecutor(context: modelContext, services: appServices).delete(
-            event: event,
-            occurrenceDate: occurrenceDate,
-            scope: scope,
-            note: "calendar.event.delete.row.menu"
-        )
-        onDelete()
+        let command = DomainCommand.calendarEventDeletion(eventID: event.id, scope: scope.revisionActionKey)
+        do {
+            try CalendarCommandExecutor(context: modelContext, services: appServices).delete(
+                event: event,
+                occurrenceDate: occurrenceDate,
+                scope: scope,
+                note: "calendar.event.delete.row.menu"
+            )
+            onDelete()
+        } catch {
+            appServices.domainRevisions.publishFailure(command: command, error: error)
+        }
     }
 
     private func launchCelebrationParticles() {
@@ -783,14 +796,19 @@ struct CalendarEventDetailPage: View {
     }
 
     private func deleteEvent(scope: CalendarEventDeletionScope) {
-        CalendarCommandExecutor(context: modelContext, services: appServices).delete(
-            event: event,
-            occurrenceDate: occurrenceDate,
-            scope: scope,
-            note: "calendar.event.delete.detail.\(scope.revisionActionKey)"
-        )
-        onDelete()
-        dismiss()
+        let command = DomainCommand.calendarEventDeletion(eventID: event.id, scope: scope.revisionActionKey)
+        do {
+            try CalendarCommandExecutor(context: modelContext, services: appServices).delete(
+                event: event,
+                occurrenceDate: occurrenceDate,
+                scope: scope,
+                note: "calendar.event.delete.detail.\(scope.revisionActionKey)"
+            )
+            onDelete()
+            dismiss()
+        } catch {
+            appServices.domainRevisions.publishFailure(command: command, error: error)
+        }
     }
 
     private func infoRow(icon: String, label: String, value: String) -> some View {

@@ -12,12 +12,15 @@ struct SettingsActiveHumanSwitchCommandResult: Equatable {
     let humanID: UUID
     let didSyncHomeStack: Bool
     let updatedHomeCardOrderRaw: String
+    var saveErrorDescription: String? = nil
 }
 
 struct SettingsCoconutBalanceCommandResult: Equatable {
     let humanID: UUID?
     let amount: Int
     let legacyDelta: Int
+    var didApply: Bool = true
+    var saveErrorDescription: String? = nil
 }
 
 struct SettingsPetCoconutBalanceCommandResult: Equatable {
@@ -25,9 +28,19 @@ struct SettingsPetCoconutBalanceCommandResult: Equatable {
     let amount: Int
     let delta: Int
     let didApply: Bool
+    var saveErrorDescription: String? = nil
 }
 
 enum SettingsCommandService {
+    @MainActor
+    private static func saveSettingsChanges(context: ModelContext) -> ModelContextSaveResult {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        if !saveResult.didSave {
+            context.rollback()
+        }
+        return saveResult
+    }
+
     @discardableResult
     @MainActor
     static func syncHomeCardStackAfterActiveHumanSwitch(
@@ -47,6 +60,7 @@ enum SettingsCommandService {
                 updatedHomeCardOrderRaw: homeCardOrderRaw
             )
         }
+        let originalOrderRaw = homeCardOrderRaw
         var updatedOrderRaw = homeCardOrderRaw
         let didChange = HomeActiveHumanCardSync.applyAfterAccountSwitch(
             from: oldHumanIdRaw,
@@ -58,7 +72,15 @@ enum SettingsCommandService {
             homeCardOrderRaw: &updatedOrderRaw
         )
         if didChange {
-            context.safeSave()
+            let saveResult = saveSettingsChanges(context: context)
+            guard saveResult.didSave else {
+                return SettingsActiveHumanSwitchCommandResult(
+                    humanID: human.id,
+                    didSyncHomeStack: false,
+                    updatedHomeCardOrderRaw: originalOrderRaw,
+                    saveErrorDescription: saveResult.errorDescription
+                )
+            }
         }
         return SettingsActiveHumanSwitchCommandResult(
             humanID: human.id,
@@ -92,7 +114,8 @@ enum SettingsCommandService {
             return SettingsCoconutBalanceCommandResult(
                 humanID: human.id,
                 amount: current,
-                legacyDelta: 0
+                legacyDelta: 0,
+                didApply: false
             )
         }
         let delta = amount - current
@@ -104,7 +127,16 @@ enum SettingsCommandService {
             displayName: displayName,
             context: context
         )
-        context.safeSave()
+        let saveResult = saveSettingsChanges(context: context)
+        guard saveResult.didSave else {
+            return SettingsCoconutBalanceCommandResult(
+                humanID: human?.id,
+                amount: current,
+                legacyDelta: 0,
+                didApply: false,
+                saveErrorDescription: saveResult.errorDescription
+            )
+        }
         if updatesProjection {
             projectionManager.replaceCoconutProjection(
                 count: amount,
@@ -115,7 +147,8 @@ enum SettingsCommandService {
         return SettingsCoconutBalanceCommandResult(
             humanID: human?.id,
             amount: amount,
-            legacyDelta: delta
+            legacyDelta: delta,
+            didApply: true
         )
     }
 
@@ -146,7 +179,16 @@ enum SettingsCommandService {
             displayName: actorName ?? pet.name,
             context: context
         )
-        context.safeSave()
+        let saveResult = saveSettingsChanges(context: context)
+        guard saveResult.didSave else {
+            return SettingsPetCoconutBalanceCommandResult(
+                petID: pet.id,
+                amount: current,
+                delta: 0,
+                didApply: false,
+                saveErrorDescription: saveResult.errorDescription
+            )
+        }
 
         return SettingsPetCoconutBalanceCommandResult(
             petID: pet.id,
@@ -224,7 +266,9 @@ struct SettingsCommandExecutor {
             homeCardOrderRaw: homeCardOrderRaw,
             context: context
         )
-        revisions.publishSettingsActiveHumanSwitch(result, note: note)
+        if result.saveErrorDescription == nil {
+            revisions.publishSettingsActiveHumanSwitch(result, note: note)
+        }
         return result
     }
 
@@ -248,7 +292,7 @@ struct SettingsCommandExecutor {
             projectionManager: questManager,
             updatesProjection: updatesProjection
         )
-        if publishesRevision {
+        if publishesRevision, result.didApply {
             revisions.publishSettingsCoconutBalance(result, note: note)
         }
         return result

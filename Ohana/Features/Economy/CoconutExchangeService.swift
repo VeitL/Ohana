@@ -10,6 +10,7 @@ enum CoconutExchangeError: LocalizedError {
     case notSender
     case notReceiver
     case memberInactive
+    case persistenceFailed(String?)
 
     var errorDescription: String? {
         switch self {
@@ -29,6 +30,8 @@ enum CoconutExchangeError: LocalizedError {
             "只有接收人可以确认。"
         case .memberInactive:
             "纪念成员不能进行货币兑换。"
+        case let .persistenceFailed(message):
+            message ?? "无法保存货币兑换。"
         }
     }
 }
@@ -106,7 +109,7 @@ enum CoconutExchangeService {
                 updatesProjection: true,
                 projectionManager: projectionManager
             )
-            try context.save()
+            try saveExchangeChanges(context: context)
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: projectionManager)
@@ -141,7 +144,7 @@ enum CoconutExchangeService {
             careLedger: careLedger
         )
         do {
-            try context.save()
+            try saveExchangeChanges(context: context)
         } catch {
             context.rollback()
             throw error
@@ -203,7 +206,7 @@ enum CoconutExchangeService {
                 updatesProjection: true,
                 projectionManager: projectionManager
             )
-            try context.save()
+            try saveExchangeChanges(context: context)
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: projectionManager)
@@ -246,5 +249,13 @@ enum CoconutExchangeService {
             context: context,
             save: save
         )
+    }
+
+    @MainActor
+    private static func saveExchangeChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            throw CoconutExchangeError.persistenceFailed(saveResult.errorDescription)
+        }
     }
 }

@@ -96,6 +96,23 @@ struct PetDocumentDeleteCommandResult: Equatable {
     let didChange: Bool
 }
 
+enum PetDocumentCommandError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        let l = L10n.current
+        switch self {
+        case let .persistenceFailed(reason):
+            let detail = reason.map { "\n\($0)" } ?? ""
+            return l.tr(
+                zh: "证件保存失败，请稍后重试。\(detail)",
+                en: "Could not save the document. Try again.\(detail)",
+                de: "Dokument konnte nicht gespeichert werden. Versuche es erneut.\(detail)"
+            )
+        }
+    }
+}
+
 enum PetDocumentCommandService {
     @discardableResult
     @MainActor
@@ -105,7 +122,7 @@ enum PetDocumentCommandService {
         context: ModelContext,
         now: Date = Date(),
         careLedger providedCareLedger: CareLedgerRecording? = nil
-    ) -> PetDocumentCommandResult {
+    ) throws -> PetDocumentCommandResult {
         guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
             pet: pet,
             occurredAt: now,
@@ -187,7 +204,7 @@ enum PetDocumentCommandService {
             return ledgerEvent
         }
 
-        context.safeSave()
+        try saveDocumentChanges(context: context)
         return PetDocumentCommandResult(
             petID: pet.id,
             documentID: document.id,
@@ -204,7 +221,7 @@ enum PetDocumentCommandService {
         pet: Pet,
         input: PetDocumentUpdateCommandInput,
         context: ModelContext
-    ) -> PetDocumentCommandResult {
+    ) throws -> PetDocumentCommandResult {
         guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
             pet: pet,
             occurredAt: Date(),
@@ -238,7 +255,7 @@ enum PetDocumentCommandService {
             document.updateLegacyAttachment(data: sanitizedData, filename: filename)
         }
         CloudSyncMutationRecorder.markModified(document, context: context)
-        context.safeSave()
+        try saveDocumentChanges(context: context)
         return PetDocumentCommandResult(
             petID: pet.id,
             documentID: document.id,
@@ -254,20 +271,29 @@ enum PetDocumentCommandService {
         _ document: PetDocument,
         pet: Pet,
         context: ModelContext
-    ) -> PetDocumentDeleteCommandResult {
+    ) throws -> PetDocumentDeleteCommandResult {
         let disposition = MemberLifecycleGate.disposition(pet: pet, writeKind: writeKind(for: document))
         guard disposition.writesContent else {
             return PetDocumentDeleteCommandResult(petID: pet.id, documentID: document.id, removedLedgerEventIDs: [], didChange: false)
         }
         let documentID = document.id
         PhysicalDeletionService.deleteDocument(document, pet: pet, context: context)
-        context.safeSave()
+        try saveDocumentChanges(context: context)
         return PetDocumentDeleteCommandResult(
             petID: pet.id,
             documentID: documentID,
             removedLedgerEventIDs: [],
             didChange: true
         )
+    }
+
+    @MainActor
+    private static func saveDocumentChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw PetDocumentCommandError.persistenceFailed(saveResult.errorDescription)
+        }
     }
 
     @MainActor
@@ -447,8 +473,8 @@ struct PetDocumentCommandExecutor {
         input: PetDocumentCreateCommandInput,
         pet: Pet,
         note: String
-    ) -> PetDocumentCommandResult {
-        let result = PetDocumentCommandService.createDocument(input: input, pet: pet, context: context)
+    ) throws -> PetDocumentCommandResult {
+        let result = try PetDocumentCommandService.createDocument(input: input, pet: pet, context: context)
         if result.didChange {
             revisions.publishPetDocumentCreate(result, category: input.category, note: note)
         }
@@ -461,8 +487,8 @@ struct PetDocumentCommandExecutor {
         pet: Pet,
         input: PetDocumentUpdateCommandInput,
         note: String
-    ) -> PetDocumentCommandResult {
-        let result = PetDocumentCommandService.updateDocument(document, pet: pet, input: input, context: context)
+    ) throws -> PetDocumentCommandResult {
+        let result = try PetDocumentCommandService.updateDocument(document, pet: pet, input: input, context: context)
         if result.didChange {
             revisions.publishPetDocumentUpdate(result, note: note)
         }
@@ -474,8 +500,8 @@ struct PetDocumentCommandExecutor {
         _ document: PetDocument,
         pet: Pet,
         note: String
-    ) -> PetDocumentDeleteCommandResult {
-        let result = PetDocumentCommandService.deleteDocument(document, pet: pet, context: context)
+    ) throws -> PetDocumentDeleteCommandResult {
+        let result = try PetDocumentCommandService.deleteDocument(document, pet: pet, context: context)
         if result.didChange {
             revisions.publishPetDocumentDelete(result, note: note)
         }

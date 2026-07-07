@@ -34,7 +34,11 @@ enum PlantMediaAttachmentIndexRepair {
         }
 
         guard changed else { return false }
-        modelContext.safeSave()
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            modelContext.rollback()
+            return false
+        }
         return true
     }
 }

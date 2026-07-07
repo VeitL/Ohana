@@ -540,13 +540,18 @@ struct AddDocumentContentSheet: View {
                 PetDocumentAttachmentCommandInput(data: $0.data, filename: $0.filename, isImage: $0.isImage)
             }
         )
-        commandQueue.enqueue(.petDocumentCreate(petID: pet.id, category: selectedCategory.rawValue)) {
-            PetDocumentCommandExecutor(context: modelContext, services: appServices).createDocument(
-                input: input,
-                pet: pet,
-                note: "petDocument.create"
-            )
+        let command = DomainCommand.petDocumentCreate(petID: pet.id, category: selectedCategory.rawValue)
+        commandQueue.enqueue(command) {
+            do {
+                try PetDocumentCommandExecutor(context: modelContext, services: appServices).createDocument(
+                    input: input,
+                    pet: pet,
+                    note: "petDocument.create"
+                )
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } catch {
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }

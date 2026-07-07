@@ -124,6 +124,20 @@ struct InsuranceClaimCommandResult: Equatable {
     let didChange: Bool
 }
 
+enum InsuranceCommandError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        switch self {
+        case let .persistenceFailed(reason):
+            if let reason, !reason.isEmpty {
+                return "保险信息保存失败：\(reason)"
+            }
+            return "保险信息保存失败，请稍后重试。"
+        }
+    }
+}
+
 enum InsurancePolicyCommandService {
     @discardableResult
     @MainActor
@@ -132,7 +146,7 @@ enum InsurancePolicyCommandService {
         pet: Pet,
         input: InsurancePolicySaveCommandInput,
         context: ModelContext
-    ) -> InsurancePolicyCommandResult {
+    ) throws -> InsurancePolicyCommandResult {
         let modifiedAt = insurance == nil ? input.startDate : Date()
         guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
             pet: pet,
@@ -169,7 +183,7 @@ enum InsurancePolicyCommandService {
                 otherFeeNote: input.otherFeeNote,
                 context: context
             )
-            context.safeSave()
+            try saveInsuranceChanges(context: context)
             return InsurancePolicyCommandResult(
                 policyID: insurance.id,
                 petID: pet.id,
@@ -199,7 +213,7 @@ enum InsurancePolicyCommandService {
         let schedule = input.autoGeneratesPayments && input.annualPremium > 0
             ? generatePaymentSchedule(for: insurance, pet: pet, executorId: input.executorId, context: context)
             : (expenseIDs: [], events: [])
-        context.safeSave()
+        try saveInsuranceChanges(context: context)
         return InsurancePolicyCommandResult(
             policyID: insurance.id,
             petID: pet.id,
@@ -216,7 +230,7 @@ enum InsurancePolicyCommandService {
         isActive: Bool,
         pet: Pet,
         context: ModelContext
-    ) -> InsurancePolicyCommandResult {
+    ) throws -> InsurancePolicyCommandResult {
         guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
             pet: pet,
             occurredAt: Date(),
@@ -232,7 +246,9 @@ enum InsurancePolicyCommandService {
             isActive: isActive,
             context: context
         )
-        context.safeSave()
+        if didChange {
+            try saveInsuranceChanges(context: context)
+        }
         return InsurancePolicyCommandResult(
             policyID: insurance.id,
             petID: pet.id,
@@ -246,7 +262,7 @@ enum InsurancePolicyCommandService {
         _ insurance: PetInsurance,
         pet: Pet,
         context: ModelContext
-    ) -> InsurancePolicyCommandResult {
+    ) throws -> InsurancePolicyCommandResult {
         guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
             pet: pet,
             occurredAt: Date(),
@@ -259,7 +275,7 @@ enum InsurancePolicyCommandService {
         let policyID = insurance.id
         let petID = pet.id
         DomainMemberFactWriter.deletePetInsurancePolicy(plan: write, insurance: insurance, pet: pet, context: context)
-        context.safeSave()
+        try saveInsuranceChanges(context: context)
         return InsurancePolicyCommandResult(
             policyID: policyID,
             petID: petID,
@@ -274,7 +290,7 @@ enum InsurancePolicyCommandService {
         pet: Pet,
         input: InsuranceClaimCommandInput,
         context: ModelContext
-    ) -> InsuranceClaimCommandResult {
+    ) throws -> InsuranceClaimCommandResult {
         guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
             pet: pet,
             occurredAt: input.claimDate,
@@ -318,7 +334,7 @@ enum InsurancePolicyCommandService {
             context: context
         )
 
-        context.safeSave()
+        try saveInsuranceChanges(context: context)
         return InsuranceClaimCommandResult(
             claimID: claim.id,
             policyID: insurance.id,
@@ -338,7 +354,7 @@ enum InsurancePolicyCommandService {
         context: ModelContext,
         approvedAt: Date = Date(),
         executorId: String? = nil
-    ) -> InsuranceClaimCommandResult {
+    ) throws -> InsuranceClaimCommandResult {
         guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
             pet: pet,
             occurredAt: approvedAt,
@@ -386,7 +402,9 @@ enum InsurancePolicyCommandService {
             context: context
         )
 
-        context.safeSave()
+        if didChange || oldStatus != status || oldApprovedAmount != nextApprovedAmount {
+            try saveInsuranceChanges(context: context)
+        }
         return InsuranceClaimCommandResult(
             claimID: claim.id,
             policyID: insurance.id,
@@ -403,7 +421,7 @@ enum InsurancePolicyCommandService {
         insurance: PetInsurance,
         pet: Pet,
         context: ModelContext
-    ) -> InsuranceClaimCommandResult {
+    ) throws -> InsuranceClaimCommandResult {
         guard let write = DomainMemberFactWriteAuthorizer.authorizePetFact(
             pet: pet,
             occurredAt: Date(),
@@ -421,7 +439,7 @@ enum InsurancePolicyCommandService {
         }
         let claimID = claim.id
         DomainMemberFactWriter.deleteInsuranceClaim(plan: write, claim: claim, pet: pet, context: context)
-        context.safeSave()
+        try saveInsuranceChanges(context: context)
         return InsuranceClaimCommandResult(
             claimID: claimID,
             policyID: insurance.id,
@@ -429,6 +447,15 @@ enum InsurancePolicyCommandService {
             expenseLogID: nil,
             didChange: true
         )
+    }
+
+    @MainActor
+    private static func saveInsuranceChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw InsuranceCommandError.persistenceFailed(saveResult.errorDescription)
+        }
     }
 
     @MainActor
@@ -548,8 +575,8 @@ struct InsuranceCommandExecutor {
         pet: Pet,
         input: InsurancePolicySaveCommandInput,
         note: String
-    ) -> InsurancePolicyCommandResult {
-        let result = InsurancePolicyCommandService.savePolicy(
+    ) throws -> InsurancePolicyCommandResult {
+        let result = try InsurancePolicyCommandService.savePolicy(
             existing: insurance,
             pet: pet,
             input: input,
@@ -571,8 +598,8 @@ struct InsuranceCommandExecutor {
         isActive: Bool,
         pet: Pet,
         note: String
-    ) -> InsurancePolicyCommandResult {
-        let result = InsurancePolicyCommandService.setPolicyActive(
+    ) throws -> InsurancePolicyCommandResult {
+        let result = try InsurancePolicyCommandService.setPolicyActive(
             insurance,
             isActive: isActive,
             pet: pet,
@@ -589,8 +616,8 @@ struct InsuranceCommandExecutor {
     }
 
     @discardableResult
-    func deletePolicy(_ insurance: PetInsurance, pet: Pet, note: String) -> InsurancePolicyCommandResult {
-        let result = InsurancePolicyCommandService.deletePolicy(insurance, pet: pet, context: context)
+    func deletePolicy(_ insurance: PetInsurance, pet: Pet, note: String) throws -> InsurancePolicyCommandResult {
+        let result = try InsurancePolicyCommandService.deletePolicy(insurance, pet: pet, context: context)
         if result.didChange {
             revisions.publishInsurancePolicy(result, action: "delete", note: note)
         }
@@ -603,8 +630,8 @@ struct InsuranceCommandExecutor {
         pet: Pet,
         input: InsuranceClaimCommandInput,
         note: String
-    ) -> InsuranceClaimCommandResult {
-        let result = InsurancePolicyCommandService.createClaim(
+    ) throws -> InsuranceClaimCommandResult {
+        let result = try InsurancePolicyCommandService.createClaim(
             insurance: insurance,
             pet: pet,
             input: input,
@@ -624,8 +651,8 @@ struct InsuranceCommandExecutor {
         pet: Pet,
         executorId: String?,
         note: String
-    ) -> InsuranceClaimCommandResult {
-        let result = InsurancePolicyCommandService.updateClaimStatus(
+    ) throws -> InsuranceClaimCommandResult {
+        let result = try InsurancePolicyCommandService.updateClaimStatus(
             claim,
             to: status,
             insurance: insurance,
@@ -645,8 +672,8 @@ struct InsuranceCommandExecutor {
         insurance: PetInsurance,
         pet: Pet,
         note: String
-    ) -> InsuranceClaimCommandResult {
-        let result = InsurancePolicyCommandService.deleteClaim(
+    ) throws -> InsuranceClaimCommandResult {
+        let result = try InsurancePolicyCommandService.deleteClaim(
             claim,
             insurance: insurance,
             pet: pet,

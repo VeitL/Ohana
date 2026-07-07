@@ -1026,21 +1026,27 @@ struct AddEventContentView: View {
     private func enqueueSaveEvent(input: CalendarEventPlanCommandInput, command: DomainCommand) {
         commandQueue.enqueue(command) {
             let executor = CalendarCommandExecutor(context: modelContext, services: appServices)
-            let result: CalendarEventPlanCommandResult? = if let editingEvent {
-                executor.updateEvent(event: editingEvent, input: input)
-            } else {
-                executor.createEvent(input: input)
-            }
-            guard result != nil else {
+            do {
+                let result: CalendarEventPlanCommandResult? = if let editingEvent {
+                    try executor.updateEvent(event: editingEvent, input: input)
+                } else {
+                    try executor.createEvent(input: input)
+                }
+                guard result != nil else {
+                    isSaving = false
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    return
+                }
+
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                withAnimation(GoMotion.feedback) { didSave = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                    closeEditor()
+                }
+            } catch {
                 isSaving = false
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
-                return
-            }
-
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation(GoMotion.feedback) { didSave = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-                closeEditor()
+                appServices.domainRevisions.publishFailure(command: command, error: error)
             }
         }
     }
