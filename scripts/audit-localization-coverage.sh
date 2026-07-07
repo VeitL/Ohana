@@ -134,7 +134,7 @@ else
 fi
 
 echo
-echo "== Direct SwiftUI Chinese literals =="
+echo "== Direct user-visible Chinese literals =="
 python_args=(--mode "$mode" --baseline "$hardcoded_chinese_baseline")
 if [[ "$update_baseline" == "1" ]]; then
   python_args+=(--update-baseline)
@@ -171,6 +171,27 @@ DIRECT_UI_LITERAL_RE = re.compile(
     "(?P<literal>(?:\\"|[^"\n])*[\u3400-\u9fff](?:\\"|[^"\n])*)"
     """,
     re.VERBOSE,
+)
+DIRECT_UI_NAMED_LITERAL_RE = re.compile(
+    r"""
+    \b(?:placeholder|title|label)\s*:\s*
+    "(?P<literal>(?:\\"|[^"\n])*[\u3400-\u9fff](?:\\"|[^"\n])*)"
+    """,
+    re.VERBOSE,
+)
+DIRECT_INPUT_LITERAL_RE = re.compile(
+    r"""
+    \b(?:GoDraftTextField|GoDraftInput|OhanaTextField|PlantCreationBufferedTextField|
+        CrewRosterEditorTextField|InlineNumericInput)\s*\(\s*
+    "(?P<literal>(?:\\"|[^"\n])*[\u3400-\u9fff](?:\\"|[^"\n])*)"
+    """,
+    re.VERBOSE,
+)
+INPUT_HELPER_CALL_RE = re.compile(
+    r"\b(?:GoDraftTextField|GoDraftInput|OhanaTextField|PlantCreationBufferedTextField|CrewRosterEditorTextField|InlineNumericInput)\s*\("
+)
+LEADING_STRING_LITERAL_RE = re.compile(
+    r'^\s*"(?P<literal>(?:\\"|[^"\n])*[\u3400-\u9fff](?:\\"|[^"\n])*)"\s*,?'
 )
 
 
@@ -224,11 +245,22 @@ def scan_file(path: pathlib.Path) -> list[dict[str, object]]:
         lines = path.read_text(encoding="utf-8").splitlines()
     except UnicodeDecodeError:
         lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    pending_input_literal_lines = 0
     for line_number, line in enumerate(lines, start=1):
         if ALLOW_MARKER in line:
+            pending_input_literal_lines = 0
             continue
-        if DIRECT_UI_LITERAL_RE.search(line):
+        if (
+            DIRECT_UI_LITERAL_RE.search(line)
+            or DIRECT_UI_NAMED_LITERAL_RE.search(line)
+            or DIRECT_INPUT_LITERAL_RE.search(line)
+            or (pending_input_literal_lines > 0 and LEADING_STRING_LITERAL_RE.search(line))
+        ):
             matches.append({"line": line_number, "source": line.strip()})
+        if INPUT_HELPER_CALL_RE.search(line):
+            pending_input_literal_lines = 4
+        elif pending_input_literal_lines > 0:
+            pending_input_literal_lines -= 1
     return matches
 
 
@@ -238,11 +270,11 @@ def load_baseline(path: pathlib.Path) -> dict[str, list[str]]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        print(f"Direct SwiftUI Chinese literal audit: invalid baseline JSON: {exc}", file=sys.stderr)
+        print(f"Direct user-visible Chinese literal audit: invalid baseline JSON: {exc}", file=sys.stderr)
         sys.exit(1)
     raw = data.get("allowedMatches", {})
     if not isinstance(raw, dict):
-        print("Direct SwiftUI Chinese literal audit: baseline missing allowedMatches.", file=sys.stderr)
+        print("Direct user-visible Chinese literal audit: baseline missing allowedMatches.", file=sys.stderr)
         sys.exit(1)
     allowed: dict[str, list[str]] = {}
     for file_path, lines in raw.items():
@@ -266,8 +298,9 @@ def write_baseline(path: pathlib.Path, matches_by_file: dict[str, list[dict[str,
             "docs/design/ohana-ui-spec.md",
         ],
         "purpose": (
-            "Ratcheted baseline for existing direct hardcoded Chinese user-visible SwiftUI "
-            "literals. New matches fail scripts/audit-localization-coverage.sh."
+            "Ratcheted baseline for existing direct hardcoded Chinese user-visible "
+            "SwiftUI and UI helper literals, including placeholder/title/label strings. New matches fail "
+            "scripts/audit-localization-coverage.sh."
         ),
         "command": "scripts/audit-localization-coverage.sh --all",
         "allowedMatches": allowed,
@@ -275,7 +308,7 @@ def write_baseline(path: pathlib.Path, matches_by_file: dict[str, list[dict[str,
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     total = sum(len(lines) for lines in allowed.values())
-    print(f"Direct SwiftUI Chinese literal baseline updated at {relative(path)} ({total} match(es), {len(allowed)} file(s)).")
+    print(f"Direct user-visible Chinese literal baseline updated at {relative(path)} ({total} match(es), {len(allowed)} file(s)).")
 
 
 parser = argparse.ArgumentParser()
@@ -316,7 +349,7 @@ if violations:
         )
         print(f"  {source}")
     print(
-        f"Direct SwiftUI Chinese literal audit: {len(violations)} new match(es) "
+        f"Direct user-visible Chinese literal audit: {len(violations)} new match(es) "
         f"across {len({item[0] for item in violations})} file(s).",
         file=sys.stderr,
     )
@@ -325,7 +358,7 @@ if violations:
 baseline_debt = sum(len(lines) for lines in allowed.values())
 current_debt = sum(len(matches) for matches in matches_by_file.values())
 print(
-    f"Direct SwiftUI Chinese literal audit: passed ({len(files)} file(s), "
+    f"Direct user-visible Chinese literal audit: passed ({len(files)} file(s), "
     f"{current_debt} current baseline match(es), {baseline_debt} allowed)."
 )
 PY
