@@ -82,7 +82,7 @@ struct SitterCardPreviewSheet: View {
     private var sitterCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             // 头部：头像 + 名字 + 物种
-            HStack(spacing: 16) {
+            HStack(alignment: .top, spacing: 16) {
                 PetAvatarPortraitView(
                     pet: pet,
                     fallbackText: pet.avatarEmoji,
@@ -96,13 +96,11 @@ struct SitterCardPreviewSheet: View {
                     Text(pet.name)
                         .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    HStack(spacing: 6) {
-                        capsuleTag(pet.localizedSpeciesName(l: l))
-                        if !pet.breed.isEmpty { capsuleTag(pet.breed) }
-                        capsuleTag(pet.genderSymbol + (pet.isNeutered ? " " + l.tr(zh: "已绝育", en: "Neutered", de: "Kastriert") : ""))
-                    }
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    sitterHeaderTags
                 }
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(20)
 
@@ -206,7 +204,7 @@ struct SitterCardPreviewSheet: View {
 
     // MARK: - Row Builder
     private func sitterRow(icon: String, color: Color, label: String, value: String) -> some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)
                     .fill(color.opacity(0.15))
@@ -215,17 +213,49 @@ struct SitterCardPreviewSheet: View {
                     .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(color)
             }
-            Text(label)
-                .font(OhanaFont.adaptive(size: 12, weight: .medium))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                .frame(width: 56, alignment: .leading)
-            Text(value)
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer()
+            VStack(alignment: .leading, spacing: 3) {
+                Text(label)
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.42))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(value)
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 8)
+    }
+
+    private var sitterHeaderTags: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                capsuleTag(pet.localizedSpeciesName(l: l))
+                if !pet.breed.isEmpty { capsuleTag(pet.breed) }
+                capsuleTag(neuteredTagText)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    capsuleTag(pet.localizedSpeciesName(l: l))
+                    if !pet.breed.isEmpty { capsuleTag(pet.breed) }
+                }
+                capsuleTag(neuteredTagText)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                capsuleTag(pet.localizedSpeciesName(l: l))
+                if !pet.breed.isEmpty { capsuleTag(pet.breed) }
+                capsuleTag(neuteredTagText)
+            }
+        }
+    }
+
+    private var neuteredTagText: String {
+        pet.genderSymbol + (pet.isNeutered ? " " + l.tr(zh: "已绝育", en: "Neutered", de: "Kastriert") : "")
     }
 
     private func capsuleTag(_ text: String) -> some View {

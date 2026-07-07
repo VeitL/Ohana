@@ -34,6 +34,17 @@ enum CareLedgerRangeFilter: CaseIterable {
             nil
         }
     }
+
+    var trendDayCount: Int {
+        switch self {
+        case .week:
+            7
+        case .month:
+            30
+        case .all:
+            14
+        }
+    }
 }
 
 @Observable
@@ -73,6 +84,43 @@ final class CareLedgerAnalysisScreenModel {
         return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }
     }
 
+    var dailyTrendPoints: [OhanaMinimalChartPoint] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let dayCount = selectedRange.trendDayCount
+        let start = calendar.date(byAdding: .day, value: -(dayCount - 1), to: today) ?? today
+        let eventsInTrendWindow = filteredEvents.filter { event in
+            event.occurredAt >= start
+        }
+        let countByDay = Dictionary(grouping: eventsInTrendWindow) { event in
+            calendar.startOfDay(for: event.occurredAt)
+        }.mapValues(\.count)
+
+        return (0 ..< dayCount).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
+            return OhanaMinimalChartPoint(
+                date: date,
+                value: Double(countByDay[date, default: 0]),
+                label: trendLabel(for: date, calendar: calendar),
+                id: "care-ledger-trend-\(offset)"
+            )
+        }
+    }
+
+    var dailyTrendActiveDayCount: Int {
+        dailyTrendPoints.count(where: { $0.value > 0 })
+    }
+
+    var dailyTrendTotal: Int {
+        Int(dailyTrendPoints.reduce(0) { $0 + $1.value })
+    }
+
+    var averageEventsPerActiveDay: Double {
+        let activeDays = dailyTrendActiveDayCount
+        guard activeDays > 0 else { return 0 }
+        return Double(dailyTrendTotal) / Double(activeDays)
+    }
+
     func actorStats(l: L10n) -> [(String, Int)] {
         let grouped = Dictionary(grouping: filteredEvents) { event in
             actorName(for: event.actorId, kind: event.actorKind, l: l)
@@ -110,5 +158,12 @@ final class CareLedgerAnalysisScreenModel {
             return l.tr(zh: "植物", en: "Plant", de: "Pflanze")
         }
         return l.tr(zh: "全家", en: "Household", de: "Haushalt")
+    }
+
+    private func trendLabel(for date: Date, calendar: Calendar) -> String {
+        if selectedRange == .week {
+            return date.formatted(.dateTime.weekday(.narrow))
+        }
+        return "\(calendar.component(.day, from: date))"
     }
 }

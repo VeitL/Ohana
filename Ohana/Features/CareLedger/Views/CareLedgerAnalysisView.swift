@@ -24,6 +24,7 @@ struct CareLedgerAnalysisContentView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
                     filterCard
+                    dailyTrendCard
                     kindBreakdownCard
                     actorBreakdownCard
                     latestEventsCard
@@ -108,6 +109,50 @@ struct CareLedgerAnalysisContentView: View {
                 ForEach(screenModel.kindStats, id: \.0) { kind, count in
                     statBar(title: kind.displayName(l: l), count: count, total: max(screenModel.filteredEvents.count, 1), color: kind.color)
                 }
+            }
+        }
+        .padding(16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
+    }
+
+    private var dailyTrendCard: some View {
+        let trendPoints = screenModel.dailyTrendPoints
+        let hasEvents = screenModel.dailyTrendTotal > 0
+        return VStack(alignment: .leading, spacing: 12) {
+            sectionHeader(l.tr(zh: "照护趋势", en: "Care trend", de: "Pflegetrend"), icon: "chart.xyaxis.line")
+            if hasEvents {
+                OhanaMinimalBarChart(
+                    points: trendPoints,
+                    tint: .goTeal,
+                    showsLabels: true,
+                    maxBarHeight: 58,
+                    emptyBarColor: Color.ohanaControlFill.opacity(0.65)
+                )
+                .frame(height: 86)
+                .accessibilityLabel(l.tr(
+                    zh: "照护账本每日趋势图",
+                    en: "Daily care ledger trend chart",
+                    de: "Taegliches Pflegebuch-Trenddiagramm"
+                ))
+
+                HStack(spacing: 10) {
+                    metric(
+                        l.tr(zh: "活跃天", en: "Active days", de: "Aktive Tage"),
+                        "\(screenModel.dailyTrendActiveDayCount)",
+                        .goTeal
+                    )
+                    metric(
+                        l.tr(zh: "日均", en: "Daily avg", de: "Tagesmittel"),
+                        screenModel.averageEventsPerActiveDay.formatted(.number.precision(.fractionLength(1))),
+                        .goPrimary
+                    )
+                }
+            } else {
+                emptyText(l.tr(
+                    zh: "选定范围内暂无趋势数据",
+                    en: "No trend data in the selected range",
+                    de: "Keine Trenddaten im gewaehlten Zeitraum"
+                ))
             }
         }
         .padding(16)
