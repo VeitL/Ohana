@@ -40,17 +40,29 @@ struct PetHygieneDetailContentView: View {
     private var chromeAccent: Color { isDark ? Color.goPrimary : Color.goBlue }
     private var l: L10n { L10n(appLanguage) }
 
-    private func daysSince(_ type: HygieneType) -> Int? {
-        guard let last = hygieneEntries.first(where: { $0.type == type }) else { return nil }
-        return Calendar.current.dateComponents([.day], from: last.date, to: Date()).day
+    private func latestHygieneDate(_ type: HygieneType) -> Date? {
+        hygieneEntries.first(where: { $0.type == type })?.date
     }
 
-    private func statusColor(_ type: HygieneType) -> Color {
-        guard let d = daysSince(type) else { return themeColor.opacity(0.42) }
-        let p = Double(d) / Double(type.effectiveCycleDays(for: pet.id))
-        if p < 0.5 { return themeColor }
-        if p < 0.85 { return themeColor.opacity(0.62) }
-        return Color.goRed
+    private func cycleStatus(_ type: HygieneType, now: Date = Date()) -> CareCycleStatus? {
+        type.cycleStatus(
+            lastDate: latestHygieneDate(type),
+            petId: pet.id,
+            now: now,
+            calendar: .current
+        )
+    }
+
+    private func statusColor(_ status: CareCycleStatus?) -> Color {
+        guard let status else { return themeColor.opacity(0.42) }
+        switch status.duePhase {
+        case .upcoming:
+            return themeColor
+        case .dueToday:
+            return Color.goOrange
+        case .overdue:
+            return Color.goRed
+        }
     }
 
     /// 与 `HygieneTodoSheet.save()` 写入的标题前缀一致（含备注时仍以此前缀开头）
@@ -153,10 +165,15 @@ struct PetHygieneDetailContentView: View {
         return strike
     }
 
-    private var overdueTypes: [HygieneType] {
+    private var attentionTypes: [HygieneType] {
         HygieneType.allCases.filter { type in
-            guard let d = daysSince(type) else { return false }
-            return d >= type.effectiveCycleDays(for: pet.id)
+            cycleStatus(type)?.requiresAttention == true
+        }
+    }
+
+    private var hasOverdueType: Bool {
+        HygieneType.allCases.contains { type in
+            cycleStatus(type)?.isOverdue == true
         }
     }
 
@@ -244,9 +261,10 @@ struct PetHygieneDetailContentView: View {
     private var monthlySummaryCard: some View {
         let totalTypes = max(HygieneType.allCases.count, 1)
         let progress = CGFloat(completedTodayCount) / CGFloat(totalTypes)
-        let headline = overdueTypes.isEmpty
+        let attentionTint = hasOverdueType ? Color.goRed : Color.goOrange
+        let headline = attentionTypes.isEmpty
             ? l.tr(zh: "今天的护理节奏很好", en: "Care rhythm looks good today", de: "Der Pflegerhythmus passt heute")
-            : l.tr(zh: "\(overdueTypes.count) 项护理需要关注", en: "\(overdueTypes.count) care items need attention", de: "\(overdueTypes.count) Pflegepunkte brauchen Aufmerksamkeit")
+            : l.tr(zh: "\(attentionTypes.count) 项护理需要关注", en: "\(attentionTypes.count) care items need attention", de: "\(attentionTypes.count) Pflegepunkte brauchen Aufmerksamkeit")
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 14) {
@@ -272,9 +290,9 @@ struct PetHygieneDetailContentView: View {
                     Text(headline)
                         .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(overdueTypes.isEmpty ? l.tr(zh: "继续保持，下一次护理会自动提醒。", en: "Keep going. The next care item will remind you.", de: "Weiter so. Die nächste Pflege erinnert dich.") : overdueTypes.map { $0.localizedLabel(l) }.joined(separator: l.tr(zh: "、", en: ", ", de: ", ")))
+                    Text(attentionTypes.isEmpty ? l.tr(zh: "继续保持，下一次护理会自动提醒。", en: "Keep going. The next care item will remind you.", de: "Weiter so. Die nächste Pflege erinnert dich.") : attentionTypes.map { $0.localizedLabel(l) }.joined(separator: l.tr(zh: "、", en: ", ", de: ", ")))
                         .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(overdueTypes.isEmpty ? .secondary : Color.goRed.opacity(0.9))
+                        .foregroundStyle(attentionTypes.isEmpty ? .secondary : attentionTint.opacity(0.9))
                         .lineLimit(2)
                 }
                 Spacer(minLength: 0)
@@ -283,7 +301,7 @@ struct PetHygieneDetailContentView: View {
             HStack(spacing: 8) {
                 overviewMetric(icon: "sparkle", value: "\(monthlyTotalCount)", label: l.tr(zh: "本月护理", en: "This month", de: "Dieser Monat"), tint: themeColor)
                 overviewMetric(icon: "bolt.fill", value: "\(currentStrike)", label: l.tr(zh: "连续打卡", en: "Streak", de: "Serie"), tint: Color.goOrange)
-                overviewMetric(icon: "clock", value: "\(overdueTypes.count)", label: l.tr(zh: "待护理", en: "Due", de: "Fällig"), tint: overdueTypes.isEmpty ? themeColor : Color.goRed)
+                overviewMetric(icon: "clock", value: "\(attentionTypes.count)", label: l.tr(zh: "待护理", en: "Due", de: "Fällig"), tint: attentionTypes.isEmpty ? themeColor : attentionTint)
             }
         }
         .padding(.vertical, 6)
@@ -323,8 +341,8 @@ struct PetHygieneDetailContentView: View {
     private func hygieneTypeCard(_ type: HygieneType) -> some View {
         _ = hygieneCycleRefresh
         let logs = hygieneEntries.filter { $0.type == type }.sorted { $0.date > $1.date }
-        let color = statusColor(type)
-        let days = daysSince(type)
+        let status = cycleStatus(type)
+        let color = statusColor(status)
         let stripHasData = monthStripPoints(type).contains { $0.count > 0 }
         let doneToday = isDoneToday(type)
         let plans = pendingHygienePlans(for: type)
@@ -340,12 +358,12 @@ struct PetHygieneDetailContentView: View {
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 4)
-                if let d = days {
-                    Text(d == 0 ? l.tr(zh: "✓ 今天", en: "✓ Today", de: "✓ Heute") : l.tr(zh: "\(d)天前", en: "\(d)d ago", de: "vor \(d) T."))
+                if let status {
+                    Text(status.requiresAttention ? status.compactDueText(l: l) : status.compactLastRecordedText(l: l))
                         .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(d == 0 ? themeColor : color)
+                        .foregroundStyle(status.elapsedDays == 0 ? themeColor : color)
                         .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background((d == 0 ? themeColor : color).opacity(0.14), in: Capsule())
+                        .background((status.elapsedDays == 0 ? themeColor : color).opacity(0.14), in: Capsule())
                 } else {
                     Text(l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag"))
                         .font(OhanaFont.adaptive(size: 10, weight: .medium))

@@ -65,6 +65,14 @@ extension HumanAllFeatureDestination: Identifiable {
 }
 
 struct HumanAllFeaturesActivitySummary: Equatable {
+    var latestWeightKg: Double?
+    var latestWeightDate: Date?
+    var monthlyWorkoutCount: Int = 0
+    var latestWorkoutDate: Date?
+    var trackedHealthMetricCount: Int = 0
+    var latestHealthMetricKey: String?
+    var latestHealthMetricUnitCode: String?
+    var latestHealthMetricValue: Double?
     var weightChartPoints: [OhanaMinimalChartPoint] = []
     var workoutChartPoints: [OhanaMinimalChartPoint] = []
     var metricsChartPoints: [OhanaMinimalChartPoint] = []
@@ -83,6 +91,9 @@ struct HumanAllFeaturesActivitySummary: Equatable {
         allMeds: [HumanMedication],
         allReports: [HumanHealthReport],
         allExpenses: [PetExpenseLog],
+        weightLogs: [HumanWeightLog] = [],
+        workoutLogs: [HumanWorkoutLog] = [],
+        healthMetricLogs: [HumanHealthMetricLog] = [],
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> HumanAllFeaturesActivitySummary {
@@ -94,6 +105,10 @@ struct HumanAllFeaturesActivitySummary: Equatable {
         let myMeds = allMeds.filter { $0.humanId == humanID }
         let myReports = allReports.filter { $0.humanId == humanID }
         let myExpenses = allExpenses.filter { $0.executorId == humanID }
+        let latestWeight = weightLogs.max(by: { $0.date < $1.date })
+        let latestWorkout = workoutLogs.max(by: { $0.date < $1.date })
+        let latestHealthMetric = healthMetricLogs.max(by: { $0.date < $1.date })
+        let monthlyWorkoutCount = workoutLogs.count(where: { calendar.isDate($0.date, equalTo: now, toGranularity: .month) })
         let visibleNotes = HumanProfileOptions.visibleNoteParts(from: human.notes)
         let profileCompletion = [
             !human.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -103,14 +118,22 @@ struct HumanAllFeaturesActivitySummary: Equatable {
         ].count { $0 }
 
         return HumanAllFeaturesActivitySummary(
-            weightChartPoints: human.weightLogs
+            latestWeightKg: latestWeight?.weight,
+            latestWeightDate: latestWeight?.date,
+            monthlyWorkoutCount: monthlyWorkoutCount,
+            latestWorkoutDate: latestWorkout?.date,
+            trackedHealthMetricCount: Set(healthMetricLogs.map(\.metricKey)).count,
+            latestHealthMetricKey: latestHealthMetric?.metricKey,
+            latestHealthMetricUnitCode: latestHealthMetric?.unitCode,
+            latestHealthMetricValue: latestHealthMetric?.value,
+            weightChartPoints: weightLogs
                 .sorted { $0.date < $1.date }
                 .suffix(7)
                 .map { OhanaMinimalChartPoint(date: $0.date, value: max(0, $0.weight), id: "human-all-weight-\($0.id.uuidString)") },
             workoutChartPoints: dailyPoints(
                 days: recentDays,
                 idPrefix: "human-all-workout",
-                values: human.workoutLogs,
+                values: workoutLogs,
                 date: \.date,
                 value: { Double(max(0, $0.durationMinutes)) },
                 calendar: calendar
@@ -118,7 +141,7 @@ struct HumanAllFeaturesActivitySummary: Equatable {
             metricsChartPoints: dailyPoints(
                 days: recentDays,
                 idPrefix: "human-all-metrics",
-                values: human.healthMetricLogs,
+                values: healthMetricLogs,
                 date: \.date,
                 value: { _ in 1 },
                 calendar: calendar
@@ -585,36 +608,35 @@ struct HumanAllFeaturesSheet: View {
     }
 
     private var latestWeightText: String {
-        guard let latest = human.weightLogs.max(by: { $0.date < $1.date }) else {
+        guard let latestWeightKg = summary.latestWeightKg else {
             return l.tr(zh: "未记录", en: "None", de: "Keine")
         }
-        return String(format: "%.1fkg", latest.weight)
+        return String(format: "%.1fkg", latestWeightKg)
     }
 
     private var latestWeightSubtitle: String {
-        guard let latest = human.weightLogs.max(by: { $0.date < $1.date }) else {
+        guard let latestWeightDate = summary.latestWeightDate else {
             return l.tr(zh: "快速记录一次体重", en: "Add a quick weight", de: "Gewicht schnell eintragen")
         }
         return l.tr(
-            zh: "上次 \(relativeDayText(latest.date))",
-            en: "Last \(relativeDayText(latest.date))",
-            de: "Zuletzt \(relativeDayText(latest.date))"
+            zh: "上次 \(relativeDayText(latestWeightDate))",
+            en: "Last \(relativeDayText(latestWeightDate))",
+            de: "Zuletzt \(relativeDayText(latestWeightDate))"
         )
     }
 
     private var workoutMetric: String {
-        let count = human.workoutLogs.count(where: { Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) })
-        return "\(count)"
+        "\(summary.monthlyWorkoutCount)"
     }
 
     private var workoutSubtitle: String {
-        guard let last = human.workoutLogs.max(by: { $0.date < $1.date }) else {
+        guard let latestWorkoutDate = summary.latestWorkoutDate else {
             return l.tr(zh: "记录运动和共同健康", en: "Track movement and co-health", de: "Bewegung und gemeinsame Gesundheit")
         }
         return l.tr(
-            zh: "上次 \(relativeDayText(last.date))",
-            en: "Last \(relativeDayText(last.date))",
-            de: "Zuletzt \(relativeDayText(last.date))"
+            zh: "上次 \(relativeDayText(latestWorkoutDate))",
+            en: "Last \(relativeDayText(latestWorkoutDate))",
+            de: "Zuletzt \(relativeDayText(latestWorkoutDate))"
         )
     }
 
@@ -653,18 +675,19 @@ struct HumanAllFeaturesSheet: View {
     }
 
     private var healthMetricMetric: String {
-        let count = Set(human.healthMetricLogs.map(\.metricKey)).count
-        guard count > 0 else { return l.tr(zh: "未追踪", en: "None", de: "Keine") }
-        return "\(count)"
+        guard summary.trackedHealthMetricCount > 0 else { return l.tr(zh: "未追踪", en: "None", de: "Keine") }
+        return "\(summary.trackedHealthMetricCount)"
     }
 
     private var healthMetricSubtitle: String {
-        guard let latest = human.healthMetricLogs.max(by: { $0.date < $1.date }),
-              let metric = HealthMetricCatalog.metric(forKey: latest.metricKey),
-              let unit = metric.unit(for: latest.unitCode) else {
+        guard let key = summary.latestHealthMetricKey,
+              let unitCode = summary.latestHealthMetricUnitCode,
+              let value = summary.latestHealthMetricValue,
+              let metric = HealthMetricCatalog.metric(forKey: key),
+              let unit = metric.unit(for: unitCode) else {
             return l.tr(zh: "TSH、HbA1c、血压等", en: "TSH, HbA1c, BP, and more", de: "TSH, HbA1c, Blutdruck")
         }
-        return "\(metric.displayName(l)) · \(unit.formattedValue(latest.value))"
+        return "\(metric.displayName(l)) · \(unit.formattedValue(value))"
     }
 
     private var monthlyExpenseText: String {

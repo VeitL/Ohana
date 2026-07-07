@@ -78,10 +78,7 @@ struct PetMedicationDetailContentSheet: View {
 
                         courseProgressCard
 
-                        HStack(alignment: .top, spacing: 12) {
-                            bentoTodayStatus
-                            bentoAdministration
-                        }
+                        medicationDetailStatusStack
 
                         if remainingAmount > 0 {
                             remainingCard
@@ -132,7 +129,8 @@ struct PetMedicationDetailContentSheet: View {
                 Text(pet.name)
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             Button {
@@ -182,12 +180,15 @@ struct PetMedicationDetailContentSheet: View {
 
     private var headerBlock: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
                 Circle()
                     .fill(Color(hex: medication.colorHex))
                     .frame(width: 14, height: 14) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                    .padding(.top, 8)
                 Text(medication.name.isEmpty ? l.tr(zh: "未命名药品", en: "Unnamed medication", de: "Unbenanntes Medikament") : medication.name)
                     .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text(l.tr(
                 zh: "\(localizedFrequency(medication.frequency)) · 每次 \(localizedDose)",
@@ -196,6 +197,8 @@ struct PetMedicationDetailContentSheet: View {
             ))
                 .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -284,17 +287,35 @@ struct PetMedicationDetailContentSheet: View {
                 Text("\(medication.startDate, format: .dateTime.year().month().day()) → \(end, format: .dateTime.year().month().day())")
                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text(l.tr(zh: "长期用药", en: "Long-term medication", de: "Langzeitmedikation"))
                     .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                 Text(l.tr(zh: "未设置结束日期", en: "No end date set", de: "Kein Enddatum festgelegt"))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+    }
+
+    private var medicationDetailStatusStack: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                bentoTodayStatus
+                bentoAdministration
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                bentoTodayStatus
+                bentoAdministration
+            }
+        }
     }
 
     private var bentoTodayStatus: some View {
@@ -305,14 +326,19 @@ struct PetMedicationDetailContentSheet: View {
             if todayRequired == 0 {
                 Text(l.tr(zh: "无需记录", en: "No dose needed", de: "Keine Dosis nötig"))
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             } else if todayDone >= todayRequired {
                 Label(l.tr(zh: "已喂完", en: "Done", de: "Erledigt"), systemImage: "checkmark.circle.fill")
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(themeColor)
+                    .lineLimit(2)
             } else {
                 Text(l.tr(zh: "还需 \(todayRequired - todayDone) 次", en: "\(todayRequired - todayDone) left", de: "Noch \(todayRequired - todayDone)"))
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.goYellow)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if let last = medEvents.filter({ Calendar.current.isDateInToday($0.startDate) }).first {
                 Text(last.startDate, format: .dateTime.hour().minute())
@@ -330,12 +356,15 @@ struct PetMedicationDetailContentSheet: View {
             Text(l.tr(zh: "喂药方式", en: "How to give", de: "Gabe"))
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
-            HStack(spacing: 6) {
+            HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "fork.knife").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 14))
                     .foregroundStyle(themeColor)
+                    .padding(.top, 2)
                 Text(administrationDisplay)
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(14)
@@ -348,15 +377,7 @@ struct PetMedicationDetailContentSheet: View {
         let estDays = Int(remainingAmount / Double(perDay))
 
         return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "cube.box.fill").accessibilityHidden(true)
-                    .foregroundStyle(themeColor)
-                Text(l.tr(zh: "剩余药量", en: "Remaining", de: "Vorrat"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                Spacer()
-                Text(l.tr(zh: "约 \(Int(remainingAmount)) 单位", en: "About \(Int(remainingAmount)) units", de: "Etwa \(Int(remainingAmount)) Einheiten"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-            }
+            medicationRemainingHeader(remainingAmount: remainingAmount)
             ProgressView(value: min(1, remainingAmount / max(remainingAmount, 1)))
                 .tint(themeColor)
             Text(l.tr(
@@ -366,9 +387,52 @@ struct PetMedicationDetailContentSheet: View {
             ))
                 .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+    }
+
+    private func medicationRemainingHeader(remainingAmount: Double) -> some View {
+        let title = l.tr(zh: "剩余药量", en: "Remaining", de: "Vorrat")
+        let value = l.tr(
+            zh: "约 \(Int(remainingAmount)) 单位",
+            en: "About \(Int(remainingAmount)) units",
+            de: "Etwa \(Int(remainingAmount)) Einheiten"
+        )
+
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                medicationRemainingTitle(title)
+                Spacer(minLength: 8)
+                medicationRemainingValue(value)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                medicationRemainingTitle(title)
+                medicationRemainingValue(value)
+            }
+        }
+    }
+
+    private func medicationRemainingTitle(_ title: String) -> some View {
+        Label {
+            Text(title)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "cube.box.fill").accessibilityHidden(true)
+                .foregroundStyle(themeColor)
+        }
+        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+    }
+
+    private func medicationRemainingValue(_ value: String) -> some View {
+        Text(value)
+            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var historySection: some View {
@@ -382,24 +446,36 @@ struct PetMedicationDetailContentSheet: View {
                     Text(row.title)
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                    HStack(spacing: 10) {
-                        ForEach(row.events) { ev in
-                            Label(ev.startDate.formatted(.dateTime.hour().minute()), systemImage: "checkmark.circle.fill")
-                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                        }
-                        if row.missedCount > 0 {
-                            ForEach(0 ..< row.missedCount, id: \.self) { _ in
-                                Label(l.tr(zh: "漏喂", en: "Missed", de: "Verpasst"), systemImage: "xmark.circle.fill")
-                                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color.goRed.opacity(0.85))
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    medicationHistoryChips(row: row)
                 }
             }
         }
+    }
+
+    private func medicationHistoryChips(row: HistoryDayRow) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], alignment: .leading, spacing: 8) {
+            ForEach(row.events) { ev in
+                Label(ev.startDate.formatted(.dateTime.hour().minute()), systemImage: "checkmark.circle.fill")
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(Color.ohanaControlFill, in: Capsule())
+            }
+            if row.missedCount > 0 {
+                ForEach(0 ..< row.missedCount, id: \.self) { _ in
+                    Label(l.tr(zh: "漏喂", en: "Missed", de: "Verpasst"), systemImage: "xmark.circle.fill")
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.goRed.opacity(0.85))
+                        .lineLimit(1)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(Color.goRed.opacity(0.10), in: Capsule())
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private struct HistoryDayRow: Identifiable {

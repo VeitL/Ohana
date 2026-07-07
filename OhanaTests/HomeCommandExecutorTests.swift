@@ -2775,7 +2775,7 @@ struct HomeCommandExecutorTests {
         #expect(resultSource.contains("let didPersist: Bool"))
         #expect(resultSource.contains("static func failed"))
         #expect(lifecycleSource.contains("private static func persistLifecycleMutation"))
-        #expect(lifecycleSource.contains("let saveResult = context.safeSaveResult()"))
+        #expect(lifecycleSource.contains("let saveResult = context.safeSaveResult(publishFailureEvent: true)"))
         #expect(lifecycleSource.contains("context.rollback()"))
         #expect(lifecycleSource.contains("return .failed"))
         #expect(!lifecycleSource.contains("RainbowBridgeService().markPassedAway(pet: pet, date: date, context: context)\n        CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: date)\n        context.safeSave()"))
@@ -2804,7 +2804,7 @@ struct HomeCommandExecutorTests {
 
         #expect(profileSource.contains("struct MemberProfileCommandResult"))
         #expect(profileSource.contains("private static func persistProfileMutation"))
-        #expect(profileSource.contains("let saveResult = context.safeSaveResult()"))
+        #expect(profileSource.contains("let saveResult = context.safeSaveResult(publishFailureEvent: true)"))
         #expect(profileSource.contains("context.rollback()"))
         #expect(!profileSource.contains("context.safeSave()"))
         #expect(interactionSource.contains("return .failed("))
@@ -2833,7 +2833,7 @@ struct HomeCommandExecutorTests {
         #expect(modelContextSource.contains("enum PersistenceSaveFailureCenter"))
         #expect(modelContextSource.contains("PassthroughSubject<ModelContextSaveFailureEvent, Never>"))
         #expect(modelContextSource.contains("static let events = subject.eraseToAnyPublisher()"))
-        #expect(modelContextSource.contains("publishFailureEvent: Bool = false"))
+        #expect(modelContextSource.contains("publishFailureEvent: Bool = true"))
         #expect(modelContextSource.contains("PersistenceSaveFailureCenter.publish(error: error, file: file, line: line)"))
         #expect(modelContextSource.contains("publishFailureEvent: true"))
         #expect(rootViewSource.contains("PersistenceSaveFailureCenter.events.receive(on: RunLoop.main)"))
@@ -3212,7 +3212,8 @@ struct HomeCommandExecutorTests {
 
         #expect(carePlanSource.contains("struct PendingSideEffects"))
         #expect(carePlanSource.contains("func commit()"))
-        #expect(carePlanSource.contains("if saveResult.didSave"))
+        #expect(carePlanSource.contains("let saveResult = context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(carePlanSource.contains("guard saveResult.didSave else"))
         #expect(carePlanSource.contains("saveChanges: Bool = true"))
     }
 
@@ -3753,7 +3754,7 @@ struct HomeCommandExecutorTests {
         #expect(result.changedFields.contains("dailyPortionGrams"))
         #expect(pet.name == "Coco")
         #expect(pet.avatarEmoji == "🐾")
-        #expect(pet.species == "猫")
+        #expect(pet.species == "cat")
         #expect(pet.breed == "Siamese")
         #expect(pet.gender == "female")
         #expect(pet.isNeutered)

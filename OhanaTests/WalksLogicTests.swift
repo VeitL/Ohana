@@ -70,10 +70,26 @@ struct WalksLogicTests {
         #expect(cardSource.contains("var onStopWalk: ([Pet], [String]) -> WalkStopRewardSummary"))
         #expect(cardSource.contains("@State var lastStopRewardSummary: WalkStopRewardSummary?"))
         #expect(actionsSource.contains("let rewardSummary = onStopWalk(selectedWalkTargets, selectedWalkExecutorIds)"))
+        #expect(actionsSource.contains("guard rewardSummary.didPersist else"))
         #expect(actionsSource.contains("lastStopRewardSummary = rewardSummary.hasReward ? rewardSummary : nil"))
         #expect(summarySource.contains("summaryRewardBadge(delta: coconutDelta)"))
         #expect(summarySource.contains("walk-tracking-summary-coconut-reward"))
         #expect(summarySource.contains("finishedCoconutDelta(for:"))
+    }
+
+    @Test func walkMapSnapshotRehydratesLogBeforeWritingAsyncImageData() throws {
+        let rootURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let managerSource = try String(
+            contentsOf: rootURL.appending(path: "Ohana/Features/Walks/PetWalkingManager.swift"),
+            encoding: .utf8
+        )
+
+        #expect(managerSource.contains("let walkLogID = walkLog.id"))
+        #expect(managerSource.contains("let modelContainer = modelContext.container"))
+        #expect(managerSource.contains("let snapshotContext = ModelContext(modelContainer)"))
+        #expect(managerSource.contains("FetchDescriptor<PetWalkLog>"))
+        #expect(managerSource.contains("persistedWalkLog.mapSnapshotData = jpegData"))
+        #expect(!managerSource.contains("walkLog.mapSnapshotData = jpegData"))
     }
 
     @Test func managerStartNoOpsForIneligiblePetsBeforeStartingLocation() {

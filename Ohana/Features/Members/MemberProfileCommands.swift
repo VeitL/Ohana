@@ -432,7 +432,7 @@ enum MemberProfileCommandService {
         changedFields: Set<String>,
         context: ModelContext
     ) -> MemberProfileCommandResult {
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             context.rollback()
             return .failed(entityID: entityID, kind: kind, error: saveResult.errorDescription)

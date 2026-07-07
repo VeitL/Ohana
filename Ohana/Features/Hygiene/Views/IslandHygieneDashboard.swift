@@ -504,16 +504,19 @@ struct IslandHygieneDashboardContentView: View {
 
     private func overdueTypes(for pet: Pet) -> [HygieneType] {
         HygieneType.allCases.filter { type in
-            let cycle = type.effectiveCycleDays(for: pet.id)
-            guard let last = hygieneDashboardActions(for: pet).first(where: {
+            hygieneCycleStatus(for: pet, type: type)?.requiresAttention == true
+        }
+    }
+
+    private func hygieneCycleStatus(for pet: Pet, type: HygieneType) -> CareCycleStatus? {
+        let latestDate = hygieneDashboardActions(for: pet)
+            .filter {
                 $0.eventKind == .hygiene &&
                     $0.actionType == type.rawValue
-            }) else {
-                return false
             }
-            let days = Calendar.current.dateComponents([.day], from: last.date, to: Date()).day ?? 0
-            return days >= cycle
-        }
+            .map(\.date)
+            .max()
+        return type.cycleStatus(lastDate: latestDate, petId: pet.id)
     }
 
     private func hygieneDashboardActions(for pet: Pet) -> [HygieneDashboardLedgerEntry] {

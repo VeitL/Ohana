@@ -60,6 +60,7 @@ nonisolated enum HomeQuickActionRenderStateLogic {
                 allEvents: source.events,
                 feedingLedgerEntries: source.feedingLedgerEntries,
                 careLedgerEntries: source.careLedgerEntries,
+                hygieneLedgerEntries: source.hygieneLedgerEntries,
                 walkLedgerEntries: source.walkLedgerEntries,
                 pottyLedgerEntries: source.pottyLedgerEntries,
                 now: now

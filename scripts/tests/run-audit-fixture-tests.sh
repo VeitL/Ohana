@@ -268,10 +268,10 @@ cp "$fixtures/SaveFailureBoundaryBad.swift" "$save_failure_fixture_path"
 run_audit scripts/audit-release-data-safety.sh
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-release-data-safety.sh SaveFailureBoundaryBad.swift: expected strict exit 1, got $status"
-elif ! grep -qF "[swiftdata-silent-safe-save]" <<<"$output"; then
-  fail "scripts/audit-release-data-safety.sh SaveFailureBoundaryBad.swift: rule [swiftdata-silent-safe-save] no longer fires"
+elif ! grep -qF "[swiftdata-ambiguous-safe-save]" <<<"$output"; then
+  fail "scripts/audit-release-data-safety.sh SaveFailureBoundaryBad.swift: rule [swiftdata-ambiguous-safe-save] no longer fires"
 else
-  echo "ok  scripts/audit-release-data-safety.sh catches new bare safeSave"
+  echo "ok  scripts/audit-release-data-safety.sh catches new ambiguous safe save"
 fi
 rm -f "$save_failure_fixture_path"
 run_audit scripts/audit-release-data-safety.sh

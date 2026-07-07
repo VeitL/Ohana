@@ -283,6 +283,36 @@ private struct HumanAllFeaturesRouteData {
             context: context,
             name: "PetExpenseLog"
         )
+        let weightLogs = fetch(
+            FetchDescriptor<HumanWeightLog>(
+                predicate: #Predicate<HumanWeightLog> { log in
+                    log.human?.id == id
+                },
+                sortBy: [SortDescriptor(\.date, order: .reverse)]
+            ),
+            context: context,
+            name: "HumanWeightLog"
+        )
+        let workoutLogs = fetch(
+            FetchDescriptor<HumanWorkoutLog>(
+                predicate: #Predicate<HumanWorkoutLog> { log in
+                    log.human?.id == id
+                },
+                sortBy: [SortDescriptor(\.date, order: .reverse)]
+            ),
+            context: context,
+            name: "HumanWorkoutLog"
+        )
+        let healthMetricLogs = fetch(
+            FetchDescriptor<HumanHealthMetricLog>(
+                predicate: #Predicate<HumanHealthMetricLog> { log in
+                    log.human?.id == id
+                },
+                sortBy: [SortDescriptor(\.date, order: .reverse)]
+            ),
+            context: context,
+            name: "HumanHealthMetricLog"
+        )
         return HumanAllFeaturesRouteData(
             human: human,
             allMeds: allMeds,
@@ -293,7 +323,10 @@ private struct HumanAllFeaturesRouteData {
                     human: $0,
                     allMeds: allMeds,
                     allReports: allReports,
-                    allExpenses: allExpenses
+                    allExpenses: allExpenses,
+                    weightLogs: weightLogs,
+                    workoutLogs: workoutLogs,
+                    healthMetricLogs: healthMetricLogs
                 )
             } ?? .empty,
             hasLoaded: true

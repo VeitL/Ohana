@@ -342,8 +342,8 @@ if save_failure_baseline:
             for line in lines:
                 if not isinstance(line, str) or not line.strip():
                     fail(f"{where} {path} contains an empty allowed line.")
-                elif ".safeSave()" not in line:
-                    fail(f"{where} {path} allowed line no longer contains safeSave(): {line}")
+                elif ".safeSave()" not in line and ".safeSaveResult()" not in line:
+                    fail(f"{where} {path} allowed line no longer contains safeSave()/safeSaveResult(): {line}")
 
 if failures:
     print("Governance manifest audit: failed.", file=sys.stderr)

@@ -50,7 +50,7 @@ extension ModelContext {
     nonisolated func safeSaveResult(
         file: String = #file,
         line: Int = #line,
-        publishFailureEvent: Bool = false
+        publishFailureEvent: Bool = true
     ) -> ModelContextSaveResult {
         do {
             try save()

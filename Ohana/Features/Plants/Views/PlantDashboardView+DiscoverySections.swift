@@ -597,32 +597,37 @@ extension PlantDashboardView {
                         .lineLimit(1)
                 }
 
-                Text(l.tr(zh: "全部区域", en: "All zones", de: "Alle Zonen"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-                    .lineLimit(1)
+                roomZoneTitle(l.tr(zh: "全部区域", en: "All zones", de: "Alle Zonen"), isSelected: isSelected)
 
-                HStack(spacing: 6) {
-                    roomZoneStatusChip(
+                if watchedPlantsCount > 0 {
+                    roomZoneStatusStack(
+                        primary: roomZoneStatusChip(
+                            icon: "calendar.badge.clock",
+                            text: dueTasks.isEmpty
+                                ? l.tr(zh: "无到期", en: "clear", de: "frei")
+                                : l.tr(zh: "\(dueTasks.count) 到期", en: "\(dueTasks.count) due", de: "\(dueTasks.count) fällig"),
+                            tint: dueTasks.isEmpty ? Color.goTeal : Color.goYellow,
+                            isSelected: isSelected
+                        ),
+                        secondary: roomZoneStatusChip(
+                            icon: "eye.fill",
+                            text: "\(watchedPlantsCount)",
+                            tint: Color.goYellow,
+                            isSelected: isSelected
+                        )
+                    )
+                } else {
+                    roomZoneStatusStack(primary: roomZoneStatusChip(
                         icon: "calendar.badge.clock",
                         text: dueTasks.isEmpty
                             ? l.tr(zh: "无到期", en: "clear", de: "frei")
                             : l.tr(zh: "\(dueTasks.count) 到期", en: "\(dueTasks.count) due", de: "\(dueTasks.count) fällig"),
                         tint: dueTasks.isEmpty ? Color.goTeal : Color.goYellow,
                         isSelected: isSelected
-                    )
-                    if watchedPlantsCount > 0 {
-                        roomZoneStatusChip(
-                            icon: "eye.fill",
-                            text: "\(watchedPlantsCount)",
-                            tint: Color.goYellow,
-                            isSelected: isSelected
-                        )
-                    }
+                    ))
                 }
             }
-            .frame(width: 142, alignment: .topLeading)
-            .frame(minHeight: 106, alignment: .topLeading)
+            .roomZoneCardFrame()
             .padding(12)
             .background(
                 isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.6),
@@ -652,33 +657,37 @@ extension PlantDashboardView {
                         .lineLimit(1)
                 }
 
-                Text(summary.title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                roomZoneTitle(summary.title, isSelected: isSelected)
 
-                HStack(spacing: 6) {
-                    roomZoneStatusChip(
+                if summary.watchCount > 0 {
+                    roomZoneStatusStack(
+                        primary: roomZoneStatusChip(
+                            icon: "calendar.badge.clock",
+                            text: summary.dueTaskCount == 0
+                                ? l.tr(zh: "无到期", en: "clear", de: "frei")
+                                : l.tr(zh: "\(summary.dueTaskCount) 到期", en: "\(summary.dueTaskCount) due", de: "\(summary.dueTaskCount) fällig"),
+                            tint: summary.dueTaskCount == 0 ? Color.goTeal : Color.goYellow,
+                            isSelected: isSelected
+                        ),
+                        secondary: roomZoneStatusChip(
+                            icon: "eye.fill",
+                            text: "\(summary.watchCount)",
+                            tint: Color.goYellow,
+                            isSelected: isSelected
+                        )
+                    )
+                } else {
+                    roomZoneStatusStack(primary: roomZoneStatusChip(
                         icon: "calendar.badge.clock",
                         text: summary.dueTaskCount == 0
                             ? l.tr(zh: "无到期", en: "clear", de: "frei")
                             : l.tr(zh: "\(summary.dueTaskCount) 到期", en: "\(summary.dueTaskCount) due", de: "\(summary.dueTaskCount) fällig"),
                         tint: summary.dueTaskCount == 0 ? Color.goTeal : Color.goYellow,
                         isSelected: isSelected
-                    )
-                    if summary.watchCount > 0 {
-                        roomZoneStatusChip(
-                            icon: "eye.fill",
-                            text: "\(summary.watchCount)",
-                            tint: Color.goYellow,
-                            isSelected: isSelected
-                        )
-                    }
+                    ))
                 }
             }
-            .frame(width: 142, alignment: .topLeading)
-            .frame(minHeight: 106, alignment: .topLeading)
+            .roomZoneCardFrame()
             .padding(12)
             .background(
                 isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.6),
@@ -688,6 +697,31 @@ extension PlantDashboardView {
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(roomZoneAccessibilityLabel(summary, isSelected: isSelected))
         .accessibilityIdentifier("plant-dashboard-room-zone-\(roomZoneIdentifier(summary.id))")
+    }
+
+    func roomZoneTitle(_ title: String, isSelected: Bool) -> some View {
+        Text(title)
+            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    func roomZoneStatusStack(primary: some View) -> some View {
+        primary
+    }
+
+    func roomZoneStatusStack(primary: some View, secondary: some View) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                primary
+                secondary
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                primary
+                secondary
+            }
+        }
     }
 
     func roomZoneStatusChip(
@@ -769,5 +803,12 @@ extension PlantDashboardView {
             item.subtitle,
             locationSummary(for: item.plant)
         ].joined(separator: ", ")
+    }
+}
+
+private extension View {
+    func roomZoneCardFrame() -> some View {
+        frame(minWidth: 150, idealWidth: 164, maxWidth: 190, alignment: .topLeading)
+            .frame(minHeight: 114, alignment: .topLeading)
     }
 }

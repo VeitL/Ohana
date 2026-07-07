@@ -213,6 +213,15 @@ extension WalkTrackingCard {
             candidates: sameSpeciesWalkPets
         )
         let rewardSummary = onStopWalk(selectedWalkTargets, selectedWalkExecutorIds)
+        guard rewardSummary.didPersist else {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            appServices.islandToasts.show(L10n(appLanguage).tr(
+                zh: "遛狗记录保存失败，请稍后重试。",
+                en: "Walk record failed to save. Try again.",
+                de: "Der Spaziergang konnte nicht gespeichert werden. Versuche es erneut."
+            ))
+            return
+        }
         lastStopRewardSummary = rewardSummary.hasReward ? rewardSummary : nil
         if rewardSummary.hasReward {
             OhanaFeedback.success()

@@ -22,6 +22,7 @@ struct RootView: View {
     @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
     @State private var plantBatchCareRewardSettlementTask: Task<Void, Never>?
+    @State private var plantBatchCareRewardRetryAfterFailure: Date?
     @State private var automaticBackupReminderTask: Task<Void, Never>?
     @State private var lastPersistenceFailureToastDate: Date?
     @Environment(\.modelContext) private var modelContext
@@ -91,8 +92,7 @@ struct RootView: View {
             scheduleAutomaticBackupFailureReminder()
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
-            if revision.lastCommand?.feature == "plants",
-               revision.lastCommand?.action == "batchCarePendingRewardsChanged" {
+            if PlantBatchCareRewardSettlementPolicy.shouldSchedule(for: revision) {
                 schedulePlantBatchCareRewardSettlement()
             }
         }
@@ -136,16 +136,12 @@ struct RootView: View {
     private func schedulePlantBatchCareRewardSettlement(now: Date = Date()) {
         plantBatchCareRewardSettlementTask?.cancel()
         let expiredTokens = PlantBatchCarePendingRewardStore.expiredTokens(now: now)
-        if !expiredTokens.isEmpty {
-            plantBatchCareRewardSettlementTask = Task { @MainActor in
-                await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 180)
-                guard !Task.isCancelled else { return }
-                settleExpiredPlantBatchCareRewards()
-            }
-            return
-        }
-
-        guard let nextDate = PlantBatchCarePendingRewardStore.nextSettlementDate(now: now) else {
+        guard let nextDate = PlantBatchCareRewardSettlementPolicy.nextRunDate(
+            now: now,
+            hasExpiredTokens: !expiredTokens.isEmpty,
+            nextSettlementDate: PlantBatchCarePendingRewardStore.nextSettlementDate(now: now),
+            retryAfterFailure: plantBatchCareRewardRetryAfterFailure
+        ) else {
             plantBatchCareRewardSettlementTask = nil
             return
         }
@@ -160,14 +156,23 @@ struct RootView: View {
     private func settleExpiredPlantBatchCareRewards(now: Date = Date()) {
         let tokens = PlantBatchCarePendingRewardStore.expiredTokens(now: now)
         guard !tokens.isEmpty else {
+            plantBatchCareRewardRetryAfterFailure = nil
             schedulePlantBatchCareRewardSettlement(now: now)
             return
         }
         let executor = HomeCommandExecutor(modelContext: modelContext, services: appServices)
+        var sawPersistenceFailure = false
         for token in tokens {
-            _ = executor.commitPlantBatchCareRewards(for: token)
+            let result = executor.commitPlantBatchCareRewards(for: token)
+            guard PlantBatchCareRewardSettlementPolicy.shouldRemovePendingToken(after: result) else {
+                sawPersistenceFailure = true
+                continue
+            }
             PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
         }
+        plantBatchCareRewardRetryAfterFailure = sawPersistenceFailure
+            ? PlantBatchCareRewardSettlementPolicy.retryAfterFailedCommit(now: now)
+            : nil
         schedulePlantBatchCareRewardSettlement(now: now)
     }
 

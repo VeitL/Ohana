@@ -23,16 +23,31 @@ struct WalkStopRewardSummary: Equatable {
     let coconutDelta: Int
     let walkCoconutDelta: Int
     let pottyCoconutDelta: Int
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 
     static let empty = WalkStopRewardSummary(
         walkLogID: nil,
         coconutDelta: 0,
         walkCoconutDelta: 0,
-        pottyCoconutDelta: 0
+        pottyCoconutDelta: 0,
+        didPersist: true,
+        persistenceErrorDescription: nil
     )
 
+    static func failed(_ errorDescription: String?) -> WalkStopRewardSummary {
+        WalkStopRewardSummary(
+            walkLogID: nil,
+            coconutDelta: 0,
+            walkCoconutDelta: 0,
+            pottyCoconutDelta: 0,
+            didPersist: false,
+            persistenceErrorDescription: errorDescription
+        )
+    }
+
     var hasReward: Bool {
-        coconutDelta > 0
+        didPersist && coconutDelta > 0
     }
 }
 
@@ -392,10 +407,6 @@ final class PetWalkingManager {
         }
 
         let sourceWalkLog = walkLogs.first { $0.pet?.id == pet.id } ?? walkLogs.first
-        lastCompletedPetId = pet.id
-        lastCompletedWalk = sourceWalkLog
-        lastCompletedRouteCoordinates = routeCoordinates
-        lastCompletedPoopMarkers = poopMarkers
 
         // 保存遛狗中的便便路线事件（含真实打卡时间与可选坐标）
         let persistedMarkers: [WalkPoopMarker] = poopMarkers.isEmpty && poop > 0
@@ -470,11 +481,35 @@ final class PetWalkingManager {
 
         CloudSyncMutationRecorder.markModified(walkLogs, context: modelContext, modifiedAt: endedAt)
         CloudSyncMutationRecorder.markModified(pottyLogs, context: modelContext, modifiedAt: endedAt)
-        let saveResult = modelContext.safeSaveResult()
-        if saveResult.didSave {
-            deleteRecoveryCheckpointIfPossible(modelContext: modelContext)
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            modelContext.rollback()
+            phase = .paused
+            showSummary = false
+            lastCompletedPetId = nil
+            lastCompletedWalk = nil
+            lastCompletedRouteCoordinates = []
+            lastCompletedPoopMarkers = []
+            AppFlowPerformance.mark(
+                AppPerformanceFlows.walkSession,
+                AppPerformancePhases.writeFailure,
+                startedAt: walkStopStartedAt,
+                note: [
+                    "action": "stop",
+                    "points": "\(routeLocations.count)",
+                    "poopCount": "\(poop)"
+                ]
+            )
+            walkStopStartedAt = nil
+            return .failed(saveResult.errorDescription)
         }
 
+        deleteRecoveryCheckpointIfPossible(modelContext: modelContext)
+
+        lastCompletedPetId = pet.id
+        lastCompletedWalk = sourceWalkLog
+        lastCompletedRouteCoordinates = routeCoordinates
+        lastCompletedPoopMarkers = poopMarkers
         phase = .finished(elapsed: elapsed, poopCount: poop)
         showSummary = true
         AppFlowPerformance.mark(
@@ -493,7 +528,9 @@ final class PetWalkingManager {
             walkLogID: sourceWalkLog?.id,
             coconutDelta: walkCoconutDelta + pottyCoconutDelta,
             walkCoconutDelta: walkCoconutDelta,
-            pottyCoconutDelta: pottyCoconutDelta
+            pottyCoconutDelta: pottyCoconutDelta,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -629,7 +666,7 @@ final class PetWalkingManager {
         CloudSyncMutationRecorder.markModified(checkpoint, context: modelContext, modifiedAt: Date())
         activeRecoveryCheckpointID = checkpoint.id
         activeWalkModelContext = modelContext
-        let saveResult = modelContext.safeSaveResult()
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
         if saveResult.didSave {
             lastRecoveryCheckpointAt = Date()
         }
@@ -652,7 +689,7 @@ final class PetWalkingManager {
             WalkRecoveryCheckpoint.metadata(elapsedTime: elapsedTime, poopMarkers: activePoopMarkers)
         )
         CloudSyncMutationRecorder.markModified(checkpoint, context: modelContext, modifiedAt: now)
-        let saveResult = modelContext.safeSaveResult()
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
         if saveResult.didSave {
             lastRecoveryCheckpointAt = now
         }
@@ -677,7 +714,7 @@ final class PetWalkingManager {
             return
         }
         modelContext.delete(checkpoint) // derived-state: allow recovery checkpoint cleanup after authoritative walk fact is saved
-        let saveResult = modelContext.safeSaveResult()
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
         if saveResult.didSave {
             activeRecoveryCheckpointID = nil
             activeWalkModelContext = nil
@@ -739,6 +776,8 @@ final class PetWalkingManager {
 
     // MARK: - Map Snapshot
     private func generateMapSnapshot(for walkLog: PetWalkLog, routeLocations: [CLLocation], poopMarkers: [WalkPoopMarker], modelContext: ModelContext) {
+        let walkLogID = walkLog.id
+        let modelContainer = modelContext.container
         let locations = routeLocations
         guard locations.count >= 2 else { return }
 
@@ -802,10 +841,20 @@ final class PetWalkingManager {
             let jpegData = image.jpegData(compressionQuality: 0.7)
             // F2: SwiftData 模型必须在 MainActor 上写入
             DispatchQueue.main.async {
-                walkLog.mapSnapshotData = jpegData
-                let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+                let snapshotContext = ModelContext(modelContainer)
+                var descriptor = FetchDescriptor<PetWalkLog>(
+                    predicate: #Predicate { candidate in
+                        candidate.id == walkLogID
+                    }
+                )
+                descriptor.fetchLimit = 1
+                guard let persistedWalkLog = try? snapshotContext.fetch(descriptor).first else {
+                    return
+                }
+                persistedWalkLog.mapSnapshotData = jpegData
+                let saveResult = snapshotContext.safeSaveResult(publishFailureEvent: true)
                 if !saveResult.didSave {
-                    modelContext.rollback()
+                    snapshotContext.rollback()
                 }
             }
         }

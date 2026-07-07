@@ -310,17 +310,38 @@ extension PetBasicInfoDetailView {
     }
 
     func compactSummaryRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(label)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.46))
-                .frame(width: 58, alignment: .leading)
-            Text(value)
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineLimit(2)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                compactSummaryLabel(label)
+                    .frame(minWidth: 62, maxWidth: 132, alignment: .leading)
+                compactSummaryValue(value)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                compactSummaryLabel(label)
+                compactSummaryValue(value)
+                    .multilineTextAlignment(.leading)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    func compactSummaryLabel(_ label: String) -> some View {
+        Text(label)
+            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.48))
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    func compactSummaryValue(_ value: String) -> some View {
+        Text(value)
+            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     var vaccineSummaryText: String {

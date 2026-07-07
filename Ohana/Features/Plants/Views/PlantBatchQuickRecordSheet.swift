@@ -18,6 +18,7 @@ struct PlantBatchQuickRecordSheet: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
+    @State private var selectedCareCategory: PlantCareCategory
     @State private var selectedCareType: PlantCareType
     @State private var selectedPlantIDs: Set<UUID> = []
 
@@ -31,12 +32,18 @@ struct PlantBatchQuickRecordSheet: View {
         self.initialCareType = initialCareType
         self.imageDataProvider = imageDataProvider
         self.onRecord = onRecord
-        _selectedCareType = State(initialValue: initialCareType ?? .watering)
+        let initialType = initialCareType ?? .watering
+        _selectedCareCategory = State(initialValue: initialType.careCategory)
+        _selectedCareType = State(initialValue: initialType)
     }
 
     private var l: L10n { L10n(appLanguage) }
     private var activePlants: [Plant] { plants.sorted { $0.name < $1.name } }
     private var selectedCount: Int { selectedPlantIDs.count }
+    private var visibleCareTypes: [PlantCareType] {
+        quickCareTypes.filter { selectedCareCategory.contains($0) }
+    }
+
     private var columns: [GridItem] {
         dynamicTypeSize.isAccessibilitySize
             ? [GridItem(.flexible(), spacing: 10)]
@@ -73,8 +80,8 @@ struct PlantBatchQuickRecordSheet: View {
                 Text(selectedCareType.displayName(l: l))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(l.tr(
                     zh: selectedCount == 0 ? "先选择要记录的植物" : "将为 \(selectedCount) 株植物写入同一条护理事实",
                     en: selectedCount == 0 ? "Select plants to log" : "Will write one care fact for \(selectedCount) plants",
@@ -83,6 +90,7 @@ struct PlantBatchQuickRecordSheet: View {
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
@@ -96,32 +104,85 @@ struct PlantBatchQuickRecordSheet: View {
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(quickCareTypes) { type in
-                        Button {
-                            withAnimation(GoMotion.feedback) {
-                                selectedCareType = type
-                            }
-                            UISelectionFeedbackGenerator().selectionChanged()
-                        } label: {
-                            Label(type.displayName(l: l), systemImage: careSymbol(for: type))
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(selectedCareType == type ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 9)
-                                .background(
-                                    selectedCareType == type ? careTint(for: type) : Color.ohanaControlFill,
-                                    in: Capsule()
-                                )
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        .accessibilityIdentifier("plant-batch-quick-type-\(type.rawValue)")
-                    }
+            categorySelector
+            careTypeGrid
+        }
+    }
+
+    private var categorySelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(PlantCareCategory.allCases) { category in
+                    categoryChip(category)
                 }
-                .padding(.horizontal, 2)
+            }
+            .padding(.horizontal, 2)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var careTypeGrid: some View {
+        LazyVGrid(columns: columns, spacing: 8) {
+            ForEach(visibleCareTypes) { type in
+                careTypeButton(type)
             }
         }
+        .accessibilityIdentifier("plant-batch-quick-type-grid")
+    }
+
+    private func categoryChip(_ category: PlantCareCategory) -> some View {
+        let isSelected = selectedCareCategory == category
+        return Button {
+            selectCategory(category)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: category.icon)
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
+                    .accessibilityHidden(true)
+                Text(category.shortTitle(l: l))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .frame(minWidth: 86)
+            .frame(minHeight: 44)
+            .padding(.horizontal, 10)
+            .background(
+                isSelected ? category.tint : Color.ohanaControlFill.opacity(0.72),
+                in: Capsule()
+            )
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("plant-batch-quick-category-\(category.rawValue)")
+    }
+
+    private func careTypeButton(_ type: PlantCareType) -> some View {
+        Button {
+            withAnimation(GoMotion.feedback) {
+                selectedCareType = type
+                selectedCareCategory = type.careCategory
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            Label(type.displayName(l: l), systemImage: careSymbol(for: type))
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(selectedCareType == type ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 44)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .background(
+                    selectedCareType == type ? careTint(for: type) : Color.ohanaControlFill,
+                    in: Capsule()
+                )
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityAddTraits(selectedCareType == type ? .isSelected : [])
+        .accessibilityIdentifier("plant-batch-quick-type-\(type.rawValue)")
     }
 
     private var selectionToolbar: some View {
@@ -176,7 +237,7 @@ struct PlantBatchQuickRecordSheet: View {
 
     private func plantCard(_ plant: Plant) -> some View {
         let isSelected = selectedPlantIDs.contains(plant.id)
-        return HStack(spacing: 10) {
+        return HStack(alignment: .top, spacing: 10) {
             FeatureHubAvatar(
                 imageCacheID: "plant-batch-quick-\(plant.id.uuidString)",
                 imageSignature: plant.avatarThumbnailSignature,
@@ -191,13 +252,13 @@ struct PlantBatchQuickRecordSheet: View {
                 Text(plant.name)
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(plant.roomName.isEmpty ? l.tr(zh: "未分组", en: "No room", de: "Kein Raum") : plant.roomName)
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
 
@@ -225,8 +286,10 @@ struct PlantBatchQuickRecordSheet: View {
             Label(recordTitle, systemImage: "checkmark.circle.fill")
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
-                .frame(height: 52)
+                .frame(minHeight: 52)
                 .background(careTint(for: selectedCareType), in: Capsule())
                 .opacity(selectedCount == 0 ? 0.45 : 1)
         }
@@ -260,6 +323,20 @@ struct PlantBatchQuickRecordSheet: View {
             }
         }
         UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    private func selectCategory(_ category: PlantCareCategory) {
+        withAnimation(GoMotion.feedback) {
+            selectedCareCategory = category
+            if !category.contains(selectedCareType) {
+                selectedCareType = visibleQuickCareTypes(for: category).first ?? category.defaultCareType
+            }
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    private func visibleQuickCareTypes(for category: PlantCareCategory) -> [PlantCareType] {
+        quickCareTypes.filter { category.contains($0) }
     }
 
     private func record() {

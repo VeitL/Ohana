@@ -2,14 +2,25 @@
 //  WaterCareCycleStatus.swift
 //  Ohana
 //
-//  Shared due/overdue calculation for water-change and filter cycles.
+//  Shared due/overdue calculation for care cycles.
 //
 
 import Foundation
 
-nonisolated struct WaterCareCycleStatus: Equatable {
+nonisolated enum CareCycleDuePhase: String, Equatable, Sendable {
+    case upcoming
+    case dueToday
+    case overdue
+}
+
+nonisolated struct CareCycleStatus: Equatable, Sendable {
     let elapsedDays: Int
     let intervalDays: Int
+
+    init(elapsedDays: Int, intervalDays: Int) {
+        self.elapsedDays = max(0, elapsedDays)
+        self.intervalDays = max(1, intervalDays)
+    }
 
     var daysUntilDue: Int {
         intervalDays - elapsedDays
@@ -27,6 +38,16 @@ nonisolated struct WaterCareCycleStatus: Equatable {
         max(0, -daysUntilDue)
     }
 
+    var duePhase: CareCycleDuePhase {
+        if isOverdue { return .overdue }
+        if isDueToday { return .dueToday }
+        return .upcoming
+    }
+
+    var requiresAttention: Bool {
+        isDueToday || isOverdue
+    }
+
     var compactDueText: String {
         compactDueText(l: .current)
     }
@@ -40,7 +61,35 @@ nonisolated struct WaterCareCycleStatus: Equatable {
         }
         return l.tr(zh: "逾期\(overdueDays)天", en: "\(overdueDays)d overdue", de: "\(overdueDays) T. überfällig")
     }
+
+    func compactLastRecordedText(l: L10n = .current) -> String {
+        if elapsedDays == 0 {
+            return l.tr(zh: "✓ 今天", en: "✓ Today", de: "✓ Heute")
+        }
+        return l.tr(zh: "\(elapsedDays)天前", en: "\(elapsedDays)d ago", de: "vor \(elapsedDays) T.")
+    }
+
+    static func make(
+        lastDate: Date?,
+        intervalDays: Int,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> CareCycleStatus? {
+        guard let lastDate else { return nil }
+        return CareCycleStatus(
+            elapsedDays: elapsedDays(from: lastDate, to: now, calendar: calendar),
+            intervalDays: intervalDays
+        )
+    }
+
+    static func elapsedDays(from start: Date, to end: Date, calendar: Calendar) -> Int {
+        let startDay = calendar.startOfDay(for: start)
+        let endDay = calendar.startOfDay(for: end)
+        return max(0, calendar.dateComponents([.day], from: startDay, to: endDay).day ?? 0)
+    }
 }
+
+typealias WaterCareCycleStatus = CareCycleStatus
 
 nonisolated struct WaterCareCycleLogSnapshot: Equatable {
     let latestWaterChangeDate: Date?
@@ -156,8 +205,6 @@ nonisolated enum WaterCareCycleStatusCalculator {
     }
 
     private static func elapsedDays(from start: Date, to end: Date, calendar: Calendar) -> Int {
-        let startDay = calendar.startOfDay(for: start)
-        let endDay = calendar.startOfDay(for: end)
-        return max(0, calendar.dateComponents([.day], from: startDay, to: endDay).day ?? 0)
+        CareCycleStatus.elapsedDays(from: start, to: end, calendar: calendar)
     }
 }

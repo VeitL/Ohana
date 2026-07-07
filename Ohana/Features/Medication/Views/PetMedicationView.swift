@@ -235,12 +235,13 @@ struct PetMedicationContentView: View {
                 Text(pet.name)
                     .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(bodyTitle)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             Button {
@@ -257,19 +258,36 @@ struct PetMedicationContentView: View {
     }
 
     private var summaryStrip: some View {
-        HStack(spacing: 12) {
-            metricCell(
-                title: l.tr(zh: "今日", en: "Today", de: "Heute"),
-                value: todayRequired == 0 ? "—" : "\(todayDone)/\(todayRequired)"
-            )
-            metricCell(
-                title: l.tr(zh: "当前", en: "Active", de: "Aktiv"),
-                value: "\(activeMeds.count)"
-            )
-            metricCell(
-                title: l.tr(zh: "待处理", en: "Pending", de: "Offen"),
-                value: "\(max(0, todayRequired - todayDone))"
-            )
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                medicationMetricCell(
+                    title: l.tr(zh: "今日", en: "Today", de: "Heute"),
+                    value: todayRequired == 0 ? "—" : "\(todayDone)/\(todayRequired)"
+                )
+                medicationMetricCell(
+                    title: l.tr(zh: "当前", en: "Active", de: "Aktiv"),
+                    value: "\(activeMeds.count)"
+                )
+                medicationMetricCell(
+                    title: l.tr(zh: "待处理", en: "Pending", de: "Offen"),
+                    value: "\(max(0, todayRequired - todayDone))"
+                )
+            }
+
+            VStack(spacing: 10) {
+                medicationMetricCell(
+                    title: l.tr(zh: "今日", en: "Today", de: "Heute"),
+                    value: todayRequired == 0 ? "—" : "\(todayDone)/\(todayRequired)"
+                )
+                medicationMetricCell(
+                    title: l.tr(zh: "当前", en: "Active", de: "Aktiv"),
+                    value: "\(activeMeds.count)"
+                )
+                medicationMetricCell(
+                    title: l.tr(zh: "待处理", en: "Pending", de: "Offen"),
+                    value: "\(max(0, todayRequired - todayDone))"
+                )
+            }
         }
     }
 
@@ -364,11 +382,13 @@ struct PetMedicationContentView: View {
         return "\(dateText) \(stats.done)/\(stats.required)"
     }
 
-    private func metricCell(title: String, value: String) -> some View {
+    private func medicationMetricCell(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(OhanaFont.caption2(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Text(value)
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -414,6 +434,8 @@ struct PetMedicationContentView: View {
                         Spacer()
                         Text(pendingMedication.dosage.isEmpty ? l.tr(zh: "按医嘱", en: "As directed", de: "Nach Anweisung") : pendingMedication.dosage)
                             .font(OhanaFont.caption(.black))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.trailing)
                     }
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
@@ -468,26 +490,7 @@ struct PetMedicationContentView: View {
         let tint = Color(hex: med.colorHex)
 
         return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: "pills.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black))
-                    .foregroundStyle(tint)
-                    .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .background(tint.opacity(0.14), in: Circle())
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(med.name.isEmpty ? l.tr(zh: "未命名药物", en: "Unnamed medication", de: "Unbenanntes Medikament") : med.name)
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                    Text(medicationSubtitle(for: med))
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(1)
-                }
-                Spacer()
-                statusPill(for: med, remaining: remaining, required: required)
-            }
+            medicationCardHeader(for: med, tint: tint, remaining: remaining, required: required)
 
             if med.isActiveToday, required > 0 {
                 ProgressView(value: Double(min(done, required)) / Double(required))
@@ -495,39 +498,101 @@ struct PetMedicationContentView: View {
                     .scaleEffect(x: 1, y: 1.25, anchor: .center)
             }
 
-            HStack(spacing: 10) {
-                Button {
-                    selectedMedication = med
-                } label: {
-                    Text(l.tr(zh: "详情", en: "Details", de: "Details"))
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.ohanaControlFill, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-
-                if !pet.hasPassedAway, med.isActiveToday {
-                    Button {
-                        recordDose(for: med)
-                    } label: {
-                        Text(remaining > 0 ? l.tr(zh: "打卡", en: "Check in", de: "Abhaken") : l.tr(zh: "加记一次", en: "Extra dose", de: "Extra"))
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(Color.ohanaPrimaryActionText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(remaining > 0 ? chromeAccent : tint, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
+            medicationCardActions(for: med, remaining: remaining, tint: tint)
         }
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .onTapGesture {
             selectedMedication = med
         }
+    }
+
+    private func medicationCardHeader(for med: PetMedication, tint: Color, remaining: Int, required: Int) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                medicationCardIcon(tint: tint)
+                medicationCardText(for: med)
+                Spacer(minLength: 8)
+                statusPill(for: med, remaining: remaining, required: required)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 12) {
+                    medicationCardIcon(tint: tint)
+                    medicationCardText(for: med)
+                }
+                statusPill(for: med, remaining: remaining, required: required)
+            }
+        }
+    }
+
+    private func medicationCardIcon(tint: Color) -> some View {
+        Image(systemName: "pills.fill").accessibilityHidden(true)
+            .font(OhanaFont.adaptive(size: 18, weight: .black))
+            .foregroundStyle(tint)
+            .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+            .background(tint.opacity(0.14), in: Circle())
+    }
+
+    private func medicationCardText(for med: PetMedication) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(med.name.isEmpty ? l.tr(zh: "未命名药物", en: "Unnamed medication", de: "Unbenanntes Medikament") : med.name)
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(medicationSubtitle(for: med))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func medicationCardActions(for med: PetMedication, remaining: Int, tint: Color) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                medicationDetailsButton(for: med)
+                if !pet.hasPassedAway, med.isActiveToday {
+                    medicationCheckInButton(for: med, remaining: remaining, tint: tint)
+                }
+            }
+
+            VStack(spacing: 8) {
+                medicationDetailsButton(for: med)
+                if !pet.hasPassedAway, med.isActiveToday {
+                    medicationCheckInButton(for: med, remaining: remaining, tint: tint)
+                }
+            }
+        }
+    }
+
+    private func medicationDetailsButton(for med: PetMedication) -> some View {
+        Button {
+            selectedMedication = med
+        } label: {
+            Text(l.tr(zh: "详情", en: "Details", de: "Details"))
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color.ohanaControlFill, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func medicationCheckInButton(for med: PetMedication, remaining: Int, tint: Color) -> some View {
+        Button {
+            recordDose(for: med)
+        } label: {
+            Text(remaining > 0 ? l.tr(zh: "打卡", en: "Check in", de: "Abhaken") : l.tr(zh: "加记一次", en: "Extra dose", de: "Extra"))
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(remaining > 0 ? chromeAccent : tint, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func statusPill(for med: PetMedication, remaining: Int, required: Int) -> some View {

@@ -211,9 +211,13 @@ extension PetBasicInfoDetailView {
     // MARK: - Helpers
     func infoSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: icon).font(OhanaFont.adaptive(size: 13, weight: .bold)).foregroundStyle(iconColor) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                Text(title).font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                Text(title)
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             content()
         }
@@ -232,11 +236,37 @@ extension PetBasicInfoDetailView {
     }
 
     func infoRow(label: String, value: String) -> some View {
-        HStack {
-            Text(label).font(OhanaFont.adaptive(size: 13, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.45)).frame(width: 80, alignment: .leading) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text(value).font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.9)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Spacer()
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                infoRowLabel(label)
+                    .frame(minWidth: 72, maxWidth: 128, alignment: .leading)
+                infoRowValue(value, alignment: .trailing, textAlignment: .trailing)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                infoRowLabel(label)
+                infoRowValue(value, alignment: .leading, textAlignment: .leading)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    func infoRowLabel(_ label: String) -> some View {
+        Text(label)
+            .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.48))
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    func infoRowValue(_ value: String, alignment: Alignment, textAlignment: TextAlignment) -> some View {
+        Text(value)
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
+            .multilineTextAlignment(textAlignment)
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: alignment)
     }
 
     func editLabel(_ label: String) -> some View {

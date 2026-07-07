@@ -289,6 +289,7 @@ struct LocalizationTests {
         )
         let waterStatus = WaterCareCycleStatus(elapsedDays: 5, intervalDays: 3)
         let dueToday = WaterCareCycleStatus(elapsedDays: 3, intervalDays: 3)
+        let upcoming = CareCycleStatus(elapsedDays: 1, intervalDays: 3)
 
         #expect(status.localizedTitle(l: L10n("en")) == "Feeding")
         #expect(status.compactText(l: L10n("en")) == "2d overdue")
@@ -296,6 +297,9 @@ struct LocalizationTests {
         #expect(waterStatus.compactDueText(l: L10n("zh")) == "逾期2天")
         #expect(waterStatus.compactDueText(l: L10n("en")) == "2d overdue")
         #expect(dueToday.compactDueText(l: L10n("de")) == "Heute")
+        #expect(dueToday.duePhase == .dueToday)
+        #expect(upcoming.duePhase == .upcoming)
+        #expect(upcoming.compactLastRecordedText(l: L10n("en")) == "1d ago")
         #expect(WaterCareCycleWarningKind.waterChange.localizedTitle(l: L10n("en")) == "Water change")
         #expect(WaterCareCycleWarningKind.filterClean.localizedTitle(l: L10n("de")) == "Filter")
         #expect(WaterCareCycleWarningKind.filterReplace.localizedTitle(l: L10n("en")) == "Replacement")

@@ -15,7 +15,7 @@ enum HygieneType: String, Codable, CaseIterable {
     case brushing = "梳毛"
     case bath = "洗澡"
 
-    var emoji: String {
+    nonisolated var emoji: String {
         switch self {
         case .teeth: "🦷"
         case .nails: "✂️"
@@ -25,7 +25,7 @@ enum HygieneType: String, Codable, CaseIterable {
         }
     }
 
-    var systemIconName: String {
+    nonisolated var systemIconName: String {
         switch self {
         case .teeth: "mouth.fill"
         case .nails: "scissors"
@@ -35,7 +35,7 @@ enum HygieneType: String, Codable, CaseIterable {
         }
     }
 
-    func localizedLabel(_ l: L10n) -> String {
+    nonisolated func localizedLabel(_ l: L10n) -> String {
         switch self {
         case .teeth:
             l.tr(zh: "刷牙", en: "Teeth", de: "Zähne")
@@ -51,7 +51,7 @@ enum HygieneType: String, Codable, CaseIterable {
     }
 
     /// 系统默认周期天数
-    var defaultCycleDays: Int {
+    nonisolated var defaultCycleDays: Int {
         switch self {
         case .teeth: 1
         case .nails: 14
@@ -62,11 +62,11 @@ enum HygieneType: String, Codable, CaseIterable {
     }
 
     /// 实际周期天数（优先使用用户自定义，fallback 到默认值）
-    var cycleDays: Int { defaultCycleDays }
+    nonisolated var cycleDays: Int { defaultCycleDays }
 }
 
 extension HygieneType: Identifiable {
-    var id: String { rawValue }
+    nonisolated var id: String { rawValue }
 }
 
 @Model

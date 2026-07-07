@@ -10,7 +10,8 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/audit-release-data-safety.sh [--update-save-baseline]
 
-Checks first-release data safety invariants. Existing bare safeSave() calls are
+Checks first-release data safety invariants. Existing bare safeSave() calls and
+ambiguous no-argument safeSaveResult() calls are
 ratcheted in docs/governance/manifests/swiftdata-save-failure-baseline.json;
 new silent save-discard sites fail the audit.
 USAGE
@@ -393,8 +394,8 @@ ROOT = pathlib.Path.cwd()
 BASELINE = ROOT / sys.argv[1]
 UPDATE_BASELINE = sys.argv[2] == "1"
 ALLOW_MARKER = "save-failure-audit: allow"
-RULE_ID = "swiftdata-silent-safe-save"
-SAFE_SAVE_RE = re.compile(r"\b(?:[A-Za-z0-9_]+Context|context|modelContext)\.safeSave\(\)")
+RULE_ID = "swiftdata-ambiguous-safe-save"
+SAFE_SAVE_RE = re.compile(r"\b(?:[A-Za-z0-9_]+Context|context|modelContext)\.(?:safeSave|safeSaveResult)\(\)")
 
 
 def relative(path: pathlib.Path) -> str:
@@ -455,9 +456,10 @@ if UPDATE_BASELINE:
             "docs/data-cache-sync-policy.md",
         ],
         "purpose": (
-            "Ratcheted baseline for existing bare safeSave() calls that discard save "
-            "failure details. New writes should use safeSaveResult(), throws, or an "
-            "explicit user-visible failure contract."
+            "Ratcheted baseline for existing bare safeSave() or no-argument "
+            "safeSaveResult() calls that leave save-failure handling ambiguous. "
+            "New writes should pass publishFailureEvent explicitly, throw, or use "
+            "an explicit user-visible failure contract."
         ),
         "command": "scripts/audit-release-data-safety.sh",
         "allowedMatches": allowed,
@@ -482,7 +484,7 @@ if violations:
     for file_path, line_number, source in violations:
         print(
             f"[{RULE_ID}] {file_path}:{line_number} "
-            "bare safeSave() discards persistence failure details; use safeSaveResult(), throws, or an explicit allow marker.",
+            "bare safeSave()/safeSaveResult() leaves persistence failure handling ambiguous; pass publishFailureEvent explicitly, throw, or add an explicit allow marker.",
             file=sys.stderr,
         )
         print(f"  {source}", file=sys.stderr)
@@ -497,7 +499,7 @@ current_debt = sum(len(matches) for matches in matches_by_file.values())
 baseline_debt = sum(len(lines) for lines in allowed.values())
 print(f"SwiftData save failure audit: passed ({current_debt} current baseline match(es), {baseline_debt} allowed).")
 PY
-  failures+=("New bare safeSave() sites must not silently discard SwiftData save failures; use safeSaveResult(), throws, or explicit allow marker.")
+  failures+=("New bare safeSave()/safeSaveResult() sites must not leave SwiftData save failure handling ambiguous; pass publishFailureEvent explicitly, throw, or use an explicit allow marker.")
 fi
 
 if [[ ${#failures[@]} -eq 0 ]]; then

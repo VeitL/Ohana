@@ -16,7 +16,7 @@ enum MemberLifecycleCommandService {
         action: String,
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             context.rollback()
             return .failed(entityID: entityID, kind: kind, action: action, error: saveResult.errorDescription)
@@ -182,7 +182,7 @@ enum MemberHomeVisibilityCommandService {
         }
         human.shouldShowOnHome = visible
         CloudSyncMutationRecorder.markModified(human, context: context)
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             context.rollback()
             return .failed(
@@ -214,7 +214,7 @@ enum PetWalkCommandService {
         }
         pet.weeklyWalkGoalKm = max(0, goalKm)
         CloudSyncMutationRecorder.markModified(pet, context: context)
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             context.rollback()
             return PetWalkGoalCommandResult(
@@ -251,7 +251,7 @@ enum PetWalkCommandService {
         walk.moodRating = normalizedRating
         walk.behaviorNotes = trimmedNotes.isEmpty ? nil : trimmedNotes
         CloudSyncMutationRecorder.markModified(walk, context: context)
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             context.rollback()
             return PetWalkSummaryCommandResult(

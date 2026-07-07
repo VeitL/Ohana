@@ -109,7 +109,7 @@ extension CareEventService {
         )
         let log = careWrite.log
         let pottyLog = careWrite.linkedPottyLog
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             return (
                 CareRecordResult(
@@ -237,7 +237,7 @@ extension CareEventService {
         }
         let disposition = write.disposition
         let log = DomainCareFactWriter.createPottyLog(plan: write, context: context)
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             return (
                 PottyRecordResult(
@@ -382,7 +382,7 @@ extension CareEventService {
             )
         }
         let log = DomainCareFactWriter.createHygieneLog(plan: write, context: context)
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             return (
                 HygieneRecordResult(
@@ -509,7 +509,7 @@ extension CareEventService {
         }
         let disposition = write.disposition
         let log = DomainCareFactWriter.createHealthLog(plan: write, context: context)
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             return (
                 HealthRecordResult(

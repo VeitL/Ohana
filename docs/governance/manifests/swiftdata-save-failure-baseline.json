@@ -6,7 +6,7 @@
     "docs/release-quality-gates.md",
     "docs/data-cache-sync-policy.md"
   ],
-  "purpose": "Ratcheted baseline for existing bare safeSave() calls that discard save failure details. New writes should use safeSaveResult(), throws, or an explicit user-visible failure contract.",
+  "purpose": "Ratcheted baseline for existing bare safeSave() or no-argument safeSaveResult() calls that leave save-failure handling ambiguous. New writes should pass publishFailureEvent explicitly, throw, or use an explicit user-visible failure contract.",
   "schema": "ohana.governance.swiftdata-save-failure-baseline.v1",
   "updated": "2026-07-07"
 }

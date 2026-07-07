@@ -493,6 +493,124 @@ struct HomeExpensePreviewStoreTests {
         #expect(isCompleted == true)
     }
 
+    @Test func expandedGroomQuickActionUsesHygieneCycleStatusForWarnings() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 15)))
+        let overdueBrushing = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 4, hour: 9)))
+        let pet = Pet(name: "Milo", species: "猫")
+        let item = QuickActionItem(
+            label: "护理",
+            icon: "scissors",
+            colorHex: "FF9966",
+            petId: pet.id,
+            actionType: "groom",
+            entityId: pet.id,
+            entityKind: .pet
+        )
+        let entries = [
+            HomeHygieneQuickActionEntry(id: UUID(), petId: pet.id, hygieneType: .brushing, date: overdueBrushing)
+        ]
+
+        let countText = ExpandedQuickActionLogic.countText(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            hygieneLedgerEntries: entries,
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            now: now,
+            calendar: calendar,
+            l: L10n("zh")
+        )
+        let hasAttention = ExpandedQuickActionLogic.showsAttentionDot(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            hygieneLedgerEntries: entries,
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            now: now
+        )
+        let attentionLevel = ExpandedQuickActionLogic.attentionLevel(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            hygieneLedgerEntries: entries,
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            now: now
+        )
+
+        #expect(countText == "梳毛 逾期1天")
+        #expect(hasAttention == true)
+        #expect(attentionLevel == .urgent)
+    }
+
+    @Test func expandedGroomQuickActionSeparatesDueTodayFromOverdue() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 8, hour: 15)))
+        let dueBrushing = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 5, hour: 9)))
+        let pet = Pet(name: "Milo", species: "猫")
+        let item = QuickActionItem(
+            label: "护理",
+            icon: "scissors",
+            colorHex: "FF9966",
+            petId: pet.id,
+            actionType: "groom",
+            entityId: pet.id,
+            entityKind: .pet
+        )
+        let entries = [
+            HomeHygieneQuickActionEntry(id: UUID(), petId: pet.id, hygieneType: .brushing, date: dueBrushing)
+        ]
+
+        let countText = ExpandedQuickActionLogic.countText(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            hygieneLedgerEntries: entries,
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            now: now,
+            calendar: calendar,
+            l: L10n("zh")
+        )
+        let hasAttention = ExpandedQuickActionLogic.showsAttentionDot(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            hygieneLedgerEntries: entries,
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            now: now
+        )
+        let attentionLevel = ExpandedQuickActionLogic.attentionLevel(
+            item: item,
+            pet: pet,
+            allEvents: [],
+            feedingLedgerEntries: [],
+            careLedgerEntries: [],
+            hygieneLedgerEntries: entries,
+            walkLedgerEntries: [],
+            pottyLedgerEntries: [],
+            now: now
+        )
+
+        #expect(countText == "梳毛 今天")
+        #expect(hasAttention == false)
+        #expect(attentionLevel == .due)
+    }
+
     @Test func petHygieneDetailEntriesFilterSortAndKeepLegacyDeleteId() throws {
         let calendar = Calendar(identifier: .gregorian)
         let olderDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 7, hour: 9)))

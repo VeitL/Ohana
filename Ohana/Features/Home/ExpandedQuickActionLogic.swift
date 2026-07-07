@@ -116,43 +116,6 @@ nonisolated struct HomePetMomentQuickActionEntry: Equatable, Identifiable {
     let date: Date
 }
 
-private nonisolated struct HomeFeedQuickActionState {
-    let rules: FeedRuleState
-    let todayEntries: [HomeFeedQuickActionEntry]
-    let todayPlanReminders: [Reminder]
-    let catchUpPlanReminders: [Reminder]
-    let expiredMissedPlanReminders: [Reminder]
-
-    init(
-        pet: Pet,
-        allEvents: [Event],
-        feedingLedgerEntries: [HomeFeedQuickActionEntry],
-        now: Date,
-        calendar: Calendar
-    ) {
-        rules = FeedRuleState(pet: pet, allEvents: allEvents, now: now, calendar: calendar)
-        todayEntries = feedingLedgerEntries
-            .filter { entry in
-                entry.petId == pet.id &&
-                    entry.source != .treat &&
-                    calendar.isDate(entry.date, inSameDayAs: now)
-            }
-        todayPlanReminders = rules.todayManualReminders
-        catchUpPlanReminders = rules.catchUpManualReminders
-        expiredMissedPlanReminders = rules.expiredMissedManualReminders
-    }
-
-    var operatingMode: FeedOperatingMode { rules.operatingMode }
-    var manualMainCount: Int { todayEntries.count { $0.source == .manualMain } }
-    var autoMainCount: Int { todayEntries.count { $0.source == .autoMain } }
-    var completedTodayPlanCount: Int { todayPlanReminders.count(where: \.isCompleted) }
-    var todayManualPlanTotalCount: Int { max(todayPlanReminders.count, rules.manualReminderEvents.count, 1) }
-    var todayManualPlanMissedCount: Int { expiredMissedPlanReminders.isEmpty ? catchUpPlanReminders.count : 0 }
-    var hasMissedManualPlan: Bool { expiredMissedPlanReminders.isEmpty && !catchUpPlanReminders.isEmpty }
-    var lastExpiredManualPlanDate: Date? { expiredMissedPlanReminders.map(\.scheduledAt).max() }
-    var nextManualReminder: Reminder? { rules.nextPendingManualReminder }
-}
-
 enum ExpandedQuickActionLogic {
     static func feedDashboard(
         for pet: Pet,
@@ -222,6 +185,7 @@ enum ExpandedQuickActionLogic {
         allEvents: [Event],
         feedingLedgerEntries: [HomeFeedQuickActionEntry],
         careLedgerEntries: [HomeCareQuickActionEntry],
+        hygieneLedgerEntries: [HomeHygieneQuickActionEntry] = [],
         walkLedgerEntries _: [HomeWalkQuickActionEntry],
         pottyLedgerEntries _: [HomePottyQuickActionEntry],
         now: Date
@@ -250,6 +214,16 @@ enum ExpandedQuickActionLogic {
                 calendar: .current
             )
             return state.operatingMode == .manualReminder && state.hasMissedManualPlan
+        case "groom":
+            if mostUrgentHygieneWarning(
+                for: pet,
+                hygieneLedgerEntries: hygieneLedgerEntries,
+                now: now,
+                calendar: .current,
+                includeDueToday: false
+            ) != nil {
+                return true
+            }
         default:
             break
         }
@@ -284,6 +258,7 @@ enum ExpandedQuickActionLogic {
         allEvents: [Event],
         feedingLedgerEntries: [HomeFeedQuickActionEntry],
         careLedgerEntries: [HomeCareQuickActionEntry],
+        hygieneLedgerEntries: [HomeHygieneQuickActionEntry] = [],
         walkLedgerEntries: [HomeWalkQuickActionEntry],
         pottyLedgerEntries: [HomePottyQuickActionEntry],
         now: Date
@@ -294,6 +269,7 @@ enum ExpandedQuickActionLogic {
             allEvents: allEvents,
             feedingLedgerEntries: feedingLedgerEntries,
             careLedgerEntries: careLedgerEntries,
+            hygieneLedgerEntries: hygieneLedgerEntries,
             walkLedgerEntries: walkLedgerEntries,
             pottyLedgerEntries: pottyLedgerEntries,
             now: now
@@ -344,6 +320,16 @@ enum ExpandedQuickActionLogic {
                 if !todayDone && cal.isDate(event.startDate, inSameDayAs: now) {
                     return .due
                 }
+            }
+        case "groom":
+            if mostUrgentHygieneWarning(
+                for: pet,
+                hygieneLedgerEntries: hygieneLedgerEntries,
+                now: now,
+                calendar: .current,
+                includeDueToday: true
+            ) != nil {
+                return .due
             }
         default:
             break
@@ -431,7 +417,7 @@ enum ExpandedQuickActionLogic {
         allEvents: [Event],
         feedingLedgerEntries: [HomeFeedQuickActionEntry],
         careLedgerEntries: [HomeCareQuickActionEntry],
-        hygieneLedgerEntries _: [HomeHygieneQuickActionEntry] = [],
+        hygieneLedgerEntries: [HomeHygieneQuickActionEntry] = [],
         walkLedgerEntries: [HomeWalkQuickActionEntry],
         pottyLedgerEntries: [HomePottyQuickActionEntry],
         petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry] = [],
@@ -634,7 +620,19 @@ enum ExpandedQuickActionLogic {
                 now: now,
                 todayDone: "今天已换"
             )
-        case "groom", "health":
+        case "groom":
+            if let warning = mostUrgentHygieneWarning(
+                for: pet,
+                hygieneLedgerEntries: hygieneLedgerEntries,
+                now: now,
+                calendar: cal,
+                includeDueToday: true
+            ) {
+                return "\(warning.type.localizedLabel(l)) \(warning.status.compactDueText(l: l))"
+            }
+            let count = todayHygieneEntries(for: pet, hygieneLedgerEntries: hygieneLedgerEntries, now: now, calendar: cal).count
+            return count > 0 ? l.tr(zh: "今日 \(count)项", en: "Today \(count)", de: "Heute \(count)") : nil
+        case "health":
             return overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l)
         default:
             return nil
