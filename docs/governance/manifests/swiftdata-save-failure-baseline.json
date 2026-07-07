@@ -13,8 +13,6 @@
       "context.safeSave()",
       "context.safeSave()",
       "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
       "context.safeSave()"
     ],
     "Ohana/Domain/Services/CloudSyncRecordApplier.swift": [
@@ -152,9 +150,6 @@
       "context.safeSave()",
       "context.safeSave()",
       "context.safeSave()",
-      "context.safeSave()"
-    ],
-    "Ohana/Features/Members/MemberCreationService.swift": [
       "context.safeSave()"
     ],
     "Ohana/Features/Members/MemberMediaAttachmentIndexRepair.swift": [

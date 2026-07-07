@@ -250,16 +250,22 @@ final class MemberCreationService: MemberCreating {
             context: context,
             countryCode: countryCode
         )
-        do {
-            try context.save()
-        } catch {
+        insertPetRelatedRecords(pet: pet, draft: draft, context: context)
+        let defaultPlanSideEffects = CarePlanCalendarSync.ensureDefaultPlans(
+            for: pet,
+            context: context,
+            saveChanges: false
+        )
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
             if !shouldShowOnHome {
                 HomeCardVisibility.restoreHiddenPetIDsRaw(previousHiddenHomePetIDsRaw)
             }
-            context.delete(pet) // derived-state: allow local rollback after failed first save; no persisted record or sync deletion exists yet
-            throw ServiceError.saveFailed(error.localizedDescription)
+            context.rollback()
+            throw ServiceError.saveFailed(saveResult.errorDescription ?? "Member creation was not saved.")
         }
 
+        defaultPlanSideEffects.commit()
         if shouldUse2D {
             Avatar2DAccess.consumeIfNeeded(kind: .pet, existingCount: existingCount)
         }
@@ -270,9 +276,6 @@ final class MemberCreationService: MemberCreating {
             actorName: pet.name,
             context: context
         )
-        insertPetRelatedRecords(pet: pet, draft: draft, context: context)
-        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context)
-        context.safeSave()
 
         let isFirstPet = !questManager.isPetWizardCompleted
         if isFirstPet {
@@ -415,11 +418,10 @@ final class MemberCreationService: MemberCreating {
                 context: context
             )
         }
-        do {
-            try context.save()
-        } catch {
-            context.delete(human) // derived-state: allow local rollback after failed first save; no persisted record or sync deletion exists yet
-            throw ServiceError.saveFailed(error.localizedDescription)
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw ServiceError.saveFailed(saveResult.errorDescription ?? "Member creation was not saved.")
         }
 
         if shouldUse2D {

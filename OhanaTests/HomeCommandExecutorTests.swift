@@ -3096,6 +3096,30 @@ struct HomeCommandExecutorTests {
         #expect(addPlantSource.contains("plantCreationSaveFailureMessage"))
     }
 
+    @Test func memberCreationDefersDefaultPlansAndRevisionsUntilPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let creationSource = try source("Ohana/Features/Members/MemberCreationService.swift", rootURL: rootURL)
+        let carePlanSource = try source("Ohana/Domain/Services/CarePlanCalendarSync.swift", rootURL: rootURL)
+
+        #expect(!creationSource.contains("context.safeSave()"))
+        #expect(creationSource.contains("let defaultPlanSideEffects = CarePlanCalendarSync.ensureDefaultPlans("))
+        #expect(creationSource.contains("saveChanges: false"))
+        #expect(creationSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(creationSource.contains("context.rollback()"))
+        #expect(creationSource.contains("defaultPlanSideEffects.commit()"))
+
+        let saveGuardIndex = try #require(creationSource.range(of: "guard saveResult.didSave else")?.lowerBound)
+        let commitIndex = try #require(creationSource.range(of: "defaultPlanSideEffects.commit()")?.lowerBound)
+        let petRevisionIndex = try #require(creationSource.range(of: "publishMemberCreation(id: pet.id")?.lowerBound)
+        #expect(commitIndex > saveGuardIndex)
+        #expect(petRevisionIndex > saveGuardIndex)
+
+        #expect(carePlanSource.contains("struct PendingSideEffects"))
+        #expect(carePlanSource.contains("func commit()"))
+        #expect(carePlanSource.contains("if saveResult.didSave"))
+        #expect(carePlanSource.contains("saveChanges: Bool = true"))
+    }
+
     @MainActor
     @Test func memberDeletionServiceDeletesPetRelatedEventsAndQuickActions() throws {
         let container = try makeInMemoryContainer()

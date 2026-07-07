@@ -11,6 +11,26 @@ import SwiftData
 enum CarePlanCalendarSync {
     nonisolated static let waterMaintenanceKinds: Set<String> = ["waterChange", "filterClean", "filterReplace"]
 
+    struct PendingSideEffects {
+        fileprivate var userDefaultsSets: [(key: String, value: String)] = []
+
+        static let none = PendingSideEffects()
+
+        fileprivate mutating func set(_ value: String, forKey key: String) {
+            userDefaultsSets.append((key, value))
+        }
+
+        fileprivate mutating func merge(_ other: PendingSideEffects) {
+            userDefaultsSets.append(contentsOf: other.userDefaultsSets)
+        }
+
+        func commit() {
+            for item in userDefaultsSets {
+                UserDefaults.standard.set(item.value, forKey: item.key)
+            }
+        }
+    }
+
     @MainActor
     private static func fetchOrLog<T: PersistentModel>(
         _ descriptor: FetchDescriptor<T>,
@@ -343,12 +363,14 @@ enum CarePlanCalendarSync {
         startDate: Date,
         recurrenceDays: Int,
         eventType: EventType = .daily,
-        context: ModelContext
-    ) {
+        context: ModelContext,
+        saveChanges: Bool = true
+    ) -> PendingSideEffects {
+        var sideEffects = PendingSideEffects()
         let petKey = pet.id.uuidString
         guard canWriteActiveCarePlan(for: pet) else {
             removeCalendarPlan(kind: kind, petKey: petKey, context: context)
-            return
+            return .none
         }
         let createIntent = DomainScheduleCreateIntent(
             title: title,
@@ -370,18 +392,27 @@ enum CarePlanCalendarSync {
                 intent: createIntent,
                 writeKind: .care,
                 context: context
-            ) else { return }
+            ) else { return .none }
             DomainScheduleWriter.updateEvent(ev, intent: createIntent, mutation: mutation)
-            context.safeSave()
-            return
+            if saveChanges {
+                _ = context.safeSaveResult(publishFailureEvent: true)
+            }
+            return .none
         }
         guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(
             intent: createIntent,
             context: context
-        ) else { return }
+        ) else { return .none }
         let ev = DomainScheduleWriter.createEvent(plan: plan, context: context).event
-        UserDefaults.standard.set(ev.id.uuidString, forKey: key)
-        context.safeSave()
+        if saveChanges {
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            if saveResult.didSave {
+                UserDefaults.standard.set(ev.id.uuidString, forKey: key)
+            }
+        } else {
+            sideEffects.set(ev.id.uuidString, forKey: key)
+        }
+        return sideEffects
     }
 
     @discardableResult
@@ -600,13 +631,20 @@ enum CarePlanCalendarSync {
         }
     }
 
-    static func ensureDefaultPlans(for pet: Pet, context: ModelContext, startDate: Date = Date()) {
+    @discardableResult
+    static func ensureDefaultPlans(
+        for pet: Pet,
+        context: ModelContext,
+        startDate: Date = Date(),
+        saveChanges: Bool = true
+    ) -> PendingSideEffects {
         guard canWriteActiveCarePlan(for: pet) else {
             removeActiveCalendarPlans(for: pet, context: context)
-            return
+            return .none
         }
         let items = defaultPlanItems(for: pet)
-        guard !items.isEmpty else { return }
+        guard !items.isEmpty else { return .none }
+        var sideEffects = PendingSideEffects()
         let petKey = pet.id.uuidString
         let activeKinds = Set(items.map { "default_\($0.kind)" })
         for kind in knownDefaultPlanKinds where !activeKinds.contains(kind) {
@@ -624,16 +662,18 @@ enum CarePlanCalendarSync {
             let firstDueDate = item.recurrenceDays > 1
                 ? Calendar.current.date(byAdding: .day, value: item.recurrenceDays, to: startDate) ?? startDate
                 : startDate
-            upsert(
+            sideEffects.merge(upsert(
                 pet: pet,
                 kind: "default_\(item.kind)",
                 title: eventTitle(pet: pet, title: item.title),
                 startDate: firstDueDate,
                 recurrenceDays: item.recurrenceDays,
                 eventType: item.eventType,
-                context: context
-            )
+                context: context,
+                saveChanges: saveChanges
+            ))
         }
+        return sideEffects
     }
 
     private nonisolated static let knownDefaultPlanKinds: Set<String> = [
