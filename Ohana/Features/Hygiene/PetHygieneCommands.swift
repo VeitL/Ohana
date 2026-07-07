@@ -43,13 +43,15 @@ struct PetHygieneCheckInCommandResult: Equatable {
     let coconutDelta: Int
     let occurredAt: Date
     let disposition: CareFactWriteDisposition
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 
     var didRecord: Bool {
-        disposition.didWriteFact
+        didPersist && disposition.didWriteFact
     }
 
     var allowsDerivedEffects: Bool {
-        disposition.allowsDerivedEffects
+        didPersist && disposition.allowsDerivedEffects
     }
 }
 
@@ -57,6 +59,8 @@ struct PetHygieneDeleteCommandResult: Equatable {
     let logID: UUID
     let subjectID: UUID
     let didDelete: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
     let removedLedgerEventIDs: [UUID]
 }
 
@@ -66,6 +70,8 @@ struct PetHygienePlanCommandResult: Equatable {
     let subjectID: UUID
     let hygieneType: HygieneType
     let didCreate: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 @MainActor
@@ -112,7 +118,9 @@ enum PetHygieneCommandService {
                     hygieneType: recorded.result.hygieneType,
                     coconutDelta: 0,
                     occurredAt: date,
-                    disposition: recorded.result.disposition
+                    disposition: recorded.result.disposition,
+                    didPersist: recorded.result.didPersist,
+                    persistenceErrorDescription: recorded.result.persistenceErrorDescription
                 ),
                 recorded.log
             )
@@ -124,7 +132,9 @@ enum PetHygieneCommandService {
                 hygieneType: recorded.result.hygieneType,
                 coconutDelta: recorded.result.coconutDelta,
                 occurredAt: date,
-                disposition: recorded.result.disposition
+                disposition: recorded.result.disposition,
+                didPersist: recorded.result.didPersist,
+                persistenceErrorDescription: recorded.result.persistenceErrorDescription
             ),
             recorded.log
         )
@@ -143,6 +153,8 @@ enum PetHygieneCommandService {
                 logID: logID,
                 subjectID: pet.id,
                 didDelete: false,
+                didPersist: true,
+                persistenceErrorDescription: nil,
                 removedLedgerEventIDs: []
             )
         }
@@ -158,11 +170,24 @@ enum PetHygieneCommandService {
             ledgerEvents: ledgerEvents,
             context: context
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetHygieneDeleteCommandResult(
+                logID: logID,
+                subjectID: pet.id,
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription,
+                removedLedgerEventIDs: []
+            )
+        }
         return PetHygieneDeleteCommandResult(
             logID: logID,
             subjectID: pet.id,
             didDelete: true,
+            didPersist: true,
+            persistenceErrorDescription: nil,
             removedLedgerEventIDs: ledgerEvents.map(\.id)
         )
     }
@@ -198,7 +223,9 @@ enum PetHygieneCommandService {
                 reminderID: UUID(),
                 subjectID: pet.id,
                 hygieneType: type,
-                didCreate: false
+                didCreate: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
 
@@ -254,7 +281,6 @@ enum PetHygieneCommandService {
 
         if input.repeatDays > 0 {
             CarePlanCalendarSync.suppressDefaultPlan(kind: "groom", pet: pet, context: context)
-            HygieneType.setCustomCycleDays(input.repeatDays, for: type, petId: pet.id)
         }
         guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: intent, context: context) else {
             return PetHygienePlanCommandResult(
@@ -262,7 +288,9 @@ enum PetHygieneCommandService {
                 reminderID: UUID(),
                 subjectID: pet.id,
                 hygieneType: type,
-                didCreate: false
+                didCreate: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let result = DomainScheduleWriter.createEvent(plan: plan, context: context)
@@ -282,10 +310,28 @@ enum PetHygieneCommandService {
                 reminderID: UUID(),
                 subjectID: pet.id,
                 hygieneType: type,
-                didCreate: false
+                didCreate: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetHygienePlanCommandResult(
+                eventID: event.id,
+                reminderID: reminder.id,
+                subjectID: pet.id,
+                hygieneType: type,
+                didCreate: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+
+        if input.repeatDays > 0 {
+            HygieneType.setCustomCycleDays(input.repeatDays, for: type, petId: pet.id)
+        }
 
         if scheduleNotification {
             let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager()
@@ -306,7 +352,9 @@ enum PetHygieneCommandService {
             reminderID: reminder.id,
             subjectID: pet.id,
             hygieneType: type,
-            didCreate: true
+            didCreate: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 }
@@ -368,6 +416,7 @@ struct PetHygieneCommandExecutor {
             executorId: executorId,
             date: date
         )
+        guard recorded.result.didPersist else { return recorded }
         deriveRecord(recorded.result, note: note)
         return recorded
     }
@@ -379,7 +428,9 @@ struct PetHygieneCommandExecutor {
         note: String
     ) -> PetHygieneDeleteCommandResult {
         let result = PetHygieneCommandService.delete(log, pet: pet, context: context)
-        revisions.publishPetHygieneDelete(result, note: note)
+        if result.didPersist {
+            revisions.publishPetHygieneDelete(result, note: note)
+        }
         return result
     }
 
@@ -413,7 +464,7 @@ struct PetHygieneCommandExecutor {
             scheduleNotification: scheduleNotification,
             reminderScheduling: reminderScheduling
         )
-        if result.didCreate {
+        if result.didPersist && result.didCreate {
             revisions.publishPetHygienePlan(result, note: note)
         }
         return result

@@ -1950,6 +1950,8 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.executorId == executorHuman.id.uuidString)
         #expect(recorded.result.subjectID == pet.id)
         #expect(recorded.result.hygieneType == .bath)
+        #expect(recorded.result.didPersist)
+        #expect(recorded.result.persistenceErrorDescription == nil)
         #expect(ledgerEvents.contains { $0.eventKind == CareLedgerEventKind.hygiene.rawValue && $0.legacyModelId == recorded.result.logID.uuidString })
         let unrelatedLedger = CareLedgerEvent(
             subjectKind: .pet,
@@ -1975,6 +1977,8 @@ struct HomeCommandExecutorTests {
         #expect(deleted.subjectID == pet.id)
         #expect(deleted.logID == recorded.result.logID)
         #expect(deleted.didDelete == true)
+        #expect(deleted.didPersist)
+        #expect(deleted.persistenceErrorDescription == nil)
         #expect(deleted.removedLedgerEventIDs == [ledgerEventID])
     }
 
@@ -2015,6 +2019,8 @@ struct HomeCommandExecutorTests {
         #expect(result.hygieneType == .brushing)
         #expect(result.eventID == event.id)
         #expect(result.reminderID == reminder.id)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(event.title == "Momo — 梳毛 — coat check")
         #expect(event.startDate == makeDate(year: 2026, month: 6, day: 8, hour: 8, minute: 15))
         #expect(event.endDate == makeDate(year: 2026, month: 7, day: 8, hour: 8, minute: 15))
@@ -3186,6 +3192,31 @@ struct HomeCommandExecutorTests {
         #expect(executorSource.contains("if result.didPersist && result.didChange"))
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist"))
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didChange"))
+    }
+
+    @Test func petHygieneAndCatCareCommandsGateSideEffectsOnPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let hygieneSource = try source("Ohana/Features/Hygiene/PetHygieneCommands.swift", rootURL: rootURL)
+        let catSource = try source("Ohana/Features/CatCare/CatCareCommands.swift", rootURL: rootURL)
+        let petCareExecutorSource = try source("Ohana/Features/PetCare/PetCareCommands.swift", rootURL: rootURL)
+        let revisionSource = try source("Ohana/Features/RevisionPublishing/DomainRevisionPublishing+FeaturePublishing.swift", rootURL: rootURL)
+
+        #expect(hygieneSource.contains("let didPersist: Bool"))
+        #expect(hygieneSource.contains("let persistenceErrorDescription: String?"))
+        #expect(!hygieneSource.contains("context.safeSave()"))
+        #expect(hygieneSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(hygieneSource.contains("context.rollback()"))
+        #expect(hygieneSource.contains("guard recorded.result.didPersist else { return recorded }"))
+        #expect(hygieneSource.contains("if result.didPersist"))
+        #expect(catSource.contains("let didPersist: Bool"))
+        #expect(catSource.contains("let persistenceErrorDescription: String?"))
+        #expect(!catSource.contains("context.safeSave()"))
+        #expect(catSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(catSource.contains("context.rollback()"))
+        #expect(catSource.contains("guard recorded.result.didPersist else"))
+        #expect(petCareExecutorSource.contains("guard result.didPersist else { return result }"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didDelete"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didCreate"))
     }
 
     @MainActor
@@ -10129,6 +10160,8 @@ struct HomeCommandExecutorTests {
         var hygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
         #expect(result.petID == pet.id)
         #expect(result.actionRaw == "铲猫砂")
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(events.count == 1)
         #expect(hygieneLogs.count == 1)
         #expect(events.first?.id == result.eventID)
@@ -10149,6 +10182,8 @@ struct HomeCommandExecutorTests {
         #expect(undoResult.petID == pet.id)
         #expect(undoResult.eventID == result.eventID)
         #expect(undoResult.hygieneLogID == result.hygieneLogID)
+        #expect(undoResult.didPersist)
+        #expect(undoResult.persistenceErrorDescription == nil)
         #expect(events.isEmpty)
         #expect(hygieneLogs.isEmpty)
     }
@@ -10178,6 +10213,8 @@ struct HomeCommandExecutorTests {
         let hygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
         #expect(result.petID == pet.id)
         #expect(result.hygieneLogID == nil)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(events.count == 1)
         #expect(events.first?.title == "🥩 喂食")
         #expect(hygieneLogs.isEmpty)

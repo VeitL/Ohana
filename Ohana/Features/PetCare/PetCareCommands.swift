@@ -501,6 +501,7 @@ struct PetCareCommandExecutor {
         note: String = "catCare.record"
     ) -> CatCareCommandResult {
         let result = CatCareCommandService.record(pet: pet, input: input, context: context)
+        guard result.didPersist else { return result }
         deriveCatCareRecord(result, note: note)
         return result
     }
@@ -518,6 +519,7 @@ struct PetCareCommandExecutor {
             hygieneLogID: hygieneLogID,
             context: context
         )
+        guard result.didPersist else { return result }
         deriveCatCareUndo(result, pet: pet, note: note)
         return result
     }

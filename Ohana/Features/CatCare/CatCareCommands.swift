@@ -37,13 +37,15 @@ struct CatCareCommandResult: Equatable {
     let hygieneLogID: UUID?
     let occurredAt: Date
     let disposition: CareFactWriteDisposition
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 
     var didRecord: Bool {
-        disposition.didWriteFact
+        didPersist && disposition.didWriteFact
     }
 
     var allowsDerivedEffects: Bool {
-        disposition.allowsDerivedEffects
+        didPersist && disposition.allowsDerivedEffects
     }
 }
 
@@ -53,6 +55,8 @@ struct CatCareUndoCommandResult: Equatable {
     let hygieneLogID: UUID?
     let removedLedgerEventIDs: [UUID]
     let didDelete: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 enum CatCareCommandService {
@@ -78,7 +82,9 @@ enum CatCareCommandService {
                 eventID: UUID(),
                 hygieneLogID: nil,
                 occurredAt: input.occurredAt,
-                disposition: disposition
+                disposition: disposition,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
 
@@ -102,7 +108,9 @@ enum CatCareCommandService {
                 eventID: UUID(),
                 hygieneLogID: nil,
                 occurredAt: input.occurredAt,
-                disposition: .noOp
+                disposition: .noOp,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
@@ -118,13 +126,39 @@ enum CatCareCommandService {
                 executorId: input.executorId,
                 date: input.occurredAt
             )
+            guard recorded.result.didPersist else {
+                context.rollback()
+                return CatCareCommandResult(
+                    petID: pet.id,
+                    actionRaw: input.actionRaw,
+                    eventID: event.id,
+                    hygieneLogID: recorded.log.id,
+                    occurredAt: input.occurredAt,
+                    disposition: recorded.result.disposition,
+                    didPersist: false,
+                    persistenceErrorDescription: recorded.result.persistenceErrorDescription
+                )
+            }
             hygieneLog = recorded.log
             resultDisposition = recorded.result.disposition
         } else {
             hygieneLog = nil
             resultDisposition = disposition
         }
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return CatCareCommandResult(
+                petID: pet.id,
+                actionRaw: input.actionRaw,
+                eventID: event.id,
+                hygieneLogID: hygieneLog?.id,
+                occurredAt: input.occurredAt,
+                disposition: resultDisposition,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
 
         return CatCareCommandResult(
             petID: pet.id,
@@ -132,7 +166,9 @@ enum CatCareCommandService {
             eventID: event.id,
             hygieneLogID: hygieneLog?.id,
             occurredAt: input.occurredAt,
-            disposition: resultDisposition
+            disposition: resultDisposition,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -150,7 +186,9 @@ enum CatCareCommandService {
                 eventID: eventID,
                 hygieneLogID: hygieneLogID,
                 removedLedgerEventIDs: [],
-                didDelete: false
+                didDelete: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         var removedLedgerEventIDs: [UUID] = []
@@ -179,13 +217,27 @@ enum CatCareCommandService {
             context.delete(log)
             didDelete = true
         }
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return CatCareUndoCommandResult(
+                petID: pet.id,
+                eventID: eventID,
+                hygieneLogID: hygieneLogID,
+                removedLedgerEventIDs: [],
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
         return CatCareUndoCommandResult(
             petID: pet.id,
             eventID: eventID,
             hygieneLogID: hygieneLogID,
             removedLedgerEventIDs: removedLedgerEventIDs,
-            didDelete: didDelete
+            didDelete: didDelete,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
