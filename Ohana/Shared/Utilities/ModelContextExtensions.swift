@@ -20,24 +20,56 @@ nonisolated struct ModelContextSaveResult: Equatable, Sendable {
     }
 }
 
+nonisolated struct ModelContextSaveFailureEvent: Equatable, Identifiable, Sendable {
+    let id: UUID
+    let fileName: String
+    let line: Int
+    let errorDescription: String
+    let occurredAt: Date
+}
+
+nonisolated enum PersistenceSaveFailureCenter {
+    static let notificationName = Notification.Name("OhanaPersistenceSaveFailed")
+    static let eventUserInfoKey = "ModelContextSaveFailureEvent"
+
+    static func publish(error: Error, file: String, line: Int) {
+        let event = ModelContextSaveFailureEvent(
+            id: UUID(),
+            fileName: URL(fileURLWithPath: file).lastPathComponent,
+            line: line,
+            errorDescription: error.localizedDescription,
+            occurredAt: Date()
+        )
+        NotificationCenter.default.post(
+            name: notificationName,
+            object: nil,
+            userInfo: [eventUserInfoKey: event]
+        )
+    }
+}
+
 extension ModelContext {
     @discardableResult
     nonisolated func safeSaveResult(
         file: String = #file,
-        line: Int = #line
+        line: Int = #line,
+        publishFailureEvent: Bool = false
     ) -> ModelContextSaveResult {
         do {
             try save()
             return .saved
         } catch {
             Self.logSaveFailure(error, file: file, line: line)
+            if publishFailureEvent {
+                PersistenceSaveFailureCenter.publish(error: error, file: file, line: line)
+            }
             return .failed(error)
         }
     }
 
     /// 安全保存，失败时记录错误日志而非静默吞掉
     nonisolated func safeSave(file: String = #file, line: Int = #line) {
-        _ = safeSaveResult(file: file, line: line)
+        _ = safeSaveResult(file: file, line: line, publishFailureEvent: true)
     }
 
     private nonisolated static func logSaveFailure(_ error: Error, file: String, line: Int) {

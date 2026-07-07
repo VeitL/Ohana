@@ -2761,6 +2761,24 @@ struct HomeCommandExecutorTests {
         #expect(walkCardSource.contains("guard result.didPersist else"))
     }
 
+    @Test func legacyBareSafeSaveFailuresPublishGlobalUserVisibleFeedback() throws {
+        let rootURL = repositoryRootURL()
+        let modelContextSource = try source("Ohana/Shared/Utilities/ModelContextExtensions.swift", rootURL: rootURL)
+        let rootViewSource = try source("Ohana/App/RootView.swift", rootURL: rootURL)
+        let islandToastSource = try source("Ohana/Shared/Components/IslandToastView.swift", rootURL: rootURL)
+
+        #expect(modelContextSource.contains("nonisolated struct ModelContextSaveFailureEvent"))
+        #expect(modelContextSource.contains("enum PersistenceSaveFailureCenter"))
+        #expect(modelContextSource.contains("publishFailureEvent: Bool = false"))
+        #expect(modelContextSource.contains("PersistenceSaveFailureCenter.publish(error: error, file: file, line: line)"))
+        #expect(modelContextSource.contains("publishFailureEvent: true"))
+        #expect(rootViewSource.contains("PersistenceSaveFailureCenter.notificationName"))
+        #expect(rootViewSource.contains("showPersistenceSaveFailureToast"))
+        #expect(rootViewSource.contains(".islandToastOverlay()"))
+        #expect(rootViewSource.contains("appServices.islandToasts.show"))
+        #expect(islandToastSource.contains("func islandToastOverlay()"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()

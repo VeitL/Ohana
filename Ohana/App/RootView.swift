@@ -23,6 +23,7 @@ struct RootView: View {
     @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
     @State private var plantBatchCareRewardSettlementTask: Task<Void, Never>?
+    @State private var lastPersistenceFailureToastDate: Date?
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
 
@@ -52,6 +53,7 @@ struct RootView: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .toggleStyle(OhanaPillToggleStyle())
+        .islandToastOverlay()
         .onAppear {
             startupMaintenance.startAfterFirstRender(context: modelContext)
             schedulePlantBatchCareRewardSettlement()
@@ -73,6 +75,15 @@ struct RootView: View {
                 medicationReminders: appServices.medicationReminders,
                 domainRevisions: appServices.domainRevisions
             )
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: PersistenceSaveFailureCenter.notificationName)
+                .receive(on: RunLoop.main)
+        ) { notification in
+            guard let event = notification.userInfo?[PersistenceSaveFailureCenter.eventUserInfoKey] as? ModelContextSaveFailureEvent else {
+                return
+            }
+            showPersistenceSaveFailureToast(event)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             appSwitcherSnapshotCoverRequested = true
@@ -160,6 +171,20 @@ struct RootView: View {
             PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
         }
         schedulePlantBatchCareRewardSettlement(now: now)
+    }
+
+    private func showPersistenceSaveFailureToast(_ event: ModelContextSaveFailureEvent, now: Date = Date()) {
+        if let lastPersistenceFailureToastDate,
+           now.timeIntervalSince(lastPersistenceFailureToastDate) < 1.5 {
+            return
+        }
+        lastPersistenceFailureToastDate = now
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        appServices.islandToasts.show(l.tr(
+            zh: "保存失败，请检查存储空间后重试",
+            en: "Save failed. Check storage and try again.",
+            de: "Speichern fehlgeschlagen. Prüfe den Speicher und versuche es erneut."
+        ))
     }
 
     private var l: L10n {
