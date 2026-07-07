@@ -63,6 +63,13 @@ private nonisolated struct CloudSyncRecordApplyOutcome {
     }
 }
 
+private nonisolated struct LegacyRecycleBinFieldValues {
+    let trashedAt: Date?
+    let trashExpiresAt: Date?
+    let trashBatchId: String
+    let trashedByHumanId: String
+}
+
 nonisolated enum CloudSyncRecordApplyError: LocalizedError, Equatable {
     case missingLocalRecordId(recordName: String)
     case invalidLocalRecordId(entityName: String, localRecordId: String)
@@ -137,11 +144,18 @@ nonisolated enum CloudSyncRecordApplier {
         if case .skippedUnsupported = result {
             return result
         }
+        let appliedLocalRecordUUID = outcome.stateLocalRecordUUID ?? existingStateRecordUUID ?? metadata.localRecordUUID
+        try applyLegacyRecycleBinFieldsIfSupported(
+            from: record,
+            entityName: metadata.entityName,
+            localRecordUUID: appliedLocalRecordUUID,
+            context: context
+        )
         let state = try upsertState(
             metadata: metadata,
             record: record,
             context: context,
-            localRecordUUID: outcome.stateLocalRecordUUID ?? existingStateRecordUUID ?? metadata.localRecordUUID
+            localRecordUUID: appliedLocalRecordUUID
         )
         state.isDeleted = false
         state.isDeletionTombstone = false
@@ -923,6 +937,149 @@ nonisolated enum CloudSyncRecordApplier {
     private static func localRecordUUID(from state: CloudSyncRecordState?) -> UUID? {
         guard let state else { return nil }
         return UUID(uuidString: state.localRecordId)
+    }
+
+    private static func applyLegacyRecycleBinFieldsIfSupported(
+        from record: CKRecord,
+        entityName: String,
+        localRecordUUID: UUID,
+        context: ModelContext
+    ) throws {
+        let values = legacyRecycleBinFieldValues(from: record)
+        switch entityName {
+        case String(describing: Pet.self):
+            if let model = try fetchPet(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: Human.self):
+            if let model = try fetchHuman(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: Event.self):
+            if let model = try fetchEvent(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: PetCareLog.self):
+            if let model = try fetchPetCareLog(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: PetPottyLog.self):
+            if let model = try fetchPetPottyLog(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: PetHygieneLog.self):
+            if let model = try fetchPetHygieneLog(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: PetHealthLog.self):
+            if let model = try fetchPetHealthLog(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: PetWalkLog.self):
+            if let model = try fetchPetWalkLog(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: PetExpenseLog.self):
+            if let model = try fetchPetExpenseLog(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: PetFoodRecord.self):
+            if let model = try fetchPetFoodRecord(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: PetWeightLog.self):
+            if let model = try fetchPetWeightLog(id: localRecordUUID, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        default:
+            break
+        }
+    }
+
+    private static func legacyRecycleBinFieldValues(from record: CKRecord) -> LegacyRecycleBinFieldValues {
+        LegacyRecycleBinFieldValues(
+            trashedAt: record.date(for: CloudSyncLegacyRecycleBinFieldKey.trashedAt),
+            trashExpiresAt: record.date(for: CloudSyncLegacyRecycleBinFieldKey.trashExpiresAt),
+            trashBatchId: record.string(for: CloudSyncLegacyRecycleBinFieldKey.trashBatchId) ?? "",
+            trashedByHumanId: record.string(for: CloudSyncLegacyRecycleBinFieldKey.trashedByHumanId) ?? ""
+        )
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: Pet) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: Human) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: Event) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: PetCareLog) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: PetPottyLog) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: PetHygieneLog) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: PetHealthLog) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: PetWalkLog) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: PetExpenseLog) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: PetFoodRecord) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: PetWeightLog) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
     }
 
     private static func deleteLocalModel(metadata: RemoteMetadata, context: ModelContext) throws {

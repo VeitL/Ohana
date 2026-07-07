@@ -289,46 +289,125 @@ nonisolated enum CloudSyncRecordSerializer {
         for model: Any,
         entityName: String
     ) throws -> [String: CloudSyncRecordFieldValue] {
+        var fields: [String: CloudSyncRecordFieldValue]
         switch model {
         case let household as Household:
-            householdFields(household)
+            fields = householdFields(household)
         case let pet as Pet:
-            petFields(pet)
+            fields = petFields(pet)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: pet.trashedAt,
+                trashExpiresAt: pet.trashExpiresAt,
+                trashBatchId: pet.trashBatchId,
+                trashedByHumanId: pet.trashedByHumanId
+            )
         case let human as Human:
-            humanFields(human)
+            fields = humanFields(human)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: human.trashedAt,
+                trashExpiresAt: human.trashExpiresAt,
+                trashBatchId: human.trashBatchId,
+                trashedByHumanId: human.trashedByHumanId
+            )
         case let event as Event:
-            eventFields(event)
+            fields = eventFields(event)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: event.trashedAt,
+                trashExpiresAt: event.trashExpiresAt,
+                trashBatchId: event.trashBatchId,
+                trashedByHumanId: event.trashedByHumanId
+            )
         case let log as PetCareLog:
-            petCareLogFields(log)
+            fields = petCareLogFields(log)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: log.trashedAt,
+                trashExpiresAt: log.trashExpiresAt,
+                trashBatchId: log.trashBatchId,
+                trashedByHumanId: log.trashedByHumanId
+            )
         case let log as PetPottyLog:
-            petPottyLogFields(log)
+            fields = petPottyLogFields(log)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: log.trashedAt,
+                trashExpiresAt: log.trashExpiresAt,
+                trashBatchId: log.trashBatchId,
+                trashedByHumanId: log.trashedByHumanId
+            )
         case let log as PetHygieneLog:
-            petHygieneLogFields(log)
+            fields = petHygieneLogFields(log)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: log.trashedAt,
+                trashExpiresAt: log.trashExpiresAt,
+                trashBatchId: log.trashBatchId,
+                trashedByHumanId: log.trashedByHumanId
+            )
         case let log as PetHealthLog:
-            petHealthLogFields(log)
+            fields = petHealthLogFields(log)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: log.trashedAt,
+                trashExpiresAt: log.trashExpiresAt,
+                trashBatchId: log.trashBatchId,
+                trashedByHumanId: log.trashedByHumanId
+            )
         case let log as PetWalkLog:
-            petWalkLogFields(log)
+            fields = petWalkLogFields(log)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: log.trashedAt,
+                trashExpiresAt: log.trashExpiresAt,
+                trashBatchId: log.trashBatchId,
+                trashedByHumanId: log.trashedByHumanId
+            )
         case let log as PetExpenseLog:
-            petExpenseLogFields(log)
+            fields = petExpenseLogFields(log)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: log.trashedAt,
+                trashExpiresAt: log.trashExpiresAt,
+                trashBatchId: log.trashBatchId,
+                trashedByHumanId: log.trashedByHumanId
+            )
         case let record as PetFoodRecord:
-            petFoodRecordFields(record)
+            fields = petFoodRecordFields(record)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: record.trashedAt,
+                trashExpiresAt: record.trashExpiresAt,
+                trashBatchId: record.trashBatchId,
+                trashedByHumanId: record.trashedByHumanId
+            )
         case let log as PetWeightLog:
-            petWeightLogFields(log)
+            fields = petWeightLogFields(log)
+            mergeLegacyRecycleBinFields(
+                into: &fields,
+                trashedAt: log.trashedAt,
+                trashExpiresAt: log.trashExpiresAt,
+                trashBatchId: log.trashBatchId,
+                trashedByHumanId: log.trashedByHumanId
+            )
         case let session as SharedCareSession:
-            sharedCareSessionFields(session)
+            fields = sharedCareSessionFields(session)
         case let event as CareLedgerEvent:
-            careLedgerEventFields(event)
+            fields = careLedgerEventFields(event)
         case let entry as CoconutLedgerEntry:
-            coconutLedgerEntryFields(entry)
+            fields = coconutLedgerEntryFields(entry)
         case let item as GachaOwnedItem:
-            gachaOwnedItemFields(item)
+            fields = gachaOwnedItemFields(item)
         case let log as GachaDrawLog:
-            gachaDrawLogFields(log)
+            fields = gachaDrawLogFields(log)
         case let record as ShopPurchaseRecord:
-            shopPurchaseRecordFields(record)
+            fields = shopPurchaseRecordFields(record)
         default:
             throw CloudSyncRecordSerializationError.unsupportedEntity(entityName: entityName)
         }
+        return fields
     }
 
     private static func householdFields(_ household: Household) -> [String: CloudSyncRecordFieldValue] {
@@ -713,6 +792,19 @@ nonisolated enum CloudSyncRecordSerializer {
             "isLegacyImport": .bool(record.isLegacyImport),
             "createdAt": .date(record.createdAt)
         ]
+    }
+
+    private static func mergeLegacyRecycleBinFields(
+        into fields: inout [String: CloudSyncRecordFieldValue],
+        trashedAt: Date?,
+        trashExpiresAt: Date?,
+        trashBatchId: String,
+        trashedByHumanId: String
+    ) {
+        fields[CloudSyncLegacyRecycleBinFieldKey.trashedAt] = optionalDate(trashedAt)
+        fields[CloudSyncLegacyRecycleBinFieldKey.trashExpiresAt] = optionalDate(trashExpiresAt)
+        fields[CloudSyncLegacyRecycleBinFieldKey.trashBatchId] = .string(trashBatchId)
+        fields[CloudSyncLegacyRecycleBinFieldKey.trashedByHumanId] = .string(trashedByHumanId)
     }
 
     private static func optionalString(_ value: String?) -> CloudSyncRecordFieldValue {

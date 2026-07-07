@@ -84,10 +84,10 @@
 ### TFU-20260613-003 - Round-Trip Recycle-Bin Soft-Delete Fields In CloudSync
 
 - Priority / bucket: P2, future CloudSync / 1.x.
-- Status: Open.
-- Why still open: first release keeps CloudKit off, but future sync must serialize/apply `trashedAt`, `trashExpiresAt`, `trashBatchId`, and `trashedByHumanId` consistently.
-- Next action: before CloudKit unlock, extend serializer/apply/import paths and registry tests for recoverable entities and bulk-clear batches.
-- Close when: remote soft delete and remote restore reproduce the same recycle-bin state locally without premature tombstones.
+- Status: Done 2026-07-08 for the local CloudSync payload/apply contract; true shared-zone enablement validation remains covered by TFU-20260614-014 while CloudKit stays disabled.
+- Why closed: upload-pipeline recoverable entities now serialize `trashedAt`, `trashExpiresAt`, `trashBatchId`, and `trashedByHumanId` as CloudSync payload fields, and live remote apply preserves or clears those legacy fields without turning the row into a deletion tombstone. This does not revive the retired user-facing Recycle Bin product surface.
+- Evidence: `CloudSyncMetadataServiceTests` covers legacy field upload, clear-field upload for restore, remote live apply preserving the legacy fields, and remote live apply clearing them for restore.
+- Close condition: remote soft-delete and remote restore semantics are locally reproducible through CloudSync payload/apply without premature tombstones.
 
 ### TFU-20260612-022 - Add Final Settings Privacy And Support Actions
 

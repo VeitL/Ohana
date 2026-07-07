@@ -524,6 +524,54 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordSerializerPreservesLegacyRecycleBinFieldsOnlyAsCloudSyncPayload() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let pet = Pet(name: "Momo")
+        pet.id = uuid("22222222-2222-4222-8222-222222222222")
+        pet.trashedAt = Date(timeIntervalSinceReferenceDate: 10)
+        pet.trashExpiresAt = Date(timeIntervalSinceReferenceDate: 20)
+        pet.trashBatchId = "batch-1"
+        pet.trashedByHumanId = "human-1"
+
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Pet.self),
+            localRecordId: pet.id,
+            householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            context: context
+        )
+        let payload = try CloudSyncRecordSerializer.payload(for: pet, state: state)
+
+        #expect(payload.fields[CloudSyncLegacyRecycleBinFieldKey.trashedAt]?.dateValue == pet.trashedAt)
+        #expect(payload.fields[CloudSyncLegacyRecycleBinFieldKey.trashExpiresAt]?.dateValue == pet.trashExpiresAt)
+        #expect(payload.fields[CloudSyncLegacyRecycleBinFieldKey.trashBatchId]?.stringValue == "batch-1")
+        #expect(payload.fields[CloudSyncLegacyRecycleBinFieldKey.trashedByHumanId]?.stringValue == "human-1")
+        #expect(payload.fields[CloudSyncRecordFieldKey.isDeleted]?.boolValue == false)
+    }
+
+    @MainActor
+    @Test func recordSerializerEmitsLegacyRecycleBinClearFieldsForRemoteRestore() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let pet = Pet(name: "Momo")
+        pet.id = uuid("22222222-2222-4222-8222-222222222222")
+
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Pet.self),
+            localRecordId: pet.id,
+            householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            context: context
+        )
+        let payload = try CloudSyncRecordSerializer.payload(for: pet, state: state)
+
+        #expect(payload.fields[CloudSyncLegacyRecycleBinFieldKey.trashedAt] == .null)
+        #expect(payload.fields[CloudSyncLegacyRecycleBinFieldKey.trashExpiresAt] == .null)
+        #expect(payload.fields[CloudSyncLegacyRecycleBinFieldKey.trashBatchId]?.stringValue == "")
+        #expect(payload.fields[CloudSyncLegacyRecycleBinFieldKey.trashedByHumanId]?.stringValue == "")
+        #expect(payload.fields[CloudSyncRecordFieldKey.isDeleted]?.boolValue == false)
+    }
+
+    @MainActor
     @Test func recordSerializerKeepsAppendOnlyLogReferencesLightweight() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -2317,6 +2365,90 @@ struct CloudSyncMetadataServiceTests {
         #expect(result == .updated(entityName: "Household", localRecordId: normalized(householdId)))
         #expect(household.name == "Remote Home")
         #expect(household.totalProsperity == 20)
+    }
+
+    @MainActor
+    @Test func recordApplierPreservesRemoteLegacyRecycleBinFieldsWithoutTombstone() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petId = uuid("33333333-3333-4333-8333-333333333333")
+        let trashedAt = Date(timeIntervalSinceReferenceDate: 100)
+        let trashExpiresAt = Date(timeIntervalSinceReferenceDate: 200)
+        let record = try makeRecordPayload(
+            entityName: String(describing: Pet.self),
+            recordType: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 300),
+            fields: [
+                "name": .string("Remote Momo"),
+                "species": .string("dog"),
+                CloudSyncLegacyRecycleBinFieldKey.trashedAt: .date(trashedAt),
+                CloudSyncLegacyRecycleBinFieldKey.trashExpiresAt: .date(trashExpiresAt),
+                CloudSyncLegacyRecycleBinFieldKey.trashBatchId: .string("batch-1"),
+                CloudSyncLegacyRecycleBinFieldKey.trashedByHumanId: .string("human-1")
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .inserted(entityName: "Pet", localRecordId: normalized(petId)))
+        let pet = try #require(try fetchPet(id: petId, context: context))
+        #expect(pet.trashedAt == trashedAt)
+        #expect(pet.trashExpiresAt == trashExpiresAt)
+        #expect(pet.trashBatchId == "batch-1")
+        #expect(pet.trashedByHumanId == "human-1")
+        let state = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            context: context
+        ))
+        #expect(!state.isDeleted)
+        #expect(!state.isDeletionTombstone)
+    }
+
+    @MainActor
+    @Test func recordApplierClearsLegacyRecycleBinFieldsForRemoteRestore() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petId = uuid("33333333-3333-4333-8333-333333333333")
+        let pet = Pet(name: "Local Momo")
+        pet.id = petId
+        pet.trashedAt = Date(timeIntervalSinceReferenceDate: 100)
+        pet.trashExpiresAt = Date(timeIntervalSinceReferenceDate: 200)
+        pet.trashBatchId = "batch-1"
+        pet.trashedByHumanId = "human-1"
+        context.insert(pet)
+
+        let record = try makeRecordPayload(
+            entityName: String(describing: Pet.self),
+            recordType: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 300),
+            fields: [
+                "name": .string("Restored Momo"),
+                "species": .string("dog")
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .updated(entityName: "Pet", localRecordId: normalized(petId)))
+        #expect(pet.name == "Restored Momo")
+        #expect(pet.trashedAt == nil)
+        #expect(pet.trashExpiresAt == nil)
+        #expect(pet.trashBatchId == "")
+        #expect(pet.trashedByHumanId == "")
+        let state = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            context: context
+        ))
+        #expect(!state.isDeleted)
+        #expect(!state.isDeletionTombstone)
     }
 
     @MainActor
