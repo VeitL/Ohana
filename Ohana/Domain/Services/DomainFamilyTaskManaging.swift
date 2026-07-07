@@ -22,6 +22,7 @@ protocol FamilyTaskManaging {
         emoji: String,
         context: ModelContext
     ) -> FamilyCollaborationTask?
+    @discardableResult
     func updateTask(
         _ task: FamilyCollaborationTask,
         title: String,
@@ -31,12 +32,19 @@ protocol FamilyTaskManaging {
         dueAt: Date?,
         emoji: String,
         context: ModelContext
-    )
-    func delete(_ task: FamilyCollaborationTask, context: ModelContext)
-    func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext)
-    func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext)
-    func complete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext)
-    func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext)
-    func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext)
-    func syncReopenedReminder(_ reminder: Reminder, context: ModelContext)
+    ) -> Bool
+    @discardableResult
+    func delete(_ task: FamilyCollaborationTask, context: ModelContext) -> Bool
+    @discardableResult
+    func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) -> Bool
+    @discardableResult
+    func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) -> Bool
+    @discardableResult
+    func complete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool
+    @discardableResult
+    func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) -> Bool
+    @discardableResult
+    func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext) -> Bool
+    @discardableResult
+    func syncReopenedReminder(_ reminder: Reminder, context: ModelContext) -> Bool
 }

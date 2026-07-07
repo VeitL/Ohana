@@ -61,20 +61,6 @@
     "Ohana/Features/FamilyTasks/FamilyTaskService+LegacyBounty.swift": [
       "context.safeSave()"
     ],
-    "Ohana/Features/FamilyTasks/FamilyTaskService.swift": [
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Features/Feeding/FeedAutoLogMaterializer.swift": [
       "context.safeSave()"
     ],

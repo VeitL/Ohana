@@ -249,15 +249,15 @@ private final class DomainNoOpFamilyTaskManager: FamilyTaskManaging {
         dueAt _: Date?,
         emoji _: String,
         context _: ModelContext
-    ) {}
+    ) -> Bool { false }
 
-    func delete(_: FamilyCollaborationTask, context _: ModelContext) {}
-    func rejectCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) {}
-    func confirmCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) {}
-    func complete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) {}
-    func claim(_: FamilyCollaborationTask, by _: Human, context _: ModelContext) {}
-    func syncCompletedReminder(_: Reminder, completedBy _: String?, context _: ModelContext) {}
-    func syncReopenedReminder(_: Reminder, context _: ModelContext) {}
+    func delete(_: FamilyCollaborationTask, context _: ModelContext) -> Bool { false }
+    func rejectCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
+    func confirmCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
+    func complete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
+    func claim(_: FamilyCollaborationTask, by _: Human, context _: ModelContext) -> Bool { false }
+    func syncCompletedReminder(_: Reminder, completedBy _: String?, context _: ModelContext) -> Bool { false }
+    func syncReopenedReminder(_: Reminder, context _: ModelContext) -> Bool { false }
 }
 
 @MainActor

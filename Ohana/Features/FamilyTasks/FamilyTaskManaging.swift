@@ -65,6 +65,7 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
         )
     }
 
+    @discardableResult
     func updateTask(
         _ task: FamilyCollaborationTask,
         title: String,
@@ -74,7 +75,7 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
         dueAt: Date?,
         emoji: String,
         context: ModelContext
-    ) {
+    ) -> Bool {
         FamilyTaskService.updateTask(
             task,
             title: title,
@@ -87,15 +88,18 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
         )
     }
 
-    func delete(_ task: FamilyCollaborationTask, context: ModelContext) {
+    @discardableResult
+    func delete(_ task: FamilyCollaborationTask, context: ModelContext) -> Bool {
         FamilyTaskService.delete(task, context: context)
     }
 
-    func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) {
+    @discardableResult
+    func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) -> Bool {
         FamilyTaskService.rejectCompletion(task, by: reviewer, context: context, careLedger: careLedger)
     }
 
-    func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) {
+    @discardableResult
+    func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) -> Bool {
         FamilyTaskService.confirmCompletion(
             task,
             by: reviewer,
@@ -106,7 +110,8 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
         )
     }
 
-    func complete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) {
+    @discardableResult
+    func complete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool {
         FamilyTaskService.complete(
             task,
             by: human,
@@ -117,11 +122,13 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
         )
     }
 
-    func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) {
+    @discardableResult
+    func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) -> Bool {
         FamilyTaskService.claim(task, by: human, context: context)
     }
 
-    func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext) {
+    @discardableResult
+    func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext) -> Bool {
         FamilyTaskService.syncCompletedReminder(
             reminder,
             completedBy: humanId,
@@ -132,7 +139,8 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
         )
     }
 
-    func syncReopenedReminder(_ reminder: Reminder, context: ModelContext) {
+    @discardableResult
+    func syncReopenedReminder(_ reminder: Reminder, context: ModelContext) -> Bool {
         FamilyTaskService.syncReopenedReminder(reminder, context: context)
     }
 }

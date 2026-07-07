@@ -29,6 +29,58 @@ enum FamilyTaskService {
         let mutation: AuthorizedDomainScheduleMutation
     }
 
+    private struct PendingFamilyTaskReminderSchedule {
+        let reminder: Reminder
+        let careLedger: CareLedgerRecording
+        let context: ModelContext
+
+        @MainActor
+        func run() {
+            let reminderScheduling = ReminderSchedulingManager(careLedger: careLedger)
+            Task { @MainActor in
+                await reminderScheduling.scheduleIfNeeded(
+                    reminder: reminder,
+                    context: context,
+                    source: .service,
+                    existingNotificationIds: nil,
+                    operation: "schedule",
+                    saveLedger: true
+                )
+            }
+        }
+    }
+
+    private struct FamilyTaskRewardTransferPreparation {
+        let didPrepare: Bool
+        let projectionEntries: [CoconutLedgerEntry]
+
+        static let preparedWithoutProjection = FamilyTaskRewardTransferPreparation(
+            didPrepare: true,
+            projectionEntries: []
+        )
+
+        static let failed = FamilyTaskRewardTransferPreparation(
+            didPrepare: false,
+            projectionEntries: []
+        )
+    }
+
+    @MainActor
+    private static func persistMutation(
+        context: ModelContext,
+        onSuccess: () -> Void = {},
+        onFailure: () -> Void = {}
+    ) -> Bool {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            onFailure()
+            return false
+        }
+        onSuccess()
+        return true
+    }
+
     private static func actorOverride(for human: Human?) -> EconomyRewardOwnerResolution? {
         guard let human else { return nil }
         let humanId = human.id.uuidString
@@ -334,10 +386,12 @@ enum FamilyTaskService {
                 assigneeUpdate.event,
                 intent: assigneeUpdate.intent,
                 mutation: assigneeUpdate.mutation
-            ) else { return nil }
+            ) else {
+                context.rollback()
+                return nil
+            }
         }
-        context.safeSave()
-        return task
+        return persistMutation(context: context) ? task : nil
     }
 
     private static func authorizedReminderAssigneeUpdate(
@@ -412,11 +466,11 @@ enum FamilyTaskService {
             emoji: emoji,
             context: context
         )
-        context.safeSave()
-        return task
+        return persistMutation(context: context) ? task : nil
     }
 
     @MainActor
+    @discardableResult
     static func updateTask(
         _ task: FamilyCollaborationTask,
         title: String,
@@ -426,18 +480,18 @@ enum FamilyTaskService {
         dueAt: Date?,
         emoji: String,
         context: ModelContext
-    ) {
+    ) -> Bool {
         guard canWriteCollaboration(for: human),
               canWriteRelatedPet(for: task, context: context),
               canWriteCollaboration(forHumanId: task.createdById, context: context),
               canWriteCollaboration(forHumanId: task.claimedById, context: context) else {
-            return
+            return false
         }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, assigneeId: human?.id.uuidString, context: context),
             actor: human,
             context: context
-        ) else { return }
+        ) else { return false }
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
             task.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -458,30 +512,32 @@ enum FamilyTaskService {
             }
             task.touch()
         }
-        context.safeSave()
+        return persistMutation(context: context)
     }
 
     @MainActor
-    static func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) {
+    @discardableResult
+    static func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) -> Bool {
         guard !task.isFinished,
               canWriteCollaboration(for: human),
-              canWriteRelatedPet(for: task, context: context) else { return }
+              canWriteRelatedPet(for: task, context: context) else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, assigneeId: human.id.uuidString, context: context),
             actor: human,
             context: context
-        ) else { return }
+        ) else { return false }
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.claimedById = human.id.uuidString
             task.claimedByName = human.name
             task.status = .claimed
             task.touch()
         }
-        context.safeSave()
+        return persistMutation(context: context)
     }
 
     @MainActor
-    static func complete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) {
+    @discardableResult
+    static func complete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool {
         complete(
             task,
             by: human,
@@ -492,6 +548,7 @@ enum FamilyTaskService {
     }
 
     @MainActor
+    @discardableResult
     static func complete(
         _ task: FamilyCollaborationTask,
         by human: Human?,
@@ -499,19 +556,18 @@ enum FamilyTaskService {
         wallet _: CoconutWalletManaging,
         careLedger: CareLedgerRecording,
         projectionManager _: QuestManager? = nil
-    ) {
+    ) -> Bool {
         guard !task.isFinished,
               canWriteCollaboration(for: human),
-              canWriteRelatedPet(for: task, context: context) else { return }
+              canWriteRelatedPet(for: task, context: context) else { return false }
         if task.hasReward {
-            submitForReview(task, by: human, context: context, careLedger: careLedger)
-            return
+            return submitForReview(task, by: human, context: context, careLedger: careLedger)
         }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, assigneeId: human?.id.uuidString, context: context),
             actor: human,
             context: context
-        ) else { return }
+        ) else { return false }
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.status = .completed
             task.completedAt = Date()
@@ -520,8 +576,9 @@ enum FamilyTaskService {
             task.touch()
         }
 
+        var notificationIDToCancel: String?
         if let reminder = reminder(for: task, context: context), !reminder.isCompleted {
-            markRelatedReminderCompleted(
+            notificationIDToCancel = markRelatedReminderCompleted(
                 reminder,
                 by: human?.id.uuidString,
                 actionType: "familyTaskCompleteReminder",
@@ -531,29 +588,38 @@ enum FamilyTaskService {
             )
         }
 
-        context.safeSave()
+        return persistMutation(
+            context: context,
+            onSuccess: {
+                if let notificationIDToCancel {
+                    OhanaNotifications.current.cancel(notificationId: notificationIDToCancel)
+                }
+            }
+        )
     }
 
     @MainActor
-    static func submitForReview(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) {
+    @discardableResult
+    static func submitForReview(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool {
         submitForReview(task, by: human, context: context, careLedger: CareLedgerService())
     }
 
     @MainActor
+    @discardableResult
     static func submitForReview(
         _ task: FamilyCollaborationTask,
         by human: Human?,
         context: ModelContext,
         careLedger: CareLedgerRecording
-    ) {
+    ) -> Bool {
         guard !task.isFinished,
               canWriteCollaboration(for: human),
-              canWriteRelatedPet(for: task, context: context) else { return }
+              canWriteRelatedPet(for: task, context: context) else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, assigneeId: human?.id.uuidString, context: context),
             actor: human,
             context: context
-        ) else { return }
+        ) else { return false }
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.status = .pendingReview
             task.completedAt = Date()
@@ -562,8 +628,9 @@ enum FamilyTaskService {
             task.touch()
         }
 
+        var notificationIDToCancel: String?
         if let reminder = reminder(for: task, context: context), !reminder.isCompleted {
-            markRelatedReminderCompleted(
+            notificationIDToCancel = markRelatedReminderCompleted(
                 reminder,
                 by: human?.id.uuidString,
                 completedAt: task.completedAt ?? Date(),
@@ -571,7 +638,7 @@ enum FamilyTaskService {
                 plan: write,
                 context: context,
                 careLedger: careLedger,
-                saveLedger: true
+                recordsLedgerState: true
             )
         }
 
@@ -601,7 +668,14 @@ enum FamilyTaskService {
                 save: false
             )
         }
-        context.safeSave()
+        return persistMutation(
+            context: context,
+            onSuccess: {
+                if let notificationIDToCancel {
+                    OhanaNotifications.current.cancel(notificationId: notificationIDToCancel)
+                }
+            }
+        )
     }
 
     @discardableResult
@@ -643,8 +717,9 @@ enum FamilyTaskService {
             task.touch()
         }
 
+        var notificationIDToCancel: String?
         if let reminder = reminder(for: task, context: context), !reminder.isCompleted {
-            markRelatedReminderCompleted(
+            notificationIDToCancel = markRelatedReminderCompleted(
                 reminder,
                 by: task.completedById,
                 completedAt: task.completedAt ?? Date(),
@@ -656,7 +731,7 @@ enum FamilyTaskService {
             )
         }
 
-        guard transferRewardIfNeeded(
+        let rewardTransfer = transferRewardIfNeeded(
             task,
             write: write,
             reviewer: reviewer,
@@ -664,38 +739,54 @@ enum FamilyTaskService {
             wallet: wallet,
             careLedger: careLedger,
             projectionManager: projectionManager
-        ) else {
+        )
+        guard rewardTransfer.didPrepare else {
             DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
                 task.status = originalStatus
                 task.completedAt = originalCompletedAt
             }
             return false
         }
-        context.safeSave()
-        return true
+        return persistMutation(
+            context: context,
+            onSuccess: {
+                if let notificationIDToCancel {
+                    OhanaNotifications.current.cancel(notificationId: notificationIDToCancel)
+                }
+                projectionManager?.recordWalletProjection(
+                    entries: rewardTransfer.projectionEntries,
+                    postsRewardFeedback: true
+                )
+            },
+            onFailure: {
+                CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
+            }
+        )
     }
 
     @MainActor
-    static func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) {
+    @discardableResult
+    static func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) -> Bool {
         rejectCompletion(task, by: reviewer, context: context, careLedger: CareLedgerService())
     }
 
     @MainActor
+    @discardableResult
     static func rejectCompletion(
         _ task: FamilyCollaborationTask,
         by reviewer: Human?,
         context: ModelContext,
         careLedger: CareLedgerRecording
-    ) {
+    ) -> Bool {
         guard task.status == .pendingReview,
               reviewer?.id.uuidString == task.createdById,
               canWriteCollaboration(for: reviewer),
-              canWriteRelatedPet(for: task, context: context) else { return }
+              canWriteRelatedPet(for: task, context: context) else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, assigneeId: reviewer?.id.uuidString, context: context),
             actor: reviewer,
             context: context
-        ) else { return }
+        ) else { return false }
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.status = task.claimedById == nil ? .active : .claimed
             task.completedAt = nil
@@ -704,8 +795,9 @@ enum FamilyTaskService {
             task.touch()
         }
 
+        var pendingSchedule: PendingFamilyTaskReminderSchedule?
         if let reminder = reminder(for: task, context: context), reminder.isCompleted {
-            reopenRelatedReminder(
+            pendingSchedule = reopenRelatedReminder(
                 reminder,
                 by: reviewer?.id.uuidString,
                 plan: write,
@@ -740,37 +832,45 @@ enum FamilyTaskService {
                 save: false
             )
         }
-        context.safeSave()
+        return persistMutation(
+            context: context,
+            onSuccess: {
+                pendingSchedule?.run()
+            }
+        )
     }
 
     @MainActor
-    static func cancel(_ task: FamilyCollaborationTask, context: ModelContext) {
-        guard task.status != .completed else { return }
+    @discardableResult
+    static func cancel(_ task: FamilyCollaborationTask, context: ModelContext) -> Bool {
+        guard task.status != .completed else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, context: context),
             actor: nil,
             context: context
-        ) else { return }
+        ) else { return false }
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.status = .cancelled
             task.touch()
         }
-        context.safeSave()
+        return persistMutation(context: context)
     }
 
     @MainActor
-    static func delete(_ task: FamilyCollaborationTask, context: ModelContext) {
+    @discardableResult
+    static func delete(_ task: FamilyCollaborationTask, context: ModelContext) -> Bool {
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, context: context),
             actor: nil,
             context: context
-        ) else { return }
+        ) else { return false }
         DomainMemberFactWriter.deleteFamilyTask(plan: write, task: task, context: context)
-        context.safeSave()
+        return persistMutation(context: context)
     }
 
     @MainActor
-    static func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext) {
+    @discardableResult
+    static func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext) -> Bool {
         syncCompletedReminder(
             reminder,
             completedBy: humanId,
@@ -781,6 +881,7 @@ enum FamilyTaskService {
     }
 
     @MainActor
+    @discardableResult
     static func syncCompletedReminder(
         _ reminder: Reminder,
         completedBy humanId: String?,
@@ -788,14 +889,14 @@ enum FamilyTaskService {
         wallet _: CoconutWalletManaging,
         careLedger _: CareLedgerRecording,
         projectionManager _: QuestManager? = nil
-    ) {
+    ) -> Bool {
         guard let task = activeTask(forReminderId: reminder.id.uuidString, context: context),
-              task.status != .completed else { return }
+              task.status != .completed else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: reminder, assigneeId: humanId, context: context),
             actor: human(id: humanId, context: context),
             context: context
-        ) else { return }
+        ) else { return false }
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.completedAt = reminder.completedAt ?? Date()
             task.completedById = humanId
@@ -804,18 +905,19 @@ enum FamilyTaskService {
             task.touch()
         }
 
-        context.safeSave()
+        return persistMutation(context: context)
     }
 
     @MainActor
-    static func syncReopenedReminder(_ reminder: Reminder, context: ModelContext) {
+    @discardableResult
+    static func syncReopenedReminder(_ reminder: Reminder, context: ModelContext) -> Bool {
         guard let task = activeOrCompletedTask(forReminderId: reminder.id.uuidString, context: context),
-              task.status == .completed else { return }
+              task.status == .completed else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: reminder, assigneeId: task.assignedToId, context: context),
             actor: nil,
             context: context
-        ) else { return }
+        ) else { return false }
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.status = .active
             task.completedAt = nil
@@ -823,7 +925,7 @@ enum FamilyTaskService {
             task.completedByName = nil
             task.touch()
         }
-        context.safeSave()
+        return persistMutation(context: context)
     }
 
     @MainActor
@@ -915,20 +1017,21 @@ enum FamilyTaskService {
         wallet: CoconutWalletManaging,
         careLedger: CareLedgerRecording,
         projectionManager: QuestManager?
-    ) -> Bool {
-        guard task.rewardCoconuts > 0 else { return true }
+    ) -> FamilyTaskRewardTransferPreparation {
+        guard task.rewardCoconuts > 0 else { return .preparedWithoutProjection }
         guard let receiver = human(id: task.completedById, context: context),
               let payer = human(id: task.createdById, context: context),
               task.completedById == receiver.id.uuidString else {
-            return false
+            return .failed
         }
-        guard payer.id != receiver.id else { return true }
+        guard payer.id != receiver.id else { return .preparedWithoutProjection }
         let marker = "familyTaskRewardTransfer:\(task.id.uuidString)"
         let payerTransactionKey = "\(marker):payer"
         let receiverTransactionKey = "\(marker):receiver"
         guard !hasWalletTransaction(payerTransactionKey, context: context),
-              !hasWalletTransaction(receiverTransactionKey, context: context) else { return true }
+              !hasWalletTransaction(receiverTransactionKey, context: context) else { return .preparedWithoutProjection }
         var transferError: Error?
+        var projectionEntries: [CoconutLedgerEntry] = []
         let didWrite = DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
             let subject = taskSubject(for: task, context: context)
             let payerLedger = careLedger.record(
@@ -978,7 +1081,7 @@ enum FamilyTaskService {
                 save: false
             )
             do {
-                try CoconutWalletMutationWriter.applyHumanMutations(
+                projectionEntries = try CoconutWalletMutationWriter.applyHumanMutations(
                     [
                         CoconutHumanWalletMutation(
                             human: payer,
@@ -1018,8 +1121,8 @@ enum FamilyTaskService {
                     wallet: wallet,
                     context: context,
                     save: false,
-                    postsRewardFeedback: true,
-                    updatesProjection: true,
+                    postsRewardFeedback: false,
+                    updatesProjection: false,
                     projectionManager: projectionManager
                 )
             } catch {
@@ -1031,9 +1134,11 @@ enum FamilyTaskService {
             #if DEBUG
                 OhanaLog.error("[FamilyTaskService] transfer wallet write failed: \(transferError.localizedDescription)", category: "FamilyTasks")
             #endif
-            return false
+            return .failed
         }
         return didWrite
+            ? FamilyTaskRewardTransferPreparation(didPrepare: true, projectionEntries: projectionEntries)
+            : .failed
     }
 
     @MainActor
@@ -1060,9 +1165,8 @@ enum FamilyTaskService {
         plan: AuthorizedDomainMemberFactWrite,
         context: ModelContext,
         careLedger: CareLedgerRecording,
-        recordsLedgerState: Bool = true,
-        saveLedger: Bool = false
-    ) {
+        recordsLedgerState: Bool = true
+    ) -> String? {
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
             reminder: reminder,
             writeKind: .collaboration,
@@ -1077,10 +1181,9 @@ enum FamilyTaskService {
                 context: context
             )
         else {
-            return
+            return nil
         }
         DomainMemberFactEffectsDispatcher.run(plan: plan) { _ in
-            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
             if recordsLedgerState {
                 careLedger.recordReminderState(
                     reminder: reminder,
@@ -1088,10 +1191,12 @@ enum FamilyTaskService {
                     actorId: humanId,
                     source: .service,
                     context: context,
-                    save: saveLedger
+                    save: false
                 )
             }
         }
+        let notificationId = reminder.notificationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        return notificationId.isEmpty ? nil : notificationId
     }
 
     @MainActor
@@ -1101,7 +1206,7 @@ enum FamilyTaskService {
         plan: AuthorizedDomainMemberFactWrite,
         context: ModelContext,
         careLedger: CareLedgerRecording
-    ) {
+    ) -> PendingFamilyTaskReminderSchedule? {
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
             reminder: reminder,
             writeKind: .collaboration,
@@ -1116,7 +1221,7 @@ enum FamilyTaskService {
                 context: context
             )
         else {
-            return
+            return nil
         }
         DomainMemberFactEffectsDispatcher.run(plan: plan) { _ in
             careLedger.recordReminderState(
@@ -1127,17 +1232,7 @@ enum FamilyTaskService {
                 context: context,
                 save: false
             )
-            let reminderScheduling = ReminderSchedulingManager(careLedger: careLedger)
-            Task { @MainActor in
-                await reminderScheduling.scheduleIfNeeded(
-                    reminder: reminder,
-                    context: context,
-                    source: .service,
-                    existingNotificationIds: nil,
-                    operation: "schedule",
-                    saveLedger: true
-                )
-            }
         }
+        return PendingFamilyTaskReminderSchedule(reminder: reminder, careLedger: careLedger, context: context)
     }
 }

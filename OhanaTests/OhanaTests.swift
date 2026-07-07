@@ -6044,21 +6044,23 @@ struct OhanaTests {
             dueAt _: Date?,
             emoji _: String,
             context _: ModelContext
-        ) {}
+        ) -> Bool { false }
 
-        func delete(_: FamilyCollaborationTask, context _: ModelContext) {}
-        func rejectCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) {}
-        func confirmCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) {}
-        func complete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) {}
-        func claim(_: FamilyCollaborationTask, by _: Human, context _: ModelContext) {}
+        func delete(_: FamilyCollaborationTask, context _: ModelContext) -> Bool { false }
+        func rejectCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
+        func confirmCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
+        func complete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
+        func claim(_: FamilyCollaborationTask, by _: Human, context _: ModelContext) -> Bool { false }
 
-        func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context _: ModelContext) {
+        func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context _: ModelContext) -> Bool {
             completedReminderIDs.append(reminder.id)
             completedReminderHumanIDs.append(humanId)
+            return true
         }
 
-        func syncReopenedReminder(_ reminder: Reminder, context _: ModelContext) {
+        func syncReopenedReminder(_ reminder: Reminder, context _: ModelContext) -> Bool {
             reopenedReminderIDs.append(reminder.id)
+            return true
         }
     }
 

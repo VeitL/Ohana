@@ -2952,6 +2952,32 @@ struct HomeCommandExecutorTests {
         #expect(settingsSource.contains("plantReminderPersistenceFailureMessage"))
     }
 
+    @Test func familyTaskCommandsGateRevisionAndExternalEffectsOnPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let serviceSource = try source("Ohana/Features/FamilyTasks/FamilyTaskService.swift", rootURL: rootURL)
+        let executorSource = try source("Ohana/Features/FamilyTasks/FamilyCollaborationCommandExecutor.swift", rootURL: rootURL)
+        let protocolSource = try source("Ohana/Domain/Services/DomainFamilyTaskManaging.swift", rootURL: rootURL)
+
+        #expect(serviceSource.contains("private static func persistMutation("))
+        #expect(serviceSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(serviceSource.contains("context.rollback()"))
+        #expect(!serviceSource.contains("context.safeSave()"))
+        #expect(serviceSource.contains("PendingFamilyTaskReminderSchedule"))
+        #expect(!serviceSource.contains("OhanaNotifications.current.cancel(notificationId: reminder.notificationId)"))
+        #expect(serviceSource.contains("if let notificationIDToCancel"))
+        #expect(serviceSource.contains("postsRewardFeedback: false"))
+        #expect(serviceSource.contains("updatesProjection: false"))
+        #expect(serviceSource.contains("projectionManager?.recordWalletProjection("))
+        #expect(executorSource.contains("guard familyTasks.updateTask("))
+        #expect(executorSource.contains("guard familyTasks.delete("))
+        #expect(executorSource.contains("guard familyTasks.rejectCompletion("))
+        #expect(executorSource.contains("guard familyTasks.confirmCompletion("))
+        #expect(executorSource.contains("guard familyTasks.complete("))
+        #expect(executorSource.contains("guard familyTasks.claim("))
+        #expect(protocolSource.contains("func complete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool"))
+        #expect(protocolSource.contains("func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext) -> Bool"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()

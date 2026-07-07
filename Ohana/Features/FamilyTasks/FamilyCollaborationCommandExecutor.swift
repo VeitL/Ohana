@@ -64,7 +64,7 @@ struct FamilyCollaborationCommandExecutor {
     }
 
     func updateTask(_ task: FamilyCollaborationTask, title: String, note: String, assignedTo human: Human?, rewardCoconuts: Int, dueAt: Date?, emoji: String) {
-        familyTasks.updateTask(
+        guard familyTasks.updateTask(
             task,
             title: title,
             note: note,
@@ -73,33 +73,33 @@ struct FamilyCollaborationCommandExecutor {
             dueAt: dueAt,
             emoji: emoji,
             context: modelContext
-        )
+        ) else { return }
         publish(.update(taskID: task.id))
     }
 
     func deleteTask(_ task: FamilyCollaborationTask) {
         let taskID = task.id
-        familyTasks.delete(task, context: modelContext)
+        guard familyTasks.delete(task, context: modelContext) else { return }
         publish(.delete(taskID: taskID))
     }
 
     func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?) {
-        familyTasks.rejectCompletion(task, by: reviewer, context: modelContext)
+        guard familyTasks.rejectCompletion(task, by: reviewer, context: modelContext) else { return }
         publish(.reject(taskID: task.id, reviewerID: reviewer?.id))
     }
 
     func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?) {
-        familyTasks.confirmCompletion(task, by: reviewer, context: modelContext)
+        guard familyTasks.confirmCompletion(task, by: reviewer, context: modelContext) else { return }
         publish(.confirm(taskID: task.id, reviewerID: reviewer?.id))
     }
 
     func complete(_ task: FamilyCollaborationTask, by human: Human?) {
-        familyTasks.complete(task, by: human, context: modelContext)
+        guard familyTasks.complete(task, by: human, context: modelContext) else { return }
         publish(.complete(taskID: task.id, humanID: human?.id))
     }
 
     func claim(_ task: FamilyCollaborationTask, by human: Human) {
-        familyTasks.claim(task, by: human, context: modelContext)
+        guard familyTasks.claim(task, by: human, context: modelContext) else { return }
         publish(.claim(taskID: task.id, humanID: human.id))
     }
 
