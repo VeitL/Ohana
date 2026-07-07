@@ -57,6 +57,18 @@ struct PlantDetailLongLanguageLayoutTests {
         #expect(!source.contains(".frame(width: 190, alignment: .leading)"))
     }
 
+    @Test func plantEditChoiceCardsAvoidFixedWidthTextColumns() throws {
+        let source = try source(
+            "Ohana/Features/Plants/Views/PlantDetailEditSheet.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains(".frame(minWidth: 104, idealWidth: 132, maxWidth: 176"))
+        #expect(source.contains(".frame(minWidth: 112, idealWidth: 148, maxWidth: 196"))
+        #expect(!source.contains(".frame(width: 102, alignment: .leading)"))
+        #expect(!source.contains(".frame(width: 104, alignment: .leading)"))
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

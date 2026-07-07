@@ -459,7 +459,7 @@ struct EditPlantSheet: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
-            .frame(width: 102, alignment: .leading)
+            .frame(minWidth: 104, idealWidth: 132, maxWidth: 176, alignment: .leading)
             .frame(minHeight: 82, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -736,7 +736,7 @@ struct EditPlantSheet: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
             }
-            .frame(width: 104, alignment: .leading)
+            .frame(minWidth: 112, idealWidth: 148, maxWidth: 196, alignment: .leading)
             .frame(minHeight: 54, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
