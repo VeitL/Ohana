@@ -227,6 +227,14 @@ extension EnvironmentValues {
     }
 }
 
+extension View {
+    func ohanaLocalizedEnvironment(_ rawLanguage: String) -> some View {
+        let normalized = AppLanguage.normalize(rawLanguage)
+        return environment(\.ohanaAppLanguageCode, normalized)
+            .environment(\.locale, AppLanguage.swiftUIPreferredLocale(for: normalized))
+    }
+}
+
 // MARK: - Localized text value
 
 nonisolated struct AppLocalizedText: Hashable, Sendable {

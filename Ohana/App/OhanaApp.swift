@@ -18,7 +18,6 @@ struct OhanaApp: App {
     @UIApplicationDelegateAdaptor(OhanaCloudSharingAppDelegate.self) private var cloudSharingAppDelegate
 
     @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
-    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem: String = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency: String = AppCurrency.fallbackCode
@@ -40,8 +39,7 @@ struct OhanaApp: App {
         WindowGroup {
             OhanaBootstrapRootView(
                 cloudSharingAppDelegate: cloudSharingAppDelegate,
-                preferredScheme: preferredScheme,
-                appLanguage: appLanguage
+                preferredScheme: preferredScheme
             )
             .onChange(of: appCountry) { _, _ in }
             .onChange(of: appCurrency) { _, _ in }
@@ -58,7 +56,6 @@ private struct OhanaBootstrapPayload {
 private struct OhanaBootstrapRootView: View {
     let cloudSharingAppDelegate: OhanaCloudSharingAppDelegate
     let preferredScheme: ColorScheme?
-    let appLanguage: String
 
     @State private var payload: OhanaBootstrapPayload?
     @State private var bootstrapStatus: OhanaBootstrapStatus = .preparing
@@ -92,8 +89,6 @@ private struct OhanaBootstrapRootView: View {
         }
         .tint(Color.goPrimary)
         .preferredColorScheme(preferredScheme)
-        .environment(\.locale, AppLanguage.swiftUIPreferredLocale(for: appLanguage))
-        .environment(\.ohanaAppLanguageCode, appLanguage)
         .onAppear(perform: startBootstrapIfNeeded)
         .onDisappear {
             bootstrapTask?.cancel()

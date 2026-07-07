@@ -92,6 +92,22 @@ struct SettingsRouteContainerTests {
             "Ohana/Features/Settings/Views/SettingsView+RegionalDefaults.swift",
             rootURL: repositoryRootURL()
         )
+        let appSource = try source(
+            "Ohana/App/OhanaApp.swift",
+            rootURL: repositoryRootURL()
+        )
+        let contentSource = try source(
+            "Ohana/App/ContentView.swift",
+            rootURL: repositoryRootURL()
+        )
+        let routeHostSource = try source(
+            "Ohana/App/RouteContainers/AppRouteDestinationContainers.swift",
+            rootURL: repositoryRootURL()
+        )
+        let localizationSource = try source(
+            "Ohana/Shared/LocalizationSettings.swift",
+            rootURL: repositoryRootURL()
+        )
 
         #expect(settingsSource.contains("@State var languageSelectionCode = AppLanguage.code"))
         #expect(settingsSource.contains("@State var languageCommitTask: Task<Void, Never>?"))
@@ -113,6 +129,15 @@ struct SettingsRouteContainerTests {
         #expect(regionalSource.contains("transaction.disablesAnimations = true"))
         #expect(!regionalSource.contains("commitLanguageChange(AppLanguage.code, emitFeedback: false)"))
         #expect(!regionalSource.contains("AppCountry.applyDefaults(for: country.code)"))
+        #expect(!appSource.contains("@AppStorage(\"appLanguage\") private var appLanguage"))
+        #expect(!appSource.contains(".environment(\\.locale, AppLanguage.swiftUIPreferredLocale(for: appLanguage))"))
+        #expect(!appSource.contains(".environment(\\.ohanaAppLanguageCode, appLanguage)"))
+        #expect(contentSource.contains("@AppStorage(\"appLanguage\") private var appLanguage: String = AppLanguage.detectedCode"))
+        #expect(contentSource.contains(".homeSurfaceLanguage(homeSurfaceLanguage)"))
+        #expect(contentSource.contains("routeLanguageCode: appLanguage"))
+        #expect(routeHostSource.contains("let routeLanguageCode: String"))
+        #expect(routeHostSource.contains(".ohanaLocalizedEnvironment(routeLanguageCode)"))
+        #expect(localizationSource.contains("func ohanaLocalizedEnvironment(_ rawLanguage: String) -> some View"))
     }
 
     @Test func settingsLanguageSwitchDefersHomeReadModelRefresh() throws {

@@ -33,7 +33,7 @@ struct ContentView: View {
     @State private var homeSurfaceLanguageThawTask: Task<Void, Never>?
     @State private var didAutoPresentFirstPetPrompt = false
     @State private var autoPresentedFirstCarePetID: UUID?
-    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @Namespace private var heroNS
@@ -153,7 +153,8 @@ struct ContentView: View {
             },
             onHumanDoseTaken: { _ in
                 completeFirstCareAfterHomeHandoff()
-            }
+            },
+            routeLanguageCode: appLanguage
         )
         .onChange(of: currentActiveHumanId) { _, newValue in
             scheduleActiveHumanReaction(newValue)
@@ -585,9 +586,7 @@ private extension ContentView {
 
 private extension View {
     func homeSurfaceLanguage(_ rawLanguage: String) -> some View {
-        let normalized = AppLanguage.normalize(rawLanguage)
-        return environment(\.ohanaAppLanguageCode, normalized)
-            .environment(\.locale, AppLanguage.swiftUIPreferredLocale(for: normalized))
+        ohanaLocalizedEnvironment(rawLanguage)
     }
 }
 

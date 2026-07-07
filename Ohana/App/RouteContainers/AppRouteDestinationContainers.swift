@@ -46,6 +46,7 @@ struct AppRoutePresentationHost: ViewModifier {
     let onHumanSavedFromAddEntity: (Human) -> Void
     let onFirstSuccessMomentCompleted: (Pet) -> Void
     let onHumanDoseTaken: (UUID) -> Void
+    let routeLanguageCode: String
 
     @State private var lastSheetRoute: AppSheetRoute?
 
@@ -65,6 +66,7 @@ struct AppRoutePresentationHost: ViewModifier {
                         }
                     )
                 }
+                .ohanaLocalizedEnvironment(routeLanguageCode)
             }
             .sheet(item: $coordinator.sheet, onDismiss: handleSheetDismissed) { route in
                 AppDeferredRouteContent(
@@ -81,6 +83,7 @@ struct AppRoutePresentationHost: ViewModifier {
                         onHumanDoseTaken: onHumanDoseTaken
                     )
                 }
+                .ohanaLocalizedEnvironment(routeLanguageCode)
                 .appRouteSheetPresentation(for: route)
                 .onAppear {
                     lastSheetRoute = route
@@ -104,6 +107,7 @@ struct AppRoutePresentationHost: ViewModifier {
                             }
                         )
                     }
+                    .ohanaLocalizedEnvironment(routeLanguageCode)
                     .ignoresSafeArea()
                     .zIndex(140)
                 }
@@ -237,7 +241,8 @@ extension View {
         onPetSavedFromAddEntity: @escaping (Pet) -> Void = { _ in },
         onHumanSavedFromAddEntity: @escaping (Human) -> Void = { _ in },
         onFirstSuccessMomentCompleted: @escaping (Pet) -> Void = { _ in },
-        onHumanDoseTaken: @escaping (UUID) -> Void = { _ in }
+        onHumanDoseTaken: @escaping (UUID) -> Void = { _ in },
+        routeLanguageCode: String = AppLanguage.code
     ) -> some View {
         modifier(
             AppRoutePresentationHost(
@@ -247,7 +252,8 @@ extension View {
                 onPetSavedFromAddEntity: onPetSavedFromAddEntity,
                 onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
                 onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
-                onHumanDoseTaken: onHumanDoseTaken
+                onHumanDoseTaken: onHumanDoseTaken,
+                routeLanguageCode: routeLanguageCode
             )
         )
     }
