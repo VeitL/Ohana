@@ -329,9 +329,10 @@ struct OhanaNotificationsSchedulingTests {
     }
 
     @Test func reminderObservabilityShowsChineseSchedulingLedgerActions() {
-        #expect(ReminderObservabilityContentView.actionDisplayName("scheduleDeferred") == "夜间延后")
-        #expect(ReminderObservabilityContentView.actionDisplayName("scheduleSkippedBudget") == "预算跳过")
-        #expect(ReminderObservabilityContentView.actionDisplayName("scheduleMerged") == "同类合并")
+        let l = L10n("zh")
+        #expect(ReminderObservabilityContentView.actionDisplayName("scheduleDeferred", l) == "夜间延后")
+        #expect(ReminderObservabilityContentView.actionDisplayName("scheduleSkippedBudget", l) == "预算跳过")
+        #expect(ReminderObservabilityContentView.actionDisplayName("scheduleMerged", l) == "同类合并")
     }
 
     @Test func notificationDelegateHandoffKeepsDefaultTapAndActionsSeparate() throws {

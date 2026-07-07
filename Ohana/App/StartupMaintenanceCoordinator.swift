@@ -67,6 +67,20 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 }
             }
 
+            await runStep("plant_care_orphan_maintenance", delayMilliseconds: 30000) {
+                guard self.shouldRunPlantCareOrphanMaintenance else { return }
+                let result = PlantCareOrphanMaintenanceService.run(context: context, defaults: self.defaults)
+                if result.didPersist {
+                    self.defaults.set(Date().timeIntervalSince1970, forKey: Keys.plantCareOrphanMaintenanceLastRunAt)
+                }
+                guard result.removedEventCount > 0 || result.cleanedPreferencePlantCount > 0 else { return }
+                AppPerformanceMonitor.shared.record(
+                    "startup_plant_care_orphan_maintenance",
+                    valueMS: 0,
+                    note: "\(result.removedEventCount) events, \(result.removedReminderCount) reminders, \(result.cleanedPreferencePlantCount) pref scopes"
+                )
+            }
+
             await runStep("care_ledger_backfill", delayMilliseconds: 45000) {
                 await self.runCareLedgerBackfillIfNeeded(context: context)
             }
@@ -126,6 +140,12 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         let twelveHours: TimeInterval = 12 * 60 * 60
         let lastRun = defaults.double(forKey: Keys.reminderMaintenanceLastRunAt)
         return Date().timeIntervalSince1970 - lastRun >= twelveHours
+    }
+
+    private var shouldRunPlantCareOrphanMaintenance: Bool {
+        let oneDay: TimeInterval = 24 * 60 * 60
+        let lastRun = defaults.double(forKey: Keys.plantCareOrphanMaintenanceLastRunAt)
+        return Date().timeIntervalSince1970 - lastRun >= oneDay
     }
 
     private func runCareLedgerBackfillIfNeeded(context: ModelContext) async {
@@ -213,6 +233,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
 
     private enum Keys {
         static let reminderMaintenanceLastRunAt = "ohana_startup_maintenance_last_run_at"
+        static let plantCareOrphanMaintenanceLastRunAt = "ohana_plant_care_orphan_maintenance_last_run_at"
         static let avatarAssetCompactionCompleted = "ohana_avatar_asset_compaction_v1_completed"
         static let careLedgerBackfillCompleted = "careLedgerBackfill_v1_completed"
         static let mediaAttachmentPresenceBackfillCompleted = "ohana_media_attachment_presence_backfill_v1_completed"

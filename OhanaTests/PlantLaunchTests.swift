@@ -1194,6 +1194,108 @@ struct PlantLaunchTests {
         #expect(PlantReminderPreferenceStore.recurrenceEndDate(forPlantID: plant.id, careType: .fertilizing, defaults: defaults) == nil)
     }
 
+    @Test func plantCareOrphanMaintenanceRepairsArchivedAndMissingPlantEvents() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 22, hour: 9)
+        let archivedPlant = Plant(name: "Archived Fern", wateringIntervalDays: 1)
+        archivedPlant.archivedAt = now
+        let activePlant = Plant(name: "Active Mint", wateringIntervalDays: 1)
+        let missingPlantID = UUID()
+        context.insert(archivedPlant)
+        context.insert(activePlant)
+
+        let archivedPlan = Event(
+            title: "Archived Fern 植物计划",
+            startDate: now,
+            isAllDay: true,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: archivedPlant.id.uuidString
+        )
+        archivedPlan.recurrenceDays = 1
+        let archivedReminder = Reminder(event: archivedPlan, scheduledAt: now)
+        archivedReminder.notificationId = "archived-plan"
+        archivedPlan.reminders = [archivedReminder]
+
+        let archivedCompletion = Event(
+            title: "Archived Fern completed watering",
+            startDate: now,
+            isAllDay: false,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: archivedPlant.id.uuidString
+        )
+
+        let missingPlan = Event(
+            title: "Missing Plant 植物计划",
+            startDate: now,
+            isAllDay: true,
+            eventType: EventType.fertilizing.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: missingPlantID.uuidString
+        )
+        missingPlan.recurrenceDays = 14
+        let missingReminder = Reminder(event: missingPlan, scheduledAt: now)
+        missingReminder.notificationId = "missing-plan"
+        missingPlan.reminders = [missingReminder]
+
+        let missingCompletion = Event(
+            title: "Missing Plant completed watering",
+            startDate: now,
+            isAllDay: false,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: missingPlantID.uuidString
+        )
+
+        let activePlan = Event(
+            title: "Active Mint 植物计划",
+            startDate: now,
+            isAllDay: true,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: activePlant.id.uuidString
+        )
+        activePlan.recurrenceDays = 1
+
+        for event in [archivedPlan, archivedCompletion, missingPlan, missingCompletion, activePlan] {
+            context.insert(event)
+        }
+        context.insert(archivedReminder)
+        context.insert(missingReminder)
+        try context.save()
+
+        PlantReminderPreferenceStore.setPlanCalendarEnabled(false, forPlantID: missingPlantID, careType: .watering, defaults: defaults)
+        PlantReminderPreferenceStore.setSystemReminderEnabled(false, forPlantID: missingPlantID, careType: .fertilizing, defaults: defaults)
+        let notifications = PlantReminderNotificationSchedulerSpy()
+
+        let result = PlantCareOrphanMaintenanceService.run(
+            context: context,
+            deletedAt: now,
+            notifications: notifications,
+            defaults: defaults
+        )
+
+        let remainingEvents = try context.fetch(FetchDescriptor<Event>())
+        #expect(result.didPersist)
+        #expect(result.removedEventCount == 3)
+        #expect(result.removedReminderCount == 2)
+        #expect(result.archivedPlantPlanCount == 1)
+        #expect(result.missingPlantEventCount == 2)
+        #expect(result.cleanedPreferencePlantCount == 1)
+        #expect(Set(notifications.cancelledNotificationIDs) == Set(["archived-plan", "missing-plan"]))
+        #expect(!remainingEvents.contains { $0.id == archivedPlan.id })
+        #expect(remainingEvents.contains { $0.id == archivedCompletion.id })
+        #expect(!remainingEvents.contains { $0.id == missingPlan.id })
+        #expect(!remainingEvents.contains { $0.id == missingCompletion.id })
+        #expect(remainingEvents.contains { $0.id == activePlan.id })
+        #expect(PlantReminderPreferenceStore.planCalendarOverride(forPlantID: missingPlantID, careType: .watering, defaults: defaults) == nil)
+        #expect(PlantReminderPreferenceStore.systemReminderOverride(forPlantID: missingPlantID, careType: .fertilizing, defaults: defaults) == nil)
+    }
+
     @Test func disabledPlantCompletionCalendarPreferenceHidesCompletedCareEvents() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
