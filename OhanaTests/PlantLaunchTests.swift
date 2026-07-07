@@ -1378,7 +1378,7 @@ struct PlantLaunchTests {
             scheduleNotifications: false,
             defaults: defaults
         )
-        let didMute = PlantReminderControlService.setPlantRemindersEnabled(
+        let muteResult = PlantReminderControlService.setPlantRemindersEnabled(
             false,
             plant: plant,
             context: context,
@@ -1386,7 +1386,8 @@ struct PlantLaunchTests {
             scheduleNotifications: false,
             notifications: NoopReminderNotificationScheduler()
         )
-        #expect(didMute)
+        #expect(muteResult.didChange)
+        #expect(muteResult.didPersist)
         #expect(!plant.remindersEnabled)
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
 
@@ -1408,6 +1409,7 @@ struct PlantLaunchTests {
             defaults: defaults
         )
         let wateringTask = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
+        #expect(result.didPersist)
         #expect(result.deferredTaskCount == 1)
         #expect(result.affectedPlantCount == 1)
         #expect(wateringTask.daysUntilDue == 1)
@@ -1439,6 +1441,7 @@ struct PlantLaunchTests {
 
         let wateringTask = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(result.didPersist)
         #expect(result.deferredTaskCount == 1)
         #expect(result.affectedPlantCount == 1)
         #expect(wateringTask.daysUntilDue == 1)

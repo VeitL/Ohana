@@ -2890,6 +2890,24 @@ struct HomeCommandExecutorTests {
         #expect(batchSource.contains("DomainRehydrateEffectsDispatcher.cancelNotifications(notificationIDsToCancel)"))
     }
 
+    @Test func plantReminderControlsDoNotPublishSuccessBeforePersistence() throws {
+        let rootURL = repositoryRootURL()
+        let reminderSource = try source("Ohana/Features/Plants/PlantReminderControlService.swift", rootURL: rootURL)
+        let homeCommandSource = try source("Ohana/Features/Home/HomeCommandExecutor.swift", rootURL: rootURL)
+        let settingsSource = try source("Ohana/Features/Settings/Views/SettingsPlantReminderDataContainer.swift", rootURL: rootURL)
+
+        #expect(reminderSource.contains("struct PlantReminderToggleResult"))
+        #expect(reminderSource.contains("let didPersist: Bool"))
+        #expect(!reminderSource.contains("context.safeSave()"))
+        #expect(reminderSource.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 2)
+        #expect(reminderSource.contains("context.rollback()"))
+        #expect(reminderSource.components(separatedBy: "saveChanges: false").count - 1 >= 2)
+        #expect(reminderSource.contains("PlantCarePlanScheduleService.commitSideEffects("))
+        #expect(homeCommandSource.contains("wroteBusinessFact: result.didPersist && result.deferredTaskCount > 0"))
+        #expect(settingsSource.contains("guard result.didPersist else"))
+        #expect(settingsSource.contains("plantReminderPersistenceFailureMessage"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()

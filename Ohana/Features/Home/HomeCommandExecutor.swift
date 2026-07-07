@@ -658,7 +658,7 @@ struct HomeCommandExecutor {
             DomainMutationResult(
                 command: command,
                 affectedEntityIDs: Set(plants.map(\.id)),
-                wroteBusinessFact: result.deferredTaskCount > 0,
+                wroteBusinessFact: result.didPersist && result.deferredTaskCount > 0,
                 note: "home.plantCare.deferDueTasks"
             )
         )

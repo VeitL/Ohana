@@ -11,6 +11,46 @@ import SwiftData
 struct PlantReminderBulkDeferResult: Equatable {
     let deferredTaskCount: Int
     let affectedPlantCount: Int
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
+
+    init(
+        deferredTaskCount: Int,
+        affectedPlantCount: Int,
+        didPersist: Bool = true,
+        persistenceErrorDescription: String? = nil
+    ) {
+        self.deferredTaskCount = deferredTaskCount
+        self.affectedPlantCount = affectedPlantCount
+        self.didPersist = didPersist
+        self.persistenceErrorDescription = persistenceErrorDescription
+    }
+}
+
+struct PlantReminderToggleResult: Equatable {
+    let didChange: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
+
+    static let noChange = PlantReminderToggleResult(
+        didChange: false,
+        didPersist: true,
+        persistenceErrorDescription: nil
+    )
+
+    static let changed = PlantReminderToggleResult(
+        didChange: true,
+        didPersist: true,
+        persistenceErrorDescription: nil
+    )
+
+    static func failed(_ errorDescription: String?) -> PlantReminderToggleResult {
+        PlantReminderToggleResult(
+            didChange: false,
+            didPersist: false,
+            persistenceErrorDescription: errorDescription
+        )
+    }
 }
 
 @MainActor
@@ -32,7 +72,7 @@ protocol PlantReminderControlling {
         now: Date,
         scheduleNotifications: Bool,
         notifications: ReminderNotificationScheduling
-    ) -> Bool
+    ) -> PlantReminderToggleResult
 
     @discardableResult
     func deferDueTasksOneDay(
@@ -61,7 +101,7 @@ extension PlantReminderControlling {
     }
 
     @discardableResult
-    func setPlantRemindersEnabled(_ enabled: Bool, plant: Plant, context: ModelContext) -> Bool {
+    func setPlantRemindersEnabled(_ enabled: Bool, plant: Plant, context: ModelContext) -> PlantReminderToggleResult {
         setPlantRemindersEnabled(
             enabled,
             plant: plant,
@@ -117,7 +157,7 @@ struct StaticPlantReminderController: PlantReminderControlling {
         now: Date,
         scheduleNotifications: Bool,
         notifications: ReminderNotificationScheduling
-    ) -> Bool {
+    ) -> PlantReminderToggleResult {
         PlantReminderControlService.setPlantRemindersEnabled(
             enabled,
             plant: plant,
@@ -164,14 +204,16 @@ enum PlantReminderControlService {
     ) -> Int {
         var count = 0
         for plant in plants {
-            PlantCarePlanScheduleService.sync(
+            let result = PlantCarePlanScheduleService.sync(
                 plant: plant,
                 context: context,
                 now: now,
                 scheduleNotifications: scheduleNotifications,
                 notifications: notifications
             )
-            count += 1
+            if result.didPersist {
+                count += 1
+            }
         }
         return count
     }
@@ -184,19 +226,29 @@ enum PlantReminderControlService {
         now: Date = Date(),
         scheduleNotifications: Bool = true,
         notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
-    ) -> Bool {
-        guard plant.remindersEnabled != enabled else { return false }
+    ) -> PlantReminderToggleResult {
+        guard plant.remindersEnabled != enabled else { return .noChange }
         plant.remindersEnabled = enabled
         CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
-        context.safeSave()
-        PlantCarePlanScheduleService.sync(
+        let scheduleResult = PlantCarePlanScheduleService.sync(
             plant: plant,
             context: context,
             now: now,
             scheduleNotifications: scheduleNotifications,
+            notifications: notifications,
+            saveChanges: false
+        )
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return .failed(saveResult.errorDescription)
+        }
+        PlantCarePlanScheduleService.commitSideEffects(
+            for: scheduleResult,
+            context: context,
             notifications: notifications
         )
-        return true
+        return .changed
     }
 
     @discardableResult
@@ -214,12 +266,15 @@ enum PlantReminderControlService {
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) ?? now.addingTimeInterval(86400)
         var deferredTaskCount = 0
         var affectedPlantIDs = Set<UUID>()
+        var touchedPlants: [Plant] = []
+        var scheduleResults: [PlantCarePlanScheduleResult] = []
 
         for plant in plants {
             let dueTasks = PlantCarePlanService.tasks(for: plant, now: now, calendar: calendar)
                 .filter { $0.daysUntilDue <= 0 }
             guard !dueTasks.isEmpty else { continue }
             affectedPlantIDs.insert(plant.id)
+            touchedPlants.append(plant)
             for task in dueTasks {
                 let note = "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))"
                 recordDeferFeedback(
@@ -231,12 +286,40 @@ enum PlantReminderControlService {
                 )
                 deferredTaskCount += 1
             }
-            context.safeSave()
-            PlantCarePlanScheduleService.sync(
+        }
+
+        guard deferredTaskCount > 0 else {
+            return PlantReminderBulkDeferResult(
+                deferredTaskCount: 0,
+                affectedPlantCount: 0
+            )
+        }
+
+        for plant in touchedPlants {
+            let scheduleResult = PlantCarePlanScheduleService.sync(
                 plant: plant,
                 context: context,
                 now: now,
                 scheduleNotifications: scheduleNotifications,
+                notifications: notifications,
+                saveChanges: false
+            )
+            scheduleResults.append(scheduleResult)
+        }
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PlantReminderBulkDeferResult(
+                deferredTaskCount: deferredTaskCount,
+                affectedPlantCount: affectedPlantIDs.count,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        for scheduleResult in scheduleResults {
+            PlantCarePlanScheduleService.commitSideEffects(
+                for: scheduleResult,
+                context: context,
                 notifications: notifications
             )
         }

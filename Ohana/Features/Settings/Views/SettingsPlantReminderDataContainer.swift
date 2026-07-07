@@ -679,11 +679,16 @@ private struct SettingsPlantReminderPanelContent: View {
         pendingPlantReminderUpdates.removeAll()
         for update in updates.values {
             guard let plant = plants.first(where: { $0.id == update.plantID }) else { continue }
-            appServices.plantReminderControls.setPlantRemindersEnabled(
+            let result = appServices.plantReminderControls.setPlantRemindersEnabled(
                 update.enabled,
                 plant: plant,
                 context: modelContext
             )
+            guard result.didPersist else {
+                plantReminderDisplayState[plant.id] = plant.remindersEnabled
+                statusMessage = plantReminderPersistenceFailureMessage(result.persistenceErrorDescription)
+                continue
+            }
         }
     }
 
@@ -711,7 +716,7 @@ private struct SettingsPlantReminderPanelContent: View {
             )
             statusMessage = bulkDeferMessage(result)
             isBulkDeferPending = false
-            UIImpactFeedbackGenerator(style: result.deferredTaskCount > 0 ? .medium : .light).impactOccurred()
+            UIImpactFeedbackGenerator(style: result.didPersist && result.deferredTaskCount > 0 ? .medium : .light).impactOccurred()
         }
     }
 
@@ -811,6 +816,9 @@ private struct SettingsPlantReminderPanelContent: View {
     }
 
     private func bulkDeferMessage(_ result: PlantReminderBulkDeferResult) -> String {
+        if !result.didPersist {
+            return plantReminderPersistenceFailureMessage(result.persistenceErrorDescription)
+        }
         if result.deferredTaskCount == 0 {
             return l.tr(
                 zh: "当前没有已到期的植物任务",
@@ -822,6 +830,21 @@ private struct SettingsPlantReminderPanelContent: View {
             zh: "已延后 \(result.affectedPlantCount) 株植物的 \(result.deferredTaskCount) 个任务",
             en: "Deferred \(result.deferredTaskCount) tasks across \(result.affectedPlantCount) plants",
             de: "\(result.deferredTaskCount) Aufgaben für \(result.affectedPlantCount) Pflanzen verschoben"
+        )
+    }
+
+    private func plantReminderPersistenceFailureMessage(_ errorDescription: String?) -> String {
+        if let errorDescription, !errorDescription.isEmpty {
+            return l.tr(
+                zh: "保存植物提醒失败：\(errorDescription)",
+                en: "Could not save plant reminders: \(errorDescription)",
+                de: "Pflanzenerinnerungen konnten nicht gespeichert werden: \(errorDescription)"
+            )
+        }
+        return l.tr(
+            zh: "保存植物提醒失败，请稍后重试",
+            en: "Could not save plant reminders. Try again later.",
+            de: "Pflanzenerinnerungen konnten nicht gespeichert werden. Bitte später erneut versuchen."
         )
     }
 

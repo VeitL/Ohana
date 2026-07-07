@@ -201,10 +201,6 @@
     "Ohana/Features/Plants/PlantMediaAttachmentIndexRepair.swift": [
       "modelContext.safeSave()"
     ],
-    "Ohana/Features/Plants/PlantReminderControlService.swift": [
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift": [
       "modelContext.safeSave()"
     ],
