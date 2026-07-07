@@ -132,9 +132,6 @@
     "Ohana/Features/Plants/PlantMediaAttachmentIndexRepair.swift": [
       "modelContext.safeSave()"
     ],
-    "Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift": [
-      "modelContext.safeSave()"
-    ],
     "Ohana/Features/Privacy/HumanPrivacyCommands.swift": [
       "context.safeSave()",
       "context.safeSave()",

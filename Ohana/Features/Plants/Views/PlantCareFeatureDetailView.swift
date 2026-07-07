@@ -119,6 +119,7 @@ struct PlantCareFeatureDetailView: View {
     @State private var waterReminderLeadDays = 0
     @State private var waterScheduleEndEnabled = false
     @State private var waterScheduleEndDate = Date()
+    @State private var waterSchedulePersistenceError: String?
     @State private var selectedWaterMode: PlantWaterGuidedMode = .overview
     @Namespace private var waterModeSelectionNamespace
 
@@ -1010,6 +1011,24 @@ struct PlantCareFeatureDetailView: View {
             .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
             .accessibilityIdentifier("plant-care-feature-water-completion-calendar-toggle")
 
+            if let waterSchedulePersistenceError {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative error glyph; adjacent text announces the failure.
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
+                        .foregroundStyle(Color.goRed)
+                        .accessibilityHidden(true)
+                    Text(waterSchedulePersistenceError)
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.goRed)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
+                .accessibilityIdentifier("plant-care-feature-water-schedule-error")
+            }
+
             Button {
                 resyncWaterReminder(for: plant)
             } label: {
@@ -1780,10 +1799,34 @@ struct PlantCareFeatureDetailView: View {
         resyncWaterSchedule(for: plant)
     }
 
-    private func persistWateringScheduleFacts(for plant: Plant) {
+    @discardableResult
+    private func persistWateringScheduleFacts(for plant: Plant) -> Bool {
         CloudSyncMutationRecorder.markModified(plant, context: modelContext)
-        modelContext.safeSave()
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            modelContext.rollback()
+            waterSchedulePersistenceError = waterScheduleSaveFailureMessage(saveResult.errorDescription)
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            return false
+        }
+        waterSchedulePersistenceError = nil
         resyncWaterSchedule(for: plant)
+        return true
+    }
+
+    private func waterScheduleSaveFailureMessage(_ errorDescription: String?) -> String {
+        if let errorDescription, !errorDescription.isEmpty {
+            return l.tr(
+                zh: "浇水计划保存失败：\(errorDescription)",
+                en: "Watering plan couldn't be saved: \(errorDescription)",
+                de: "Gießplan konnte nicht gespeichert werden: \(errorDescription)"
+            )
+        }
+        return l.tr(
+            zh: "浇水计划保存失败，请检查存储空间后重试。",
+            en: "Watering plan couldn't be saved. Check storage and try again.",
+            de: "Gießplan konnte nicht gespeichert werden. Speicher pruefen und erneut versuchen."
+        )
     }
 
     private func resyncWaterSchedule(for plant: Plant) {
