@@ -3280,8 +3280,14 @@ struct CloudSyncMetadataServiceTests {
         let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
         #expect(result == .deleted(entityName: "Pet", localRecordId: normalized(petId)))
         #expect(try fetchPet(id: petId, context: context) == nil)
-        #expect(accounts.allSatisfy { $0.ownerId != pet.id.uuidString })
-        #expect(walletEntries.allSatisfy { $0.ownerId != pet.id.uuidString && $0.subjectId != pet.id.uuidString })
+        let retiredAccount = try #require(accounts.first { $0.ownerId == pet.id.uuidString })
+        #expect(retiredAccount.balance == 0)
+        #expect(CoconutWalletAccountLifecycleMetadata.isDeletedOwner(retiredAccount))
+        let retainedWalletEntry = try #require(walletEntries.first { $0.id == walletEntry.id })
+        #expect(retainedWalletEntry.ownerId != pet.id.uuidString)
+        #expect(retainedWalletEntry.subjectId != pet.id.uuidString)
+        #expect(retainedWalletEntry.metadataJSON.contains("\"deletedOwnerRetention\":true"))
+        #expect(retainedWalletEntry.metadataJSON.contains("\"deletedOwnerKind\":\"pet\""))
         #expect(careLedgers.allSatisfy { $0.subjectId != pet.id.uuidString && $0.legacyModelId != deletedLog.id.uuidString })
         #expect(careLogs.allSatisfy { $0.pet?.id != pet.id })
         #expect(careLogs.contains { $0.pet?.id == survivor.id })
@@ -3345,9 +3351,9 @@ struct CloudSyncMetadataServiceTests {
         let result = try CloudSyncRecordApplier.apply(record, context: context)
 
         #expect(result == .deleted(entityName: "CoconutLedgerEntry", localRecordId: normalized(ledgerId)))
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-        #expect(account.balance == 0)
-        #expect(human.coconutBalance == 0)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).map(\.id) == [ledgerId])
+        #expect(account.balance == 10)
+        #expect(human.coconutBalance == 10)
     }
 
     @MainActor

@@ -874,9 +874,7 @@ nonisolated enum CloudSyncRecordApplier {
     ) throws {
         switch entityName {
         case String(describing: Household.self):
-            if let model = try fetchHousehold(id: localRecordUUID, context: context) {
-                context.delete(model)
-            }
+            try deleteHousehold(id: localRecordUUID, context: context)
         case String(describing: Pet.self):
             if let model = try fetchPet(id: localRecordUUID, context: context) {
                 PhysicalDeletionService.deletePet(
@@ -994,28 +992,50 @@ nonisolated enum CloudSyncRecordApplier {
                 )
             }
         case String(describing: CareLedgerEvent.self):
-            if let model = try fetchCareLedgerEvent(id: localRecordUUID, context: context) {
-                context.delete(model)
-            }
+            try deleteCareLedgerEvent(id: localRecordUUID, context: context)
         case String(describing: CoconutLedgerEntry.self):
-            if let model = try fetchCoconutLedgerEntry(id: localRecordUUID, context: context) {
-                context.delete(model)
-                CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context)
-            }
+            // CoconutLedgerEntry is append-only. A remote tombstone should mark
+            // sync state only; removing local history would corrupt replay and
+            // make balances jump without an explicit reversal entry.
+            break
         case String(describing: GachaOwnedItem.self):
-            if let model = try fetchGachaOwnedItem(id: localRecordUUID, context: context) {
-                context.delete(model)
-            }
+            try deleteGachaOwnedItem(id: localRecordUUID, context: context)
         case String(describing: GachaDrawLog.self):
-            if let model = try fetchGachaDrawLog(id: localRecordUUID, context: context) {
-                context.delete(model)
-            }
+            try deleteGachaDrawLog(id: localRecordUUID, context: context)
         case String(describing: ShopPurchaseRecord.self):
-            if let model = try fetchShopPurchaseRecord(id: localRecordUUID, context: context) {
-                context.delete(model)
-            }
+            try deleteShopPurchaseRecord(id: localRecordUUID, context: context)
         default:
             break
+        }
+    }
+
+    private static func deleteHousehold(id: UUID, context: ModelContext) throws {
+        if let model = try fetchHousehold(id: id, context: context) {
+            context.delete(model)
+        }
+    }
+
+    private static func deleteCareLedgerEvent(id: UUID, context: ModelContext) throws {
+        if let model = try fetchCareLedgerEvent(id: id, context: context) {
+            context.delete(model)
+        }
+    }
+
+    private static func deleteGachaOwnedItem(id: UUID, context: ModelContext) throws {
+        if let model = try fetchGachaOwnedItem(id: id, context: context) {
+            context.delete(model)
+        }
+    }
+
+    private static func deleteGachaDrawLog(id: UUID, context: ModelContext) throws {
+        if let model = try fetchGachaDrawLog(id: id, context: context) {
+            context.delete(model)
+        }
+    }
+
+    private static func deleteShopPurchaseRecord(id: UUID, context: ModelContext) throws {
+        if let model = try fetchShopPurchaseRecord(id: id, context: context) {
+            context.delete(model)
         }
     }
 

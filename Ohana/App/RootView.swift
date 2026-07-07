@@ -11,6 +11,8 @@ import SwiftUI
 import UIKit
 
 struct RootView: View {
+    var appLanguage: String = AppLanguage.code
+
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("ohana_has_onboarded") private var hasOnboarded = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
@@ -33,7 +35,8 @@ struct RootView: View {
             if hasOnboarded {
                 ContentView(
                     showsEmbeddedOnboarding: false,
-                    onboardingPrimaryHumanID: onboardingPrimaryHumanID
+                    onboardingPrimaryHumanID: onboardingPrimaryHumanID,
+                    routeLanguageCode: appLanguage
                 )
             }
 

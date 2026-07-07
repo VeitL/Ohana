@@ -12,6 +12,7 @@ import SwiftUI
 struct ContentView: View {
     var showsEmbeddedOnboarding = true
     var onboardingPrimaryHumanID: String?
+    var routeLanguageCode: String = AppLanguage.code
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
@@ -33,7 +34,6 @@ struct ContentView: View {
     @State private var homeSurfaceLanguageThawTask: Task<Void, Never>?
     @State private var didAutoPresentFirstPetPrompt = false
     @State private var autoPresentedFirstCarePetID: UUID?
-    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @Namespace private var heroNS
@@ -80,7 +80,7 @@ struct ContentView: View {
 
             if let starterGiftAmount {
                 StarterGiftCeremonyOverlay(
-                    appLanguage: appLanguage,
+                    appLanguage: routeLanguageCode,
                     amount: starterGiftAmount,
                     onFinish: completeStarterGiftCeremony
                 )
@@ -90,7 +90,7 @@ struct ContentView: View {
         }
         .animation(GoMotion.sheetEnter, value: onboardingJourneyPhase)
         .onAppear {
-            synchronizeHomeSurfaceLanguageIfAllowed(appLanguage)
+            synchronizeHomeSurfaceLanguageIfAllowed(routeLanguageCode)
             scheduleRootAppearHandoff()
             applyOnboardingPrimaryHumanIDIfNeeded()
             scheduleUITestHumanProfileRouteIfNeeded()
@@ -107,7 +107,7 @@ struct ContentView: View {
             homeSurfaceLanguageThawTask?.cancel()
             homeSurfaceLanguageThawTask = nil
         }
-        .onChange(of: appLanguage) { _, newValue in
+        .onChange(of: routeLanguageCode) { _, newValue in
             synchronizeHomeSurfaceLanguageIfAllowed(newValue)
         }
         .onChange(of: appRoutes.sheet) { _, newValue in
@@ -154,7 +154,7 @@ struct ContentView: View {
             onHumanDoseTaken: { _ in
                 completeFirstCareAfterHomeHandoff()
             },
-            routeLanguageCode: appLanguage
+            routeLanguageCode: routeLanguageCode
         )
         .onChange(of: currentActiveHumanId) { _, newValue in
             scheduleActiveHumanReaction(newValue)
@@ -178,7 +178,7 @@ struct ContentView: View {
 
     private func thawHomeSurfaceLanguageAfterSheetDismissal() {
         homeSurfaceLanguageThawTask?.cancel()
-        let language = appLanguage
+        let language = routeLanguageCode
         guard AppLanguage.normalize(homeSurfaceLanguage) != AppLanguage.normalize(language) else {
             homeSurfaceLanguageThawTask = nil
             return

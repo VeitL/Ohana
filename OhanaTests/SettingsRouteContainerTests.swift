@@ -100,6 +100,10 @@ struct SettingsRouteContainerTests {
             "Ohana/App/ContentView.swift",
             rootURL: repositoryRootURL()
         )
+        let rootSource = try source(
+            "Ohana/App/RootView.swift",
+            rootURL: repositoryRootURL()
+        )
         let routeHostSource = try source(
             "Ohana/App/RouteContainers/AppRouteDestinationContainers.swift",
             rootURL: repositoryRootURL()
@@ -129,12 +133,17 @@ struct SettingsRouteContainerTests {
         #expect(regionalSource.contains("transaction.disablesAnimations = true"))
         #expect(!regionalSource.contains("commitLanguageChange(AppLanguage.code, emitFeedback: false)"))
         #expect(!regionalSource.contains("AppCountry.applyDefaults(for: country.code)"))
-        #expect(!appSource.contains("@AppStorage(\"appLanguage\") private var appLanguage"))
+        #expect(appSource.contains("@AppStorage(\"appLanguage\") private var appLanguage: String = AppLanguage.detectedCode"))
+        #expect(appSource.contains("appLanguage: appLanguage"))
         #expect(!appSource.contains(".environment(\\.locale, AppLanguage.swiftUIPreferredLocale(for: appLanguage))"))
         #expect(!appSource.contains(".environment(\\.ohanaAppLanguageCode, appLanguage)"))
-        #expect(contentSource.contains("@AppStorage(\"appLanguage\") private var appLanguage: String = AppLanguage.detectedCode"))
+        #expect(!contentSource.contains("@AppStorage(\"appLanguage\") private var appLanguage"))
+        #expect(contentSource.contains("var routeLanguageCode: String = AppLanguage.code"))
         #expect(contentSource.contains(".homeSurfaceLanguage(homeSurfaceLanguage)"))
-        #expect(contentSource.contains("routeLanguageCode: appLanguage"))
+        #expect(contentSource.contains("routeLanguageCode: routeLanguageCode"))
+        #expect(!rootSource.contains("@AppStorage(\"appLanguage\") private var appLanguage"))
+        #expect(rootSource.contains("var appLanguage: String = AppLanguage.code"))
+        #expect(rootSource.contains("routeLanguageCode: appLanguage"))
         #expect(routeHostSource.contains("let routeLanguageCode: String"))
         #expect(routeHostSource.contains(".ohanaLocalizedEnvironment(routeLanguageCode)"))
         #expect(localizationSource.contains("func ohanaLocalizedEnvironment(_ rawLanguage: String) -> some View"))
@@ -156,6 +165,8 @@ struct SettingsRouteContainerTests {
         #expect(homeDataSource.contains("language: readModelLanguage"))
         #expect(!homeDataSource.contains("language: appLanguage"))
         #expect(!rootSource.contains("@AppStorage(\"appLanguage\") private var appLanguage"))
+        #expect(rootSource.contains("var appLanguage: String = AppLanguage.code"))
+        #expect(rootSource.contains("routeLanguageCode: appLanguage"))
     }
 
     @Test func notificationSettingsKeepCategoryControlsBehindAdvancedDisclosure() throws {

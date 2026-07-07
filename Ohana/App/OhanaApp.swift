@@ -17,6 +17,7 @@ let ohanaProcessStartTime = CFAbsoluteTimeGetCurrent()
 struct OhanaApp: App {
     @UIApplicationDelegateAdaptor(OhanaCloudSharingAppDelegate.self) private var cloudSharingAppDelegate
 
+    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
     @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem: String = AppMeasurementSystem.fallbackCode
@@ -39,7 +40,8 @@ struct OhanaApp: App {
         WindowGroup {
             OhanaBootstrapRootView(
                 cloudSharingAppDelegate: cloudSharingAppDelegate,
-                preferredScheme: preferredScheme
+                preferredScheme: preferredScheme,
+                appLanguage: appLanguage
             )
             .onChange(of: appCountry) { _, _ in }
             .onChange(of: appCurrency) { _, _ in }
@@ -56,6 +58,7 @@ private struct OhanaBootstrapPayload {
 private struct OhanaBootstrapRootView: View {
     let cloudSharingAppDelegate: OhanaCloudSharingAppDelegate
     let preferredScheme: ColorScheme?
+    let appLanguage: String
 
     @State private var payload: OhanaBootstrapPayload?
     @State private var bootstrapStatus: OhanaBootstrapStatus = .preparing
@@ -65,7 +68,7 @@ private struct OhanaBootstrapRootView: View {
     var body: some View {
         Group {
             if let payload {
-                RootView()
+                RootView(appLanguage: appLanguage)
                     .modelContainer(payload.modelContainer)
                     .environment(payload.appServices)
                     .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
