@@ -281,18 +281,25 @@ enum ReminderSchedulingService {
         )
         let plantBatchScheduler = OhanaNotifications.current as? PlantBatchCareSummaryNotificationScheduling
         var plantBatchCareSummaryByReminderID: [UUID: PlantBatchCareNotificationSummary] = [:]
+        var knownNotificationIds = await OhanaNotifications.current.pendingNotificationIds()
         if let plantBatchScheduler {
             let summaries = plantBatchCareSummaries
             for summary in summaries {
-                plantBatchScheduler.schedulePlantBatchCareSummary(summary)
-            }
-            plantBatchCareSummaryByReminderID = Dictionary(
-                uniqueKeysWithValues: summaries.flatMap { summary in
-                    summary.reminderIDs.map { ($0, summary) }
+                let result = plantBatchScheduler.schedulePlantBatchCareSummary(
+                    summary,
+                    existingNotificationIds: knownNotificationIds
+                )
+                guard result.didRegisterNotification || result == .skippedDuplicate else {
+                    continue
                 }
-            )
+                if result.didRegisterNotification {
+                    knownNotificationIds.insert(summary.notificationId)
+                }
+                for id in summary.reminderIDs {
+                    plantBatchCareSummaryByReminderID[id] = summary
+                }
+            }
         }
-        var knownNotificationIds = await OhanaNotifications.current.pendingNotificationIds()
         for (index, reminder) in orderedReminders.enumerated() {
             guard !Task.isCancelled else {
                 _ = saveReminderSchedulingChanges(context: context)

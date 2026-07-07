@@ -358,7 +358,24 @@ final class NotificationManager: NSObject, @unchecked Sendable {
     }
 
     func schedulePlantBatchCareSummary(_ summary: PlantBatchCareNotificationSummary) {
-        guard summary.deliveryDate > Date() else { return }
+        center.getPendingNotificationRequests { existing in
+            let existingIds = Set(existing.map(\.identifier))
+            _ = self.schedulePlantBatchCareSummary(summary, existingNotificationIds: existingIds)
+        }
+    }
+
+    @discardableResult
+    func schedulePlantBatchCareSummary(
+        _ summary: PlantBatchCareNotificationSummary,
+        existingNotificationIds: Set<String>
+    ) -> ReminderNotificationScheduleResult {
+        guard summary.deliveryDate > Date() else { return .skippedPastDue }
+        guard !existingNotificationIds.contains(summary.notificationId) else {
+            return .skippedDuplicate
+        }
+        guard NotificationPendingBudget.hasCapacity(existingPendingCount: existingNotificationIds.count) else {
+            return .skippedBudget(NotificationPendingBudget.skippedBudgetMetadataJSON(existingPendingCount: existingNotificationIds.count))
+        }
         let l = L10n()
         let content = UNMutableNotificationContent()
         content.title = l.tr(zh: "植物照护提醒", en: "Plant care reminder", de: "Pflanzenpflege-Erinnerung")
@@ -383,12 +400,8 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             content: content,
             trigger: trigger
         )
-        center.getPendingNotificationRequests { existing in
-            let existingIds = Set(existing.map(\.identifier))
-            guard !existingIds.contains(summary.notificationId) else { return }
-            guard NotificationPendingBudget.hasCapacity(existingPendingCount: existingIds.count) else { return }
-            self.center.add(request)
-        }
+        center.add(request)
+        return .scheduled
     }
 
     // MARK: - Cancel

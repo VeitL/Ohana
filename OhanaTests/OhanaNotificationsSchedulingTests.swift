@@ -8,10 +8,11 @@ import UserNotifications
 struct OhanaNotificationsSchedulingTests {
     /// In-memory stand-in for the notification scheduler so reminder/care write
     /// paths can be tested without touching UNUserNotificationCenter.
-    final class FakeScheduler: ReminderNotificationScheduling, @unchecked Sendable {
+    final class FakeScheduler: ReminderNotificationScheduling, PlantBatchCareSummaryNotificationScheduling, @unchecked Sendable {
         private(set) var cancelledIds: [String] = []
         private(set) var scheduledIds: [String] = []
         private(set) var scheduledDeliveryDates: [Date] = []
+        private(set) var scheduledPlantBatchSummaries: [PlantBatchCareNotificationSummary] = []
         private var pendingIds: Set<String>
 
         init(pendingNotificationIds: Set<String> = []) {
@@ -75,6 +76,21 @@ struct OhanaNotificationsSchedulingTests {
         }
         func cancelAll(for _: Pet, reminders _: [Reminder]) {}
         func compensate(reminders _: [Reminder]) {}
+        @discardableResult
+        func schedulePlantBatchCareSummary(
+            _ summary: PlantBatchCareNotificationSummary,
+            existingNotificationIds: Set<String>
+        ) -> ReminderNotificationScheduleResult {
+            guard !existingNotificationIds.contains(summary.notificationId) else {
+                return .skippedDuplicate
+            }
+            guard NotificationPendingBudget.hasCapacity(existingPendingCount: existingNotificationIds.count) else {
+                return .skippedBudget(NotificationPendingBudget.skippedBudgetMetadataJSON(existingPendingCount: existingNotificationIds.count))
+            }
+            scheduledPlantBatchSummaries.append(summary)
+            pendingIds.insert(summary.notificationId)
+            return .scheduled
+        }
     }
 
     @Test func skipRoutesCancelThroughInjectedScheduler() throws {
@@ -389,6 +405,43 @@ struct OhanaNotificationsSchedulingTests {
         #expect(fake.scheduledIds.count == 1)
         let ledgerActions = try context.fetch(FetchDescriptor<CareLedgerEvent>()).map(\.actionType).sorted()
         #expect(ledgerActions == ["scheduleSkippedBudget", "scheduleSuccess"])
+    }
+
+    @Test func plantBatchSummaryConsumesSharedPendingBudgetBeforeIndividualReminders() async throws {
+        let existingIds = Set((0 ..< NotificationPendingBudget.managedPendingRequestLimit - 1).map { "existing-\($0)" })
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler(pendingNotificationIds: existingIds)
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let scheduledAt = futureDate(dayOffset: 2, hour: 9, minute: 0)
+        let plants = [
+            Plant(name: "Fern"),
+            Plant(name: "Pothos")
+        ]
+        for plant in plants {
+            context.insert(plant)
+        }
+        let reminders = plants.map { plant in
+            makePlantCareReminder(
+                title: "给\(plant.name)浇水植物计划",
+                plant: plant,
+                careType: .watering,
+                scheduledAt: scheduledAt,
+                context: context
+            )
+        }
+        try context.save()
+
+        await ReminderSchedulingService.scheduleManyIfNeeded(reminders: reminders, context: context)
+
+        #expect(fake.scheduledPlantBatchSummaries.count == 1)
+        #expect(fake.scheduledPlantBatchSummaries.first?.taskCount == 2)
+        #expect(fake.scheduledPlantBatchSummaries.first?.plantCount == 2)
+        #expect(fake.scheduledIds.isEmpty)
+        let ledgerActions = try context.fetch(FetchDescriptor<CareLedgerEvent>()).map(\.actionType)
+        #expect(ledgerActions.allSatisfy { $0 == "scheduleMerged" })
     }
 
     @Test func disabledNotificationPreferenceSkipsMatchingReminder() async throws {
@@ -804,6 +857,28 @@ struct OhanaNotificationsSchedulingTests {
             relatedEntityType: relatedEntityType,
             relatedEntityId: relatedEntityId
         )
+        let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        context.insert(event)
+        context.insert(reminder)
+        return reminder
+    }
+
+    private func makePlantCareReminder(
+        title: String,
+        plant: Plant,
+        careType: PlantCareType,
+        scheduledAt: Date,
+        context: ModelContext
+    ) -> Reminder {
+        let event = Event(
+            title: title,
+            startDate: scheduledAt,
+            isAllDay: true,
+            eventType: careType.eventType.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+        event.recurrenceDays = 1
         let reminder = Reminder(event: event, scheduledAt: scheduledAt)
         context.insert(event)
         context.insert(reminder)
