@@ -2832,6 +2832,22 @@ struct HomeCommandExecutorTests {
         #expect(calendarCommandSource.contains("guard syncResult.didPersist else"))
     }
 
+    @Test func reminderCompletionStopsSideEffectsWhenPersistenceFails() throws {
+        let rootURL = repositoryRootURL()
+        let source = try source("Ohana/Domain/Services/ReminderCompletionService.swift", rootURL: rootURL)
+
+        #expect(source.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(source.contains("context.rollback()"))
+        #expect(!source.contains("context.safeSave()"))
+        #expect(source.contains("guard saveResult.didSave else"))
+        #expect(source.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 4)
+        #expect(source.components(separatedBy: "guard saveResult.didSave else").count - 1 == 4)
+        #expect(source.contains("PlantCareScheduleSyncService.syncCompletedReminder"))
+        #expect(source.contains("cancelNotification(for: reminder, notifications: notifications)"))
+        #expect(source.contains("await reminderScheduling.scheduleIfNeeded"))
+        #expect(source.contains("await reminderScheduling.cancelAndReschedule"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()

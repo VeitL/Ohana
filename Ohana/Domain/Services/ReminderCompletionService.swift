@@ -108,7 +108,11 @@ final class ReminderCompletionService: ReminderCompleting {
         else {
             return false
         }
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
         PlantCareScheduleSyncService.syncCompletedReminder(
             reminder,
             executorId: humanId,
@@ -158,7 +162,11 @@ final class ReminderCompletionService: ReminderCompleting {
         else {
             return false
         }
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
         PlantCareScheduleSyncService.syncSkippedReminder(
             reminder,
             executorId: humanId,
@@ -209,7 +217,11 @@ final class ReminderCompletionService: ReminderCompleting {
         else {
             return false
         }
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
         if reschedule {
             Task { @MainActor in
                 await reminderScheduling.scheduleIfNeeded(
@@ -263,7 +275,11 @@ final class ReminderCompletionService: ReminderCompleting {
         else {
             return false
         }
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
         if reschedule {
             Task { @MainActor in
                 await reminderScheduling.cancelAndReschedule(reminder: reminder, context: context, source: .service)
