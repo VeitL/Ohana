@@ -44,7 +44,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .quickHumanMedication(humanID: result.subjectID),
                 affectedEntityIDs: [result.subjectID, result.medicationID],
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didPersist,
                 note: note
             )
         )

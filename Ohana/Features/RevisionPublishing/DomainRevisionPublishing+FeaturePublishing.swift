@@ -489,7 +489,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .petMedicationPlan(petID: result.subjectID, medicationID: result.medicationID),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didPersist,
                 note: note
             )
         )
@@ -502,7 +502,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .petMedicationPlanDelete(petID: result.subjectID, medicationID: result.medicationID),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didPersist && result.didChange,
                 note: note
             )
         )
@@ -523,7 +523,7 @@ extension DomainRevisionPublishing {
                     isActive: result.isActive
                 ),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: result.didChange,
+                wroteBusinessFact: result.didPersist && result.didChange,
                 note: note
             )
         )

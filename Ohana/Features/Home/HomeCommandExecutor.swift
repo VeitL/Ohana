@@ -458,7 +458,7 @@ struct HomeCommandExecutor {
             economy: StaticCareEventEconomyAwarder(questManager: questManager),
             medicationReminders: medicationReminders
         )
-        guard result.didRecord, result.allowsDerivedEffects else {
+        guard result.didPersist, result.didRecord, result.allowsDerivedEffects else {
             publishNoop(QuickCareCommand.medicationDose(petID: pet.id, medicationID: medication.id), note: "home.medicationDose.noop")
             return false
         }

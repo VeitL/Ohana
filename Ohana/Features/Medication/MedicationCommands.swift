@@ -25,10 +25,72 @@ func fetchMedicationCommandModelsOrLog<T: PersistentModel>(
     }
 }
 
+private enum PendingMedicationStorageWrite {
+    case remove(defaults: UserDefaults, key: String)
+    case setDouble(defaults: UserDefaults, key: String, value: Double)
+
+    func commit() {
+        switch self {
+        case let .remove(defaults, key):
+            defaults.removeObject(forKey: key)
+        case let .setDouble(defaults, key, value):
+            defaults.set(value, forKey: key)
+        }
+    }
+}
+
+private final class DeferredMedicationNotificationCanceller: ReminderNotificationScheduling, @unchecked Sendable {
+    private var cancelledNotificationIds: [String] = []
+
+    func schedule(reminder _: Reminder) {}
+
+    func schedule(
+        reminder _: Reminder,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.skippedUserDisabled(""))
+    }
+
+    func schedule(
+        reminder _: Reminder,
+        deliveryDate _: Date?,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.skippedUserDisabled(""))
+    }
+
+    func pendingNotificationIds() async -> Set<String> { [] }
+
+    func scheduleRollingWindow(reminders _: [Reminder]) {}
+
+    func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+
+    func cancel(notificationId: String) {
+        guard !notificationId.isEmpty else { return }
+        cancelledNotificationIds.append(notificationId)
+    }
+
+    func cancelAll(for _: Pet, reminders: [Reminder]) {
+        cancelledNotificationIds.append(contentsOf: reminders.map(\.notificationId).filter { !$0.isEmpty })
+    }
+
+    func compensate(reminders _: [Reminder]) {}
+
+    func commit(to notifications: ReminderNotificationScheduling) {
+        for notificationId in cancelledNotificationIds {
+            notifications.cancel(notificationId: notificationId)
+        }
+    }
+}
+
 struct HumanMedicationCommandResult: Equatable {
     let medicationID: UUID
     let subjectID: UUID
     let scheduledReminderSync: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct HumanMedicationPlanCommandInput: Equatable {
@@ -134,8 +196,9 @@ struct PetMedicationDoseCommandResult: Equatable {
     let eventID: UUID
     let coconutDelta: Int
     let didRecord: Bool
-
     let allowsDerivedEffects: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 
     init(
         subjectID: UUID,
@@ -143,7 +206,9 @@ struct PetMedicationDoseCommandResult: Equatable {
         eventID: UUID,
         coconutDelta: Int,
         didRecord: Bool,
-        allowsDerivedEffects: Bool? = nil
+        allowsDerivedEffects: Bool? = nil,
+        didPersist: Bool = true,
+        persistenceErrorDescription: String? = nil
     ) {
         self.subjectID = subjectID
         self.medicationID = medicationID
@@ -151,6 +216,8 @@ struct PetMedicationDoseCommandResult: Equatable {
         self.coconutDelta = coconutDelta
         self.didRecord = didRecord
         self.allowsDerivedEffects = allowsDerivedEffects ?? didRecord
+        self.didPersist = didPersist
+        self.persistenceErrorDescription = persistenceErrorDescription
     }
 }
 
@@ -194,7 +261,17 @@ enum HumanMedicationCommandService {
             isActive: true,
             context: context
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return HumanMedicationCommandResult(
+                medicationID: medication.id,
+                subjectID: human.id,
+                scheduledReminderSync: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
 
         if reminderEnabled {
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -211,7 +288,9 @@ enum HumanMedicationCommandService {
         return HumanMedicationCommandResult(
             medicationID: medication.id,
             subjectID: human.id,
-            scheduledReminderSync: reminderEnabled
+            scheduledReminderSync: reminderEnabled,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -275,6 +354,8 @@ struct PetMedicationPlanCommandResult: Equatable {
     let calendarEventIDs: [UUID]
     let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct PetMedicationPlanDeleteCommandResult: Equatable {
@@ -283,6 +364,8 @@ struct PetMedicationPlanDeleteCommandResult: Equatable {
     let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
     let didChange: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct PetMedicationPlanActivationCommandResult: Equatable {
@@ -293,6 +376,8 @@ struct PetMedicationPlanActivationCommandResult: Equatable {
     let calendarEventIDs: [UUID]
     let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 enum PetMedicationPlanStorageKeys {
@@ -388,13 +473,34 @@ enum PetMedicationPlanCommandService {
             created = true
         }
 
+        let deferredNotifications = DeferredMedicationNotificationCanceller()
         let calendarSync = syncCalendarEvents(
             for: medication,
             pet: pet,
-            context: context
+            context: context,
+            notifications: deferredNotifications
         )
-        syncRemainingAmount(input.remainingAmount, medication: medication, userDefaults: userDefaults)
-        context.safeSave()
+        let pendingRemainingAmountWrite = prepareRemainingAmountSync(
+            input.remainingAmount,
+            medication: medication,
+            userDefaults: userDefaults
+        )
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetMedicationPlanCommandResult(
+                subjectID: pet.id,
+                medicationID: medication.id,
+                created: false,
+                calendarEventIDs: [],
+                removedCalendarEventIDs: [],
+                scheduledReminderSync: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        pendingRemainingAmountWrite.commit()
+        deferredNotifications.commit(to: OhanaNotifications.current)
 
         if scheduleReminders {
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -409,7 +515,9 @@ enum PetMedicationPlanCommandService {
             created: created,
             calendarEventIDs: calendarSync.createdEventIDs,
             removedCalendarEventIDs: calendarSync.removedEventIDs,
-            scheduledReminderSync: scheduleReminders
+            scheduledReminderSync: scheduleReminders,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -436,19 +544,39 @@ enum PetMedicationPlanCommandService {
                 medicationID: medication.id,
                 removedCalendarEventIDs: [],
                 scheduledReminderSync: false,
-                didChange: false
+                didChange: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let medicationID = medication.id
-        let removedEventIDs = removeCalendarEvents(for: medicationID, context: context)
+        let deferredNotifications = DeferredMedicationNotificationCanceller()
+        let removedEventIDs = removeCalendarEvents(
+            for: medicationID,
+            context: context,
+            notifications: deferredNotifications
+        )
         DomainMemberFactWriter.deletePetMedicationPlan(
             plan: write,
             medication: medication,
             pet: pet,
             context: context
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetMedicationPlanDeleteCommandResult(
+                subjectID: pet.id,
+                medicationID: medicationID,
+                removedCalendarEventIDs: [],
+                scheduledReminderSync: false,
+                didChange: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
         userDefaults.removeObject(forKey: PetMedicationPlanStorageKeys.remainingAmount(medicationID: medicationID))
+        deferredNotifications.commit(to: OhanaNotifications.current)
 
         if scheduleReminders {
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -462,7 +590,9 @@ enum PetMedicationPlanCommandService {
             medicationID: medicationID,
             removedCalendarEventIDs: removedEventIDs,
             scheduledReminderSync: scheduleReminders,
-            didChange: true
+            didChange: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -491,7 +621,9 @@ enum PetMedicationPlanCommandService {
                 didChange: false,
                 calendarEventIDs: [],
                 removedCalendarEventIDs: [],
-                scheduledReminderSync: false
+                scheduledReminderSync: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let didChange = medication.isActive != isActive
@@ -503,12 +635,29 @@ enum PetMedicationPlanCommandService {
                 context: context
             )
         }
+        let deferredNotifications = DeferredMedicationNotificationCanceller()
         let calendarSync = syncCalendarEvents(
             for: medication,
             pet: pet,
-            context: context
+            context: context,
+            notifications: deferredNotifications
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetMedicationPlanActivationCommandResult(
+                subjectID: pet.id,
+                medicationID: medication.id,
+                isActive: medication.isActive,
+                didChange: false,
+                calendarEventIDs: [],
+                removedCalendarEventIDs: [],
+                scheduledReminderSync: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        deferredNotifications.commit(to: OhanaNotifications.current)
 
         if scheduleReminders {
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -524,7 +673,9 @@ enum PetMedicationPlanCommandService {
             didChange: didChange,
             calendarEventIDs: calendarSync.createdEventIDs,
             removedCalendarEventIDs: calendarSync.removedEventIDs,
-            scheduledReminderSync: scheduleReminders
+            scheduledReminderSync: scheduleReminders,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -543,29 +694,33 @@ enum PetMedicationPlanCommandService {
         medication.pet = pet
     }
 
-    private static func syncRemainingAmount(
+    private static func prepareRemainingAmountSync(
         _ amount: Double?,
         medication: PetMedication,
         userDefaults: UserDefaults
-    ) {
+    ) -> PendingMedicationStorageWrite {
         let key = PetMedicationPlanStorageKeys.remainingAmount(medicationID: medication.id)
         guard let amount else {
             medication.remainingAmount = 0
-            userDefaults.removeObject(forKey: key)
-            return
+            return .remove(defaults: userDefaults, key: key)
         }
         let normalized = max(0, amount)
         medication.remainingAmount = normalized
-        userDefaults.set(normalized, forKey: key)
+        return .setDouble(defaults: userDefaults, key: key, value: normalized)
     }
 
     @MainActor
     private static func syncCalendarEvents(
         for medication: PetMedication,
         pet: Pet,
-        context: ModelContext
+        context: ModelContext,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> (removedEventIDs: [UUID], createdEventIDs: [UUID]) {
-        let removedEventIDs = removeCalendarEvents(for: medication.id, context: context)
+        let removedEventIDs = removeCalendarEvents(
+            for: medication.id,
+            context: context,
+            notifications: notifications
+        )
         guard medication.isActive,
               PetMedicationSchedulePlan.dosesPerDay(for: medication.frequency) > 0 else {
             return (removedEventIDs, [])
@@ -634,7 +789,11 @@ enum PetMedicationPlanCommandService {
     }
 
     @MainActor
-    private static func removeCalendarEvents(for medicationID: UUID, context: ModelContext) -> [UUID] {
+    private static func removeCalendarEvents(
+        for medicationID: UUID,
+        context: ModelContext,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+    ) -> [UUID] {
         let descriptor = FetchDescriptor<Event>()
         let events = fetchMedicationCommandModelsOrLog(
             descriptor,
@@ -652,7 +811,7 @@ enum PetMedicationPlanCommandService {
                 continue
             }
             let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
-            DomainScheduleEffectsDispatcher.dispatch(delete: result)
+            DomainScheduleEffectsDispatcher.dispatch(delete: result, notifications: notifications)
             if result.didDelete {
                 removedEventIDs.append(event.id)
             }
@@ -745,6 +904,7 @@ struct PetMedicationCommandExecutor {
             )
             return nil
         }
+        guard result.didPersist else { return result }
         revisions.publishPetMedicationPlan(result, note: note)
         return result
     }
@@ -765,7 +925,7 @@ struct PetMedicationCommandExecutor {
             scheduleReminders: scheduleReminders,
             medicationReminders: medicationReminders
         )
-        guard result.didChange else { return result }
+        guard result.didPersist, result.didChange else { return result }
         revisions.publishPetMedicationPlanDelete(result, note: note)
         return result
     }
@@ -786,6 +946,7 @@ struct PetMedicationCommandExecutor {
             scheduleReminders: scheduleReminders,
             medicationReminders: medicationReminders
         )
+        guard result.didPersist else { return result }
         guard result.didChange || !result.calendarEventIDs.isEmpty || !result.removedCalendarEventIDs.isEmpty else {
             return result
         }
@@ -818,8 +979,11 @@ struct PetMedicationCommandExecutor {
             eventID: recorded.event.id,
             coconutDelta: recorded.coconutDelta,
             didRecord: recorded.didRecord,
-            allowsDerivedEffects: recorded.allowsDerivedEffects
+            allowsDerivedEffects: recorded.allowsDerivedEffects,
+            didPersist: recorded.didPersist,
+            persistenceErrorDescription: recorded.persistenceErrorDescription
         )
+        guard result.didPersist else { return result }
         deriveDose(result, factDate: recorded.event.startDate, note: note)
         return result
     }
@@ -831,7 +995,7 @@ struct PetMedicationCommandExecutor {
         note: String
     ) -> CareDerivationResult {
         let command = DomainCommand.medicationDose(petID: result.subjectID, medicationID: result.medicationID)
-        guard result.didRecord else {
+        guard result.didPersist, result.didRecord else {
             return derivations.derive(
                 .noOp(
                     command: command,

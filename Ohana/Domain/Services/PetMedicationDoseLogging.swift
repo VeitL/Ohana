@@ -28,6 +28,8 @@ nonisolated enum PetMedicationDoseLogging {
         let didRecord: Bool
         let coconutDelta: Int
         let allowsDerivedEffects: Bool
+        let didPersist: Bool
+        let persistenceErrorDescription: String?
     }
 
     /// 某日该药应喂次数（`asNeeded` 为 0，不产生委托）
@@ -161,7 +163,9 @@ nonisolated enum PetMedicationDoseLogging {
                 event: event,
                 didRecord: false,
                 coconutDelta: 0,
-                allowsDerivedEffects: false
+                allowsDerivedEffects: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let event = DomainScheduleWriter.createEvent(plan: plan, context: modelContext).event
@@ -178,25 +182,25 @@ nonisolated enum PetMedicationDoseLogging {
         )
 
         var coconutDelta = 0
-        do {
-            if let effectsPlan {
-                DomainEffectDispatcher.run(plan: effectsPlan) { actor in
-                    if awardCoconut, effectsPlan.allowsEconomyDerivation {
-                        let reward = economy.awardCareAction(
-                            type: .general(
-                                humanReward: 1,
-                                petReward: 0,
-                                emoji: "💊",
-                                title: doseRewardTitle()
-                            ),
-                            pet: pet,
-                            context: modelContext,
-                            quality: .none,
-                            date: now,
-                            executorId: actor.rewardExecutorId
-                        )
-                        coconutDelta = reward.humanGot + reward.petGot
-                    }
+        var pendingRemainingAmountWrite = PendingMedicationDoseStorageWrite.none
+        if let effectsPlan {
+            DomainEffectDispatcher.run(plan: effectsPlan) { actor in
+                if awardCoconut, effectsPlan.allowsEconomyDerivation {
+                    let reward = economy.awardCareAction(
+                        type: .general(
+                            humanReward: 1,
+                            petReward: 0,
+                            emoji: "💊",
+                            title: doseRewardTitle()
+                        ),
+                        pet: pet,
+                        context: modelContext,
+                        quality: .none,
+                        date: now,
+                        executorId: actor.rewardExecutorId
+                    )
+                    coconutDelta = reward.humanGot + reward.petGot
+                }
 
                 careLedger.record(
                     occurredAt: event.startDate,
@@ -221,26 +225,62 @@ nonisolated enum PetMedicationDoseLogging {
                     context: modelContext,
                     save: false
                 )
-                    if decrementRemaining {
-                        PetMedicationPlanStorageKeys.decrementRemainingAmount(medication: medication)
-                    }
-                    medicationReminders.recordDose(for: medication.id)
+                if decrementRemaining {
+                    pendingRemainingAmountWrite = prepareRemainingAmountDecrement(medication)
                 }
             }
-            try modelContext.save()
-        } catch {
+        }
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
             modelContext.rollback()
             economy.refreshProjectionAfterRollback(context: modelContext)
-            #if DEBUG
-                OhanaLog.error("[PetMedicationDoseLogging] dose save failed: \(error.localizedDescription)", category: "Economy")
-            #endif
+            return RecordDoseResult(
+                event: event,
+                didRecord: false,
+                coconutDelta: 0,
+                allowsDerivedEffects: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        pendingRemainingAmountWrite.commit()
+        if effectsPlan != nil {
+            medicationReminders.recordDose(for: medication.id)
         }
 
         return RecordDoseResult(
             event: event,
             didRecord: true,
             coconutDelta: coconutDelta,
-            allowsDerivedEffects: effectsPlan?.allowsDerivedEffects == true
+            allowsDerivedEffects: effectsPlan?.allowsDerivedEffects == true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
+    }
+
+    @MainActor
+    private static func prepareRemainingAmountDecrement(_ medication: PetMedication) -> PendingMedicationDoseStorageWrite {
+        let current = PetMedicationPlanStorageKeys.remainingAmountValue(medication: medication)
+        guard current > 0 else { return .none }
+        let next = max(0, current - 1)
+        medication.remainingAmount = next
+        return .setDouble(
+            key: PetMedicationPlanStorageKeys.remainingAmount(medicationID: medication.id),
+            value: next
+        )
+    }
+}
+
+private enum PendingMedicationDoseStorageWrite {
+    case none
+    case setDouble(key: String, value: Double)
+
+    func commit(defaults: UserDefaults = .standard) {
+        switch self {
+        case .none:
+            break
+        case let .setDouble(key, value):
+            defaults.set(value, forKey: key)
+        }
     }
 }

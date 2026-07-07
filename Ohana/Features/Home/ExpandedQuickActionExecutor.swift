@@ -201,7 +201,7 @@ enum ExpandedQuickActionExecutor {
             economy: StaticCareEventEconomyAwarder(questManager: questManager),
             medicationReminders: medicationReminders
         )
-        guard result.didRecord, result.allowsDerivedEffects else { return false }
+        guard result.didPersist, result.didRecord, result.allowsDerivedEffects else { return false }
         medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
         feedback(Feedback(cardId: pet.id, coconutDelta: result.coconutDelta, label: rewardLabel(actionType: "medication", delta: result.coconutDelta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)

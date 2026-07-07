@@ -423,6 +423,7 @@ struct HumanCareCommandExecutor {
             )
             return nil
         }
+        guard result.didPersist else { return result }
         revisions.publishQuickHumanMedication(result, note: note)
         return result
     }
