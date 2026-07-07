@@ -9,6 +9,7 @@ import Foundation
 
 extension DomainRevisionPublishing {
     func publishMemberDeletion(_ result: MemberDeletionCommandResult, note: String) {
+        guard result.didWrite else { return }
         var affected = Set(result.removedRelatedEventIDs)
         affected.insert(result.entityID)
         publish(

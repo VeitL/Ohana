@@ -38,10 +38,6 @@
       "context.safeSave()",
       "context.safeSave()"
     ],
-    "Ohana/Domain/Services/PlantLifecycleService.swift": [
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Domain/Services/ReminderCompletionService.swift": [
       "context.safeSave()",
       "context.safeSave()",
@@ -182,28 +178,8 @@
     "Ohana/Features/Members/MemberCreationService.swift": [
       "context.safeSave()"
     ],
-    "Ohana/Features/Members/MemberDeletionCommands.swift": [
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
-    "Ohana/Features/Members/MemberInteractionCommands.swift": [
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Features/Members/MemberMediaAttachmentIndexRepair.swift": [
       "modelContext.safeSave()"
-    ],
-    "Ohana/Features/Members/MemberProfileCommands.swift": [
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()"
     ],
     "Ohana/Features/Memorial/RainbowBridgeService.swift": [
       "context.safeSave()",
@@ -236,11 +212,6 @@
       "context.safeSave()"
     ],
     "Ohana/Features/PhotoAlbum/PetPhotoAlbumCommands.swift": [
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
-    "Ohana/Features/Plants/PlantBatchCareCommands.swift": [
       "context.safeSave()",
       "context.safeSave()",
       "context.safeSave()"

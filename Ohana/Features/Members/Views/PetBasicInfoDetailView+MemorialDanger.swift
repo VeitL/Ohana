@@ -146,11 +146,11 @@ extension PetBasicInfoDetailView {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         dismiss()
         commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
-            MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
                 p,
                 note: "petBasicInfo.delete"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 

@@ -722,6 +722,10 @@ struct HumanBasicInfoDetailContentView: View {
                 activeHumanID: activeHumanID,
                 note: "humanBasicInfo.delete"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             if result.clearsActiveHumanID {
                 activeHumanIdStr = ""
             }

@@ -180,13 +180,15 @@ struct SettingsPetManagementSheet: View {
             return
         }
 
-        MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
+        let result = MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
             pet,
             note: "settings.pet.deleted"
         )
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        petToDelete = nil
-        deleteConfirmName = ""
+        UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
+        if result.didPersist {
+            petToDelete = nil
+            deleteConfirmName = ""
+        }
     }
 
     private func resetPetLogs(_ pet: Pet) {

@@ -2795,6 +2795,26 @@ struct HomeCommandExecutorTests {
         #expect(dashboardSource.contains("PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)"))
     }
 
+    @Test func memberDeletionCommandsDelaySideEffectsUntilPersistenceSucceeds() throws {
+        let rootURL = repositoryRootURL()
+        let deletionSource = try source("Ohana/Features/Members/MemberDeletionCommands.swift", rootURL: rootURL)
+        let revisionSource = try source("Ohana/Features/RevisionPublishing/DomainRevisionPublishing+AppAndMembers.swift", rootURL: rootURL)
+        let plantActionsSource = try source("Ohana/Features/Plants/Views/PlantDetailView+Actions.swift", rootURL: rootURL)
+        let crewSource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift", rootURL: rootURL)
+
+        #expect(deletionSource.contains("let didPersist: Bool"))
+        #expect(deletionSource.contains("let persistenceErrorDescription: String?"))
+        #expect(deletionSource.contains("DeferredNotificationCancellationScheduler"))
+        #expect(deletionSource.contains("let saveResult = context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(deletionSource.contains("context.rollback()"))
+        #expect(deletionSource.contains("notificationCancels.flush()"))
+        #expect(deletionSource.contains("quickAccessPlan.apply(to: userDefaults, key: quickActionItemsKey)"))
+        #expect(!deletionSource.contains("context.safeSave()"))
+        #expect(revisionSource.contains("guard result.didWrite else { return }"))
+        #expect(plantActionsSource.contains("notificationOccurred(result.didPersist ? .success : .error)"))
+        #expect(crewSource.contains("if result.didPersist"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()
@@ -3149,6 +3169,8 @@ struct HomeCommandExecutorTests {
         let events = try context.fetch(FetchDescriptor<Event>())
         #expect(result.entityID == plantID)
         #expect(result.kind == EntityKind.plant.rawValue)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(result.removedRelatedEventIDs == [plantEvent.id])
         #expect(plants.isEmpty)
         #expect(events.map(\.id) == [unrelatedEvent.id])
@@ -3168,7 +3190,9 @@ struct HomeCommandExecutorTests {
             removedQuickActionCount: 2,
             requiresReplacementHuman: false,
             requiresAccountSwitch: false,
-            clearsActiveHumanID: false
+            clearsActiveHumanID: false,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
         let beforeRevision = revisionCenter.homeRevision.value
         let revisions = SharedDomainRevisionPublisher(center: revisionCenter)

@@ -33,6 +33,10 @@ struct MemberDeletionCommandResult: Equatable {
     let requiresReplacementHuman: Bool
     let requiresAccountSwitch: Bool
     let clearsActiveHumanID: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
+
+    var didWrite: Bool { didPersist }
 }
 
 enum MemberDeletionCommandService {
@@ -43,36 +47,58 @@ enum MemberDeletionCommandService {
     static func deletePet(
         _ pet: Pet,
         context: ModelContext,
-        userDefaults: UserDefaults = .standard
+        userDefaults: UserDefaults = .standard,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> MemberDeletionCommandResult {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let now = Date()
         let petID = pet.id
         let relatedEvents = fetchPetEvents(pet, context: context)
+        let quickAccessPlan = quickAccessRemovalPlan(forPetID: petID, userDefaults: userDefaults)
+        let notificationCancels = DeferredNotificationCancellationScheduler(delegate: notifications)
         for event in relatedEvents {
             PhysicalDeletionService.deleteEvent(
                 event,
                 context: context,
-                deletedAt: now
+                deletedAt: now,
+                notifications: notificationCancels
             )
         }
 
-        let removedQuickActionCount = removeQuickAccessItems(forPetID: petID, userDefaults: userDefaults)
         PhysicalDeletionService.deletePet(
             pet,
             context: context,
-            deletedAt: now
+            deletedAt: now,
+            notifications: notificationCancels
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return MemberDeletionCommandResult(
+                entityID: petID,
+                kind: EntityKind.pet.rawValue,
+                removedRelatedEventIDs: [],
+                removedQuickActionCount: 0,
+                requiresReplacementHuman: false,
+                requiresAccountSwitch: false,
+                clearsActiveHumanID: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        quickAccessPlan.apply(to: userDefaults, key: quickActionItemsKey)
+        notificationCancels.flush()
 
         return MemberDeletionCommandResult(
             entityID: petID,
             kind: EntityKind.pet.rawValue,
             removedRelatedEventIDs: relatedEvents.map(\.id),
-            removedQuickActionCount: removedQuickActionCount,
+            removedQuickActionCount: quickAccessPlan.removedCount,
             requiresReplacementHuman: false,
             requiresAccountSwitch: false,
-            clearsActiveHumanID: false
+            clearsActiveHumanID: false,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -81,7 +107,8 @@ enum MemberDeletionCommandService {
     static func deleteHuman(
         _ human: Human,
         activeHumanID: String,
-        context: ModelContext
+        context: ModelContext,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> MemberDeletionCommandResult {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let humanID = human.id
@@ -103,21 +130,39 @@ enum MemberDeletionCommandService {
 
         let now = Date()
         let relatedEvents = fetchHumanOwnedEvents(humanId: humanIDString, context: context)
+        let notificationCancels = DeferredNotificationCancellationScheduler(delegate: notifications)
         for event in relatedEvents {
             PhysicalDeletionService.deleteEvent(
                 event,
                 context: context,
                 deletedAt: now,
-                deletedByHumanId: activeHumanID
+                deletedByHumanId: activeHumanID,
+                notifications: notificationCancels
             )
         }
         PhysicalDeletionService.deleteHuman(
             human,
             context: context,
             deletedAt: now,
-            deletedByHumanId: activeHumanID
+            deletedByHumanId: activeHumanID,
+            notifications: notificationCancels
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return MemberDeletionCommandResult(
+                entityID: humanID,
+                kind: EntityKind.human.rawValue,
+                removedRelatedEventIDs: [],
+                removedQuickActionCount: 0,
+                requiresReplacementHuman: false,
+                requiresAccountSwitch: false,
+                clearsActiveHumanID: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        notificationCancels.flush()
 
         return MemberDeletionCommandResult(
             entityID: humanID,
@@ -126,29 +171,53 @@ enum MemberDeletionCommandService {
             removedQuickActionCount: 0,
             requiresReplacementHuman: requiresReplacementHuman,
             requiresAccountSwitch: requiresAccountSwitch,
-            clearsActiveHumanID: deletedCurrentHuman || requiresReplacementHuman
+            clearsActiveHumanID: deletedCurrentHuman || requiresReplacementHuman,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
     @discardableResult
     @MainActor
-    static func deletePlant(_ plant: Plant, context: ModelContext) -> MemberDeletionCommandResult {
+    static func deletePlant(
+        _ plant: Plant,
+        context: ModelContext,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+    ) -> MemberDeletionCommandResult {
         let now = Date()
         let plantID = plant.id
         let relatedEvents = fetchPlantEvents(plant, context: context)
+        let notificationCancels = DeferredNotificationCancellationScheduler(delegate: notifications)
         for event in relatedEvents {
             PhysicalDeletionService.deleteEvent(
                 event,
                 context: context,
-                deletedAt: now
+                deletedAt: now,
+                notifications: notificationCancels
             )
         }
         PhysicalDeletionService.deletePlant(
             plant,
             context: context,
-            deletedAt: now
+            deletedAt: now,
+            notifications: notificationCancels
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return MemberDeletionCommandResult(
+                entityID: plantID,
+                kind: EntityKind.plant.rawValue,
+                removedRelatedEventIDs: [],
+                removedQuickActionCount: 0,
+                requiresReplacementHuman: false,
+                requiresAccountSwitch: false,
+                clearsActiveHumanID: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        notificationCancels.flush()
 
         return MemberDeletionCommandResult(
             entityID: plantID,
@@ -157,7 +226,9 @@ enum MemberDeletionCommandService {
             removedQuickActionCount: 0,
             requiresReplacementHuman: false,
             requiresAccountSwitch: false,
-            clearsActiveHumanID: false
+            clearsActiveHumanID: false,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -223,12 +294,12 @@ enum MemberDeletionCommandService {
         return role.isPlantScoped || role == .unscoped
     }
 
-    private static func removeQuickAccessItems(forPetID petID: UUID, userDefaults: UserDefaults) -> Int {
+    private static func quickAccessRemovalPlan(forPetID petID: UUID, userDefaults: UserDefaults) -> QuickAccessRemovalPlan {
         guard let json = userDefaults.string(forKey: quickActionItemsKey),
               let data = json.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data),
               let items = object as? [[String: Any]]
-        else { return 0 }
+        else { return QuickAccessRemovalPlan(removedCount: 0, replacementJSON: nil) }
 
         let petIDString = petID.uuidString
         var removedCount = 0
@@ -246,8 +317,86 @@ enum MemberDeletionCommandService {
         guard removedCount > 0,
               let newData = try? JSONSerialization.data(withJSONObject: filtered, options: []),
               let newJSON = String(data: newData, encoding: .utf8)
-        else { return removedCount }
-        userDefaults.set(newJSON, forKey: quickActionItemsKey)
-        return removedCount
+        else { return QuickAccessRemovalPlan(removedCount: removedCount, replacementJSON: nil) }
+        return QuickAccessRemovalPlan(removedCount: removedCount, replacementJSON: newJSON)
+    }
+}
+
+private struct QuickAccessRemovalPlan {
+    let removedCount: Int
+    let replacementJSON: String?
+
+    func apply(to userDefaults: UserDefaults, key: String) {
+        guard let replacementJSON else { return }
+        userDefaults.set(replacementJSON, forKey: key)
+    }
+}
+
+private final class DeferredNotificationCancellationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
+    private let delegate: ReminderNotificationScheduling
+    private var pendingCancelIds: [String] = []
+
+    init(delegate: ReminderNotificationScheduling) {
+        self.delegate = delegate
+    }
+
+    func schedule(reminder: Reminder) {
+        delegate.schedule(reminder: reminder)
+    }
+
+    func schedule(
+        reminder: Reminder,
+        existingNotificationIds: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        delegate.schedule(reminder: reminder, existingNotificationIds: existingNotificationIds, completion: completion)
+    }
+
+    func schedule(
+        reminder: Reminder,
+        deliveryDate: Date?,
+        existingNotificationIds: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        delegate.schedule(
+            reminder: reminder,
+            deliveryDate: deliveryDate,
+            existingNotificationIds: existingNotificationIds,
+            completion: completion
+        )
+    }
+
+    func pendingNotificationIds() async -> Set<String> {
+        await delegate.pendingNotificationIds()
+    }
+
+    func scheduleRollingWindow(reminders: [Reminder]) {
+        delegate.scheduleRollingWindow(reminders: reminders)
+    }
+
+    func refillWindowIfNeeded(allReminders: [Reminder]) {
+        delegate.refillWindowIfNeeded(allReminders: allReminders)
+    }
+
+    func cancel(notificationId: String) {
+        guard !notificationId.isEmpty else { return }
+        pendingCancelIds.append(notificationId)
+    }
+
+    func cancelAll(for pet: Pet, reminders: [Reminder]) {
+        for reminder in reminders {
+            cancel(notificationId: reminder.notificationId)
+        }
+    }
+
+    func compensate(reminders: [Reminder]) {
+        delegate.compensate(reminders: reminders)
+    }
+
+    func flush() {
+        for notificationId in Set(pendingCancelIds) {
+            delegate.cancel(notificationId: notificationId)
+        }
+        pendingCancelIds.removeAll()
     }
 }

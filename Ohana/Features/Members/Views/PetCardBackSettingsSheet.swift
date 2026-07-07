@@ -180,11 +180,11 @@ struct PetCardBackSettingsSheet: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         dismiss()
         commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
-            MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
                 pet,
                 note: "pet.cardBack.delete"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 }

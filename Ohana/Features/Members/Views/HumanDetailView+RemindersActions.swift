@@ -187,6 +187,10 @@ extension HumanDetailView {
                 activeHumanID: activeHumanID,
                 note: "human.detail.delete"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             if result.clearsActiveHumanID {
                 activeHumanIdStr = ""
             }

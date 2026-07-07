@@ -362,11 +362,11 @@ extension PlantDetailContentView {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         dismiss()
         commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
-            MemberCommandExecutor(context: modelContext, services: appServices).deletePlant(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).deletePlant(
                 targetPlant,
                 note: "plant.detail.delete"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 }

@@ -222,11 +222,14 @@ struct CrewRosterProfilePanel: View {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
                 guard let plant else { return }
-                MemberCommandExecutor(context: modelContext, services: appServices).deletePlant(
+                let result = MemberCommandExecutor(context: modelContext, services: appServices).deletePlant(
                     plant,
                     note: "crew.member.deleted.plant"
                 )
-                onDeleted()
+                UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
+                if result.didPersist {
+                    onDeleted()
+                }
             }
         } message: {
             Text("确定要删除 \(plant?.name ?? "这株植物") 吗？")
@@ -1044,12 +1047,15 @@ struct CrewRosterProfilePanel: View {
         guard let pet else { return }
         let command = DomainCommand.memberDeletion(entityID: pet.id, kind: EntityKind.pet.rawValue)
         showingPetDeleteSheet = false
-        onDeleted()
         commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
-            MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
                 pet,
                 note: "crew.member.deleted.pet"
             )
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
+            if result.didPersist {
+                onDeleted()
+            }
         }
     }
 
@@ -1058,13 +1064,17 @@ struct CrewRosterProfilePanel: View {
         let activeHumanID = activeHumanIdStr
         let command = DomainCommand.memberDeletion(entityID: human.id, kind: EntityKind.human.rawValue)
         showingHumanDeleteSheet = false
-        onDeleted()
         commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).deleteHuman(
                 human,
                 activeHumanID: activeHumanID,
                 note: "crew.member.deleted.human"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
+            onDeleted()
             if result.clearsActiveHumanID {
                 activeHumanIdStr = ""
             }

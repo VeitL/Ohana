@@ -646,6 +646,10 @@ struct ExpandedHumanFeaturesContentSheet: View {
                 activeHumanID: activeHumanID,
                 note: "expandedHumanFeatures.delete"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             if result.clearsActiveHumanID {
                 activeHumanIdStr = ""
             }
