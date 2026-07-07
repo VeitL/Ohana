@@ -13,6 +13,7 @@ struct PetBasicInfoDetailView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     @Environment(AppServices.self) var appServices
+    @AppStorage("appLanguage") var appLanguage = AppLanguage.code
 
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @State var isEditing = false
@@ -60,6 +61,7 @@ struct PetBasicInfoDetailView: View {
         ("95E1D3", "mint"), ("F38181", "sunset"), ("AA96DA", "berry"),
         ("F472B6", "rose"), ("A8E6CF", "sage"), ("FFD3B6", "peach"), ("95ADBE", "slate")
     ]
+    var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -78,7 +80,7 @@ struct PetBasicInfoDetailView: View {
                 .padding(.top, 8)
             }
         }
-        .navigationTitle("\(pet.name) 的信息")
+        .navigationTitle(l.tr(zh: "\(pet.name) 的信息", en: "\(pet.name)'s info", de: "Infos zu \(pet.name)"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -86,7 +88,7 @@ struct PetBasicInfoDetailView: View {
                     Button {
                         saveChanges()
                     } label: {
-                        Text("保存")
+                        Text(l.save)
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                     }
@@ -101,13 +103,13 @@ struct PetBasicInfoDetailView: View {
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.goPrimary)
                     }
-                    .accessibilityLabel("编辑宠物资料")
+                    .accessibilityLabel(l.tr(zh: "编辑宠物资料", en: "Edit pet profile", de: "Haustierprofil bearbeiten"))
                     .accessibilityIdentifier("pet-basic-info-edit-action")
                 }
             }
             if isEditing {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("取消") { withAnimation { isEditing = false } }
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { withAnimation { isEditing = false } }
                         .accessibilityIdentifier("pet-basic-info-cancel-edit-action")
                 }
             }

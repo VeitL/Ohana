@@ -12,12 +12,12 @@ extension PetBasicInfoDetailView {
     var editContent: some View {
         VStack(spacing: 14) {
             // 基本信息
-            editSection(title: "基本信息", icon: "pawprint.fill", iconColor: Color.goPrimary) {
-                editField("名字", text: $eName)
+            editSection(title: l.tr(zh: "基本信息", en: "Basic info", de: "Basisdaten"), icon: "pawprint.fill", iconColor: Color.goPrimary) {
+                editField(l.tr(zh: "名字", en: "Name", de: "Name"), text: $eName, identifier: "pet-basic-info-name-input")
                 Divider().opacity(0.1)
                 // 物种
                 HStack {
-                    editLabel("物种")
+                    editLabel(l.tr(zh: "物种", en: "Species", de: "Art"))
                     Spacer()
                     Picker("", selection: $eSpecies) {
                         ForEach(speciesOptions, id: \.self) { Text($0) }
@@ -31,25 +31,25 @@ extension PetBasicInfoDetailView {
                         }
                 }
                 Divider().opacity(0.1)
-                optionPickerRow("品种", selection: $eBreed, options: breedOptions)
+                optionPickerRow(l.tr(zh: "品种", en: "Breed", de: "Rasse"), selection: $eBreed, options: breedOptions)
                 Divider().opacity(0.1)
                 // 性别
                 HStack {
-                    editLabel("性别")
+                    editLabel(l.tr(zh: "性别", en: "Gender", de: "Geschlecht"))
                     Spacer()
                     Picker("", selection: $eGender) {
-                        Text("♂ 男孩").tag("male")
-                        Text("♀ 女孩").tag("female")
-                        Text("未知").tag("unknown")
+                        Text(l.tr(zh: "♂ 男孩", en: "♂ Boy", de: "♂ Junge")).tag("male")
+                        Text(l.tr(zh: "♀ 女孩", en: "♀ Girl", de: "♀ Maedchen")).tag("female")
+                        Text(l.tr(zh: "未知", en: "Unknown", de: "Unbekannt")).tag("unknown")
                     }.pickerStyle(.segmented).frame(maxWidth: 160)
                 }
                 Divider().opacity(0.1)
                 Toggle(isOn: $eIsNeutered) {
-                    editLabel("已绝育")
+                    editLabel(l.tr(zh: "已绝育", en: "Neutered", de: "Kastriert"))
                 }.tint(Color.goPrimary)
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasBirthday) {
-                    editLabel("设置生日")
+                    editLabel(l.tr(zh: "设置生日", en: "Set birthday", de: "Geburtstag festlegen"))
                 }.tint(Color.goPrimary)
                 if eHasBirthday {
                     DatePicker("", selection: $eBirthday, in: ...Date(), displayedComponents: .date)
@@ -57,7 +57,7 @@ extension PetBasicInfoDetailView {
                 }
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasHomeDate) {
-                    editLabel("设置到家日")
+                    editLabel(l.tr(zh: "设置到家日", en: "Set home date", de: "Einzugstag festlegen"))
                 }.tint(Color.goPrimary)
                 if eHasHomeDate {
                     DatePicker("", selection: $eHomeDate, displayedComponents: .date)
@@ -65,31 +65,31 @@ extension PetBasicInfoDetailView {
                 }
             }
             // 外貌
-            editSection(title: "外貌特征", icon: "eye.fill", iconColor: Color.goCardCyan) {
-                colorOptionGrid(title: "毛色", selection: $eCoatColor, items: coatOptions)
+            editSection(title: l.tr(zh: "外貌特征", en: "Appearance", de: "Aussehen"), icon: "eye.fill", iconColor: Color.goCardCyan) {
+                colorOptionGrid(title: l.tr(zh: "毛色", en: "Coat color", de: "Fellfarbe"), selection: $eCoatColor, items: coatOptions)
                 Divider().opacity(0.1)
-                colorOptionGrid(title: "眼色", selection: $eEyeColor, items: eyeOptions)
+                colorOptionGrid(title: l.tr(zh: "眼色", en: "Eye color", de: "Augenfarbe"), selection: $eEyeColor, items: eyeOptions)
             }
             // 健康
-            editSection(title: "健康与医疗", icon: "cross.circle.fill", iconColor: Color.goRed) {
-                editField("芯片号", text: $eMicrochipID)
+            editSection(title: l.tr(zh: "健康与医疗", en: "Health & medical", de: "Gesundheit & Medizin"), icon: "cross.circle.fill", iconColor: Color.goRed) {
+                editField(l.tr(zh: "芯片号", en: "Microchip", de: "Mikrochip"), text: $eMicrochipID, identifier: "pet-basic-info-microchip-input")
                 Divider().opacity(0.1)
-                editField("诊所名称", text: $eVetClinicName)
+                editField(l.tr(zh: "诊所名称", en: "Clinic", de: "Praxis"), text: $eVetClinicName, identifier: "pet-basic-info-vet-clinic-input")
                 Divider().opacity(0.1)
-                editField("主治医生", text: $eVetDoctorName)
+                editField(l.tr(zh: "主治医生", en: "Doctor", de: "Tierarzt"), text: $eVetDoctorName, identifier: "pet-basic-info-vet-doctor-input")
                 Divider().opacity(0.1)
-                editField("联系电话", text: $eVetContact)
+                editField(l.tr(zh: "联系电话", en: "Phone", de: "Telefon"), text: $eVetContact, identifier: "pet-basic-info-vet-contact-input")
                 Divider().opacity(0.1)
-                editField("诊所地址", text: $eVetAddress)
+                editField(l.tr(zh: "诊所地址", en: "Clinic address", de: "Praxisadresse"), text: $eVetAddress, identifier: "pet-basic-info-vet-address-input")
                 Divider().opacity(0.1)
-                editField("过敏原", text: $eAllergies)
+                editField(l.tr(zh: "过敏原", en: "Allergies", de: "Allergien"), text: $eAllergies, identifier: "pet-basic-info-allergies-input")
             }
             // 证件
-            editSection(title: "证件信息", icon: "doc.badge.fill", iconColor: Color.goYellow) {
-                editField("护照编号", text: $ePassportNumber)
+            editSection(title: l.tr(zh: "证件信息", en: "Documents", de: "Dokumente"), icon: "doc.badge.fill", iconColor: Color.goYellow) {
+                editField(l.tr(zh: "护照编号", en: "Passport number", de: "Passnummer"), text: $ePassportNumber, identifier: "pet-basic-info-passport-input")
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasPassportExpiry) {
-                    editLabel("护照有效期")
+                    editLabel(l.tr(zh: "护照有效期", en: "Passport expiry", de: "Pass gueltig bis"))
                 }.tint(Color.goYellow)
                 if eHasPassportExpiry {
                     DatePicker("", selection: $ePassportExpiry, displayedComponents: .date)
@@ -97,17 +97,17 @@ extension PetBasicInfoDetailView {
                 }
             }
             // 血统
-            editSection(title: "血统来源", icon: "list.star", iconColor: Color.goMint) {
-                editField("曾用名", text: $eFormerName)
+            editSection(title: l.tr(zh: "血统来源", en: "Lineage", de: "Herkunft"), icon: "list.star", iconColor: Color.goMint) {
+                editField(l.tr(zh: "曾用名", en: "Former name", de: "Frueherer Name"), text: $eFormerName, identifier: "pet-basic-info-former-name-input")
                 Divider().opacity(0.1)
-                optionPickerRow("出生国家", selection: $eBirthCountry, options: countryOptions)
+                optionPickerRow(l.tr(zh: "出生国家", en: "Birth country", de: "Geburtsland"), selection: $eBirthCountry, options: countryOptions)
                 Divider().opacity(0.1)
-                optionPickerRow("出生城市", selection: $eBirthCity, options: birthCityOptions)
+                optionPickerRow(l.tr(zh: "出生城市", en: "Birth city", de: "Geburtsstadt"), selection: $eBirthCity, options: birthCityOptions)
                 Divider().opacity(0.1)
-                editField("血统信息", text: $eLineageInfo)
+                editField(l.tr(zh: "血统信息", en: "Lineage info", de: "Abstammungsinfo"), text: $eLineageInfo, identifier: "pet-basic-info-lineage-input")
             }
             // 主题色
-            editSection(title: "主题色", icon: "paintpalette.fill", iconColor: Color(hex: eThemeColorHex)) {
+            editSection(title: l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"), icon: "paintpalette.fill", iconColor: Color(hex: eThemeColorHex)) {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 12) {
                     ForEach(themePresets, id: \.0) { hex, _ in
                         Button { eThemeColorHex = hex } label: {
@@ -129,8 +129,8 @@ extension PetBasicInfoDetailView {
                 }
             }
             // 备注
-            editSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
-                TextField("备注（可选）", text: $eNotes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            editSection(title: l.tr(zh: "备注", en: "Notes", de: "Notizen"), icon: "note.text", iconColor: Color.goOrange) {
+                TextField(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)"), text: $eNotes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .tint(Color.goOrange)
@@ -158,7 +158,7 @@ extension PetBasicInfoDetailView {
                             .lineLimit(1)
                             .minimumScaleFactor(0.65)
                             .accessibilityIdentifier("pet-basic-info-name-readback")
-                        Text("\(isEditing ? eSpecies : pet.species) · \(isEditing ? (eBreed.isEmpty ? "未填写品种" : eBreed) : (pet.breed.isEmpty ? "未填写品种" : pet.breed))")
+                        Text("\(isEditing ? eSpecies : pet.species) · \(isEditing ? localizedBreedSummary(eBreed) : localizedBreedSummary(pet.breed))")
                             .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                             .lineLimit(1)
@@ -168,7 +168,7 @@ extension PetBasicInfoDetailView {
                 .frame(maxWidth: .infinity)
 
                 if isEditing {
-                    Text("编辑中")
+                    Text(l.tr(zh: "编辑中", en: "Editing", de: "Bearbeitung"))
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                         .padding(.horizontal, 8)
@@ -237,7 +237,7 @@ extension PetBasicInfoDetailView {
         Text(label).font(OhanaFont.adaptive(size: 13, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.55)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
     }
 
-    func editField(_ label: String, text: Binding<String>) -> some View {
+    func editField(_ label: String, text: Binding<String>, identifier: String? = nil) -> some View {
         HStack {
             editLabel(label).frame(width: 70, alignment: .leading)
             TextField(label, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
@@ -245,7 +245,7 @@ extension PetBasicInfoDetailView {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
                 .multilineTextAlignment(.trailing)
-                .accessibilityIdentifier(editFieldIdentifier(for: label))
+                .accessibilityIdentifier(identifier ?? editFieldIdentifier(for: label))
         }
     }
 
@@ -332,6 +332,10 @@ extension PetBasicInfoDetailView {
             .pickerStyle(.menu)
             .tint(Color.goPrimary)
         }
+    }
+
+    func localizedBreedSummary(_ breed: String) -> String {
+        breed.isEmpty ? l.tr(zh: "未填写品种", en: "Breed not set", de: "Rasse nicht festgelegt") : breed
     }
 
     func colorOptionGrid(title: String, selection: Binding<String>, items: [(name: String, hex: String)]) -> some View {
