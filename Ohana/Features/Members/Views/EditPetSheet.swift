@@ -108,26 +108,18 @@ struct EditPetContentSheet: View {
                     VStack(spacing: 16) {
                         sectionHeader(l.tr(zh: "饮食", en: "Food", de: "Futter"))
                         formField(l.tr(zh: "粮食品牌", en: "Food brand", de: "Futtermarke"), text: $foodBrand)
-                        HStack {
-                            Text(l.tr(zh: "每日喂食量 (g)", en: "Daily portion (g)", de: "Tagesportion (g)"))
-                                .font(OhanaFont.footnote(.medium))
-                                .foregroundStyle(Color.ohanaSecondaryText)
-                            Spacer()
-                            InlineNumericInput(
-                                text: dailyPortionTextBinding,
-                                placeholder: "0",
-                                unit: "g",
-                                maxFractionDigits: 0,
-                                accent: Color.goPrimary,
-                                step: 5,
-                                valueFont: OhanaFont.callout(.bold),
-                                valueAlignment: .trailing,
-                                fill: Color.ohanaControlFill,
-                                cornerRadius: OhanaRadius.chip,
-                                horizontalPadding: 8,
-                                verticalPadding: 6
-                            )
-                            .frame(width: 124)
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .center, spacing: 12) {
+                                dailyPortionLabel
+                                Spacer(minLength: 8)
+                                dailyPortionInput
+                                    .frame(minWidth: 104, idealWidth: 124, maxWidth: 150)
+                            }
+                            VStack(alignment: .leading, spacing: 8) {
+                                dailyPortionLabel
+                                dailyPortionInput
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
                         }
                     }
                     .padding(16)
@@ -223,6 +215,31 @@ struct EditPetContentSheet: View {
             set: { value in
                 dailyPortionGrams = CountryDecimalInput.parse(value, countryCode: AppCountry.code) ?? 0
             }
+        )
+    }
+
+    private var dailyPortionLabel: some View {
+        Text(l.tr(zh: "每日喂食量 (g)", en: "Daily portion (g)", de: "Tagesportion (g)"))
+            .font(OhanaFont.footnote(.medium))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var dailyPortionInput: some View {
+        InlineNumericInput(
+            text: dailyPortionTextBinding,
+            placeholder: "0",
+            unit: "g",
+            maxFractionDigits: 0,
+            accent: Color.goPrimary,
+            step: 5,
+            valueFont: OhanaFont.callout(.bold),
+            valueAlignment: .trailing,
+            fill: Color.ohanaControlFill,
+            cornerRadius: OhanaRadius.chip,
+            horizontalPadding: 8,
+            verticalPadding: 6
         )
     }
 

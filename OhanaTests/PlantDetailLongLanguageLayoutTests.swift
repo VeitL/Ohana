@@ -47,6 +47,16 @@ struct PlantDetailLongLanguageLayoutTests {
         #expect(!source.contains(".frame(minHeight: 42)"))
     }
 
+    @Test func plantCareLogSuggestionsAvoidFixedWidthCards() throws {
+        let source = try source(
+            "Ohana/Features/Plants/Views/PlantCareLogSheet.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains(".frame(minWidth: 168, idealWidth: 220, maxWidth: 260"))
+        #expect(!source.contains(".frame(width: 190, alignment: .leading)"))
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

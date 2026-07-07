@@ -271,18 +271,45 @@ extension PetBasicInfoDetailView {
 
     func editLabel(_ label: String) -> some View {
         Text(label).font(OhanaFont.adaptive(size: 13, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.55)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     func editField(_ label: String, text: Binding<String>, identifier: String? = nil) -> some View {
-        HStack {
-            editLabel(label).frame(width: 70, alignment: .leading)
-            TextField(label, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .tint(Color.goPrimary)
-                .multilineTextAlignment(.trailing)
-                .accessibilityIdentifier(identifier ?? editFieldIdentifier(for: label))
+        petProfileEditableRow(label) {
+            editTextField(label, text: text, identifier: identifier)
+        } stackedContent: {
+            editTextField(label, text: text, identifier: identifier)
+                .multilineTextAlignment(.leading)
         }
+    }
+
+    func petProfileEditableRow(
+        _ label: String,
+        @ViewBuilder horizontalContent: () -> some View,
+        @ViewBuilder stackedContent: () -> some View
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                editLabel(label)
+                    .frame(minWidth: 72, alignment: .leading)
+                horizontalContent()
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                editLabel(label)
+                stackedContent()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    func editTextField(_ label: String, text: Binding<String>, identifier: String? = nil) -> some View {
+        TextField(label, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .tint(Color.goPrimary)
+            .multilineTextAlignment(.trailing)
+            .accessibilityIdentifier(identifier ?? editFieldIdentifier(for: label))
     }
 
     func editFieldIdentifier(for label: String) -> String {
@@ -352,9 +379,16 @@ extension PetBasicInfoDetailView {
     }
 
     func optionPickerRow(_ label: String, selection: Binding<String>, options: [String]) -> some View {
-        HStack {
-            editLabel(label).frame(width: 70, alignment: .leading)
-            Spacer()
+        petProfileEditableRow(label) {
+            Picker("", selection: selection) {
+                ForEach(options, id: \.self) { option in
+                    Text(option.isEmpty ? petProfileEmptyValue : option).tag(option)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(Color.goPrimary)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        } stackedContent: {
             Picker("", selection: selection) {
                 ForEach(options, id: \.self) { option in
                     Text(option.isEmpty ? petProfileEmptyValue : option).tag(option)

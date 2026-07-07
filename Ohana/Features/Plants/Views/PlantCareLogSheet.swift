@@ -347,7 +347,7 @@ struct PlantCareLogSheet: View {
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
-                                .frame(width: 190, alignment: .leading)
+                                .frame(minWidth: 168, idealWidth: 220, maxWidth: 260, alignment: .leading)
                                 .frame(minHeight: 54, alignment: .leading)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 10)

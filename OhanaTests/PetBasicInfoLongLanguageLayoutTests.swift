@@ -16,12 +16,27 @@ struct PetBasicInfoLongLanguageLayoutTests {
         #expect(editSource.contains("ViewThatFits(in: .horizontal)"))
         #expect(editSource.contains("func infoRowLabel"))
         #expect(editSource.contains("func infoRowValue"))
+        #expect(editSource.contains("func petProfileEditableRow"))
         #expect(!editSource.contains(".frame(width: 80, alignment: .leading)"))
+        #expect(!editSource.contains(".frame(width: 70, alignment: .leading)"))
 
         #expect(healthSource.contains("ViewThatFits(in: .horizontal)"))
         #expect(healthSource.contains("func compactSummaryLabel"))
         #expect(healthSource.contains("func compactSummaryValue"))
         #expect(!healthSource.contains(".frame(width: 58, alignment: .leading)"))
+    }
+
+    @Test func editPetSheetDailyPortionFallsBackForLongLabels() throws {
+        let source = try source(
+            "Ohana/Features/Members/Views/EditPetSheet.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains("dailyPortionLabel"))
+        #expect(source.contains("dailyPortionInput"))
+        #expect(source.contains("ViewThatFits(in: .horizontal)"))
+        #expect(source.contains(".frame(minWidth: 104, idealWidth: 124, maxWidth: 150)"))
+        #expect(!source.contains(".frame(width: 124)"))
     }
 
     private func repositoryRootURL() -> URL {
