@@ -62,7 +62,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .humanMedicationPlan(humanID: result.subjectID, medicationID: commandMedicationID),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didPersist,
                 note: note
             )
         )
@@ -80,7 +80,7 @@ extension DomainRevisionPublishing {
                     isActive: result.isActive
                 ),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: result.didChange || !result.calendarEventIDs.isEmpty || !result.removedCalendarEventIDs.isEmpty,
+                wroteBusinessFact: result.didPersist && (result.didChange || !result.calendarEventIDs.isEmpty || !result.removedCalendarEventIDs.isEmpty),
                 note: note
             )
         )
@@ -93,7 +93,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .humanMedicationPlanDelete(humanID: result.subjectID, medicationID: result.medicationID),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: result.didChange,
+                wroteBusinessFact: result.didPersist && result.didChange,
                 note: note
             )
         )
@@ -113,7 +113,7 @@ extension DomainRevisionPublishing {
                     status: result.status.rawValue
                 ),
                 affectedEntityIDs: Set([result.subjectID, result.medicationID, result.logID].compactMap(\.self)),
-                wroteBusinessFact: result.didChange,
+                wroteBusinessFact: result.didPersist && result.didChange,
                 note: note
             )
         )

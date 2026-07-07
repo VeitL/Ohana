@@ -406,6 +406,7 @@ struct HumanCareCommandExecutor {
             )
             return nil
         }
+        guard result.didPersist else { return result }
         revisions.publishHumanMedicationPlan(
             result,
             commandMedicationID: existingMedication?.id,

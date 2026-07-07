@@ -91,6 +91,8 @@ struct HumanMedicationPlanCommandResult: Equatable {
     let calendarEventIDs: [UUID]
     let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct HumanMedicationPlanDeleteCommandResult: Equatable {
@@ -99,6 +101,8 @@ struct HumanMedicationPlanDeleteCommandResult: Equatable {
     let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
     let didChange: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct HumanMedicationPlanActivationCommandResult: Equatable {
@@ -109,6 +113,8 @@ struct HumanMedicationPlanActivationCommandResult: Equatable {
     let calendarEventIDs: [UUID]
     let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct HumanMedicationDoseCommandResult: Equatable {
@@ -118,6 +124,8 @@ struct HumanMedicationDoseCommandResult: Equatable {
     let status: HumanMedicationStatus
     let didChange: Bool
     let recordedLedgerEvent: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct PetMedicationDoseCommandResult: Equatable {

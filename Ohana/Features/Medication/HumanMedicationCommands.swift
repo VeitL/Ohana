@@ -73,7 +73,21 @@ enum HumanMedicationPlanCommandService {
             appLanguage: input.appLanguage,
             context: context
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            let medicationID = medication.id
+            context.rollback()
+            return HumanMedicationPlanCommandResult(
+                subjectID: human.id,
+                medicationID: medicationID,
+                created: created,
+                calendarEventIDs: [],
+                removedCalendarEventIDs: [],
+                scheduledReminderSync: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
 
         if scheduleReminders {
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -91,7 +105,9 @@ enum HumanMedicationPlanCommandService {
             created: created,
             calendarEventIDs: calendarSync.createdEventIDs,
             removedCalendarEventIDs: calendarSync.removedEventIDs,
-            scheduledReminderSync: scheduleReminders
+            scheduledReminderSync: scheduleReminders,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -118,7 +134,9 @@ enum HumanMedicationPlanCommandService {
                 medicationID: medicationID,
                 removedCalendarEventIDs: [],
                 scheduledReminderSync: false,
-                didChange: false
+                didChange: false,
+                didPersist: false,
+                persistenceErrorDescription: nil
             )
         }
 
@@ -128,7 +146,19 @@ enum HumanMedicationPlanCommandService {
             medication: medication,
             context: context
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return HumanMedicationPlanDeleteCommandResult(
+                subjectID: human.id,
+                medicationID: medicationID,
+                removedCalendarEventIDs: [],
+                scheduledReminderSync: false,
+                didChange: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
 
         if scheduleReminders {
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -145,7 +175,9 @@ enum HumanMedicationPlanCommandService {
             medicationID: medicationID,
             removedCalendarEventIDs: removedEventIDs,
             scheduledReminderSync: scheduleReminders,
-            didChange: true
+            didChange: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -175,10 +207,13 @@ enum HumanMedicationPlanCommandService {
                 didChange: false,
                 calendarEventIDs: [],
                 removedCalendarEventIDs: [],
-                scheduledReminderSync: false
+                scheduledReminderSync: false,
+                didPersist: false,
+                persistenceErrorDescription: nil
             )
         }
 
+        let originalIsActive = medication.isActive
         let didChange = medication.isActive != isActive
         if didChange {
             DomainMemberFactWriter.updateHumanMedicationPlanActive(
@@ -194,7 +229,21 @@ enum HumanMedicationPlanCommandService {
             appLanguage: appLanguage,
             context: context
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return HumanMedicationPlanActivationCommandResult(
+                subjectID: human.id,
+                medicationID: medication.id,
+                isActive: originalIsActive,
+                didChange: false,
+                calendarEventIDs: [],
+                removedCalendarEventIDs: [],
+                scheduledReminderSync: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
 
         if scheduleReminders {
             DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -213,7 +262,9 @@ enum HumanMedicationPlanCommandService {
             didChange: didChange,
             calendarEventIDs: calendarSync.createdEventIDs,
             removedCalendarEventIDs: calendarSync.removedEventIDs,
-            scheduledReminderSync: scheduleReminders
+            scheduledReminderSync: scheduleReminders,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -401,7 +452,9 @@ enum HumanMedicationDoseCommandService {
                 logID: nil,
                 status: status,
                 didChange: false,
-                recordedLedgerEvent: false
+                recordedLedgerEvent: false,
+                didPersist: false,
+                persistenceErrorDescription: nil
             )
         }
 
@@ -446,7 +499,20 @@ enum HumanMedicationDoseCommandService {
         }
 
         if update.didChange {
-            context.safeSave()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            guard saveResult.didSave else {
+                context.rollback()
+                return HumanMedicationDoseCommandResult(
+                    subjectID: human.id,
+                    medicationID: medicationID,
+                    logID: nil,
+                    status: status,
+                    didChange: false,
+                    recordedLedgerEvent: false,
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                )
+            }
         }
 
         return HumanMedicationDoseCommandResult(
@@ -455,7 +521,9 @@ enum HumanMedicationDoseCommandService {
             logID: update.log?.id,
             status: status,
             didChange: update.didChange,
-            recordedLedgerEvent: recordedLedgerEvent
+            recordedLedgerEvent: recordedLedgerEvent,
+            didPersist: update.didChange,
+            persistenceErrorDescription: nil
         )
     }
 }

@@ -3135,6 +3135,23 @@ struct HomeCommandExecutorTests {
         #expect(reportViewSource.contains("if result.didChange {\n                    dismiss()\n                } else {\n                    isSaving = false\n                }"))
     }
 
+    @Test func humanMedicationCommandsGateSideEffectsOnPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let resultSource = try source("Ohana/Features/Medication/MedicationCommands.swift", rootURL: rootURL)
+        let commandSource = try source("Ohana/Features/Medication/HumanMedicationCommands.swift", rootURL: rootURL)
+        let executorSource = try source("Ohana/Features/HumanNotes/HumanNoteCommands.swift", rootURL: rootURL)
+        let revisionSource = try source("Ohana/Features/RevisionPublishing/DomainRevisionPublishing+HumanPublishing.swift", rootURL: rootURL)
+
+        #expect(resultSource.contains("let didPersist: Bool"))
+        #expect(resultSource.contains("let persistenceErrorDescription: String?"))
+        #expect(!commandSource.contains("context.safeSave()"))
+        #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(commandSource.contains("context.rollback()"))
+        #expect(executorSource.contains("guard result.didPersist else { return result }"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist &&"))
+    }
+
     @MainActor
     @Test func memberDeletionServiceDeletesPetRelatedEventsAndQuickActions() throws {
         let container = try makeInMemoryContainer()
@@ -5802,6 +5819,8 @@ struct HomeCommandExecutorTests {
         #expect(events.last?.title.contains("Dose 2") == true)
         #expect(result.calendarEventIDs.count == 2)
         #expect(result.scheduledReminderSync == false)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         let parsedMetadata = try #require(HumanMedicationScheduleMetadata.parse(from: medications.first?.notes ?? ""))
         #expect(parsedMetadata.doseMinutes == [8 * 60, 20 * 60])
         #expect(HumanMedicationScheduleMetadata.visibleNotes(from: medications.first?.notes ?? "") == "after meal")
@@ -5873,6 +5892,8 @@ struct HomeCommandExecutorTests {
         #expect(updated.created == false)
         #expect(updated.removedCalendarEventIDs.count == 2)
         #expect(updated.calendarEventIDs.count == 1)
+        #expect(updated.didPersist)
+        #expect(updated.persistenceErrorDescription == nil)
     }
 
     @MainActor
@@ -5929,6 +5950,8 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.id == log.id)
         #expect(result.removedCalendarEventIDs.count == 1)
         #expect(result.scheduledReminderSync == false)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
     }
 
     @MainActor
@@ -5989,6 +6012,10 @@ struct HomeCommandExecutorTests {
         #expect(events.first?.relatedEntityId == medication.id.uuidString)
         #expect(resumed.didChange == true)
         #expect(resumed.calendarEventIDs.count == 1)
+        #expect(stopped.didPersist)
+        #expect(stopped.persistenceErrorDescription == nil)
+        #expect(resumed.didPersist)
+        #expect(resumed.persistenceErrorDescription == nil)
     }
 
     @MainActor
@@ -6030,6 +6057,8 @@ struct HomeCommandExecutorTests {
         #expect(result.medicationID == medication.id)
         #expect(result.didChange == true)
         #expect(result.recordedLedgerEvent == true)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.medication.rawValue)
         #expect(ledgerEvents.first?.actionType == "humanMedicationTaken")
@@ -6078,6 +6107,8 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.recordedTime == nil)
         #expect(result.didChange == true)
         #expect(result.recordedLedgerEvent == false)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(ledgerEvents.isEmpty)
     }
 
