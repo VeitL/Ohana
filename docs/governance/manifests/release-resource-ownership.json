@@ -1,6 +1,6 @@
 {
   "schema": "ohana.governance.release-resource-ownership.v1",
-  "updated": "2026-07-06",
+  "updated": "2026-07-07",
   "policyDocuments": [
     "AGENTS.md",
     "docs/release-quality-gates.md",
@@ -12,8 +12,8 @@
       "id": "all-bundled-resources",
       "owner": "Release owner",
       "path": "Resources",
-      "limitMiB": 180,
-      "rationale": "Top-level bundled resources must stay below an intentional pre-sign budget aligned to the current avatar catalogs so app size regressions remain visible before archive.",
+      "limitMiB": 130,
+      "rationale": "Top-level bundled resources must stay below an intentional pre-sign budget aligned to the optimized avatar catalogs so app size regressions remain visible before archive.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
       "evidence": "Current local size is reported by release hardening; CI fails if the budget is exceeded."
     },
@@ -39,8 +39,8 @@
       "id": "plant-avatar-assets",
       "owner": "Avatar asset owner",
       "path": "Resources/Avatars/PlantAvatarAssets",
-      "limitMiB": 75,
-      "rationale": "Plant avatar resources currently ship as a broad 450x600 PNG catalog; this budget keeps that catalog owned while still blocking further unreviewed growth.",
+      "limitMiB": 20,
+      "rationale": "Plant avatar resources ship as an optimized 450x600 indexed PNG catalog with transparency; this budget keeps the catalog compact while still allowing small curated additions.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
       "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."
     },

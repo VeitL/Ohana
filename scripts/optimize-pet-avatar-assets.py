@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Optimize bundled PetAvatarAssets PNGs with a guarded, repeatable pipeline."""
+"""Optimize bundled avatar PNGs with a guarded, repeatable pipeline."""
 
 from __future__ import annotations
 
@@ -50,9 +50,7 @@ class OptimizationResult:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Optimize Resources/Avatars/PetAvatarAssets PNGs without changing filenames."
-    )
+    parser = argparse.ArgumentParser(description="Optimize bundled avatar PNGs without changing filenames.")
     parser.add_argument("--asset-dir", type=Path, default=DEFAULT_ASSET_DIR)
     parser.add_argument("--width", type=int, default=450)
     parser.add_argument("--height", type=int, default=600)
@@ -61,6 +59,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--display-height", type=int, default=440)
     parser.add_argument("--min-ssim", type=float, default=0.985)
     parser.add_argument("--max-alpha-delta", type=int, default=0)
+    parser.add_argument(
+        "--palette-alpha",
+        action="store_true",
+        help="Use indexed PNG output with palette transparency. This is much smaller for plant cutout art, but should use explicit SSIM/alpha gates.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Preview output without replacing files. This is the default.")
     parser.add_argument("--apply", action="store_true", help="Replace source PNGs after all candidates pass.")
     parser.add_argument("--no-zopflipng", action="store_true", help="Skip optional zopflipng pass.")
@@ -127,8 +130,18 @@ def optimized_candidate(
     output_path: Path,
     target_size: tuple[int, int],
     colors: int,
+    palette_alpha: bool,
 ) -> None:
     resized = image.resize(target_size, Image.Resampling.LANCZOS)
+    if palette_alpha:
+        quantized = resized.quantize(
+            colors=colors,
+            method=Image.Quantize.FASTOCTREE,
+            dither=Image.Dither.NONE,
+        )
+        quantized.save(output_path, optimize=True)
+        return
+
     alpha = resized.getchannel("A")
     rgb = resized.convert("RGB")
     quantized = rgb.quantize(
@@ -204,11 +217,12 @@ def optimize_one(
     min_ssim: float,
     max_alpha_delta: int,
     use_zopflipng: bool,
+    palette_alpha: bool,
 ) -> OptimizationResult:
     original_size = path.stat().st_size
     original = open_rgba(path)
     quantized_path = temp_dir / path.name
-    optimized_candidate(original, quantized_path, target_size, colors)
+    optimized_candidate(original, quantized_path, target_size, colors, palette_alpha)
     if use_zopflipng:
         quantized_path = run_zopflipng(quantized_path)
 
@@ -357,7 +371,7 @@ def print_summary(results: list[OptimizationResult], asset_dir: Path, apply: boo
     accepted = sum(1 for result in results if result.accepted)
     rejected = len(results) - accepted
     mode = "applied" if apply else "dry-run"
-    print(f"Pet avatar optimization {mode}: {asset_dir}")
+    print(f"Avatar asset optimization {mode}: {asset_dir}")
     print(f"files: {len(results)} accepted={accepted} rejected={rejected}")
     print(f"total: {total_original / 1024 / 1024:.1f} MiB -> {total_optimized / 1024 / 1024:.1f} MiB")
     print(f"saved: {total_saved / 1024 / 1024:.1f} MiB ({(total_saved / total_original * 100) if total_original else 0:.1f}%)")
@@ -404,6 +418,7 @@ def main() -> int:
                 min_ssim=args.min_ssim,
                 max_alpha_delta=args.max_alpha_delta,
                 use_zopflipng=not args.no_zopflipng,
+                palette_alpha=args.palette_alpha,
             )
             for path in files
         ]
