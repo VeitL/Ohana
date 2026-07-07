@@ -329,12 +329,12 @@ extension PlantDetailContentView {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).archivePlant(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).archivePlant(
                 plant,
                 date: Date(),
                 note: "plant.detail.archive"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 
@@ -346,11 +346,11 @@ extension PlantDetailContentView {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).restorePlant(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).restorePlant(
                 plant,
                 note: "plant.detail.restore"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 

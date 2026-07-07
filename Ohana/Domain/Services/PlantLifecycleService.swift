@@ -12,6 +12,8 @@ struct PlantLifecycleTransitionResult: Equatable, Sendable {
     let plantID: UUID
     let action: String
     let didWrite: Bool
+    let didPersist: Bool
+    let persistenceError: String?
     let removedEventIDs: [UUID]
     let removedReminderIDs: [UUID]
 }
@@ -31,6 +33,8 @@ enum PlantLifecycleService {
                 plantID: plant.id,
                 action: "archive.no-op",
                 didWrite: false,
+                didPersist: true,
+                persistenceError: nil,
                 removedEventIDs: [],
                 removedReminderIDs: []
             )
@@ -45,11 +49,25 @@ enum PlantLifecycleService {
             defaults: defaults
         )
         CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: archivedAt)
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            context.rollback()
+            return PlantLifecycleTransitionResult(
+                plantID: plant.id,
+                action: "archive.failed",
+                didWrite: false,
+                didPersist: false,
+                persistenceError: saveResult.errorDescription,
+                removedEventIDs: [],
+                removedReminderIDs: []
+            )
+        }
         return PlantLifecycleTransitionResult(
             plantID: plant.id,
             action: "archive.mark",
             didWrite: true,
+            didPersist: true,
+            persistenceError: nil,
             removedEventIDs: removed.removedEventIDs,
             removedReminderIDs: removed.removedReminderIDs
         )
@@ -69,6 +87,8 @@ enum PlantLifecycleService {
                 plantID: plant.id,
                 action: "archive.restore.no-op",
                 didWrite: false,
+                didPersist: true,
+                persistenceError: nil,
                 removedEventIDs: [],
                 removedReminderIDs: []
             )
@@ -85,11 +105,25 @@ enum PlantLifecycleService {
             defaults: defaults,
             saveChanges: false
         )
-        context.safeSave()
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            context.rollback()
+            return PlantLifecycleTransitionResult(
+                plantID: plant.id,
+                action: "archive.restore.failed",
+                didWrite: false,
+                didPersist: false,
+                persistenceError: saveResult.errorDescription,
+                removedEventIDs: [],
+                removedReminderIDs: []
+            )
+        }
         return PlantLifecycleTransitionResult(
             plantID: plant.id,
             action: "archive.restore",
             didWrite: true,
+            didPersist: true,
+            persistenceError: nil,
             removedEventIDs: synced.removedEventIDs,
             removedReminderIDs: synced.removedReminderIDs
         )

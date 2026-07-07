@@ -126,7 +126,9 @@ enum MemberLifecycleCommandService {
         return MemberLifecycleCommandResult(
             entityID: plant.id,
             kind: EntityKind.plant.rawValue,
-            action: result.didWrite ? result.action : "no-op"
+            action: result.didWrite ? result.action : "no-op",
+            didPersist: result.didPersist,
+            persistenceError: result.persistenceError
         )
     }
 
@@ -140,7 +142,9 @@ enum MemberLifecycleCommandService {
         return MemberLifecycleCommandResult(
             entityID: plant.id,
             kind: EntityKind.plant.rawValue,
-            action: result.didWrite ? result.action : "no-op"
+            action: result.didWrite ? result.action : "no-op",
+            didPersist: result.didPersist,
+            persistenceError: result.persistenceError
         )
     }
 }

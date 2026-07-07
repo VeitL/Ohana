@@ -278,8 +278,10 @@ struct MemberLifecycleCommandResult: Equatable {
     let entityID: UUID
     let kind: String
     let action: String
+    let didPersist: Bool = true
+    let persistenceError: String? = nil
 
-    var didWrite: Bool { action != "no-op" }
+    var didWrite: Bool { didPersist && action != "no-op" }
 }
 
 struct MemberHomeVisibilityCommandResult: Equatable {

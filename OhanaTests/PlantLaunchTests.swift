@@ -1021,6 +1021,8 @@ struct PlantLaunchTests {
         )
 
         #expect(archive.didWrite)
+        #expect(archive.didPersist)
+        #expect(archive.persistenceError == nil)
         #expect(plant.isArchived)
         #expect(archive.removedEventIDs.count == 7)
         #expect(archive.removedReminderIDs.count == 7)
@@ -1036,6 +1038,8 @@ struct PlantLaunchTests {
         )
 
         #expect(restore.didWrite)
+        #expect(restore.didPersist)
+        #expect(restore.persistenceError == nil)
         #expect(!plant.isArchived)
         #expect(try context.fetch(FetchDescriptor<Event>()).count == 7)
         #expect(try context.fetch(FetchDescriptor<Reminder>()).count == 7)
