@@ -20,11 +20,15 @@ struct HumanNoteCommandResult: Equatable {
     let attachmentCount: Int
     let eventID: UUID?
     let reminderID: UUID?
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct HumanNoteDeleteResult: Equatable {
     let subjectID: UUID
     let didDelete: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 enum HumanNoteCommandService {
@@ -79,7 +83,19 @@ enum HumanNoteCommandService {
             )
         }
 
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            HumanNoteAttachmentStore.deletePendingAttachments(attachments)
+            context.rollback()
+            return HumanNoteCommandResult(
+                subjectID: human.id,
+                attachmentCount: 0,
+                eventID: nil,
+                reminderID: nil,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
 
         if scheduleNotification, let reminder = reminderPair?.reminder {
             let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager()
@@ -99,7 +115,9 @@ enum HumanNoteCommandService {
             subjectID: human.id,
             attachmentCount: attachments.count,
             eventID: reminderPair?.event.id,
-            reminderID: reminderPair?.reminder.id
+            reminderID: reminderPair?.reminder.id,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -111,11 +129,21 @@ enum HumanNoteCommandService {
         context: ModelContext
     ) -> HumanNoteDeleteResult {
         guard MemberLifecycleGate.disposition(human: human, writeKind: .memorial).writesContent else {
-            return HumanNoteDeleteResult(subjectID: human.id, didDelete: false)
+            return HumanNoteDeleteResult(
+                subjectID: human.id,
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: nil
+            )
         }
         let target = rawString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !target.isEmpty, !human.notes.isEmpty else {
-            return HumanNoteDeleteResult(subjectID: human.id, didDelete: false)
+            return HumanNoteDeleteResult(
+                subjectID: human.id,
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: nil
+            )
         }
 
         let parts = human.notes.components(separatedBy: "\n\n")
@@ -124,14 +152,33 @@ enum HumanNoteCommandService {
         }
         let didDelete = remaining.count != parts.count
         guard didDelete else {
-            return HumanNoteDeleteResult(subjectID: human.id, didDelete: false)
+            return HumanNoteDeleteResult(
+                subjectID: human.id,
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: nil
+            )
         }
 
         human.notes = remaining
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: "\n\n")
-        context.safeSave()
-        return HumanNoteDeleteResult(subjectID: human.id, didDelete: true)
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return HumanNoteDeleteResult(
+                subjectID: human.id,
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        return HumanNoteDeleteResult(
+            subjectID: human.id,
+            didDelete: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
+        )
     }
 
     private static func persistAttachments(
@@ -570,6 +617,7 @@ struct HumanCareCommandExecutor {
             )
             return nil
         }
+        guard result.didPersist else { return result }
         revisions.publishHumanNote(result, note: note)
         return result
     }
@@ -585,10 +633,12 @@ struct HumanCareCommandExecutor {
             rawString: rawString,
             context: context
         )
-        revisions.publishHumanNoteDelete(
-            result,
-            note: note ?? (result.didDelete ? "human.note.delete" : "human.note.delete.noop")
-        )
+        if result.didPersist {
+            revisions.publishHumanNoteDelete(
+                result,
+                note: note ?? (result.didDelete ? "human.note.delete" : "human.note.delete.noop")
+            )
+        }
         return result
     }
 }

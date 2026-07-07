@@ -157,7 +157,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .humanNote(humanID: result.subjectID),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didPersist,
                 note: note
             )
         )
@@ -168,7 +168,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .humanNote(humanID: result.subjectID),
                 affectedEntityIDs: [result.subjectID],
-                wroteBusinessFact: result.didDelete,
+                wroteBusinessFact: result.didPersist && result.didDelete,
                 note: note
             )
         )

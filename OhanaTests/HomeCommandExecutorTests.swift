@@ -3152,6 +3152,25 @@ struct HomeCommandExecutorTests {
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist &&"))
     }
 
+    @Test func humanNoteCommandsGateSideEffectsOnPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let commandSource = try source("Ohana/Features/HumanNotes/HumanNoteCommands.swift", rootURL: rootURL)
+        let attachmentSource = try source("Ohana/Features/HumanNotes/HumanNoteAttachmentStore.swift", rootURL: rootURL)
+        let revisionSource = try source("Ohana/Features/RevisionPublishing/DomainRevisionPublishing+HumanPublishing.swift", rootURL: rootURL)
+
+        #expect(commandSource.contains("let didPersist: Bool"))
+        #expect(commandSource.contains("let persistenceErrorDescription: String?"))
+        #expect(!commandSource.contains("context.safeSave()"))
+        #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(commandSource.contains("HumanNoteAttachmentStore.deletePendingAttachments(attachments)"))
+        #expect(commandSource.contains("context.rollback()"))
+        #expect(commandSource.contains("guard result.didPersist else { return result }"))
+        #expect(commandSource.contains("if result.didPersist"))
+        #expect(attachmentSource.contains("static func deletePendingAttachments(_ references: [HumanNoteAttachmentReference])"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didDelete"))
+    }
+
     @MainActor
     @Test func memberDeletionServiceDeletesPetRelatedEventsAndQuickActions() throws {
         let container = try makeInMemoryContainer()
@@ -5360,6 +5379,8 @@ struct HomeCommandExecutorTests {
         ))
         mutation = try #require(revisionCenter.lastMutation)
         #expect(note.subjectID == human.id)
+        #expect(note.didPersist)
+        #expect(note.persistenceErrorDescription == nil)
         #expect(mutation.command == .humanNote(humanID: human.id))
         #expect(mutation.affectedEntityIDs == [human.id])
         #expect(mutation.note == "test.human.note")
@@ -5368,6 +5389,8 @@ struct HomeCommandExecutorTests {
         let deletedNote = executor.deleteNote(human: human, rawString: rawNote)
         mutation = try #require(revisionCenter.lastMutation)
         #expect(deletedNote.didDelete == true)
+        #expect(deletedNote.didPersist)
+        #expect(deletedNote.persistenceErrorDescription == nil)
         #expect(mutation.command == .humanNote(humanID: human.id))
         #expect(mutation.note == "human.note.delete")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 5)
@@ -6360,6 +6383,8 @@ struct HomeCommandExecutorTests {
         #expect(result.attachmentCount == 1)
         #expect(result.eventID == events.first?.id)
         #expect(result.reminderID == reminders.first?.id)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(human.notes.contains("[2026-06-08] remember meds"))
         #expect(human.notes.contains("Files: lab.pdf"))
         #expect(parsed.attachments.count == 1)
@@ -6392,6 +6417,8 @@ struct HomeCommandExecutorTests {
 
         #expect(result.subjectID == human.id)
         #expect(result.didDelete == true)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(human.notes == "[2026-06-09] second")
     }
 

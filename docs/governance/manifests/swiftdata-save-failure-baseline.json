@@ -116,10 +116,6 @@
     "Ohana/Features/Health/PetHeatCycleCommands.swift": [
       "context.safeSave()"
     ],
-    "Ohana/Features/HumanNotes/HumanNoteCommands.swift": [
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Features/Hygiene/PetHygieneCommands.swift": [
       "context.safeSave()",
       "context.safeSave()"

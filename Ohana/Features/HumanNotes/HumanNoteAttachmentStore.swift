@@ -87,6 +87,13 @@ enum HumanNoteAttachmentStore {
         url(forRelativePath: reference.relativePath)
     }
 
+    static func deletePendingAttachments(_ references: [HumanNoteAttachmentReference]) {
+        for reference in references {
+            guard let url = url(for: reference) else { continue }
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
     private static func url(forRelativePath relativePath: String) -> URL? {
         guard let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             return nil
