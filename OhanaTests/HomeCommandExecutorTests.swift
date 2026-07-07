@@ -7248,7 +7248,7 @@ struct HomeCommandExecutorTests {
 
         let executor = CalendarCommandExecutor(context: context, revisionCenter: revisionCenter)
         let beforeRevision = revisionCenter.homeRevision.value
-        let created = try #require(executor.createEvent(input: input))
+        let created = try #require(try executor.createEvent(input: input))
         let createMutation = try #require(revisionCenter.lastMutation)
         let event = try #require(try context.fetch(FetchDescriptor<Event>()).first)
 
@@ -10599,7 +10599,7 @@ struct HomeCommandExecutorTests {
 
         let beforeRevision = revisionCenter.homeRevision.value
         let executor = QuickFeedCommandExecutor(context: context, revisionCenter: revisionCenter)
-        let result = executor.saveStock(
+        let result = try executor.saveStock(
             pet: pet,
             brand: "Royal Canin",
             totalGrams: 1200,

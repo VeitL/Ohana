@@ -2742,7 +2742,7 @@ struct OhanaTests {
         let petKey = pet.id.uuidString
         defer { clearCareCalendarDefaults(petKey: petKey, kinds: ["drink"]) }
 
-        let reminders = WaterPlanWriter.replacePlan(
+        let reminders = try WaterPlanWriter.replacePlan(
             pet: pet,
             times: WaterPlanWriter.suggestedTimes(count: 3, now: now, calendar: calendar),
             allEvents: [defaultDrink],
@@ -2767,7 +2767,7 @@ struct OhanaTests {
         context.insert(pet)
         try context.save()
 
-        _ = WaterPlanWriter.replacePlan(
+        _ = try WaterPlanWriter.replacePlan(
             pet: pet,
             times: WaterPlanWriter.suggestedTimes(count: 2, now: now),
             allEvents: [],
@@ -2777,7 +2777,7 @@ struct OhanaTests {
         var events = try context.fetch(FetchDescriptor<Event>())
         #expect(events.contains { $0.relatedEntityType == WaterPlanWriter.entityType })
 
-        WaterPlanWriter.deletePlan(pet: pet, allEvents: events, context: context)
+        try WaterPlanWriter.deletePlan(pet: pet, allEvents: events, context: context)
         events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(!events.contains { $0.relatedEntityType == WaterPlanWriter.entityType })
@@ -2795,7 +2795,7 @@ struct OhanaTests {
         context.insert(pet)
         try context.save()
 
-        _ = WaterPlanWriter.replacePlan(
+        _ = try WaterPlanWriter.replacePlan(
             pet: pet,
             times: WaterPlanWriter.suggestedTimes(count: 2, now: now, calendar: calendar),
             allEvents: [],
@@ -2809,7 +2809,7 @@ struct OhanaTests {
         #expect(reminders.contains { $0.scheduledAt > now && $0.isPending })
 
         WaterOperatingMode.set(pet.id, mode: .manual)
-        WaterPlanWriter.deactivateReminderOperations(pet: pet, allEvents: events, context: context, now: now)
+        try WaterPlanWriter.deactivateReminderOperations(pet: pet, allEvents: events, context: context, now: now)
         events = try context.fetch(FetchDescriptor<Event>())
         reminders = try context.fetch(FetchDescriptor<Reminder>())
         let planEvent = try #require(WaterPlanWriter.planEvents(pet: pet, allEvents: events).first)
@@ -3231,7 +3231,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(
+        _ = try FeedingPlanWriter.replacePlan(
             pet: pet,
             draft: draft,
             allEvents: events,
@@ -3282,7 +3282,7 @@ struct OhanaTests {
         pet.dailyPortionGrams = 100
         context.insert(pet)
 
-        let record = FeedingPlanWriter.saveFoodPurchase(
+        let record = try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Manual Stock",
             totalGrams: 1000,
@@ -3337,7 +3337,7 @@ struct OhanaTests {
         autoEvent.feedAmountGrams = 50
         context.insert(autoEvent)
 
-        let record = FeedingPlanWriter.saveFoodPurchase(
+        let record = try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Auto Stock",
             totalGrams: 1000,
@@ -3480,7 +3480,7 @@ struct OhanaTests {
         let pet = Pet(name: "Momo", species: "猫")
         context.insert(pet)
 
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Wet Test",
             totalGrams: 600,
@@ -3539,7 +3539,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
         var events = try context.fetch(FetchDescriptor<Event>())
         #expect(events.count(where: { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }) == 1)
 
@@ -3552,7 +3552,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: events, context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: events, context: context, now: now, calendar: calendar)
         events = try context.fetch(FetchDescriptor<Event>())
         #expect(events.count(where: { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }) == 1)
         #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }) == 2)
@@ -3571,7 +3571,7 @@ struct OhanaTests {
         FeedOperatingMode.set(pet.id, mode: .manual)
         #expect(!CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(manualEvent, occurrenceDate: now, allEvents: events, pets: [pet], now: now, calendar: calendar))
         #expect(!CarePlanCalendarSync.shouldShowModeScopedPlanOccurrence(autoEvent, occurrenceDate: now, allEvents: events, pets: [pet], now: now, calendar: calendar))
-        #expect(FeedMaintenanceCommand.ensureUpcomingPlanReminders(pet: pet, allEvents: events, context: context, now: now, calendar: calendar).isEmpty)
+        #expect(try FeedMaintenanceCommand.ensureUpcomingPlanReminders(pet: pet, allEvents: events, context: context, now: now, calendar: calendar).isEmpty)
         events = try context.fetch(FetchDescriptor<Event>())
         let remainingFeedReminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(!remainingFeedReminders.contains { $0.scheduledAt > now && $0.isPending })
@@ -3584,7 +3584,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoAgainDraft, allEvents: events, context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: autoAgainDraft, allEvents: events, context: context, now: now, calendar: calendar)
         events = try context.fetch(FetchDescriptor<Event>())
         #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }) == 2)
         #expect(events.count(where: { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }) == 1)
@@ -3608,7 +3608,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
         let events = try context.fetch(FetchDescriptor<Event>())
         let autoEvent = try #require(events.first { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) })
 
@@ -3639,7 +3639,7 @@ struct OhanaTests {
             now: setupNow,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: [], context: context, now: setupNow, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: [], context: context, now: setupNow, calendar: calendar)
         let events = try context.fetch(FetchDescriptor<Event>())
         let manualEvent = try #require(events.first { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) })
 
@@ -3674,7 +3674,7 @@ struct OhanaTests {
             now: setupNow,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: [], context: context, now: setupNow, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: [], context: context, now: setupNow, calendar: calendar)
         let events = try context.fetch(FetchDescriptor<Event>())
 
         FeedOperatingMode.set(pet.id, mode: .manualReminder)
@@ -3753,7 +3753,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
         var events = try context.fetch(FetchDescriptor<Event>())
 
         let manualDraft = FeedPlanDraft(
@@ -3765,7 +3765,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: events, context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: events, context: context, now: now, calendar: calendar)
         events = try context.fetch(FetchDescriptor<Event>())
 
         FeedOperatingMode.set(pet.id, mode: .manualReminder)
@@ -3799,11 +3799,11 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
         var events = try context.fetch(FetchDescriptor<Event>())
         FeedOperatingMode.set(pet.id, mode: .autoFeeder)
 
-        SwitchFeedModeCommand.switchToManual(pet: pet, allEvents: events, context: context)
+        try SwitchFeedModeCommand.switchToManual(pet: pet, allEvents: events, context: context)
 
         events = try context.fetch(FetchDescriptor<Event>())
         #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.isEmpty)
@@ -3828,7 +3828,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
         var events = try context.fetch(FetchDescriptor<Event>())
 
         let manualDraft = FeedPlanDraft(
@@ -3839,11 +3839,11 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: events, context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: events, context: context, now: now, calendar: calendar)
         events = try context.fetch(FetchDescriptor<Event>())
         FeedOperatingMode.set(pet.id, mode: .autoFeeder)
 
-        let result = SwitchFeedModeCommand.activateExistingRule(pet: pet, kind: .manualReminder, allEvents: events, context: context)
+        let result = try SwitchFeedModeCommand.activateExistingRule(pet: pet, kind: .manualReminder, allEvents: events, context: context)
 
         events = try context.fetch(FetchDescriptor<Event>())
         if case .missingPlan = result {
@@ -3872,7 +3872,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = SaveFeedPlanCommand.run(pet: pet, targets: [], kind: .autoFeeder, draft: autoDraft, allEvents: [], context: context)
+        _ = try SaveFeedPlanCommand.run(pet: pet, targets: [], kind: .autoFeeder, draft: autoDraft, allEvents: [], context: context)
         var events = try context.fetch(FetchDescriptor<Event>())
         #expect(events.count(where: { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }) == 1)
         #expect(FeedOperatingMode.resolved(pet: pet, allEvents: events, now: now, calendar: calendar) == .autoFeeder)
@@ -3885,7 +3885,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = SaveFeedPlanCommand.run(pet: pet, targets: [], kind: .manualReminder, draft: manualDraft, allEvents: events, context: context)
+        _ = try SaveFeedPlanCommand.run(pet: pet, targets: [], kind: .manualReminder, draft: manualDraft, allEvents: events, context: context)
 
         events = try context.fetch(FetchDescriptor<Event>())
         #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.isEmpty)
@@ -3911,7 +3911,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: [], context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: [], context: context, now: now, calendar: calendar)
         var events = try context.fetch(FetchDescriptor<Event>())
         #expect(FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar).operatingMode == .manualReminder)
 
@@ -3923,11 +3923,11 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: events, context: context, now: now, calendar: calendar)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: events, context: context, now: now, calendar: calendar)
         events = try context.fetch(FetchDescriptor<Event>())
         #expect(FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar).operatingMode == .autoFeeder)
 
-        FeedingPlanWriter.clearFeedModePlans(pet: pet, allEvents: events, context: context)
+        try FeedingPlanWriter.clearFeedModePlans(pet: pet, allEvents: events, context: context)
         events = try context.fetch(FetchDescriptor<Event>())
         #expect(FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar).operatingMode == .manual)
         #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.isEmpty)
@@ -3969,7 +3969,7 @@ struct OhanaTests {
             calendar: calendar
         )
 
-        let result = FeedingPlanWriter.replacePlan(
+        let result = try FeedingPlanWriter.replacePlan(
             pet: pet,
             draft: draft,
             allEvents: [],
@@ -4233,7 +4233,7 @@ struct OhanaTests {
             calendar: calendar
         )
 
-        let result = FeedingPlanWriter.replacePlan(
+        let result = try FeedingPlanWriter.replacePlan(
             pet: pet,
             draft: draft,
             allEvents: [],
@@ -4260,7 +4260,7 @@ struct OhanaTests {
         context.insert(pet)
         try context.save()
 
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Test Food",
             totalGrams: 1000,
@@ -4297,7 +4297,7 @@ struct OhanaTests {
         let pet = Pet(name: "Momo", species: "猫")
         context.insert(pet)
 
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Dry Test",
             totalGrams: 1000,
@@ -4311,7 +4311,7 @@ struct OhanaTests {
             context: context,
             now: now
         )
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Wet Test",
             totalGrams: 600,
@@ -4351,7 +4351,7 @@ struct OhanaTests {
         let pet = Pet(name: "Momo", species: "猫")
         context.insert(pet)
 
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Dry Test",
             totalGrams: 1000,
@@ -4390,7 +4390,7 @@ struct OhanaTests {
         let pet = Pet(name: "Momo", species: "猫")
         context.insert(pet)
 
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Current",
             totalGrams: 1000,
@@ -4406,7 +4406,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Future",
             totalGrams: 2000,
@@ -4432,7 +4432,7 @@ struct OhanaTests {
 
         let futureOnlyPet = Pet(name: "Luna", species: "猫")
         context.insert(futureOnlyPet)
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: futureOnlyPet,
             brand: "Future Only",
             totalGrams: 1500,
@@ -4463,7 +4463,7 @@ struct OhanaTests {
         let pet = Pet(name: "Momo", species: "猫")
         context.insert(pet)
 
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Dry Test",
             totalGrams: 1000,
@@ -4482,7 +4482,7 @@ struct OhanaTests {
         let record = try #require(try context.fetch(FetchDescriptor<PetFoodRecord>()).first)
         CareEventService.recordManualFeed(pet: pet, amountGrams: 100, context: context, date: dateForTest(year: 2026, month: 5, day: 2, hour: 8), foodKind: .dry)
         CareEventService.recordManualFeed(pet: pet, amountGrams: 200, context: context, date: dateForTest(year: 2026, month: 5, day: 3, hour: 8), foodKind: .dry)
-        FeedingPlanWriter.correctFoodStock(record: record, remainingGrams: 700, allEvents: [], context: context, now: correctionTime)
+        try FeedingPlanWriter.correctFoodStock(record: record, remainingGrams: 700, allEvents: [], context: context, now: correctionTime)
         CareEventService.recordManualFeed(pet: pet, amountGrams: 50, context: context, date: dateForTest(year: 2026, month: 5, day: 3, hour: 18), foodKind: .dry)
         let logs = try context.fetch(FetchDescriptor<PetCareLog>())
 
@@ -4504,7 +4504,7 @@ struct OhanaTests {
         let pet = Pet(name: "Momo", species: "猫")
         context.insert(pet)
 
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Old",
             totalGrams: 1000,
@@ -4520,7 +4520,7 @@ struct OhanaTests {
             now: now,
             calendar: calendar
         )
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Current",
             totalGrams: 800,
@@ -4556,7 +4556,7 @@ struct OhanaTests {
         context.insert(momo)
         context.insert(luna)
 
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: momo,
             brand: "Momo Dry",
             totalGrams: 1000,
@@ -4570,7 +4570,7 @@ struct OhanaTests {
             context: context,
             now: now
         )
-        FeedingPlanWriter.saveFoodPurchase(
+        try FeedingPlanWriter.saveFoodPurchase(
             pet: luna,
             brand: "Luna Dry",
             totalGrams: 1000,

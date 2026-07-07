@@ -173,6 +173,32 @@ struct OhanaNotificationsSchedulingTests {
         #expect(NotificationPendingBudget.skippedBudgetMetadataJSON(existingPendingCount: 55).contains("\"reason\":\"iosPendingLimit\""))
     }
 
+    @Test func medicationNotificationBudgetUsesSamePendingRequestCapacity() {
+        var existingIds = Set((0 ..< NotificationPendingBudget.managedPendingRequestLimit - 1).map { "existing-\($0)" })
+
+        let first = MedicationNotificationBudget.reserve(
+            notificationId: "medication-dose-1",
+            existingNotificationIds: &existingIds
+        )
+        let duplicate = MedicationNotificationBudget.reserve(
+            notificationId: "medication-dose-1",
+            existingNotificationIds: &existingIds
+        )
+        let overflow = MedicationNotificationBudget.reserve(
+            notificationId: "medication-dose-2",
+            existingNotificationIds: &existingIds
+        )
+
+        #expect(first == .scheduled)
+        #expect(duplicate == .skippedDuplicate)
+        guard case let .skippedBudget(metadata) = overflow else {
+            Issue.record("Expected medication notification budget to stop at the shared managed pending limit")
+            return
+        }
+        #expect(metadata.contains("\"managedPendingLimit\":55"))
+        #expect(existingIds.count == NotificationPendingBudget.managedPendingRequestLimit)
+    }
+
     @Test func scheduleBatchRecordsBudgetSkipWhenPendingNotificationsAreFull() async throws {
         let existingIds = Set((0 ..< NotificationPendingBudget.managedPendingRequestLimit).map { "existing-\($0)" })
         let container = try makeContainer()

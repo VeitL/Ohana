@@ -428,7 +428,7 @@ struct ManualFeedCommandTests {
         context.insert(pet)
         try context.save()
 
-        let result = SaveFoodStockCommand.run(
+        let result = try SaveFoodStockCommand.run(
             pet: pet,
             brand: "Test",
             totalGrams: 1200,
@@ -488,7 +488,7 @@ struct ManualFeedCommandTests {
         context.insert(payer)
         try context.save()
 
-        let created = SaveFoodStockCommand.run(
+        let created = try SaveFoodStockCommand.run(
             pet: pet,
             brand: "Test",
             totalGrams: 1200,
@@ -512,7 +512,7 @@ struct ManualFeedCommandTests {
         let createdRecord = try #require(created.record)
         let expenseId = try #require(createdRecord.expenseId)
 
-        _ = SaveFoodStockCommand.run(
+        _ = try SaveFoodStockCommand.run(
             pet: pet,
             brand: "Test Plus",
             totalGrams: 1500,
@@ -564,7 +564,7 @@ struct ManualFeedCommandTests {
         context.insert(deceasedPayer)
         try context.save()
 
-        _ = SaveFoodStockCommand.run(
+        _ = try SaveFoodStockCommand.run(
             pet: pet,
             brand: "Test",
             totalGrams: 1200,
@@ -605,7 +605,7 @@ struct ManualFeedCommandTests {
         context.insert(pet)
         try context.save()
 
-        let result = SaveFoodStockCommand.run(
+        let result = try SaveFoodStockCommand.run(
             pet: pet,
             brand: "Test",
             totalGrams: 1200,
@@ -663,14 +663,14 @@ struct ManualFeedCommandTests {
             meals: [FeedPlanMealDraft(time: date(year: 2026, month: 5, day: 1, hour: 8), foodKind: .dry, grams: 45)],
             now: now
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: [], context: context, now: now)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: [], context: context, now: now)
         var events = try context.fetch(FetchDescriptor<Event>())
         let autoDraft = FeedPlanDraft(
             kind: .autoFeeder,
             meals: [FeedPlanMealDraft(time: date(year: 2026, month: 5, day: 1, hour: 18), foodKind: .wet, grams: 30)],
             now: now
         )
-        _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: events, context: context, now: now)
+        _ = try FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: events, context: context, now: now)
         events = try context.fetch(FetchDescriptor<Event>())
         FeedOperatingMode.set(pet.id, mode: .autoFeeder)
         pet.passedAwayDate = date(year: 2026, month: 5, day: 2)
@@ -679,37 +679,37 @@ struct ManualFeedCommandTests {
         let beforeEventIds = Set(events.map(\.id))
         let beforeReminderIds = Set((try context.fetch(FetchDescriptor<Reminder>())).map(\.id))
 
-        let stockSettings = StockReminderSettingsCommand.run(
+        let stockSettings = try StockReminderSettingsCommand.run(
             pet: pet,
             enabled: true,
             advanceDays: 1,
             allEvents: events,
             context: context
         )
-        let correction = CorrectStockCommand.run(
+        let correction = try CorrectStockCommand.run(
             pet: pet,
             record: record,
             remainingGrams: 100,
             allEvents: events,
             context: context
         )
-        let deletion = DeleteFeedPlanCommand.run(
+        let deletion = try DeleteFeedPlanCommand.run(
             pet: pet,
             kind: .autoFeeder,
             activeMode: .autoFeeder,
             allEvents: events,
             context: context
         )
-        SetMainFoodKindCommand.run(pet: pet, foodKind: .wet, context: context)
+        try SetMainFoodKindCommand.run(pet: pet, foodKind: .wet, context: context)
         let directModeChanged = SetFeedModeCommand.run(.manual, pet: pet)
-        let ensuredReminders = FeedMaintenanceCommand.ensureUpcomingPlanReminders(
+        let ensuredReminders = try FeedMaintenanceCommand.ensureUpcomingPlanReminders(
             pet: pet,
             allEvents: events,
             context: context,
             now: now
         )
-        SwitchFeedModeCommand.switchToManual(pet: pet, allEvents: events, context: context)
-        let switchResult = SwitchFeedModeCommand.activateExistingRule(
+        try SwitchFeedModeCommand.switchToManual(pet: pet, allEvents: events, context: context)
+        let switchResult = try SwitchFeedModeCommand.activateExistingRule(
             pet: pet,
             kind: .manualReminder,
             allEvents: events,
@@ -973,7 +973,7 @@ struct ManualFeedCommandTests {
             ],
             now: now
         )
-        let result = SaveFeedPlanCommand.run(
+        let result = try SaveFeedPlanCommand.run(
             pet: petA,
             targets: [petB, petC],
             kind: .manualReminder,
@@ -1026,7 +1026,7 @@ struct ManualFeedCommandTests {
         )
 
         let staleRouteEvents: [Event] = []
-        let result = SaveFeedPlanCommand.run(
+        let result = try SaveFeedPlanCommand.run(
             pet: pet,
             targets: [pet],
             kind: .manualReminder,
@@ -1072,7 +1072,7 @@ struct ManualFeedCommandTests {
         context.insert(autoEvent)
         try context.save()
 
-        let result = SwitchFeedModeCommand.activateExistingRule(
+        let result = try SwitchFeedModeCommand.activateExistingRule(
             pet: pet,
             kind: .autoFeeder,
             allEvents: [manualEvent, autoEvent],

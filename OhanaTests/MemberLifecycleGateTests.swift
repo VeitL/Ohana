@@ -328,14 +328,14 @@ struct MemberLifecycleGateTests {
             times: [now],
             now: now
         )
-        let result = FeedingPlanWriter.replacePlan(
+        let result = try FeedingPlanWriter.replacePlan(
             pet: pet,
             draft: draft,
             allEvents: [],
             context: context,
             now: now
         )
-        _ = FeedingPlanWriter.saveFoodPurchase(
+        _ = try FeedingPlanWriter.saveFoodPurchase(
             pet: pet,
             brand: "Test",
             totalGrams: 1000,
@@ -365,7 +365,7 @@ struct MemberLifecycleGateTests {
         try context.save()
 
         let now = Date(timeIntervalSince1970: 1_800_001_300)
-        _ = WaterPlanWriter.replacePlan(
+        _ = try WaterPlanWriter.replacePlan(
             pet: pet,
             times: [now],
             allEvents: [],
@@ -432,7 +432,7 @@ struct MemberLifecycleGateTests {
             replaceIntervalDays: 25,
             reminderOn: true
         )
-        let plan = executor.saveWaterPlan(pet: pet, targets: [pet], times: [now], count: 1, allEvents: [])
+        let plan = try executor.saveWaterPlan(pet: pet, targets: [pet], times: [now], count: 1, allEvents: [])
         executor.setWaterMode(.reminder, pet: pet)
 
         let snapshot = WaterCareSettingsStore.snapshot(petKey: pet.id.uuidString, now: now)

@@ -73,6 +73,77 @@ nonisolated enum MedicationNotificationPrivacyStore {
     }
 }
 
+nonisolated enum MedicationNotificationBudget {
+    @discardableResult
+    static func reserve(
+        notificationId: String,
+        existingNotificationIds: inout Set<String>
+    ) -> ReminderNotificationScheduleResult {
+        guard !existingNotificationIds.contains(notificationId) else {
+            return .skippedDuplicate
+        }
+        guard NotificationPendingBudget.hasCapacity(existingPendingCount: existingNotificationIds.count) else {
+            return .skippedBudget(
+                NotificationPendingBudget.skippedBudgetMetadataJSON(existingPendingCount: existingNotificationIds.count)
+            )
+        }
+        existingNotificationIds.insert(notificationId)
+        return .scheduled
+    }
+
+    static func metadataJSON(
+        for result: ReminderNotificationScheduleResult,
+        notificationId: String,
+        scheduledAt: Date
+    ) -> String {
+        let base = "\"notificationId\":\"\(notificationId)\",\"scheduledAt\":\(scheduledAt.timeIntervalSince1970)"
+        switch result {
+        case .scheduled:
+            return "{\(base)}"
+        case .skippedDuplicate:
+            return "{\(base),\"reason\":\"duplicate\"}"
+        case let .skippedBudget(metadata):
+            return "{\(base),\"reason\":\"budget\",\"budget\":\(metadata)}"
+        case .skippedPastDue:
+            return "{\(base),\"reason\":\"pastDue\"}"
+        case .missingEvent:
+            return "{\(base),\"reason\":\"missingEvent\"}"
+        case let .failed(message):
+            return "{\(base),\"error\":\"\(message.replacingOccurrences(of: "\"", with: "\\\""))\"}"
+        case let .deferred(metadata),
+             let .skippedMerged(metadata),
+             let .skippedUserDisabled(metadata):
+            return "{\(base),\"policy\":\(metadata)}"
+        }
+    }
+
+    static func skippedActionType(
+        for result: ReminderNotificationScheduleResult,
+        scheduledActionType: String
+    ) -> String {
+        switch result {
+        case .skippedDuplicate:
+            scheduledActionType.replacingOccurrences(of: "Success", with: "Duplicate")
+        case .skippedBudget:
+            scheduledActionType.replacingOccurrences(of: "Success", with: "SkippedBudget")
+        case .skippedPastDue:
+            scheduledActionType.replacingOccurrences(of: "Success", with: "SkippedPastDue")
+        case .missingEvent:
+            scheduledActionType.replacingOccurrences(of: "Success", with: "MissingEvent")
+        case .failed:
+            scheduledActionType.replacingOccurrences(of: "Success", with: "Failed")
+        case .deferred:
+            scheduledActionType.replacingOccurrences(of: "Success", with: "Deferred")
+        case .skippedMerged:
+            scheduledActionType.replacingOccurrences(of: "Success", with: "Merged")
+        case .skippedUserDisabled:
+            scheduledActionType.replacingOccurrences(of: "Success", with: "UserDisabled")
+        case .scheduled:
+            scheduledActionType
+        }
+    }
+}
+
 // MARK: - 频次 → 每日次数
 
 extension PetMedicationFrequency {
@@ -138,10 +209,17 @@ final class MedicationReminderService {
                 .map(\.identifier)
                 .filter { $0.hasPrefix(prefix) }
             self.center.removePendingNotificationRequests(withIdentifiers: ids)
+            var knownNotificationIds = Set(requests.map(\.identifier)).subtracting(ids)
 
             // 重新调度
             for med in meds {
-                self.scheduleRemindersForMedication(med, pet: pet, write: write, context: context)
+                self.scheduleRemindersForMedication(
+                    med,
+                    pet: pet,
+                    write: write,
+                    context: context,
+                    knownNotificationIds: &knownNotificationIds
+                )
             }
         }
     }
@@ -152,7 +230,8 @@ final class MedicationReminderService {
         _ med: PetMedication,
         pet: Pet,
         write: AuthorizedDomainEffectWrite?,
-        context: ModelContext?
+        context: ModelContext?,
+        knownNotificationIds: inout Set<String>
     ) {
         let dosesPerDay = med.frequency.dosesPerDay
         guard dosesPerDay > 0 else { return } // asNeeded / custom 不推送
@@ -213,8 +292,31 @@ final class MedicationReminderService {
                 let petId = pet.id.uuidString
                 let medicationId = med.id.uuidString
                 let medicationName = med.name
-                let metadata = "{\"notificationId\":\"\(identifier)\",\"scheduledAt\":\(fireDate.timeIntervalSince1970)}"
+                let reservation = MedicationNotificationBudget.reserve(
+                    notificationId: identifier,
+                    existingNotificationIds: &knownNotificationIds
+                )
                 let contextBox = MedicationReminderContextBox(context)
+                guard reservation == .scheduled else {
+                    recordMedicationScheduleResult(
+                        contextBox: contextBox,
+                        write: write,
+                        subjectKind: .pet,
+                        subjectId: petId,
+                        medicationId: medicationId,
+                        medicationName: medicationName,
+                        actionType: MedicationNotificationBudget.skippedActionType(
+                            for: reservation,
+                            scheduledActionType: "medicationScheduleSuccess"
+                        ),
+                        metadataJSON: MedicationNotificationBudget.metadataJSON(
+                            for: reservation,
+                            notificationId: identifier,
+                            scheduledAt: fireDate
+                        )
+                    )
+                    continue
+                }
                 center.add(request) { error in
                     self.recordMedicationScheduleResult(
                         contextBox: contextBox,
@@ -224,7 +326,11 @@ final class MedicationReminderService {
                         medicationId: medicationId,
                         medicationName: medicationName,
                         actionType: error == nil ? "medicationScheduleSuccess" : "medicationScheduleFailed",
-                        metadataJSON: error.map { "{\"notificationId\":\"\(identifier)\",\"error\":\"\($0.localizedDescription.replacingOccurrences(of: "\"", with: "\\\""))\"}" } ?? metadata
+                        metadataJSON: error.map { "{\"notificationId\":\"\(identifier)\",\"error\":\"\($0.localizedDescription.replacingOccurrences(of: "\"", with: "\\\""))\"}" } ?? MedicationNotificationBudget.metadataJSON(
+                            for: .scheduled,
+                            notificationId: identifier,
+                            scheduledAt: fireDate
+                        )
                     )
                 }
                 scheduled += 1
@@ -233,7 +339,13 @@ final class MedicationReminderService {
         }
 
         // 疗程结束前3天提醒
-        scheduleEndReminder(for: med, pet: pet, write: write, context: context)
+        scheduleEndReminder(
+            for: med,
+            pet: pet,
+            write: write,
+            context: context,
+            knownNotificationIds: &knownNotificationIds
+        )
     }
 
     // MARK: - 疗程结束前3天提醒
@@ -242,7 +354,8 @@ final class MedicationReminderService {
         for med: PetMedication,
         pet: Pet,
         write: AuthorizedDomainEffectWrite?,
-        context: ModelContext?
+        context: ModelContext?,
+        knownNotificationIds: inout Set<String>
     ) {
         guard let endDate = med.endDate else { return }
         guard let alertDate = Calendar.current.date(byAdding: .day, value: -3, to: endDate) else { return }
@@ -276,6 +389,30 @@ final class MedicationReminderService {
         let medicationId = med.id.uuidString
         let medicationName = med.name
         let contextBox = MedicationReminderContextBox(context)
+        let reservation = MedicationNotificationBudget.reserve(
+            notificationId: identifier,
+            existingNotificationIds: &knownNotificationIds
+        )
+        guard reservation == .scheduled else {
+            recordMedicationScheduleResult(
+                contextBox: contextBox,
+                write: write,
+                subjectKind: .pet,
+                subjectId: petId,
+                medicationId: medicationId,
+                medicationName: medicationName,
+                actionType: MedicationNotificationBudget.skippedActionType(
+                    for: reservation,
+                    scheduledActionType: "medicationEndScheduleSuccess"
+                ),
+                metadataJSON: MedicationNotificationBudget.metadataJSON(
+                    for: reservation,
+                    notificationId: identifier,
+                    scheduledAt: alertDate
+                )
+            )
+            return
+        }
         center.add(request) { error in
             self.recordMedicationScheduleResult(
                 contextBox: contextBox,
@@ -327,9 +464,16 @@ final class MedicationReminderService {
                 .map(\.identifier)
                 .filter { $0.hasPrefix(prefix) }
             self.center.removePendingNotificationRequests(withIdentifiers: ids)
+            var knownNotificationIds = Set(requests.map(\.identifier)).subtracting(ids)
 
             for med in meds {
-                self.scheduleRemindersForHumanMedication(med, human: human, write: write, context: context)
+                self.scheduleRemindersForHumanMedication(
+                    med,
+                    human: human,
+                    write: write,
+                    context: context,
+                    knownNotificationIds: &knownNotificationIds
+                )
             }
         }
     }
@@ -338,7 +482,8 @@ final class MedicationReminderService {
         _ med: HumanMedication,
         human: Human,
         write: AuthorizedDomainEffectWrite?,
-        context: ModelContext?
+        context: ModelContext?,
+        knownNotificationIds: inout Set<String>
     ) {
         let now = Date()
         let doses = HumanMedicationSchedulePlan.futureDoses(for: med, from: now, days: 14)
@@ -380,6 +525,30 @@ final class MedicationReminderService {
                 ? l.tr(zh: "隐私用药", en: "Private medication", de: "Privates Medikament")
                 : med.name
             let contextBox = MedicationReminderContextBox(context)
+            let reservation = MedicationNotificationBudget.reserve(
+                notificationId: identifier,
+                existingNotificationIds: &knownNotificationIds
+            )
+            guard reservation == .scheduled else {
+                recordMedicationScheduleResult(
+                    contextBox: contextBox,
+                    write: write,
+                    subjectKind: .human,
+                    subjectId: humanId,
+                    medicationId: medicationId,
+                    medicationName: medicationName,
+                    actionType: MedicationNotificationBudget.skippedActionType(
+                        for: reservation,
+                        scheduledActionType: "medicationScheduleSuccess"
+                    ),
+                    metadataJSON: MedicationNotificationBudget.metadataJSON(
+                        for: reservation,
+                        notificationId: identifier,
+                        scheduledAt: fireDate
+                    )
+                )
+                continue
+            }
             center.add(request) { error in
                 self.recordMedicationScheduleResult(
                     contextBox: contextBox,
