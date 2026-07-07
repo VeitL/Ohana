@@ -161,8 +161,9 @@ enum PlantCareCommandService {
             save: false
         )
         if saveChanges {
-            let saveResult = context.safeSaveResult()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
             guard saveResult.didSave else {
+                context.rollback()
                 return PlantCareCommandResult(
                     plantID: plant.id,
                     logID: log.id,

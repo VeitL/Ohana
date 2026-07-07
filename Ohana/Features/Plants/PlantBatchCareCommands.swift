@@ -298,7 +298,7 @@ enum PlantBatchCareCommandService {
             }
         }
         if !items.isEmpty {
-            let saveResult = context.safeSaveResult()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
             guard saveResult.didSave else {
                 context.rollback()
                 return PlantBatchCareCommandResult(
@@ -414,7 +414,7 @@ enum PlantBatchCareCommandService {
 
         let didChange = !removedLogIDs.isEmpty || !removedEventIDs.isEmpty || !removedLedgerEventIDs.isEmpty || !restoredPlantIDs.isEmpty
         if didChange {
-            let saveResult = context.safeSaveResult()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
             guard saveResult.didSave else {
                 context.rollback()
                 return PlantBatchCareUndoResult(
@@ -496,7 +496,7 @@ enum PlantBatchCareCommandService {
         }
 
         if !ledgerEventIDs.isEmpty {
-            let saveResult = context.safeSaveResult()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
             guard saveResult.didSave else {
                 context.rollback()
                 return PlantBatchCareRewardCommitResult(

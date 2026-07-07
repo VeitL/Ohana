@@ -49,7 +49,7 @@ enum PlantLifecycleService {
             defaults: defaults
         )
         CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: archivedAt)
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             context.rollback()
             return PlantLifecycleTransitionResult(
@@ -111,7 +111,7 @@ enum PlantLifecycleService {
             defaults: defaults,
             saveChanges: false
         )
-        let saveResult = context.safeSaveResult()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             context.rollback()
             return PlantLifecycleTransitionResult(
