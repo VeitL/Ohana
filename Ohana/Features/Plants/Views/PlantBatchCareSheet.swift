@@ -515,7 +515,7 @@ private struct PlantBatchCareActionRevealRow<Content: View>: View {
         case vertical
     }
 
-    private let revealWidth: CGFloat = 156
+    private let revealWidth: CGFloat = 198
     private let triggerDistance: CGFloat = 62
 
     var body: some View {
@@ -576,12 +576,12 @@ private struct PlantBatchCareActionRevealRow<Content: View>: View {
                     .accessibilityHidden(true)
                 Text(title)
                     .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.78)
             }
             .foregroundStyle(Color.arkInk)
-            .frame(width: 72)
-            .frame(minHeight: 52)
+            .frame(minWidth: 82, idealWidth: 90, maxWidth: 96, minHeight: 56)
             .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             .contentShape(Rectangle())
         }

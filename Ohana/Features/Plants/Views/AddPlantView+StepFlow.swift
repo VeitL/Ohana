@@ -181,7 +181,7 @@ extension AddPlantView {
                     Label(l.tr(zh: "上一步", en: "Back", de: "Zurück"), systemImage: "chevron.left")
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
-                        .frame(width: 104, height: 54)
+                        .frame(minWidth: 96, idealWidth: 112, maxWidth: 154, minHeight: 54)
                         .background(Color.ohanaControlFill.opacity(0.62), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())

@@ -39,6 +39,16 @@ struct PetBasicInfoLongLanguageLayoutTests {
         #expect(!source.contains(".frame(width: 124)"))
     }
 
+    @Test func memberCreationBottomNavigationAvoidsFixedWidthBackButton() throws {
+        let source = try source(
+            "Ohana/Features/Members/Views/MemberCardCreationContentView+Layout.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains(".frame(minWidth: 96, idealWidth: 112, maxWidth: 154, minHeight: 54)"))
+        #expect(!source.contains(".frame(width: 104, height: 54)"))
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

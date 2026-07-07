@@ -69,6 +69,16 @@ struct PlantDetailLongLanguageLayoutTests {
         #expect(!source.contains(".frame(width: 104, alignment: .leading)"))
     }
 
+    @Test func addPlantBottomNavigationAvoidsFixedWidthBackButton() throws {
+        let source = try source(
+            "Ohana/Features/Plants/Views/AddPlantView+StepFlow.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains(".frame(minWidth: 96, idealWidth: 112, maxWidth: 154, minHeight: 54)"))
+        #expect(!source.contains(".frame(width: 104, height: 54)"))
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
