@@ -14,6 +14,8 @@ extension FocusCard {
         _ plant: Plant,
         catalog: PlantCatalogEntry? = nil,
         nextTask: PlantCareTaskSnapshot? = nil,
+        dueCareCount: Int? = nil,
+        overdueCareCount: Int? = nil,
         includeAvatarData: Bool = false,
         localization l: L10n = L10n.current
     ) -> FocusCard {
@@ -28,6 +30,13 @@ extension FocusCard {
         let status = needsCare
             ? l.tr(zh: "待照护", en: "Needs care", de: "Braucht Pflege")
             : plant.healthStatus.displayName
+        let overdueCount = overdueCareCount ?? (nextTask?.isOverdue == true ? 1 : 0)
+        let dueCount = dueCareCount ?? (needsCare && overdueCount == 0 ? 1 : 0)
+        let badgeStatus = HomeCardStatusPolicy.plantSnapshot(
+            overdueCareCount: overdueCount,
+            dueCareCount: dueCount,
+            hasUrgentHealthSignal: plant.healthStatus == .stressed
+        )
         let assetName = catalog?.catalogImageAssetName ?? PlantCatalogMedia.localFoliage.assetName
         let hasAvatarAttachment = plant.hasAvatarImageAttachment
         let avatarData = includeAvatarData && hasAvatarAttachment ? plant.avatarImageData : nil
@@ -64,8 +73,9 @@ extension FocusCard {
             themeColorHex: theme,
             daysTogether: days,
             breed: catalog?.localizedCommonName ?? safeSpecies,
-            statusBadgeText: status,
-            statusBadgeIsWarning: needsCare || plant.healthStatus == .stressed,
+            statusBadgeText: badgeStatus.text,
+            statusBadgeIsWarning: badgeStatus.isWarning,
+            statusBadgeToneRaw: badgeStatus.tone.rawValue,
             isPlant: true,
             isReal: true,
             actions: [

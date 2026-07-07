@@ -333,11 +333,14 @@ extension PlantDashboardView {
     func plantListRow(_ plant: Plant) -> some View {
         let careTasks = appServices.plantCarePlans.tasks(for: plant)
         let nextTask = careTasks.first
+        let statusCounts = plantCardStatusCounts(tasks: careTasks)
         let isExpanded = expandedPlantCardID == plant.id
         let card = FocusCard.fromPlant(
             plant,
             catalog: PlantCatalog.entry(id: plant.catalogSpeciesId),
             nextTask: nextTask,
+            dueCareCount: statusCounts.due,
+            overdueCareCount: statusCounts.overdue,
             localization: l
         )
         return VStack(spacing: isExpanded ? 10 : 0) {
@@ -540,6 +543,13 @@ extension PlantDashboardView {
 
     func plantOverdueCareTypes(tasks: [PlantCareTaskSnapshot]) -> Set<PlantCareType> {
         Set(tasks.filter(\.isOverdue).map(\.careType))
+    }
+
+    func plantCardStatusCounts(tasks: [PlantCareTaskSnapshot]) -> (due: Int, overdue: Int) {
+        (
+            due: tasks.count { $0.daysUntilDue == 0 },
+            overdue: tasks.count(where: \.isOverdue)
+        )
     }
 
     func plantDockQuickAccessibilityLabel(_ action: PlantDockQuickAction, plant: Plant) -> String {

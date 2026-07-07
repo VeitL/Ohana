@@ -278,7 +278,13 @@ struct HumanAllFeaturesSheet: View {
                     HumanOwnerPrivacyHint(appLanguage: appLanguage)
                 }
 
-                FeatureHubMetricStrip(metrics: metrics)
+                FeatureHubSummaryPanel(
+                    title: l.tr(zh: "成员摘要", en: "Member Summary", de: "Mitgliederübersicht"),
+                    statusText: summaryStatusText,
+                    statusTint: summaryStatusTint,
+                    metrics: metrics
+                )
+                .accessibilityIdentifier("human-all-features-summary-panel")
 
                 ForEach(visibleSections) { section in
                     FeatureHubSectionActionView(section: section) { destination in
@@ -395,6 +401,26 @@ struct HumanAllFeaturesSheet: View {
                 value: lockedValue(.expense, visible: monthlyExpenseText)
             )
         ]
+    }
+
+    private var summaryStatusText: String {
+        if human.hasPassedAway {
+            return l.tr(zh: "纪念模式", en: "Memorial", de: "Gedenken")
+        }
+        if isViewingOwnProfile, !human.privateFields.isEmpty {
+            return l.tr(zh: "\(human.privateFields.count) 项隐私保护", en: "\(human.privateFields.count) private fields", de: "\(human.privateFields.count) private Felder")
+        }
+        return l.tr(zh: "资料可用", en: "Profile ready", de: "Profil bereit")
+    }
+
+    private var summaryStatusTint: Color {
+        if human.hasPassedAway {
+            return Color.ohanaSecondaryText
+        }
+        if isViewingOwnProfile, !human.privateFields.isEmpty {
+            return Color.goPurple
+        }
+        return Color.goTeal
     }
 
     private var visibleSections: [FeatureHubSectionData<HumanAllFeatureDestination>] {

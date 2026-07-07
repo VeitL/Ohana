@@ -117,21 +117,8 @@ nonisolated enum HomeSnapshotBuilder {
         }
 
         var copy = card
-        if urgentCount > 0 {
-            copy.statusBadgeText = badgeCountText(urgentCount)
-            copy.statusBadgeTone = .urgent
-        } else if dueCount > 0 {
-            copy.statusBadgeText = badgeCountText(dueCount)
-            copy.statusBadgeTone = .due
-        } else {
-            copy.statusBadgeText = nil
-            copy.statusBadgeTone = .ok
-        }
+        HomeCardStatusPolicy.apply(to: &copy, urgentCount: urgentCount, dueCount: dueCount)
         return copy
-    }
-
-    private static func badgeCountText(_ count: Int) -> String {
-        count > 99 ? "99+" : "\(count)"
     }
 
     private static func waterCycleLogSnapshot(

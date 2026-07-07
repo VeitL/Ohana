@@ -175,7 +175,8 @@ struct VerticalSolidHomePlantsPage: View {
 
     private var plantCards: [FocusCard] {
         visiblePlants.map { plant in
-            FocusCard(
+            let status = plantCardStatus(for: plant)
+            return FocusCard(
                 id: plant.id,
                 name: plant.name,
                 kind: plant.subtitle.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.subtitle,
@@ -188,9 +189,9 @@ struct VerticalSolidHomePlantsPage: View {
                 avatarImageAssetName: plant.avatarImageAssetName,
                 petSpecies: plant.subtitle,
                 themeColorHex: plant.themeHex,
-                statusBadgeText: plantCardStatusText(for: plant),
-                statusBadgeIsWarning: plant.overdueCareCount > 0,
-                statusBadgeToneRaw: plantCardStatusTone(for: plant).rawValue,
+                statusBadgeText: status.text,
+                statusBadgeIsWarning: status.isWarning,
+                statusBadgeToneRaw: status.tone.rawValue,
                 isPlant: true,
                 isReal: true,
                 actions: [
@@ -921,24 +922,11 @@ struct VerticalSolidHomePlantsPage: View {
         Set(plant.overdueCareTypes)
     }
 
-    private func plantCardStatusText(for plant: VerticalSolidHomePlantSnapshot) -> String? {
-        if plant.overdueCareCount > 0 {
-            return plant.overdueCareCount > 99 ? "99+" : "\(plant.overdueCareCount)"
-        }
-        if plant.dueCareCount > 0 {
-            return plant.dueCareCount > 99 ? "99+" : "\(plant.dueCareCount)"
-        }
-        return nil
-    }
-
-    private func plantCardStatusTone(for plant: VerticalSolidHomePlantSnapshot) -> FocusCardStatusBadgeTone {
-        if plant.overdueCareCount > 0 {
-            return .urgent
-        }
-        if plant.dueCareCount > 0 {
-            return .due
-        }
-        return .ok
+    private func plantCardStatus(for plant: VerticalSolidHomePlantSnapshot) -> HomeCardStatusSnapshot {
+        HomeCardStatusPolicy.plantSnapshot(
+            overdueCareCount: plant.overdueCareCount,
+            dueCareCount: plant.dueCareCount
+        )
     }
 
     private func plantQuickCareTypes(in keys: Set<String>, for plantID: UUID) -> Set<PlantCareType> {

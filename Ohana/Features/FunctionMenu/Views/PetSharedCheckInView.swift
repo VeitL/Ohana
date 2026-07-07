@@ -126,19 +126,19 @@ struct PetSharedCheckInView: View {
     }
 
     private var summaryPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(l.tr(zh: "共同照护入口", en: "Shared Care Entries", de: "Gemeinsame Pflege"))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-
-            FeatureHubMetricStrip(metrics: [
+        FeatureHubSummaryPanel(
+            title: l.tr(zh: "共同照护入口", en: "Shared Care Entries", de: "Gemeinsame Pflege"),
+            statusText: actions.isEmpty
+                ? l.tr(zh: "暂无可用共同动作", en: "No shared actions yet", de: "Noch keine gemeinsamen Aktionen")
+                : l.tr(zh: "\(actions.count) 个共同动作", en: "\(actions.count) shared actions", de: "\(actions.count) Aktionen"),
+            statusTint: actions.isEmpty ? Color.ohanaSecondaryText : Color.goPrimary,
+            metrics: [
                 FeatureHubMetric(id: "pets", title: l.tr(zh: "活跃宠物", en: "Active pets", de: "Aktive Tiere"), value: "\(activePets.count)"),
                 FeatureHubMetric(id: "cats", title: l.tr(zh: "猫砂可用", en: "Litter ready", de: "Streu bereit"), value: "\(cats.count)"),
                 FeatureHubMetric(id: "actions", title: l.tr(zh: "共同动作", en: "Shared actions", de: "Aktionen"), value: "\(actions.count)")
-            ])
-        }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+            ]
+        )
+        .accessibilityIdentifier("pet-shared-check-in-summary-panel")
     }
 
     private func tileData(for action: PetSharedCheckInAction) -> FeatureHubTileData {

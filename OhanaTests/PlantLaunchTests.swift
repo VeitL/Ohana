@@ -458,6 +458,35 @@ struct PlantLaunchTests {
         #expect(card.avatarImageSignature == MediaPayloadSignature.signature(for: avatarData))
     }
 
+    @Test func plantFocusCardStatusUsesCountedDueAndOverdueBadges() {
+        let plant = Plant(name: "Fern")
+        let dueCard = FocusCard.fromPlant(
+            plant,
+            dueCareCount: 2,
+            overdueCareCount: 0
+        )
+        let overdueCard = FocusCard.fromPlant(
+            plant,
+            dueCareCount: 2,
+            overdueCareCount: 1
+        )
+        plant.healthStatus = .stressed
+        let stressedCard = FocusCard.fromPlant(
+            plant,
+            dueCareCount: 0,
+            overdueCareCount: 0
+        )
+
+        #expect(dueCard.statusBadgeText == "2")
+        #expect(dueCard.statusBadgeTone == .due)
+        #expect(dueCard.statusBadgeIsWarning == false)
+        #expect(overdueCard.statusBadgeText == "1")
+        #expect(overdueCard.statusBadgeTone == .urgent)
+        #expect(overdueCard.statusBadgeIsWarning)
+        #expect(stressedCard.statusBadgeText == "1")
+        #expect(stressedCard.statusBadgeTone == .urgent)
+    }
+
     @Test func plantCatalogLocalizedDisplayFieldsDoNotFallbackToChineseForEnglishOrGerman() {
         let defaults = UserDefaults.standard
         let oldLanguage = defaults.object(forKey: "appLanguage")

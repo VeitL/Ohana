@@ -488,6 +488,51 @@ struct FeatureHubMetricStrip: View {
     }
 }
 
+struct FeatureHubSummaryPanel: View {
+    let title: String
+    let statusText: String
+    let statusTint: Color
+    let metrics: [FeatureHubMetric]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    summaryTitle
+                    Spacer(minLength: 8)
+                    summaryStatus
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    summaryTitle
+                    summaryStatus
+                }
+            }
+
+            FeatureHubMetricStrip(metrics: metrics)
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+
+    private var summaryTitle: some View {
+        Text(title)
+            .font(OhanaFont.callout(.black))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var summaryStatus: some View {
+        Text(statusText)
+            .font(OhanaFont.caption(.black))
+            .foregroundStyle(statusTint)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 struct FeatureHubSectionActionView<Destination: Hashable>: View {
     let section: FeatureHubSectionData<Destination>
     let onSelect: (Destination) -> Void
@@ -503,11 +548,19 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(section.title)
-                .font(OhanaFont.headline(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(section.title)
+                    .font(OhanaFont.headline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(section.subtitle)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
                 ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
@@ -527,6 +580,8 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("feature-hub-section-\(section.id)")
     }
 }
 

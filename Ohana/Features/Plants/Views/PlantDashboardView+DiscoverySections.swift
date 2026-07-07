@@ -396,10 +396,14 @@ extension PlantDashboardView {
 
     var plantWalletCards: [FocusCard] {
         visiblePlants.map { plant in
-            FocusCard.fromPlant(
+            let careTasks = appServices.plantCarePlans.tasks(for: plant)
+            let statusCounts = plantCardStatusCounts(tasks: careTasks)
+            return FocusCard.fromPlant(
                 plant,
                 catalog: PlantCatalog.entry(id: plant.catalogSpeciesId),
-                nextTask: appServices.plantCarePlans.nextTask(for: plant),
+                nextTask: careTasks.first,
+                dueCareCount: statusCounts.due,
+                overdueCareCount: statusCounts.overdue,
                 localization: l
             )
         }

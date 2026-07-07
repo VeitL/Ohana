@@ -179,6 +179,58 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(CareLedgerEvent.self, id: rewardLedger.id, context: context) == nil)
     }
 
+    @Test func deletePlantRetainsHumanCoconutRewardAndReconcilesWalletDrift() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let plant = Plant(name: "Mint")
+        human.coconutBalance = 99
+        let account = CoconutAccount(
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            displayName: human.name,
+            balance: 99
+        )
+        let plantCareReward = CoconutLedgerEntry(
+            transactionKey: "delete-plant-human-reward",
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            ownerName: human.name,
+            delta: 8,
+            balanceBefore: 0,
+            balanceAfter: 8,
+            entryKind: .reward,
+            source: .careEvent,
+            title: "Plant care reward",
+            emoji: "coconut",
+            actorId: human.id.uuidString,
+            actorName: human.name,
+            subjectKind: .plant,
+            subjectId: plant.id.uuidString,
+            sourceModelName: String(describing: PlantCareLog.self),
+            sourceModelId: UUID().uuidString
+        )
+        context.insert(human)
+        context.insert(plant)
+        context.insert(account)
+        context.insert(plantCareReward)
+        try context.save()
+
+        PhysicalDeletionService.deletePlant(plant, context: context)
+        try context.save()
+
+        let remainingAccount = try #require(try context.fetch(FetchDescriptor<CoconutAccount>()).first {
+            $0.accountKey == CoconutAccountKey.human(human.id)
+        })
+        #expect(remainingAccount.balance == 8)
+        #expect(human.coconutBalance == 8)
+        #expect(CoconutWalletService.totalBalance(context: context) == 8)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).map(\.id) == [plantCareReward.id])
+        #expect(deletionTombstone(CoconutLedgerEntry.self, id: plantCareReward.id, context: context) == nil)
+    }
+
     @Test func deletePetRetiresWalletAccountKeepsLedgerAndScrubsSharedSessionReferences() throws {
         let container = try makeContainer()
         let context = container.mainContext

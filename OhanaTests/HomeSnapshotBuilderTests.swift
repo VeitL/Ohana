@@ -5,6 +5,24 @@ import Testing
 
 @MainActor
 struct HomeSnapshotBuilderTests {
+    @Test func cardStatusPolicyUsesThreeCountedStates() {
+        let ok = HomeCardStatusPolicy.snapshot(urgentCount: 0, dueCount: 0)
+        let due = HomeCardStatusPolicy.snapshot(urgentCount: 0, dueCount: 3)
+        let urgent = HomeCardStatusPolicy.snapshot(urgentCount: 2, dueCount: 9)
+        let capped = HomeCardStatusPolicy.snapshot(urgentCount: 120, dueCount: 0)
+
+        #expect(ok.text == nil)
+        #expect(ok.tone == .ok)
+        #expect(due.text == "3")
+        #expect(due.tone == .due)
+        #expect(due.isWarning == false)
+        #expect(urgent.text == "2")
+        #expect(urgent.tone == .urgent)
+        #expect(urgent.isWarning)
+        #expect(capped.text == "99+")
+        #expect(capped.tone == .urgent)
+    }
+
     @Test func pottyDashboardLedgerEntriesFilterPetPottyEvents() {
         let petId = UUID()
         let otherPetId = UUID()

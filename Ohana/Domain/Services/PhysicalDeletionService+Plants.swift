@@ -48,6 +48,7 @@ extension PhysicalDeletionService {
             deletedByHumanId: deletedByHumanId
         )
         context.delete(plant)
+        reconcileWalletAfterEconomyDeletion(context: context)
         return PhysicalPlantDeletionResult(
             removedRelatedEventIDs: removedRelatedEventIDs
         )

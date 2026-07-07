@@ -53,24 +53,26 @@ struct PetFeatureCollectionView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         summaryPanel
 
-                        Button {
-                            parentPath.append(FMDest.petSharedCheckIn)
-                        } label: {
-                            FeatureSummaryChartCard(data: sharedCheckInActionData)
+                        FeatureHubSectionActionView(section: sharedCareActionSection) { destination in
+                            parentPath.append(destination)
                         }
-                        .buttonStyle(ScaleButtonStyle())
-                        .accessibilityIdentifier("pet-feature-collection-shared-check-in")
 
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(items) { item in
-                                PetFeatureCollectionCard(
-                                    item: item,
-                                    summary: cardSummary(for: item.feature)
-                                ) {
-                                    parentPath.append(FMDest.featureAggregate(item.feature))
+                        VStack(alignment: .leading, spacing: 10) {
+                            featureCardsHeader
+
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(items) { item in
+                                    PetFeatureCollectionCard(
+                                        item: item,
+                                        summary: cardSummary(for: item.feature)
+                                    ) {
+                                        parentPath.append(FMDest.featureAggregate(item.feature))
+                                    }
                                 }
                             }
                         }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("pet-feature-collection-stat-section")
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
@@ -81,50 +83,63 @@ struct PetFeatureCollectionView: View {
         .accessibilityIdentifier("pet-feature-collection")
     }
 
+    private var sharedCareActionSection: FeatureHubSectionData<FMDest> {
+        FeatureHubSectionData(
+            id: "pet-shared-care-actions",
+            title: l.tr(zh: "多宠物动作", en: "Multi-Pet Actions", de: "Mehrere Tiere"),
+            subtitle: l.tr(
+                zh: "这里是执行共同打卡的入口，和下面的统计卡分开",
+                en: "Use this for shared check-ins; statistics stay below",
+                de: "Gemeinsame Einträge hier, Auswertungen darunter"
+            ),
+            items: [
+                FeatureHubDestinationItem(
+                    data: sharedCheckInActionData,
+                    destination: FMDest.petSharedCheckIn
+                )
+            ]
+        )
+    }
+
+    private var featureCardsHeader: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(l.tr(zh: "功能数据", en: "Feature Data", de: "Funktionsdaten"))
+                .font(OhanaFont.headline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(l.tr(
+                zh: "点击卡片查看所有宠物的统计与比较",
+                en: "Open aggregate statistics and comparisons for all pets",
+                de: "Statistiken und Vergleiche für alle Tiere öffnen"
+            ))
+            .font(OhanaFont.caption(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var summaryPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    summaryPanelTitle
-                    Spacer(minLength: 8)
-                    summaryPanelStatus
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    summaryPanelTitle
-                    summaryPanelStatus
-                }
-            }
-
-            FeatureHubMetricStrip(metrics: [
+        FeatureHubSummaryPanel(
+            title: l.tr(zh: "家庭宠物摘要", en: "Pet Summary", de: "Tierübersicht"),
+            statusText: summaryPanelStatusText,
+            statusTint: summary.healthSignalCount > 0 ? Color.goYellow : Color.goTeal,
+            metrics: [
                 FeatureHubMetric(id: "pets", title: l.tr(zh: "活跃宠物", en: "Active pets", de: "Aktive Tiere"), value: "\(summary.activePetCount)"),
                 FeatureHubMetric(id: "today", title: l.tr(zh: "今日记录", en: "Today logs", de: "Heute"), value: "\(summary.todayFoodLogs + summary.todayPottyLogs + summary.todayWalkCount)"),
                 FeatureHubMetric(id: "expense", title: l.tr(zh: "本月花费", en: "This month", de: "Diesen Monat"), value: expenseAmountText),
                 FeatureHubMetric(id: "archive", title: l.tr(zh: "成长档案", en: "Archive", de: "Archiv"), value: "\(summary.archiveItemCount)")
-            ])
-        }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+            ]
+        )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pet-feature-collection-summary")
     }
 
-    private var summaryPanelTitle: some View {
-        Text(l.tr(zh: "家庭宠物摘要", en: "Pet Summary", de: "Tierübersicht"))
-            .font(OhanaFont.callout(.black))
-            .foregroundStyle(Color.ohanaPrimaryText)
-            .lineLimit(2)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var summaryPanelStatus: some View {
-        Text(summary.healthSignalCount > 0
+    private var summaryPanelStatusText: String {
+        summary.healthSignalCount > 0
             ? l.tr(zh: "\(summary.healthSignalCount) 项需关注", en: "\(summary.healthSignalCount) signals", de: "\(summary.healthSignalCount) Signale")
-            : l.tr(zh: "状态稳定", en: "Steady", de: "Stabil"))
-            .font(OhanaFont.caption(.black))
-            .foregroundStyle(summary.healthSignalCount > 0 ? Color.goYellow : Color.goTeal)
-            .lineLimit(2)
-            .fixedSize(horizontal: false, vertical: true)
+            : l.tr(zh: "状态稳定", en: "Steady", de: "Stabil")
     }
 
     private var sharedCheckInActionData: FeatureHubTileData {

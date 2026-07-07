@@ -1298,7 +1298,7 @@ nonisolated enum PhysicalDeletionService {
         return values.filter { seen.insert($0[keyPath: keyPath]).inserted }
     }
 
-    private static func reconcileWalletAfterEconomyDeletion(context: ModelContext) {
+    static func reconcileWalletAfterEconomyDeletion(context: ModelContext) {
         _ = CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: context, saveChanges: false)
     }
 }

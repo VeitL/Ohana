@@ -10,6 +10,10 @@ struct FeatureHubAdaptiveLayoutTests {
 
         #expect(source.contains("GridItem(.adaptive(minimum: 118)"))
         #expect(source.contains("GridItem(.adaptive(minimum: 156)"))
+        #expect(source.contains("struct FeatureHubSummaryPanel"))
+        #expect(source.contains("FeatureHubMetricStrip(metrics: metrics)"))
+        #expect(source.contains("Text(section.subtitle)"))
+        #expect(source.contains("feature-hub-section-\\(section.id)"))
         #expect(source.contains("@Environment(\\.dynamicTypeSize) private var dynamicTypeSize"))
         #expect(source.contains(".lineLimit(2)"))
         #expect(source.contains(".fixedSize(horizontal: false, vertical: true)"))
@@ -29,9 +33,9 @@ struct FeatureHubAdaptiveLayoutTests {
             rootURL: repositoryRootURL()
         )
 
-        #expect(petSource.contains("summaryPanelTitle"))
-        #expect(petSource.contains("summaryPanelStatus"))
-        #expect(petSource.contains("ViewThatFits(in: .horizontal)"))
+        #expect(petSource.contains("FeatureHubSummaryPanel("))
+        #expect(petSource.contains("summaryPanelStatusText"))
+        #expect(try sharedSourceContainsViewThatFits())
         #expect(petSource.contains(".fixedSize(horizontal: false, vertical: true)"))
 
         #expect(plantSource.contains("commandCenterTitle"))
@@ -52,11 +56,19 @@ struct FeatureHubAdaptiveLayoutTests {
             "Ohana/Features/Plants/Views/PlantAllFeaturesSheet.swift",
             rootURL: repositoryRootURL()
         )
+        let petSource = try source(
+            "Ohana/Features/Members/Views/PetAllFeaturesSheet.swift",
+            rootURL: repositoryRootURL()
+        )
         let sharedSource = try source(
             "Ohana/Shared/Components/FeatureHubComponents.swift",
             rootURL: repositoryRootURL()
         )
 
+        #expect(humanSource.contains("FeatureHubSummaryPanel("))
+        #expect(humanSource.contains("human-all-features-summary-panel"))
+        #expect(petSource.contains("FeatureHubSummaryPanel("))
+        #expect(petSource.contains("pet-all-features-summary-panel"))
         #expect(humanSource.contains("private struct HumanOwnerPrivacyHint"))
         #expect(humanSource.contains("HStack(alignment: .top, spacing: 10)"))
         #expect(humanSource.contains("private struct HumanMemorialBanner"))
@@ -79,6 +91,14 @@ struct FeatureHubAdaptiveLayoutTests {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+
+    private func sharedSourceContainsViewThatFits() throws -> Bool {
+        let sharedSource = try source(
+            "Ohana/Shared/Components/FeatureHubComponents.swift",
+            rootURL: repositoryRootURL()
+        )
+        return sharedSource.contains("ViewThatFits(in: .horizontal)")
     }
 
     private func source(_ path: String, rootURL: URL) throws -> String {

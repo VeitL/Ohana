@@ -51,16 +51,22 @@ struct PlantFeatureCollectionView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         batchActionPanel
 
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(items) { item in
-                                PlantFeatureCollectionCard(
-                                    item: item,
-                                    summary: cardSummary(for: item.id)
-                                ) {
-                                    parentPath.append(item.destination)
+                        VStack(alignment: .leading, spacing: 10) {
+                            featureCardsHeader
+
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(items) { item in
+                                    PlantFeatureCollectionCard(
+                                        item: item,
+                                        summary: cardSummary(for: item.id)
+                                    ) {
+                                        parentPath.append(item.destination)
+                                    }
                                 }
                             }
                         }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("plant-feature-collection-stat-section")
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 14)
@@ -72,22 +78,49 @@ struct PlantFeatureCollectionView: View {
     }
 
     private var batchActionPanel: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
-            Button {
-                parentPath.append(FMDest.plantsBatchCare)
-            } label: {
-                FeatureSummaryChartCard(data: dueCareActionData)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityIdentifier("plant-feature-action-due-care")
+        FeatureHubSectionActionView(section: plantActionSection) { destination in
+            parentPath.append(destination)
+        }
+    }
 
-            Button {
-                parentPath.append(FMDest.plantsBatchQuickRecord)
-            } label: {
-                FeatureSummaryChartCard(data: quickRecordActionData)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityIdentifier("plant-feature-action-quick-record")
+    private var plantActionSection: FeatureHubSectionData<FMDest> {
+        FeatureHubSectionData(
+            id: "plant-care-actions",
+            title: l.tr(zh: "多植物动作", en: "Multi-Plant Actions", de: "Mehrere Pflanzen"),
+            subtitle: l.tr(
+                zh: "这里负责批量执行；下面的卡片负责统计、比较和资料入口",
+                en: "Batch actions live here; statistics and profiles stay below",
+                de: "Sammelaktionen hier, Statistiken und Profile darunter"
+            ),
+            items: [
+                FeatureHubDestinationItem(
+                    data: dueCareActionData,
+                    destination: FMDest.plantsBatchCare
+                ),
+                FeatureHubDestinationItem(
+                    data: quickRecordActionData,
+                    destination: FMDest.plantsBatchQuickRecord
+                )
+            ]
+        )
+    }
+
+    private var featureCardsHeader: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(l.tr(zh: "功能数据", en: "Feature Data", de: "Funktionsdaten"))
+                .font(OhanaFont.headline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(l.tr(
+                zh: "点击卡片进入植物护理分类、成长记录或管理视图",
+                en: "Open care categories, growth records or plant management",
+                de: "Pflegekategorien, Wachstum oder Verwaltung öffnen"
+            ))
+            .font(OhanaFont.caption(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
