@@ -1613,6 +1613,8 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.contains { $0.eventKind == CareLedgerEventKind.expense.rawValue && $0.legacyModelId == result.expenseLogID?.uuidString })
         #expect(result.subjectID == pet.id)
         #expect(result.coconutDelta == 0)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
     }
 
     @MainActor
@@ -1668,6 +1670,8 @@ struct HomeCommandExecutorTests {
         #expect(reminders.first?.id == result.reminderID)
         #expect(reminders.first?.scheduledAt == reminderDate)
         #expect(reminders.first?.event?.id == result.eventID)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(reminders.first?.isPending == true)
         #expect(ledgerEvents.count == 2)
     }
@@ -2235,10 +2239,16 @@ struct HomeCommandExecutorTests {
         #expect(try cloudSyncState(entityName: String(describing: HeatCycleLog.self), id: heatID, context: context)?.isDeletionTombstone == true)
         #expect(deletedHealth.subjectID == pet.id)
         #expect(deletedHealth.kind == "health")
+        #expect(deletedHealth.didPersist)
+        #expect(deletedHealth.persistenceErrorDescription == nil)
         #expect(deletedSymptom.subjectID == pet.id)
         #expect(deletedSymptom.kind == "symptom")
+        #expect(deletedSymptom.didPersist)
+        #expect(deletedSymptom.persistenceErrorDescription == nil)
         #expect(deletedHeat.subjectID == pet.id)
         #expect(deletedHeat.kind == "heat")
+        #expect(deletedHeat.didPersist)
+        #expect(deletedHeat.persistenceErrorDescription == nil)
     }
 
     @MainActor
@@ -2291,6 +2301,8 @@ struct HomeCommandExecutorTests {
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
 
         #expect(deleteResult.recordID == result.logID)
+        #expect(deleteResult.didPersist)
+        #expect(deleteResult.persistenceErrorDescription == nil)
         #expect(healthLogs.isEmpty)
         #expect(expenses.isEmpty)
         #expect(events.isEmpty)
@@ -3179,6 +3191,8 @@ struct HomeCommandExecutorTests {
         #expect(!commandSource.contains("context.safeSave()"))
         #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
         #expect(commandSource.contains("context.rollback()"))
+        #expect(commandSource.contains("DeferredReminderNotificationCanceller"))
+        #expect(commandSource.contains("deferredNotifications.commit(to: OhanaNotifications.current)"))
         #expect(executorSource.contains("guard result.didPersist else { return result }"))
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist"))
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist &&"))
@@ -3258,6 +3272,27 @@ struct HomeCommandExecutorTests {
         #expect(commandSource.contains("guard recorded.result.didPersist else { return recorded }"))
         #expect(commandSource.contains("guard result.didPersist else { return result }"))
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didDelete"))
+    }
+
+    @Test func petHealthCommandsGateSideEffectsOnPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let commandSource = try source("Ohana/Features/Health/PetHealthCommands.swift", rootURL: rootURL)
+        let executorSource = try source("Ohana/Features/Health/PetHealthCommandExecutor.swift", rootURL: rootURL)
+        let revisionSource = try source("Ohana/Features/RevisionPublishing/DomainRevisionPublishing+FeaturePublishing.swift", rootURL: rootURL)
+
+        #expect(commandSource.contains("let didPersist: Bool"))
+        #expect(commandSource.contains("let persistenceErrorDescription: String?"))
+        #expect(!commandSource.contains("context.safeSave()"))
+        #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(commandSource.contains("context.rollback()"))
+        #expect(executorSource.contains("guard result.didPersist else { return result }"))
+        #expect(executorSource.contains("if result.didPersist && result.didDelete"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didRecord"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didDelete"))
+
+        let saveGuardIndex = try #require(commandSource.range(of: "guard saveResult.didSave else")?.lowerBound)
+        let scheduleIndex = try #require(commandSource.range(of: "await reminderScheduling.scheduleIfNeeded")?.lowerBound)
+        #expect(scheduleIndex > saveGuardIndex)
     }
 
     @MainActor
@@ -7501,6 +7536,8 @@ struct HomeCommandExecutorTests {
             note: "test.health.record"
         ))
         let healthMutation = try #require(revisionCenter.lastMutation)
+        #expect(health.didPersist)
+        #expect(health.persistenceErrorDescription == nil)
         #expect(healthMutation.command == .petHealthRecord(petID: pet.id, type: HealthLogType.vaccine.rawValue))
         #expect(healthMutation.affectedEntityIDs == [pet.id, health.logID])
         #expect(healthMutation.note == "test.health.record")
@@ -7518,6 +7555,8 @@ struct HomeCommandExecutorTests {
             note: "test.health.symptom"
         ))
         let symptomMutation = try #require(revisionCenter.lastMutation)
+        #expect(symptom.didPersist)
+        #expect(symptom.persistenceErrorDescription == nil)
         #expect(symptomMutation.command == .petHealthRecord(petID: pet.id, type: "symptom"))
         #expect(symptomMutation.affectedEntityIDs == [pet.id, symptom.logID, symptom.ledgerEventID])
         #expect(symptomMutation.note == "test.health.symptom")
@@ -7543,6 +7582,8 @@ struct HomeCommandExecutorTests {
         let deletedHealth = executor.deleteHealthLog(healthLog, pet: pet, note: "test.health.delete.health")
         let deleteHealthMutation = try #require(revisionCenter.lastMutation)
         #expect(deletedHealth.recordID == health.logID)
+        #expect(deletedHealth.didPersist)
+        #expect(deletedHealth.persistenceErrorDescription == nil)
         #expect(deleteHealthMutation.command == .petHealthDelete(petID: pet.id, kind: "health", recordID: health.logID))
         #expect(deleteHealthMutation.note == "test.health.delete.health")
 
@@ -7550,6 +7591,8 @@ struct HomeCommandExecutorTests {
         let deletedSymptom = executor.deleteSymptomLog(symptomLog, pet: pet, note: "test.health.delete.symptom")
         let deleteSymptomMutation = try #require(revisionCenter.lastMutation)
         #expect(deletedSymptom.recordID == symptom.logID)
+        #expect(deletedSymptom.didPersist)
+        #expect(deletedSymptom.persistenceErrorDescription == nil)
         #expect(deleteSymptomMutation.command == .petHealthDelete(petID: pet.id, kind: "symptom", recordID: symptom.logID))
         #expect(deleteSymptomMutation.note == "test.health.delete.symptom")
 
@@ -7557,6 +7600,8 @@ struct HomeCommandExecutorTests {
         let deletedHeat = executor.deleteHeatCycleLog(heatLog, pet: pet, note: "test.health.delete.heat")
         let deleteHeatMutation = try #require(revisionCenter.lastMutation)
         #expect(deletedHeat.recordID == heat.logID)
+        #expect(deletedHeat.didPersist)
+        #expect(deletedHeat.persistenceErrorDescription == nil)
         #expect(deleteHeatMutation.command == .petHealthDelete(petID: pet.id, kind: "heat", recordID: heat.logID))
         #expect(deleteHeatMutation.note == "test.health.delete.heat")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 6)

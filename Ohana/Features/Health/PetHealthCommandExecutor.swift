@@ -104,6 +104,7 @@ struct PetHealthCommandExecutor {
             )
             return nil
         }
+        guard result.didPersist else { return result }
         deriveHealthRecord(result, type: input.type.rawValue, factDate: input.date, note: note)
         return result
     }
@@ -125,6 +126,7 @@ struct PetHealthCommandExecutor {
             )
             return nil
         }
+        guard result.didPersist else { return result }
         revisions.publishPetSymptom(result, note: note)
         return result
     }
@@ -152,7 +154,7 @@ struct PetHealthCommandExecutor {
     @discardableResult
     func deleteHealthLog(_ log: PetHealthLog, pet: Pet, note: String) -> PetHealthDeleteResult {
         let result = PetHealthDeleteCommandService.deleteHealthLog(log, pet: pet, context: context)
-        if result.didDelete {
+        if result.didPersist && result.didDelete {
             revisions.publishPetHealthDelete(result, note: note)
         }
         return result
@@ -161,7 +163,7 @@ struct PetHealthCommandExecutor {
     @discardableResult
     func deleteSymptomLog(_ log: SymptomLog, pet: Pet, note: String) -> PetHealthDeleteResult {
         let result = PetHealthDeleteCommandService.deleteSymptomLog(log, pet: pet, context: context)
-        if result.didDelete {
+        if result.didPersist && result.didDelete {
             revisions.publishPetHealthDelete(result, note: note)
         }
         return result
@@ -170,7 +172,7 @@ struct PetHealthCommandExecutor {
     @discardableResult
     func deleteHeatCycleLog(_ log: HeatCycleLog, pet: Pet, note: String) -> PetHealthDeleteResult {
         let result = PetHealthDeleteCommandService.deleteHeatCycleLog(log, pet: pet, context: context)
-        if result.didDelete {
+        if result.didPersist && result.didDelete {
             revisions.publishPetHealthDelete(result, note: note)
         }
         return result

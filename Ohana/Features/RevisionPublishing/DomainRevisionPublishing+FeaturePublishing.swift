@@ -544,7 +544,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .petHealthRecord(petID: result.subjectID, type: type),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didPersist && result.didRecord,
                 note: note
             )
         )
@@ -555,7 +555,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .petHealthRecord(petID: result.subjectID, type: "symptom"),
                 affectedEntityIDs: [result.subjectID, result.logID, result.ledgerEventID],
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didPersist,
                 note: note
             )
         )
@@ -577,7 +577,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .petHealthDelete(petID: result.subjectID, kind: result.kind, recordID: result.recordID),
                 affectedEntityIDs: [result.subjectID, result.recordID],
-                wroteBusinessFact: result.didDelete,
+                wroteBusinessFact: result.didPersist && result.didDelete,
                 note: note
             )
         )

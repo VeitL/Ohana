@@ -78,6 +78,8 @@ struct PetHealthCommandResult: Equatable {
     let coconutDelta: Int
     let didRecord: Bool
     let allowsDerivedEffects: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 
     init(
         logID: UUID,
@@ -87,7 +89,9 @@ struct PetHealthCommandResult: Equatable {
         reminderID: UUID?,
         coconutDelta: Int,
         didRecord: Bool = true,
-        allowsDerivedEffects: Bool = true
+        allowsDerivedEffects: Bool = true,
+        didPersist: Bool = true,
+        persistenceErrorDescription: String? = nil
     ) {
         self.logID = logID
         self.subjectID = subjectID
@@ -97,6 +101,8 @@ struct PetHealthCommandResult: Equatable {
         self.coconutDelta = coconutDelta
         self.didRecord = didRecord
         self.allowsDerivedEffects = allowsDerivedEffects
+        self.didPersist = didPersist
+        self.persistenceErrorDescription = persistenceErrorDescription
     }
 }
 
@@ -141,7 +147,22 @@ enum PetHealthCommandService {
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: input.date)
 
         guard write.allowsDerivedEffects else {
-            context.safeSave()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            guard saveResult.didSave else {
+                context.rollback()
+                return PetHealthCommandResult(
+                    logID: log.id,
+                    subjectID: pet.id,
+                    expenseLogID: nil,
+                    eventID: nil,
+                    reminderID: nil,
+                    coconutDelta: 0,
+                    didRecord: false,
+                    allowsDerivedEffects: false,
+                    didPersist: false,
+                    persistenceErrorDescription: saveResult.errorDescription
+                )
+            }
             return PetHealthCommandResult(
                 logID: log.id,
                 subjectID: pet.id,
@@ -244,21 +265,36 @@ enum PetHealthCommandService {
             }
 
             careLedger.syncLedgerEnergyIfNeeded(metadataJSON: rewardMetadataJSON, context: context)
-            if schedulesReminderNotification, let reminder {
-                Task { @MainActor in
-                    await reminderScheduling.scheduleIfNeeded(
-                        reminder: reminder,
-                        context: context,
-                        source: input.source,
-                        existingNotificationIds: nil,
-                        operation: "schedule",
-                        saveLedger: true
-                    )
-                }
-            }
         }
 
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetHealthCommandResult(
+                logID: log.id,
+                subjectID: pet.id,
+                expenseLogID: nil,
+                eventID: nil,
+                reminderID: nil,
+                coconutDelta: 0,
+                didRecord: false,
+                allowsDerivedEffects: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        if schedulesReminderNotification, let reminder {
+            Task { @MainActor in
+                await reminderScheduling.scheduleIfNeeded(
+                    reminder: reminder,
+                    context: context,
+                    source: input.source,
+                    existingNotificationIds: nil,
+                    operation: "schedule",
+                    saveLedger: true
+                )
+            }
+        }
         return PetHealthCommandResult(
             logID: log.id,
             subjectID: pet.id,
@@ -383,6 +419,8 @@ struct PetSymptomCommandResult: Equatable {
     let logID: UUID
     let subjectID: UUID
     let ledgerEventID: UUID
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 enum PetSymptomCommandService {
@@ -441,13 +479,25 @@ enum PetSymptomCommandService {
                 save: false
             )
         }
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetSymptomCommandResult(
+                logID: log.id,
+                subjectID: pet.id,
+                ledgerEventID: ledgerEvent?.id ?? UUID(),
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
 
         guard let ledgerEvent else { return nil }
         return PetSymptomCommandResult(
             logID: log.id,
             subjectID: pet.id,
-            ledgerEventID: ledgerEvent.id
+            ledgerEventID: ledgerEvent.id,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 }
@@ -457,6 +507,8 @@ struct PetHealthDeleteResult: Equatable {
     let recordID: UUID
     let kind: String
     let didDelete: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 enum PetHealthDeleteCommandService {
@@ -472,18 +524,41 @@ enum PetHealthDeleteCommandService {
                 subjectID: pet.id,
                 recordID: log.id,
                 kind: "health",
-                didDelete: false
+                didDelete: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let recordID = log.id
         let deletedAt = Date()
-        PhysicalDeletionService.deletePetScopedRecord(log, pet: pet, context: context, deletedAt: deletedAt)
-        context.safeSave()
+        let deferredNotifications = DeferredReminderNotificationCanceller()
+        PhysicalDeletionService.deletePetScopedRecord(
+            log,
+            pet: pet,
+            context: context,
+            deletedAt: deletedAt,
+            notifications: deferredNotifications
+        )
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetHealthDeleteResult(
+                subjectID: pet.id,
+                recordID: recordID,
+                kind: "health",
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        deferredNotifications.commit(to: OhanaNotifications.current)
         return PetHealthDeleteResult(
             subjectID: pet.id,
             recordID: recordID,
             kind: "health",
-            didDelete: true
+            didDelete: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -499,7 +574,9 @@ enum PetHealthDeleteCommandService {
                 subjectID: pet.id,
                 recordID: log.id,
                 kind: "symptom",
-                didDelete: false
+                didDelete: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let recordID = log.id
@@ -507,12 +584,25 @@ enum PetHealthDeleteCommandService {
         deleteLedgerEvents(modelName: "SymptomLog", modelId: recordID, context: context, deletedAt: deletedAt)
         CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt)
         context.delete(log)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetHealthDeleteResult(
+                subjectID: pet.id,
+                recordID: recordID,
+                kind: "symptom",
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
         return PetHealthDeleteResult(
             subjectID: pet.id,
             recordID: recordID,
             kind: "symptom",
-            didDelete: true
+            didDelete: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -528,7 +618,9 @@ enum PetHealthDeleteCommandService {
                 subjectID: pet.id,
                 recordID: log.id,
                 kind: "heat",
-                didDelete: false
+                didDelete: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let recordID = log.id
@@ -536,12 +628,25 @@ enum PetHealthDeleteCommandService {
         deleteLedgerEvents(modelName: "HeatCycleLog", modelId: recordID, context: context, deletedAt: deletedAt)
         CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt)
         context.delete(log)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetHealthDeleteResult(
+                subjectID: pet.id,
+                recordID: recordID,
+                kind: "heat",
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
         return PetHealthDeleteResult(
             subjectID: pet.id,
             recordID: recordID,
             kind: "heat",
-            didDelete: true
+            didDelete: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -563,5 +668,51 @@ enum PetHealthDeleteCommandService {
 
     private static func fetchAll<T: PersistentModel>(_: T.Type, context: ModelContext) -> [T] {
         (try? context.fetch(FetchDescriptor<T>())) ?? []
+    }
+}
+
+private final class DeferredReminderNotificationCanceller: ReminderNotificationScheduling, @unchecked Sendable {
+    private var cancelledNotificationIds: [String] = []
+
+    func schedule(reminder _: Reminder) {}
+
+    func schedule(
+        reminder _: Reminder,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.skippedUserDisabled("{}"))
+    }
+
+    func schedule(
+        reminder _: Reminder,
+        deliveryDate _: Date?,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.skippedUserDisabled("{}"))
+    }
+
+    func pendingNotificationIds() async -> Set<String> { [] }
+
+    func scheduleRollingWindow(reminders _: [Reminder]) {}
+
+    func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+
+    func cancel(notificationId: String) {
+        guard !notificationId.isEmpty else { return }
+        cancelledNotificationIds.append(notificationId)
+    }
+
+    func cancelAll(for _: Pet, reminders: [Reminder]) {
+        cancelledNotificationIds.append(contentsOf: reminders.map(\.notificationId).filter { !$0.isEmpty })
+    }
+
+    func compensate(reminders _: [Reminder]) {}
+
+    func commit(to notifications: ReminderNotificationScheduling) {
+        for notificationId in cancelledNotificationIds {
+            notifications.cancel(notificationId: notificationId)
+        }
     }
 }
