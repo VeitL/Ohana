@@ -738,12 +738,12 @@ struct HumanBasicInfoDetailContentView: View {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).markHumanPassedAway(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).markHumanPassedAway(
                 human,
                 date: date,
                 note: "humanBasicInfo.passed.mark"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 
@@ -755,11 +755,11 @@ struct HumanBasicInfoDetailContentView: View {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).undoHumanPassedAway(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).undoHumanPassedAway(
                 human,
                 note: "humanBasicInfo.passed.undo"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 }

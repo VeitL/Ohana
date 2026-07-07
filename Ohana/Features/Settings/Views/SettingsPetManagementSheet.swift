@@ -190,10 +190,10 @@ struct SettingsPetManagementSheet: View {
     }
 
     private func resetPetLogs(_ pet: Pet) {
-        MemberCommandExecutor(context: modelContext, services: appServices).clearPetActivityRecords(
+        let result = MemberCommandExecutor(context: modelContext, services: appServices).clearPetActivityRecords(
             pet,
             note: "settings.pet.lifecycle.records.clear"
         )
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
     }
 }

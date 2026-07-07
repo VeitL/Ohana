@@ -116,12 +116,12 @@ extension PetBasicInfoDetailView {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).markPetPassedAway(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).markPetPassedAway(
                 pet,
                 date: rainbowBridgeDate,
                 note: "petBasicInfo.passed.mark"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 
@@ -133,11 +133,11 @@ extension PetBasicInfoDetailView {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).undoPetPassedAway(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).undoPetPassedAway(
                 pet,
                 note: "petBasicInfo.passed.undo"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 
@@ -162,11 +162,11 @@ extension PetBasicInfoDetailView {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).clearPetActivityRecords(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).clearPetActivityRecords(
                 pet,
                 note: "petBasicInfo.records.clear"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 

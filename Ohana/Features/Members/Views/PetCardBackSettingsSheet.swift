@@ -127,11 +127,11 @@ struct PetCardBackSettingsSheet: View {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).clearPetActivityRecords(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).clearPetActivityRecords(
                 pet,
                 note: "pet.cardBack.records.clear"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 
@@ -143,12 +143,12 @@ struct PetCardBackSettingsSheet: View {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).markPetPassedAway(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).markPetPassedAway(
                 pet,
                 date: rainbowDate,
                 note: "pet.cardBack.passed.mark"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 
@@ -160,11 +160,11 @@ struct PetCardBackSettingsSheet: View {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).undoPetPassedAway(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).undoPetPassedAway(
                 pet,
                 note: "pet.cardBack.passed.undo"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 

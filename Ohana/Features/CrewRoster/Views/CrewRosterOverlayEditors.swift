@@ -198,7 +198,6 @@ struct CrewRosterProfilePanel: View {
             Button("取消", role: .cancel) {}
             Button("清空记录", role: .destructive) {
                 clearPetActivityRecords()
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
             }
         } message: {
             Text("将删除护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录；保留名字、头像、品种与证件/保险档案。此操作不可撤销。")
@@ -908,25 +907,33 @@ struct CrewRosterProfilePanel: View {
 
     private func markPetPassedAway() {
         guard let pet else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(.memberLifecycle(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "passed.mark")) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).markPetPassedAway(
                 pet,
                 date: passedDate,
                 note: "crew.member.lifecycle.pet.passed.mark"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved(result.entityID, result.kind)
         }
     }
 
     private func undoPetPassedAway() {
         guard let pet else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(.memberLifecycle(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "passed.undo")) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).undoPetPassedAway(
                 pet,
                 note: "crew.member.lifecycle.pet.passed.undo"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved(result.entityID, result.kind)
         }
     }
@@ -938,31 +945,44 @@ struct CrewRosterProfilePanel: View {
                 pet,
                 note: "crew.member.lifecycle.pet.records.clear"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved(result.entityID, result.kind)
         }
     }
 
     private func markHumanPassedAway() {
         guard let human else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(.memberLifecycle(entityID: human.id, kind: EntityKind.human.rawValue, action: "passed.mark")) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).markHumanPassedAway(
                 human,
                 date: passedDate,
                 note: "crew.member.lifecycle.human.passed.mark"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved(result.entityID, result.kind)
         }
     }
 
     private func undoHumanPassedAway() {
         guard let human else { return }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(.memberLifecycle(entityID: human.id, kind: EntityKind.human.rawValue, action: "passed.undo")) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).undoHumanPassedAway(
                 human,
                 note: "crew.member.lifecycle.human.passed.undo"
             )
+            guard result.didPersist else {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved(result.entityID, result.kind)
         }
     }

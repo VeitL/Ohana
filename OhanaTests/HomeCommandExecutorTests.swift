@@ -2699,6 +2699,32 @@ struct HomeCommandExecutorTests {
         #expect(quickWaterSource.contains("didPersist: recorded.result.didPersist"))
     }
 
+    @Test func memberLifecycleCommandsSurfacePersistenceFailures() throws {
+        let rootURL = repositoryRootURL()
+        let resultSource = try source("Ohana/Features/Members/MemberProfileCommands.swift", rootURL: rootURL)
+        let lifecycleSource = try source("Ohana/Features/Members/MemberInteractionCommands.swift", rootURL: rootURL)
+        let petDetailSource = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView+MemorialDanger.swift", rootURL: rootURL)
+        let petSettingsSource = try source("Ohana/Features/Members/Views/PetCardBackSettingsSheet.swift", rootURL: rootURL)
+        let humanBasicSource = try source("Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift", rootURL: rootURL)
+        let humanDetailSource = try source("Ohana/Features/Members/Views/HumanDetailView+RemindersActions.swift", rootURL: rootURL)
+        let crewSource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift", rootURL: rootURL)
+        let settingsPetSource = try source("Ohana/Features/Settings/Views/SettingsPetManagementSheet.swift", rootURL: rootURL)
+
+        #expect(resultSource.contains("let didPersist: Bool"))
+        #expect(resultSource.contains("static func failed"))
+        #expect(lifecycleSource.contains("private static func persistLifecycleMutation"))
+        #expect(lifecycleSource.contains("let saveResult = context.safeSaveResult()"))
+        #expect(lifecycleSource.contains("context.rollback()"))
+        #expect(lifecycleSource.contains("return .failed"))
+        #expect(!lifecycleSource.contains("RainbowBridgeService().markPassedAway(pet: pet, date: date, context: context)\n        CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: date)\n        context.safeSave()"))
+        #expect(petDetailSource.contains("notificationOccurred(result.didPersist ? .success : .error)"))
+        #expect(petSettingsSource.contains("notificationOccurred(result.didPersist ? .success : .error)"))
+        #expect(humanBasicSource.contains("notificationOccurred(result.didPersist ? .success : .error)"))
+        #expect(humanDetailSource.contains("notificationOccurred(result.didPersist ? .success : .error)"))
+        #expect(crewSource.contains("guard result.didPersist else"))
+        #expect(settingsPetSource.contains("notificationOccurred(result.didPersist ? .success : .error)"))
+    }
+
     @MainActor
     @Test func plantCareCommandServiceWritesEveryLaunchCareType() throws {
         let container = try makeInMemoryContainer()

@@ -278,10 +278,38 @@ struct MemberLifecycleCommandResult: Equatable {
     let entityID: UUID
     let kind: String
     let action: String
-    let didPersist: Bool = true
-    let persistenceError: String? = nil
+    let didPersist: Bool
+    let persistenceError: String?
+
+    init(
+        entityID: UUID,
+        kind: String,
+        action: String,
+        didPersist: Bool = true,
+        persistenceError: String? = nil
+    ) {
+        self.entityID = entityID
+        self.kind = kind
+        self.action = action
+        self.didPersist = didPersist
+        self.persistenceError = persistenceError
+    }
 
     var didWrite: Bool { didPersist && action != "no-op" }
+
+    static func noOp(entityID: UUID, kind: String) -> MemberLifecycleCommandResult {
+        MemberLifecycleCommandResult(entityID: entityID, kind: kind, action: "no-op")
+    }
+
+    static func failed(entityID: UUID, kind: String, action: String, error: String?) -> MemberLifecycleCommandResult {
+        MemberLifecycleCommandResult(
+            entityID: entityID,
+            kind: kind,
+            action: "\(action).failed",
+            didPersist: false,
+            persistenceError: error
+        )
+    }
 }
 
 struct MemberHomeVisibilityCommandResult: Equatable {

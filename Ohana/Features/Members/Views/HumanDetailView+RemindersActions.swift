@@ -207,12 +207,12 @@ extension HumanDetailView {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).markHumanPassedAway(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).markHumanPassedAway(
                 human,
                 date: date,
                 note: "human.detail.passed.mark"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 
@@ -224,11 +224,11 @@ extension HumanDetailView {
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            _ = MemberCommandExecutor(context: modelContext, services: appServices).undoHumanPassedAway(
+            let result = MemberCommandExecutor(context: modelContext, services: appServices).undoHumanPassedAway(
                 human,
                 note: "human.detail.passed.undo"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }
 }

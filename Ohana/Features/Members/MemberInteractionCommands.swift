@@ -9,6 +9,21 @@ import Foundation
 import SwiftData
 
 enum MemberLifecycleCommandService {
+    @MainActor
+    private static func persistLifecycleMutation(
+        entityID: UUID,
+        kind: String,
+        action: String,
+        context: ModelContext
+    ) -> MemberLifecycleCommandResult {
+        let saveResult = context.safeSaveResult()
+        guard saveResult.didSave else {
+            context.rollback()
+            return .failed(entityID: entityID, kind: kind, action: action, error: saveResult.errorDescription)
+        }
+        return MemberLifecycleCommandResult(entityID: entityID, kind: kind, action: action)
+    }
+
     @discardableResult
     @MainActor
     static func markPetPassedAway(
@@ -17,15 +32,15 @@ enum MemberLifecycleCommandService {
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
         guard MemberLifecycleGate.disposition(pet: pet, writeKind: .lifecycle(.markPassedAway)).isAllowed else {
-            return MemberLifecycleCommandResult(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "no-op")
+            return .noOp(entityID: pet.id, kind: EntityKind.pet.rawValue)
         }
         RainbowBridgeService().markPassedAway(pet: pet, date: date, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: date)
-        context.safeSave()
-        return MemberLifecycleCommandResult(
+        return persistLifecycleMutation(
             entityID: pet.id,
             kind: EntityKind.pet.rawValue,
-            action: "passed.mark"
+            action: "passed.mark",
+            context: context
         )
     }
 
@@ -36,15 +51,15 @@ enum MemberLifecycleCommandService {
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
         guard MemberLifecycleGate.disposition(pet: pet, writeKind: .lifecycle(.undoPassedAway)).isAllowed else {
-            return MemberLifecycleCommandResult(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "no-op")
+            return .noOp(entityID: pet.id, kind: EntityKind.pet.rawValue)
         }
         RainbowBridgeService().undoPassedAway(pet: pet, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context)
-        context.safeSave()
-        return MemberLifecycleCommandResult(
+        return persistLifecycleMutation(
             entityID: pet.id,
             kind: EntityKind.pet.rawValue,
-            action: "passed.undo"
+            action: "passed.undo",
+            context: context
         )
     }
 
@@ -67,11 +82,11 @@ enum MemberLifecycleCommandService {
         let manager = questManager ?? QuestManager()
         manager.clearPerPetAuxiliaryState(forPetId: pet.id)
         CloudSyncMutationRecorder.markModified(pet, context: context)
-        context.safeSave()
-        return MemberLifecycleCommandResult(
+        return persistLifecycleMutation(
             entityID: pet.id,
             kind: EntityKind.pet.rawValue,
-            action: "records.clear"
+            action: "records.clear",
+            context: context
         )
     }
 
@@ -83,16 +98,16 @@ enum MemberLifecycleCommandService {
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
         guard MemberLifecycleGate.disposition(human: human, writeKind: .lifecycle(.markPassedAway)).isAllowed else {
-            return MemberLifecycleCommandResult(entityID: human.id, kind: EntityKind.human.rawValue, action: "no-op")
+            return .noOp(entityID: human.id, kind: EntityKind.human.rawValue)
         }
         human.passedAwayDate = date
         MemberLifecycleActiveScheduleCleanup.removeFutureSchedules(for: human, passedAwayAt: date, context: context)
         CloudSyncMutationRecorder.markModified(human, context: context, modifiedAt: date)
-        context.safeSave()
-        return MemberLifecycleCommandResult(
+        return persistLifecycleMutation(
             entityID: human.id,
             kind: EntityKind.human.rawValue,
-            action: "passed.mark"
+            action: "passed.mark",
+            context: context
         )
     }
 
@@ -103,15 +118,15 @@ enum MemberLifecycleCommandService {
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
         guard MemberLifecycleGate.disposition(human: human, writeKind: .lifecycle(.undoPassedAway)).isAllowed else {
-            return MemberLifecycleCommandResult(entityID: human.id, kind: EntityKind.human.rawValue, action: "no-op")
+            return .noOp(entityID: human.id, kind: EntityKind.human.rawValue)
         }
         human.passedAwayDate = nil
         CloudSyncMutationRecorder.markModified(human, context: context)
-        context.safeSave()
-        return MemberLifecycleCommandResult(
+        return persistLifecycleMutation(
             entityID: human.id,
             kind: EntityKind.human.rawValue,
-            action: "passed.undo"
+            action: "passed.undo",
+            context: context
         )
     }
 
@@ -126,7 +141,7 @@ enum MemberLifecycleCommandService {
         return MemberLifecycleCommandResult(
             entityID: plant.id,
             kind: EntityKind.plant.rawValue,
-            action: result.didWrite ? result.action : "no-op",
+            action: result.didWrite || !result.didPersist ? result.action : "no-op",
             didPersist: result.didPersist,
             persistenceError: result.persistenceError
         )
@@ -142,7 +157,7 @@ enum MemberLifecycleCommandService {
         return MemberLifecycleCommandResult(
             entityID: plant.id,
             kind: EntityKind.plant.rawValue,
-            action: result.didWrite ? result.action : "no-op",
+            action: result.didWrite || !result.didPersist ? result.action : "no-op",
             didPersist: result.didPersist,
             persistenceError: result.persistenceError
         )
