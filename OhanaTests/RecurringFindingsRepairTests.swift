@@ -766,7 +766,7 @@ struct RecurringFindingsRepairTests {
         context.insert(waterPlanEvent)
         context.insert(reminder)
         try context.save()
-        WaterPlanWriter.deletePlan(pet: pet, allEvents: [waterPlanEvent], context: context)
+        try WaterPlanWriter.deletePlan(pet: pet, allEvents: [waterPlanEvent], context: context)
 
         #expect(try cloudSyncState(entityName: String(describing: Event.self), id: carePlanEvent.id, context: context)?.isDeletionTombstone == true)
         #expect(try cloudSyncState(entityName: String(describing: Event.self), id: waterPlanEvent.id, context: context)?.isDeletionTombstone == true)

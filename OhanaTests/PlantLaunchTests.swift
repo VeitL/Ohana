@@ -1160,6 +1160,40 @@ struct PlantLaunchTests {
         #expect(reminders.contains { $0.event?.eventType == EventType.fertilizing.rawValue })
     }
 
+    @Test func deletingPlantClearsPlantScopedReminderOverridesButKeepsGlobalCareDefaults() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let plant = Plant(name: "Pothos", wateringIntervalDays: 3, fertilizingIntervalDays: 30)
+        context.insert(plant)
+        try context.save()
+
+        let recurrenceEndDate = makeDate(year: 2026, month: 8, day: 1)
+        PlantReminderPreferenceStore.setCareTypeReminderEnabled(false, for: .watering, defaults: defaults)
+        PlantReminderPreferenceStore.setPlanCalendarEnabled(false, forPlantID: plant.id, careType: .watering, defaults: defaults)
+        PlantReminderPreferenceStore.setSystemReminderEnabled(false, forPlantID: plant.id, careType: .watering, defaults: defaults)
+        PlantReminderPreferenceStore.setCompletionCalendarEnabled(false, forPlantID: plant.id, careType: .fertilizing, defaults: defaults)
+        PlantReminderPreferenceStore.setReminderLeadDays(3, forPlantID: plant.id, careType: .misting, defaults: defaults)
+        PlantReminderPreferenceStore.setRecurrenceEndDate(recurrenceEndDate, forPlantID: plant.id, careType: .fertilizing, defaults: defaults)
+
+        let result = MemberDeletionCommandService.deletePlant(
+            plant,
+            context: context,
+            userDefaults: defaults,
+            notifications: NoopReminderNotificationScheduler()
+        )
+
+        #expect(result.didPersist)
+        #expect(try context.fetch(FetchDescriptor<Plant>()).isEmpty)
+        #expect(!PlantReminderPreferenceStore.isCareTypeReminderEnabled(.watering, defaults: defaults))
+        #expect(PlantReminderPreferenceStore.planCalendarOverride(forPlantID: plant.id, careType: .watering, defaults: defaults) == nil)
+        #expect(PlantReminderPreferenceStore.systemReminderOverride(forPlantID: plant.id, careType: .watering, defaults: defaults) == nil)
+        #expect(PlantReminderPreferenceStore.completionCalendarOverride(forPlantID: plant.id, careType: .fertilizing, defaults: defaults) == nil)
+        #expect(PlantReminderPreferenceStore.reminderLeadDaysOverride(forPlantID: plant.id, careType: .misting, defaults: defaults) == nil)
+        #expect(PlantReminderPreferenceStore.recurrenceEndDate(forPlantID: plant.id, careType: .fertilizing, defaults: defaults) == nil)
+    }
+
     @Test func disabledPlantCompletionCalendarPreferenceHidesCompletedCareEvents() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext

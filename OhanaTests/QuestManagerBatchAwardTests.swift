@@ -331,7 +331,7 @@ struct QuestManagerBatchAwardTests {
         _ = questManager.batchAward(type: .care(type: .bath), pets: [first, second], context: context)
 
         let session = try #require(try context.fetch(FetchDescriptor<SharedCareSession>()).first)
-        let result = SharedCareSessionMaintenance.deleteCascade(
+        let result = try SharedCareSessionMaintenance.deleteCascade(
             session,
             context: context,
             deletedByHumanId: executor.id.uuidString,

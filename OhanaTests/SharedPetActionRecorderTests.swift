@@ -103,7 +103,7 @@ struct SharedPetActionRecorderTests {
         #expect(hygieneLogs.count == 2)
         #expect(Set(hygieneLogs.map(\.sharedSessionId)) == Set([session.id.uuidString]))
 
-        let deleteResult = SharedCareSessionMaintenance.deleteCascade(session, context: context)
+        let deleteResult = try SharedCareSessionMaintenance.deleteCascade(session, context: context)
         let remainingHygieneLogs = try context.fetch(FetchDescriptor<PetHygieneLog>())
 
         #expect(Set(deleteResult.hygieneLogIDs) == Set(hygieneLogs.map(\.id)))
@@ -828,7 +828,7 @@ struct SharedPetActionRecorderTests {
         )
         try context.save()
 
-        _ = FeedRecordCommand.updateLog(
+        _ = try FeedRecordCommand.updateLog(
             editedLog,
             grams: 80,
             date: Date(timeIntervalSince1970: 2400),
@@ -1008,7 +1008,7 @@ struct SharedPetActionRecorderTests {
         context.insert(unrelatedSameModelLedger)
         try context.save()
 
-        let result = SharedCareSessionMaintenance.deleteCascade(
+        let result = try SharedCareSessionMaintenance.deleteCascade(
             session,
             context: context,
             deletedByHumanId: human.id.uuidString,

@@ -15,7 +15,7 @@ struct QuickWaterCommandTests {
         try context.save()
         defer { clearWaterDefaults(for: pet) }
 
-        let firstReminders = WaterPlanWriter.replacePlan(
+        let firstReminders = try WaterPlanWriter.replacePlan(
             pet: pet,
             times: [
                 date(year: 2026, month: 6, day: 1, hour: 10),
@@ -29,7 +29,7 @@ struct QuickWaterCommandTests {
         #expect(firstEvents.count == 2)
         #expect(!firstReminders.isEmpty)
 
-        _ = WaterPlanWriter.replacePlan(
+        _ = try WaterPlanWriter.replacePlan(
             pet: pet,
             times: [date(year: 2026, month: 6, day: 1, hour: 12)],
             allEvents: firstEvents,
@@ -61,13 +61,13 @@ struct QuickWaterCommandTests {
         context.insert(event)
         try context.save()
 
-        let first = WaterPlanWriter.ensureUpcomingReminders(
+        let first = try WaterPlanWriter.ensureUpcomingReminders(
             pet: pet,
             allEvents: [event],
             context: context,
             now: now
         )
-        let second = WaterPlanWriter.ensureUpcomingReminders(
+        let second = try WaterPlanWriter.ensureUpcomingReminders(
             pet: pet,
             allEvents: [event],
             context: context,
@@ -88,7 +88,7 @@ struct QuickWaterCommandTests {
         try context.save()
         defer { clearWaterDefaults(for: pet) }
 
-        _ = WaterPlanWriter.replacePlan(
+        _ = try WaterPlanWriter.replacePlan(
             pet: pet,
             times: [date(year: 2026, month: 6, day: 1, hour: 10)],
             allEvents: [],
@@ -201,7 +201,7 @@ struct QuickWaterCommandTests {
             revisions: SharedDomainRevisionPublisher(center: center)
         )
 
-        _ = executor.saveWaterPlan(
+        _ = try executor.saveWaterPlan(
             pet: pet,
             targets: [pet],
             times: [date(year: 2026, month: 6, day: 1, hour: 10)],

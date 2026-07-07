@@ -241,6 +241,16 @@ nonisolated enum PlantReminderPreferenceStore {
         }
     }
 
+    static func removePlantScopedOverrides(forPlantID plantID: UUID, defaults: UserDefaults = .standard) {
+        for careType in controllableCareTypes {
+            defaults.removeObject(forKey: plantCareKey(prefix: plantCarePlanCalendarPrefix, plantID: plantID, careType: careType))
+            defaults.removeObject(forKey: plantCareKey(prefix: plantCareSystemReminderPrefix, plantID: plantID, careType: careType))
+            defaults.removeObject(forKey: plantCareKey(prefix: plantCareCompletionCalendarPrefix, plantID: plantID, careType: careType))
+            defaults.removeObject(forKey: plantCareKey(prefix: plantCareLeadDaysPrefix, plantID: plantID, careType: careType))
+            defaults.removeObject(forKey: plantCareKey(prefix: plantCareRecurrenceEndPrefix, plantID: plantID, careType: careType))
+        }
+    }
+
     static func shouldDeliverNotification(for event: Event, defaults: UserDefaults = .standard) -> Bool {
         guard !isTravelModeEnabled(defaults: defaults) else { return false }
         guard let type = careType(forEventType: event.eventType) else { return true }

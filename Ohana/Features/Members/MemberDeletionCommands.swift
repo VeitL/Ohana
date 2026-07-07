@@ -182,6 +182,7 @@ enum MemberDeletionCommandService {
     static func deletePlant(
         _ plant: Plant,
         context: ModelContext,
+        userDefaults: UserDefaults = .standard,
         notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> MemberDeletionCommandResult {
         let now = Date()
@@ -218,6 +219,7 @@ enum MemberDeletionCommandService {
             )
         }
         notificationCancels.flush()
+        PlantReminderPreferenceStore.removePlantScopedOverrides(forPlantID: plantID, defaults: userDefaults)
 
         return MemberDeletionCommandResult(
             entityID: plantID,
