@@ -198,16 +198,18 @@ struct DesignSpecControlsPanelV4: View {
 struct DesignSpecAuditPanelV4: View {
     let selection: DesignSpecSelectionV4
     let mode: DesignPreviewModeV4
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var palette: DesignSpecPaletteV4 {
         DesignSpecPaletteV4(selection: selection, mode: mode)
     }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         let results = DesignSpecAuditEngineV4.results(for: selection)
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("设计检查 / Design Audit", systemImage: "checkmark.shield.fill")
+                Label(l.tr(zh: "设计检查", en: "Design Audit"), systemImage: "checkmark.shield.fill")
                     .font(DesignSpecUIV4.typeFont(13, weight: .black, selection: selection))
                     .foregroundStyle(palette.primaryText)
                 Spacer()

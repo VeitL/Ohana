@@ -553,7 +553,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
                     return nil
                 }
                 return CarePlanOverdueStatus(
-                    title: "用药",
+                    title: "Medication",
                     actionType: "humanMedication",
                     scheduledAt: dose.scheduledTime,
                     daysOverdue: overdueDays(from: dose.scheduledTime, to: now, calendar: calendar),
@@ -594,7 +594,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
                     return nil
                 }
                 return CarePlanOverdueStatus(
-                    title: "用药",
+                    title: "Medication",
                     actionType: "humanMedication",
                     scheduledAt: dose.scheduledTime,
                     daysOverdue: 0,
@@ -651,7 +651,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     ) -> [CarePlanOverdueStatus] {
         [
             cycleWarning(
-                title: "换水",
+                title: "Water change",
                 actionType: "waterChange",
                 status: WaterCareCycleStatusCalculator.waterChangeStatus(
                     for: pet,
@@ -663,7 +663,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
                 calendar: calendar
             ),
             cycleWarning(
-                title: "滤芯",
+                title: "Filter",
                 actionType: "filterClean",
                 status: WaterCareCycleStatusCalculator.filterCleanStatus(
                     for: pet,
@@ -675,7 +675,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
                 calendar: calendar
             ),
             cycleWarning(
-                title: "更换",
+                title: "Replacement",
                 actionType: "filterClean",
                 status: WaterCareCycleStatusCalculator.filterReplaceStatus(
                     for: pet,
@@ -698,7 +698,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     ) -> [CarePlanOverdueStatus] {
         [
             cycleDueTodayStatus(
-                title: "换水",
+                title: "Water change",
                 actionType: "waterChange",
                 status: WaterCareCycleStatusCalculator.waterChangeStatus(
                     for: pet,
@@ -710,7 +710,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
                 calendar: calendar
             ),
             cycleDueTodayStatus(
-                title: "滤芯",
+                title: "Filter",
                 actionType: "filterClean",
                 status: WaterCareCycleStatusCalculator.filterCleanStatus(
                     for: pet,
@@ -722,7 +722,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
                 calendar: calendar
             ),
             cycleDueTodayStatus(
-                title: "更换",
+                title: "Replacement",
                 actionType: "filterClean",
                 status: WaterCareCycleStatusCalculator.filterReplaceStatus(
                     for: pet,

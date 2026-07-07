@@ -17,26 +17,26 @@ nonisolated enum QuickActionPickerCatalog {
         let colorHex: String
     }
 
-    private static var all: [Option] {
+    private static func all(localization l: L10n) -> [Option] {
         [
-            Option(id: "walk", label: "遛狗", icon: "figure.walk", colorHex: "14B8A6"),
-            Option(id: "feed", label: "喂食", icon: "fork.knife", colorHex: "FFDD44"),
-            Option(id: "water", label: "喂水", icon: "drop.fill", colorHex: "00D4AA"),
-            Option(id: "potty", label: "便便", icon: "allergens", colorHex: "FF8C42"),
-            Option(id: "litter", label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF"),
-            Option(id: "waterChange", label: "换水", icon: "arrow.2.circlepath", colorHex: "4ECDC4"),
-            Option(id: "filterClean", label: "清滤材", icon: "sparkles", colorHex: "A78BFA"),
-            Option(id: "groom", label: "护理", icon: "scissors", colorHex: "FF8C42"),
-            Option(id: "health", label: "健康", icon: "heart.fill", colorHex: "FF4757"),
-            Option(id: "medication", label: "用药", icon: "pill.fill", colorHex: "A855F7"),
-            Option(id: "expense", label: "花费", icon: AppCurrency.systemIconName, colorHex: "A78BFA"),
-            Option(id: "weight", label: "体重", icon: "scalemass.fill", colorHex: "80FFEA"),
-            Option(id: "play", label: "陪玩", icon: "tennisball.fill", colorHex: "FF6B6B"),
-            Option(id: "moment", label: "记录", icon: "camera.circle.fill", colorHex: "FF6B9D"),
-            Option(id: "cageCleaning", label: "清鸟笼", icon: "basket.fill", colorHex: "FFD166"),
-            Option(id: "freeFlight", label: "放飞", icon: "bird.fill", colorHex: "06D6A0"),
-            Option(id: "misting", label: "喷水", icon: "cloud.drizzle.fill", colorHex: "118AB2"),
-            Option(id: "substrateChange", label: "换垫材", icon: "leaf.fill", colorHex: "07DB8B")
+            Option(id: "walk", label: l.quickActionLabel(for: "walk"), icon: "figure.walk", colorHex: "14B8A6"),
+            Option(id: "feed", label: l.quickActionLabel(for: "feed"), icon: "fork.knife", colorHex: "FFDD44"),
+            Option(id: "water", label: l.quickActionLabel(for: "water"), icon: "drop.fill", colorHex: "00D4AA"),
+            Option(id: "potty", label: l.quickActionLabel(for: "potty"), icon: "allergens", colorHex: "FF8C42"),
+            Option(id: "litter", label: l.quickActionLabel(for: "litter"), icon: "trash.fill", colorHex: "5B6AFF"),
+            Option(id: "waterChange", label: l.quickActionLabel(for: "waterChange"), icon: "arrow.2.circlepath", colorHex: "4ECDC4"),
+            Option(id: "filterClean", label: l.quickActionLabel(for: "filterClean"), icon: "sparkles", colorHex: "A78BFA"),
+            Option(id: "groom", label: l.quickActionLabel(for: "groom"), icon: "scissors", colorHex: "FF8C42"),
+            Option(id: "health", label: l.quickActionLabel(for: "health"), icon: "heart.fill", colorHex: "FF4757"),
+            Option(id: "medication", label: l.quickActionLabel(for: "medication"), icon: "pill.fill", colorHex: "A855F7"),
+            Option(id: "expense", label: l.quickActionLabel(for: "expense"), icon: AppCurrency.systemIconName, colorHex: "A78BFA"),
+            Option(id: "weight", label: l.quickActionLabel(for: "weight"), icon: "scalemass.fill", colorHex: "80FFEA"),
+            Option(id: "play", label: l.quickActionLabel(for: "play"), icon: "tennisball.fill", colorHex: "FF6B6B"),
+            Option(id: "moment", label: l.quickActionLabel(for: "moment"), icon: "camera.circle.fill", colorHex: "FF6B9D"),
+            Option(id: "cageCleaning", label: l.quickActionLabel(for: "cageCleaning"), icon: "basket.fill", colorHex: "FFD166"),
+            Option(id: "freeFlight", label: l.quickActionLabel(for: "freeFlight"), icon: "bird.fill", colorHex: "06D6A0"),
+            Option(id: "misting", label: l.quickActionLabel(for: "misting"), icon: "cloud.drizzle.fill", colorHex: "118AB2"),
+            Option(id: "substrateChange", label: l.quickActionLabel(for: "substrateChange"), icon: "leaf.fill", colorHex: "07DB8B")
         ]
     }
 
@@ -60,14 +60,14 @@ nonisolated enum QuickActionPickerCatalog {
         return allowed
     }
 
-    static func options(for pet: Pet) -> [Option] {
+    static func options(for pet: Pet, localization l: L10n = L10n()) -> [Option] {
         let allowed = allowedActionTypeIds(forSpecies: pet.species)
-        return all.filter { allowed.contains($0.id) }
+        return all(localization: l).filter { allowed.contains($0.id) }
     }
 
-    static func available(for pet: Pet, existingActionTypes: Set<String>) -> [Option] {
+    static func available(for pet: Pet, existingActionTypes: Set<String>, localization l: L10n = L10n()) -> [Option] {
         let existing = normalizedExistingActionTypes(existingActionTypes)
-        return options(for: pet).filter { !existing.contains($0.id) }
+        return options(for: pet, localization: l).filter { !existing.contains($0.id) }
     }
 
     private static func normalizedExistingActionTypes(_ actionTypes: Set<String>) -> Set<String> {
@@ -109,6 +109,57 @@ nonisolated struct QuickActionItem: Identifiable, Codable, Hashable {
         self.actionType = actionType
         self.entityId = entityId
         self.entityKindRaw = entityKind?.rawValue
+    }
+
+    func displayLabel(localization l: L10n) -> String {
+        l.quickActionLabel(for: actionType, fallback: label)
+    }
+}
+
+extension L10n {
+    nonisolated func quickActionLabel(for actionType: String, fallback: String? = nil) -> String {
+        switch actionType {
+        case "feed":
+            homeQAFeed
+        case "water":
+            homeQAWater
+        case "waterChange":
+            homeQAWaterChange
+        case "filterClean":
+            homeQAFilterClean
+        case "walk":
+            homeQAWalk
+        case "potty":
+            homeQAPotty
+        case "litter":
+            homeQALitter
+        case "groom":
+            homeQAGroom
+        case "health":
+            tr(zh: "健康", en: "Health", de: "Gesundheit")
+        case "medication", "humanMedication":
+            homeQAMeds
+        case "expense", "humanExpense":
+            expense
+        case "weight", "humanWeight":
+            homeQAWeight
+        case "play":
+            homeQAPlay
+        case "moment", "humanNote":
+            homeQANote
+        case "cageCleaning":
+            homeQACageClean
+        case "freeFlight":
+            homeQAFreeFlight
+        case "misting":
+            tr(zh: "喷水", en: "Mist", de: "Sprühen")
+        case "substrateChange":
+            tr(zh: "换垫材", en: "Substrate", de: "Substrat")
+        case "humanWorkout":
+            homeQASport
+        default:
+            fallback ?? actionType
+        }
     }
 }
 

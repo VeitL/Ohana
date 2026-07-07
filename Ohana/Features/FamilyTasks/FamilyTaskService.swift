@@ -950,6 +950,11 @@ enum FamilyTaskService {
                 context: context,
                 save: false
             )
+            let confirmationNote = L10n.current.tr(
+                zh: "\(reviewer?.name ?? payer.name) 确认 · \(task.title)",
+                en: "\(reviewer?.name ?? payer.name) confirmed · \(task.title)",
+                de: "\(reviewer?.name ?? payer.name) bestaetigt · \(task.title)"
+            )
             let receiverLedger = careLedger.record(
                 occurredAt: Date(),
                 actorKind: .human,
@@ -960,7 +965,7 @@ enum FamilyTaskService {
                 actionType: "familyTaskRewardReceived",
                 amountValue: 0,
                 amountUnit: "",
-                note: "\(reviewer?.name ?? payer.name) 确认 · \(task.title)",
+                note: confirmationNote,
                 source: .service,
                 sourceEventId: nil,
                 sourceReminderId: task.relatedReminderId,
@@ -981,7 +986,7 @@ enum FamilyTaskService {
                             delta: -task.rewardCoconuts,
                             entryKind: .transferOut,
                             source: .familyTask,
-                            title: "家庭任务悬赏支付",
+                            title: DomainCareRewardGeneralTitle.familyTaskRewardPaid,
                             emoji: "🎯",
                             actorId: payer.id.uuidString,
                             actorName: payer.name,
@@ -998,7 +1003,7 @@ enum FamilyTaskService {
                             delta: task.rewardCoconuts,
                             entryKind: .transferIn,
                             source: .familyTask,
-                            title: "家庭任务悬赏收入",
+                            title: DomainCareRewardGeneralTitle.familyTaskRewardReceived,
                             emoji: "🎯",
                             actorId: receiver.id.uuidString,
                             actorName: receiver.name,

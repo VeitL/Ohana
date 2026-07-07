@@ -251,7 +251,7 @@ nonisolated enum HomeInteractionSnapshotBuilder {
         )
         let visibleItems = Array(currentItems.prefix(QuickActionLimit.maxItemsPerEntity))
         let candidateItems = stableItems(
-            QuickActionPickerCatalog.options(for: pet).map { option in
+            QuickActionPickerCatalog.options(for: pet, localization: l).map { option in
                 QuickActionItem(
                     id: "\(EntityKind.pet.rawValue)-\(pet.id.uuidString)-\(option.id)",
                     label: option.label,

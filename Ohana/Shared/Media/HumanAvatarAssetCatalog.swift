@@ -2,7 +2,7 @@
 //  HumanAvatarAssetCatalog.swift
 //  Ohana
 //
-//  Deterministic mapping from human profile selections to bundled avatar PNGs.
+//  Deterministic mapping from human profile selections to bundled avatar assets.
 //
 
 import Foundation
@@ -33,10 +33,21 @@ enum HumanAvatarAssetCatalog {
     nonisolated static func avatarData(filename: String, bundle: Bundle = .main) -> Data? {
         let name = (filename as NSString).deletingPathExtension
         let ext = (filename as NSString).pathExtension
-        guard let url = bundle.url(forResource: name, withExtension: ext, subdirectory: assetDirectory) else {
+        guard let url = avatarURL(name: name, preferredExtension: ext, bundle: bundle) else {
             return nil
         }
         return try? Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
+    }
+
+    private nonisolated static func avatarURL(name: String, preferredExtension: String, bundle: Bundle) -> URL? {
+        if preferredExtension != "webp",
+           let url = bundle.url(forResource: name, withExtension: "webp", subdirectory: assetDirectory) {
+            return url
+        }
+        if let url = bundle.url(forResource: name, withExtension: preferredExtension, subdirectory: assetDirectory) {
+            return url
+        }
+        return bundle.url(forResource: name, withExtension: "png", subdirectory: assetDirectory)
     }
 
     nonisolated static func ageGroup(for birthday: Date?, now: Date = Date(), calendar: Calendar = .current) -> AgeGroup {

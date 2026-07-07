@@ -12,6 +12,7 @@ import SwiftUI
 
 struct UIGuidelinesView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("ohanaDesignSpecSelectionV4") private var storedSelectionV4 = DesignSpecSelectionV4.ohanaDefault.encodedString(pretty: false)
     @AppStorage("ohanaDesignSpecSelectionV3") private var storedSelectionV3 = ""
 
@@ -25,6 +26,7 @@ struct UIGuidelinesView: View {
     private var palette: DesignSpecPaletteV4 {
         DesignSpecPaletteV4(selection: selection, mode: previewMode)
     }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -81,10 +83,10 @@ struct UIGuidelinesView: View {
                             .background(palette.controlFill, in: Circle())
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("成长解锁流程 / Growth Unlock")
+                            Text(l.tr(zh: "成长解锁流程", en: "Growth Unlock"))
                                 .font(DesignSpecUIV4.typeFont(13, weight: .black, selection: selection))
                                 .foregroundStyle(palette.primaryText)
-                            Text("新手引导、树等级、功能锁测试")
+                            Text(l.tr(zh: "新手引导、树等级、功能锁测试", en: "Onboarding, tree levels, and feature lock tests"))
                                 .font(DesignSpecUIV4.typeFont(10, weight: .bold, selection: selection))
                                 .foregroundStyle(palette.secondaryText)
                         }
@@ -104,7 +106,7 @@ struct UIGuidelinesView: View {
                 DesignSpecControlsPanelV4(selection: $selection, step: $step, mode: previewMode)
 
                 advancedToggle(
-                    title: "设计检查 / Design Audit",
+                    title: l.tr(zh: "设计检查", en: "Design Audit"),
                     icon: "checkmark.shield.fill",
                     isExpanded: $showAudit
                 )
@@ -113,7 +115,7 @@ struct UIGuidelinesView: View {
                 }
 
                 advancedToggle(
-                    title: "导出规范 / Export",
+                    title: l.tr(zh: "导出规范", en: "Export"),
                     icon: "square.and.arrow.up.fill",
                     isExpanded: $showExport
                 )
@@ -198,7 +200,7 @@ struct UIGuidelinesView: View {
                 Button {
                     copy(DesignSpecExporterV4.json(selection: selection, mode: previewMode), message: "已复制 V4 JSON")
                 } label: {
-                    Label("复制 JSON", systemImage: "curlybraces")
+                    Label(l.tr(zh: "复制 JSON", en: "Copy JSON"), systemImage: "curlybraces")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(buttonStyle(.secondary))
@@ -206,7 +208,7 @@ struct UIGuidelinesView: View {
                 Button {
                     copy(DesignSpecExporterV4.markdown(selection: selection, mode: previewMode), message: "已复制 Markdown")
                 } label: {
-                    Label("复制 MD", systemImage: "doc.on.doc.fill")
+                    Label(l.tr(zh: "复制 MD", en: "Copy MD"), systemImage: "doc.on.doc.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(buttonStyle(.secondary))

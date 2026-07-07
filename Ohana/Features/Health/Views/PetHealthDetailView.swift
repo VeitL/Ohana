@@ -725,7 +725,7 @@ struct PetHealthDetailContentView: View {
 
     func refreshHealthAlerts() {
         if let healthAlertSource {
-            healthAlerts = PetHealthAlertEngine().scanAlerts(sources: [healthAlertSource])
+            healthAlerts = PetHealthAlertEngine().scanAlerts(sources: [healthAlertSource], localization: l)
         } else {
             healthAlerts = []
         }

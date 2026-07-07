@@ -160,7 +160,7 @@ struct LegacyBountyCommandExecutor {
                 _ = try questManager.stageSpecialCoconutReward(
                     amount: task.reward,
                     emoji: "📋",
-                    title: "完成家庭任务",
+                    title: DomainCareRewardGeneralTitle.familyTaskComplete,
                     actorId: activeHumanId.isEmpty ? nil : activeHumanId,
                     actorName: currentHuman?.name,
                     source: .familyTask,

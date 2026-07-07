@@ -77,7 +77,7 @@ extension QuestManager {
         guard recordSpecialCoconutReward(
             15,
             emoji: "🍖",
-            title: "首次喜食打卡奖励",
+            title: DomainCareRewardGeneralTitle.questFirstMeal,
             actorId: actorId,
             actorName: actorName,
             rewardKey: "welcome:firstMeal",
@@ -94,7 +94,7 @@ extension QuestManager {
         guard recordSpecialCoconutReward(
             10,
             emoji: "🎨",
-            title: "设置家人主题色",
+            title: DomainCareRewardGeneralTitle.questThemeColor,
             actorId: actorId,
             actorName: actorName,
             rewardKey: "welcome:themeColor",
@@ -127,7 +127,7 @@ extension QuestManager {
         guard recordSpecialCoconutReward(
             10,
             emoji: "🚶",
-            title: "今日步数达标奖励",
+            title: DomainCareRewardGeneralTitle.questDailyStepGoal,
             actorId: actorId,
             actorName: actorName,
             rewardKey: "dailyStepGoal:\(EconomyDailyBudgetStore.dayKey(for: today))",
@@ -160,7 +160,7 @@ extension QuestManager {
         guard recordSpecialCoconutReward(
             5,
             emoji: "🐾",
-            title: "人宠同行奖励",
+            title: DomainCareRewardGeneralTitle.questBondedWalk,
             actorId: actorId,
             actorName: actorName,
             rewardKey: "bondedWalk:\(EconomyDailyBudgetStore.dayKey(for: today))",

@@ -232,7 +232,11 @@ enum WaterPlanWriter {
         for time in normalizedTimes(times, count: times.count, now: now, calendar: calendar) {
             let startDate = nextOccurrenceDate(forTimeOfDay: time, after: now, calendar: calendar)
             let intent = DomainScheduleCreateIntent(
-                title: "\(pet.name) 喂水",
+                title: L10n.current.tr(
+                    zh: "\(pet.name) 喂水",
+                    en: "\(pet.name) water",
+                    de: "\(pet.name) Wasser"
+                ),
                 startDate: startDate,
                 isAllDay: false,
                 eventType: EventType.daily.rawValue,

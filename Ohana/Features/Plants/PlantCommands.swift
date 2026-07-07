@@ -98,13 +98,20 @@ enum PlantCareCommandService {
         if let healthStatus {
             plant.healthStatus = healthStatus
         }
+        let persistedPhotoData = photoData.map {
+            AttachmentPrivacySanitizer.sanitizedData(
+                $0,
+                filename: "plant-care-\(type.rawValue).jpg",
+                isImage: true
+            )
+        }
 
         let log = PlantCareLog(
             date: now,
             careType: type,
             note: careNote,
             executorId: authorizedExecutorId,
-            photoData: photoData,
+            photoData: persistedPhotoData,
             healthStatus: healthStatus
         )
         log.plant = plant
@@ -124,7 +131,7 @@ enum PlantCareCommandService {
                 quality: DomainCareRewardQuality.compose(
                     precise: false,
                     hasNote: !careNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                    hasPhoto: photoData != nil
+                    hasPhoto: persistedPhotoData != nil
                 ),
                 date: now,
                 executorId: authorizedExecutorId,

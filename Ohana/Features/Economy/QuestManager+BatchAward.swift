@@ -132,7 +132,7 @@ extension QuestManager {
                 reward: .care(type: type),
                 rewardTitle: batchRewardTitle(type: .care(type: type), targets: targets)
             )
-        case let .general(_, _, _, title) where title.contains("铲砂") || title.contains("铲屎"):
+        case let .general(_, _, _, title) where DomainCareRewardGeneralTitle.isLitterRewardTitle(title):
             let result = careEvents.recordSharedCareFact(
                 sourcePet: sourcePet,
                 targets: targets,
@@ -148,7 +148,7 @@ extension QuestManager {
             )
             guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
             return result.reward
-        case let .general(_, _, _, title) where title.contains("陪玩") || title.contains("逗玩"):
+        case let .general(_, _, _, title) where DomainCareRewardGeneralTitle.isPlayRewardTitle(title):
             let result = careEvents.recordSharedCareFact(
                 sourcePet: sourcePet,
                 targets: targets,
@@ -157,7 +157,7 @@ extension QuestManager {
                 context: context,
                 executorId: executorId,
                 reward: type,
-                rewardTitle: "共同陪玩 · \(targets.count)只",
+                rewardTitle: DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.sharedPlay, count: targets.count),
                 quality: .none,
                 date: date,
                 source: .quickAction

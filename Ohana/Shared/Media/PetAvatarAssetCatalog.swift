@@ -1103,7 +1103,14 @@ enum PetAvatarAssetCatalog {
     static func avatarURL(filename: String, bundle: Bundle = .main) -> URL? {
         let name = (filename as NSString).deletingPathExtension
         let ext = (filename as NSString).pathExtension
-        return bundle.url(forResource: name, withExtension: ext, subdirectory: assetDirectory)
+        if ext != "webp",
+           let url = bundle.url(forResource: name, withExtension: "webp", subdirectory: assetDirectory) {
+            return url
+        }
+        if let url = bundle.url(forResource: name, withExtension: ext, subdirectory: assetDirectory) {
+            return url
+        }
+        return bundle.url(forResource: name, withExtension: "png", subdirectory: assetDirectory)
     }
 
     static func avatarData(filename: String, bundle: Bundle = .main) -> Data? {

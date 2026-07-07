@@ -10,6 +10,7 @@ import SwiftUI
 struct WalletPetCardBack: View {
     let pet: Pet
     let cornerRadius: CGFloat
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     // MARK: - Callbacks
     var onShowSettings: () -> Void = {}
@@ -54,46 +55,47 @@ struct WalletPetCardBack: View {
     }
 
     private var isFish: Bool { pet.species.contains("鱼") }
+    private var l: L10n { L10n(appLanguage) }
 
     // MARK: - Section data
     private var sections: [FeatureSection] {
         // ── 健康管理 ──────────────────────────
         var healthEntries: [FeatureEntry] = [
-            FeatureEntry(id: "health", symbol: "stethoscope", title: "健康档案", action: onShowHealth),
-            FeatureEntry(id: "weight", symbol: "scalemass.fill", title: "体重记录", action: onShowWeight)
+            FeatureEntry(id: "health", symbol: "stethoscope", title: l.tr(zh: "健康档案", en: "Health", de: "Gesundheit"), action: onShowHealth),
+            FeatureEntry(id: "weight", symbol: "scalemass.fill", title: l.tr(zh: "体重记录", en: "Weight", de: "Gewicht"), action: onShowWeight)
         ]
         if !isFish {
             healthEntries.append(
-                FeatureEntry(id: "meds", symbol: "pills.fill", title: "用药管理", action: onShowMedications)
+                FeatureEntry(id: "meds", symbol: "pills.fill", title: l.tr(zh: "用药管理", en: "Medication", de: "Medikamente"), action: onShowMedications)
             )
         }
 
         // ── 日常生活 ──────────────────────────
         var dailyEntries: [FeatureEntry] = [
-            FeatureEntry(id: "food", symbol: "fork.knife", title: "饮食管理", action: onShowFood),
-            FeatureEntry(id: "hygiene", symbol: "bubbles.and.sparkles.fill", title: "清洁护理", action: onShowHygiene),
-            FeatureEntry(id: "potty", symbol: "drop.fill", title: "噗噗电台", action: onShowPotty),
-            FeatureEntry(id: "expenses", symbol: "creditcard.fill", title: "花费记录", action: onShowExpenses)
+            FeatureEntry(id: "food", symbol: "fork.knife", title: l.tr(zh: "饮食管理", en: "Food", de: "Futter"), action: onShowFood),
+            FeatureEntry(id: "hygiene", symbol: "bubbles.and.sparkles.fill", title: l.tr(zh: "清洁护理", en: "Hygiene", de: "Pflege"), action: onShowHygiene),
+            FeatureEntry(id: "potty", symbol: "drop.fill", title: l.tr(zh: "噗噗电台", en: "Potty", de: "Häufchen"), action: onShowPotty),
+            FeatureEntry(id: "expenses", symbol: "creditcard.fill", title: l.tr(zh: "花费记录", en: "Expenses", de: "Ausgaben"), action: onShowExpenses)
         ]
         if isDog {
             dailyEntries.insert(
-                FeatureEntry(id: "walks", symbol: "figure.walk", title: "遛狗记录", action: onShowWalks),
+                FeatureEntry(id: "walks", symbol: "figure.walk", title: l.tr(zh: "遛狗记录", en: "Walks", de: "Gassi"), action: onShowWalks),
                 at: 2
             )
         }
 
         // ── 档案与记忆 ──────────────────────────
         let archiveEntries: [FeatureEntry] = [
-            FeatureEntry(id: "basicInfo", symbol: "person.fill", title: "基本信息", action: onShowBasicInfo),
-            FeatureEntry(id: "documents", symbol: "doc.fill", title: "证件保障", action: onShowDocuments),
-            FeatureEntry(id: "moments", symbol: "sparkles", title: "重要时刻", action: onShowMoments),
-            FeatureEntry(id: "achievements", symbol: "trophy.fill", title: "成就", action: onShowAchievements)
+            FeatureEntry(id: "basicInfo", symbol: "person.fill", title: l.tr(zh: "基本信息", en: "Profile", de: "Profil"), action: onShowBasicInfo),
+            FeatureEntry(id: "documents", symbol: "doc.fill", title: l.tr(zh: "证件保障", en: "Documents", de: "Dokumente"), action: onShowDocuments),
+            FeatureEntry(id: "moments", symbol: "sparkles", title: l.tr(zh: "重要时刻", en: "Moments", de: "Momente"), action: onShowMoments),
+            FeatureEntry(id: "achievements", symbol: "trophy.fill", title: l.tr(zh: "成就", en: "Badges", de: "Erfolge"), action: onShowAchievements)
         ]
 
         return [
-            FeatureSection(id: "health", symbol: "cross.fill", title: "健康管理", entries: healthEntries),
-            FeatureSection(id: "daily", symbol: "sun.max.fill", title: "日常生活", entries: dailyEntries),
-            FeatureSection(id: "archive", symbol: "folder.fill", title: "档案与记忆", entries: archiveEntries)
+            FeatureSection(id: "health", symbol: "cross.fill", title: l.tr(zh: "健康管理", en: "Health", de: "Gesundheit"), entries: healthEntries),
+            FeatureSection(id: "daily", symbol: "sun.max.fill", title: l.tr(zh: "日常生活", en: "Daily care", de: "Alltag"), entries: dailyEntries),
+            FeatureSection(id: "archive", symbol: "folder.fill", title: l.tr(zh: "档案与记忆", en: "Archive", de: "Archiv"), entries: archiveEntries)
         ]
     }
 
@@ -150,7 +152,7 @@ struct WalletPetCardBack: View {
             HStack(spacing: 4) {
                 Image(systemName: section.symbol)
                     .font(OhanaFont.adaptive(size: 7, weight: .bold))
-                Text(LocalizedStringKey(section.title))
+                Text(section.title)
                     .font(OhanaFont.adaptive(size: 8, weight: .bold, design: .rounded))
                     .kerning(0.3)
                 Rectangle()
@@ -175,7 +177,7 @@ struct WalletPetCardBack: View {
                     .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(.white.opacity(0.95)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-                Text(LocalizedStringKey(entry.title))
+                Text(entry.title)
                     .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.9)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     .lineLimit(1)

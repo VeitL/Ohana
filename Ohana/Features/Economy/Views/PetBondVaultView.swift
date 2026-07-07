@@ -261,7 +261,7 @@ struct PetBondVaultContentView: View {
                         HStack(spacing: 10) {
                             Text(log.emoji).font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(log.title)
+                                Text(log.localizedTitle(l: l))
                                     .font(OhanaFont.caption(.black))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(1)

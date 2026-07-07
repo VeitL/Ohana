@@ -169,9 +169,10 @@ struct VerticalSolidHomeExpandedCardActions: View {
         let options = menuOptions(for: item)
         let menuPolicy = state.isLocked ? .none : state.menuPolicy.expandedPolicy
         let actionUsesQuickPath = menuPolicy.showsQuickButton
+        let title = item.displayLabel(localization: l)
         return VerticalHomeEmbeddedAction(
             id: item.id,
-            title: item.label,
+            title: title,
             icon: item.icon,
             actionType: item.actionType,
             statusText: state.status,
@@ -185,7 +186,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
             menuOptions: options,
             showsMenu: menuPolicy.showsMenu,
             showsQuickButton: menuPolicy.showsQuickButton,
-            quickAccessibilityLabel: item.label,
+            quickAccessibilityLabel: title,
             detailAccessibilityLabel: l.tr(zh: "查看详情", en: "Details", de: "Details"),
             detailAction: { onAction(item, false) },
             optionAction: { optionId in onOptionAction(item, optionId) },
@@ -198,9 +199,10 @@ struct VerticalSolidHomeExpandedCardActions: View {
         existingActionTypes: Set<String>
     ) -> VerticalHomeEmbeddedAction {
         let isAlreadyAdded = existingActionTypes.contains(normalizedActionType(item.actionType))
+        let title = item.displayLabel(localization: l)
         return VerticalHomeEmbeddedAction(
             id: item.actionType,
-            title: item.label,
+            title: title,
             icon: item.icon,
             actionType: item.actionType,
             isCompleted: false,

@@ -39,7 +39,7 @@ struct OhanaCoconutRewardEvent: Identifiable, Equatable {
         amount = entry.amount
         growthXP = entry.growthXP ?? 0
         emoji = entry.emoji
-        title = entry.feedbackMessage ?? entry.title
+        title = entry.localizedTitle
         actorId = entry.actorId
         date = entry.date
     }

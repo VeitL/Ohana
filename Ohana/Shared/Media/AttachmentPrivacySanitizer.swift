@@ -13,6 +13,7 @@ import UniformTypeIdentifiers
 
 nonisolated enum AttachmentPrivacySanitizer {
     static let jpegCompressionQuality: CGFloat = 0.86
+    static let maxPersistedImagePixel: CGFloat = 2048
 
     static func sanitizedData(
         _ data: Data,
@@ -28,7 +29,7 @@ nonisolated enum AttachmentPrivacySanitizer {
         ] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions),
               CGImageSourceGetType(source) != nil,
-              let image = CGImageSourceCreateImageAtIndex(source, 0, sourceOptions) else {
+              let image = downsampledImage(from: source, maxPixel: maxPersistedImagePixel) else {
             OhanaLog.warning(
                 "Attachment sanitizer could not decode image bytes; preserving original data",
                 category: "Privacy"
@@ -36,6 +37,27 @@ nonisolated enum AttachmentPrivacySanitizer {
             return data
         }
 
+        guard let sanitized = jpegData(from: image, compressionQuality: jpegCompressionQuality) else {
+            OhanaLog.warning(
+                "Attachment sanitizer could not re-encode image bytes; preserving original data",
+                category: "Privacy"
+            )
+            return data
+        }
+        return sanitized
+    }
+
+    private static func downsampledImage(from source: CGImageSource, maxPixel: CGFloat) -> CGImage? {
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: Int(max(1, maxPixel))
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary)
+    }
+
+    private static func jpegData(from image: CGImage, compressionQuality: CGFloat) -> Data? {
         let sanitized = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             sanitized,
@@ -47,15 +69,12 @@ nonisolated enum AttachmentPrivacySanitizer {
                 "Attachment sanitizer could not re-encode image bytes; preserving original data",
                 category: "Privacy"
             )
-            return data
+            return nil
         }
 
-        var destinationProperties: [CFString: Any] = [
-            kCGImageDestinationLossyCompressionQuality: jpegCompressionQuality
+        let destinationProperties: [CFString: Any] = [
+            kCGImageDestinationLossyCompressionQuality: compressionQuality
         ]
-        if let orientation = imageOrientation(from: source) {
-            destinationProperties[kCGImagePropertyOrientation] = orientation
-        }
         CGImageDestinationAddImage(destination, image, destinationProperties as CFDictionary)
 
         guard CGImageDestinationFinalize(destination) else {
@@ -63,7 +82,7 @@ nonisolated enum AttachmentPrivacySanitizer {
                 "Attachment sanitizer could not finalize image bytes; preserving original data",
                 category: "Privacy"
             )
-            return data
+            return nil
         }
 
         return sanitized as Data
@@ -71,9 +90,26 @@ nonisolated enum AttachmentPrivacySanitizer {
 
     static func sanitizedImageData(
         from image: UIImage,
-        compressionQuality: CGFloat = jpegCompressionQuality
+        compressionQuality: CGFloat = jpegCompressionQuality,
+        maxPixel: CGFloat = maxPersistedImagePixel
     ) -> Data? {
-        image.jpegData(compressionQuality: compressionQuality)
+        let longestPixel = max(image.size.width * image.scale, image.size.height * image.scale)
+        guard longestPixel > maxPixel, maxPixel > 0 else {
+            return image.jpegData(compressionQuality: compressionQuality)
+        }
+
+        let ratio = maxPixel / longestPixel
+        let targetSize = CGSize(
+            width: max(1, image.size.width * image.scale * ratio),
+            height: max(1, image.size.height * image.scale * ratio)
+        )
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let resized = UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+        return resized.jpegData(compressionQuality: compressionQuality)
     }
 
     static func isImageFilename(_ filename: String) -> Bool {
@@ -84,13 +120,5 @@ nonisolated enum AttachmentPrivacySanitizer {
 
     private static func shouldSanitize(filename: String, isImage: Bool) -> Bool {
         isImage || isImageFilename(filename)
-    }
-
-    private static func imageOrientation(from source: CGImageSource) -> Int? {
-        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-              let value = properties[kCGImagePropertyOrientation] as? NSNumber else {
-            return nil
-        }
-        return value.intValue
     }
 }

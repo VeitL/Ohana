@@ -114,12 +114,16 @@ enum Avatar2DCandidateProvider {
     }
 
     private static func bundledFilenames(directory: String) -> [String] {
-        guard let urls = Bundle.main.urls(forResourcesWithExtension: "png", subdirectory: directory) else {
-            return []
-        }
-        return urls
-            .map(\.lastPathComponent)
+        let pngURLs = Bundle.main.urls(forResourcesWithExtension: "png", subdirectory: directory) ?? []
+        let webpURLs = Bundle.main.urls(forResourcesWithExtension: "webp", subdirectory: directory) ?? []
+        var seen: Set<String> = []
+        return (pngURLs + webpURLs)
+            .map { url in
+                let name = (url.lastPathComponent as NSString).deletingPathExtension
+                return "\(name).png"
+            }
             .filter { $0.contains("_") }
+            .filter { seen.insert($0).inserted }
             .sorted()
     }
 

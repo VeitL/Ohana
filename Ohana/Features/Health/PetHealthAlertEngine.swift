@@ -138,29 +138,29 @@ final nonisolated class PetHealthAlertEngine {
     // MARK: - 主入口
 
     /// 扫描所有宠物，返回按严重程度排序的警报列表
-    func scanAlerts(pets: [Pet]) -> [HealthAlert] {
-        scanAlerts(sources: pets.map(PetHealthAlertSource.init(pet:)))
+    func scanAlerts(pets: [Pet], localization l: L10n = L10n()) -> [HealthAlert] {
+        scanAlerts(sources: pets.map(PetHealthAlertSource.init(pet:)), localization: l)
     }
 
-    func scanAlerts(sources: [PetHealthAlertSource]) -> [HealthAlert] {
+    func scanAlerts(sources: [PetHealthAlertSource], localization l: L10n = L10n()) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
         let now = Date()
         let cal = Calendar.current
 
         for source in sources where source.canWriteHealthFacts {
-            alerts += checkVaccines(source: source, now: now, cal: cal)
-            alerts += checkDeworming(source: source, now: now, cal: cal)
-            alerts += checkWeight(source: source, now: now, cal: cal)
-            alerts += checkCheckIn(source: source, now: now, cal: cal)
-            alerts += checkPotty(source: source, now: now, cal: cal)
-            alerts += checkWalk(source: source, now: now, cal: cal)
-            alerts += checkCheckup(source: source, now: now, cal: cal)
-            alerts += checkDocuments(source: source, now: now, cal: cal)
+            alerts += checkVaccines(source: source, now: now, cal: cal, localization: l)
+            alerts += checkDeworming(source: source, now: now, cal: cal, localization: l)
+            alerts += checkWeight(source: source, now: now, cal: cal, localization: l)
+            alerts += checkCheckIn(source: source, now: now, cal: cal, localization: l)
+            alerts += checkPotty(source: source, now: now, cal: cal, localization: l)
+            alerts += checkWalk(source: source, now: now, cal: cal, localization: l)
+            alerts += checkCheckup(source: source, now: now, cal: cal, localization: l)
+            alerts += checkDocuments(source: source, now: now, cal: cal, localization: l)
 
             // 新增检查项目
-            alerts += checkSymptoms(source: source, now: now, cal: cal)
-            alerts += checkReproductiveHealth(source: source, now: now, cal: cal)
-            alerts += checkCrossCorrelation(source: source, now: now, cal: cal)
+            alerts += checkSymptoms(source: source, now: now, cal: cal, localization: l)
+            alerts += checkReproductiveHealth(source: source, now: now, cal: cal, localization: l)
+            alerts += checkCrossCorrelation(source: source, now: now, cal: cal, localization: l)
         }
 
         return alerts.sorted { $0.severity > $1.severity }
@@ -168,7 +168,7 @@ final nonisolated class PetHealthAlertEngine {
 
     // MARK: - 疫苗检测
 
-    private func checkVaccines(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkVaccines(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
         let vaccineLogs = source.healthLogs.filter { $0.healthLogType == .vaccine && $0.expirationDate != nil }
 
@@ -179,8 +179,12 @@ final nonisolated class PetHealthAlertEngine {
                 alerts.append(HealthAlert(
                     id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                     type: .vaccineExpired,
-                    title: "疫苗已过期",
-                    detail: "「\(log.note.isEmpty ? "疫苗" : log.note)」已于 \(expiry.formatted(.dateTime.month().day())) 过期，请尽快补种。",
+                    title: l.tr(zh: "疫苗已过期", en: "Vaccine expired", de: "Impfung abgelaufen"),
+                    detail: l.tr(
+                        zh: "「\(log.note.isEmpty ? l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung") : log.note)」已于 \(expiry.formatted(.dateTime.month().day())) 过期，请尽快补种。",
+                        en: "\"\(log.note.isEmpty ? l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung") : log.note)\" expired on \(expiry.formatted(.dateTime.month().day())). Please schedule a booster soon.",
+                        de: "\"\(log.note.isEmpty ? l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung") : log.note)\" ist am \(expiry.formatted(.dateTime.month().day())) abgelaufen. Bitte bald auffrischen."
+                    ),
                     severity: .urgent,
                     generatedAt: now
                 ))
@@ -188,8 +192,12 @@ final nonisolated class PetHealthAlertEngine {
                 alerts.append(HealthAlert(
                     id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                     type: .vaccineExpiringSoon,
-                    title: "疫苗即将到期",
-                    detail: "「\(log.note.isEmpty ? "疫苗" : log.note)」将在 \(days) 天后到期，建议提前预约。",
+                    title: l.tr(zh: "疫苗即将到期", en: "Vaccine expiring soon", de: "Impfung läuft bald ab"),
+                    detail: l.tr(
+                        zh: "「\(log.note.isEmpty ? l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung") : log.note)」将在 \(days) 天后到期，建议提前预约。",
+                        en: "\"\(log.note.isEmpty ? l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung") : log.note)\" expires in \(days) days. Consider booking ahead.",
+                        de: "\"\(log.note.isEmpty ? l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung") : log.note)\" läuft in \(days) Tagen ab. Plane am besten frühzeitig."
+                    ),
                     severity: .warning,
                     generatedAt: now
                 ))
@@ -200,7 +208,7 @@ final nonisolated class PetHealthAlertEngine {
 
     // MARK: - 驱虫检测
 
-    private func checkDeworming(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkDeworming(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
         let dewormLogs = source.healthLogs.filter {
             ($0.healthLogType == .dewormingInternal || $0.healthLogType == .dewormingExternal)
@@ -210,12 +218,18 @@ final nonisolated class PetHealthAlertEngine {
             guard let expiry = log.expirationDate else { continue }
             let days = cal.dateComponents([.day], from: now, to: expiry).day ?? 0
             if days <= 14 {
-                let label = log.healthLogType == .dewormingInternal ? "体内驱虫" : "体外驱虫"
+                let label = log.healthLogType == .dewormingInternal
+                    ? l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+                    : l.tr(zh: "体外驱虫", en: "External parasite care", de: "Äußerer Parasitenschutz")
                 alerts.append(HealthAlert(
                     id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                     type: .dewormingDue,
-                    title: "\(label)即将到期",
-                    detail: "\(label) 将在 \(max(0, days)) 天后到期，记得按时补充。",
+                    title: l.tr(zh: "\(label)即将到期", en: "\(label) due soon", de: "\(label) bald fällig"),
+                    detail: l.tr(
+                        zh: "\(label) 将在 \(max(0, days)) 天后到期，记得按时补充。",
+                        en: "\(label) is due in \(max(0, days)) days.",
+                        de: "\(label) ist in \(max(0, days)) Tagen fällig."
+                    ),
                     severity: days <= 3 ? .urgent : .warning,
                     generatedAt: now
                 ))
@@ -226,7 +240,7 @@ final nonisolated class PetHealthAlertEngine {
 
     // MARK: - 体重异常检测
 
-    private func checkWeight(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkWeight(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         let sorted = source.weightLogs.sorted { $0.date > $1.date }
         guard sorted.count >= 2, let latestLog = sorted.first else { return [] }
         let cutoff = cal.date(byAdding: .day, value: -30, to: now) ?? now
@@ -242,8 +256,12 @@ final nonisolated class PetHealthAlertEngine {
             return [HealthAlert(
                 id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                 type: .weightGainAlert,
-                title: "体重明显增加",
-                detail: String(format: "近 %d 天体重增加了 %.1f%%（%.1f → %.1f kg），需注意饮食控制。", days, changePct, baseline, latest),
+                title: l.tr(zh: "体重明显增加", en: "Weight increased", de: "Gewicht deutlich gestiegen"),
+                detail: l.tr(
+                    zh: String(format: "近 %d 天体重增加了 %.1f%%（%.1f → %.1f kg），需注意饮食控制。", days, changePct, baseline, latest),
+                    en: String(format: "Weight rose %.1f%% over %d days (%.1f → %.1f kg). Consider reviewing diet portions.", changePct, days, baseline, latest),
+                    de: String(format: "Das Gewicht stieg in %d Tagen um %.1f%% (%.1f → %.1f kg). Prüfe die Futtermenge.", days, changePct, baseline, latest)
+                ),
                 severity: changePct >= 15 ? .urgent : .warning,
                 generatedAt: now
             )]
@@ -251,8 +269,12 @@ final nonisolated class PetHealthAlertEngine {
             return [HealthAlert(
                 id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                 type: .weightLossAlert,
-                title: "体重明显减轻",
-                detail: String(format: "近 %d 天体重减少了 %.1f%%（%.1f → %.1f kg），建议排查健康原因。", days, abs(changePct), baseline, latest),
+                title: l.tr(zh: "体重明显减轻", en: "Weight decreased", de: "Gewicht deutlich gesunken"),
+                detail: l.tr(
+                    zh: String(format: "近 %d 天体重减少了 %.1f%%（%.1f → %.1f kg），建议排查健康原因。", days, abs(changePct), baseline, latest),
+                    en: String(format: "Weight dropped %.1f%% over %d days (%.1f → %.1f kg). Consider checking for health causes.", abs(changePct), days, baseline, latest),
+                    de: String(format: "Das Gewicht sank in %d Tagen um %.1f%% (%.1f → %.1f kg). Bitte gesundheitliche Ursachen prüfen.", days, abs(changePct), baseline, latest)
+                ),
                 severity: changePct <= -15 ? .urgent : .warning,
                 generatedAt: now
             )]
@@ -262,7 +284,7 @@ final nonisolated class PetHealthAlertEngine {
 
     // MARK: - 打卡检测（喂食 / 喂水）
 
-    private func checkCheckIn(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkCheckIn(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         let careLogs = source.careLogs.filter {
             $0.careType == .feeding ||
                 $0.careType == .watering ||
@@ -272,8 +294,12 @@ final nonisolated class PetHealthAlertEngine {
             return [HealthAlert(
                 id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                 type: .noCheckIn,
-                title: "未记录喂食/喂水",
-                detail: "尚未记录任何喂食、喂水或换水，请养成每日打卡习惯。",
+                title: l.tr(zh: "未记录喂食/喂水", en: "No food or water logs", de: "Keine Futter- oder Wassereinträge"),
+                detail: l.tr(
+                    zh: "尚未记录任何喂食、喂水或换水，请养成每日打卡习惯。",
+                    en: "No feeding, water, or water-change logs yet. Daily check-ins keep care visible.",
+                    de: "Noch keine Futter-, Wasser- oder Wasserwechsel-Einträge. Tägliche Einträge halten die Pflege sichtbar."
+                ),
                 severity: .info,
                 generatedAt: now
             )]
@@ -283,8 +309,12 @@ final nonisolated class PetHealthAlertEngine {
             return [HealthAlert(
                 id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                 type: .noCheckIn,
-                title: "已 \(days) 天未打卡",
-                detail: "距上次喂食、喂水或换水记录已超过 \(days) 天，请保持日常照料记录。",
+                title: l.tr(zh: "已 \(days) 天未打卡", en: "\(days) days without check-ins", de: "\(days) Tage ohne Eintrag"),
+                detail: l.tr(
+                    zh: "距上次喂食、喂水或换水记录已超过 \(days) 天，请保持日常照料记录。",
+                    en: "It has been over \(days) days since the last food, water, or water-change log.",
+                    de: "Seit dem letzten Futter-, Wasser- oder Wasserwechsel-Eintrag sind über \(days) Tage vergangen."
+                ),
                 severity: days >= 5 ? .warning : .info,
                 generatedAt: now
             )]
@@ -294,17 +324,23 @@ final nonisolated class PetHealthAlertEngine {
 
     // MARK: - 便便检测
 
-    private func checkPotty(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkPotty(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         guard !["猫", "兔子", "仓鼠"].contains(source.species) else { return [] }
         guard let last = source.pottyLogs.map(\.date).max() else { return [] }
         let hours = cal.dateComponents([.hour], from: last, to: now).hour ?? 0
         if hours >= 36 {
-            let elapsedText = hours < 48 ? "\(hours) 小时" : "\(max(1, hours / 24)) 天"
+            let elapsedText = hours < 48
+                ? l.tr(zh: "\(hours) 小时", en: "\(hours) hours", de: "\(hours) Stunden")
+                : l.tr(zh: "\(max(1, hours / 24)) 天", en: "\(max(1, hours / 24)) days", de: "\(max(1, hours / 24)) Tage")
             return [HealthAlert(
                 id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                 type: .noPotty,
-                title: "长时间未记录便便",
-                detail: "距上次便便记录已超过 \(elapsedText)，注意观察宠物排便状况。",
+                title: l.tr(zh: "长时间未记录便便", en: "No potty log for a while", de: "Lange kein Häufchen-Eintrag"),
+                detail: l.tr(
+                    zh: "距上次便便记录已超过 \(elapsedText)，注意观察宠物排便状况。",
+                    en: "It has been more than \(elapsedText) since the last potty log. Keep an eye on elimination.",
+                    de: "Seit dem letzten Häufchen-Eintrag sind über \(elapsedText) vergangen. Bitte die Verdauung beobachten."
+                ),
                 severity: hours >= 72 ? .urgent : .warning,
                 generatedAt: now
             )]
@@ -314,7 +350,7 @@ final nonisolated class PetHealthAlertEngine {
 
     // MARK: - 遛狗检测
 
-    private func checkWalk(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkWalk(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         guard source.species == "狗" else { return [] }
         guard let last = source.walkLogs.map(\.startDate).max() else { return [] }
         let days = cal.dateComponents([.day], from: last, to: now).day ?? 0
@@ -322,8 +358,12 @@ final nonisolated class PetHealthAlertEngine {
             return [HealthAlert(
                 id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                 type: .noWalk,
-                title: "\(days) 天未遛狗",
-                detail: "距上次遛狗已过 \(days) 天，建议每天至少遛一次。",
+                title: l.tr(zh: "\(days) 天未遛狗", en: "\(days) days without a walk", de: "\(days) Tage ohne Gassi"),
+                detail: l.tr(
+                    zh: "距上次遛狗已过 \(days) 天，建议每天至少遛一次。",
+                    en: "It has been \(days) days since the last walk. A daily walk is recommended.",
+                    de: "Seit dem letzten Spaziergang sind \(days) Tage vergangen. Tägliches Gassi ist empfehlenswert."
+                ),
                 severity: days >= 7 ? .warning : .info,
                 generatedAt: now
             )]
@@ -333,7 +373,7 @@ final nonisolated class PetHealthAlertEngine {
 
     // MARK: - 年度体检检测
 
-    private func checkCheckup(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkCheckup(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         let checkups = source.healthLogs.filter { $0.healthLogType == .checkup }
         guard let last = checkups.map(\.date).max() else {
             guard let birthday = source.birthday,
@@ -341,8 +381,12 @@ final nonisolated class PetHealthAlertEngine {
             return [HealthAlert(
                 id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                 type: .checkupOverdue,
-                title: "建议进行年度体检",
-                detail: "尚未记录体检，建议每年带宠物做一次全面体检。",
+                title: l.tr(zh: "建议进行年度体检", en: "Annual checkup recommended", de: "Jährlicher Check-up empfohlen"),
+                detail: l.tr(
+                    zh: "尚未记录体检，建议每年带宠物做一次全面体检。",
+                    en: "No checkup has been logged yet. A full annual exam is recommended.",
+                    de: "Noch kein Check-up erfasst. Eine jährliche Untersuchung ist empfehlenswert."
+                ),
                 severity: .info,
                 generatedAt: now
             )]
@@ -352,8 +396,12 @@ final nonisolated class PetHealthAlertEngine {
             return [HealthAlert(
                 id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                 type: .checkupOverdue,
-                title: "年度体检已逾期",
-                detail: "上次体检距今已 \(days / 30) 个月，建议尽快安排复查。",
+                title: l.tr(zh: "年度体检已逾期", en: "Annual checkup overdue", de: "Jährlicher Check-up überfällig"),
+                detail: l.tr(
+                    zh: "上次体检距今已 \(days / 30) 个月，建议尽快安排复查。",
+                    en: "The last checkup was \(days / 30) months ago. Consider scheduling a follow-up soon.",
+                    de: "Der letzte Check-up war vor \(days / 30) Monaten. Plane bald eine Kontrolle."
+                ),
                 severity: days >= 548 ? .warning : .info,
                 generatedAt: now
             )]
@@ -363,7 +411,7 @@ final nonisolated class PetHealthAlertEngine {
 
     // MARK: - 证件到期检测
 
-    private func checkDocuments(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkDocuments(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
         for doc in source.documents {
             guard let expiry = doc.expiryDate else { continue }
@@ -372,8 +420,12 @@ final nonisolated class PetHealthAlertEngine {
                 alerts.append(HealthAlert(
                     id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                     type: .documentExpiringSoon,
-                    title: "证件即将到期",
-                    detail: "「\(doc.title)」将在 \(days) 天后到期，请提前续期。",
+                    title: l.tr(zh: "证件即将到期", en: "Document expiring soon", de: "Dokument läuft bald ab"),
+                    detail: l.tr(
+                        zh: "「\(doc.title)」将在 \(days) 天后到期，请提前续期。",
+                        en: "\"\(doc.title)\" expires in \(days) days. Renew it ahead of time.",
+                        de: "\"\(doc.title)\" läuft in \(days) Tagen ab. Bitte rechtzeitig verlängern."
+                    ),
                     severity: days <= 7 ? .urgent : .warning,
                     generatedAt: now
                 ))
@@ -381,8 +433,12 @@ final nonisolated class PetHealthAlertEngine {
                 alerts.append(HealthAlert(
                     id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                     type: .documentExpiringSoon,
-                    title: "证件已过期",
-                    detail: "「\(doc.title)」已于 \(expiry.formatted(.dateTime.month().day())) 过期，请尽快处理。",
+                    title: l.tr(zh: "证件已过期", en: "Document expired", de: "Dokument abgelaufen"),
+                    detail: l.tr(
+                        zh: "「\(doc.title)」已于 \(expiry.formatted(.dateTime.month().day())) 过期，请尽快处理。",
+                        en: "\"\(doc.title)\" expired on \(expiry.formatted(.dateTime.month().day())). Please handle it soon.",
+                        de: "\"\(doc.title)\" ist am \(expiry.formatted(.dateTime.month().day())) abgelaufen. Bitte bald bearbeiten."
+                    ),
                     severity: .urgent,
                     generatedAt: now
                 ))
@@ -393,7 +449,7 @@ final nonisolated class PetHealthAlertEngine {
 
     // MARK: - 新增异常与生理期检测
 
-    private func checkSymptoms(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkSymptoms(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
         let recentSymptoms = source.symptomLogs.filter { cal.dateComponents([.day], from: $0.date, to: now).day ?? 0 <= 3 }
 
@@ -402,8 +458,12 @@ final nonisolated class PetHealthAlertEngine {
             alerts.append(HealthAlert(
                 id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                 type: .activeSymptom,
-                title: "严重异常症状",
-                detail: "近期记录了【\(symptom.symptomName)】，由于情况被标记为\(symptom.severity.label)，建议尽快就医！",
+                title: l.tr(zh: "严重异常症状", en: "Serious symptom logged", de: "Schweres Symptom erfasst"),
+                detail: l.tr(
+                    zh: "近期记录了【\(symptom.symptomName)】，由于情况被标记为\(symptom.severity.label)，建议尽快就医！",
+                    en: "\"\(symptom.symptomName)\" was recently marked \(symptom.severity.label). Consider contacting a vet soon.",
+                    de: "\"\(symptom.symptomName)\" wurde kürzlich als \(symptom.severity.label) markiert. Bitte bald tierärztlich abklären."
+                ),
                 severity: .urgent,
                 generatedAt: now
             ))
@@ -411,7 +471,7 @@ final nonisolated class PetHealthAlertEngine {
         return alerts
     }
 
-    private func checkReproductiveHealth(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkReproductiveHealth(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
         // 只对未绝育的宠物生效
         guard !source.isNeutered else { return alerts }
@@ -426,8 +486,12 @@ final nonisolated class PetHealthAlertEngine {
                     alerts.append(HealthAlert(
                         id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                         type: .pregnancyCountdown,
-                        title: "待产预警",
-                        detail: "预计将在 \(daysToDeliver) 天后生产，请准备好产房和应急物资。",
+                        title: l.tr(zh: "待产预警", en: "Delivery approaching", de: "Geburt rückt näher"),
+                        detail: l.tr(
+                            zh: "预计将在 \(daysToDeliver) 天后生产，请准备好产房和应急物资。",
+                            en: "Delivery is expected in \(daysToDeliver) days. Prepare a nesting area and emergency supplies.",
+                            de: "Die Geburt wird in \(daysToDeliver) Tagen erwartet. Bereite Wurfplatz und Notfallmaterial vor."
+                        ),
                         severity: .urgent,
                         generatedAt: now
                     ))
@@ -435,8 +499,12 @@ final nonisolated class PetHealthAlertEngine {
                     alerts.append(HealthAlert(
                         id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                         type: .pregnancyCountdown,
-                        title: "进入预产期",
-                        detail: "已经到达预产期，请密切关注主子状况并联系兽医备用！",
+                        title: l.tr(zh: "进入预产期", en: "Due date reached", de: "Geburtstermin erreicht"),
+                        detail: l.tr(
+                            zh: "已经到达预产期，请密切关注主子状况并联系兽医备用！",
+                            en: "The expected delivery date has arrived. Monitor closely and keep a vet contact ready.",
+                            de: "Der erwartete Geburtstermin ist erreicht. Beobachte genau und halte den Tierarztkontakt bereit."
+                        ),
                         severity: .urgent,
                         generatedAt: now
                     ))
@@ -445,8 +513,12 @@ final nonisolated class PetHealthAlertEngine {
                 alerts.append(HealthAlert(
                     id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                     type: .heatCycleAlert,
-                    title: "正在发情期",
-                    detail: "当前处于发情期，请注意门窗关闭，外出务必牵好牵引绳。",
+                    title: l.tr(zh: "正在发情期", en: "In heat", de: "Läufigkeit aktiv"),
+                    detail: l.tr(
+                        zh: "当前处于发情期，请注意门窗关闭，外出务必牵好牵引绳。",
+                        en: "Heat cycle is active. Keep doors and windows secure, and use a leash outdoors.",
+                        de: "Die Läufigkeit ist aktiv. Türen und Fenster sichern und draußen unbedingt anleinen."
+                    ),
                     severity: .warning,
                     generatedAt: now
                 ))
@@ -455,7 +527,7 @@ final nonisolated class PetHealthAlertEngine {
         return alerts
     }
 
-    private func checkCrossCorrelation(source: PetHealthAlertSource, now: Date, cal: Calendar) -> [HealthAlert] {
+    private func checkCrossCorrelation(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
 
         // 饮水激增 + 体重下降 -> 潜在肾脏或糖尿病风险
@@ -472,8 +544,12 @@ final nonisolated class PetHealthAlertEngine {
                     alerts.append(HealthAlert(
                         id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                         type: .drinkingWeightAlert,
-                        title: "多饮且体重下降",
-                        detail: "近期饮水频率异常升高且伴随明显体重下降，建议检查肾脏或内分泌健康。",
+                        title: l.tr(zh: "多饮且体重下降", en: "More drinking with weight loss", de: "Mehr Trinken und Gewichtsverlust"),
+                        detail: l.tr(
+                            zh: "近期饮水频率异常升高且伴随明显体重下降，建议检查肾脏或内分泌健康。",
+                            en: "Recent water frequency is unusually high while weight is dropping. Consider checking kidney or endocrine health.",
+                            de: "Die Trinkhäufigkeit ist ungewöhnlich hoch und das Gewicht sinkt. Nieren- oder Hormonwerte prüfen lassen."
+                        ),
                         severity: .warning,
                         generatedAt: now
                     ))
@@ -488,8 +564,12 @@ final nonisolated class PetHealthAlertEngine {
                 alerts.append(HealthAlert(
                     id: UUID(), petId: source.petId, petName: source.petName, petEmoji: source.petEmoji,
                     type: .lowActivityAlert,
-                    title: "近期活动量极低",
-                    detail: "过去 7 天几乎没有出门活动，请留意是否有关节不适或抑郁倾向。",
+                    title: l.tr(zh: "近期活动量极低", en: "Very low activity", de: "Sehr wenig Aktivität"),
+                    detail: l.tr(
+                        zh: "过去 7 天几乎没有出门活动，请留意是否有关节不适或抑郁倾向。",
+                        en: "There has been almost no outdoor activity in the past 7 days. Watch for joint discomfort or low mood.",
+                        de: "In den letzten 7 Tagen gab es kaum Aktivität draußen. Achte auf Gelenkbeschwerden oder gedrückte Stimmung."
+                    ),
                     severity: .info,
                     generatedAt: now
                 ))

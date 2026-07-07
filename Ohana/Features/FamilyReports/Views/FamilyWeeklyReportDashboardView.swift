@@ -113,7 +113,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
     }
 
     private var healthAlerts: [HealthAlert] {
-        PetHealthAlertEngine().scanAlerts(sources: healthAlertSources)
+        PetHealthAlertEngine().scanAlerts(sources: healthAlertSources, localization: l)
     }
 
     private var storyHeadline: String {

@@ -6,6 +6,17 @@
 import Foundation
 
 extension CoconutLogEntry {
+    var localizedTitle: String {
+        localizedTitle(l: .current)
+    }
+
+    func localizedTitle(l: L10n) -> String {
+        if let feedbackMessage, !feedbackMessage.isEmpty {
+            return DomainCareRewardGeneralTitle.localized(feedbackMessage, fallbackActorName: actorName, l: l) ?? feedbackMessage
+        }
+        return DomainCareRewardGeneralTitle.localized(title, fallbackActorName: actorName, l: l) ?? title
+    }
+
     var timeAgoString: String {
         timeAgoString(l: .current)
     }

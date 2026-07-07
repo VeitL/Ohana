@@ -527,7 +527,7 @@ struct CoconutLogContentView: View {
                 Text(log.emoji).font(OhanaFont.adaptive(size: 22)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             VStack(alignment: .leading, spacing: 3) {
-                Text(log.title)
+                Text(log.localizedTitle(l: l))
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 HStack(spacing: 6) {

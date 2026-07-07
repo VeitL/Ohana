@@ -584,10 +584,10 @@ enum ExpandedQuickActionLogic {
         case "filterClean":
             if let replaceStatus = WaterCareCycleStatusCalculator.filterReplaceStatus(for: pet, now: now, calendar: cal, logSnapshot: waterCycleSnapshot),
                replaceStatus.isOverdue {
-                return waterCycleOverdueText(title: "更换", days: replaceStatus.overdueDays, l: l)
+                return waterCycleOverdueText(title: waterCycleReplacementTitle(l), days: replaceStatus.overdueDays, l: l)
             }
             if let status = WaterCareCycleStatusCalculator.filterCleanStatus(for: pet, now: now, calendar: cal, logSnapshot: waterCycleSnapshot) {
-                if status.isOverdue { return waterCycleOverdueText(title: "清洗", days: status.overdueDays, l: l) }
+                if status.isOverdue { return waterCycleOverdueText(title: waterCycleCleaningTitle(l), days: status.overdueDays, l: l) }
                 if status.isDueToday { return l.tr(zh: "今天应清", en: "Due today", de: "Heute fällig") }
             }
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, careLedgerEntries: careLedgerEntries, now: now, calendar: cal, l: l) {
@@ -1025,6 +1025,14 @@ enum ExpandedQuickActionLogic {
         default:
             title
         }
+    }
+
+    private nonisolated static func waterCycleReplacementTitle(_ l: L10n) -> String {
+        l.tr(zh: "更换", en: "Replacement", de: "Wechsel")
+    }
+
+    private nonisolated static func waterCycleCleaningTitle(_ l: L10n) -> String {
+        l.tr(zh: "清洗", en: "Cleaning", de: "Reinigung")
     }
 
     private nonisolated static func quickPlanTimeText(_ date: Date, now: Date, calendar: Calendar) -> String {

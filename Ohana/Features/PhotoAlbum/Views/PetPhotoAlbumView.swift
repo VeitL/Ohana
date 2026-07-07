@@ -354,10 +354,13 @@ private struct PhotoDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var noteText: String = ""
     @State private var displayedNote: String = ""
     @State private var isEditingNote = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -388,7 +391,7 @@ private struct PhotoDetailSheet: View {
                             .foregroundStyle(.white.opacity(0.6)) // ui-v4: allow fullScreenPhotoViewer
 
                         if isEditingNote {
-                            TextField("添加备注…", text: $noteText, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                            TextField(l.tr(zh: "添加备注...", en: "Add a note...", de: "Notiz hinzufuegen..."), text: $noteText, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                 .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(.white) // ui-v4: allow fullScreenPhotoViewer
                                 .multilineTextAlignment(.center)
@@ -397,7 +400,7 @@ private struct PhotoDetailSheet: View {
                                     saveNote()
                                 }
                         } else {
-                            Text(displayedNote.isEmpty ? "轻触添加备注" : displayedNote)
+                            Text(displayedNote.isEmpty ? l.tr(zh: "轻触添加备注", en: "Tap to add a note", de: "Tippen, um eine Notiz hinzuzufuegen") : displayedNote)
                                 .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(displayedNote.isEmpty ? .white.opacity(0.3) : .white.opacity(0.8)) // ui-v4: allow fullScreenPhotoViewer
                                 .multilineTextAlignment(.center)

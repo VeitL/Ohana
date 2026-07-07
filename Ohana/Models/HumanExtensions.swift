@@ -23,7 +23,7 @@ extension Human {
             log.executorId == myId && log.careType == .litter && log.date >= thirtyDaysAgo
         }
         if recentLitter.count > 10 {
-            badges.append(HumanBadge(emoji: "💩", title: "无情铲屎机", color: "FFF44F"))
+            badges.append(HumanBadge(emoji: "💩", titleText: AppLocalizedText(zh: "无情铲屎机", en: "Fearless Scooper", de: "Furchtloser Schaufler"), color: "FFF44F"))
         }
 
         // 规则 B："💸 榜一大哥"（累计 Expense 金额全家最高）
@@ -37,7 +37,7 @@ extension Human {
         }
         let maxOtherExpense = otherExpenses.max() ?? 0
         if myExpense > 0, myExpense >= maxOtherExpense {
-            badges.append(HumanBadge(emoji: "💸", title: "榜一大哥", color: "F59E0B"))
+            badges.append(HumanBadge(emoji: "💸", titleText: AppLocalizedText(zh: "榜一大哥", en: "Top Sponsor", de: "Top-Unterstuetzer"), color: "F59E0B"))
         }
 
         // 规则 C："🥾 追风少年"（Walk 记录数 > 5）
@@ -45,7 +45,7 @@ extension Human {
             .filter { !$0.isRecoveryCheckpoint }
         let myWalks = allWalkLogs.filter { $0.executorIds.contains(myId) }
         if myWalks.count > 5 {
-            badges.append(HumanBadge(emoji: "🥾", title: "追风少年", color: "00D4AA"))
+            badges.append(HumanBadge(emoji: "🥾", titleText: AppLocalizedText(zh: "追风少年", en: "Trail Chaser", de: "Spurenjaeger"), color: "00D4AA"))
         }
 
         return badges
@@ -61,6 +61,7 @@ extension Human {
 struct HumanBadge: Identifiable {
     let id = UUID()
     let emoji: String
-    let title: String
+    let titleText: AppLocalizedText
+    var title: String { L10n.current.text(titleText) }
     let color: String // hex
 }

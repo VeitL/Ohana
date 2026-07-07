@@ -50,6 +50,15 @@ struct ProtectionInsurancePopup: View {
         hasCoverage ? (CountryDecimalInput.parse(coverageInput, countryCode: AppCountry.code) ?? 0) : 0
     }
 
+    private var primaryButtonTitle: String {
+        if isSaving {
+            return l.tr(zh: "保存中", en: "Saving", de: "Speichern")
+        }
+        return isEdit
+            ? l.tr(zh: "保存", en: "Save", de: "Speichern")
+            : l.tr(zh: "添加", en: "Add", de: "Hinzufuegen")
+    }
+
     var body: some View {
         GeometryReader { proxy in
             OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: visible) {
@@ -72,7 +81,7 @@ struct ProtectionInsurancePopup: View {
                             .frame(width: 48, height: 48)
                             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(isEdit ? "编辑保险" : "添加保险")
+                            Text(isEdit ? l.tr(zh: "编辑保险", en: "Edit insurance", de: "Versicherung bearbeiten") : l.tr(zh: "添加保险", en: "Add insurance", de: "Versicherung hinzufuegen"))
                                 .font(OhanaFont.title3(.black))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(pet.name)
@@ -93,7 +102,7 @@ struct ProtectionInsurancePopup: View {
                             dateBlock
                             optionsBlock
                             popupBlock {
-                                TextField("备注", text: $notes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                TextField(l.tr(zh: "备注", en: "Notes", de: "Notizen"), text: $notes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.subheadline(.bold))
                                     .lineLimit(2 ... 4)
                                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -106,7 +115,7 @@ struct ProtectionInsurancePopup: View {
                     .frame(maxHeight: min(proxy.size.height * 0.62, 590))
 
                     Button(action: save) {
-                        Text(isSaving ? "保存中" : (isEdit ? "保存" : "添加"))
+                        Text(primaryButtonTitle)
                             .font(OhanaFont.subheadline(.black))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
@@ -150,17 +159,17 @@ struct ProtectionInsurancePopup: View {
 
     private var basicBlock: some View {
         popupBlock {
-            TextField("产品名称", text: $productName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            TextField(l.tr(zh: "产品名称", en: "Product name", de: "Produktname"), text: $productName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.subheadline(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            TextField("保险公司", text: $companyName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            TextField(l.tr(zh: "保险公司", en: "Insurance company", de: "Versicherer"), text: $companyName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.subheadline(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Toggle("保单号", isOn: $hasPolicyNumber)
+            Toggle(l.tr(zh: "保单号", en: "Policy number", de: "Policennummer"), isOn: $hasPolicyNumber)
                 .font(OhanaFont.caption(.bold))
                 .tint(Color.goPrimary)
             if hasPolicyNumber {
-                TextField("保单号", text: $policyNumber) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                TextField(l.tr(zh: "保单号", en: "Policy number", de: "Policennummer"), text: $policyNumber) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
@@ -170,8 +179,8 @@ struct ProtectionInsurancePopup: View {
     private var premiumBlock: some View {
         popupBlock {
             HStack(spacing: 0) {
-                modeTab("年费", mode: .annual)
-                modeTab("月费", mode: .monthly)
+                modeTab(l.tr(zh: "年费", en: "Annual", de: "Jaehrlich"), mode: .annual)
+                modeTab(l.tr(zh: "月费", en: "Monthly", de: "Monatlich"), mode: .monthly)
             }
             .background(Color.ohanaControlFill, in: Capsule())
 
@@ -254,10 +263,10 @@ struct ProtectionInsurancePopup: View {
 
     private var dateBlock: some View {
         popupBlock {
-            DatePicker("生效日期", selection: $startDate, displayedComponents: .date)
+            DatePicker(l.tr(zh: "生效日期", en: "Start date", de: "Startdatum"), selection: $startDate, displayedComponents: .date)
                 .font(OhanaFont.subheadline(.bold))
                 .tint(Color.goPrimary)
-            DatePicker("续期日期", selection: $renewalDate, in: startDate..., displayedComponents: .date)
+            DatePicker(l.tr(zh: "续期日期", en: "Renewal date", de: "Verlaengerungsdatum"), selection: $renewalDate, in: startDate..., displayedComponents: .date)
                 .font(OhanaFont.subheadline(.bold))
                 .tint(Color.goPrimary)
         }
@@ -265,11 +274,11 @@ struct ProtectionInsurancePopup: View {
 
     private var optionsBlock: some View {
         popupBlock {
-            Toggle("写入保费记录", isOn: $autoGenExpenses)
+            Toggle(l.tr(zh: "写入保费记录", en: "Create premium record", de: "Praemienausgabe erfassen"), isOn: $autoGenExpenses)
                 .font(OhanaFont.subheadline(.bold))
                 .tint(Color.goPrimary)
                 .disabled(isEdit)
-            Toggle("日历提醒", isOn: $showInCalendar)
+            Toggle(l.tr(zh: "日历提醒", en: "Calendar reminder", de: "Kalendererinnerung"), isOn: $showInCalendar)
                 .font(OhanaFont.subheadline(.bold))
                 .tint(Color.goPrimary)
         }

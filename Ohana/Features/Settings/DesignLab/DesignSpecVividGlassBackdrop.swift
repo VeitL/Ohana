@@ -199,9 +199,12 @@ private struct VividGlassVerticalTextRow: View {
     let mode: DesignPreviewModeV4
     let wave: Double
     let drift: Double
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        Text("0123456789  文字穿过玻璃  LENS")
+        Text(l.tr(zh: "0123456789  文字穿过玻璃  LENS", en: "0123456789  TEXT THROUGH GLASS  LENS"))
             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
             .tracking(1.5)
             .foregroundStyle(Color.ohanaPrimaryActionText.opacity(mode == .dark ? 0.22 : 0.34)) // ui-v4: allow vivid glass lab text contrast

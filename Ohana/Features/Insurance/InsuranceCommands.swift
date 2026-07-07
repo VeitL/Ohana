@@ -526,7 +526,11 @@ enum InsurancePolicyCommandService {
 
             if insurance.showInCalendar {
                 let intent = DomainScheduleCreateIntent(
-                    title: "🛡️ \(name) 缴费",
+                    title: L10n.current.tr(
+                        zh: "🛡️ \(name) 缴费",
+                        en: "🛡️ \(name) premium payment",
+                        de: "🛡️ \(name) Versicherungszahlung"
+                    ),
                     startDate: payDate,
                     isAllDay: true,
                     eventType: EventType.insurancePremium.rawValue,

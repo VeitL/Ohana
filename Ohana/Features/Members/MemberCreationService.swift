@@ -458,7 +458,11 @@ final class MemberCreationService: MemberCreating {
     private func insertPetRelatedRecords(pet: Pet, draft: MemberCreationDraft, context: ModelContext) {
         if draft.hasBirthday {
             createMemberSchedule(
-                title: "\(draft.trimmedName) 的生日 🎂",
+                title: L10n.current.tr(
+                    zh: "\(draft.trimmedName) 的生日 🎂",
+                    en: "\(draft.trimmedName)'s birthday 🎂",
+                    de: "\(draft.trimmedName) hat Geburtstag 🎂"
+                ),
                 startDate: draft.birthday,
                 isAllDay: true,
                 eventType: EventType.birthday.rawValue,
@@ -471,7 +475,11 @@ final class MemberCreationService: MemberCreating {
         }
         if draft.hasHomeDate {
             createMemberSchedule(
-                title: "\(draft.trimmedName) 的到家纪念日 🏠",
+                title: L10n.current.tr(
+                    zh: "\(draft.trimmedName) 的到家纪念日 🏠",
+                    en: "\(draft.trimmedName)'s gotcha day 🏠",
+                    de: "\(draft.trimmedName)s Einzugstag 🏠"
+                ),
                 startDate: draft.homeDate,
                 isAllDay: true,
                 eventType: EventType.anniversary.rawValue,

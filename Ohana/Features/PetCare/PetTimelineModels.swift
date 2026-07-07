@@ -191,7 +191,12 @@ nonisolated enum PetTimelineItemsBuilder {
         for p in sourceRows.pottyLogs {
             let session = sharedSession(for: p.sharedSessionId, in: sessionsById)
             list.append(UnifiedLogItem(id: session?.id ?? p.id, date: p.date, type: "potty",
-                                       title: "噗噗 · \(p.pottyType.emoji)\(p.pottyType.rawValue)", subtitle: "",
+                                       title: l.tr(
+                                           zh: "噗噗 · \(p.pottyType.emoji)\(p.pottyType.localizedLabel(l))",
+                                           en: "Potty · \(p.pottyType.emoji)\(p.pottyType.localizedLabel(l))",
+                                           de: "Toilette · \(p.pottyType.emoji)\(p.pottyType.localizedLabel(l))"
+                                       ),
+                                       subtitle: "",
                                        iconName: "drop.fill", colorToken: .goOrange,
                                        sharedSessionID: session?.id))
         }

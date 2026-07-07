@@ -281,7 +281,7 @@ final class OasisTreeManager {
         guard OasisCritterEconomyService.awardBudgetedCurrentHumanCoconuts(
             passiveIncomeAmount,
             emoji: "🌳",
-            title: "生命之树的馈赠 +\(passiveIncomeAmount)🥥",
+            title: DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.oasisTreeGift, count: passiveIncomeAmount),
             context: modelContext,
             postsRewardFeedback: true,
             activeHumanSelection: activeHumanSelection,
@@ -804,7 +804,10 @@ final class OasisTreeManager {
                 cost: OasisTreeEnergyInjectionPolicy.largePackageCost,
                 xp: OasisTreeEnergyInjectionPolicy.largePackageXP,
                 actionType: "treeInjectionLarge",
-                title: "生命之树能量包 +\(OasisTreeEnergyInjectionPolicy.largePackageXP)XP",
+                title: DomainCareRewardGeneralTitle.counted(
+                    DomainCareRewardGeneralTitle.oasisTreeEnergyLarge,
+                    count: OasisTreeEnergyInjectionPolicy.largePackageXP
+                ),
                 limitKey: OasisTreePreferenceStore.weeklyInjectionWeekKey,
                 isAvailable: currentLevel >= .lv5,
                 enforcesPeriodLimit: false
@@ -814,7 +817,10 @@ final class OasisTreeManager {
             cost: OasisTreeEnergyInjectionPolicy.starterPackageCost,
             xp: OasisTreeEnergyInjectionPolicy.starterPackageXP,
             actionType: "treeInjection",
-            title: "注入生命之树能量 +\(OasisTreeEnergyInjectionPolicy.starterPackageXP)XP",
+            title: DomainCareRewardGeneralTitle.counted(
+                DomainCareRewardGeneralTitle.oasisTreeEnergyStarter,
+                count: OasisTreeEnergyInjectionPolicy.starterPackageXP
+            ),
             limitKey: OasisTreePreferenceStore.dailyInjectionDayKey,
             isAvailable: true,
             enforcesPeriodLimit: false

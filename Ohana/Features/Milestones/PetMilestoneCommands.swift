@@ -94,22 +94,39 @@ enum PetMilestoneCommandService {
 
         appendIfNeeded(
             date: pet.birthday,
-            title: "\(pet.name)的生日 🎂",
+            title: L10n.current.tr(
+                zh: "\(pet.name)的生日 🎂",
+                en: "\(pet.name)'s birthday 🎂",
+                de: "\(pet.name) hat Geburtstag 🎂"
+            ),
             emoji: "🎂",
-            notes: "出生啦！"
+            notes: L10n.current.tr(zh: "出生啦！", en: "Born today!", de: "Geboren!")
         )
         appendIfNeeded(
             date: pet.homeDate,
-            title: "\(pet.name)到家了 🏠",
+            title: L10n.current.tr(
+                zh: "\(pet.name)到家了 🏠",
+                en: "\(pet.name)'s gotcha day 🏠",
+                de: "\(pet.name)s Einzugstag 🏠"
+            ),
             emoji: "🏠",
-            notes: "第一天回家!"
+            notes: L10n.current.tr(zh: "第一天回家!", en: "First day home!", de: "Erster Tag zuhause!")
         )
         if let heaviest = pet.weightLogs.max(by: { $0.weight < $1.weight }) {
+            let formattedWeight = String(format: "%.1f", heaviest.weight)
             appendIfNeeded(
                 date: heaviest.date,
-                title: "最重记录：\(String(format: "%.1f", heaviest.weight))kg",
+                title: L10n.current.tr(
+                    zh: "最重记录：\(formattedWeight)kg",
+                    en: "Highest weight: \(formattedWeight) kg",
+                    de: "Hoechstgewicht: \(formattedWeight) kg"
+                ),
                 emoji: "⚖️",
-                notes: "历史最高体重记录"
+                notes: L10n.current.tr(
+                    zh: "历史最高体重记录",
+                    en: "Highest weight on record",
+                    de: "Hoechstes gespeichertes Gewicht"
+                )
             )
         }
 

@@ -2505,7 +2505,7 @@ struct MemberLifecycleGateTests {
         #expect(!dashboardSource.contains("let imageData: Data"))
         #expect(!dashboardSource.contains("AsyncDecodedImageView(data: memory.imageData"))
         #expect(!dashboardSource.contains("return log.imageData"))
-        #expect(dashboardSource.contains("scanAlerts(sources: healthAlertSources)"))
+        #expect(dashboardSource.contains("scanAlerts(sources: healthAlertSources, localization: l)"))
         #expect(!dashboardSource.contains("scanAlerts(pets: activePets)"))
         #expect(dashboardSource.contains("appServices.careLedgerStats.reportEntries"))
         #expect(dataContainerSource.contains("FamilyWeeklyReportRouteData.load(from: modelContext)"))
@@ -3603,8 +3603,8 @@ struct MemberLifecycleGateTests {
         #expect(detailSource.contains("let symptomLogs: [SymptomLog]"))
         #expect(detailSource.contains("let heatCycleLogs: [HeatCycleLog]"))
         #expect(detailSource.contains("let healthAlertSource: PetHealthAlertSource?"))
-        #expect(detailSource.contains("scanAlerts(sources: [healthAlertSource])"))
-        #expect(alertEngineSource.contains("func scanAlerts(sources: [PetHealthAlertSource])"))
+        #expect(detailSource.contains("scanAlerts(sources: [healthAlertSource], localization: l)"))
+        #expect(alertEngineSource.contains("func scanAlerts(sources: [PetHealthAlertSource], localization l: L10n = L10n())"))
     }
 
     @Test func petHealthRouteDataScopesHealthRowsAndAlertSource() throws {
@@ -3663,6 +3663,7 @@ struct MemberLifecycleGateTests {
         let bulkSource = try #require(bulkSources.first { $0.petId == pet.id })
         let otherBulkSource = try #require(bulkSources.first { $0.petId == otherPet.id })
         let alerts = PetHealthAlertEngine().scanAlerts(sources: [source])
+        let germanAlerts = PetHealthAlertEngine().scanAlerts(sources: [source], localization: L10n("de"))
 
         #expect(routeData.healthLogs.map(\.note) == ["Rabies"])
         #expect(routeData.symptomLogs.map(\.symptomName) == ["Cough"])
@@ -3678,6 +3679,7 @@ struct MemberLifecycleGateTests {
         #expect(islandData.healthLogsByPetID[pet.id]?.map(\.note) == ["Rabies"])
         #expect(islandData.healthLogsByPetID[otherPet.id]?.map(\.note) == ["Other vaccine"])
         #expect(alerts.contains { $0.type == .vaccineExpired && $0.petId == pet.id })
+        #expect(germanAlerts.contains { $0.type == .vaccineExpired && $0.title == "Impfung abgelaufen" })
         #expect(alerts.contains { $0.type == .activeSymptom && $0.petId == pet.id })
         #expect(!alerts.contains { $0.petId == otherPet.id })
     }

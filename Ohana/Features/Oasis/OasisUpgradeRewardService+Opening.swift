@@ -84,7 +84,7 @@ extension OasisUpgradeRewardService {
         guard OasisCritterEconomyService.awardSpecialCurrentHumanCoconuts(
             coconut.coconutAmount,
             emoji: "🥥",
-            title: "升级椰子 Lv.\(coconut.level)",
+            title: DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.oasisUpgradeCoconut, count: coconut.level),
             sourceModelName: "OasisUpgradeCoconut",
             sourceModelId: coconut.id.uuidString,
             transactionKey: "oasis:upgradeCoconut:\(coconut.id.uuidString):coconuts",

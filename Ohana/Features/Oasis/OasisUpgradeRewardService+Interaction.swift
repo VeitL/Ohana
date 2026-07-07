@@ -54,7 +54,7 @@ extension OasisUpgradeRewardService {
             guard OasisCritterEconomyService.spendCurrentHumanCoconuts(
                 cost,
                 emoji: "🍽️",
-                title: "喂养电子宠物",
+                title: DomainCareRewardGeneralTitle.oasisCritterFeed,
                 context: context,
                 activeHumanSelection: activeHumanSelection,
                 wallet: wallet,
@@ -96,7 +96,7 @@ extension OasisUpgradeRewardService {
             guard OasisCritterEconomyService.spendCurrentHumanCoconuts(
                 cost,
                 emoji: "🪀",
-                title: "陪电子宠物玩耍",
+                title: DomainCareRewardGeneralTitle.oasisCritterPlay,
                 context: context,
                 activeHumanSelection: activeHumanSelection,
                 wallet: wallet,
@@ -115,7 +115,7 @@ extension OasisUpgradeRewardService {
             guard OasisCritterEconomyService.spendCurrentHumanCoconuts(
                 cost,
                 emoji: "🌙",
-                title: "电子宠物休息",
+                title: DomainCareRewardGeneralTitle.oasisCritterRest,
                 context: context,
                 activeHumanSelection: activeHumanSelection,
                 wallet: wallet,
@@ -141,7 +141,7 @@ extension OasisUpgradeRewardService {
             guard let awardedCoconuts = OasisCritterEconomyService.awardBudgetedCurrentHumanCoconuts(
                 wish.rewardCoconuts,
                 emoji: "💌",
-                title: "电子宠物小愿望",
+                title: DomainCareRewardGeneralTitle.oasisCritterDailyWish,
                 context: context,
                 postsRewardFeedback: true,
                 activeHumanSelection: activeHumanSelection,

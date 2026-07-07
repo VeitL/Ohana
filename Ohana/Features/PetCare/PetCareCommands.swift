@@ -285,19 +285,19 @@ enum PetCareTrackingCommandService {
         case .litter:
             .potty(isLitter: true)
         case .play:
-            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 互动奖励")
+            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCarePlay, petName: pet.name))
         case .filterClean:
-            .general(humanReward: 25, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理滤材报酬")
+            .general(humanReward: 25, petReward: 2, emoji: type.emoji, title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCareFilterClean, petName: pet.name))
         case .cageCleaning:
-            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理鸟笼奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCareCageCleaning, petName: pet.name))
         case .freeFlight:
-            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 放飞互动奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCareFreeFlight, petName: pet.name))
         case .misting:
-            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 保湿打卡奖励")
+            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCareMisting, petName: pet.name))
         case .substrateChange:
-            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 环境清洁奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCareSubstrateChange, petName: pet.name))
         case .waterChange:
-            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 换水奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCareWaterChange, petName: pet.name))
         }
     }
 }

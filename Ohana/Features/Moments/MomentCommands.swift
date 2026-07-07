@@ -92,7 +92,12 @@ enum MomentCommandService {
             do {
                 DomainMemberFactEffectsDispatcher.run(plan: write) { actor in
                     let reward = EconomyRewardDiscipline.awardNonCareReward(
-                        type: .general(humanReward: 1, petReward: 0, emoji: "📸", title: "记录时刻 +1🥥"),
+                        type: .general(
+                            humanReward: 1,
+                            petReward: 0,
+                            emoji: "📸",
+                            title: DomainCareRewardGeneralTitle.momentCapture
+                        ),
                         pet: pet,
                         context: context,
                         executorId: actor.rewardExecutorId,

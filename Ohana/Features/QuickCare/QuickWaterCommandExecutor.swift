@@ -466,7 +466,7 @@ struct QuickWaterCommandExecutor {
             humanReward: 15,
             petReward: 2,
             emoji: CareType.waterChange.emoji,
-            title: "\(pet.name) 换水奖励"
+            title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCareWaterChange, petName: pet.name)
         )
         let recorded = careEvents.recordSharedCareFact(
             sourcePet: pet,
@@ -476,7 +476,7 @@ struct QuickWaterCommandExecutor {
             context: context,
             executorId: executorId,
             reward: reward,
-            rewardTitle: liveTargets.count > 1 ? "共同换水 · \(liveTargets.count)只" : nil,
+            rewardTitle: liveTargets.count > 1 ? DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.sharedWaterChange, count: liveTargets.count) : nil,
             quality: .none,
             date: Date(),
             source: .quickAction
@@ -539,7 +539,7 @@ struct QuickWaterCommandExecutor {
             humanReward: 25,
             petReward: 2,
             emoji: CareType.filterClean.emoji,
-            title: "\(pet.name) 清理滤材报酬"
+            title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCareFilterClean, petName: pet.name)
         )
         let recorded = careEvents.recordSharedCareFact(
             sourcePet: pet,
@@ -549,7 +549,7 @@ struct QuickWaterCommandExecutor {
             context: context,
             executorId: executorId,
             reward: reward,
-            rewardTitle: liveTargets.count > 1 ? "共同清理滤材 · \(liveTargets.count)只" : nil,
+            rewardTitle: liveTargets.count > 1 ? DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.sharedFilterClean, count: liveTargets.count) : nil,
             quality: .none,
             date: Date(),
             source: .quickAction

@@ -206,7 +206,7 @@ struct AddPetMedicationSheet: View {
         labeledField(l.tr(zh: "药品名称 *", en: "Medication name *", de: "Medikament *")) {
             VStack(alignment: .leading, spacing: 12) {
                 GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                    "例：阿莫西林、肠胃宝…",
+                    l.tr(zh: "例：阿莫西林、肠胃宝...", en: "Example: amoxicillin, gut support...", de: "Beispiel: Amoxicillin, Darmhilfe..."),
                     text: $name,
                     capitalization: .words,
                     autoFocusDelay: isInlinePopup ? nil : 0.25
@@ -398,7 +398,7 @@ struct AddPetMedicationSheet: View {
 
         labeledField(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)")) {
             GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                "兽医叮嘱、注意事项…",
+                l.tr(zh: "兽医叮嘱、注意事项...", en: "Vet instructions, cautions...", de: "Tierarzt-Hinweise, Vorsicht..."),
                 text: $notes,
                 axis: .vertical
             )

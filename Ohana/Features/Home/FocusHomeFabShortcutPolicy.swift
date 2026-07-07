@@ -22,7 +22,7 @@ nonisolated enum FocusHomeFabShortcutPolicy {
             .humanItems(for: human, localization: l)
             .filter { !displayedActionTypes.contains($0.actionType) }
             .map { item in
-                ExpandedCardFabShortcut(label: item.label, icon: item.icon, action: .humanQuick(item.actionType))
+                ExpandedCardFabShortcut(label: item.displayLabel(localization: l), icon: item.icon, action: .humanQuick(item.actionType))
             }
 
         return hiddenQuickItems + [
@@ -65,7 +65,7 @@ nonisolated enum FocusHomeFabShortcutPolicy {
                 .map(\.actionType)
         )
         let hiddenQuickItems = QuickActionPickerCatalog
-            .options(for: pet)
+            .options(for: pet, localization: l)
             .filter { !displayedActionTypes.contains($0.id) }
             .map { petShortcut(from: $0) }
 

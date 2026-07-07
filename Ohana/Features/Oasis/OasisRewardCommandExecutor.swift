@@ -145,7 +145,7 @@ struct OasisRewardCommandExecutor {
         guard rewards.awardBudgetedCurrentHumanCoconuts(
             amount,
             emoji: "🥥",
-            title: "摘下椰子 +\(amount)🥥",
+            title: DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.oasisHarvestedCoconut, count: amount),
             context: context,
             postsRewardFeedback: false,
             date: Date()
@@ -164,7 +164,7 @@ struct OasisRewardCommandExecutor {
         guard rewards.awardBudgetedCurrentHumanCoconuts(
             amount,
             emoji: "🌳",
-            title: "生命之树的馈赠 +\(amount)🥥",
+            title: DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.oasisTreeGift, count: amount),
             context: context,
             postsRewardFeedback: false,
             date: harvestDate
@@ -246,7 +246,7 @@ struct OasisRewardCommandExecutor {
         guard rewards.awardBudgetedCurrentHumanCoconuts(
             1,
             emoji: "📅",
-            title: "每日打卡奖励",
+            title: DomainCareRewardGeneralTitle.oasisDailyCheckIn,
             context: context,
             postsRewardFeedback: postsRewardFeedback,
             date: Date()
@@ -280,7 +280,7 @@ struct OasisRewardCommandExecutor {
         guard rewards.awardSpecialCurrentHumanCoconuts(
             reward,
             emoji: emoji,
-            title: "\(days)天连胜奖励",
+            title: DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.oasisCheckInStreak, count: days),
             sourceModelName: "OasisCheckInMilestone",
             sourceModelId: "\(currentActiveHumanId):\(days)",
             transactionKey: "oasis:checkInMilestone:\(currentActiveHumanId):\(days)",

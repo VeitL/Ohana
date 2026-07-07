@@ -13,6 +13,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
     let step: DesignBuilderStepV4
     @Binding var toast: String?
 
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var toggleOn = true
     @State private var selectedChip = "30D"
     @State private var fabOpen = false
@@ -22,6 +23,14 @@ struct DesignSpecSafePreviewCanvasV4: View {
 
     private var palette: DesignSpecPaletteV4 {
         DesignSpecPaletteV4(selection: selection, mode: mode)
+    }
+    private var l: L10n { L10n(appLanguage) }
+    private var foodChipSamples: [String] {
+        [
+            l.tr(zh: "干粮", en: "Dry food"),
+            l.tr(zh: "湿粮", en: "Wet food"),
+            l.tr(zh: "零食", en: "Treats")
+        ]
     }
 
     var body: some View {
@@ -54,7 +63,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                 VStack(alignment: .leading, spacing: 7) {
                     navigationCompact
                     HStack(spacing: 8) {
-                        Button("打卡 / Record") { play("按钮点击 / \(selection.tap)") }
+                        Button(localized("打卡", "Record")) { play(localized("按钮点击", "Button tap") + " / \(selection.tap)") }
                             .buttonStyle(buttonStyle(.primary))
                         Button("Overview") { play("Overview") }
                             .buttonStyle(buttonStyle(.secondary))
@@ -77,7 +86,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
             segmentPreview
 
             HStack(spacing: 7) {
-                ForEach(["干粮", "湿粮", "零食"], id: \.self) { item in
+                ForEach(foodChipSamples, id: \.self) { item in
                     Button {
                         withAnimation(DesignSpecUIV4.controlChangeAnimation(selection)) {
                             selectedChip = item
@@ -209,8 +218,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
             }
 
             HStack(spacing: 8) {
-                settingsRowMock(icon: "person.2.badge.key.fill", title: "设备身份", subtitle: "Account")
-                settingsRowMock(icon: "paintpalette.fill", title: "UI 规范", subtitle: "Design")
+                settingsRowMock(icon: "person.2.badge.key.fill", title: l.tr(zh: "设备身份", en: "Device identity"), subtitle: "Account")
+                settingsRowMock(icon: "paintpalette.fill", title: l.tr(zh: "UI 规范", en: "UI guidelines"), subtitle: "Design")
             }
         }
         .padding(10)
@@ -318,7 +327,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
     private var header: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("安全预览")
+                Text(l.tr(zh: "安全预览", en: "Safe preview"))
                     .font(font(18, .black))
                     .foregroundStyle(palette.primaryText)
                 Text("Safe live preview · no real data · all tokens applied")
@@ -366,7 +375,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(selection.navigation == "bottom" ? "GO Focus" : "今日设计")
+                    Text(selection.navigation == "bottom" ? "GO Focus" : l.tr(zh: "今日设计", en: "Today's design"))
                         .font(font(selection.navigation == "compact" ? 14 : 16, .black))
                         .foregroundStyle(palette.primaryText)
                     Text("Current style · \(selection.navigation)")
@@ -401,7 +410,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
             tokenCaption("卡片 / Card", "\(selection.card) · \(selection.glass) · \(selection.density)")
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("今日照顾")
+                    Text(l.tr(zh: "今日照顾", en: "Today Care"))
                         .font(font(17, .black))
                         .foregroundStyle(palette.primaryText)
                     Text("Feeding · Water · Litter")
@@ -413,7 +422,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
             }
 
             HStack(spacing: 8) {
-                Button("打卡 / Record") { play("按钮点击 / \(selection.tap)") }
+                Button(localized("打卡", "Record")) { play(localized("按钮点击", "Button tap") + " / \(selection.tap)") }
                     .buttonStyle(buttonStyle(.primary))
                 Button("Overview") { play("Overview Sheet") }
                     .buttonStyle(buttonStyle(.secondary))
@@ -483,7 +492,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                     }
                 }
                 if selection.calendarLayout == "agendaHybrid" {
-                    agendaRow("20:00", "体重记录", "Weight", "scalemass.fill", Color.goTeal)
+                    agendaRow("20:00", l.tr(zh: "体重记录", en: "Weight check"), "Weight", "scalemass.fill", Color.goTeal)
                 }
             }
         }
@@ -504,12 +513,12 @@ struct DesignSpecSafePreviewCanvasV4: View {
                     withAnimation(motion) {
                         rewardOn.toggle()
                     }
-                    play("保存成功 / \(selection.transition)")
+                    play(localized("保存成功", "Saved") + " / \(selection.transition)")
                 }
                 .buttonStyle(sheetButtonStyle(selection.sheet == "confirm" || selection.sheetChrome == "danger" ? .destructive : .primary))
 
                 if selection.sheetChrome == "bottomCTA" {
-                    Button("稍后 / Later") { play("Bottom CTA") }
+                    Button(localized("稍后", "Later")) { play("Bottom CTA") }
                         .buttonStyle(sheetButtonStyle(.secondary))
                 }
             }
@@ -528,7 +537,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
             bannerPreview
             HStack(spacing: 9) {
                 rewardPreview
-                Button("播放 / Preview") {
+                Button(localized("播放", "Preview")) {
                     withAnimation(motion) {
                         rewardOn.toggle()
                         transitionOn.toggle()
@@ -567,7 +576,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
 
     private var progressMock: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("进度 / Progress")
+            Text(localized("进度", "Progress"))
                 .font(font(9, .black))
                 .foregroundStyle(palette.secondaryText)
             Group {
@@ -933,7 +942,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
         case "textPill":
             HStack(spacing: 4) {
                 Image(systemName: "chevron.left") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
-                Text("返回")
+                Text(l.tr(zh: "返回", en: "Back"))
             }
             .font(font(10, .black))
             .foregroundStyle(palette.primaryText)
@@ -963,7 +972,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
         case "pill":
             HStack(spacing: 5) {
                 Image(systemName: "xmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
-                Text("关闭")
+                Text(l.tr(zh: "关闭", en: "Close"))
             }
             .font(font(10, .black))
             .foregroundStyle(palette.primaryText)
@@ -971,7 +980,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
             .frame(height: 34)
             .background(palette.controlFill, in: Capsule())
         case "text":
-            Text("关闭")
+            Text(l.tr(zh: "关闭", en: "Close"))
                 .font(font(10, .black))
                 .foregroundStyle(palette.primaryText)
                 .frame(height: 34)
@@ -1053,7 +1062,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                 .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(palette.controlFill, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
-                Text("最近记录")
+                Text(l.tr(zh: "最近记录", en: "Recent record"))
                     .font(font(11, .black))
                     .foregroundStyle(palette.primaryText)
                 Text("List row · \(selection.listRow)")
@@ -1157,7 +1166,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                 case "row":
                     HStack(spacing: 6) {
                         compactSwitch
-                        Text("开关")
+                        Text(l.tr(zh: "开关", en: "Toggle"))
                     }
                     .font(font(10, .black))
                     .foregroundStyle(palette.primaryText)
@@ -1243,7 +1252,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
     private var closePreview: some View {
         Group {
             if selection.sheetChrome == "pillClose" {
-                Text("关闭")
+                Text(l.tr(zh: "关闭", en: "Close"))
                     .font(font(10, .black))
                     .foregroundStyle(palette.primaryText)
                     .padding(.horizontal, 10)
@@ -1278,7 +1287,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
             HStack(spacing: 9) {
                 Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .foregroundStyle(palette.danger)
-                Text("确认删除 / Confirm")
+                Text(localized("确认删除", "Confirm"))
                     .font(font(12, .black))
                     .foregroundStyle(palette.primaryText)
                 Spacer()
@@ -1296,7 +1305,9 @@ struct DesignSpecSafePreviewCanvasV4: View {
     }
 
     private var sheetActionTitle: String {
-        selection.sheet == "confirm" || selection.sheetChrome == "danger" ? "确认删除 / Delete" : "保存记录 / Save"
+        selection.sheet == "confirm" || selection.sheetChrome == "danger"
+            ? l.tr(zh: "确认删除", en: "Delete")
+            : l.tr(zh: "保存记录", en: "Save")
     }
 
     private var feedbackToast: some View {
@@ -1305,7 +1316,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                 Image(systemName: "checkmark.circle.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .foregroundStyle(palette.accent)
             }
-            Text(selection.toast == "silent" ? "Saved" : "已保存 / Saved")
+            Text(selection.toast == "silent" ? "Saved" : localized("已保存", "Saved"))
                 .font(font(selection.toast == "compact" ? 10 : 11, .black))
                 .foregroundStyle(palette.primaryText)
             Spacer()
@@ -1320,7 +1331,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
             Image(systemName: selection.banner == "quiet" ? "bell.slash.fill" : "exclamationmark.triangle.fill")
                 .foregroundStyle(selection.banner == "quiet" ? palette.secondaryText : palette.warning)
             VStack(alignment: .leading, spacing: 1) {
-                Text("提醒 / Banner")
+                Text(localized("提醒", "Banner"))
                     .font(font(11, .black))
                     .foregroundStyle(palette.primaryText)
                 Text(selection.banner)
@@ -1373,5 +1384,9 @@ struct DesignSpecSafePreviewCanvasV4: View {
         case "groupedCards": tint.opacity(0.12)
         default: palette.controlFill
         }
+    }
+
+    private func localized(_ zh: String, _ en: String) -> String {
+        l.tr(zh: zh, en: en)
     }
 }

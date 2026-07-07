@@ -10,6 +10,7 @@ struct DesignSpecPreviewCanvasV4: View {
     let mode: DesignPreviewModeV4
     @Binding var toast: String?
 
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var tapPulse = false
     @State private var fabOpen = false
@@ -24,6 +25,7 @@ struct DesignSpecPreviewCanvasV4: View {
     private var palette: DesignSpecPaletteV4 {
         DesignSpecPaletteV4(selection: selection, mode: mode)
     }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -54,7 +56,7 @@ struct DesignSpecPreviewCanvasV4: View {
         .shadow(color: .black.opacity(mode == .dark ? 0.22 : 0.08), radius: 18, y: 10) // ui-v4: allow framed developer preview depth
         .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous))
         .onTapGesture {
-            play("画布点击 / Canvas tap")
+            play(localized("画布点击", "Canvas tap"))
         }
         .onAppear {
             isVisible = true
@@ -79,7 +81,7 @@ struct DesignSpecPreviewCanvasV4: View {
         HStack(spacing: 6) {
             Image(systemName: "arrow.up.and.down") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .font(OhanaFont.adaptive(size: 9, weight: .black))
-            Text("上下滑动预览 / Scroll preview")
+            Text(localized("上下滑动预览", "Scroll preview"))
                 .font(font(9, .black))
         }
         .foregroundStyle(palette.secondaryText)
@@ -91,7 +93,7 @@ struct DesignSpecPreviewCanvasV4: View {
 
     private var allElementsPreview: some View {
         VStack(alignment: .leading, spacing: space(10, 12, 15)) {
-            previewNavigationBar(title: "UI 元素总览", subtitle: "All iOS elements · fixture data")
+            previewNavigationBar(title: l.tr(zh: "UI 元素总览", en: "UI element overview"), subtitle: l.tr(zh: "iOS 元素与示例数据", en: "All iOS elements · fixture data"))
 
             HStack(spacing: 9) {
                 metricTile("卡片", "Card", "Glass", "rectangle.on.rectangle.angled.fill", palette.accent)
@@ -101,7 +103,7 @@ struct DesignSpecPreviewCanvasV4: View {
 
             bigFocusCard
             controlsShowcase
-            chartTile(title: "图表 / Chart", subtitle: "Line, axis, progress and metric", values: [0.30, 0.58, 0.48, 0.70, 0.62, 0.84, 0.78])
+            chartTile(title: localized("图表", "Chart"), subtitle: l.tr(zh: "折线、坐标轴、进度和指标", en: "Line, axis, progress and metric"), values: [0.30, 0.58, 0.48, 0.70, 0.62, 0.84, 0.78])
             calendarShowcase
             formAndListShowcase
             sheetLauncher
@@ -130,12 +132,12 @@ struct DesignSpecPreviewCanvasV4: View {
                 .buttonStyle(buttonStyle(.icon))
             }
             VStack(alignment: .leading, spacing: 7) {
-                Text("选择标签 / Chips")
+                Text(localized("选择标签", "Chips"))
                     .font(font(10, .black))
                     .foregroundStyle(palette.secondaryText)
                 HStack(spacing: 7) {
-                    chip("干粮", selected: true)
-                    chip("湿粮", selected: false)
+                    chip(l.tr(zh: "干粮", en: "Dry food"), selected: true)
+                    chip(l.tr(zh: "湿粮", en: "Wet food"), selected: false)
                     chip("90D", selected: selectedRange == "90D")
                 }
             }
@@ -148,9 +150,9 @@ struct DesignSpecPreviewCanvasV4: View {
     private var formAndListShowcase: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("输入与列表", "Inputs, toggles, rows and badges")
-            formRow("当前成员", "Current human", "person.crop.circle.fill", trailing: "Guan")
-            formRow("隐私测试", "Privacy matrix", "lock.shield.fill", trailing: toggleOn ? "On" : "Off")
-            inputPreview(title: "金额 / Amount", value: "$26.80", state: fieldFocused ? .focused : .normal)
+            formRow(l.tr(zh: "当前成员", en: "Current human"), l.tr(zh: "成员状态", en: "Current human"), "person.crop.circle.fill", trailing: "Guan")
+            formRow(l.tr(zh: "隐私测试", en: "Privacy matrix"), l.tr(zh: "隐私状态", en: "Privacy matrix"), "lock.shield.fill", trailing: toggleOn ? "On" : "Off")
+            inputPreview(title: localized("金额", "Amount"), value: "$26.80", state: fieldFocused ? .focused : .normal)
             listRowPreview
         }
         .padding(12)
@@ -166,14 +168,14 @@ struct DesignSpecPreviewCanvasV4: View {
                 metricTile("关闭", "Close", selection.sheetChrome, "xmark", Color.goTeal)
             }
             HStack(spacing: 8) {
-                Button("打开弹窗 / Open Sheet") {
+                Button(localized("打开弹窗", "Open Sheet")) {
                     withAnimation(motion) { showSheetLayer = true }
-                    play("打开弹窗 / Open sheet")
+                    play(localized("打开弹窗", "Open sheet"))
                 }
                 .buttonStyle(buttonStyle(.primary))
-                Button("删除确认 / Confirm") {
+                Button(localized("删除确认", "Confirm")) {
                     withAnimation(motion) { showSheetLayer = true }
-                    play("删除确认 / Confirm")
+                    play(localized("删除确认", "Confirm"))
                 }
                 .buttonStyle(buttonStyle(.destructive))
             }
@@ -273,13 +275,13 @@ struct DesignSpecPreviewCanvasV4: View {
     private var calendarAgendaPreview: some View {
         VStack(alignment: .leading, spacing: 7) {
             if selection.calendarAgenda == "groupedCards" {
-                Text("今日 / Today")
+                Text(localized("今日", "Today"))
                     .font(font(10, .black))
                     .foregroundStyle(palette.secondaryText)
             }
-            calendarAgendaRow(time: "09:00", title: "主粮计划", subtitle: "Food plan · li lo", icon: "fork.knife", tint: palette.accent)
-            calendarAgendaRow(time: "14:30", title: "换水", subtitle: "Water change · 4 天周期", icon: "drop.fill", tint: Color.goBlue)
-            calendarAgendaRow(time: "20:00", title: "体重记录", subtitle: "Weight check · private", icon: "scalemass.fill", tint: Color.goTeal)
+            calendarAgendaRow(time: "09:00", title: l.tr(zh: "主粮计划", en: "Food plan"), subtitle: l.tr(zh: "食物计划 · li lo", en: "Food plan · li lo"), icon: "fork.knife", tint: palette.accent)
+            calendarAgendaRow(time: "14:30", title: l.tr(zh: "换水", en: "Water change"), subtitle: l.tr(zh: "换水 · 4 天周期", en: "Water change · 4-day cycle"), icon: "drop.fill", tint: Color.goBlue)
+            calendarAgendaRow(time: "20:00", title: l.tr(zh: "体重记录", en: "Weight check"), subtitle: l.tr(zh: "体重检查 · 隐私", en: "Weight check · private"), icon: "scalemass.fill", tint: Color.goTeal)
         }
         .padding(selection.calendarAgenda == "groupedCards" ? 10 : 0)
         .background(selection.calendarAgenda == "groupedCards" ? palette.controlFill : .clear, in: RoundedRectangle(cornerRadius: innerRadius, style: .continuous))
@@ -411,16 +413,17 @@ struct DesignSpecPreviewCanvasV4: View {
     }
 
     private func calendarOptionTitle(_ id: String, in options: [DesignSpecOptionV4]) -> String {
-        options.first(where: { $0.id == id }).map(\.zh) ?? id
+        guard let option = options.first(where: { $0.id == id }) else { return id }
+        return l.tr(zh: option.zh, en: option.en)
     }
 
     private func sectionHeader(_ zh: String, _ en: String) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 1) {
-                Text(zh)
+                Text(l.tr(zh: zh, en: en))
                     .font(font(13, .black))
                     .foregroundStyle(palette.primaryText)
-                Text(en)
+                Text(l.tr(zh: en, en: en))
                     .font(font(9, .bold))
                     .foregroundStyle(palette.secondaryText)
             }
@@ -433,10 +436,10 @@ struct DesignSpecPreviewCanvasV4: View {
         VStack(alignment: .leading, spacing: space(9, 11, 13)) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("今日照顾")
+                    Text(l.tr(zh: "今日照顾", en: "Today Care"))
                         .font(font(19, .black))
                         .foregroundStyle(palette.primaryText)
-                    Text("Today Care")
+                    Text(l.tr(zh: "护理动作预览", en: "Care action preview"))
                         .font(font(11, .bold))
                         .foregroundStyle(palette.secondaryText)
                 }
@@ -449,15 +452,15 @@ struct DesignSpecPreviewCanvasV4: View {
             editableInputPreview
 
             HStack(spacing: 8) {
-                Button("打卡 / Record") { play("按钮点击 / Button tap") }
+                Button(localized("打卡", "Record")) { play(localized("按钮点击", "Button tap")) }
                     .onLongPressGesture {
                         withAnimation(motion) { showSheetLayer = true }
-                        play("长按反馈 / Long press")
+                        play(localized("长按反馈", "Long press"))
                     }
                     .buttonStyle(buttonStyle(.primary))
-                Button("计划 / Plan") {
+                Button(localized("计划", "Plan")) {
                     withAnimation(motion) { showSheetLayer = true }
-                    play("打开弹窗 / Open sheet")
+                    play(localized("打开弹窗", "Open sheet"))
                 }
                 .buttonStyle(buttonStyle(.secondary))
             }
@@ -470,7 +473,7 @@ struct DesignSpecPreviewCanvasV4: View {
         let state: FieldState = selection.inputState == "errorFirst" ? .error : (fieldFocused ? .focused : .normal)
         let stroke = state == .focused ? palette.accent : (state == .error ? palette.danger : palette.stroke)
         return VStack(alignment: .leading, spacing: 5) {
-            Text("克数 / Grams")
+            Text(localized("克数", "Grams"))
                 .font(font(10, .black))
                 .foregroundStyle(state == .error ? palette.danger : palette.secondaryText)
             HStack(spacing: 9) {
@@ -481,7 +484,7 @@ struct DesignSpecPreviewCanvasV4: View {
                     withAnimation(GoMotion.feedback) {
                         fieldFocused.toggle()
                     }
-                    play("输入框聚焦 / Field focus")
+                    play(localized("输入框聚焦", "Field focus"))
                 } label: {
                     Text(fieldText)
                         .font(font(14, .bold))
@@ -563,7 +566,7 @@ struct DesignSpecPreviewCanvasV4: View {
     private var progressPreview: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Text("进度 / Progress")
+                Text(localized("进度", "Progress"))
                     .font(font(10, .black))
                     .foregroundStyle(palette.secondaryText)
                 Spacer()
@@ -618,7 +621,7 @@ struct DesignSpecPreviewCanvasV4: View {
                 .background(palette.controlFill, in: Circle())
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("最近记录")
+                Text(l.tr(zh: "最近记录", en: "Recent record"))
                     .font(font(11, .black))
                     .foregroundStyle(palette.primaryText)
                 Text("12:30 · 50g")
@@ -657,7 +660,7 @@ struct DesignSpecPreviewCanvasV4: View {
                 }
                 Spacer()
                 if selection.sheetChrome == "pillClose" {
-                    Button("关闭") { dismissSheet() }
+                    Button(l.tr(zh: "关闭", en: "Close")) { dismissSheet() }
                         .font(font(11, .black))
                         .foregroundStyle(palette.primaryText)
                         .padding(.horizontal, 10)
@@ -675,11 +678,11 @@ struct DesignSpecPreviewCanvasV4: View {
             }
 
             if selection.sheet == "overview" {
-                chartTile(title: "喂食 Overview", subtitle: "Food overview", values: [0.35, 0.62, 0.42, 0.80, 0.66, 0.74, 0.58])
+                chartTile(title: l.tr(zh: "喂食总览", en: "Food Overview"), subtitle: l.tr(zh: "饮食概览", en: "Food overview"), values: [0.35, 0.62, 0.42, 0.80, 0.66, 0.74, 0.58])
             } else if selection.sheet == "confirm" || selection.sheetChrome == "danger" {
                 destructivePreview
             } else {
-                inputPreview(title: "克数 / Grams", value: fieldText, state: .focused, sheetStyle: true)
+                inputPreview(title: localized("克数", "Grams"), value: fieldText, state: .focused, sheetStyle: true)
                 HStack(spacing: 8) {
                     chip("42g", selected: false)
                     chip("50g", selected: true)
@@ -693,12 +696,12 @@ struct DesignSpecPreviewCanvasV4: View {
                         rewardActive = true
                         showSheetLayer = false
                     }
-                    play("保存成功 / Saved")
+                    play(localized("保存成功", "Saved"))
                 }
                 .buttonStyle(sheetButtonStyle(selection.sheet == "confirm" ? .destructive : .primary))
 
                 if selection.sheetChrome == "bottomCTA" {
-                    Button("稍后 / Later") { dismissSheet() }
+                    Button(localized("稍后", "Later")) { dismissSheet() }
                         .buttonStyle(sheetButtonStyle(.secondary))
                 }
             }
@@ -713,7 +716,7 @@ struct DesignSpecPreviewCanvasV4: View {
             Image(systemName: "trash.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .foregroundStyle(palette.danger)
             VStack(alignment: .leading, spacing: 2) {
-                Text("确认删除")
+                Text(l.tr(zh: "确认删除", en: "Confirm delete"))
                     .font(font(14, .black))
                     .foregroundStyle(palette.primaryText)
                 Text("Confirm destructive action")
@@ -757,10 +760,10 @@ struct DesignSpecPreviewCanvasV4: View {
     private func fabAction(_ zh: String, _ en: String, _ iconName: String) -> some View {
         Button {
             withAnimation(motion) { fabOpen = false }
-            play("\(zh) / \(en)")
+            play(localized(zh, en))
         } label: {
             HStack(spacing: 7) {
-                Text("\(zh) / \(en)")
+                Text(localized(zh, en))
                     .font(font(10, .black))
                 Image(systemName: icon(iconName))
                     .font(OhanaFont.adaptive(size: 11, weight: iconWeight))
@@ -845,7 +848,7 @@ struct DesignSpecPreviewCanvasV4: View {
             Text(value)
                 .font(font(16, .black))
                 .foregroundStyle(palette.primaryText)
-            Text("\(zh) / \(en)")
+            Text(localized(zh, en))
                 .font(font(10, .black))
                 .foregroundStyle(palette.secondaryText)
                 .lineLimit(1)
@@ -1445,15 +1448,21 @@ struct DesignSpecPreviewCanvasV4: View {
 
     private var sheetTitle: String {
         switch selection.sheet {
-        case "overview": "喂食 Overview"
-        case "minimal": "快速打卡"
-        case "confirm": "确认操作"
-        default: "记录喂食"
+        case "overview": l.tr(zh: "喂食总览", en: "Food Overview")
+        case "minimal": l.tr(zh: "快速打卡", en: "Quick record")
+        case "confirm": l.tr(zh: "确认操作", en: "Confirm action")
+        default: l.tr(zh: "记录喂食", en: "Record feeding")
         }
     }
 
     private var sheetActionTitle: String {
-        selection.sheet == "confirm" || selection.sheetChrome == "danger" ? "确认删除 / Delete" : "保存记录 / Save"
+        selection.sheet == "confirm" || selection.sheetChrome == "danger"
+            ? l.tr(zh: "确认删除", en: "Delete")
+            : l.tr(zh: "保存记录", en: "Save")
+    }
+
+    private func localized(_ zh: String, _ en: String) -> String {
+        l.tr(zh: zh, en: en)
     }
 }
 

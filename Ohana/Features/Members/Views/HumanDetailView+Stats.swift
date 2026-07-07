@@ -19,7 +19,7 @@ extension HumanDetailView {
                     return String(format: "%.1f", latest.weight)
                 }(),
                 unit: human.isPrivate(.weight, viewedBy: activeHumanId) || human.weightLogs.isEmpty ? "" : "kg",
-                label: "体重",
+                label: l.tr(zh: "体重", en: "Weight", de: "Gewicht"),
                 color: Color.goPrimary
             )
             bentoStatMini(

@@ -119,6 +119,9 @@ struct HomeFabMainButton: View {
     var isExpanded: Bool
     var accessibilityLabel: String
     var action: () -> Void
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         Button(action: action) {
@@ -135,6 +138,6 @@ struct HomeFabMainButton: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("点击展开常用功能")
+        .accessibilityHint(l.tr(zh: "点击展开常用功能", en: "Tap to open shortcuts", de: "Tippen, um Kurzbefehle zu oeffnen"))
     }
 }

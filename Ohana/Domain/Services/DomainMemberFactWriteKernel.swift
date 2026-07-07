@@ -390,7 +390,12 @@ nonisolated enum DomainMemberFactWriter {
         context: ModelContext
     ) -> PetDocumentAttachment {
         plan.consume()
-        let attachment = PetDocumentAttachment(data: data, filename: filename, isImage: isImage)
+        let persistedData = AttachmentPrivacySanitizer.sanitizedData(
+            data,
+            filename: filename,
+            isImage: isImage
+        )
+        let attachment = PetDocumentAttachment(data: persistedData, filename: filename, isImage: isImage)
         document.attachments.append(attachment)
         context.insert(attachment)
         CloudSyncMutationRecorder.markModified(document, context: context, modifiedAt: plan.modifiedAt)
@@ -410,8 +415,13 @@ nonisolated enum DomainMemberFactWriter {
         context: ModelContext
     ) -> PetPhotoLog {
         plan.consume()
+        let persistedImageData = AttachmentPrivacySanitizer.sanitizedData(
+            imageData,
+            filename: "pet-photo-log.jpg",
+            isImage: true
+        )
         let log = PetPhotoLog(
-            imageData: imageData,
+            imageData: persistedImageData,
             date: date,
             note: note,
             pet: pet,
@@ -437,13 +447,20 @@ nonisolated enum DomainMemberFactWriter {
         context: ModelContext
     ) -> PetMilestone {
         plan.consume()
+        let persistedPhotoData = photoData.map {
+            AttachmentPrivacySanitizer.sanitizedData(
+                $0,
+                filename: "pet-milestone.jpg",
+                isImage: true
+            )
+        }
         let milestone = PetMilestone(
             date: date,
             title: title,
             emoji: emoji,
             notes: notes,
             pet: pet,
-            photoData: photoData,
+            photoData: persistedPhotoData,
             location: location
         )
         context.insert(milestone)
@@ -506,13 +523,20 @@ nonisolated enum DomainMemberFactWriter {
         context: ModelContext
     ) -> SymptomLog {
         plan.consume()
+        let persistedPhotoData = photoData.map {
+            AttachmentPrivacySanitizer.sanitizedData(
+                $0,
+                filename: "pet-symptom.jpg",
+                isImage: true
+            )
+        }
         let log = SymptomLog(
             date: plan.occurredAt,
             category: category,
             symptomName: symptomName,
             severity: severity,
             note: note,
-            photoData: photoData,
+            photoData: persistedPhotoData,
             pet: pet
         )
         context.insert(log)

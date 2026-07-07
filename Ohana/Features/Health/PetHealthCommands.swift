@@ -361,7 +361,11 @@ enum PetHealthCommandService {
         }
 
         let intent = DomainScheduleCreateIntent(
-            title: "\(eventType.emoji) \(pet.name) · \(input.recordName)到期提醒",
+            title: L10n.current.tr(
+                zh: "\(eventType.emoji) \(pet.name) · \(input.recordName)到期提醒",
+                en: "\(eventType.emoji) \(pet.name) · \(input.recordName) expiration reminder",
+                de: "\(eventType.emoji) \(pet.name) · \(input.recordName) Ablauf-Erinnerung"
+            ),
             startDate: dueDate,
             isAllDay: true,
             eventType: eventType.rawValue,

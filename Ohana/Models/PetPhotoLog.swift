@@ -17,7 +17,7 @@ enum PetPhotoAttachmentState: String, Codable, Sendable {
 @Model
 final class PetPhotoLog {
     var id: UUID
-    @Attribute(.externalStorage) var imageData: Data // 原图（externalStorage 防止 db 膨胀）
+    @Attribute(.externalStorage) var imageData: Data // Persisted photo payload; command writers sanitize and downsample new user imports.
     var imageAttachmentStateRaw: String = PetPhotoAttachmentState.unknown.rawValue
     var imageSignature: String = ""
     var date: Date

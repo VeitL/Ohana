@@ -33,6 +33,20 @@ struct PrivacyHardeningTests {
         ) == malformedImage)
     }
 
+    @Test func imageAttachmentSanitizerCapsPersistedImageDimensions() throws {
+        let largeJPEG = try makeSolidJPEG(width: 3200, height: 2400)
+
+        let sanitized = AttachmentPrivacySanitizer.sanitizedData(
+            largeJPEG,
+            filename: "large-photo.jpg",
+            isImage: true
+        )
+        let pixelSize = try imagePixelSize(sanitized)
+
+        #expect(max(pixelSize.width, pixelSize.height) <= Int(AttachmentPrivacySanitizer.maxPersistedImagePixel))
+        #expect(!hasGPSMetadata(sanitized))
+    }
+
     @Test func receiptDocumentBuilderSanitizesImageAttachmentsBeforePersistence() throws {
         let jpegWithGPS = try makeJPEGWithGPSMetadata()
         let pdf = Data("%PDF-1.7\n%%EOF".utf8)
@@ -142,6 +156,35 @@ struct PrivacyHardeningTests {
         #expect(photo.locationPlacename == "Home")
     }
 
+    @MainActor
+    @Test func plantCareCommandSanitizesPhotoBytesBeforeSave() throws {
+        let container = try makeCurrentPrivacyHardeningContainer()
+        let context = container.mainContext
+        let plant = Plant(name: "Fern")
+        let largeJPEG = try makeSolidJPEG(width: 3200, height: 2400)
+        context.insert(plant)
+        try context.save()
+
+        let result = PlantCareCommandService.recordCare(
+            .photo,
+            plant: plant,
+            executorId: nil,
+            context: context,
+            now: Date(timeIntervalSince1970: 1_800_000_000),
+            photoData: largeJPEG,
+            syncCarePlan: false,
+            scheduleNotifications: false,
+            awardRewards: false
+        )
+
+        let log = try #require(try context.fetch(FetchDescriptor<PlantCareLog>()).first)
+        let photoData = try #require(log.photoData)
+        let pixelSize = try imagePixelSize(photoData)
+
+        #expect(result.didPersist)
+        #expect(max(pixelSize.width, pixelSize.height) <= Int(AttachmentPrivacySanitizer.maxPersistedImagePixel))
+    }
+
     @Test func encryptedBackupRejectsWeakPasswordsAndUsesPBKDF2ForNewExports() throws {
         do {
             _ = try DataBackupEncryption.encrypt(Data("private".utf8), password: "1234567")
@@ -172,6 +215,41 @@ struct PrivacyHardeningTests {
         let schema = Schema(ArkSchemaV64.models)
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    @MainActor
+    private func makeCurrentPrivacyHardeningContainer() throws -> ModelContainer {
+        let schema = Schema(ArkSchemaV85.models)
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    private func makeSolidJPEG(width: Int, height: Int) throws -> Data {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let context = try #require(CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.setFillColor(UIColor(red: 0.1, green: 0.45, blue: 0.85, alpha: 1).cgColor)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let image = try #require(context.makeImage())
+        let data = NSMutableData()
+        let destination = try #require(CGImageDestinationCreateWithData(
+            data,
+            UTType.jpeg.identifier as CFString,
+            1,
+            nil
+        ))
+        CGImageDestinationAddImage(destination, image, [
+            kCGImageDestinationLossyCompressionQuality: 0.95
+        ] as CFDictionary)
+        #expect(CGImageDestinationFinalize(destination))
+        return data as Data
     }
 
     private func makeJPEGWithGPSMetadata() throws -> Data {
@@ -213,6 +291,14 @@ struct PrivacyHardeningTests {
             return false
         }
         return properties[kCGImagePropertyGPSDictionary] != nil
+    }
+
+    private func imagePixelSize(_ data: Data) throws -> (width: Int, height: Int) {
+        let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+        let properties = try #require(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+        let width = try #require(properties[kCGImagePropertyPixelWidth] as? NSNumber)
+        let height = try #require(properties[kCGImagePropertyPixelHeight] as? NSNumber)
+        return (width.intValue, height.intValue)
     }
 
     private func makeLegacyHKDFEnvelope(plaintext: Data, password: String) throws -> Data {
