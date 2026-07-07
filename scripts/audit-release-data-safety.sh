@@ -357,6 +357,24 @@ require_pattern "OhanaTests/MediaAttachmentUpgradeCompatibilityTests.swift" 'unk
 require_pattern "OhanaTests/SharedModelContainerRecoveryTests.swift" 'testV67StoreOpensThroughLatestLightweightMigrationWithCoreUserData' \
   "Release data safety should cover a realistic old-store upgrade with core user data, not only metadata rows."
 
+require_pattern "Ohana/Shared/Media/AttachmentPrivacySanitizer.swift" 'SanitizedAttachmentPayload' \
+  "Attachment sanitizer should return both sanitized bytes and the normalized display filename."
+
+require_pattern "Ohana/Shared/Media/AttachmentPrivacySanitizer.swift" 'normalizedJPEGFilename' \
+  "Attachment sanitizer should normalize successful JPEG rewrites to .jpg display filenames."
+
+require_pattern "Ohana/Features/Documents/PetDocumentCommands.swift" 'sanitizedAttachment\(attachment, index:' \
+  "Pet document writes should normalize attachment filenames through the shared sanitizer payload."
+
+require_pattern "Ohana/Features/Documents/Views/AddDocumentSheet.swift" 'startingAttachmentCount' \
+  "Pet document photo batch imports should assign stable per-photo fallback filenames instead of duplicating photo.jpg."
+
+require_pattern "Ohana/Features/Expenses/ExpenseReceiptSupport.swift" 'sanitizedAttachment\(attachment, index:' \
+  "Expense receipt document drafts should normalize attachment filenames through the shared sanitizer payload."
+
+require_pattern "OhanaTests/PrivacyHardeningTests.swift" 'imageAttachmentSanitizerNormalizesFilenameOnlyAfterJPEGRewrite' \
+  "Privacy hardening tests should prove JPEG rewrite filename normalization and decode-failure preservation."
+
 if rg -n --pcre2 '^[[:space:]]*try\?[[:space:]]+(?:modelContext|context)\.save\(\)' Ohana --glob '*.swift' >/tmp/ohana-release-data-safety-silent-save.txt; then
   failures+=("App code must not silently discard SwiftData save failures with try? context.save(); use safeSave/safeSaveResult or explicit do/catch.")
 fi

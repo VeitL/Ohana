@@ -383,7 +383,7 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
     }
 
     private static func sharedLitterKey(for pet: Pet) -> String {
-        pet.species.contains("猫") || pet.species.contains("兔") ? "litter" : "potty"
+        Pet.isCatSpecies(pet.species) || Pet.isRabbitSpecies(pet.species) ? "litter" : "potty"
     }
 
     private static func normalizedText(for event: Event) -> String {

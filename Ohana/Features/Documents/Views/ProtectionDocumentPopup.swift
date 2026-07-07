@@ -179,13 +179,15 @@ struct ProtectionDocumentContentPopup: View {
                 let isImage = UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
                 await MainActor.run {
                     if let data {
-                        attachmentData = AttachmentPrivacySanitizer.sanitizedData(
+                        let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
                             data,
                             filename: url.lastPathComponent,
-                            isImage: isImage
+                            isImage: isImage,
+                            fallbackFilename: "document.jpg"
                         )
-                        attachmentFilename = url.lastPathComponent
-                        attachmentIsImage = isImage
+                        attachmentData = payload.data
+                        attachmentFilename = payload.filename
+                        attachmentIsImage = payload.isImage
                         hasNewAttachment = true
                     }
                 }

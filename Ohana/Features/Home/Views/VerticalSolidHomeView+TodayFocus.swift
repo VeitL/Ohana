@@ -380,7 +380,7 @@ extension VerticalSolidHomeView {
         if quest.id.hasPrefix("q_water_") { return "water" }
         if quest.id == "q_walk" || quest.id.hasPrefix("q_walk_") { return "walk" }
         if quest.id == "q_potty" || quest.id.hasPrefix("q_potty_") {
-            return pet.species.contains("猫") || pet.species.contains("兔") ? "litter" : "potty"
+            return Pet.isCatSpecies(pet.species) || Pet.isRabbitSpecies(pet.species) ? "litter" : "potty"
         }
         if quest.id.hasPrefix("q_play_") { return "play" }
         if quest.id.hasPrefix("q_weight_") { return "weight" }

@@ -330,17 +330,20 @@ struct AddDocumentContentSheet: View {
                                         attachmentBtnLabel(icon: "photo.fill", label: l.tr(zh: "相册", en: "Photos", de: "Fotos"), color: petThemeColor.opacity(0.85))
                                     }
                                     .onChange(of: photoPickerItems) { _, items in
+                                        let startingAttachmentCount = attachments.count
                                         Task {
-                                            for item in items {
+                                            for (offset, item) in items.enumerated() {
                                                 if let data = try? await item.loadTransferable(type: Data.self) {
-                                                    let att = DocAttachment(
-                                                        data: AttachmentPrivacySanitizer.sanitizedData(
-                                                            data,
-                                                            filename: "photo.jpg",
-                                                            isImage: true
-                                                        ),
+                                                    let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
+                                                        data,
                                                         filename: "",
-                                                        isImage: true
+                                                        isImage: true,
+                                                        fallbackFilename: "photo_\(startingAttachmentCount + offset + 1).jpg"
+                                                    )
+                                                    let att = DocAttachment(
+                                                        data: payload.data,
+                                                        filename: payload.filename,
+                                                        isImage: payload.isImage
                                                     )
                                                     await MainActor.run { attachments.append(att) }
                                                 }
@@ -455,14 +458,16 @@ struct AddDocumentContentSheet: View {
                 Task {
                     if let data = await AttachmentImageDecoder.readFileData(url) {
                         let isImage = AttachmentPrivacySanitizer.isImageFilename(url.lastPathComponent)
-                        let att = DocAttachment(
-                            data: AttachmentPrivacySanitizer.sanitizedData(
-                                data,
-                                filename: url.lastPathComponent,
-                                isImage: isImage
-                            ),
+                        let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
+                            data,
                             filename: url.lastPathComponent,
-                            isImage: isImage
+                            isImage: isImage,
+                            fallbackFilename: "attachment_\(attachments.count + 1).jpg"
+                        )
+                        let att = DocAttachment(
+                            data: payload.data,
+                            filename: payload.filename,
+                            isImage: payload.isImage
                         )
                         await MainActor.run {
                             attachments.append(att)

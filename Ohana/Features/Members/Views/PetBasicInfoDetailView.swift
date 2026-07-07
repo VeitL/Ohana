@@ -55,7 +55,7 @@ struct PetBasicInfoDetailView: View {
     @State var eThemeColorHex = ""
     @State var eAvatarImageData: Data? = nil
 
-    let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
+    let speciesOptions = Pet.canonicalSpeciesOptions
     let themePresets: [(String, String)] = [
         ("FF6B6B", "coral"), ("4ECDC4", "ocean"), ("B8A9C9", "lavender"),
         ("95E1D3", "mint"), ("F38181", "sunset"), ("AA96DA", "berry"),

@@ -8,7 +8,7 @@ import UIKit
 
 struct PetImageCropView: View {
     let image: UIImage
-    var species: String = "狗"
+    var species: String = "dog"
     var silhouetteSystemName: String?
     let onCrop: (UIImage?) -> Void
 

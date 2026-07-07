@@ -390,12 +390,20 @@ nonisolated enum DomainMemberFactWriter {
         context: ModelContext
     ) -> PetDocumentAttachment {
         plan.consume()
-        let persistedData = AttachmentPrivacySanitizer.sanitizedData(
+        let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
             data,
             filename: filename,
-            isImage: isImage
+            isImage: isImage,
+            fallbackFilename: isImage ? "image.jpg" : "attachment"
         )
-        let attachment = PetDocumentAttachment(data: persistedData, filename: filename, isImage: isImage)
+        let persistedFilename = payload.filename.isEmpty
+            ? (isImage ? "image.jpg" : "attachment")
+            : payload.filename
+        let attachment = PetDocumentAttachment(
+            data: payload.data,
+            filename: persistedFilename,
+            isImage: payload.isImage
+        )
         document.attachments.append(attachment)
         context.insert(attachment)
         CloudSyncMutationRecorder.markModified(document, context: context, modifiedAt: plan.modifiedAt)

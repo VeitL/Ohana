@@ -26,37 +26,27 @@ nonisolated enum QACardType: String, CaseIterable, Codable {
     case substrateChange
 
     static func available(for species: String) -> [QACardType] {
-        let normalizedSpecies = species.lowercased()
-
-        if species.contains("狗") || normalizedSpecies.contains("dog") {
+        if Pet.isDogSpecies(species) {
             return [.walk, .feed, .water, .potty, .care, .play, .health, .expense, .weight]
         }
 
-        if species.contains("猫") || normalizedSpecies.contains("cat") {
+        if Pet.isCatSpecies(species) {
             return [.litter, .feed, .water, .potty, .play, .care, .health, .expense, .weight]
         }
 
-        if species.contains("鱼") || species.contains("锦鲤") || species.contains("金鱼") ||
-            normalizedSpecies.contains("fish") || normalizedSpecies.contains("koi") {
+        if Pet.isFishSpecies(species) {
             return [.feed, .waterChange, .filterClean, .play, .health, .expense]
         }
 
-        if species.contains("鸟") || species.contains("鹦鹉") || species.contains("文鸟") ||
-            normalizedSpecies.contains("bird") || normalizedSpecies.contains("parrot") {
+        if Pet.isBirdSpecies(species) {
             return [.feed, .water, .cageCleaning, .freeFlight, .play, .health, .expense, .weight]
         }
 
-        if species.contains("兔") || species.contains("仓鼠") || species.contains("龙猫") ||
-            species.contains("豚鼠") || normalizedSpecies.contains("rabbit") ||
-            normalizedSpecies.contains("hamster") {
+        if Pet.isRabbitSpecies(species) || Pet.isSmallMammalSpecies(species) {
             return [.feed, .water, .litter, .care, .play, .health, .expense, .weight]
         }
 
-        if species.contains("爬") || species.contains("蜥") || species.contains("蛇") ||
-            species.contains("龟") || species.contains("守宫") || species.contains("壁虎") ||
-            normalizedSpecies.contains("reptile") || normalizedSpecies.contains("lizard") ||
-            normalizedSpecies.contains("snake") || normalizedSpecies.contains("turtle") ||
-            normalizedSpecies.contains("gecko") {
+        if Pet.isReptileSpecies(species) {
             return [.feed, .misting, .substrateChange, .play, .health, .expense, .weight]
         }
 

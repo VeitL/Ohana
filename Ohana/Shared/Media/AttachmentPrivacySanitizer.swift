@@ -11,6 +11,12 @@ import ImageIO
 import UIKit
 import UniformTypeIdentifiers
 
+nonisolated struct SanitizedAttachmentPayload: Equatable {
+    let data: Data
+    let filename: String
+    let isImage: Bool
+}
+
 nonisolated enum AttachmentPrivacySanitizer {
     static let jpegCompressionQuality: CGFloat = 0.86
     static let maxPersistedImagePixel: CGFloat = 2048
@@ -20,8 +26,26 @@ nonisolated enum AttachmentPrivacySanitizer {
         filename: String = "",
         isImage: Bool
     ) -> Data {
+        sanitizedAttachment(
+            data,
+            filename: filename,
+            isImage: isImage
+        ).data
+    }
+
+    static func sanitizedAttachment(
+        _ data: Data,
+        filename: String = "",
+        isImage: Bool,
+        fallbackFilename: String = "image.jpg"
+    ) -> SanitizedAttachmentPayload {
+        let cleanedFilename = trimmedFilename(filename)
         guard shouldSanitize(filename: filename, isImage: isImage) else {
-            return data
+            return SanitizedAttachmentPayload(
+                data: data,
+                filename: cleanedFilename,
+                isImage: isImage
+            )
         }
 
         let sourceOptions = [
@@ -34,7 +58,11 @@ nonisolated enum AttachmentPrivacySanitizer {
                 "Attachment sanitizer could not decode image bytes; preserving original data",
                 category: "Privacy"
             )
-            return data
+            return SanitizedAttachmentPayload(
+                data: data,
+                filename: cleanedFilename,
+                isImage: isImage
+            )
         }
 
         guard let sanitized = jpegData(from: image, compressionQuality: jpegCompressionQuality) else {
@@ -42,9 +70,17 @@ nonisolated enum AttachmentPrivacySanitizer {
                 "Attachment sanitizer could not re-encode image bytes; preserving original data",
                 category: "Privacy"
             )
-            return data
+            return SanitizedAttachmentPayload(
+                data: data,
+                filename: cleanedFilename,
+                isImage: isImage
+            )
         }
-        return sanitized
+        return SanitizedAttachmentPayload(
+            data: sanitized,
+            filename: normalizedJPEGFilename(cleanedFilename, fallbackFilename: fallbackFilename),
+            isImage: true
+        )
     }
 
     private static func downsampledImage(from source: CGImageSource, maxPixel: CGFloat) -> CGImage? {
@@ -118,7 +154,21 @@ nonisolated enum AttachmentPrivacySanitizer {
         return UTType(filenameExtension: pathExtension)?.conforms(to: .image) == true
     }
 
+    static func normalizedJPEGFilename(_ filename: String, fallbackFilename: String = "image.jpg") -> String {
+        let cleaned = trimmedFilename(filename)
+        let fallback = trimmedFilename(fallbackFilename).isEmpty ? "image.jpg" : trimmedFilename(fallbackFilename)
+        let source = cleaned.isEmpty ? fallback : cleaned
+        let base = (source as NSString).deletingPathExtension
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let safeBase = base.isEmpty ? "image" : base
+        return (safeBase as NSString).appendingPathExtension("jpg") ?? "\(safeBase).jpg"
+    }
+
     private static func shouldSanitize(filename: String, isImage: Bool) -> Bool {
         isImage || isImageFilename(filename)
+    }
+
+    private static func trimmedFilename(_ filename: String) -> String {
+        filename.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

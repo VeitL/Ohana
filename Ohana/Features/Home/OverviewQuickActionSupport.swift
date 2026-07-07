@@ -47,12 +47,12 @@ nonisolated enum QuickActionPickerCatalog {
         allowed.insert("water")
         allowed.insert("moment")
         allowed.insert("medication")
-        if species.contains("猫") || species.lowercased().contains("cat") {
+        if Pet.isCatSpecies(species) {
             allowed.insert("litter")
             allowed.insert("play")
             allowed.insert("weight")
         }
-        if species.contains("狗") || species.lowercased().contains("dog") {
+        if Pet.isDogSpecies(species) {
             allowed.insert("walk")
             allowed.insert("groom")
             allowed.insert("weight")
@@ -290,11 +290,7 @@ nonisolated enum WaterQuickActionPolicy {
     static let foldedActionTypes: Set<String> = ["waterChange", "filterClean"]
 
     static func isAquatic(species: String) -> Bool {
-        let lower = species.lowercased()
-        return species.contains("鱼") ||
-            species.contains("水族") ||
-            lower.contains("fish") ||
-            lower.contains("aquarium")
+        Pet.isFishSpecies(species)
     }
 
     static func normalizedItems(

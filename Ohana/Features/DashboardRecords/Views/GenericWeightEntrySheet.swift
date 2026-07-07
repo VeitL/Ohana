@@ -98,10 +98,9 @@ struct GenericWeightEntrySheet: View {
     private var quickWeights: [Double] {
         switch target {
         case let .pet(pet):
-            let species = pet.species.lowercased()
-            let defaults: [Double] = if species.contains("cat") || pet.species.contains("猫") {
+            let defaults: [Double] = if Pet.isCatSpecies(pet.species) {
                 [3.5, 4.5, 5.5]
-            } else if species.contains("dog") || pet.species.contains("狗") {
+            } else if Pet.isDogSpecies(pet.species) {
                 [5, 10, 20]
             } else {
                 [0.5, 1, 2]

@@ -35,6 +35,18 @@ nonisolated struct BreedInfo: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
+private nonisolated struct BreedCareTipSet {
+    let zh: [String]
+    let en: [String]
+    let de: [String]
+
+    func resolve(l: L10n) -> [String] {
+        if l.isChinese { return zh }
+        if l.isDe { return de }
+        return en
+    }
+}
+
 // MARK: - Pet Breed Database
 nonisolated enum PetBreedDatabase {
 
@@ -388,12 +400,12 @@ nonisolated enum PetBreedDatabase {
 
     // MARK: - Lookup
     static func breeds(for species: String) -> [BreedInfo] {
-        let raw: [BreedInfo] = switch species {
-        case "狗": dogBreeds
-        case "猫": catBreeds
-        case "兔子": rabbitBreeds
-        case "仓鼠": hamsterBreeds
-        case "鸟": birdBreeds
+        let raw: [BreedInfo] = switch Pet.canonicalSpeciesKey(species) {
+        case "dog": dogBreeds
+        case "cat": catBreeds
+        case "rabbit": rabbitBreeds
+        case "hamster": hamsterBreeds
+        case "bird": birdBreeds
         default: otherBreeds
         }
         // 「其他」固定排在最后
@@ -490,51 +502,180 @@ nonisolated enum PetBreedDatabase {
 
     // MARK: - P1: 品种护理小贴士
 
-    /// 品种护理建议 [breed名称: [贴士条目]]
-    static let breedCareTips: [String: [String]] = [
+    /// 品种护理建议 [breed名称: 本地化贴士条目]。UI 只能通过 `careTips(for:l:)` 取值，避免非中文语言直接展示中文数据源。
+    private static let breedCareTips: [String: BreedCareTipSet] = [
         // 狗
-        "边境牧羊犬": ["每日需≥2小时高强度运动，智力游戏不可少", "每周梳毛3次，换毛期每天梳", "高能量犬种，适合有经验的主人"],
-        "澳大利亚牧羊犬": ["每日需要充足运动和互动训练", "中长毛每周梳理2-3次，换毛期增加频率", "聪明敏感，适合嗅闻、敏捷和服从游戏"],
-        "金毛寻回犬": ["每周梳毛2-3次，洗澡约4-6周一次", "每日散步≥1小时，喜欢游泳", "关注关节健康，体重控制很重要"],
-        "拉布拉多寻回犬": ["食欲旺盛，注意控制饮食防止肥胖", "每日运动1-2小时，喜欢游泳", "每周梳毛2次，换毛期每天梳"],
-        "柴犬": ["独立性强，需耐心社会化训练", "每周梳毛1-2次，换毛期每天梳", "每日散步30-60分钟即可"],
-        "泰迪/贵宾犬": ["毛发持续生长，每6-8周专业美容一次", "聪明易训练，适合做各类trick", "日常刷牙很重要，牙齿疾病高发"],
-        "比熊犬": ["毛发需每日梳理防打结，每4-6周美容", "每日中等运动，适合公寓居住", "泪痕明显，需定期清洁眼周"],
-        "英国短毛猫": ["每周梳毛1-2次即可，偶尔掉毛", "体型偏胖，注意饮食控制", "性格温和，适合室内生活"],
-        "布偶猫": ["毛发柔软，每周梳理2-3次防结块", "性格温顺，不适合独处太久", "体型大，成猫体重可达8-10kg"],
-        "缅因猫": ["半长毛，每周梳理2次", "体型最大的家猫之一，需要空间活动", "喜水，部分个体可以学习玩水"],
-        "美国短毛猫": ["短毛易打理，每周梳理1次", "性格活泼，适应力强", "注意体重控制，容易发胖"],
-        "哈士奇": ["换毛期大量掉毛，每天梳毛必不可少", "需要大量运动，每日≥2小时", "聪明但独立，逃跑能力强，需防护"],
-        "阿拉斯加雪橇犬": ["毛量惊人，换毛期需每日梳毛", "体型大，需充足运动空间", "不耐热，夏季注意防暑"],
-        "萨摩耶": ["白色毛发需定期清洁，每周梳毛2-3次", "活泼友善，需要陪伴和运动", "微笑天使，但掉毛量惊人"],
-        "西高地白梗": ["白色被毛需定期清洁，避免泪痕和口周染色", "活泼自信，每日散步和嗅闻游戏不可少", "注意皮肤敏感和耳朵清洁"],
-        "博美": ["双层毛发，每周梳毛2-3次", "体型小但活力十足", "膝盖骨脱臼高发，注意关节保护"],
-        "巴哥犬": ["短鼻犬种，不耐热，夏季避免剧烈运动", "注意控制体重，肥胖会加重呼吸负担", "每日清洁面部褶皱和眼周"],
-        "波士顿梗": ["短鼻犬种，炎热天气减少户外强度", "短毛易打理，每周梳理1次即可", "活泼聪明，适合短时间多频率训练"],
-        "法国斗牛犬": ["短鼻犬种，注意呼吸道护理", "清洁皮肤褶皱，防止细菌滋生", "不耐热，夏季避免剧烈运动"],
-        "英国斗牛犬": ["清洁面部皱褶非常重要，每天擦拭", "短鼻犬种，高温下谨慎运动", "体重管理严格，关节负担大"],
-        "吉娃娃": ["注意保暖，冬季需穿衣", "牙齿较小，每日刷牙防牙石", "骨骼细小，避免从高处跳下"],
-        "杰克罗素梗": ["精力旺盛，每天需要充足运动和嗅闻游戏", "聪明但主见强，训练要稳定一致", "短毛护理简单，每周梳理1次"],
-        "秋田犬": ["独立且护主，幼犬期社会化非常重要", "双层毛换毛明显，换毛期需每日梳理", "体型较大，注意关节和体重管理"],
-        "罗威纳犬": ["力量大，需要稳定牵引和服从训练", "注意关节健康和体重控制", "短毛护理简单，每周梳理1次"],
-        "沙皮犬": ["皮肤褶皱需保持干爽，注意皮肤炎症", "耳道较窄，定期检查清洁耳朵", "运动中等，避免高温环境"],
-        "松狮犬": ["厚毛怕热，夏季注意降温", "每周梳毛2-3次，换毛期增加频率", "性格独立，训练需耐心且一致"],
-        "喜乐蒂牧羊犬": ["中长毛每周梳理2-3次，换毛期更频繁", "聪明敏感，适合服从和嗅闻训练", "运动需求中高，需要稳定陪伴"],
-        "腊肠犬": ["脊椎问题高发，减少跳跃上下楼梯", "注意体重控制", "每周梳毛1次（短毛型）"],
-        "雪纳瑞": ["胡须需定期清洁，避免食物残留", "每8-12周专业美容一次", "容易形成结石，多喝水"],
-        "马尔济斯": ["丝状长毛需每日梳理或定期剪短", "泪痕问题，每日清洁眼周", "体型娇小，注意低血糖风险"],
-        "中华田园犬": ["适应性强，日常护理简单", "每周梳毛1次，注意耳朵清洁", "性格忠诚，需充足运动和社会化"]
+        "边境牧羊犬": .init(
+            zh: ["每日需>=2小时高强度运动，智力游戏不可少", "每周梳毛3次，换毛期每天梳", "高能量犬种，适合有经验的主人"],
+            en: ["Plan 2+ hours of intense exercise and brain games daily.", "Brush 3 times a week, and daily during shedding season.", "A high-energy breed best for experienced handlers."],
+            de: ["Plane täglich mindestens 2 Stunden Bewegung und Denkspiele ein.", "3-mal pro Woche bürsten, im Fellwechsel täglich.", "Eine energiegeladene Rasse für erfahrene Halter."]
+        ),
+        "澳大利亚牧羊犬": .init(
+            zh: ["每日需要充足运动和互动训练", "中长毛每周梳理2-3次，换毛期增加频率", "聪明敏感，适合嗅闻、敏捷和服从游戏"],
+            en: ["Needs generous daily exercise plus interactive training.", "Brush the medium coat 2-3 times weekly, more during shedding.", "Smart and sensitive; scent, agility, and obedience games fit well."],
+            de: ["Braucht täglich viel Bewegung und interaktives Training.", "Mittellanges Fell 2-3-mal pro Woche bürsten, im Fellwechsel öfter.", "Klug und sensibel; Nasenarbeit, Agility und Gehorsam passen gut."]
+        ),
+        "金毛寻回犬": .init(
+            zh: ["每周梳毛2-3次，洗澡约4-6周一次", "每日散步>=1小时，喜欢游泳", "关注关节健康，体重控制很重要"],
+            en: ["Brush 2-3 times weekly; bathe about every 4-6 weeks.", "Aim for at least 1 hour of walking daily; many love swimming.", "Watch joints and keep weight under control."],
+            de: ["2-3-mal pro Woche bürsten; etwa alle 4-6 Wochen baden.", "Täglich mindestens 1 Stunde spazieren; viele schwimmen gern.", "Gelenke beobachten und Gewicht konsequent kontrollieren."]
+        ),
+        "拉布拉多寻回犬": .init(
+            zh: ["食欲旺盛，注意控制饮食防止肥胖", "每日运动1-2小时，喜欢游泳", "每周梳毛2次，换毛期每天梳"],
+            en: ["Strong appetite; portion control helps prevent obesity.", "Needs 1-2 hours of activity daily and often loves swimming.", "Brush twice weekly, and daily during shedding season."],
+            de: ["Großer Appetit; Portionen kontrollieren, um Übergewicht zu vermeiden.", "Braucht täglich 1-2 Stunden Aktivität und schwimmt oft gern.", "2-mal pro Woche bürsten, im Fellwechsel täglich."]
+        ),
+        "柴犬": .init(
+            zh: ["独立性强，需耐心社会化训练", "每周梳毛1-2次，换毛期每天梳", "每日散步30-60分钟即可"],
+            en: ["Independent; patient socialization matters.", "Brush 1-2 times weekly, and daily during shedding season.", "30-60 minutes of walking each day is usually enough."],
+            de: ["Eigenständig; geduldige Sozialisierung ist wichtig.", "1-2-mal pro Woche bürsten, im Fellwechsel täglich.", "30-60 Minuten Spaziergang pro Tag reichen meist."]
+        ),
+        "泰迪/贵宾犬": .init(
+            zh: ["毛发持续生长，每6-8周专业美容一次", "聪明易训练，适合做各类 trick", "日常刷牙很重要，牙齿疾病高发"],
+            en: ["Coat keeps growing; professional grooming every 6-8 weeks helps.", "Highly trainable and great for trick practice.", "Daily tooth brushing matters because dental disease is common."],
+            de: ["Das Fell wächst weiter; alle 6-8 Wochen professionell pflegen lassen.", "Sehr lernfreudig und gut für Tricks geeignet.", "Tägliches Zähneputzen ist wichtig, da Zahnprobleme häufig sind."]
+        ),
+        "比熊犬": .init(
+            zh: ["毛发需每日梳理防打结，每4-6周美容", "每日中等运动，适合公寓居住", "泪痕明显，需定期清洁眼周"],
+            en: ["Brush daily to prevent mats; groom every 4-6 weeks.", "Moderate daily activity works well for apartment life.", "Tear stains are common; clean around the eyes regularly."],
+            de: ["Täglich bürsten, um Verfilzungen zu vermeiden; alle 4-6 Wochen pflegen.", "Mäßige tägliche Bewegung passt gut zur Wohnung.", "Tränenflecken sind häufig; Augenbereich regelmäßig reinigen."]
+        ),
+        "英国短毛猫": .init(
+            zh: ["每周梳毛1-2次即可，偶尔掉毛", "体型偏胖，注意饮食控制", "性格温和，适合室内生活"],
+            en: ["Brush 1-2 times weekly; shedding is usually moderate.", "Prone to weight gain, so keep portions steady.", "Calm temperament and well suited to indoor life."],
+            de: ["1-2-mal pro Woche bürsten; Haaren meist mäßig.", "Neigt zu Gewichtszunahme, daher Portionen im Blick behalten.", "Ruhiges Wesen und gut für Wohnungshaltung geeignet."]
+        ),
+        "布偶猫": .init(
+            zh: ["毛发柔软，每周梳理2-3次防结块", "性格温顺，不适合独处太久", "体型大，成猫体重可达8-10kg"],
+            en: ["Soft coat; brush 2-3 times weekly to prevent tangles.", "Gentle and social, so long lonely stretches are not ideal.", "Large breed; adults can reach 8-10 kg."],
+            de: ["Weiches Fell; 2-3-mal pro Woche bürsten gegen Knoten.", "Sanft und sozial, daher lange Alleinzeiten vermeiden.", "Große Rasse; erwachsene Tiere können 8-10 kg erreichen."]
+        ),
+        "缅因猫": .init(
+            zh: ["半长毛，每周梳理2次", "体型最大的家猫之一，需要空间活动", "喜水，部分个体可以学习玩水"],
+            en: ["Semi-long coat; brush about twice weekly.", "One of the largest house cats and needs room to move.", "Often curious about water; some can learn water play."],
+            de: ["Halblanges Fell; etwa 2-mal pro Woche bürsten.", "Eine der größten Hauskatzen und braucht Bewegungsraum.", "Oft wasserneugierig; manche lernen Wasserspiele."]
+        ),
+        "美国短毛猫": .init(
+            zh: ["短毛易打理，每周梳理1次", "性格活泼，适应力强", "注意体重控制，容易发胖"],
+            en: ["Short coat is easy; weekly brushing is enough.", "Playful and adaptable temperament.", "Watch weight, as this breed can gain easily."],
+            de: ["Kurzhaar ist pflegeleicht; wöchentliches Bürsten reicht.", "Verspielt und anpassungsfähig.", "Gewicht im Blick behalten, da sie leicht zunimmt."]
+        ),
+        "哈士奇": .init(
+            zh: ["换毛期大量掉毛，每天梳毛必不可少", "需要大量运动，每日>=2小时", "聪明但独立，逃跑能力强，需防护"],
+            en: ["Heavy seasonal shedding; daily brushing is essential then.", "Needs lots of activity, often 2+ hours daily.", "Smart but independent; secure fences and leads matter."],
+            de: ["Starker Fellwechsel; dann täglich bürsten.", "Braucht viel Aktivität, oft 2+ Stunden täglich.", "Klug, aber eigenständig; sichere Leinen und Zäune sind wichtig."]
+        ),
+        "阿拉斯加雪橇犬": .init(
+            zh: ["毛量惊人，换毛期需每日梳毛", "体型大，需充足运动空间", "不耐热，夏季注意防暑"],
+            en: ["Very dense coat; brush daily during shedding season.", "Large body and needs plenty of movement space.", "Heat-sensitive; plan summer cooling carefully."],
+            de: ["Sehr dichtes Fell; im Fellwechsel täglich bürsten.", "Großer Körper und viel Bewegungsraum nötig.", "Hitzeempfindlich; im Sommer gut kühlen."]
+        ),
+        "萨摩耶": .init(
+            zh: ["白色毛发需定期清洁，每周梳毛2-3次", "活泼友善，需要陪伴和运动", "微笑天使，但掉毛量惊人"],
+            en: ["White coat needs regular cleaning and 2-3 brushes weekly.", "Friendly and lively; needs company and exercise.", "Lovely smile, serious shedding."],
+            de: ["Weißes Fell regelmäßig reinigen und 2-3-mal pro Woche bürsten.", "Freundlich und lebhaft; braucht Nähe und Bewegung.", "Charmantes Lächeln, aber viel Fellverlust."]
+        ),
+        "西高地白梗": .init(
+            zh: ["白色被毛需定期清洁，避免泪痕和口周染色", "活泼自信，每日散步和嗅闻游戏不可少", "注意皮肤敏感和耳朵清洁"],
+            en: ["Clean the white coat regularly to reduce tear and mouth staining.", "Confident and lively; daily walks and sniff games help.", "Watch sensitive skin and keep ears clean."],
+            de: ["Weißes Fell regelmäßig reinigen, um Augen- und Maulflecken zu reduzieren.", "Selbstbewusst und lebhaft; tägliche Spaziergänge und Schnüffelspiele helfen.", "Empfindliche Haut beobachten und Ohren sauber halten."]
+        ),
+        "博美": .init(
+            zh: ["双层毛发，每周梳毛2-3次", "体型小但活力十足", "膝盖骨脱臼高发，注意关节保护"],
+            en: ["Double coat; brush 2-3 times weekly.", "Small body, big energy.", "Patellar issues are common, so protect the joints."],
+            de: ["Doppelfell; 2-3-mal pro Woche bürsten.", "Kleiner Körper, viel Energie.", "Kniescheibenprobleme sind häufig, daher Gelenke schützen."]
+        ),
+        "巴哥犬": .init(
+            zh: ["短鼻犬种，不耐热，夏季避免剧烈运动", "注意控制体重，肥胖会加重呼吸负担", "每日清洁面部褶皱和眼周"],
+            en: ["Flat-faced breed; avoid intense summer exercise.", "Weight control reduces breathing strain.", "Clean facial folds and eye area daily."],
+            de: ["Kurznasige Rasse; im Sommer intensive Bewegung vermeiden.", "Gewichtskontrolle entlastet die Atmung.", "Gesichtsfalten und Augenbereich täglich reinigen."]
+        ),
+        "波士顿梗": .init(
+            zh: ["短鼻犬种，炎热天气减少户外强度", "短毛易打理，每周梳理1次即可", "活泼聪明，适合短时间多频率训练"],
+            en: ["Flat-faced breed; lower outdoor intensity in hot weather.", "Short coat is easy; weekly brushing is enough.", "Bright and lively; short frequent training works well."],
+            de: ["Kurznasige Rasse; bei Hitze draußen ruhiger machen.", "Kurzhaar ist pflegeleicht; wöchentliches Bürsten reicht.", "Klug und lebhaft; kurze häufige Trainings passen gut."]
+        ),
+        "法国斗牛犬": .init(
+            zh: ["短鼻犬种，注意呼吸道护理", "清洁皮肤褶皱，防止细菌滋生", "不耐热，夏季避免剧烈运动"],
+            en: ["Flat-faced breed; monitor breathing comfort.", "Clean skin folds to reduce bacterial buildup.", "Heat-sensitive; avoid intense summer exercise."],
+            de: ["Kurznasige Rasse; Atmung aufmerksam beobachten.", "Hautfalten reinigen, um Bakterien zu reduzieren.", "Hitzeempfindlich; im Sommer starke Belastung vermeiden."]
+        ),
+        "英国斗牛犬": .init(
+            zh: ["清洁面部皱褶非常重要，每天擦拭", "短鼻犬种，高温下谨慎运动", "体重管理严格，关节负担大"],
+            en: ["Wipe facial wrinkles daily; it is essential care.", "Flat-faced breed; be cautious with heat.", "Strict weight control protects overloaded joints."],
+            de: ["Gesichtsfalten täglich abwischen; das ist zentrale Pflege.", "Kurznasige Rasse; bei Hitze vorsichtig bewegen.", "Strenge Gewichtskontrolle schützt belastete Gelenke."]
+        ),
+        "吉娃娃": .init(
+            zh: ["注意保暖，冬季需穿衣", "牙齿较小，每日刷牙防牙石", "骨骼细小，避免从高处跳下"],
+            en: ["Keep warm; winter clothing may be needed.", "Small teeth need daily brushing to reduce tartar.", "Fragile frame; prevent jumps from height."],
+            de: ["Warm halten; im Winter kann Kleidung nötig sein.", "Kleine Zähne täglich putzen, um Zahnstein zu reduzieren.", "Zarter Körper; Sprünge aus Höhe vermeiden."]
+        ),
+        "杰克罗素梗": .init(
+            zh: ["精力旺盛，每天需要充足运动和嗅闻游戏", "聪明但主见强，训练要稳定一致", "短毛护理简单，每周梳理1次"],
+            en: ["High energy; needs daily exercise and sniff games.", "Smart but strong-willed, so keep training consistent.", "Short coat is simple; brush weekly."],
+            de: ["Sehr aktiv; braucht täglich Bewegung und Schnüffelspiele.", "Klug, aber willensstark; Training konsequent halten.", "Kurzhaar ist einfach; wöchentlich bürsten."]
+        ),
+        "秋田犬": .init(
+            zh: ["独立且护主，幼犬期社会化非常重要", "双层毛换毛明显，换毛期需每日梳理", "体型较大，注意关节和体重管理"],
+            en: ["Independent and protective; puppy socialization is crucial.", "Double coat sheds heavily; brush daily during shedding.", "Large body; watch joints and weight."],
+            de: ["Eigenständig und beschützend; frühe Sozialisierung ist sehr wichtig.", "Doppelfell mit starkem Wechsel; dann täglich bürsten.", "Großer Körper; Gelenke und Gewicht beachten."]
+        ),
+        "罗威纳犬": .init(
+            zh: ["力量大，需要稳定牵引和服从训练", "注意关节健康和体重控制", "短毛护理简单，每周梳理1次"],
+            en: ["Powerful breed; steady leash and obedience work matter.", "Watch joint health and weight control.", "Short coat is simple; brush weekly."],
+            de: ["Kräftige Rasse; stabile Leinenführung und Gehorsam sind wichtig.", "Gelenkgesundheit und Gewicht kontrollieren.", "Kurzhaar ist einfach; wöchentlich bürsten."]
+        ),
+        "沙皮犬": .init(
+            zh: ["皮肤褶皱需保持干爽，注意皮肤炎症", "耳道较窄，定期检查清洁耳朵", "运动中等，避免高温环境"],
+            en: ["Keep skin folds dry and watch for inflammation.", "Narrow ear canals need regular checks and cleaning.", "Moderate activity; avoid hot environments."],
+            de: ["Hautfalten trocken halten und Entzündungen beobachten.", "Enge Gehörgänge regelmäßig prüfen und reinigen.", "Mäßige Bewegung; Hitze vermeiden."]
+        ),
+        "松狮犬": .init(
+            zh: ["厚毛怕热，夏季注意降温", "每周梳毛2-3次，换毛期增加频率", "性格独立，训练需耐心且一致"],
+            en: ["Thick coat traps heat; prioritize cooling in summer.", "Brush 2-3 times weekly, more during shedding.", "Independent nature; training needs patience and consistency."],
+            de: ["Dickes Fell speichert Hitze; im Sommer gut kühlen.", "2-3-mal pro Woche bürsten, im Fellwechsel öfter.", "Eigenständiges Wesen; Training braucht Geduld und Konstanz."]
+        ),
+        "喜乐蒂牧羊犬": .init(
+            zh: ["中长毛每周梳理2-3次，换毛期更频繁", "聪明敏感，适合服从和嗅闻训练", "运动需求中高，需要稳定陪伴"],
+            en: ["Brush the medium coat 2-3 times weekly, more while shedding.", "Smart and sensitive; obedience and scent work fit well.", "Medium-high exercise needs and steady companionship."],
+            de: ["Mittellanges Fell 2-3-mal pro Woche bürsten, im Fellwechsel öfter.", "Klug und sensibel; Gehorsam und Nasenarbeit passen gut.", "Mittelhoher bis hoher Bewegungsbedarf und verlässliche Nähe."]
+        ),
+        "腊肠犬": .init(
+            zh: ["脊椎问题高发，减少跳跃上下楼梯", "注意体重控制", "每周梳毛1次（短毛型）"],
+            en: ["Back issues are common; reduce jumping and stairs.", "Keep weight controlled.", "Brush weekly for short-coated types."],
+            de: ["Rückenprobleme sind häufig; Sprünge und Treppen reduzieren.", "Gewicht im Blick behalten.", "Kurzhaarige Varianten wöchentlich bürsten."]
+        ),
+        "雪纳瑞": .init(
+            zh: ["胡须需定期清洁，避免食物残留", "每8-12周专业美容一次", "容易形成结石，多喝水"],
+            en: ["Clean the beard regularly to remove food residue.", "Professional grooming every 8-12 weeks helps.", "Can be prone to stones; encourage water intake."],
+            de: ["Bart regelmäßig reinigen, damit keine Futterreste bleiben.", "Professionelle Pflege alle 8-12 Wochen hilft.", "Kann zu Steinen neigen; Wasseraufnahme fördern."]
+        ),
+        "马尔济斯": .init(
+            zh: ["丝状长毛需每日梳理或定期剪短", "泪痕问题，每日清洁眼周", "体型娇小，注意低血糖风险"],
+            en: ["Silky long coat needs daily brushing or regular trimming.", "Tear staining is common; clean around the eyes daily.", "Tiny body; watch low blood sugar risk."],
+            de: ["Seidiges Langhaar täglich bürsten oder regelmäßig kürzen.", "Tränenflecken sind häufig; Augenbereich täglich reinigen.", "Sehr klein; Risiko für Unterzuckerung beachten."]
+        ),
+        "中华田园犬": .init(
+            zh: ["适应性强，日常护理简单", "每周梳毛1次，注意耳朵清洁", "性格忠诚，需充足运动和社会化"],
+            en: ["Adaptable and usually simple to care for.", "Brush weekly and keep ears clean.", "Loyal temperament; needs enough activity and socialization."],
+            de: ["Anpassungsfähig und meist unkompliziert in der Pflege.", "Wöchentlich bürsten und Ohren sauber halten.", "Treues Wesen; braucht genug Bewegung und Sozialisierung."]
+        )
     ]
 
     /// 查找品种护理贴士（模糊匹配）
     static func careTips(for breed: String) -> [String]? {
+        careTips(for: breed, l: L10n())
+    }
+
+    /// 查找本地化品种护理贴士（模糊匹配）
+    static func careTips(for breed: String, l: L10n) -> [String]? {
         let normalized = breed.trimmingCharacters(in: .whitespaces)
         // 精确匹配
-        if let tips = breedCareTips[normalized] { return tips }
+        if let tips = breedCareTips[normalized] { return tips.resolve(l: l) }
         // 模糊匹配（包含关系）
         for (key, tips) in breedCareTips {
             if normalized.contains(key) || key.contains(normalized) {
-                return tips
+                return tips.resolve(l: l)
             }
         }
         return nil

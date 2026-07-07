@@ -20,7 +20,9 @@ extension PetBasicInfoDetailView {
                     editLabel(l.tr(zh: "物种", en: "Species", de: "Art"))
                     Spacer()
                     Picker("", selection: $eSpecies) {
-                        ForEach(speciesOptions, id: \.self) { Text($0) }
+                        ForEach(speciesOptions, id: \.self) { species in
+                            Text(Pet.localizedSpeciesName(species, l: l)).tag(species)
+                        }
                     }.pickerStyle(.menu).tint(Color.goPrimary)
                         .onChange(of: eSpecies) { _, _ in
                             let firstBreed = PetBreedDatabase.breeds(for: eSpecies).first
@@ -254,19 +256,17 @@ extension PetBasicInfoDetailView {
     }
 
     func editFieldIdentifier(for label: String) -> String {
-        switch label {
-        case "名字": "pet-basic-info-name-input"
-        case "芯片号": "pet-basic-info-microchip-input"
-        case "诊所名称": "pet-basic-info-vet-clinic-input"
-        case "主治医生": "pet-basic-info-vet-doctor-input"
-        case "联系电话": "pet-basic-info-vet-contact-input"
-        case "诊所地址": "pet-basic-info-vet-address-input"
-        case "过敏原": "pet-basic-info-allergies-input"
-        case "护照编号": "pet-basic-info-passport-input"
-        case "曾用名": "pet-basic-info-former-name-input"
-        case "血统信息": "pet-basic-info-lineage-input"
-        default: "pet-basic-info-field-\(label)"
-        }
+        let slug = label
+            .lowercased()
+            .unicodeScalars
+            .map { scalar -> Character in
+                let value = scalar.value
+                return ((48 ... 57).contains(value) || (97 ... 122).contains(value)) ? Character(scalar) : "-"
+            }
+            .reduce(into: "") { $0.append($1) }
+            .split(separator: "-")
+            .joined(separator: "-")
+        return slug.isEmpty ? "pet-basic-info-field" : "pet-basic-info-field-\(slug)"
     }
 
     var selectedBreedInfo: BreedInfo? {
@@ -274,8 +274,8 @@ extension PetBasicInfoDetailView {
     }
 
     var breedOptions: [String] {
-        var options = ["未填写"] + PetBreedDatabase.breeds(for: eSpecies).map(\.name)
-        if !eBreed.isEmpty, eBreed != "未填写", !options.contains(eBreed) {
+        var options = [""] + PetBreedDatabase.breeds(for: eSpecies).map(\.name)
+        if !eBreed.isEmpty, !options.contains(eBreed) {
             options.insert(eBreed, at: 1)
         }
         return options
@@ -294,7 +294,7 @@ extension PetBasicInfoDetailView {
     }
 
     var countryOptions: [String] {
-        var options = ["未填写"] + PetBreedDatabase.countries
+        var options = [""] + PetBreedDatabase.countries
         if !eBirthCountry.isEmpty, !options.contains(eBirthCountry) {
             options.insert(eBirthCountry, at: 1)
         }
@@ -302,9 +302,9 @@ extension PetBasicInfoDetailView {
     }
 
     var birthCityOptions: [String] {
-        let cities = eBirthCountry.isEmpty || eBirthCountry == "未填写"
-            ? ["未填写"]
-            : ["未填写"] + PetBreedDatabase.cities(for: eBirthCountry)
+        let cities = eBirthCountry.isEmpty
+            ? [""]
+            : [""] + PetBreedDatabase.cities(for: eBirthCountry)
         var options = cities
         if !eBirthCity.isEmpty, !options.contains(eBirthCity) {
             options.insert(eBirthCity, at: 1)
@@ -325,12 +325,9 @@ extension PetBasicInfoDetailView {
         HStack {
             editLabel(label).frame(width: 70, alignment: .leading)
             Spacer()
-            Picker("", selection: Binding(
-                get: { selection.wrappedValue.isEmpty ? "未填写" : selection.wrappedValue },
-                set: { selection.wrappedValue = $0 == "未填写" ? "" : $0 }
-            )) {
+            Picker("", selection: selection) {
                 ForEach(options, id: \.self) { option in
-                    Text(option).tag(option)
+                    Text(option.isEmpty ? petProfileEmptyValue : option).tag(option)
                 }
             }
             .pickerStyle(.menu)

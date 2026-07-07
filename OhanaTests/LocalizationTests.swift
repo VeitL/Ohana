@@ -139,6 +139,32 @@ struct LocalizationTests {
         #expect(PetAgeConverter.humanAge(birthday: date, species: "狗", l: de).contains("Menschenalter"))
     }
 
+    @Test func petTagGreetingDoesNotFallbackToChineseForEnglishOrGerman() {
+        let pet = Pet(name: "Momo", species: "狗")
+        pet.personalityTagsRaw = "curious"
+
+        let zh = PetTagGreeting.homeSubtitleHint(pet: pet, hour: 8, l: L10n("zh"))
+        let en = PetTagGreeting.homeSubtitleHint(pet: pet, hour: 8, l: L10n("en"))
+        let de = PetTagGreeting.homeSubtitleHint(pet: pet, hour: 8, l: L10n("de"))
+
+        #expect(!zh.isEmpty)
+        #expect(!containsCJK(en))
+        #expect(!containsCJK(de))
+    }
+
+    @Test func petBreedCareTipsDoNotFallbackToChineseForEnglishOrGerman() throws {
+        let zh = try #require(PetBreedDatabase.careTips(for: "西伯利亚哈士奇", l: L10n("zh")))
+        let en = try #require(PetBreedDatabase.careTips(for: "西伯利亚哈士奇", l: L10n("en")))
+        let de = try #require(PetBreedDatabase.careTips(for: "西伯利亚哈士奇", l: L10n("de")))
+
+        #expect(!zh.isEmpty)
+        #expect(!en.isEmpty)
+        #expect(!de.isEmpty)
+        #expect(containsCJK(zh.joined(separator: " ")))
+        #expect(!containsCJK(en.joined(separator: " ")))
+        #expect(!containsCJK(de.joined(separator: " ")))
+    }
+
     @Test func day0PromiseCopyResolvesChineseAndEnglish() {
         let zh = Day0PromiseCopy(L10n("zh"))
         let en = Day0PromiseCopy(L10n("en"))
@@ -254,7 +280,7 @@ struct LocalizationTests {
 
     @Test func carePlanOverdueCopyResolvesLocalizedStatus() {
         let status = CarePlanOverdueStatus(
-            title: "喂食",
+            title: "喂食", // localization-audit: allow test fixture source title
             actionType: "feed",
             scheduledAt: Date(timeIntervalSince1970: 1000),
             daysOverdue: 2,
@@ -365,6 +391,12 @@ struct LocalizationTests {
             UserDefaults.standard.set(value, forKey: key)
         } else {
             UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
+    private func containsCJK(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            (0x4E00 ... 0x9FFF).contains(Int(scalar.value))
         }
     }
 }

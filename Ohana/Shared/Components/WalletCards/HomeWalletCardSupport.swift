@@ -385,9 +385,6 @@ struct WalletPetCardDraftFront: View {
                 EmptyView()
             }
         } else {
-            let sp = species.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            let silSpecies = (sp == "dog" || species == "狗") ? "狗" :
-                (sp == "cat" || species == "猫") ? "猫" : species
             ZStack {
                 Ellipse()
                     .fill(Color.arkInk.opacity(0.16))
@@ -395,7 +392,7 @@ struct WalletPetCardDraftFront: View {
                     .blur(radius: 10)
                     .offset(y: h * 0.14)
                 PetSilhouetteView(
-                    species: silSpecies,
+                    species: Pet.canonicalSpeciesKey(species),
                     coatColor: coatColor,
                     eyeColor: eyeColor,
                     patternName: coatPatternName,

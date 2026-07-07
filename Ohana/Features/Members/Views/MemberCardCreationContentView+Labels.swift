@@ -14,16 +14,7 @@ import UIKit
 
 extension MemberCardCreationContentView {
     func speciesLabel(_ species: String) -> String {
-        switch species {
-        case "狗": l.tr(zh: "狗", en: "Dog", de: "Hund")
-        case "猫": l.tr(zh: "猫", en: "Cat", de: "Katze")
-        case "鱼": l.tr(zh: "鱼", en: "Fish", de: "Fisch")
-        case "鸟": l.tr(zh: "鸟", en: "Bird", de: "Vogel")
-        case "兔子": l.tr(zh: "兔子", en: "Rabbit", de: "Kaninchen")
-        case "爬宠": l.tr(zh: "爬宠", en: "Reptile", de: "Reptil")
-        case "仓鼠": l.tr(zh: "仓鼠", en: "Hamster", de: "Hamster")
-        default: l.tr(zh: "其他", en: "Other", de: "Andere")
-        }
+        Pet.localizedSpeciesName(species, l: l)
     }
 
     func personalityLabel(_ id: String) -> String {

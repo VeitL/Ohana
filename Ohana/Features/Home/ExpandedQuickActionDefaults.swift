@@ -24,13 +24,12 @@ nonisolated enum ExpandedQuickActionDefaults {
     }
 
     static func items(for pet: Pet, localization l: L10n, waterManagementLabel: String) -> [QuickActionItem] {
-        let species = pet.species.lowercased()
-        let isDog = pet.species.contains("狗") || species.contains("dog")
-        let isCat = pet.species.contains("猫") || species.contains("cat")
-        let isFish = pet.species.contains("鱼") || species.contains("水族") || species.contains("锦鲤") || species.contains("金鱼") || species.contains("水龟") || species.contains("乌龟") || species.contains("龟") || species.contains("turtle") || species.contains("aquarium") || species.contains("fish") || species.contains("koi")
-        let isBird = pet.species.contains("鸟") || pet.species.contains("鹦鹉") || pet.species.contains("文鸟") || species.contains("bird") || species.contains("parrot")
-        let isRabbit = pet.species.contains("兔") || pet.species.contains("仓鼠") || pet.species.contains("龙猫") || pet.species.contains("豚鼠") || species.contains("rabbit") || species.contains("hamster")
-        let isReptile = pet.species.contains("爬") || pet.species.contains("蛇") || pet.species.contains("蜥") || pet.species.contains("守宫") || species.contains("reptile") || species.contains("lizard") || species.contains("snake") || species.contains("gecko")
+        let isDog = Pet.isDogSpecies(pet.species)
+        let isCat = Pet.isCatSpecies(pet.species)
+        let isFish = Pet.isFishSpecies(pet.species)
+        let isBird = Pet.isBirdSpecies(pet.species)
+        let isRabbit = Pet.isRabbitSpecies(pet.species) || Pet.isSmallMammalSpecies(pet.species)
+        let isReptile = Pet.isReptileSpecies(pet.species)
 
         if isFish {
             return items(for: pet, localization: l, waterManagementLabel: waterManagementLabel, [

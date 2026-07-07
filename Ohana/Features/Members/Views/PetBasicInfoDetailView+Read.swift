@@ -12,7 +12,7 @@ extension PetBasicInfoDetailView {
     var readContent: some View {
         VStack(spacing: 16) {
             // 品种护理小贴士（有品种且有数据时显示）
-            if !pet.breed.isEmpty, let tips = PetBreedDatabase.careTips(for: pet.breed) {
+            if !pet.breed.isEmpty, let tips = PetBreedDatabase.careTips(for: pet.breed, l: l) {
                 breedTipsCard(breed: pet.breed, tips: tips)
             }
 

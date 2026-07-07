@@ -33,6 +33,25 @@ struct PrivacyHardeningTests {
         ) == malformedImage)
     }
 
+    @Test func imageAttachmentSanitizerNormalizesFilenameOnlyAfterJPEGRewrite() throws {
+        let jpegWithGPS = try makeJPEGWithGPSMetadata()
+        let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
+            jpegWithGPS,
+            filename: " receipt.png ",
+            isImage: true
+        )
+        let malformed = AttachmentPrivacySanitizer.sanitizedAttachment(
+            Data("not actually an image".utf8),
+            filename: "receipt.png",
+            isImage: true
+        )
+
+        #expect(payload.filename == "receipt.jpg")
+        #expect(!hasGPSMetadata(payload.data))
+        #expect(payload.isImage)
+        #expect(malformed.filename == "receipt.png")
+    }
+
     @Test func imageAttachmentSanitizerCapsPersistedImageDimensions() throws {
         let largeJPEG = try makeSolidJPEG(width: 3200, height: 2400)
 
@@ -67,6 +86,9 @@ struct PrivacyHardeningTests {
         let imageAttachment = try #require(draft.attachments.first)
         let pdfAttachment = try #require(draft.attachments.dropFirst().first)
         let legacyAttachmentData = try #require(draft.attachmentData)
+        #expect(draft.attachmentFilename == "receipt.jpg")
+        #expect(imageAttachment.filename == "receipt.jpg")
+        #expect(pdfAttachment.filename == "invoice.pdf")
         #expect(!hasGPSMetadata(legacyAttachmentData))
         #expect(!hasGPSMetadata(imageAttachment.data))
         #expect(pdfAttachment.data == pdf)
@@ -95,7 +117,7 @@ struct PrivacyHardeningTests {
                 attachments: [
                     PetDocumentAttachmentCommandInput(
                         data: jpegWithGPS,
-                        filename: "vaccine.jpg",
+                        filename: "vaccine.png",
                         isImage: true
                     )
                 ]
@@ -107,6 +129,8 @@ struct PrivacyHardeningTests {
         let document = try #require(try context.fetch(FetchDescriptor<PetDocument>()).first)
         let attachment = try #require(document.attachments.first)
         let legacyAttachmentData = try #require(document.attachmentData)
+        #expect(document.attachmentFilename == "vaccine.jpg")
+        #expect(attachment.filename == "vaccine.jpg")
         #expect(!hasGPSMetadata(legacyAttachmentData))
         #expect(!hasGPSMetadata(attachment.data))
     }

@@ -22,10 +22,7 @@ struct PetFeatureCollectionView: View {
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var hasDogs: Bool {
-        activePets.contains {
-            $0.species.localizedCaseInsensitiveContains("狗") ||
-                $0.species.localizedCaseInsensitiveContains("dog")
-        }
+        activePets.contains { Pet.isDogSpecies($0.species) }
     }
     private var columns: [GridItem] {
         if dynamicTypeSize.isAccessibilitySize {

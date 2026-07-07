@@ -247,12 +247,13 @@ enum PetDocumentCommandService {
             applyAttachments(input.attachments, to: document, write: write, context: context)
         } else if let data = input.attachmentData {
             let filename = document.attachmentFilename.isEmpty ? "image.jpg" : document.attachmentFilename
-            let sanitizedData = AttachmentPrivacySanitizer.sanitizedData(
+            let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
                 data,
                 filename: filename,
-                isImage: AttachmentPrivacySanitizer.isImageFilename(filename)
+                isImage: AttachmentPrivacySanitizer.isImageFilename(filename),
+                fallbackFilename: filename
             )
-            document.updateLegacyAttachment(data: sanitizedData, filename: filename)
+            document.updateLegacyAttachment(data: payload.data, filename: payload.filename)
         }
         CloudSyncMutationRecorder.markModified(document, context: context)
         try saveDocumentChanges(context: context)
@@ -303,19 +304,18 @@ enum PetDocumentCommandService {
         write: AuthorizedDomainMemberFactWrite,
         context: ModelContext
     ) {
-        guard let first = attachments.first else { return }
-        let sanitizedAttachments = attachments.map(sanitizedAttachment)
+        guard !attachments.isEmpty else { return }
+        let sanitizedAttachments = attachments.enumerated().map { index, attachment in
+            sanitizedAttachment(attachment, index: index + 1)
+        }
         let sanitizedFirst = sanitizedAttachments[0]
-        let legacyFilename = first.filename.isEmpty
-            ? (first.isImage ? "image.jpg" : "attachment")
-            : first.filename
-        document.updateLegacyAttachment(data: sanitizedFirst.data, filename: legacyFilename)
+        document.updateLegacyAttachment(data: sanitizedFirst.data, filename: sanitizedFirst.filename)
         document.attachments.removeAll()
         for input in sanitizedAttachments {
             _ = DomainMemberFactWriter.createPetDocumentAttachment(
                 plan: write,
                 data: input.data,
-                filename: input.filename.isEmpty ? (input.isImage ? "image.jpg" : "attachment") : input.filename,
+                filename: input.filename,
                 isImage: input.isImage,
                 document: document,
                 context: context
@@ -348,16 +348,24 @@ enum PetDocumentCommandService {
     }
 
     private static func sanitizedAttachment(
-        _ input: PetDocumentAttachmentCommandInput
+        _ input: PetDocumentAttachmentCommandInput,
+        index: Int
     ) -> PetDocumentAttachmentCommandInput {
-        PetDocumentAttachmentCommandInput(
-            data: AttachmentPrivacySanitizer.sanitizedData(
-                input.data,
-                filename: input.filename,
-                isImage: input.isImage
-            ),
+        let fallback = if input.isImage {
+            index == 1 ? "image.jpg" : "image_\(index).jpg"
+        } else {
+            index == 1 ? "attachment" : "attachment_\(index)"
+        }
+        let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
+            input.data,
             filename: input.filename,
-            isImage: input.isImage
+            isImage: input.isImage,
+            fallbackFilename: fallback
+        )
+        return PetDocumentAttachmentCommandInput(
+            data: payload.data,
+            filename: payload.filename.isEmpty ? fallback : payload.filename,
+            isImage: payload.isImage
         )
     }
 

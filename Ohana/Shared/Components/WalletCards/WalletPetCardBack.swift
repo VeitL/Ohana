@@ -51,10 +51,10 @@ struct WalletPetCardBack: View {
 
     // MARK: - Species helpers
     private var isDog: Bool {
-        pet.species.lowercased().contains("dog") || pet.species.contains("狗")
+        Pet.isDogSpecies(pet.species)
     }
 
-    private var isFish: Bool { pet.species.contains("鱼") }
+    private var isFish: Bool { Pet.isFishSpecies(pet.species) }
     private var l: L10n { L10n(appLanguage) }
 
     // MARK: - Section data

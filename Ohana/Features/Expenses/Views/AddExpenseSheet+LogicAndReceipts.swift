@@ -147,14 +147,16 @@ extension AddExpenseSheetContent {
         guard let data = SecurityScopedFileDataReader.read(url) else { return }
         let type = UTType(filenameExtension: url.pathExtension)
         let isImage = type?.conforms(to: .image) ?? false
-        let attachment = ExpenseReceiptAttachment(
-            data: AttachmentPrivacySanitizer.sanitizedData(
-                data,
-                filename: url.lastPathComponent,
-                isImage: isImage
-            ),
+        let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
+            data,
             filename: url.lastPathComponent,
-            isImage: isImage
+            isImage: isImage,
+            fallbackFilename: "receipt_\(receiptAttachments.count + 1).jpg"
+        )
+        let attachment = ExpenseReceiptAttachment(
+            data: payload.data,
+            filename: payload.filename,
+            isImage: payload.isImage
         )
         withAnimation(GoMotion.feedback) {
             receiptAttachments.append(attachment)

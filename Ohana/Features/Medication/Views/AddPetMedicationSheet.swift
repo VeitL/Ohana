@@ -128,7 +128,7 @@ struct AddPetMedicationSheet: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle(existing == nil ? "添加用药记录" : "编辑用药")
+            .navigationTitle(existing == nil ? l.tr(zh: "添加用药记录", en: "Add medication record", de: "Medikationseintrag hinzufügen") : l.tr(zh: "编辑用药", en: "Edit medication", de: "Medikation bearbeiten"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -411,7 +411,7 @@ struct AddPetMedicationSheet: View {
         Button {
             saveAfterKeyboardDismiss()
         } label: {
-            Text(isSaving ? "保存中…" : (existing == nil ? "开始记录这个疗程" : "保存修改"))
+            Text(isSaving ? l.tr(zh: "保存中…", en: "Saving...", de: "Speichert...") : (existing == nil ? l.tr(zh: "开始记录这个疗程", en: "Start this course", de: "Diese Behandlung starten") : l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen speichern")))
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(maxWidth: .infinity)

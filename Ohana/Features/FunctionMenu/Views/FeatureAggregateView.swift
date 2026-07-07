@@ -29,7 +29,7 @@ struct FeatureAggregateView: View {
     private var l: L10n { L10n(appLanguage) }
 
     private func isDog(_ pet: Pet) -> Bool {
-        pet.species.lowercased().contains("狗") || pet.species.lowercased().contains("dog")
+        Pet.isDogSpecies(pet.species)
     }
 
     // Pets visible in chip row (walks = dogs only)
@@ -303,13 +303,13 @@ struct FeatureAggregateView: View {
         let summary = petAggregateSummaries[pet.id] ?? .empty
         switch feature {
         case .basicInfo:
-            return pet.breed.isEmpty ? pet.species : pet.breed
+            return pet.breed.isEmpty ? Pet.localizedSpeciesName(pet.species, l: l) : pet.breed
         case .documents:
-            return "\(summary.documentCount)份证件"
+            return l.tr(zh: "\(summary.documentCount) 份证件", en: "\(summary.documentCount) documents", de: "\(summary.documentCount) Dokumente")
         case .moments:
-            return "\(summary.photoCount)个时刻"
+            return l.tr(zh: "\(summary.photoCount) 个时刻", en: "\(summary.photoCount) moments", de: "\(summary.photoCount) Momente")
         case .achievements:
-            return "\(summary.milestoneCount)个里程碑"
+            return l.tr(zh: "\(summary.milestoneCount) 个里程碑", en: "\(summary.milestoneCount) milestones", de: "\(summary.milestoneCount) Meilensteine")
         case .health, .medications, .food, .hygiene, .walks, .potty, .retention, .weight, .expense:
             return ""
         }

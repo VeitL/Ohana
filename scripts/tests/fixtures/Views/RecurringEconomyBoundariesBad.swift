@@ -238,3 +238,14 @@ struct RecurringEconomyExpenseWithoutLedgerCommand {
         expense.note = "still.no.ledger"
     }
 }
+
+struct RecurringEconomyCoconutLedgerDeletionCommand {
+    let context: ModelContext
+
+    func deleteWalletHistory() {
+        let entries = try? context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        for entry in entries ?? [] {
+            context.delete(entry)
+        }
+    }
+}

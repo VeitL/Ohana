@@ -300,10 +300,9 @@ extension FamilyCollaborationDashboardView {
             } || careDone(.litter)
         }
 
-        let species = pet.species.lowercased()
-        let isDog = pet.species.contains("狗") || species.contains("dog")
-        let isCat = pet.species.contains("猫") || species.contains("cat")
-        let isFish = pet.species.contains("鱼") || species.contains("fish")
+        let isDog = Pet.isDogSpecies(pet.species)
+        let isCat = Pet.isCatSpecies(pet.species)
+        let isFish = Pet.isFishSpecies(pet.species)
 
         let expected: [(String, Bool)] = if isFish {
             [

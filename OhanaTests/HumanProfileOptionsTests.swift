@@ -35,6 +35,26 @@ struct HumanProfileOptionsTests {
         #expect(HumanProfileOptions.normalizedGender("不透露") == "不透露")
     }
 
+    @Test func storesGenderIdentityAsCanonicalKeys() {
+        #expect(HumanProfileOptions.genderOptions.map(\.key) == ["female", "male", "nonbinary", "private"])
+        #expect(HumanProfileOptions.storedGenderIdentity("女") == "female")
+        #expect(HumanProfileOptions.storedGenderIdentity("male") == "male")
+        #expect(HumanProfileOptions.storedGenderIdentity("非二元") == "nonbinary")
+        #expect(HumanProfileOptions.storedGenderIdentity("prefer not to say") == "private")
+        #expect(HumanProfileOptions.storedGenderIdentity("") == nil)
+    }
+
+    @Test func backupStorageGenderFallsBackToLegacyMetadataAsCanonicalKey() {
+        #expect(HumanProfileOptions.storedGenderIdentity(raw: "女", notes: "") == "female")
+        #expect(HumanProfileOptions.storedGenderIdentity(raw: "female", notes: "性别:男｜memo") == "female")
+        #expect(HumanProfileOptions.storedGenderIdentity(raw: nil, notes: "性别:男｜memo") == "male")
+        #expect(HumanProfileOptions.storedGenderIdentity(raw: "", notes: "memo") == nil)
+    }
+
+    @Test func memberCreationDraftDefaultsToCanonicalHumanGenderKey() {
+        #expect(MemberCreationDraft(kind: .human).humanGender == "nonbinary")
+    }
+
     @Test func visibleNotesHideLegacyRelationshipMetadata() {
         let notes = "性别:female｜关系:妈妈｜喜欢周末遛狗"
 

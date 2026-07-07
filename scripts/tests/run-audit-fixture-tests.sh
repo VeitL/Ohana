@@ -224,6 +224,7 @@ assert_bad scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBounda
   care-fact-executor-resolution-drops-fact care-command-result-unconsumed \
   care-derivation-direct-publish \
   pet-expense-ledger-boundary \
+  coconut-ledger-entry-append-only \
   care-secondary-executor-policy-unchecked \
   view-soft-gate-without-service-hard-gate
 assert_good scripts/audit-economy-boundaries.sh "$fixtures/RecurringEconomyBoundariesGood.swift"

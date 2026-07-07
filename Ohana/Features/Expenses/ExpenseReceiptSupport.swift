@@ -240,7 +240,9 @@ enum ExpenseReceiptDocumentBuilder {
         linkedExpenseLogId: String,
         attachments: [ExpenseReceiptAttachmentDraft]
     ) -> ExpenseReceiptDocumentDraft {
-        let sanitizedAttachments = attachments.map(sanitizedAttachment)
+        let sanitizedAttachments = attachments.enumerated().map { index, attachment in
+            sanitizedAttachment(attachment, index: index + 1)
+        }
         let firstAttachment = sanitizedAttachments.first
         return ExpenseReceiptDocumentDraft(
             title: title,
@@ -263,15 +265,20 @@ enum ExpenseReceiptDocumentBuilder {
         )
     }
 
-    private nonisolated static func sanitizedAttachment(_ attachment: ExpenseReceiptAttachmentDraft) -> ExpenseReceiptAttachmentDraft {
-        ExpenseReceiptAttachmentDraft(
-            data: AttachmentPrivacySanitizer.sanitizedData(
-                attachment.data,
-                filename: attachment.filename,
-                isImage: attachment.isImage
-            ),
+    private nonisolated static func sanitizedAttachment(
+        _ attachment: ExpenseReceiptAttachmentDraft,
+        index: Int
+    ) -> ExpenseReceiptAttachmentDraft {
+        let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
+            attachment.data,
             filename: attachment.filename,
-            isImage: attachment.isImage
+            isImage: attachment.isImage,
+            fallbackFilename: attachment.isImage ? "receipt_\(index).jpg" : "receipt_\(index)"
+        )
+        return ExpenseReceiptAttachmentDraft(
+            data: payload.data,
+            filename: payload.filename,
+            isImage: payload.isImage
         )
     }
 

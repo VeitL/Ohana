@@ -22,16 +22,16 @@ struct PetSilhouetteView: View {
     /// 关闭偶发眨眼（用于小尺寸预览卡等，完全静态）
     var isAnimationEnabled: Bool = true
     var body: some View {
-        switch species {
-        case "猫": CatSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
+        switch Pet.canonicalSpeciesKey(species) {
+        case "cat": CatSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
                                 onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
-        case "狗": DogSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
+        case "dog": DogSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
                                 onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
-        case "兔子", "兔": RabbitSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
+        case "rabbit": RabbitSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
                                          onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
-        case "仓鼠": HamsterSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
+        case "hamster": HamsterSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
                                      onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
-        case "鸟": BirdSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
+        case "bird": BirdSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
                                  onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
         default: GenericSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
                                    onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)

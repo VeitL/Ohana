@@ -21,7 +21,7 @@ struct EditHumanSheet: View {
     @State private var hasBirthday = false
     @State private var bloodType: String = ""
     @State private var role: String = "owner"
-    @State private var gender: String = "不透露"
+    @State private var gender: String = "private"
     @State private var notes: String = ""
     @State private var nationality: String = ""
     @State private var city: String = ""
@@ -106,7 +106,7 @@ struct EditHumanSheet: View {
             hasBirthday = human.birthday != nil
             bloodType = human.bloodType
             role = HumanProfileOptions.normalizedRole(human.role)
-            gender = human.genderRaw.isEmpty ? "不透露" : human.genderRaw
+            gender = HumanProfileOptions.storedGenderIdentity(human.genderRaw) ?? "private"
             notes = HumanProfileOptions.visibleNoteParts(from: human.notes).joined(separator: "｜")
             nationality = human.nationality
             city = human.city

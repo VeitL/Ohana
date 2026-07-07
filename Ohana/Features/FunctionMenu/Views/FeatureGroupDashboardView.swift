@@ -27,10 +27,7 @@ struct FeatureGroupDashboardView: View {
     private var l: L10n { L10n(appLanguage) }
 
     private var hasDogs: Bool {
-        activePets.contains {
-            $0.species.localizedCaseInsensitiveContains("狗") ||
-                $0.species.localizedCaseInsensitiveContains("dog")
-        }
+        activePets.contains { Pet.isDogSpecies($0.species) }
     }
 
     private var items: [FeatureGroupItem] {

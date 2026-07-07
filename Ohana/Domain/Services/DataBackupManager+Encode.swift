@@ -58,7 +58,7 @@ nonisolated extension DataBackupManager {
             id: h.id.uuidString, name: h.name, birthday: d(h.birthday),
             bloodType: h.bloodType, avatarEmoji: h.avatarEmoji, role: h.role,
             appleUserIdentifier: nil,
-            genderIdentityRaw: h.genderRaw.isEmpty ? nil : h.genderRaw,
+            genderIdentityRaw: HumanProfileOptions.storedGenderIdentity(raw: h.genderIdentityRaw, notes: h.notes),
             notes: HumanProfileOptions.visibleNoteParts(from: h.notes).joined(separator: "｜"),
             createdAt: d(h.createdAt), nationality: h.nationality, city: h.city,
             coconutBalance: h.coconutBalance, shouldShowOnHome: h.shouldShowOnHome,

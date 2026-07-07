@@ -11,7 +11,7 @@ import SwiftUI
 extension PetBasicInfoDetailView {
     func loadEditState() {
         eName = pet.name
-        eSpecies = pet.species
+        eSpecies = Pet.canonicalSpeciesKey(pet.species)
         eBreed = pet.breed
         eGender = pet.gender
         eIsNeutered = pet.isNeutered
@@ -44,7 +44,7 @@ extension PetBasicInfoDetailView {
             name: eName,
             avatarImageData: eAvatarImageData,
             avatarEmoji: pet.avatarEmoji,
-            species: eSpecies,
+            species: Pet.canonicalSpeciesKey(eSpecies),
             breed: eBreed,
             gender: eGender,
             isNeutered: eIsNeutered,

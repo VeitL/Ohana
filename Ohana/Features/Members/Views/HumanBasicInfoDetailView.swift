@@ -50,8 +50,8 @@ struct HumanBasicInfoDetailContentView: View {
     @State private var ePrivateNote = false
 
     private let themePresets = ["F97316", "EC4899", "A855F7", "EF4444", "14B8A6", "FACC15", "8B5CF6", "64748B", "B45309", "DB2777"]
-    private let bloodTypeOptions = ["未填写", "A", "B", "AB", "O"]
-    private let mbtiOptions = ["未填写", "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]
+    private let bloodTypeOptions = ["", "A", "B", "AB", "O"]
+    private let mbtiOptions = ["", "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]
     private let genderOptions = HumanProfileOptions.genderOptions
 
     var body: some View {
@@ -431,7 +431,7 @@ struct HumanBasicInfoDetailContentView: View {
     }
 
     private var countryOptions: [String] {
-        var options = ["未填写"] + PetBreedDatabase.countries
+        var options = [""] + PetBreedDatabase.countries
         if !eNationality.isEmpty, !options.contains(eNationality) {
             options.insert(eNationality, at: 1)
         }
@@ -439,9 +439,9 @@ struct HumanBasicInfoDetailContentView: View {
     }
 
     private var residenceCityOptions: [String] {
-        let base = eNationality.isEmpty || eNationality == "未填写"
-            ? ["未填写"]
-            : ["未填写"] + PetBreedDatabase.cities(for: eNationality)
+        let base = eNationality.isEmpty
+            ? [""]
+            : [""] + PetBreedDatabase.cities(for: eNationality)
         var options = base
         if !eCity.isEmpty, !options.contains(eCity) {
             options.insert(eCity, at: 1)
@@ -463,11 +463,11 @@ struct HumanBasicInfoDetailContentView: View {
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
             }
             HStack(spacing: 8) {
-                ForEach(["未填写", "160", "165", "170", "175", "180"], id: \.self) { option in
+                ForEach(["", "160", "165", "170", "175", "180"], id: \.self) { option in
                     Button {
-                        eHeightText = option == "未填写" ? "" : option
+                        eHeightText = option
                     } label: {
-                        Text(option == "未填写" ? localizedEmptyValue : "\(option)")
+                        Text(option.isEmpty ? localizedEmptyValue : "\(option)")
                             .font(OhanaFont.adaptive(size: 12, weight: heightOptionSelected(option) ? .black : .semibold, design: .rounded))
                             .foregroundStyle(heightOptionSelected(option) ? Color.arkInk : .primary.opacity(0.78))
                             .padding(.horizontal, 10)
@@ -493,7 +493,7 @@ struct HumanBasicInfoDetailContentView: View {
     }
 
     private func heightOptionSelected(_ option: String) -> Bool {
-        guard option != "未填写", let optionValue = Int(option) else {
+        guard let optionValue = Int(option) else {
             return eHeightText.isEmpty
         }
         return Int(heightValue) == optionValue
@@ -503,10 +503,7 @@ struct HumanBasicInfoDetailContentView: View {
         HStack {
             editLabel(title)
             Spacer()
-            Picker("", selection: Binding(
-                get: { selection.wrappedValue.isEmpty ? "未填写" : selection.wrappedValue },
-                set: { selection.wrappedValue = $0 == "未填写" ? "" : $0 }
-            )) {
+            Picker("", selection: selection) {
                 ForEach(options, id: \.self) { option in
                     Text(localizedOptionTitle(option)).tag(option)
                 }
@@ -521,9 +518,9 @@ struct HumanBasicInfoDetailContentView: View {
             editLabel(title)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 54), spacing: 8)], alignment: .leading, spacing: 8) {
                 ForEach(options, id: \.self) { option in
-                    let selected = (selection.wrappedValue.isEmpty && option == "未填写") || selection.wrappedValue.uppercased() == option
+                    let selected = (selection.wrappedValue.isEmpty && option.isEmpty) || selection.wrappedValue.uppercased() == option
                     Button {
-                        selection.wrappedValue = option == "未填写" ? "" : option
+                        selection.wrappedValue = option
                     } label: {
                         Text(localizedOptionTitle(option))
                             .font(OhanaFont.adaptive(size: 12, weight: selected ? .black : .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -588,7 +585,7 @@ struct HumanBasicInfoDetailContentView: View {
         eAvatarImageData = human.avatarImageData
         eAvatarEmoji = human.avatarEmoji
         eRole = HumanProfileOptions.normalizedRole(human.role)
-        eGender = human.genderRaw.isEmpty ? "不透露" : human.genderRaw
+        eGender = HumanProfileOptions.storedGenderIdentity(human.genderRaw) ?? "private"
         eBirthday = human.birthday ?? Date()
         eHasBirthday = human.birthday != nil
         eBloodType = human.bloodType
@@ -662,7 +659,7 @@ struct HumanBasicInfoDetailContentView: View {
     }
 
     private func localizedOptionTitle(_ option: String) -> String {
-        option == "未填写" ? localizedEmptyValue : option
+        option.isEmpty ? localizedEmptyValue : option
     }
 
     private func localizedRoleText(for raw: String) -> String {

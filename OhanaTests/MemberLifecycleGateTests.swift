@@ -1849,14 +1849,14 @@ struct MemberLifecycleGateTests {
         let otherMedication = PetMedication(name: "Vitamin", pet: otherPet)
         let scheduledAt = Calendar.current.startOfDay(for: Date()).addingTimeInterval(12 * 3600)
         let medicationEvent = Event(
-            title: "用药 Drops",
+            title: "用药 Drops", // localization-audit: allow historical event fixture title
             startDate: scheduledAt,
             eventType: EventType.medication.rawValue,
             relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
             relatedEntityId: medication.id.uuidString
         )
         let otherMedicationEvent = Event(
-            title: "用药 Vitamin",
+            title: "用药 Vitamin", // localization-audit: allow historical event fixture title
             startDate: scheduledAt,
             eventType: EventType.medication.rawValue,
             relatedEntityType: DomainEntityLinkRegistry.petMedicationPlan,
@@ -2380,6 +2380,10 @@ struct MemberLifecycleGateTests {
     @Test func petProfileCardsUseRouteSummariesInsteadOfPetRelationshipHealthReads() throws {
         let rootURL = repositoryRootURL()
         let basicSource = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView.swift", rootURL: rootURL)
+        let editSource = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView+Edit.swift", rootURL: rootURL)
+        let humanBasicSource = try source("Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift", rootURL: rootURL)
+        let humanEditSource = try source("Ohana/Features/Members/Views/EditHumanSheet.swift", rootURL: rootURL)
+        let memberCreationSource = try source("Ohana/Features/Members/MemberCardCreationSupport.swift", rootURL: rootURL)
         let healthSource = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView+HealthSummary.swift", rootURL: rootURL)
         let sitterSource = try source("Ohana/Features/Members/Views/SitterCardPreviewSheet.swift", rootURL: rootURL)
 
@@ -2399,6 +2403,27 @@ struct MemberLifecycleGateTests {
         #expect(healthSource.contains("FetchDescriptor<PetInsurance>"))
         #expect(healthSource.contains("FetchDescriptor<CareLedgerEvent>"))
         #expect(healthSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
+        #expect(!healthSource.contains("var vaccineSummaryText: String ="))
+        #expect(!healthSource.contains("var activeMedicationSummaryText: String ="))
+        #expect(!healthSource.contains("var recentSymptomSummaryText: String ="))
+        #expect(!healthSource.contains("var insuranceSummaryText: String ="))
+        #expect(!healthSource.contains("var recentWeightSummaryText: String ="))
+        #expect(healthSource.contains("localizedVaccineSummary(l:"))
+        #expect(healthSource.contains("localizedMedicationSummary(l:"))
+        let legacyEmptyValue = "\u{672A}\u{586B}\u{5199}"
+        #expect(!editSource.contains("selection.wrappedValue.isEmpty ? \"\(legacyEmptyValue)\""))
+        #expect(!editSource.contains("$0 == \"\(legacyEmptyValue)\" ? \"\" : $0"))
+        #expect(editSource.contains("Text(option.isEmpty ? petProfileEmptyValue : option).tag(option)"))
+        #expect(!editSource.contains("ForEach(speciesOptions, id: \\.self) { Text($0) }"))
+        #expect(editSource.contains("Text(Pet.localizedSpeciesName(species, l: l)).tag(species)"))
+        #expect(!humanBasicSource.contains("selection.wrappedValue.isEmpty ? \"\(legacyEmptyValue)\""))
+        #expect(!humanBasicSource.contains("$0 == \"\(legacyEmptyValue)\" ? \"\" : $0"))
+        #expect(humanBasicSource.contains("Text(localizedOptionTitle(option)).tag(option)"))
+        #expect(humanBasicSource.contains("option.isEmpty ? localizedEmptyValue : option"))
+        #expect(!humanBasicSource.contains("eGender = human.genderRaw.isEmpty ? \"不透露\" : human.genderRaw"))
+        #expect(!humanEditSource.contains("@State private var gender: String = \"不透露\""))
+        #expect(!humanEditSource.contains("gender = human.genderRaw.isEmpty ? \"不透露\" : human.genderRaw"))
+        #expect(!memberCreationSource.contains("var humanGender = \"非二元\""))
         #expect(sitterSource.contains("PetBasicInfoHealthSummary.latestWeight"))
         #expect(sitterSource.contains("OhanaFrameScheduler.runAfterNextFrame"))
     }
@@ -2466,14 +2491,20 @@ struct MemberLifecycleGateTests {
         try context.save()
 
         let summary = PetBasicInfoHealthSummary.load(petID: pet.id, context: context, now: now)
+        let en = L10n("en")
+        let de = L10n("de")
 
-        #expect(summary.vaccineSummaryText.contains("Rabies"))
-        #expect(summary.activeMedicationSummaryText.contains("Antibiotic"))
-        #expect(summary.recentSymptomSummaryText.contains("Cough"))
-        #expect(summary.insuranceSummaryText.contains("Guard Plan"))
+        #expect(summary.vaccine?.name == "Rabies")
+        #expect(summary.activeMedications.first?.name == "Antibiotic")
+        #expect(summary.recentSymptoms.first?.name == "Cough")
+        #expect(summary.insurance?.name == "Guard Plan")
+        #expect(summary.localizedVaccineSummary(l: en).contains("valid until"))
+        #expect(summary.localizedMedicationSummary(l: en).contains("Antibiotic"))
+        #expect(summary.localizedSymptomSummary(l: de).contains("Leicht"))
+        #expect(summary.localizedInsuranceSummary(l: en).contains("Guard Plan"))
         #expect(summary.latestWeight?.kg == 4.6)
-        #expect(!summary.recentWeightSummaryText.contains("99"))
-        #expect(!summary.recentWeightSummaryText.contains("9.9"))
+        #expect(!summary.localizedWeightSummary(l: en).contains("99"))
+        #expect(!summary.localizedWeightSummary(l: en).contains("9.9"))
     }
 
     @Test func familyWeeklyReportsUseDeferredLedgerReadModelInsteadOfPetRelationshipLogs() throws {

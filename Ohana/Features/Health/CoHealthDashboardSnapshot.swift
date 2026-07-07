@@ -50,7 +50,7 @@ struct CoHealthDashboardSnapshot: Equatable {
 
     func associatedPets(for humanID: UUID, dogsOnly: Bool) -> [CoHealthPetSnapshot] {
         associatedPets.filter { pet in
-            (!dogsOnly || pet.species == "狗") && pet.hasWalk(by: humanID)
+            (!dogsOnly || Pet.isDogSpecies(pet.species)) && pet.hasWalk(by: humanID)
         }
     }
 

@@ -12,7 +12,7 @@
 ## Current Read
 
 - Last compacted: 2026-06-25.
-- Open follow-ups: 12 total: P1 = 4, P2 = 6, P3 = 2.
+- Open follow-ups: 9 total: P1 = 4, P2 = 4, P3 = 1.
 - Open P0: 0.
 - Known first-release-reachable repository-code P1: none.
 - P1 still open because of CloudKit 1.x deferred work or real-device validation.
@@ -73,14 +73,6 @@
 - Next action: install a signed build on a real device, open Human Workout, grant Apple Health read access, confirm activity rings/step/distance cards populate from Health data, import one workout, relaunch, and verify the imported Human workout remains local with Health source metadata.
 - Close when: the real-device checklist passes or any device-specific HealthKit defect is fixed or split into a scoped follow-up.
 
-### TFU-20260613-004 - Restore Pet Quick-Access Derived State
-
-- Priority / bucket: P2, recycle-bin/member restore polish.
-- Status: Open.
-- Why still open: member deletion removes pet quick-access entries; restore currently does not recreate or recompute that derived state.
-- Next action: decide intended restored-pet product behavior, then recreate previous quick access or recompute defaults during restore.
-- Close when: restored pets have approved quick-action availability and a focused regression test covers it.
-
 ### TFU-20260629-004 - Finish Pet Simulator GUI Deep Coverage
 
 - Priority / bucket: P2, Pet simulator validation / UI-test coverage gap.
@@ -109,25 +101,9 @@
 
 - Priority / bucket: P2, Members localization.
 - Status: Open.
-- Why still open: the 2026-06-28 human slices moved Human detail overview, basic-info edit/read surfaces, feature hubs, privacy placeholders, reminder/notes copy, route fallback/loading/missing copy, dynamic role/age/blood chips, `EditHumanSheet`, human-reachable CrewRoster edit/delete/accessibility copy, and shared avatar/crop controls onto `L10n`, but broader Members Pet/plant-specific surfaces still contain user-visible hardcoded Chinese strings.
+- Why still open: the 2026-06-28 human slices moved Human detail overview, basic-info edit/read surfaces, feature hubs, privacy placeholders, reminder/notes copy, route fallback/loading/missing copy, dynamic role/age/blood chips, `EditHumanSheet`, human-reachable CrewRoster edit/delete/accessibility copy, and shared avatar/crop controls onto `L10n`. The 2026-07-07 pass also moved pet personality home greetings onto unified `L10n.tr` copy with regression coverage, converted the Pet basic-info vet summary read model from prebuilt Chinese strings into value snapshots rendered through localized helpers, localized Pet breed care-tip output at the `PetBreedDatabase.careTips(for:l:)` source boundary, removed Pet/Human basic-info edit forms' Chinese `未填写` picker sentinel in favor of internal empty values plus localized display text, made Pet Basic Info species picker render localized labels over stable raw values, made new Pet species writes/defaults use canonical keys with legacy Chinese raw-value read compatibility across high-traffic home/profile/health/function-menu/shared-check-in surfaces, made Pet health alert species exceptions consume the same canonical helpers, and made new Human gender selection/write/backup-export paths use canonical keys while retaining legacy Chinese raw-value read compatibility. Broader Members Pet/plant-specific surfaces still need a final hardcoded-copy and long-language visual sweep.
 - Next action: continue with Pet edit/read/danger-zone surfaces plus sitter-card and Pet health/medication copy, authoring Chinese and English at minimum.
 - Close when: Members user-facing strings pass localization coverage and main long-language screens remain visually clean.
-
-### TFU-20260611-005 - Route Shared Walk Writes Through Owning Command/Service
-
-- Priority / bucket: P2, Walks/shared-care architecture.
-- Status: Open.
-- Why still open: active Walks/shared-care workflow still has a static service-call boundary violation in `PetWalkingManager`.
-- Next action: route shared walk writes through the owning shared-care command/service boundary used by the current Walks workflow.
-- Close when: whole-repo architecture audit no longer reports the violation and relevant Walks/shared-care validation covers the path.
-
-### TFU-20260611-003 - Normalize Sanitized Image Attachment Filenames
-
-- Priority / bucket: P3, low-risk privacy/document polish.
-- Status: Open.
-- Why still open: normalized JPEG bytes can still display misleading historical or imported filename extensions.
-- Next action: normalize new sanitized image filenames/extensions to `.jpg` or store explicit sanitized content type.
-- Close when: new sanitized image attachments no longer show misleading `.png` extensions while import/display still rely on explicit image metadata.
 
 ### TFU-20260612-010 - Unify Care Status Read Models And Expand Ledger Analysis
 
@@ -148,9 +124,12 @@ Use the archive for full detail. High-signal closures already reflected in the c
 - TFU-20260625-002: Plants launch integration closed on 2026-06-25; care-plan Event/Reminder materialization, per-plant reminder disable cleanup, plan refresh after care completion, dashboard location filtering, full-field detail editing, Today Focus/calendar/economy/Oasis/shop coverage, and targeted simulator tests are recorded in `docs/testing-progress.md`.
 - TFU-20260614-013, 015, 016, 017, 018, 019 and TFU-20260615-001: current-head closure reviews completed on 2026-06-25; raw Open P1 count reduced to 4.
 - TFU-20260623-001: Home quick-action render-state isolation cleanup closed after Terminal `iPhone 17` targeted suites reported `TEST SUCCEEDED`; Codex shell CoreSimulator remains a session blocker, now diagnosed by `scripts/diagnose-simulator.sh`.
+- TFU-20260613-004: pet quick-access restore polish closed as stale against current product code. Pets now use physical deletion/memorial lifecycle rather than a restore-from-recycle-bin path; `MemberDeletionCommandService.deletePet` intentionally removes pet-scoped quick actions from `quickActionItems_v2`, and `HomeCommandExecutorTests.memberDeletionServiceDeletesPetRelatedEventsAndQuickAccess` covers that cleanup.
+- TFU-20260611-005: shared-walk command/service boundary closed as current-code resolved. Multi-target walks route through `walkCareEvents.recordSharedWalk` / `SharedPetActionRecorder`, single-target walks use `DomainCareFactWriteAuthorizer` + `DomainCareFactWriter` + `DomainCareFactEffectsDispatcher`, and whole-repo architecture plus economy-boundary audits cover the path.
 - TFU-20260629-003: Human Settings privacy batch-action UITest/smoothness gap closed on 2026-06-29 for the then-current PIN/privacy UI; that UI evidence is now superseded by the first-release local policy that hides member privacy/PIN controls and treats same-device member switching as attribution only.
 - TFU-20260630-001: Coconut Shop Function Menu route blocker closed on 2026-06-30 after the current iPhone 17 simulator revalidation passed the Home FAB -> Function Menu -> Coconut Shop -> Lime Glow purchase UI test plus route, growth, gacha, catalog, and plant-shop guards.
 - TFU-20260629-002: Plants simulator GUI coverage closed on 2026-07-03 after current evidence covered the launch-required simulator paths: full unlock/create/reminder/Calendar/care/delete, no-reset reminder toggle, no-reset detail profile sections, no-reset Settings bulk defer plus edit cancel/save, Calendar plant filter, catalog-first add flow, and wallet expand/collapse position stability including the mid-animation inactive-card jump root fix. Remaining plant work is tracked as true-device/manual acceptance in `docs/release-true-device-test-plan.md` or as non-launch future scope, not as a simulator focus blocker.
+- TFU-20260611-003: sanitized image attachment filename polish closed on 2026-07-07. Document and receipt import paths now consume the shared sanitizer payload, successful JPEG rewrites surface `.jpg` filenames, fallback batch names remain unique, and `scripts/build-debug-fast.sh` passed on the pinned `iPhone 17` simulator.
 - TFU-20260629-001: Human automated write-flow coverage closed on 2026-06-29; the combined pinned `iPhone 17` UI run passed route coverage, Home human quick actions, feature-hub record persistence, and extended health/workout/report/wishlist/profile writes.
 - TFU-20260628-001: Home first-pet onboarding accessibility polish closed in the same validation pass; non-front Today Focus compact-stack cards are no longer mounted at rest, and expanded non-selected Home card surfaces are hidden from accessibility.
 - TFU-20260612-018: duplicate Members profile revision publishes closed on 2026-06-28; profile executors own the single publish boundary and `scripts/audit-architecture-boundaries.sh` now guards against direct Members view publishes.

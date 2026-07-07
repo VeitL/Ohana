@@ -427,14 +427,14 @@ struct AddVaccineSheet: View {
     }
 
     private var vaccineSuggestions: [String] {
-        if pet.species == "猫" {
+        if Pet.isCatSpecies(pet.species) {
             return [
                 l.tr(zh: "猫三联", en: "FVRCP", de: "Katzenseuche/-schnupfen"),
                 l.tr(zh: "狂犬疫苗", en: "Rabies", de: "Tollwut"),
                 l.tr(zh: "猫白血病", en: "FeLV", de: "FeLV")
             ]
         }
-        if pet.species == "狗" {
+        if Pet.isDogSpecies(pet.species) {
             return [
                 l.tr(zh: "犬四联", en: "DHPP", de: "DHPP"),
                 l.tr(zh: "狂犬疫苗", en: "Rabies", de: "Tollwut"),

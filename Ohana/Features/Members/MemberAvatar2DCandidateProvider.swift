@@ -28,7 +28,7 @@ enum Avatar2DCandidateProvider {
 
     private static func humanCandidates(for draft: MemberCreationDraft, l: L10n) -> [Avatar2DCandidate] {
         let gender = HumanProfileOptions.normalizedGender(draft.humanGender)
-        let fallbackGender = ["男", "女", "非二元"].contains(gender) ? gender : "非二元"
+        let fallbackGender = ["男", "女", "非二元"].contains(gender) ? gender : "nonbinary"
         let birthday = draft.hasBirthday ? draft.birthday : nil
         let defaultFilename = HumanAvatarAssetCatalog.avatarFilename(gender: fallbackGender, birthday: birthday)
         let genderSlug = humanGenderSlug(fallbackGender)
@@ -136,16 +136,15 @@ enum Avatar2DCandidateProvider {
     }
 
     private static func petSpeciesPrefix(_ species: String) -> String {
-        let value = species.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        switch value {
-        case "猫", "cat", "cats": return "cat_"
-        case "狗", "dog", "dogs": return "dog_"
-        case "鸟", "bird", "birds": return "bird_"
-        case "鱼", "fish", "fishes": return "fish_"
-        case "兔", "兔子", "rabbit", "rabbits": return "rabbit_"
-        case "爬宠", "爬虫", "reptile", "reptiles": return "reptile_"
-        case "仓鼠", "hamster", "hamsters": return "hamster_"
-        default: return "pet_"
+        switch Pet.canonicalSpeciesKey(species) {
+        case "cat": "cat_"
+        case "dog": "dog_"
+        case "bird": "bird_"
+        case "fish": "fish_"
+        case "rabbit": "rabbit_"
+        case "reptile": "reptile_"
+        case "hamster": "hamster_"
+        default: "pet_"
         }
     }
 

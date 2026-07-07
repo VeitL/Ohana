@@ -301,14 +301,7 @@ private struct PetSilhouetteIcon: View {
     }
 
     private var systemIconName: String {
-        switch species {
-        case "狗": "dog.fill"
-        case "猫": "cat.fill"
-        case "兔子": "hare.fill"
-        case "仓鼠": "circle.fill"
-        case "鸟": "bird.fill"
-        default: "pawprint.fill"
-        }
+        Pet.speciesSilhouetteSymbol(forSpecies: species)
     }
 }
 

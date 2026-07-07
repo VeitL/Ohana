@@ -208,12 +208,12 @@ extension MemberCardCreationContentView {
     }
 
     var petInitialWeightPlaceholder: String {
-        switch draft.species {
-        case "猫":
+        switch Pet.canonicalSpeciesKey(draft.species) {
+        case "cat":
             "4.2"
-        case "兔子", "仓鼠":
+        case "rabbit", "hamster":
             "1.2"
-        case "鸟":
+        case "bird":
             "0.3"
         default:
             "12.0"
@@ -534,17 +534,11 @@ extension MemberCardCreationContentView {
     }
 
     var petFallbackSymbol: String {
-        switch draft.species {
-        case "狗": "dog.fill"
-        case "猫": "cat.fill"
-        case "鸟": "bird.fill"
-        case "鱼": "fish.fill"
-        default: "pawprint.fill"
-        }
+        Pet.speciesSilhouetteSymbol(forSpecies: draft.species)
     }
 
     var speciesOptions: [String] {
-        ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
+        Pet.canonicalSpeciesOptions
     }
 
     var petGenderOptions: [String] {
@@ -552,7 +546,7 @@ extension MemberCardCreationContentView {
     }
 
     var humanGenderOptions: [String] {
-        ["男", "女", "非二元"]
+        HumanProfileOptions.genderOptions.map(\.key)
     }
 
     var humanRoleOptions: [String] {

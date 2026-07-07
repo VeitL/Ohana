@@ -213,14 +213,15 @@ final class MemberCreationService: MemberCreating {
         if shouldUse2D, !Avatar2DAccess.hasAccess(kind: .pet, existingCount: existingCount) {
             throw ServiceError.avatarPassRequired
         }
+        let speciesKey = Pet.canonicalSpeciesKey(draft.species)
         let pet = Pet(
             name: draft.trimmedName,
-            species: draft.species,
+            species: speciesKey,
             breed: draft.resolvedBreed,
             birthday: draft.hasBirthday ? draft.birthday : nil,
             gender: draft.petGender,
             isNeutered: draft.isNeutered,
-            avatarEmoji: speciesEmoji(draft.species),
+            avatarEmoji: speciesEmoji(speciesKey),
             themeColorHex: draft.normalizedThemeHex,
             homeDate: draft.hasHomeDate ? draft.homeDate : nil
         )
@@ -565,16 +566,7 @@ final class MemberCreationService: MemberCreating {
     }
 
     private func speciesEmoji(_ species: String) -> String {
-        switch species {
-        case "狗": "🐕"
-        case "猫": "🐈"
-        case "兔子": "🐇"
-        case "鱼": "🐟"
-        case "鸟": "🦜"
-        case "爬宠": "🦎"
-        case "仓鼠": "🐹"
-        default: "🐾"
-        }
+        Pet.speciesEmoji(forSpecies: species)
     }
 
     private func residenceText(country: String, city: String) -> String {

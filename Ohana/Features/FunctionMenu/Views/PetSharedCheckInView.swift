@@ -18,10 +18,7 @@ struct PetSharedCheckInView: View {
     private var l: L10n { L10n(appLanguage) }
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var cats: [Pet] {
-        activePets.filter {
-            $0.species.localizedCaseInsensitiveContains("猫") ||
-                $0.species.localizedCaseInsensitiveContains("cat")
-        }
+        activePets.filter { Pet.isCatSpecies($0.species) }
     }
     private var columns: [GridItem] {
         dynamicTypeSize.isAccessibilitySize

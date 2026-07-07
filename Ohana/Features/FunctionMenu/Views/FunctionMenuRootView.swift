@@ -188,37 +188,36 @@ struct FunctionMenuRootView: View {
     private func subtitle(for group: FeatureGroup) -> String {
         switch group {
         case .dailyCare:
-            hasDogs ? "饮食 · 清洁 · 遛狗 · 便便" : "饮食 · 清洁 · 便便"
+            hasDogs
+                ? l.tr(zh: "饮食 · 清洁 · 遛狗 · 便便", en: "Food · Hygiene · Walks · Potty", de: "Futter · Pflege · Gassi · Toilette")
+                : l.tr(zh: "饮食 · 清洁 · 便便", en: "Food · Hygiene · Potty", de: "Futter · Pflege · Toilette")
         case .healthBody:
-            "健康档案 · 用药 · 体重"
+            l.tr(zh: "健康档案 · 用药 · 体重", en: "Health · Medication · Weight", de: "Gesundheit · Medikamente · Gewicht")
         case .archiveMemory:
-            "成长 · 基本信息 · 证件 · 时刻"
+            l.tr(zh: "成长 · 基本信息 · 证件 · 时刻", en: "Growth · Profile · Documents · Moments", de: "Wachstum · Profil · Dokumente · Momente")
         case .householdHub:
-            "花费 · 照护分析 · 提醒 · 周报"
+            l.tr(zh: "花费 · 照护分析 · 提醒 · 周报", en: "Expenses · Care analysis · Reminders · Weekly", de: "Ausgaben · Pflegeanalyse · Erinnerungen · Woche")
         case .oasisRewards:
-            "\(wealthSubtitle) · 商店 · 扭蛋"
+            l.tr(zh: "\(wealthSubtitle) · 商店 · 扭蛋", en: "\(wealthSubtitle) · Shop · Gacha", de: "\(wealthSubtitle) · Shop · Gacha")
         case .plants:
             l.tr(zh: "浇水 · 施肥 · 状态", en: "Watering · Fertilizing · Status", de: "Gießen · Düngen · Status")
         }
     }
 
     private var hasDogs: Bool {
-        activePets.contains { $0.species.localizedCaseInsensitiveContains("狗") || $0.species.localizedCaseInsensitiveContains("dog") }
+        activePets.contains { Pet.isDogSpecies($0.species) }
     }
 
     private var wealthSubtitle: String {
-        "总资产 \(humans.reduce(0) { $0 + $1.coconutBalance } + pets.reduce(0) { $0 + $1.coconutBalance })🥥"
+        l.tr(
+            zh: "总资产 \(humans.reduce(0) { $0 + $1.coconutBalance } + pets.reduce(0) { $0 + $1.coconutBalance })🥥",
+            en: "Assets \(humans.reduce(0) { $0 + $1.coconutBalance } + pets.reduce(0) { $0 + $1.coconutBalance })🥥",
+            de: "Vermoegen \(humans.reduce(0) { $0 + $1.coconutBalance } + pets.reduce(0) { $0 + $1.coconutBalance })🥥"
+        )
     }
 
     private func compactSubtitle(for subtitle: String) -> String {
-        if subtitle.contains("待完成") || subtitle.contains("任务") {
-            return subtitle.components(separatedBy: " · ").first ?? subtitle
-        }
-        if subtitle.contains("全家庭") { return "全家" }
-        if subtitle.contains("椰子") { return "椰子" }
-        if subtitle.contains("提醒") { return "提醒" }
-        if subtitle.contains("花费") { return "花费" }
-        return subtitle.components(separatedBy: " · ").first ?? subtitle
+        subtitle.components(separatedBy: " · ").first ?? subtitle
     }
 
     private func select(_ destination: FMDest) {

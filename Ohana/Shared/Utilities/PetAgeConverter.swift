@@ -15,27 +15,22 @@ enum PetAgeConverter {
         let days = max(0, Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0)
         let age = max(0, Double(days) / 365.25)
         let years = days / 365
-        let normalizedSpecies = species.lowercased()
-
-        if species.contains("狗") || normalizedSpecies.contains("dog") {
+        switch Pet.canonicalSpeciesKey(species) {
+        case "dog":
             return dogHumanYears(age: age)
-        }
-        if species.contains("猫") || normalizedSpecies.contains("cat") {
+        case "cat":
             return catHumanYears(age: age)
-        }
-        if species.contains("兔") || normalizedSpecies.contains("rabbit") {
+        case "rabbit":
             return Int((age * 8.0).rounded())
-        }
-        if species.contains("仓鼠") || normalizedSpecies.contains("hamster") {
+        case "hamster":
             return Int((age * 26.0).rounded())
-        }
-        if species.contains("鸟") || normalizedSpecies.contains("bird") {
+        case "bird":
             return Int((age * 5.0).rounded())
-        }
-        if species.contains("鱼") || normalizedSpecies.contains("fish") {
+        case "fish":
             return Int((age * 6.0).rounded())
+        default:
+            return max(0, years)
         }
-        return max(0, years)
     }
 
     private static func dogHumanYears(age: Double) -> Int {

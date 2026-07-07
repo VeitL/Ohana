@@ -170,21 +170,17 @@ nonisolated enum PetTagGreeting {
     private static func customLines(tagId: String, name: String, l: L10n) -> [String] {
         guard tagId.hasPrefix("u."),
               let label = CustomPersonalityTagStore.title(forId: tagId, l: l) else { return [] }
-        if l.isDe {
-            return [
-                "\(name) zeigt heute \(label)-Energie.",
-                "Heute im Programm: \(name) im \(label)-Modus."
-            ]
-        }
-        if l.isEnglish {
-            return [
-                "\(name)’s “\(label)” energy is showing.",
-                "Today’s headline: \(name) in full \(label) mode."
-            ]
-        }
         return [
-            "\(name) 的「\(label)」属性今天也在线。",
-            "一眼认出 \(name) 的 \(label) 气质。"
+            l.tr(
+                zh: "\(name) 的「\(label)」属性今天也在线。",
+                en: "\(name)’s “\(label)” energy is showing.",
+                de: "\(name) zeigt heute \(label)-Energie."
+            ),
+            l.tr(
+                zh: "一眼认出 \(name) 的 \(label) 气质。",
+                en: "Today’s headline: \(name) in full \(label) mode.",
+                de: "Heute im Programm: \(name) im \(label)-Modus."
+            )
         ]
     }
 
@@ -192,129 +188,86 @@ nonisolated enum PetTagGreeting {
         let custom = customLines(tagId: tagId, name: name, l: l)
         if !custom.isEmpty { return custom }
 
-        if l.isDe {
-            let label = PetPersonalityTag.displayTitle(for: tagId, l: l)
-            return [
-                "\(name) ist heute ganz \(label).",
-                "\(name)s \(label)-Modus ist an."
-            ]
-        }
-
-        if l.isEnglish {
-            switch tagId {
-            case "curious":
-                return ["Is \(name) already doing recon at the door?", "\(name)’s curiosity budget is unlimited today."]
-            case "lazy":
-                return ["\(name) declares: the blanket is the final boss.", "Maybe \(name) will move… tomorrow."]
-            case "energetic":
-                return ["\(name) is at 120% battery — discharge mission?", "Walk \(name) before \(name) walks you."]
-            case "clingy":
-                return ["\(name) has you on full radar lock.", "Human detected. \(name) is incoming."]
-            case "smart":
-                return ["\(name) is pretending to be innocent again.", "\(name) probably understands every word."]
-            case "toy":
-                return ["Shoelaces count as toys, says \(name).", "\(name) demands a play audit."]
-            case "foodie":
-                return ["\(name)’s tail is drumming for snacks.", "The food bowl is \(name)’s favorite TV channel."]
-            case "drama":
-                return ["\(name)’s daily Oscar scene is live.", "One sigh from \(name) = full storyline."]
-            case "clean":
-                return ["\(name) finds one hair on the floor: code red.", "\(name) runs a tight ship."]
-            case "shy":
-                return ["Gentle mode: \(name) needs a soft hello.", "\(name) is brave in tiny steps."]
-            case "brave":
-                return ["\(name) fears nothing (except the vacuum maybe).", "Captain \(name) reporting for duty."]
-            case "sleepy":
-                return ["\(name) is saving the world… in dreams.", "Nap equity: \(name) is fully vested."]
-            case "social":
-                return ["\(name) wants to say hi to the whole island.", "\(name) treats every guest like VIP."]
-            case "gentle":
-                return ["Soft paws, soft heart: that’s \(name).", "\(name) prefers kindness over chaos."]
-            case "playful":
-                return ["\(name) is live-testing gravity again.", "Play session? \(name) already voted yes."]
-            case "quiet":
-                return ["\(name) speaks in tiny signals today.", "Low volume, high charm — hi \(name)."]
-            case "stubborn":
-                return ["\(name) has opinions. Strong ones.", "Negotiation table: \(name) is chairperson."]
-            case "vocal":
-                return ["\(name) has notes. Many notes.", "If silence is gold, \(name) is investing elsewhere."]
-            case "greedy":
-                return ["Snack math is \(name)’s favorite subject.", "The treat jar blinked. \(name) noticed."]
-            case "guardian":
-                return ["\(name) is on perimeter watch.", "Stranger danger? \(name) filed the report."]
-            case "independent":
-                return ["\(name) enjoys solo missions sometimes.", "Independent \(name), still checks in."]
-            case "trainable":
-                return ["\(name) learns fast when treats are involved.", "Training day? \(name) brought focus."]
-            case "anxious":
-                return ["Gentle energy for \(name) today.", "\(name) might need a calm rhythm."]
-            case "mischief":
-                return ["\(name) is plotting something adorable.", "Evidence suggests \(name) touched the forbidden sock."]
-            case "loyal":
-                return ["\(name)’s loyalty stat is maxed.", "You + \(name) = default party."]
-            case "chill":
-                return ["\(name) is running on cruise control.", "Slow morning? \(name) approves."]
-            default:
-                return []
-            }
-        }
-
         switch tagId {
         case "curious":
-            return ["\(name) 是不是又在门口当侦察兵啦？", "好奇宝宝 \(name) 今天又想破解什么新地图？"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "\(name) 是不是又在门口当侦察兵啦？", en: "Is \(name) already doing recon at the door?", zh2: "好奇宝宝 \(name) 今天又想破解什么新地图？", en2: "\(name)’s curiosity budget is unlimited today.")
         case "lazy":
-            return ["\(name) 表示：被窝以外，皆是远方。", "小懒猪 \(name) 正在和被窝谈判续费。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "\(name) 表示：被窝以外，皆是远方。", en: "\(name) declares: the blanket is the final boss.", zh2: "小懒猪 \(name) 正在和被窝谈判续费。", en2: "Maybe \(name) will move… tomorrow.")
         case "energetic":
-            return ["\(name) 电量满格，今天要不要一起放放电？", "闪电侠 \(name) 已就位，沙发危险。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "\(name) 电量满格，今天要不要一起放放电？", en: "\(name) is at 120% battery — discharge mission?", zh2: "闪电侠 \(name) 已就位，沙发危险。", en2: "Walk \(name) before \(name) walks you.")
         case "clingy":
-            return ["黏人精 \(name) 的雷达已锁定你。", "\(name)：你走一步，我跟三步，很合理吧？"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "黏人精 \(name) 的雷达已锁定你。", en: "\(name) has you on full radar lock.", zh2: "\(name)：你走一步，我跟三步，很合理吧？", en2: "Human detected. \(name) is incoming.")
         case "smart":
-            return ["聪明蛋 \(name) 又在装无辜，其实都懂对吧？", "\(name) 的眼神写着「我早就知道了」。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "聪明蛋 \(name) 又在装无辜，其实都懂对吧？", en: "\(name) is pretending to be innocent again.", zh2: "\(name) 的眼神写着「我早就知道了」。", en2: "\(name) probably understands every word.")
         case "toy":
-            return ["玩具控 \(name) 提醒你：鞋带也属于玩具范畴。", "\(name) 的巡回赛决赛现在开始。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "玩具控 \(name) 提醒你：鞋带也属于玩具范畴。", en: "Shoelaces count as toys, says \(name).", zh2: "\(name) 的巡回赛决赛现在开始。", en2: "\(name) demands a play audit.")
         case "foodie":
-            return ["干饭王 \(name) 的尾巴已经敲成架子鼓了。", "\(name) 觉得今天的碗，还可以再满一点。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "干饭王 \(name) 的尾巴已经敲成架子鼓了。", en: "\(name)’s tail is drumming for snacks.", zh2: "\(name) 觉得今天的碗，还可以再满一点。", en2: "The food bowl is \(name)’s favorite TV channel.")
         case "drama":
-            return ["戏精 \(name) 今日戏份还满吗？需要导演吗？", "\(name) 一个叹气能演三集连续剧。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "戏精 \(name) 今日戏份还满吗？需要导演吗？", en: "\(name)’s daily Oscar scene is live.", zh2: "\(name) 一个叹气能演三集连续剧。", en2: "One sigh from \(name) = full storyline.")
         case "clean":
-            return ["洁癖星人 \(name)：地上多一根毛都是大事。", "\(name) 正在默默给地板打分的路上。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "洁癖星人 \(name)：地上多一根毛都是大事。", en: "\(name) finds one hair on the floor: code red.", zh2: "\(name) 正在默默给地板打分的路上。", en2: "\(name) runs a tight ship.")
         case "shy":
-            return ["胆小鬼 \(name) 需要轻声细语版早安。", "\(name) 的勇敢是迷你款，但很珍贵。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "胆小鬼 \(name) 需要轻声细语版早安。", en: "Gentle mode: \(name) needs a soft hello.", zh2: "\(name) 的勇敢是迷你款，但很珍贵。", en2: "\(name) is brave in tiny steps.")
         case "brave":
-            return ["勇敢崽 \(name) 出门像巡山，除了吸尘器。", "\(name)：危险？我先看看香不香。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "勇敢崽 \(name) 出门像巡山，除了吸尘器。", en: "\(name) fears nothing (except the vacuum maybe).", zh2: "\(name)：危险？我先看看香不香。", en2: "Captain \(name) reporting for duty.")
         case "sleepy":
-            return ["睡神 \(name) 正在梦里拯救世界。", "\(name) 的 KPI 是睡满十二个太阳。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "睡神 \(name) 正在梦里拯救世界。", en: "\(name) is saving the world… in dreams.", zh2: "\(name) 的 KPI 是睡满十二个太阳。", en2: "Nap equity: \(name) is fully vested.")
         case "social":
-            return ["社交达人 \(name) 想跟全岛打个招呼。", "有客人？\(name) 已经切换到接待模式。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "社交达人 \(name) 想跟全岛打个招呼。", en: "\(name) wants to say hi to the whole island.", zh2: "有客人？\(name) 已经切换到接待模式。", en2: "\(name) treats every guest like VIP.")
         case "gentle":
-            return ["温柔派 \(name) 今天也想被轻声对待。", "\(name) 的温柔是慢热型宝藏。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "温柔派 \(name) 今天也想被轻声对待。", en: "Soft paws, soft heart: that’s \(name).", zh2: "\(name) 的温柔是慢热型宝藏。", en2: "\(name) prefers kindness over chaos.")
         case "playful":
-            return ["贪玩鬼 \(name) 正在测试重力定律。", "球一滚，\(name) 的雷达就响了。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "贪玩鬼 \(name) 正在测试重力定律。", en: "\(name) is live-testing gravity again.", zh2: "球一滚，\(name) 的雷达就响了。", en2: "Play session? \(name) already voted yes.")
         case "quiet":
-            return ["安静派 \(name) 用眼神完成全部社交。", "\(name) 的话少，但戏份不少。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "安静派 \(name) 用眼神完成全部社交。", en: "\(name) speaks in tiny signals today.", zh2: "\(name) 的话少，但戏份不少。", en2: "Low volume, high charm — hi \(name).")
         case "stubborn":
-            return ["倔脾气 \(name) 有自己的时间表。", "说服 \(name)？那是长期项目。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "倔脾气 \(name) 有自己的时间表。", en: "\(name) has opinions. Strong ones.", zh2: "说服 \(name)？那是长期项目。", en2: "Negotiation table: \(name) is chairperson.")
         case "vocal":
-            return ["话痨 \(name) 的点评永不缺席。", "\(name) 一开口，全家都知道剧情更新了。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "话痨 \(name) 的点评永不缺席。", en: "\(name) has notes. Many notes.", zh2: "\(name) 一开口，全家都知道剧情更新了。", en2: "If silence is gold, \(name) is investing elsewhere.")
         case "greedy":
-            return ["小吃货 \(name) 对零食数学特别敏感。", "开袋声一响，\(name) 已抵达现场。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "小吃货 \(name) 对零食数学特别敏感。", en: "Snack math is \(name)’s favorite subject.", zh2: "开袋声一响，\(name) 已抵达现场。", en2: "The treat jar blinked. \(name) noticed.")
         case "guardian":
-            return ["护主模式 \(name) 已上线。", "有动静？\(name) 比你先进入警戒。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "护主模式 \(name) 已上线。", en: "\(name) is on perimeter watch.", zh2: "有动静？\(name) 比你先进入警戒。", en2: "Stranger danger? \(name) filed the report.")
         case "independent":
-            return ["独立派 \(name) 偶尔也想自己待会儿。", "\(name)：我需要 me time，谢谢。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "独立派 \(name) 偶尔也想自己待会儿。", en: "\(name) enjoys solo missions sometimes.", zh2: "\(name)：我需要 me time，谢谢。", en2: "Independent \(name), still checks in.")
         case "trainable":
-            return ["好训练 \(name) 一学就会（在有零食的前提下）。", "\(name) 今天也想拿满分小红花。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "好训练 \(name) 一学就会（在有零食的前提下）。", en: "\(name) learns fast when treats are involved.", zh2: "\(name) 今天也想拿满分小红花。", en2: "Training day? \(name) brought focus.")
         case "anxious":
-            return ["小紧张 \(name) 今天需要温柔节奏。", "轻声一点，\(name) 会更安心。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "小紧张 \(name) 今天需要温柔节奏。", en: "Gentle energy for \(name) today.", zh2: "轻声一点，\(name) 会更安心。", en2: "\(name) might need a calm rhythm.")
         case "mischief":
-            return ["捣蛋王 \(name) 又在策划可爱犯罪。", "案发现场总有 \(name) 的爪印。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "捣蛋王 \(name) 又在策划可爱犯罪。", en: "\(name) is plotting something adorable.", zh2: "案发现场总有 \(name) 的爪印。", en2: "Evidence suggests \(name) touched the forbidden sock.")
         case "loyal":
-            return ["忠诚 \(name) 的跟随距离是零距离。", "\(name) 的选择永远是你。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "忠诚 \(name) 的跟随距离是零距离。", en: "\(name)’s loyalty stat is maxed.", zh2: "\(name) 的选择永远是你。", en2: "You + \(name) = default party.")
         case "chill":
-            return ["佛系 \(name) 表示：急什么。", "\(name) 的人生信条是慢慢来。"]
+            return tagLines(name: name, tagId: tagId, l: l, zh: "佛系 \(name) 表示：急什么。", en: "\(name) is running on cruise control.", zh2: "\(name) 的人生信条是慢慢来。", en2: "Slow morning? \(name) approves.")
         default:
-            return []
+            return l.isDe ? genericTagLines(name: name, tagId: tagId, l: l) : []
         }
+    }
+
+    private static func tagLines(
+        name: String,
+        tagId: String,
+        l: L10n,
+        zh: String,
+        en: String,
+        zh2: String,
+        en2: String
+    ) -> [String] {
+        let generic = genericTagLines(name: name, tagId: tagId, l: l)
+        return [
+            l.tr(zh: zh, en: en, de: generic[0]),
+            l.tr(zh: zh2, en: en2, de: generic[1])
+        ]
+    }
+
+    private static func genericTagLines(name: String, tagId: String, l: L10n) -> [String] {
+        let label = PetPersonalityTag.displayTitle(for: tagId, l: l)
+        return [
+            "\(name) ist heute ganz \(label).",
+            "\(name)s \(label)-Modus ist an."
+        ]
     }
 }
 

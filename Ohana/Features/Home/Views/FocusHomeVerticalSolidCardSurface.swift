@@ -470,12 +470,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
         if card.isElectronicPet { return "leaf.fill" }
         if card.isHuman { return "person.fill" }
         if card.isPlant { return "leaf.fill" }
-        let species = (card.petSpecies ?? card.kind).lowercased()
-        if species.contains("dog") || species.contains("狗") { return "dog.fill" }
-        if species.contains("cat") || species.contains("猫") { return "cat.fill" }
-        if species.contains("bird") || species.contains("鸟") { return "bird.fill" }
-        if species.contains("fish") || species.contains("鱼") { return "fish.fill" }
-        return "pawprint.fill"
+        return Pet.speciesSilhouetteSymbol(forSpecies: card.petSpecies ?? card.kind)
     }
 
     private func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat {

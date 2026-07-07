@@ -49,12 +49,12 @@ enum PetBodyConditionEstimator {
             return max(1, cal.dateComponents([.month], from: b, to: Date()).month ?? 24)
         }()
         var idealKg = 10.0
-        if pet.species == "猫" {
+        if Pet.isCatSpecies(pet.species) {
             idealKg = 4.2
             let b = pet.breed.lowercased()
             if b.contains("缅因") || b.contains("大型") || b.contains("挪威") { idealKg = 6.8 }
             if b.contains("小型") || b.contains("暹罗") { idealKg = 3.4 }
-        } else if pet.species == "狗" {
+        } else if Pet.isDogSpecies(pet.species) {
             let b = pet.breed.lowercased()
             if b.contains("大型") || b.contains("金毛") || b.contains("拉布拉多") || b.contains("德牧")
                 || b.contains("阿拉斯加") || b.contains("萨摩耶") || b.contains("哈士奇") {

@@ -457,7 +457,7 @@ enum MemberProfileCommandService {
             let trimmedEmoji = avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
             pet.avatarEmoji = trimmedEmoji.isEmpty ? "🐾" : trimmedEmoji
         }
-        pet.species = input.species
+        pet.species = Pet.canonicalSpeciesKey(input.species)
         pet.breed = input.breed.trimmingCharacters(in: .whitespacesAndNewlines)
         pet.gender = input.gender
         pet.isNeutered = input.isNeutered
@@ -567,9 +567,9 @@ enum MemberProfileCommandService {
             : input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
         human.role = HumanProfileOptions.normalizedRole(input.role)
         human.birthday = input.birthday
-        human.bloodType = input.bloodType == "未填写" ? "" : input.bloodType
+        human.bloodType = Self.emptyIfLegacyUnset(input.bloodType)
         human.heightCm = Double(input.heightText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
-        human.mbti = input.mbti == "未填写" ? "" : input.mbti.uppercased()
+        human.mbti = Self.emptyIfLegacyUnset(input.mbti).uppercased()
         human.nationality = input.nationality.trimmingCharacters(in: .whitespacesAndNewlines)
         human.city = input.city.trimmingCharacters(in: .whitespacesAndNewlines)
         human.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
@@ -678,5 +678,10 @@ enum MemberProfileCommandService {
         PlantCarePlanScheduleService.sync(plant: plant, context: context)
 
         return profileResult
+    }
+
+    private static func emptyIfLegacyUnset(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed == "未填写" ? "" : trimmed
     }
 }

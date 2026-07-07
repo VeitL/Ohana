@@ -127,8 +127,7 @@ extension FocusCard {
     }
 
     private nonisolated var isDogCard: Bool {
-        let species = (petSpecies ?? kind).lowercased()
-        return species.contains("dog") || species.contains("狗")
+        Pet.isDogSpecies(petSpecies ?? kind)
     }
 
     private nonisolated var homeWalkDistanceMetric: (value: String, unit: String) {
@@ -245,12 +244,12 @@ extension FocusCard {
         homeWalkDistanceMeters: Double = 0,
         l: L10n = .current
     ) -> FocusCard {
-        let isDog = pet.species.contains("狗") || pet.species.lowercased().contains("dog")
-        let isCat = pet.species.contains("猫") || pet.species.lowercased().contains("cat")
-        let isFish = pet.species.contains("鱼") || pet.species.lowercased().contains("fish")
-        let isBird = pet.species.contains("鸟") || pet.species.lowercased().contains("bird")
-        let isRabbit = pet.species.contains("兔") || pet.species.lowercased().contains("rabbit")
-        let isReptile = pet.species.contains("爬") || pet.species.contains("龟") || pet.species.contains("蛇") || pet.species.contains("蜥") || pet.species.contains("守宫") || pet.species.lowercased().contains("reptile")
+        let isDog = Pet.isDogSpecies(pet.species)
+        let isCat = Pet.isCatSpecies(pet.species)
+        let isFish = Pet.isFishSpecies(pet.species)
+        let isBird = Pet.isBirdSpecies(pet.species)
+        let isRabbit = Pet.isRabbitSpecies(pet.species) || Pet.isSmallMammalSpecies(pet.species)
+        let isReptile = Pet.isReptileSpecies(pet.species)
 
         var acts: [Action] = [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44")]
         if isFish {
@@ -517,27 +516,22 @@ nonisolated enum FocusPetHumanAgeEstimator {
     static func equivalentHumanYears(birthday: Date, species: String, breed: String) -> Int {
         let ageYears = max(0, Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0) / 365
         let preciseAge = max(0, Double(Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0) / 365.25)
-        let normalizedSpecies = species.lowercased()
-
-        if species.contains("狗") || normalizedSpecies.contains("dog") {
+        switch Pet.canonicalSpeciesKey(species) {
+        case "dog":
             return dogHumanYears(age: preciseAge, breed: breed)
-        }
-        if species.contains("猫") || normalizedSpecies.contains("cat") {
+        case "cat":
             return catHumanYears(age: preciseAge)
-        }
-        if species.contains("兔") || normalizedSpecies.contains("rabbit") {
+        case "rabbit":
             return Int((preciseAge * 8.0).rounded())
-        }
-        if species.contains("仓鼠") || normalizedSpecies.contains("hamster") {
+        case "hamster":
             return Int((preciseAge * 26.0).rounded())
-        }
-        if species.contains("鸟") || normalizedSpecies.contains("bird") {
+        case "bird":
             return Int((preciseAge * 5.0).rounded())
-        }
-        if species.contains("鱼") || normalizedSpecies.contains("fish") {
+        case "fish":
             return Int((preciseAge * 6.0).rounded())
+        default:
+            return max(0, ageYears)
         }
-        return max(0, ageYears)
     }
 
     private static func dogHumanYears(age: Double, breed: String) -> Int {

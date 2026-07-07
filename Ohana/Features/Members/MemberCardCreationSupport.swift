@@ -138,7 +138,7 @@ struct MemberCreationDraft: Equatable {
     var avatarImageData: Data?
     var usesPurchasedOrInventoryPass = false
 
-    var species = "狗"
+    var species = "dog"
     var breed = ""
     var customBreed = ""
     var isCustomBreed = false
@@ -152,7 +152,7 @@ struct MemberCreationDraft: Equatable {
     var homeDate = Date()
     var personalityTagIds: [String] = []
 
-    var humanGender = "非二元"
+    var humanGender = "nonbinary"
     var bloodType = ""
     var mbti = ""
     var role = "owner"

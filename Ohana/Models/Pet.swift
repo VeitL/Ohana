@@ -156,7 +156,7 @@ final class Pet {
 
     init(
         name: String = "",
-        species: String = "狗",
+        species: String = "dog",
         breed: String = "",
         birthday: Date? = nil,
         gender: String = "unknown",
@@ -167,7 +167,7 @@ final class Pet {
     ) {
         self.id = UUID()
         self.name = name
-        self.species = species
+        self.species = Self.canonicalSpeciesKey(species)
         self.breed = breed
         self.birthday = birthday
         self.gender = gender
@@ -415,15 +415,71 @@ final class Pet {
     }
 
     /// 日历筛选条、添加宠物物种等：SF Symbol 纯色剪影
+    static let canonicalSpeciesOptions = ["dog", "cat", "fish", "bird", "rabbit", "reptile", "hamster", "other"]
+
+    static func canonicalSpeciesKey(_ rawSpecies: String) -> String {
+        let trimmed = rawSpecies.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "other" }
+        switch trimmed.lowercased() {
+        case "狗", "犬", "dog", "dogs":
+            return "dog"
+        case "猫", "cat", "cats":
+            return "cat"
+        case "鱼", "金鱼", "锦鲤", "水族", "水族箱", "fish", "fishes", "goldfish", "koi", "aquarium", "aquatic":
+            return "fish"
+        case "鸟", "鹦鹉", "文鸟", "猫头鹰", "bird", "birds", "parrot", "owl":
+            return "bird"
+        case "兔", "兔子", "rabbit", "rabbits", "bunny", "bunnies":
+            return "rabbit"
+        case "爬宠", "爬虫", "爬行动物", "乌龟", "水龟", "龟", "蜥", "蜥蜴", "蛇", "守宫", "壁虎",
+             "reptile", "reptiles", "lizard", "snake", "gecko", "turtle", "tortoise":
+            return "reptile"
+        case "仓鼠", "龙猫", "豚鼠", "hamster", "hamsters", "chinchilla", "guinea pig", "guineapig":
+            return "hamster"
+        case "其他", "other", "others":
+            return "other"
+        default:
+            return trimmed.lowercased()
+        }
+    }
+
+    static func isDogSpecies(_ species: String) -> Bool {
+        canonicalSpeciesKey(species) == "dog"
+    }
+
+    static func isCatSpecies(_ species: String) -> Bool {
+        canonicalSpeciesKey(species) == "cat"
+    }
+
+    static func isFishSpecies(_ species: String) -> Bool {
+        canonicalSpeciesKey(species) == "fish"
+    }
+
+    static func isBirdSpecies(_ species: String) -> Bool {
+        canonicalSpeciesKey(species) == "bird"
+    }
+
+    static func isRabbitSpecies(_ species: String) -> Bool {
+        canonicalSpeciesKey(species) == "rabbit"
+    }
+
+    static func isReptileSpecies(_ species: String) -> Bool {
+        canonicalSpeciesKey(species) == "reptile"
+    }
+
+    static func isSmallMammalSpecies(_ species: String) -> Bool {
+        canonicalSpeciesKey(species) == "hamster"
+    }
+
     static func speciesSilhouetteSymbol(forSpecies species: String) -> String {
-        switch species {
-        case "狗": "dog.fill"
-        case "猫": "cat.fill"
-        case "兔子": "hare.fill"
-        case "鱼": "fish.fill"
-        case "爬宠": "lizard.fill"
-        case "仓鼠": "circle.fill"
-        case "鸟": "bird.fill"
+        switch canonicalSpeciesKey(species) {
+        case "dog": "dog.fill"
+        case "cat": "cat.fill"
+        case "rabbit": "hare.fill"
+        case "fish": "fish.fill"
+        case "reptile": "lizard.fill"
+        case "hamster": "circle.fill"
+        case "bird": "bird.fill"
         default: "pawprint.fill"
         }
     }
@@ -445,13 +501,13 @@ final class Pet {
     var humanEquivalentAge: Int {
         guard let birthday else { return 0 }
         let years = Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0
-        switch species {
-        case "狗":
+        switch Self.canonicalSpeciesKey(species) {
+        case "dog":
             if years <= 0 { return 0 }
             if years == 1 { return 15 }
             if years == 2 { return 24 }
             return 24 + (years - 2) * 5
-        case "猫":
+        case "cat":
             if years <= 0 { return 0 }
             if years == 1 { return 15 }
             if years == 2 { return 24 }
@@ -520,14 +576,18 @@ final class Pet {
     }
 
     var speciesEmoji: String {
-        switch species {
-        case "狗": "🐕"
-        case "猫": "🐈"
-        case "鱼": "🐟"
-        case "兔子": "🐇"
-        case "爬宠": "🦎"
-        case "仓鼠": "🐹"
-        case "鸟": "🦜"
+        Self.speciesEmoji(forSpecies: species)
+    }
+
+    static func speciesEmoji(forSpecies species: String) -> String {
+        switch canonicalSpeciesKey(species) {
+        case "dog": "🐕"
+        case "cat": "🐈"
+        case "fish": "🐟"
+        case "rabbit": "🐇"
+        case "reptile": "🦎"
+        case "hamster": "🐹"
+        case "bird": "🦜"
         default: "🐾"
         }
     }
@@ -535,23 +595,22 @@ final class Pet {
     static func localizedSpeciesName(_ rawSpecies: String, l: L10n) -> String {
         let trimmed = rawSpecies.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
-        let normalized = trimmed.lowercased()
-        switch normalized {
-        case "狗", "dog", "dogs":
+        switch canonicalSpeciesKey(trimmed) {
+        case "dog":
             return l.tr(zh: "狗", en: "Dog", de: "Hund")
-        case "猫", "cat", "cats":
+        case "cat":
             return l.tr(zh: "猫", en: "Cat", de: "Katze")
-        case "鱼", "fish", "aquarium", "aquatic":
+        case "fish":
             return l.tr(zh: "鱼", en: "Fish", de: "Fisch")
-        case "鸟", "bird", "birds", "parrot":
+        case "bird":
             return l.tr(zh: "鸟", en: "Bird", de: "Vogel")
-        case "兔子", "兔", "rabbit", "rabbits", "bunny":
+        case "rabbit":
             return l.tr(zh: "兔子", en: "Rabbit", de: "Kaninchen")
-        case "爬宠", "reptile", "reptiles", "lizard", "snake", "gecko":
+        case "reptile":
             return l.tr(zh: "爬宠", en: "Reptile", de: "Reptil")
-        case "仓鼠", "hamster", "hamsters":
+        case "hamster":
             return l.tr(zh: "仓鼠", en: "Hamster", de: "Hamster")
-        case "其他", "other":
+        case "other":
             return l.tr(zh: "其他", en: "Other", de: "Andere")
         default:
             return trimmed

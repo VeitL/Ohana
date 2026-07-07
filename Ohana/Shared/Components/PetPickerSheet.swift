@@ -72,7 +72,7 @@ struct PetPickerSheet: View {
                                 // 头像
                                 PetAvatarPortraitView(
                                     pet: pet,
-                                    fallbackText: pet.species == "狗" ? "🐶" : pet.species == "猫" ? "🐱" : "🐾",
+                                    fallbackText: pet.speciesEmoji,
                                     themeColor: Color(hex: pet.safeThemeColorHex),
                                     size: 52,
                                     backgroundOpacity: 0.2

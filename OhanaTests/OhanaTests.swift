@@ -1161,7 +1161,7 @@ struct OhanaTests {
         #expect(!exported.contains("apple-user-secret"))
         #expect(!exported.contains("appleUserIdentifier"))
         #expect(!exported.contains("性别:"))
-        #expect(backup.humans.first?.genderIdentityRaw == "女")
+        #expect(backup.humans.first?.genderIdentityRaw == "female")
         #expect(backup.humans.first?.notes == "visible note")
 
         let target = try makeInMemoryContainer()

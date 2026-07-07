@@ -44,10 +44,10 @@ nonisolated enum HumanProfileOptions {
     ]
 
     static let genderOptions: [(key: String, icon: String)] = [
-        ("女", "♀"),
-        ("男", "♂"),
-        ("非二元", "⚧"),
-        ("不透露", "•")
+        ("female", "♀"),
+        ("male", "♂"),
+        ("nonbinary", "⚧"),
+        ("private", "•")
     ]
 
     static func normalizedRole(_ raw: String) -> String {
@@ -73,7 +73,26 @@ nonisolated enum HumanProfileOptions {
 
     static func storedGenderIdentity(_ raw: String) -> String? {
         let normalized = normalizedGender(raw)
-        return normalized.isEmpty ? nil : normalized
+        guard !normalized.isEmpty else { return nil }
+        switch normalized {
+        case "女":
+            return "female"
+        case "男":
+            return "male"
+        case "非二元":
+            return "nonbinary"
+        case "不透露":
+            return "private"
+        default:
+            return raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    static func storedGenderIdentity(raw: String?, notes: String) -> String? {
+        if let raw, let stored = storedGenderIdentity(raw) {
+            return stored
+        }
+        return storedGenderIdentity(genderMetadata(from: notes))
     }
 
     static func visibleNoteParts(from notes: String) -> [String] {

@@ -21,6 +21,7 @@ Purpose:
   - R5e: care command no-op results must be consumed before UI feedback/revision/secondary actor writes.
   - R6: care command/view code must not publish derived revision/no-op side effects outside CareDerivationExecutor.
   - R7: PetExpenseLog business writes must record a same-boundary CareLedgerEvent.
+  - R8: CoconutLedgerEntry is append-only; undo/delete must add reversal entries or replay balances, not delete wallet history.
 
 Baseline:
   Full-scope debt is ratcheted in
@@ -372,6 +373,10 @@ PET_EXPENSE_IMPORT_BOUNDARY_ALLOWLIST = {
     "Ohana/Domain/Services/CloudSyncRecordApplier.swift",
     "Ohana/Domain/Services/DataBackupManager+Decode.swift",
 }
+COCONUT_LEDGER_ENTRY_MARKER_RE = re.compile(
+    r"\bCoconutLedgerEntry\b|FetchDescriptor\s*<\s*CoconutLedgerEntry\s*>|fetchAll\s*\(\s*CoconutLedgerEntry\.self"
+)
+CONTEXT_DELETE_RE = re.compile(r"\bcontext\.delete\s*\(")
 
 
 def direct_reward_call_allowed(path: str) -> bool:
@@ -776,6 +781,30 @@ def scan_pet_expense_ledger_boundary(path: pathlib.Path, lines: list[str], warni
         )
 
 
+def scan_coconut_ledger_append_only(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
+    path_str = rel(path)
+    for _, start, end in function_bounds(lines):
+        function_block = "\n".join(lines[start:end + 1])
+        if "economy-boundary: allow" in function_block:
+            continue
+        if not COCONUT_LEDGER_ENTRY_MARKER_RE.search(function_block):
+            continue
+        if not CONTEXT_DELETE_RE.search(function_block):
+            continue
+        for idx in range(start, end + 1):
+            line = lines[idx]
+            if CONTEXT_DELETE_RE.search(line):
+                add(
+                    warnings,
+                    "coconut-ledger-entry-append-only",
+                    path_str,
+                    idx + 1,
+                    line,
+                    "CoconutLedgerEntry is append-only; undo/delete paths must add reversal entries or replay wallet balances, not physically delete ledger history.",
+                )
+                break
+
+
 def scan_physical_deletion_wallet_reconciliation(path: pathlib.Path, lines: list[str], warnings: list[WarningItem]) -> None:
     path_str = rel(path)
     if path_str != "Ohana/Domain/Services/PhysicalDeletionService.swift":
@@ -885,6 +914,7 @@ def scan(files: list[pathlib.Path]) -> list[WarningItem]:
         scan_secondary_executor_write_policy(path, lines, warnings)
         scan_care_derivation_direct_publish(path, lines, warnings)
         scan_pet_expense_ledger_boundary(path, lines, warnings)
+        scan_coconut_ledger_append_only(path, lines, warnings)
         scan_physical_deletion_wallet_reconciliation(path, lines, warnings)
     scan_service_gate_coverage(files, warnings)
     return sorted(warnings, key=lambda item: (item.rule, item.path, item.line, item.snippet))

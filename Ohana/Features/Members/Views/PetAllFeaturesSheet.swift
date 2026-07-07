@@ -437,8 +437,7 @@ struct PetAllFeaturesSheet: View {
 
     private var l: L10n { L10n() }
     private var isDog: Bool {
-        pet.species.localizedCaseInsensitiveContains("狗") ||
-            pet.species.localizedCaseInsensitiveContains("dog")
+        Pet.isDogSpecies(pet.species)
     }
 
     private var archiveSnapshot: ArchiveMemorySnapshot { ArchiveMemorySnapshot(pet: pet, activitySummary: activitySummary) }

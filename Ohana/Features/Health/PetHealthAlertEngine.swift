@@ -325,7 +325,10 @@ final nonisolated class PetHealthAlertEngine {
     // MARK: - 便便检测
 
     private func checkPotty(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
-        guard !["猫", "兔子", "仓鼠"].contains(source.species) else { return [] }
+        guard !Pet.isCatSpecies(source.species),
+              !Pet.isRabbitSpecies(source.species),
+              !Pet.isSmallMammalSpecies(source.species)
+        else { return [] }
         guard let last = source.pottyLogs.map(\.date).max() else { return [] }
         let hours = cal.dateComponents([.hour], from: last, to: now).hour ?? 0
         if hours >= 36 {
@@ -351,7 +354,7 @@ final nonisolated class PetHealthAlertEngine {
     // MARK: - 遛狗检测
 
     private func checkWalk(source: PetHealthAlertSource, now: Date, cal: Calendar, localization l: L10n) -> [HealthAlert] {
-        guard source.species == "狗" else { return [] }
+        guard Pet.isDogSpecies(source.species) else { return [] }
         guard let last = source.walkLogs.map(\.startDate).max() else { return [] }
         let days = cal.dateComponents([.day], from: last, to: now).day ?? 0
         if days >= 3 {
@@ -558,7 +561,7 @@ final nonisolated class PetHealthAlertEngine {
         }
 
         // 连续几天步数严重不达标（狗特有）
-        if source.species.lowercased().contains("dog") || source.species.lowercased().contains("狗") {
+        if Pet.isDogSpecies(source.species) {
             let past7DaysWalks = source.walkLogs.filter { cal.dateComponents([.day], from: $0.startDate, to: now).day ?? 0 <= 7 }
             if past7DaysWalks.count <= 1 {
                 alerts.append(HealthAlert(
