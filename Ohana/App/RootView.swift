@@ -22,6 +22,7 @@ struct RootView: View {
     @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
     @State private var plantBatchCareRewardSettlementTask: Task<Void, Never>?
+    @State private var automaticBackupReminderTask: Task<Void, Never>?
     @State private var lastPersistenceFailureToastDate: Date?
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -56,11 +57,14 @@ struct RootView: View {
         .onAppear {
             startupMaintenance.startAfterFirstRender(context: modelContext)
             schedulePlantBatchCareRewardSettlement()
+            scheduleAutomaticBackupFailureReminder()
         }
         .onDisappear {
             startupMaintenance.cancel()
             plantBatchCareRewardSettlementTask?.cancel()
             plantBatchCareRewardSettlementTask = nil
+            automaticBackupReminderTask?.cancel()
+            automaticBackupReminderTask = nil
         }
         .onReceive(appServices.notificationRoutes.reminderActionEvents) { event in
             appServices.reminderActions.handle(
@@ -84,6 +88,7 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             appSwitcherSnapshotCoverRequested = false
             schedulePlantBatchCareRewardSettlement()
+            scheduleAutomaticBackupFailureReminder()
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
             if revision.lastCommand?.feature == "plants",
@@ -178,6 +183,29 @@ struct RootView: View {
             en: "Save failed. Check storage and try again.",
             de: "Speichern fehlgeschlagen. Prüfe den Speicher und versuche es erneut."
         ))
+    }
+
+    private func scheduleAutomaticBackupFailureReminder(now: Date = Date()) {
+        automaticBackupReminderTask?.cancel()
+        let status = appServices.automaticBackups.snapshot(now: now)
+        guard status.shouldShowGentleReminder(now: now) else {
+            automaticBackupReminderTask = nil
+            return
+        }
+        automaticBackupReminderTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 720) {
+            showAutomaticBackupFailureReminder(now: Date())
+        }
+    }
+
+    private func showAutomaticBackupFailureReminder(now: Date = Date()) {
+        let status = appServices.automaticBackups.snapshot(now: now)
+        guard status.shouldShowGentleReminder(now: now) else { return }
+        appServices.islandToasts.show(l.tr(
+            zh: "自动备份连续失败，请在设置里检查 iCloud Drive",
+            en: "Automatic backup keeps failing. Check iCloud Drive in Settings.",
+            de: "Automatisches Backup schlägt weiter fehl. Prüfe iCloud Drive in den Einstellungen."
+        ))
+        appServices.automaticBackups.markReminderShown(now: now)
     }
 
     private var l: L10n {

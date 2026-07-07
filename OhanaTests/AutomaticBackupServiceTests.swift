@@ -203,6 +203,16 @@ struct AutomaticBackupServiceTests {
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).first?.itemId == "fx_lime_glow")
     }
 
+    @Test func rootViewSurfacesAutomaticBackupFailureReminderOutsideSettings() throws {
+        let rootSource = try source("Ohana/App/RootView.swift", rootURL: repositoryRootURL())
+
+        #expect(rootSource.contains("@State private var automaticBackupReminderTask"))
+        #expect(rootSource.contains("scheduleAutomaticBackupFailureReminder()"))
+        #expect(rootSource.contains("status.shouldShowGentleReminder(now: now)"))
+        #expect(rootSource.contains("appServices.islandToasts.show(l.tr("))
+        #expect(rootSource.contains("appServices.automaticBackups.markReminderShown(now: now)"))
+    }
+
     private func isolatedDefaults() throws -> (String, UserDefaults) {
         let suiteName = "AutomaticBackupServiceTests.\(UUID().uuidString)"
         return try (suiteName, #require(UserDefaults(suiteName: suiteName)))
@@ -212,6 +222,16 @@ struct AutomaticBackupServiceTests {
         let schema = Schema(ArkSchemaV71.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func repositoryRootURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    private func source(_ path: String, rootURL: URL) throws -> String {
+        try String(contentsOf: rootURL.appendingPathComponent(path), encoding: .utf8)
     }
 }
 

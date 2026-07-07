@@ -184,7 +184,7 @@ struct CoHealthDashboardFullContentView: View {
                     PetAvatarPortraitView(
                         cacheID: pet.id,
                         imageSignature: pet.avatarImageSignature,
-                        imageDataProvider: { pet.avatarImageData },
+                        petModelID: pet.petModelID,
                         fallbackText: pet.avatarEmoji,
                         themeColor: Color(hex: pet.themeColorHex),
                         size: 44,

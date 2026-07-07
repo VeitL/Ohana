@@ -113,7 +113,6 @@ final class MediaBlobBoundaryTests: XCTestCase {
             "Ohana/Features/Economy/Views/EquipPopoutCardSheet.swift": "edit preview thumbnail preparation",
             "Ohana/Features/FamilyTasks/Views/FamilyCollaborationDashboardView+Map.swift": "post-frame map avatar cache preparation",
             "Ohana/Features/FunctionMenu/Views/FeatureAggregateView.swift": "post-frame avatar cache preparation",
-            "Ohana/Features/Health/Views/CoHealthDashboardFullView.swift": "lazy avatar provider",
             "Ohana/Features/Insurance/Views/ProtectionDashboardComponents.swift": "document preview data providers",
             "Ohana/Features/Members/Views/EditHumanSheet.swift": "edit-state seed",
             "Ohana/Features/Members/Views/EditPetSheet.swift": "edit-state seed",
@@ -164,6 +163,14 @@ final class MediaBlobBoundaryTests: XCTestCase {
             "Ohana/Shared/Components/FeatureHubComponents.swift",
             rootURL: rootURL
         )
+        let coHealthFullSource = try source(
+            "Ohana/Features/Health/Views/CoHealthDashboardFullView.swift",
+            rootURL: rootURL
+        )
+        let coHealthSnapshotSource = try source(
+            "Ohana/Features/Health/CoHealthDashboardSnapshot.swift",
+            rootURL: rootURL
+        )
 
         XCTAssertTrue(photoAlbumSource.contains("AsyncDecodedImageView"))
         XCTAssertTrue(photoAlbumSource.contains("SwiftDataMediaBlobLoader(modelContainer: modelContext.container)"))
@@ -177,6 +184,10 @@ final class MediaBlobBoundaryTests: XCTestCase {
         XCTAssertTrue(petAvatarSource.contains("MediaThumbnailProvider.imageWithTransparency(for: key, dataProvider: imageDataProvider)"))
         XCTAssertTrue(featureHubSource.contains(".task(id: lazyThumbnailKey)"))
         XCTAssertTrue(featureHubSource.contains("MediaThumbnailProvider.imageWithTransparency(for: key, dataProvider: imageDataProvider)"))
+        XCTAssertTrue(coHealthFullSource.contains("petModelID: pet.petModelID"))
+        XCTAssertFalse(coHealthFullSource.contains("imageDataProvider: { pet.avatarImageData }"))
+        XCTAssertFalse(coHealthSnapshotSource.contains("let avatarImageData: Data?"))
+        XCTAssertFalse(coHealthSnapshotSource.contains("pet.avatarImageData"))
 
         let deferredAvatarSources = [
             "Ohana/Features/Achievements/Views/AchievementWallContentView+PopupAndAvatars.swift",

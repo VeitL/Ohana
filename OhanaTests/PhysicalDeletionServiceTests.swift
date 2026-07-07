@@ -158,7 +158,7 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(CareLedgerEvent.self, id: ledger.id, context: context) != nil)
     }
 
-    @Test func deletePetRemovesWalletLedgerAndSharedSessionReferences() throws {
+    @Test func deletePetRetiresWalletAccountKeepsLedgerAndScrubsSharedSessionReferences() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let deletedPet = Pet(name: "Milo", species: "猫")
