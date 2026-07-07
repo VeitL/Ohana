@@ -46,18 +46,21 @@ struct PetMedicationDetailContentSheet: View {
     }
 
     private var administrationDisplay: String {
-        let (tag, _) = splitAdministration(from: medication.notes)
-        if let tag { return tag }
+        let (tag, _) = PetMedicationAdministrationMetadata.split(from: medication.notes)
+        if let tag {
+            return PetMedicationAdministrationOption.displayTitle(for: tag, l: l)
+        }
         return "—"
     }
 
     private var noteBody: String {
-        let (_, rest) = splitAdministration(from: medication.notes)
+        let (_, rest) = PetMedicationAdministrationMetadata.split(from: medication.notes)
         return rest
     }
 
     private var localizedDose: String {
-        medication.dosage.isEmpty ? "—" : medication.dosage
+        let formatted = PetMedicationDoseUnitOption.formatDosage(medication.dosage, l: l)
+        return formatted.isEmpty ? "—" : formatted
     }
 
     var body: some View {
@@ -432,18 +435,6 @@ struct PetMedicationDetailContentSheet: View {
             }
         }
         return rows
-    }
-
-    private func splitAdministration(from full: String) -> (String?, String) {
-        let prefix = "【喂法:"
-        guard full.hasPrefix(prefix), let range = full.range(of: "】") else {
-            return (nil, full)
-        }
-        let innerStart = full.index(full.startIndex, offsetBy: prefix.count)
-        let tag = String(full[innerStart ..< range.lowerBound])
-        var rest = String(full[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        if rest.hasPrefix("\n") { rest = String(rest.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines) }
-        return (tag.isEmpty ? nil : tag, rest)
     }
 
     private func localizedFrequency(_ frequency: PetMedicationFrequency) -> String {

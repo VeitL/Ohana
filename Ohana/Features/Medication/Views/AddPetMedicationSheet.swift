@@ -26,8 +26,8 @@ struct AddPetMedicationSheet: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name = ""
     @State private var doseAmount = ""
-    @State private var doseUnit = "片"
-    private let doseUnits = ["片", "粒", "ml", "g", "次"]
+    @State private var doseUnit = PetMedicationDoseUnitOption.tablet.rawValue
+    private let doseUnits = PetMedicationDoseUnitOption.allCases
 
     @State private var frequency: PetMedicationFrequency = .daily
     @State private var doseMinutes: [Int] = PetMedicationSchedulePlan.defaultDoseMinutes(for: .daily)
@@ -39,7 +39,7 @@ struct AddPetMedicationSheet: View {
     @State private var showsCourseDaysKeypad = false
 
     @State private var administrationTag: String? = nil
-    private let administrationOptions = ["拌饭", "直接喂", "溶水", "零食包裹"]
+    private let administrationOptions = PetMedicationAdministrationOption.allCases
 
     @State private var remainingText = ""
     @State private var notes = ""
@@ -331,15 +331,16 @@ struct AddPetMedicationSheet: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(administrationOptions, id: \.self) { opt in
+                        let key = opt.rawValue
                         Button {
-                            administrationTag = administrationTag == opt ? nil : opt
+                            administrationTag = administrationTag == key ? nil : key
                         } label: {
-                            Text(opt)
+                            Text(opt.title(l: l))
                                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(administrationTag == opt ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
+                                .foregroundStyle(administrationTag == key ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
-                                .background(administrationTag == opt ? chromeAccent : Color.ohanaControlFill, in: Capsule())
+                                .background(administrationTag == key ? chromeAccent : Color.ohanaControlFill, in: Capsule())
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
@@ -353,7 +354,7 @@ struct AddPetMedicationSheet: View {
                     InlineNumericInput(
                         text: $remainingText,
                         placeholder: l.tr(zh: "数量", en: "Amount", de: "Menge"),
-                        unit: doseUnit,
+                        unit: PetMedicationDoseUnitOption.displayTitle(for: doseUnit, l: l),
                         countryCode: AppCountry.code,
                         maxFractionDigits: 2,
                         accent: chromeAccent,
@@ -434,15 +435,15 @@ struct AddPetMedicationSheet: View {
         }
     }
 
-    private func unitChip(_ u: String) -> some View {
+    private func unitChip(_ unit: PetMedicationDoseUnitOption) -> some View {
         Button {
-            doseUnit = u
+            doseUnit = unit.rawValue
         } label: {
-            Text(u)
+            Text(unit.title(l: l))
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(doseUnit == u ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
+                .foregroundStyle(doseUnit == unit.rawValue ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(doseUnit == u ? chromeAccent : Color.ohanaControlFill, in: Capsule())
+                .background(doseUnit == unit.rawValue ? chromeAccent : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -577,7 +578,9 @@ struct AddPetMedicationSheet: View {
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(chromeAccent, in: Circle())
-            Text(index == 0 ? "第一次" : "第\(index + 1)次")
+            Text(index == 0
+                ? l.tr(zh: "第一次", en: "Dose 1", de: "Dosis 1")
+                : l.tr(zh: "第\(index + 1)次", en: "Dose \(index + 1)", de: "Dosis \(index + 1)"))
                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
@@ -594,31 +597,19 @@ struct AddPetMedicationSheet: View {
         let parts = raw.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
         if parts.count >= 2 {
             doseAmount = String(parts[0])
-            let u = String(parts[1])
-            if doseUnits.contains(u) { doseUnit = u }
+            let key = PetMedicationDoseUnitOption.canonicalKey(String(parts[1]))
+            if doseUnits.contains(where: { $0.rawValue == key }) { doseUnit = key }
         } else if !raw.isEmpty {
             doseAmount = raw
         }
     }
 
     private func splitAdministration(from full: String) -> (String?, String) {
-        let prefix = "【喂法:"
-        guard full.hasPrefix(prefix), let range = full.range(of: "】") else {
-            return (nil, full)
-        }
-        let innerStart = full.index(full.startIndex, offsetBy: prefix.count)
-        let tag = String(full[innerStart ..< range.lowerBound])
-        let rest = String(full[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let note = rest.hasPrefix("\n") ? String(rest.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines) : rest
-        return (tag.isEmpty ? nil : tag, note)
+        PetMedicationAdministrationMetadata.split(from: full)
     }
 
     private func mergedNotes() -> String {
-        let n = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let tag = administrationTag {
-            return "【喂法:\(tag)】" + (n.isEmpty ? "" : "\n\(n)")
-        }
-        return n
+        PetMedicationAdministrationMetadata.merged(key: administrationTag, note: notes)
     }
 
     private func saveAfterKeyboardDismiss() {

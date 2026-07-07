@@ -409,11 +409,6 @@ struct HumanAccountSwitcherSheet: View {
     }
 
     private func localizedRoleText(for raw: String) -> String {
-        switch HumanProfileOptions.normalizedRole(raw) {
-        case "owner":
-            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
-        default:
-            l.tr(zh: "成员", en: "Member", de: "Mitglied")
-        }
+        HumanProfileOptions.localizedRoleTitle(raw, l: l)
     }
 }

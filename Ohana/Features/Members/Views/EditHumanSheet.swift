@@ -183,18 +183,7 @@ struct EditHumanSheet: View {
     }
 
     private func localizedGenderTitle(for raw: String) -> String {
-        switch HumanProfileOptions.normalizedGender(raw) {
-        case "女":
-            l.tr(zh: "女", en: "Female", de: "Weiblich")
-        case "男":
-            l.tr(zh: "男", en: "Male", de: "Männlich")
-        case "非二元":
-            l.tr(zh: "非二元", en: "Non-binary", de: "Nichtbinär")
-        case "不透露":
-            l.tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
-        default:
-            HumanGenderIdentity.title(for: raw)
-        }
+        HumanProfileOptions.localizedGenderTitle(raw, l: l)
     }
 
     private func editPrivacyRow(_ title: String, binding: Binding<Bool>) -> some View {

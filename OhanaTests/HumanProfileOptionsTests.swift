@@ -44,6 +44,17 @@ struct HumanProfileOptionsTests {
         #expect(HumanProfileOptions.storedGenderIdentity("") == nil)
     }
 
+    @Test func localizedHumanOptionTitlesAcceptLegacyAndCanonicalValues() {
+        let zh = L10n("zh")
+        let en = L10n("en")
+
+        #expect(HumanProfileOptions.localizedRoleTitle("owner", l: en) == "Owner")
+        #expect(HumanProfileOptions.localizedRoleTitle("viewer", l: zh) == "成员")
+        #expect(HumanProfileOptions.localizedGenderTitle("女", l: en) == "Female")
+        #expect(HumanProfileOptions.localizedGenderTitle("female", l: zh) == "女")
+        #expect(HumanProfileOptions.localizedGenderTitle("private", l: en) == "Prefer not to say")
+    }
+
     @Test func backupStorageGenderFallsBackToLegacyMetadataAsCanonicalKey() {
         #expect(HumanProfileOptions.storedGenderIdentity(raw: "女", notes: "") == "female")
         #expect(HumanProfileOptions.storedGenderIdentity(raw: "female", notes: "性别:男｜memo") == "female")

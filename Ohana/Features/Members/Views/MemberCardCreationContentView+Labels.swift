@@ -31,19 +31,12 @@ extension MemberCardCreationContentView {
     }
 
     func humanGenderLabel(_ gender: String) -> String {
-        switch HumanProfileOptions.normalizedGender(gender) {
-        case "男": l.tr(zh: "男", en: "Male", de: "Männlich")
-        case "女": l.tr(zh: "女", en: "Female", de: "Weiblich")
-        case "非二元": l.tr(zh: "非二元", en: "Nonbinary", de: "Nichtbinär")
-        default: l.tr(zh: "未设置", en: "Not set", de: "Nicht gesetzt")
-        }
+        let title = HumanProfileOptions.localizedGenderTitle(gender, l: l)
+        return title.isEmpty ? l.tr(zh: "未设置", en: "Not set", de: "Nicht gesetzt") : title
     }
 
     func humanRoleLabel(_ role: String) -> String {
-        switch HumanProfileOptions.normalizedRole(role) {
-        case "owner": l.tr(zh: "主人", en: "Owner", de: "Besitzer")
-        default: l.tr(zh: "家人", en: "Family", de: "Familie")
-        }
+        HumanProfileOptions.localizedRoleTitle(role, l: l)
     }
 
     func bloodTypeLabel(_ value: String) -> String {

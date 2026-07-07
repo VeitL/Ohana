@@ -372,7 +372,7 @@ extension FocusCard {
             ageText: human.hasPassedAway ? human.ageAtPassingText : human.birthday.map { human.localizedAgeTextForWallet(birthday: $0, l: l) },
             zodiacText: human.birthday.map { Human.westernZodiacDisplay(for: $0, l: l) },
             mbtiText: human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : human.mbti.uppercased(),
-            genderText: HumanGenderIdentity.title(for: human.genderRaw),
+            genderText: HumanProfileOptions.localizedGenderTitle(human.genderRaw, l: l),
             avatarImageData: includeAvatarData && hasAvatarAttachment ? human.avatarImageData : nil,
             avatarImageSignature: hasAvatarAttachment ? human.avatarThumbnailSignature : "",
             humanGender: human.genderRaw,

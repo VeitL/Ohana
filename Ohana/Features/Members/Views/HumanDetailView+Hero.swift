@@ -113,12 +113,7 @@ extension HumanDetailView {
     }
 
     private var localizedHeroRoleText: String {
-        switch HumanProfileOptions.normalizedRole(human.role) {
-        case "owner":
-            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
-        default:
-            l.tr(zh: "成员", en: "Member", de: "Mitglied")
-        }
+        HumanProfileOptions.localizedRoleTitle(human.role, l: l)
     }
 
     private func localizedHeroAgeText(for birthday: Date) -> String {

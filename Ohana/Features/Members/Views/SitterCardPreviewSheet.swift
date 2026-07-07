@@ -183,7 +183,7 @@ struct SitterCardPreviewSheet: View {
             // 底部 Ohana 品牌水印
             HStack {
                 Spacer()
-                Text("Made with Ohana 🏝️")
+                Text(l.tr(zh: "由 Ohana 生成 🏝️", en: "Made with Ohana 🏝️", de: "Erstellt mit Ohana 🏝️"))
                     .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     .padding(.bottom, 16)

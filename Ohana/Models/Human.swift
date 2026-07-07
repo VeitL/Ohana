@@ -54,6 +54,15 @@ nonisolated enum HumanProfileOptions {
         raw == "owner" ? "owner" : "member"
     }
 
+    static func localizedRoleTitle(_ raw: String, l: L10n) -> String {
+        switch normalizedRole(raw) {
+        case "owner":
+            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
+        default:
+            l.tr(zh: "成员", en: "Member", de: "Mitglied")
+        }
+    }
+
     static func normalizedGender(_ raw: String) -> String {
         switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "male", "man", "boy", "男":
@@ -93,6 +102,21 @@ nonisolated enum HumanProfileOptions {
             return stored
         }
         return storedGenderIdentity(genderMetadata(from: notes))
+    }
+
+    static func localizedGenderTitle(_ raw: String, l: L10n) -> String {
+        switch storedGenderIdentity(raw) {
+        case "female":
+            l.tr(zh: "女", en: "Female", de: "Weiblich")
+        case "male":
+            l.tr(zh: "男", en: "Male", de: "Männlich")
+        case "nonbinary":
+            l.tr(zh: "非二元", en: "Non-binary", de: "Nichtbinaer")
+        case "private":
+            l.tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
+        default:
+            raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
     }
 
     static func visibleNoteParts(from notes: String) -> [String] {

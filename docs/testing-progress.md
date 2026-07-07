@@ -97,6 +97,11 @@
   Document and receipt attachment privacy sanitation now also normalizes
   successful JPEG rewrite filenames to `.jpg`, keeps batch fallback filenames
   unique, and compiles in the current Debug build on the pinned simulator.
+  Members localization hardening now also proves Pet medication dose-unit and
+  administration-method display use stable keys with legacy Chinese read
+  compatibility (`PetMedicationDisplayOptionsTests`, 2 tests), while Human
+  role/gender display accepts legacy and canonical values through centralized
+  `HumanProfileOptions` helpers (`HumanProfileOptionsTests`, 8 tests).
 	  Memorial-pet stale Calendar rows now also have GUI guard coverage proving an
 	  old pet-linked water reminder does not reopen live pet-care, health, walk, or
 	  economy routes after the pet is marked passed away and the app relaunches.
