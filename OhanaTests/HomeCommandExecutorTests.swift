@@ -615,6 +615,8 @@ struct HomeCommandExecutorTests {
         #expect(recorded.result.petID == pet.id)
         #expect(recorded.result.careType == .feeding)
         #expect(recorded.result.linkedPottyLogID == nil)
+        #expect(recorded.result.didPersist)
+        #expect(recorded.result.persistenceErrorDescription == nil)
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.legacyModelId == recorded.result.careLogID.uuidString)
         #expect(ledgerEvents.first?.source == CareLedgerSource.detail.rawValue)
@@ -649,6 +651,8 @@ struct HomeCommandExecutorTests {
         #expect(recorded.result.petID == pet.id)
         #expect(recorded.result.careType == .play)
         #expect(recorded.result.linkedPottyLogID == nil)
+        #expect(recorded.result.didPersist)
+        #expect(recorded.result.persistenceErrorDescription == nil)
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.care.rawValue)
         #expect(ledgerEvents.first?.actionType == CareType.play.rawValue)
@@ -1173,6 +1177,8 @@ struct HomeCommandExecutorTests {
         #expect(claimResult.logID == unknownLog.id)
         #expect(claimResult.sharedSessionID == session.id.uuidString)
         #expect(claimResult.updatedLedgerEventIDs == [claimedLedgerEvent.id])
+        #expect(claimResult.didPersist)
+        #expect(claimResult.persistenceErrorDescription == nil)
         #expect(claimedLog.pet?.id == second.id)
         #expect(claimedSession.sourcePetId == second.id.uuidString)
         #expect(claimedSession.speciesRaw == second.species)
@@ -1221,6 +1227,8 @@ struct HomeCommandExecutorTests {
         #expect(pottyLogs.count == 1)
         #expect(recorded.result.careLogID == careLogs.first?.id)
         #expect(recorded.result.linkedPottyLogID == pottyLogs.first?.id)
+        #expect(recorded.result.didPersist)
+        #expect(recorded.result.persistenceErrorDescription == nil)
         #expect(ledgerEvents.count == 2)
         #expect(ledgerEvents.contains { $0.legacyModelName == "PetCareLog" && $0.legacyModelId == recorded.result.careLogID.uuidString })
         #expect(ledgerEvents.contains { $0.legacyModelName == "PetPottyLog" && $0.legacyModelId == recorded.result.linkedPottyLogID?.uuidString })
@@ -1257,6 +1265,8 @@ struct HomeCommandExecutorTests {
         #expect(deleteResult.linkedPottyLogID == recorded.result.linkedPottyLogID)
         #expect(deleteResult.removedLedgerEventIDs.count == 2)
         #expect(deleteResult.didDelete)
+        #expect(deleteResult.didPersist)
+        #expect(deleteResult.persistenceErrorDescription == nil)
         #expect(careLogs.isEmpty)
         #expect(pottyLogs.isEmpty)
         let remainingLedgerIDs = Set(ledgerEvents.map(\.id))
@@ -1305,6 +1315,8 @@ struct HomeCommandExecutorTests {
         #expect(result.logID == log.id)
         #expect(result.removedLedgerEventIDs.count == 1)
         #expect(result.didDelete)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(pottyLogs.isEmpty)
         #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
     }
@@ -1339,8 +1351,12 @@ struct HomeCommandExecutorTests {
         let wrongPottyDelete = PetPottyCommandService.deletePottyLog(pottyLog, pet: other, context: context)
 
         #expect(wrongCareDelete.didDelete == false)
+        #expect(wrongCareDelete.didPersist)
+        #expect(wrongCareDelete.persistenceErrorDescription == nil)
         #expect(wrongCareDelete.removedLedgerEventIDs.isEmpty)
         #expect(wrongPottyDelete.didDelete == false)
+        #expect(wrongPottyDelete.didPersist)
+        #expect(wrongPottyDelete.persistenceErrorDescription == nil)
         #expect(wrongPottyDelete.removedLedgerEventIDs.isEmpty)
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).map(\.id) == [careLog.id])
         #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).map(\.id) == [pottyLog.id])
@@ -1394,6 +1410,8 @@ struct HomeCommandExecutorTests {
         let result = executor.deletePottyLog(log, pet: first, note: "test.pet.potty.delete.unclaimed")
 
         #expect(result.didDelete)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(result.logID == log.id)
         #expect(result.removedLedgerEventIDs.count == 1)
         #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).isEmpty)
@@ -1442,6 +1460,8 @@ struct HomeCommandExecutorTests {
         mutation = try #require(revisionCenter.lastMutation)
         #expect(deletedCare.careLogID == recorded.result.careLogID)
         #expect(deletedCare.didDelete)
+        #expect(deletedCare.didPersist)
+        #expect(deletedCare.persistenceErrorDescription == nil)
         #expect(mutation.command == .petCareDelete(petID: pet.id, logID: recorded.result.careLogID))
         #expect(mutation.affectedEntityIDs.contains(linkedPottyID))
         #expect(mutation.note == "test.pet.care.delete")
@@ -1464,6 +1484,8 @@ struct HomeCommandExecutorTests {
         mutation = try #require(revisionCenter.lastMutation)
         #expect(deletedPotty.logID == potty.id)
         #expect(deletedPotty.didDelete)
+        #expect(deletedPotty.didPersist)
+        #expect(deletedPotty.persistenceErrorDescription == nil)
         #expect(mutation.command == .petPottyDelete(petID: pet.id, logID: potty.id))
         #expect(mutation.note == "test.pet.potty.delete")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 3)
@@ -1496,6 +1518,8 @@ struct HomeCommandExecutorTests {
         let delete = executor.deleteCareLog(careLog, pet: other, note: "test.pet.care.delete.wrongPet")
 
         #expect(delete.didDelete == false)
+        #expect(delete.didPersist)
+        #expect(delete.persistenceErrorDescription == nil)
         #expect(delete.careLogID == recorded.result.careLogID)
         #expect(revisionCenter.lastMutation == recordMutation)
         #expect(revisionCenter.homeRevision.value == beforeDeleteRevision)
@@ -1520,6 +1544,8 @@ struct HomeCommandExecutorTests {
         )
 
         #expect(pottyDelete.didDelete == false)
+        #expect(pottyDelete.didPersist)
+        #expect(pottyDelete.persistenceErrorDescription == nil)
         #expect(revisionCenter.lastMutation == recordMutation)
         #expect(revisionCenter.homeRevision.value == beforePottyDeleteRevision)
         #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).map(\.id) == [pottyLog.id])
@@ -3219,6 +3245,21 @@ struct HomeCommandExecutorTests {
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didCreate"))
     }
 
+    @Test func petCareCommandsGateSideEffectsOnPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let commandSource = try source("Ohana/Features/PetCare/PetCareCommands.swift", rootURL: rootURL)
+        let revisionSource = try source("Ohana/Features/RevisionPublishing/DomainRevisionPublishing+FeaturePublishing.swift", rootURL: rootURL)
+
+        #expect(commandSource.contains("let didPersist: Bool"))
+        #expect(commandSource.contains("let persistenceErrorDescription: String?"))
+        #expect(!commandSource.contains("context.safeSave()"))
+        #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(commandSource.contains("context.rollback()"))
+        #expect(commandSource.contains("guard recorded.result.didPersist else { return recorded }"))
+        #expect(commandSource.contains("guard result.didPersist else { return result }"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didDelete"))
+    }
+
     @MainActor
     @Test func memberDeletionServiceDeletesPetRelatedEventsAndQuickActions() throws {
         let container = try makeInMemoryContainer()
@@ -3458,7 +3499,9 @@ struct HomeCommandExecutorTests {
             careLogID: careLogID,
             linkedPottyLogID: linkedPottyLogID,
             removedLedgerEventIDs: [ledgerEventID],
-            didDelete: true
+            didDelete: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
         let beforeRevision = revisionCenter.homeRevision.value
         let revisions = SharedDomainRevisionPublisher(center: revisionCenter)

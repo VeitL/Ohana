@@ -16,13 +16,15 @@ struct PetCareTrackingCommandResult: Equatable {
     let coconutDelta: Int
     let occurredAt: Date
     let disposition: CareFactWriteDisposition
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 
     var didRecord: Bool {
-        disposition.didWriteFact
+        didPersist && disposition.didWriteFact
     }
 
     var allowsDerivedEffects: Bool {
-        disposition.allowsDerivedEffects
+        didPersist && disposition.allowsDerivedEffects
     }
 }
 
@@ -32,6 +34,8 @@ struct PetCareTrackingDeleteCommandResult: Equatable {
     let linkedPottyLogID: UUID?
     let removedLedgerEventIDs: [UUID]
     let didDelete: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 @MainActor
@@ -104,7 +108,9 @@ enum PetCareTrackingCommandService {
                         careType: .feeding,
                         coconutDelta: 0,
                         occurredAt: date,
-                        disposition: recorded.result.disposition
+                        disposition: recorded.result.disposition,
+                        didPersist: recorded.result.didPersist,
+                        persistenceErrorDescription: recorded.result.persistenceErrorDescription
                     ),
                     recorded.log
                 )
@@ -117,7 +123,9 @@ enum PetCareTrackingCommandService {
                     careType: .feeding,
                     coconutDelta: recorded.result.coconutDelta,
                     occurredAt: date,
-                    disposition: recorded.result.disposition
+                    disposition: recorded.result.disposition,
+                    didPersist: recorded.result.didPersist,
+                    persistenceErrorDescription: recorded.result.persistenceErrorDescription
                 ),
                 recorded.log
             )
@@ -144,7 +152,9 @@ enum PetCareTrackingCommandService {
                     careType: type,
                     coconutDelta: 0,
                     occurredAt: date,
-                    disposition: recorded.result.disposition
+                    disposition: recorded.result.disposition,
+                    didPersist: recorded.result.didPersist,
+                    persistenceErrorDescription: recorded.result.persistenceErrorDescription
                 ),
                 recorded.log
             )
@@ -157,7 +167,9 @@ enum PetCareTrackingCommandService {
                 careType: type,
                 coconutDelta: recorded.result.coconutDelta,
                 occurredAt: date,
-                disposition: recorded.result.disposition
+                disposition: recorded.result.disposition,
+                didPersist: recorded.result.didPersist,
+                persistenceErrorDescription: recorded.result.persistenceErrorDescription
             ),
             recorded.log
         )
@@ -177,7 +189,9 @@ enum PetCareTrackingCommandService {
                 careLogID: careLogID,
                 linkedPottyLogID: nil,
                 removedLedgerEventIDs: [],
-                didDelete: false
+                didDelete: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         guard log.pet?.id == pet.id else {
@@ -186,7 +200,9 @@ enum PetCareTrackingCommandService {
                 careLogID: careLogID,
                 linkedPottyLogID: nil,
                 removedLedgerEventIDs: [],
-                didDelete: false
+                didDelete: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let linkedPotty = linkedPottyLog(for: log, pet: pet, context: context)
@@ -207,14 +223,28 @@ enum PetCareTrackingCommandService {
         CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
         context.delete(log)
         SharedCareSessionMaintenance.reconcileAfterDeletingChild(sharedSessionId: sharedSessionId, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetCareTrackingDeleteCommandResult(
+                petID: pet.id,
+                careLogID: careLogID,
+                linkedPottyLogID: nil,
+                removedLedgerEventIDs: [],
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
 
         return PetCareTrackingDeleteCommandResult(
             petID: pet.id,
             careLogID: careLogID,
             linkedPottyLogID: linkedPotty?.id,
             removedLedgerEventIDs: removedLedgerEvents.map(\.id),
-            didDelete: true
+            didDelete: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -277,6 +307,8 @@ struct PetPottyDeleteCommandResult: Equatable {
     let logID: UUID
     let removedLedgerEventIDs: [UUID]
     let didDelete: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct PetPottyClaimCommandResult: Equatable {
@@ -284,6 +316,8 @@ struct PetPottyClaimCommandResult: Equatable {
     let logID: UUID
     let sharedSessionID: String
     let updatedLedgerEventIDs: [UUID]
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 enum PetPottyCommandService {
@@ -300,7 +334,9 @@ enum PetPottyCommandService {
                 petID: pet.id,
                 logID: logID,
                 removedLedgerEventIDs: [],
-                didDelete: false
+                didDelete: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         guard canDeletePottyLog(log, from: pet) else {
@@ -308,7 +344,9 @@ enum PetPottyCommandService {
                 petID: pet.id,
                 logID: logID,
                 removedLedgerEventIDs: [],
-                didDelete: false
+                didDelete: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         let ledgerEvents = ledgerEvents(forLegacyModelName: "PetPottyLog", id: logID, context: context)
@@ -320,12 +358,25 @@ enum PetPottyCommandService {
         CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
         context.delete(log)
         SharedCareSessionMaintenance.reconcileAfterDeletingChild(sharedSessionId: sharedSessionId, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetPottyDeleteCommandResult(
+                petID: pet.id,
+                logID: logID,
+                removedLedgerEventIDs: [],
+                didDelete: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
         return PetPottyDeleteCommandResult(
             petID: pet.id,
             logID: logID,
             removedLedgerEventIDs: ledgerEvents.map(\.id),
-            didDelete: true
+            didDelete: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -342,7 +393,9 @@ enum PetPottyCommandService {
                 petID: pet.id,
                 logID: log.id,
                 sharedSessionID: sharedSessionId,
-                updatedLedgerEventIDs: []
+                updatedLedgerEventIDs: [],
+                didPersist: true,
+                persistenceErrorDescription: nil
             )
         }
         log.pet = pet
@@ -354,13 +407,26 @@ enum PetPottyCommandService {
             event.note = SharedCareMetadata.visibleNote(event.note)
         }
         SharedCareSessionMaintenance.reconcileAfterClaimingPotty(log, pet: pet, context: context)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return PetPottyClaimCommandResult(
+                petID: pet.id,
+                logID: log.id,
+                sharedSessionID: sharedSessionId,
+                updatedLedgerEventIDs: [],
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
 
         return PetPottyClaimCommandResult(
             petID: pet.id,
             logID: log.id,
             sharedSessionID: sharedSessionId,
-            updatedLedgerEventIDs: ledgerEvents.map(\.id)
+            updatedLedgerEventIDs: ledgerEvents.map(\.id),
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -424,6 +490,7 @@ struct PetCareCommandExecutor {
             executorId: executorId,
             date: date
         )
+        guard recorded.result.didPersist else { return recorded }
         deriveCareRecord(recorded.result, note: note)
         return recorded
     }
@@ -435,6 +502,7 @@ struct PetCareCommandExecutor {
         note: String
     ) -> PetCareTrackingDeleteCommandResult {
         let result = PetCareTrackingCommandService.deleteCareLog(log, pet: pet, context: context)
+        guard result.didPersist else { return result }
         deriveCareDelete(result, pet: pet, note: note)
         return result
     }
@@ -460,6 +528,7 @@ struct PetCareCommandExecutor {
         note: String
     ) -> PetPottyDeleteCommandResult {
         let result = PetPottyCommandService.deletePottyLog(log, pet: pet, context: context)
+        guard result.didPersist else { return result }
         derivePottyDelete(result, pet: pet, note: note)
         return result
     }
@@ -485,6 +554,7 @@ struct PetCareCommandExecutor {
         note: String
     ) -> PetPottyClaimCommandResult {
         let result = PetPottyCommandService.claimUnknownPottyLog(log, pet: pet, context: context)
+        guard result.didPersist else { return result }
         deriveAuthorizedPetMutation(
             .quickCare(entityID: pet.id, action: "claimUnknownPotty"),
             pets: [pet],

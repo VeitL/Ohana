@@ -155,11 +155,6 @@
     "Ohana/Features/Oasis/OasisUpgradeRewardService+Upgrades.swift": [
       "context.safeSave()"
     ],
-    "Ohana/Features/PetCare/PetCareCommands.swift": [
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Features/PhotoAlbum/PetPhotoAlbumCommands.swift": [
       "context.safeSave()",
       "context.safeSave()",

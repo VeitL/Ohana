@@ -45,7 +45,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .petCareDelete(petID: result.petID, logID: result.careLogID),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: result.didDelete,
+                wroteBusinessFact: result.didPersist && result.didDelete,
                 note: note
             )
         )
@@ -59,7 +59,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .petPottyDelete(petID: result.petID, logID: result.logID),
                 affectedEntityIDs: affected,
-                wroteBusinessFact: result.didDelete,
+                wroteBusinessFact: result.didPersist && result.didDelete,
                 note: note
             )
         )
