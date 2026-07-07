@@ -74,7 +74,7 @@ extension CalendarView {
                         let isToday = Calendar.current.isDateInToday(date)
                         let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
                         let dayNumber = Calendar.current.component(.day, from: date)
-                        let hasEvents = preparedCalendarSnapshot.monthEventDayIDs.contains(timelineDateID(date))
+                        let hasEvents = !preparedCalendarSnapshot.events(for: date).isEmpty
 
                         Button {
                             withAnimation(GoMotion.feedback) {

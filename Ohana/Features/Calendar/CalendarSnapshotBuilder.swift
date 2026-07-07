@@ -90,6 +90,16 @@ nonisolated struct CalendarPreparedSnapshot {
     nonisolated func events(forDayID dayID: String) -> [Event] {
         eventsByDay[dayID] ?? []
     }
+
+    nonisolated func events(for date: Date) -> [Event] {
+        events(forDayID: CalendarSnapshotBuilder.timelineDateID(date))
+    }
+
+    nonisolated func eventDayIDs(for dates: [Date]) -> Set<String> {
+        Set(dates
+            .map(CalendarSnapshotBuilder.timelineDateID)
+            .filter { !(eventsByDay[$0] ?? []).isEmpty })
+    }
 }
 
 nonisolated struct CalendarPreparedSnapshotReference: Sendable {
@@ -178,6 +188,8 @@ extension CalendarEventOccurrenceReference {
 }
 
 nonisolated enum CalendarSnapshotBuilder {
+    static let preparedSnapshotWindowKey = "rolling-window-v1"
+
     static func buildTimeline(
         events: [Event],
         allEvents: [Event],
@@ -224,20 +236,13 @@ nonisolated enum CalendarSnapshotBuilder {
             occurrenceIndex: occurrenceIndex,
             visibilityContext: visibilityContext
         )
-        let daysToIndex = Array(Set(weekDays + monthDays).map { calendar.startOfDay(for: $0) })
-        let eventsByDay = buildEventsByDay(
-            occurrenceIndex: occurrenceIndex,
-            days: daysToIndex,
-            calendar: calendar
-        )
+        let eventsByDay = buildEventsByDay(occurrenceIndex: occurrenceIndex)
         var weekEventsByDay: [String: [Event]] = [:]
         for day in weekDays {
             let dayID = timelineDateID(day)
             weekEventsByDay[dayID] = eventsByDay[dayID] ?? []
         }
-        let monthEventDayIDs = Set(monthDays
-            .map(timelineDateID)
-            .filter { !(eventsByDay[$0] ?? []).isEmpty })
+        let monthEventDayIDs = Set(monthDays.map(timelineDateID).filter { !(eventsByDay[$0] ?? []).isEmpty })
         return CalendarPreparedSnapshot(
             filteredEvents: filteredEvents,
             timeline: timeline,
@@ -285,16 +290,12 @@ nonisolated enum CalendarSnapshotBuilder {
     }
 
     private static func buildEventsByDay(
-        occurrenceIndex: CalendarOccurrenceDayIndex,
-        days: [Date],
-        calendar: Calendar
+        occurrenceIndex: CalendarOccurrenceDayIndex
     ) -> [String: [Event]] {
         var eventsByDay: [String: [Event]] = [:]
-        for day in Set(days.map { calendar.startOfDay(for: $0) }) {
-            let dayEvents = occurrenceIndex.events(on: day, calendar: calendar)
-            if !dayEvents.isEmpty {
-                eventsByDay[timelineDateID(day)] = dayEvents
-            }
+        for (day, occurrences) in occurrenceIndex.occurrencesByDay {
+            guard !occurrences.isEmpty else { continue }
+            eventsByDay[timelineDateID(day)] = occurrences.map(\.event)
         }
         return eventsByDay
     }

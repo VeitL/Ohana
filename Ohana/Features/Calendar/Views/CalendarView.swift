@@ -205,7 +205,7 @@ struct CalendarView: View {
 
     var preparedCalendarSnapshotTriggerKey: CalendarPreparedSnapshotTriggerKey {
         CalendarPreparedSnapshotTriggerKey(
-            monthKey: calendarMonthKey,
+            monthKey: CalendarSnapshotBuilder.preparedSnapshotWindowKey,
             filter: effectiveFilterSelection,
             dataRevision: dataRevision
         )
@@ -254,7 +254,7 @@ struct CalendarView: View {
     }
 
     var eventsForSelectedDate: [Event] {
-        preparedCalendarSnapshot.events(forDayID: timelineDateID(selectedDate))
+        preparedCalendarSnapshot.events(for: selectedDate)
     }
 
     func shouldShowEventOccurrence(_ event: Event, occurrenceDate: Date) -> Bool {

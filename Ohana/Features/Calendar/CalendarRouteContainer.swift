@@ -334,7 +334,7 @@ private actor CalendarRouteDataActor {
         input: CalendarRouteDataLoadInput
     ) -> CalendarRoutePreparedSnapshotReference {
         let key = CalendarPreparedSnapshotTriggerKey(
-            monthKey: monthKey(for: input.selectedDate),
+            monthKey: CalendarSnapshotBuilder.preparedSnapshotWindowKey,
             filter: input.filterSelection,
             dataRevision: input.dataRevision
         )
@@ -450,10 +450,6 @@ private actor CalendarRouteDataActor {
         }
     }
 
-    private func monthKey(for selectedDate: Date) -> String {
-        let components = Calendar.current.dateComponents([.year, .month], from: selectedDate)
-        return "\(components.year ?? 0)-\(components.month ?? 0)"
-    }
 }
 
 @ModelActor
@@ -561,7 +557,7 @@ actor CalendarPreparedSnapshotActor {
         input: CalendarPreparedSnapshotLoadInput
     ) -> CalendarRoutePreparedSnapshotReference {
         let key = CalendarPreparedSnapshotTriggerKey(
-            monthKey: monthKey(for: input.selectedDate),
+            monthKey: CalendarSnapshotBuilder.preparedSnapshotWindowKey,
             filter: input.filterSelection,
             dataRevision: input.dataRevision
         )
@@ -677,10 +673,6 @@ actor CalendarPreparedSnapshotActor {
         }
     }
 
-    private func monthKey(for selectedDate: Date) -> String {
-        let components = Calendar.current.dateComponents([.year, .month], from: selectedDate)
-        return "\(components.year ?? 0)-\(components.month ?? 0)"
-    }
 }
 
 private nonisolated struct CalendarActorRouteData {

@@ -135,7 +135,7 @@ extension CalendarView {
                     let isToday = Calendar.current.isDateInToday(day)
                     let isSelected = Calendar.current.isDate(day, inSameDayAs: selectedDate)
                     let dayNumber = Calendar.current.component(.day, from: day)
-                    let dayEvents = preparedCalendarSnapshot.weekEventsByDay[timelineDateID(day)] ?? []
+                    let dayEvents = preparedCalendarSnapshot.events(for: day)
                     let hasEvents = !dayEvents.isEmpty
                     // 每个事件对应的宠物主题色（去重，最多3种）
                     let dotColors: [Color] = {
