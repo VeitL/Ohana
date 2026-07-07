@@ -368,7 +368,7 @@ struct HumanCareCommandExecutor {
             sourcePetWalkLogID: sourcePetWalkLogID,
             source: source
         )
-        guard result.ledgerEventID != nil else { return result }
+        guard result.didPersist, result.ledgerEventID != nil else { return result }
         revisions.publishHumanWorkout(result, command: command, note: note)
         return result
     }
@@ -381,7 +381,7 @@ struct HumanCareCommandExecutor {
         note: String
     ) -> WorkoutDeleteCommandResult {
         let result = WorkoutCommandService.deleteHumanWorkout(log, human: human, context: context)
-        if result.didChange {
+        if result.didPersist && result.didChange {
             revisions.publishHumanWorkoutDelete(result, command: command, note: note)
         }
         return result

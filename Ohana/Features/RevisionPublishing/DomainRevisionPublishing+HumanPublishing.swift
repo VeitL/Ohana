@@ -20,7 +20,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: command,
                 affectedEntityIDs: affected,
-                wroteBusinessFact: true,
+                wroteBusinessFact: result.didPersist,
                 note: note
             )
         )
@@ -33,7 +33,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: command,
                 affectedEntityIDs: affected,
-                wroteBusinessFact: result.didChange,
+                wroteBusinessFact: result.didPersist && result.didChange,
                 note: note
             )
         )

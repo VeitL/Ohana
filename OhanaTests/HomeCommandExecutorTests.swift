@@ -3171,6 +3171,23 @@ struct HomeCommandExecutorTests {
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didDelete"))
     }
 
+    @Test func humanWorkoutCommandsGateSideEffectsOnPersistence() throws {
+        let rootURL = repositoryRootURL()
+        let commandSource = try source("Ohana/Features/Workouts/WorkoutCommands.swift", rootURL: rootURL)
+        let executorSource = try source("Ohana/Features/HumanNotes/HumanNoteCommands.swift", rootURL: rootURL)
+        let revisionSource = try source("Ohana/Features/RevisionPublishing/DomainRevisionPublishing+HumanPublishing.swift", rootURL: rootURL)
+
+        #expect(commandSource.contains("let didPersist: Bool"))
+        #expect(commandSource.contains("let persistenceErrorDescription: String?"))
+        #expect(!commandSource.contains("context.safeSave()"))
+        #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(commandSource.contains("context.rollback()"))
+        #expect(executorSource.contains("guard result.didPersist, result.ledgerEventID != nil else { return result }"))
+        #expect(executorSource.contains("if result.didPersist && result.didChange"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist"))
+        #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didChange"))
+    }
+
     @MainActor
     @Test func memberDeletionServiceDeletesPetRelatedEventsAndQuickActions() throws {
         let container = try makeInMemoryContainer()
@@ -4885,6 +4902,8 @@ struct HomeCommandExecutorTests {
 
         let logs = try context.fetch(FetchDescriptor<HumanWorkoutLog>())
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(logs.count == 1)
         #expect(logs.first?.id == result.logID)
         #expect(logs.first?.human?.id == human.id)
@@ -4926,6 +4945,8 @@ struct HomeCommandExecutorTests {
 
         let logs = try context.fetch(FetchDescriptor<HumanWorkoutLog>())
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(logs.count == 1)
         #expect(logs.first?.id == result.logID)
         #expect(logs.first?.human?.id == human.id)
@@ -4968,6 +4989,8 @@ struct HomeCommandExecutorTests {
 
         let log = try #require(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).first)
         let event = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(log.id == result.logID)
         #expect(log.sourceHealthKit)
         #expect(log.healthKitWorkoutUUID == "hk-workout-001")
@@ -5010,6 +5033,8 @@ struct HomeCommandExecutorTests {
 
         let log = try #require(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).first)
         let event = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
+        #expect(result.didPersist)
+        #expect(result.persistenceErrorDescription == nil)
         #expect(log.id == result.logID)
         #expect(log.sourcePetWalkLogID == petWalkLogID)
         #expect(!log.sourceHealthKit)
@@ -5059,6 +5084,9 @@ struct HomeCommandExecutorTests {
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(logs.count == 1)
         #expect(ledgerEvents.count == 1)
+        #expect(first.didPersist)
+        #expect(second.didPersist)
+        #expect(second.persistenceErrorDescription == nil)
         #expect(first.logID == second.logID)
         #expect(first.ledgerEventID == second.ledgerEventID)
         #expect(logs.first?.workoutType == .walking)
@@ -5101,6 +5129,9 @@ struct HomeCommandExecutorTests {
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(logs.count == 1)
         #expect(ledgerEvents.count == 1)
+        #expect(first.didPersist)
+        #expect(second.didPersist)
+        #expect(second.persistenceErrorDescription == nil)
         #expect(first.logID == second.logID)
         #expect(first.ledgerEventID == second.ledgerEventID)
         #expect(logs.first?.durationMinutes == 20)
@@ -5150,6 +5181,9 @@ struct HomeCommandExecutorTests {
         let event = try #require(ledgerEvents.first)
         #expect(logs.count == 1)
         #expect(ledgerEvents.count == 1)
+        #expect(petWalkResult.didPersist)
+        #expect(healthKitResult.didPersist)
+        #expect(healthKitResult.persistenceErrorDescription == nil)
         #expect(petWalkResult.logID == healthKitResult.logID)
         #expect(log.sourcePetWalkLogID == petWalkLogID)
         #expect(log.sourceHealthKit)
@@ -5204,6 +5238,9 @@ struct HomeCommandExecutorTests {
         let event = try #require(ledgerEvents.first)
         #expect(logs.count == 1)
         #expect(ledgerEvents.count == 1)
+        #expect(healthKitResult.didPersist)
+        #expect(petWalkResult.didPersist)
+        #expect(petWalkResult.persistenceErrorDescription == nil)
         #expect(healthKitResult.logID == petWalkResult.logID)
         #expect(log.sourcePetWalkLogID == petWalkLogID)
         #expect(log.healthKitWorkoutUUID == "hk-overlap-002")
@@ -5252,6 +5289,8 @@ struct HomeCommandExecutorTests {
 
         let logs = try context.fetch(FetchDescriptor<HumanWorkoutLog>())
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(deleteResult.didPersist)
+        #expect(deleteResult.persistenceErrorDescription == nil)
         #expect(logs.isEmpty)
         #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
         #expect(deleteResult.logID == createResult.logID)

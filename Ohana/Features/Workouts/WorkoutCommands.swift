@@ -29,6 +29,8 @@ struct WorkoutCommandResult: Equatable {
     let logID: UUID
     let subjectID: UUID?
     let ledgerEventID: UUID?
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
 }
 
 struct WorkoutDeleteCommandResult: Equatable {
@@ -36,6 +38,18 @@ struct WorkoutDeleteCommandResult: Equatable {
     let subjectID: UUID
     let removedLedgerEventIDs: [UUID]
     let didChange: Bool
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
+}
+
+private struct WorkoutSourceMetadataAttachResult: Equatable {
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
+
+    static let unchanged = WorkoutSourceMetadataAttachResult(
+        didPersist: true,
+        persistenceErrorDescription: nil
+    )
 }
 
 enum WorkoutCommandService {
@@ -73,7 +87,7 @@ enum WorkoutCommandService {
                sourcePetWalkLogID: cleanPetWalkLogID,
                context: context
            ) {
-            attachSourceMetadataIfNeeded(
+            let attachResult = attachSourceMetadataIfNeeded(
                 to: existing,
                 human: human,
                 sourceHealthKit: sourceHealthKit,
@@ -83,8 +97,16 @@ enum WorkoutCommandService {
                 sourcePetWalkLogID: cleanPetWalkLogID,
                 context: context
             )
-            let existingLedgerID = ledgerEvents(for: existing.id, context: context).first?.id
-            return WorkoutCommandResult(logID: existing.id, subjectID: human.id, ledgerEventID: existingLedgerID)
+            let existingLedgerID = attachResult.didPersist
+                ? ledgerEvents(for: existing.id, context: context).first?.id
+                : nil
+            return WorkoutCommandResult(
+                logID: existing.id,
+                subjectID: human.id,
+                ledgerEventID: existingLedgerID,
+                didPersist: attachResult.didPersist,
+                persistenceErrorDescription: attachResult.persistenceErrorDescription
+            )
         }
 
         if sourceHealthKit, !cleanHealthKitUUID.isEmpty,
@@ -93,7 +115,7 @@ enum WorkoutCommandService {
                healthKitWorkoutUUID: cleanHealthKitUUID,
                context: context
            ) {
-            attachSourceMetadataIfNeeded(
+            let attachResult = attachSourceMetadataIfNeeded(
                 to: existing,
                 human: human,
                 sourceHealthKit: sourceHealthKit,
@@ -103,8 +125,16 @@ enum WorkoutCommandService {
                 sourcePetWalkLogID: cleanPetWalkLogID,
                 context: context
             )
-            let existingLedgerID = ledgerEvents(for: existing.id, context: context).first?.id
-            return WorkoutCommandResult(logID: existing.id, subjectID: human.id, ledgerEventID: existingLedgerID)
+            let existingLedgerID = attachResult.didPersist
+                ? ledgerEvents(for: existing.id, context: context).first?.id
+                : nil
+            return WorkoutCommandResult(
+                logID: existing.id,
+                subjectID: human.id,
+                ledgerEventID: existingLedgerID,
+                didPersist: attachResult.didPersist,
+                persistenceErrorDescription: attachResult.persistenceErrorDescription
+            )
         }
 
         if let existing = existingOverlappingSourceWorkout(
@@ -117,7 +147,7 @@ enum WorkoutCommandService {
             needsPetWalkSource: !cleanPetWalkLogID.isEmpty,
             context: context
         ) {
-            attachSourceMetadataIfNeeded(
+            let attachResult = attachSourceMetadataIfNeeded(
                 to: existing,
                 human: human,
                 sourceHealthKit: sourceHealthKit,
@@ -127,8 +157,16 @@ enum WorkoutCommandService {
                 sourcePetWalkLogID: cleanPetWalkLogID,
                 context: context
             )
-            let existingLedgerID = ledgerEvents(for: existing.id, context: context).first?.id
-            return WorkoutCommandResult(logID: existing.id, subjectID: human.id, ledgerEventID: existingLedgerID)
+            let existingLedgerID = attachResult.didPersist
+                ? ledgerEvents(for: existing.id, context: context).first?.id
+                : nil
+            return WorkoutCommandResult(
+                logID: existing.id,
+                subjectID: human.id,
+                ledgerEventID: existingLedgerID,
+                didPersist: attachResult.didPersist,
+                persistenceErrorDescription: attachResult.persistenceErrorDescription
+            )
         }
 
         guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
@@ -138,7 +176,13 @@ enum WorkoutCommandService {
             context: context,
             logPrefix: "WorkoutCommandService.recordHumanWorkout"
         ) else {
-            return WorkoutCommandResult(logID: UUID(), subjectID: human.id, ledgerEventID: nil)
+            return WorkoutCommandResult(
+                logID: UUID(),
+                subjectID: human.id,
+                ledgerEventID: nil,
+                didPersist: false,
+                persistenceErrorDescription: nil
+            )
         }
         let careLedger = providedCareLedger ?? CareLedgerService()
         let cleanNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -184,8 +228,24 @@ enum WorkoutCommandService {
                 save: false
             )
         }
-        context.safeSave()
-        return WorkoutCommandResult(logID: log.id, subjectID: human.id, ledgerEventID: ledgerEvent?.id)
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return WorkoutCommandResult(
+                logID: log.id,
+                subjectID: human.id,
+                ledgerEventID: nil,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        return WorkoutCommandResult(
+            logID: log.id,
+            subjectID: human.id,
+            ledgerEventID: ledgerEvent?.id,
+            didPersist: true,
+            persistenceErrorDescription: nil
+        )
     }
 
     @discardableResult
@@ -200,10 +260,13 @@ enum WorkoutCommandService {
                 logID: log.id,
                 subjectID: human.id,
                 removedLedgerEventIDs: [],
-                didChange: false
+                didChange: false,
+                didPersist: false,
+                persistenceErrorDescription: nil
             )
         }
         let ledgerEvents = ledgerEvents(for: log.id, context: context)
+        let removedLedgerEventIDs = ledgerEvents.map(\.id)
         for event in ledgerEvents {
             CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
@@ -211,12 +274,25 @@ enum WorkoutCommandService {
         let logID = log.id
         CloudSyncMutationRecorder.markDeleted(log, context: context)
         context.delete(log)
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return WorkoutDeleteCommandResult(
+                logID: logID,
+                subjectID: human.id,
+                removedLedgerEventIDs: [],
+                didChange: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
         return WorkoutDeleteCommandResult(
             logID: logID,
             subjectID: human.id,
-            removedLedgerEventIDs: ledgerEvents.map(\.id),
-            didChange: true
+            removedLedgerEventIDs: removedLedgerEventIDs,
+            didChange: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 
@@ -301,9 +377,9 @@ enum WorkoutCommandService {
         healthKitSourceName: String,
         sourcePetWalkLogID: String,
         context: ModelContext
-    ) {
+    ) -> WorkoutSourceMetadataAttachResult {
         guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
-            return
+            return .unchanged
         }
         var changed = false
         if sourceHealthKit, !log.sourceHealthKit {
@@ -326,13 +402,24 @@ enum WorkoutCommandService {
             log.sourcePetWalkLogID = sourcePetWalkLogID
             changed = true
         }
-        guard changed else { return }
+        guard changed else { return .unchanged }
         CloudSyncMutationRecorder.markModified(log, context: context)
         for event in ledgerEvents(for: log.id, context: context) {
             event.metadataJSON = workoutMetadataJSON(for: log)
             CloudSyncMutationRecorder.markModified(event, context: context)
         }
-        context.safeSave()
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return WorkoutSourceMetadataAttachResult(
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        return WorkoutSourceMetadataAttachResult(
+            didPersist: true,
+            persistenceErrorDescription: nil
+        )
     }
 
     private static func workoutMetadataJSON(for log: HumanWorkoutLog) -> String {
