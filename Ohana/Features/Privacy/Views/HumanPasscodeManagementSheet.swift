@@ -299,7 +299,10 @@ struct HumanPasscodeManagementSheet: View {
             )
             successAndDismiss(l.tr(zh: "密码已开启", en: "PIN enabled", de: "PIN aktiviert"))
         } catch {
-            showError(l.tr(zh: "请输入 4 位数字", en: "Enter a 4-digit PIN", de: "4-stellige PIN eingeben"))
+            showError(passcodeErrorMessage(
+                error,
+                fallback: l.tr(zh: "请输入 4 位数字", en: "Enter a 4-digit PIN", de: "4-stellige PIN eingeben")
+            ))
         }
     }
 
@@ -314,7 +317,10 @@ struct HumanPasscodeManagementSheet: View {
             )
             handleManagementResult(result, success: l.tr(zh: "密码已修改", en: "PIN changed", de: "PIN geändert"))
         } catch {
-            showError(l.tr(zh: "请输入 4 位数字", en: "Enter a 4-digit PIN", de: "4-stellige PIN eingeben"))
+            showError(passcodeErrorMessage(
+                error,
+                fallback: l.tr(zh: "请输入 4 位数字", en: "Enter a 4-digit PIN", de: "4-stellige PIN eingeben")
+            ))
         }
     }
 
@@ -327,8 +333,20 @@ struct HumanPasscodeManagementSheet: View {
             )
             handleManagementResult(result, success: l.tr(zh: "密码已关闭", en: "PIN turned off", de: "PIN deaktiviert"))
         } catch {
-            showError(l.tr(zh: "请输入当前 4 位密码", en: "Enter the current 4-digit PIN", de: "Aktuelle 4-stellige PIN eingeben"))
+            showError(passcodeErrorMessage(
+                error,
+                fallback: l.tr(zh: "请输入当前 4 位密码", en: "Enter the current 4-digit PIN", de: "Aktuelle 4-stellige PIN eingeben")
+            ))
         }
+    }
+
+    private func passcodeErrorMessage(_ error: Error, fallback: String) -> String {
+        if let localizedError = error as? LocalizedError,
+           let message = localizedError.errorDescription,
+           !message.isEmpty {
+            return message
+        }
+        return fallback
     }
 
     private func handleManagementResult(_ result: HumanPasscodeVerification, success: String) {

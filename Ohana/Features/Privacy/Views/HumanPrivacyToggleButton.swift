@@ -88,13 +88,18 @@ struct HumanPrivacyToggleButton: View {
         let action = "field.\(field.rawValue).\(nextValue ? "private" : "public")"
         let command = DomainCommand.humanPrivacy(humanID: human.id, action: action)
         commandQueue.enqueue(command) {
-            HumanPrivacyCommandExecutor(context: modelContext, services: appServices).setPrivateField(
-                field,
-                isPrivate: nextValue,
-                for: human,
-                note: "human.privacy.field"
-            )
-            optimisticIsPrivate = nil
+            do {
+                try HumanPrivacyCommandExecutor(context: modelContext, services: appServices).setPrivateField(
+                    field,
+                    isPrivate: nextValue,
+                    for: human,
+                    note: "human.privacy.field"
+                )
+                optimisticIsPrivate = nil
+            } catch {
+                optimisticIsPrivate = nil
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 

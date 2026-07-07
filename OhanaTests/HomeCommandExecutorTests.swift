@@ -4397,23 +4397,32 @@ struct HomeCommandExecutorTests {
 
     @MainActor
     @Test func humanPrivacyCommandServiceTogglesPrivateFields() throws {
+        let privacyCommandSource = try source(
+            "Ohana/Features/Privacy/HumanPrivacyCommands.swift",
+            rootURL: repositoryRootURL()
+        )
+        #expect(privacyCommandSource.contains("HumanPrivacyCommandError"))
+        #expect(privacyCommandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
+        #expect(privacyCommandSource.contains("context.rollback()"))
+        #expect(!privacyCommandSource.contains("context.safeSave()"))
+
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
         context.insert(human)
         try context.save()
 
-        let single = HumanPrivacyCommandService.setPrivateField(.weight, isPrivate: true, for: human, context: context)
+        let single = try HumanPrivacyCommandService.setPrivateField(.weight, isPrivate: true, for: human, context: context)
         #expect(single.humanID == human.id)
         #expect(single.action == "privacy.field")
         #expect(single.changedFields == Set([HumanPrivateField.weight.rawValue]))
         #expect(human.privateFields == Set([HumanPrivateField.weight.rawValue]))
 
-        let allPrivate = HumanPrivacyCommandService.setAllPrivateFields(isPrivate: true, for: human, context: context)
+        let allPrivate = try HumanPrivacyCommandService.setAllPrivateFields(isPrivate: true, for: human, context: context)
         #expect(allPrivate.action == "privacy.allPrivate")
         #expect(human.privateFields == Set(HumanPrivateField.allCases.map(\.rawValue)))
 
-        let allPublic = HumanPrivacyCommandService.setAllPrivateFields(isPrivate: false, for: human, context: context)
+        let allPublic = try HumanPrivacyCommandService.setAllPrivateFields(isPrivate: false, for: human, context: context)
         #expect(allPublic.action == "privacy.allPublic")
         #expect(human.privateFields.isEmpty)
     }
@@ -4428,7 +4437,7 @@ struct HomeCommandExecutorTests {
         try context.save()
 
         let executor = HumanPrivacyCommandExecutor(context: context, revisionCenter: revisionCenter)
-        let single = executor.setPrivateField(
+        let single = try executor.setPrivateField(
             .weight,
             isPrivate: true,
             for: human,
@@ -4440,7 +4449,7 @@ struct HomeCommandExecutorTests {
         #expect(mutation.affectedEntityIDs == [human.id])
         #expect(mutation.note == "test.privacy.field")
 
-        let allPublic = executor.setAllPrivateFields(
+        let allPublic = try executor.setAllPrivateFields(
             isPrivate: false,
             for: human,
             note: "test.privacy.allPublic"

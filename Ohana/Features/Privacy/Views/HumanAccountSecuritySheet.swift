@@ -17,6 +17,7 @@ struct HumanAccountSecuritySheet: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var showingPasscodeSheet = false
     @State private var optimisticPrivateFields: Set<String>? = nil
+    @State private var privacyErrorMessage: String?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
@@ -56,6 +57,7 @@ struct HumanAccountSecuritySheet: View {
         .onDisappear {
             commandQueue.cancelAll()
             optimisticPrivateFields = nil
+            privacyErrorMessage = nil
         }
     }
 
@@ -164,6 +166,14 @@ struct HumanAccountSecuritySheet: View {
                 .accessibilityIdentifier("human-account-privacy-all-private-action")
             }
 
+            if let privacyErrorMessage {
+                Text(privacyErrorMessage)
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.goRed)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("human-account-privacy-save-error")
+            }
+
             ForEach(HumanPrivateField.allCases) { field in
                 privacyToggleRow(field)
             }
@@ -213,13 +223,20 @@ struct HumanAccountSecuritySheet: View {
         let action = "field.\(field.rawValue).\(isPrivate ? "private" : "public")"
         let command = DomainCommand.humanPrivacy(humanID: human.id, action: action)
         commandQueue.enqueue(command, delayMilliseconds: 160) {
-            HumanPrivacyCommandExecutor(context: modelContext, services: appServices).setPrivateField(
-                field,
-                isPrivate: isPrivate,
-                for: human,
-                note: "human.privacy.field"
-            )
-            clearOptimisticPrivateFieldsIfCommitted()
+            do {
+                try HumanPrivacyCommandExecutor(context: modelContext, services: appServices).setPrivateField(
+                    field,
+                    isPrivate: isPrivate,
+                    for: human,
+                    note: "human.privacy.field"
+                )
+                privacyErrorMessage = nil
+                clearOptimisticPrivateFieldsIfCommitted()
+            } catch {
+                optimisticPrivateFields = nil
+                showPrivacyError(error)
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
     }
 
@@ -231,12 +248,19 @@ struct HumanAccountSecuritySheet: View {
         let command = DomainCommand.humanPrivacy(humanID: human.id, action: action)
         commandQueue.cancelAll()
         commandQueue.enqueue(command, delayMilliseconds: 160) {
-            HumanPrivacyCommandExecutor(context: modelContext, services: appServices).setAllPrivateFields(
-                isPrivate: isPrivate,
-                for: human,
-                note: isPrivate ? "human.privacy.allPrivate" : "human.privacy.allPublic"
-            )
-            clearOptimisticPrivateFieldsIfCommitted()
+            do {
+                try HumanPrivacyCommandExecutor(context: modelContext, services: appServices).setAllPrivateFields(
+                    isPrivate: isPrivate,
+                    for: human,
+                    note: isPrivate ? "human.privacy.allPrivate" : "human.privacy.allPublic"
+                )
+                privacyErrorMessage = nil
+                clearOptimisticPrivateFieldsIfCommitted()
+            } catch {
+                optimisticPrivateFields = nil
+                showPrivacyError(error)
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
         }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
@@ -252,6 +276,27 @@ struct HumanAccountSecuritySheet: View {
     private func clearOptimisticPrivateFieldsIfCommitted() {
         guard optimisticPrivateFields == human.privateFields else { return }
         optimisticPrivateFields = nil
+    }
+
+    private func showPrivacyError(_ error: Error) {
+        privacyErrorMessage = localizedErrorMessage(
+            error,
+            fallback: l.tr(
+                zh: "隐私设置保存失败，请稍后重试。",
+                en: "Could not save privacy settings. Try again.",
+                de: "Datenschutzeinstellungen konnten nicht gespeichert werden. Versuche es erneut."
+            )
+        )
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+    }
+
+    private func localizedErrorMessage(_ error: Error, fallback: String) -> String {
+        if let localizedError = error as? LocalizedError,
+           let message = localizedError.errorDescription,
+           !message.isEmpty {
+            return message
+        }
+        return fallback
     }
 
     @ViewBuilder

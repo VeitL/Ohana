@@ -132,14 +132,6 @@
     "Ohana/Features/Plants/PlantMediaAttachmentIndexRepair.swift": [
       "modelContext.safeSave()"
     ],
-    "Ohana/Features/Privacy/HumanPrivacyCommands.swift": [
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()",
-      "context.safeSave()"
-    ],
     "Ohana/Features/QuickCare/QuickWaterCommandExecutor.swift": [
       "context.safeSave()"
     ],

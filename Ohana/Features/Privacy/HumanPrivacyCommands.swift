@@ -14,6 +14,23 @@ struct HumanPrivacyCommandResult: Equatable {
     let changedFields: Set<String>
 }
 
+enum HumanPrivacyCommandError: LocalizedError, Equatable {
+    case persistenceFailed(String?)
+
+    var errorDescription: String? {
+        let l = L10n.current
+        switch self {
+        case let .persistenceFailed(reason):
+            let detail = reason.map { "\n\($0)" } ?? ""
+            return l.tr(
+                zh: "隐私设置保存失败，请稍后重试。\(detail)",
+                en: "Could not save privacy settings. Try again.\(detail)",
+                de: "Datenschutzeinstellungen konnten nicht gespeichert werden. Versuche es erneut.\(detail)"
+            )
+        }
+    }
+}
+
 enum HumanPrivacyCommandService {
     @discardableResult
     @MainActor
@@ -25,7 +42,10 @@ enum HumanPrivacyCommandService {
     ) -> HumanPasscodeVerification {
         let result = HumanPasscodeService.verify(pin, for: human, now: now)
         if shouldSaveVerificationResult(result) {
-            context.safeSave()
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            if !saveResult.didSave {
+                context.rollback()
+            }
         }
         return result
     }
@@ -38,7 +58,7 @@ enum HumanPrivacyCommandService {
         context: ModelContext
     ) throws -> HumanPrivacyCommandResult {
         try HumanPasscodeService.setPasscode(pin, for: human)
-        context.safeSave()
+        try savePrivacyChanges(context: context)
         return HumanPrivacyCommandResult(
             humanID: human.id,
             action: "passcode.set",
@@ -62,7 +82,7 @@ enum HumanPrivacyCommandService {
             now: now
         )
         if shouldSaveVerificationResult(result) {
-            context.safeSave()
+            try savePrivacyChanges(context: context)
         }
         return result
     }
@@ -77,7 +97,7 @@ enum HumanPrivacyCommandService {
     ) throws -> HumanPasscodeVerification {
         let result = try HumanPasscodeService.removePasscode(currentPin: currentPin, for: human, now: now)
         if shouldSaveVerificationResult(result) {
-            context.safeSave()
+            try savePrivacyChanges(context: context)
         }
         return result
     }
@@ -89,13 +109,13 @@ enum HumanPrivacyCommandService {
         isPrivate: Bool,
         for human: Human,
         context: ModelContext
-    ) -> HumanPrivacyCommandResult {
+    ) throws -> HumanPrivacyCommandResult {
         guard MemberLifecycleGate.disposition(human: human, writeKind: .accountSecurity).writesContent else {
             return HumanPrivacyCommandResult(humanID: human.id, action: "privacy.field", changedFields: [])
         }
         let before = human.privateFields
         human.setPrivate(field, isPrivate)
-        context.safeSave()
+        try savePrivacyChanges(context: context)
         return HumanPrivacyCommandResult(
             humanID: human.id,
             action: "privacy.field",
@@ -109,7 +129,7 @@ enum HumanPrivacyCommandService {
         isPrivate: Bool,
         for human: Human,
         context: ModelContext
-    ) -> HumanPrivacyCommandResult {
+    ) throws -> HumanPrivacyCommandResult {
         guard MemberLifecycleGate.disposition(human: human, writeKind: .accountSecurity).writesContent else {
             return HumanPrivacyCommandResult(
                 humanID: human.id,
@@ -121,7 +141,7 @@ enum HumanPrivacyCommandService {
         for field in HumanPrivateField.allCases {
             human.setPrivate(field, isPrivate)
         }
-        context.safeSave()
+        try savePrivacyChanges(context: context)
         return HumanPrivacyCommandResult(
             humanID: human.id,
             action: isPrivate ? "privacy.allPrivate" : "privacy.allPublic",
@@ -135,6 +155,15 @@ enum HumanPrivacyCommandService {
             true
         case .invalidFormat, .noPasscode, .memberInactive:
             false
+        }
+    }
+
+    @MainActor
+    private static func savePrivacyChanges(context: ModelContext) throws {
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            throw HumanPrivacyCommandError.persistenceFailed(saveResult.errorDescription)
         }
     }
 }
@@ -233,8 +262,8 @@ struct HumanPrivacyCommandExecutor {
         isPrivate: Bool,
         for human: Human,
         note: String
-    ) -> HumanPrivacyCommandResult {
-        let result = HumanPrivacyCommandService.setPrivateField(
+    ) throws -> HumanPrivacyCommandResult {
+        let result = try HumanPrivacyCommandService.setPrivateField(
             field,
             isPrivate: isPrivate,
             for: human,
@@ -249,8 +278,8 @@ struct HumanPrivacyCommandExecutor {
         isPrivate: Bool,
         for human: Human,
         note: String
-    ) -> HumanPrivacyCommandResult {
-        let result = HumanPrivacyCommandService.setAllPrivateFields(
+    ) throws -> HumanPrivacyCommandResult {
+        let result = try HumanPrivacyCommandService.setAllPrivateFields(
             isPrivate: isPrivate,
             for: human,
             context: context

@@ -4242,7 +4242,7 @@ struct MemberLifecycleGateTests {
             wallet: SwiftDataCoconutWalletManager(),
             projectionManager: QuestManager()
         )
-        let privacyResult = HumanPrivacyCommandService.setPrivateField(
+        let privacyResult = try HumanPrivacyCommandService.setPrivateField(
             .weight,
             isPrivate: true,
             for: human,
