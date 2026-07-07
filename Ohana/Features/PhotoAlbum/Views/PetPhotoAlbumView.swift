@@ -22,6 +22,7 @@ struct PetPhotoAlbumView: View {
     @State private var internalPickerItems: [PhotosPickerItem] = []
     @State private var selectedPhoto: PetPhotoAlbumPhotoItem? = nil
     @State private var showingPhotoDetail = false
+    @State private var mediaBlobLoader: SwiftDataMediaBlobLoader?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     init(
@@ -269,12 +270,23 @@ struct PetPhotoAlbumView: View {
         }
     }
 
+    @MainActor
     private func imageData(for photo: PetPhotoAlbumPhotoItem) async -> Data? {
         guard photo.canAttemptImageAttachmentLoad else {
             return nil
         }
-        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        let loader = routeMediaBlobLoader()
         return await loader.petPhotoLogImageData(modelID: photo.modelID)
+    }
+
+    @MainActor
+    private func routeMediaBlobLoader() -> SwiftDataMediaBlobLoader {
+        if let mediaBlobLoader {
+            return mediaBlobLoader
+        }
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        mediaBlobLoader = loader
+        return loader
     }
 
     private func photoLog(for photo: PetPhotoAlbumPhotoItem) -> PetPhotoLog? {
@@ -358,6 +370,7 @@ private struct PhotoDetailSheet: View {
     @State private var noteText: String = ""
     @State private var displayedNote: String = ""
     @State private var isEditingNote = false
+    @State private var mediaBlobLoader: SwiftDataMediaBlobLoader?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
@@ -451,12 +464,23 @@ private struct PhotoDetailSheet: View {
         }
     }
 
+    @MainActor
     private func imageData() async -> Data? {
         guard photo.canAttemptImageAttachmentLoad else {
             return nil
         }
-        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        let loader = routeMediaBlobLoader()
         return await loader.petPhotoLogImageData(modelID: photo.modelID)
+    }
+
+    @MainActor
+    private func routeMediaBlobLoader() -> SwiftDataMediaBlobLoader {
+        if let mediaBlobLoader {
+            return mediaBlobLoader
+        }
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        mediaBlobLoader = loader
+        return loader
     }
 
     private var photoLog: PetPhotoLog? {

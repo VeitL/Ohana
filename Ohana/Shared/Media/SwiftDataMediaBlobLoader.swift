@@ -51,6 +51,16 @@ actor SwiftDataMediaBlobLoader {
         return data
     }
 
+    func petMilestonePhotoData(modelID: PersistentIdentifier) -> Data? {
+        guard let milestone = modelContext.model(for: modelID) as? PetMilestone,
+              milestone.canAttemptPhotoAttachmentLoad else {
+            return nil
+        }
+        let data = milestone.photoData
+        persistRepairIfNeeded(milestone.repairPhotoAttachmentIndexIfNeeded())
+        return data
+    }
+
     func plantAvatarImageData(modelID: PersistentIdentifier) -> Data? {
         guard let plant = modelContext.model(for: modelID) as? Plant,
               plant.canAttemptAvatarImageAttachmentLoad else {

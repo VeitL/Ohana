@@ -87,6 +87,7 @@ struct PetMomentsHubView: View {
     @State private var photosPickerItems: [PhotosPickerItem] = []
     @State private var showingQuickMoment = false
     @State private var pendingSharedSessionDelete: PendingSharedSessionDelete?
+    @State private var mediaBlobLoader: SwiftDataMediaBlobLoader?
 
     init(
         pet: Pet,
@@ -557,12 +558,23 @@ struct PetMomentsHubView: View {
         }
     }
 
+    @MainActor
     private func photoData(for photo: PetTimelinePhotoReference) async -> Data? {
         guard photo.canAttemptImageAttachmentLoad else {
             return nil
         }
-        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        let loader = routeMediaBlobLoader()
         return await loader.petPhotoLogImageData(modelID: photo.modelID)
+    }
+
+    @MainActor
+    private func routeMediaBlobLoader() -> SwiftDataMediaBlobLoader {
+        if let mediaBlobLoader {
+            return mediaBlobLoader
+        }
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        mediaBlobLoader = loader
+        return loader
     }
 
     private var emptyState: some View {

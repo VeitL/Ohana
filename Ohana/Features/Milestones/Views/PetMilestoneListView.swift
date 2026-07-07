@@ -26,6 +26,7 @@ struct PetMilestoneListContentView: View {
     @State private var newPhotoItem: PhotosPickerItem? = nil
     @State private var newPhotoData: Data? = nil
     @State private var selectedMilestone: PetMilestone? = nil
+    @State private var mediaBlobLoader: SwiftDataMediaBlobLoader?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     init(pet: Pet, routeMilestones: [PetMilestone]) {
@@ -175,8 +176,8 @@ struct PetMilestoneListContentView: View {
                                     cacheID: "pet-milestone-card-\(milestone.id.uuidString)",
                                     sourceSignature: milestone.photoThumbnailSignature,
                                     maxPixel: 520,
-                                    dataProvider: {
-                                        milestonePhotoData(for: milestone)
+                                    asyncDataProvider: {
+                                        await milestonePhotoData(for: milestone)
                                     }
                                 ) { image in
                                     Image(uiImage: image)
@@ -202,13 +203,22 @@ struct PetMilestoneListContentView: View {
     }
 
     @MainActor
-    private func milestonePhotoData(for milestone: PetMilestone) -> Data? {
-        guard milestone.canAttemptPhotoAttachmentLoad,
-              let rehydrated = modelContext.model(for: milestone.persistentModelID) as? PetMilestone,
-              rehydrated.canAttemptPhotoAttachmentLoad else {
+    private func milestonePhotoData(for milestone: PetMilestone) async -> Data? {
+        guard milestone.canAttemptPhotoAttachmentLoad else {
             return nil
         }
-        return rehydrated.photoData
+        let loader = routeMediaBlobLoader()
+        return await loader.petMilestonePhotoData(modelID: milestone.persistentModelID)
+    }
+
+    @MainActor
+    private func routeMediaBlobLoader() -> SwiftDataMediaBlobLoader {
+        if let mediaBlobLoader {
+            return mediaBlobLoader
+        }
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        mediaBlobLoader = loader
+        return loader
     }
 
     // MARK: - Empty State
@@ -654,6 +664,7 @@ private struct MilestoneDetailSheet: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var showingPhoto = false
     @State private var showingDeleteAlert = false
+    @State private var mediaBlobLoader: SwiftDataMediaBlobLoader?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
@@ -686,8 +697,8 @@ private struct MilestoneDetailSheet: View {
                                     cacheID: "pet-milestone-detail-\(milestone.id.uuidString)",
                                     sourceSignature: milestone.photoThumbnailSignature,
                                     maxPixel: 720,
-                                    dataProvider: {
-                                        photoData()
+                                    asyncDataProvider: {
+                                        await photoData()
                                     }
                                 ) { image in
                                     Image(uiImage: image)
@@ -717,8 +728,8 @@ private struct MilestoneDetailSheet: View {
                                         cacheID: "pet-milestone-fullscreen-\(milestone.id.uuidString)",
                                         sourceSignature: milestone.photoThumbnailSignature,
                                         maxPixel: 2400,
-                                        dataProvider: {
-                                            photoData()
+                                        asyncDataProvider: {
+                                            await photoData()
                                         }
                                     ) { image in
                                         Image(uiImage: image).resizable().scaledToFit().ignoresSafeArea()
@@ -821,12 +832,21 @@ private struct MilestoneDetailSheet: View {
     }
 
     @MainActor
-    private func photoData() -> Data? {
-        guard milestone.canAttemptPhotoAttachmentLoad,
-              let rehydrated = modelContext.model(for: milestone.persistentModelID) as? PetMilestone,
-              rehydrated.canAttemptPhotoAttachmentLoad else {
+    private func photoData() async -> Data? {
+        guard milestone.canAttemptPhotoAttachmentLoad else {
             return nil
         }
-        return rehydrated.photoData
+        let loader = routeMediaBlobLoader()
+        return await loader.petMilestonePhotoData(modelID: milestone.persistentModelID)
+    }
+
+    @MainActor
+    private func routeMediaBlobLoader() -> SwiftDataMediaBlobLoader {
+        if let mediaBlobLoader {
+            return mediaBlobLoader
+        }
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        mediaBlobLoader = loader
+        return loader
     }
 }
