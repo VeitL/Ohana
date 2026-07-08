@@ -87,6 +87,25 @@ struct FeatureHubAdaptiveLayoutTests {
         #expect(!sharedSource.contains("struct PetMemorialBanner: View {\n    let pet: Pet\n    @Environment(\\.ohanaAppLanguageCode) private var appLanguage\n\n    private var l: L10n { L10n(appLanguage) }\n\n    var body: some View {\n        HStack(spacing: 12)"))
     }
 
+    @Test func humanAllFeaturesUsesSingleCanonicalFeatureHubRoute() throws {
+        let rootURL = repositoryRootURL()
+        let routeSource = try source(
+            "Ohana/Features/Members/HumanDetailSheetRouteContainer.swift",
+            rootURL: rootURL
+        )
+        let homeRouteSource = try source(
+            "Ohana/Features/Home/FocusHomeExpandedFabRouter.swift",
+            rootURL: rootURL
+        )
+
+        #expect(routeSource.contains("HumanAllFeaturesSheet("))
+        #expect(routeSource.contains("HumanAllFeaturesRouteData.load"))
+        #expect(homeRouteSource.contains("actions.showHumanAllFeatures"))
+        #expect(!sourceTreeContains("ExpandedHumanFeatures", rootURL: rootURL))
+        #expect(!fileExists("Ohana/Features/Members/ExpandedHumanFeaturesDataContainer.swift", rootURL: rootURL))
+        #expect(!fileExists("Ohana/Features/Members/Views/ExpandedHumanFeaturesSheet.swift", rootURL: rootURL))
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -99,6 +118,35 @@ struct FeatureHubAdaptiveLayoutTests {
             rootURL: repositoryRootURL()
         )
         return sharedSource.contains("ViewThatFits(in: .horizontal)")
+    }
+
+    private func fileExists(_ path: String, rootURL: URL) -> Bool {
+        FileManager.default.fileExists(atPath: rootURL.appending(path: path).path)
+    }
+
+    private func sourceTreeContains(_ needle: String, rootURL: URL) -> Bool {
+        let roots = [
+            rootURL.appending(path: "Ohana"),
+            rootURL.appending(path: "OhanaTests")
+        ]
+        for root in roots {
+            guard let enumerator = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            ) else { continue }
+
+            for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
+                guard fileURL.lastPathComponent != "FeatureHubAdaptiveLayoutTests.swift" else {
+                    continue
+                }
+                if let source = try? String(contentsOf: fileURL, encoding: .utf8),
+                   source.contains(needle) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     private func source(_ path: String, rootURL: URL) throws -> String {
