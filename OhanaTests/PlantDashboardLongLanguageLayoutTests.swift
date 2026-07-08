@@ -46,6 +46,21 @@ struct PlantDashboardLongLanguageLayoutTests {
         #expect(!source.contains("HStack(spacing: 8) {\n            dashboardStatusChip("))
     }
 
+    @Test func listModeRowsWrapLongLocalizedStatusText() throws {
+        let source = try source(
+            "Ohana/Features/Plants/Views/PlantDashboardView+ListMode.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains("func plantRoomListTitleBlock"))
+        #expect(source.contains("func plantRoomListHeaderBadges"))
+        #expect(source.contains("ViewThatFits(in: .horizontal)"))
+        #expect(source.contains(".lineLimit(2)"))
+        #expect(source.contains(".fixedSize(horizontal: false, vertical: true)"))
+        #expect(!source.contains(".minimumScaleFactor"))
+        #expect(!source.contains(".lineLimit(1)"))
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

@@ -46,6 +46,25 @@ extension PlantDashboardView {
     }
 
     func plantRoomListHeader(_ summary: PlantDashboardRoomSummary) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 8) {
+                plantRoomListTitleBlock(summary)
+
+                Spacer(minLength: 8)
+
+                plantRoomListHeaderBadges(summary)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                plantRoomListTitleBlock(summary)
+                plantRoomListHeaderBadges(summary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(roomZoneAccessibilityLabel(summary, isSelected: false))
+    }
+
+    func plantRoomListTitleBlock(_ summary: PlantDashboardRoomSummary) -> some View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: "house.fill") // a11y: allow decorative room glyph; heading text names the room.
                 .font(OhanaFont.adaptive(size: 12, weight: .black))
@@ -54,12 +73,12 @@ extension PlantDashboardView {
                 .background(Color.goTeal.opacity(0.14), in: Circle())
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(summary.title)
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(l.tr(
                     zh: "\(summary.plantCount) 株植物",
                     en: "\(summary.plantCount) plants",
@@ -67,11 +86,14 @@ extension PlantDashboardView {
                 ))
                 .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
 
-            Spacer(minLength: 6)
-
+    func plantRoomListHeaderBadges(_ summary: PlantDashboardRoomSummary) -> some View {
+        HStack(alignment: .center, spacing: 6) {
             plantRoomListHeaderBadge(
                 icon: "calendar.badge.clock",
                 text: summary.dueTaskCount == 0
@@ -88,12 +110,10 @@ extension PlantDashboardView {
                 )
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(roomZoneAccessibilityLabel(summary, isSelected: false))
     }
 
     func plantRoomListHeaderBadge(icon: String, text: String, tint: Color) -> some View {
-        HStack(spacing: 4) {
+        HStack(alignment: .center, spacing: 4) {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 9, weight: .black))
                 .foregroundStyle(tint)
@@ -101,8 +121,8 @@ extension PlantDashboardView {
             Text(text)
                 .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.74)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 8)
         .frame(minHeight: 28)
@@ -142,14 +162,14 @@ extension PlantDashboardView {
                         : plant.name)
                         .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.74)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(plantRoomListSpeciesLine(for: plant, catalog: catalog))
                         .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 VStack(spacing: 6) {
@@ -158,7 +178,7 @@ extension PlantDashboardView {
                     plantRoomListInfoRow(signal: todo)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 218, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 234, alignment: .topLeading)
             .padding(10)
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             .overlay {
@@ -184,7 +204,7 @@ extension PlantDashboardView {
                 .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
-                .minimumScaleFactor(0.68)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
