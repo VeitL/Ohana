@@ -141,12 +141,12 @@ struct PlantBatchQuickRecordSheet: View {
                     .accessibilityHidden(true)
                 Text(category.shortTitle(l: l))
                     .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-            .frame(minWidth: 86)
-            .frame(minHeight: 44)
+            .frame(minWidth: 86, idealWidth: 104, maxWidth: 128, minHeight: 44)
             .padding(.horizontal, 10)
             .background(
                 isSelected ? category.tint : Color.ohanaControlFill.opacity(0.72),

@@ -30,6 +30,18 @@ struct PlantBatchQuickRecordLayoutTests {
         #expect(!source.contains("Text(plant.roomName.isEmpty ? l.tr(zh: \"未分组\", en: \"No room\", de: \"Kein Raum\") : plant.roomName)\n                    .font(OhanaFont.caption2(.bold))\n                    .foregroundStyle(Color.ohanaSecondaryText)\n                    .lineLimit(1)"))
     }
 
+    @Test func quickRecordCategoryChipsWrapLongLocalizedLabels() throws {
+        let source = try source(
+            "Ohana/Features/Plants/Views/PlantBatchQuickRecordSheet.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains(".lineLimit(2)"))
+        #expect(source.contains(".multilineTextAlignment(.center)"))
+        #expect(source.contains(".frame(minWidth: 86, idealWidth: 104, maxWidth: 128, minHeight: 44)"))
+        #expect(!source.contains(".frame(minWidth: 86)\n            .frame(minHeight: 44)"))
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

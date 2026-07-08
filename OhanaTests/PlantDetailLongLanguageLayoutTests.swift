@@ -57,6 +57,18 @@ struct PlantDetailLongLanguageLayoutTests {
         #expect(!source.contains(".frame(width: 190, alignment: .leading)"))
     }
 
+    @Test func plantCareLogCategoryChipsWrapLongLocalizedLabels() throws {
+        let source = try source(
+            "Ohana/Features/Plants/Views/PlantCareLogSheet.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains(".lineLimit(2)"))
+        #expect(source.contains(".multilineTextAlignment(.center)"))
+        #expect(source.contains(".frame(minWidth: 86, idealWidth: 104, maxWidth: 128, minHeight: 44)"))
+        #expect(!source.contains(".frame(minWidth: 86)\n            .frame(minHeight: 44)"))
+    }
+
     @Test func plantEditChoiceCardsAvoidFixedWidthTextColumns() throws {
         let source = try source(
             "Ohana/Features/Plants/Views/PlantDetailEditSheet.swift",

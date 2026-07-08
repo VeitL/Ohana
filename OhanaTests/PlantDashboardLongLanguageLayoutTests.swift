@@ -30,6 +30,22 @@ struct PlantDashboardLongLanguageLayoutTests {
         #expect(!source.contains(".frame(width: 72)"))
     }
 
+    @Test func overviewHeaderRailsUseAdaptiveGridsForDenseLocalizedText() throws {
+        let source = try source(
+            "Ohana/Features/Plants/Views/PlantDashboardView+Sections.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains("var dashboardStatusColumns: [GridItem]"))
+        #expect(source.contains("GridItem(.adaptive(minimum: 108)"))
+        #expect(source.contains("LazyVGrid(columns: dashboardStatusColumns"))
+        #expect(source.contains("var dashboardQuickActionColumns: [GridItem]"))
+        #expect(source.contains("LazyVGrid(columns: dashboardQuickActionColumns"))
+        #expect(source.contains(".lineLimit(2)"))
+        #expect(!source.contains("return HStack(spacing: 8) {\n            dashboardQuickActionButton("))
+        #expect(!source.contains("HStack(spacing: 8) {\n            dashboardStatusChip("))
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

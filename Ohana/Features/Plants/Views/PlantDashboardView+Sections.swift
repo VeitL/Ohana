@@ -137,7 +137,7 @@ extension PlantDashboardView {
     }
 
     var dashboardStatusRibbon: some View {
-        HStack(spacing: 8) {
+        LazyVGrid(columns: dashboardStatusColumns, spacing: 8) {
             dashboardStatusChip(
                 id: "tasks",
                 icon: "calendar.badge.clock",
@@ -167,6 +167,10 @@ extension PlantDashboardView {
         .accessibilityIdentifier("plant-dashboard-status-ribbon")
     }
 
+    var dashboardStatusColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 108), spacing: 8)]
+    }
+
     func dashboardStatusChip(id: String, icon: String, title: String, tint: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
@@ -176,11 +180,12 @@ extension PlantDashboardView {
             Text(title)
                 .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
-        .frame(minHeight: 34)
+        .frame(minHeight: 38)
         .padding(.horizontal, 8)
         .background(Color.ohanaCardSurface, in: Capsule())
         .accessibilityElement(children: .combine)
@@ -296,7 +301,7 @@ extension PlantDashboardView {
     var dashboardQuickActionRail: some View {
         let photoPreviewCount = min(plants.count, PlantDashboardPhotoPolicy.maxDashboardItems)
 
-        return HStack(spacing: 8) {
+        return LazyVGrid(columns: dashboardQuickActionColumns, spacing: 8) {
             dashboardQuickActionButton(
                 id: "care-plan",
                 icon: "calendar.badge.clock",
@@ -334,6 +339,10 @@ extension PlantDashboardView {
         .accessibilityIdentifier("plant-dashboard-quick-actions")
     }
 
+    var dashboardQuickActionColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 108), spacing: 8)]
+    }
+
     func dashboardQuickActionButton(
         id: String,
         icon: String,
@@ -351,16 +360,18 @@ extension PlantDashboardView {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 74, alignment: .center)
+            .frame(minHeight: 82, alignment: .center)
             .padding(.horizontal, 10)
             .background(Color.ohanaControlFill.opacity(0.54), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         }
