@@ -17,17 +17,7 @@ private struct PlantCareFeatureLogDraft: Identifiable {
     let careType: PlantCareType
 }
 
-private struct PlantCareFeatureRecord: Identifiable {
-    let id: UUID
-    let plantID: UUID
-    let plantName: String
-    let date: Date
-    let careType: PlantCareType
-    let note: String
-    let healthStatus: PlantHealthStatus?
-}
-
-private struct PlantWateringChartPoint: Identifiable {
+private struct PlantWateringChartPoint: Identifiable, Equatable, Sendable {
     let id: String
     let date: Date
     let intervalDays: Int
@@ -121,6 +111,9 @@ struct PlantCareFeatureDetailView: View {
     @State private var waterScheduleEndDate = Date()
     @State private var waterSchedulePersistenceError: String?
     @State private var selectedWaterMode: PlantWaterGuidedMode = .overview
+    @State private var routeSnapshot = PlantCareFeatureRouteSnapshot.empty
+    @State private var routeSnapshotRefreshTask: Task<Void, Never>?
+    @State private var routeSnapshotRefreshGeneration = 0
     @Namespace private var waterModeSelectionNamespace
 
     private var l: L10n { L10n(appLanguage) }
@@ -139,24 +132,19 @@ struct PlantCareFeatureDetailView: View {
             lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
     }
+    private var routeSnapshotRequest: PlantCareFeatureRouteSnapshotRequest {
+        PlantCareFeatureRouteSnapshotRequest(
+            plantIDs: scopedPlants.map(\.id),
+            feature: feature,
+            focusedCareType: focusedCareType,
+            now: Date()
+        )
+    }
+    private var isRouteSnapshotLoading: Bool {
+        routeSnapshot.requestKey != routeSnapshotRequest.key || !routeSnapshot.hasLoaded
+    }
     private var records: [PlantCareFeatureRecord] {
-        scopedPlants
-            .flatMap { plant in
-                plant.careLogs
-                    .filter { matchesFocusedFeature($0.careType) }
-                    .map { log in
-                        PlantCareFeatureRecord(
-                            id: log.id,
-                            plantID: plant.id,
-                            plantName: plant.name,
-                            date: log.date,
-                            careType: log.careType,
-                            note: log.note.trimmingCharacters(in: .whitespacesAndNewlines),
-                            healthStatus: log.healthStatus
-                        )
-                    }
-            }
-            .sorted { $0.date > $1.date }
+        routeSnapshot.records
     }
     private var pageTitle: String {
         if let focusedCareType {
@@ -237,10 +225,22 @@ struct PlantCareFeatureDetailView: View {
         }
         .onAppear {
             refreshWaterScheduleControls()
+            scheduleRouteSnapshotRefresh()
         }
         .onChange(of: focusedPlantID) {
             selectedWaterMode = .overview
             refreshWaterScheduleControls()
+            scheduleRouteSnapshotRefresh(force: true)
+        }
+        .onChange(of: routeSnapshotRequest.key) {
+            scheduleRouteSnapshotRefresh(force: true)
+        }
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
+            scheduleRouteSnapshotRefresh(force: true)
+        }
+        .onDisappear {
+            routeSnapshotRefreshTask?.cancel()
+            routeSnapshotRefreshTask = nil
         }
         .accessibilityIdentifier(accessibilityRootID)
     }
@@ -298,21 +298,21 @@ struct PlantCareFeatureDetailView: View {
                 id: "records",
                 icon: "clock.arrow.circlepath",
                 title: l.tr(zh: "记录", en: "Logs", de: "Einträge"),
-                value: "\(records.count)",
+                value: isRouteSnapshotLoading ? "…" : "\(records.count)",
                 tint: feature.tint
             )
             metricTile(
                 id: "latest",
                 icon: "calendar",
                 title: l.tr(zh: "最近一次", en: "Latest", de: "Zuletzt"),
-                value: latestRecordDate.map(relativeDateText) ?? l.tr(zh: "暂无", en: "None", de: "Keine"),
+                value: isRouteSnapshotLoading ? "…" : (latestRecordDate.map(relativeDateText) ?? l.tr(zh: "暂无", en: "None", de: "Keine")),
                 tint: Color.goTeal
             )
             metricTile(
                 id: "due",
                 icon: "calendar.badge.clock",
                 title: l.tr(zh: "待处理", en: "Due", de: "Fällig"),
-                value: "\(duePlantCount)",
+                value: isRouteSnapshotLoading ? "…" : "\(duePlantCount)",
                 tint: duePlantCount > 0 ? Color.goYellow : Color.goTeal
             )
         }
@@ -1084,7 +1084,6 @@ struct PlantCareFeatureDetailView: View {
     private func waterGuidedMiniChartCard(for plant: Plant) -> some View {
         let points = wateringChartPoints(for: plant)
         let chartPoints = wateringBarChartPoints(for: plant)
-        let targetDays = appServices.plantCarePlans.intervalDays(for: .watering, plant: plant)
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -1099,14 +1098,16 @@ struct PlantCareFeatureDetailView: View {
                         .minimumScaleFactor(0.72)
                 }
                 Spacer(minLength: 8)
-                Text(l.tr(zh: "目标 \(targetDays) 天", en: "Target \(targetDays)d", de: "Ziel \(targetDays) T."))
+                Text(l.tr(zh: "目标 \(plannedIntervalDays(for: plant)) 天", en: "Target \(plannedIntervalDays(for: plant))d", de: "Ziel \(plannedIntervalDays(for: plant)) T."))
                     .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goTeal)
                     .lineLimit(1)
                     .minimumScaleFactor(0.62)
             }
 
-            if points.isEmpty {
+            if isRouteSnapshotLoading {
+                loadingWaterChartState
+            } else if points.isEmpty {
                 emptyWaterChartState(for: plant)
             } else {
                 OhanaMinimalBarChart(
@@ -1344,7 +1345,9 @@ struct PlantCareFeatureDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle(l.tr(zh: "历史记录", en: "History", de: "Verlauf"))
 
-            if records.isEmpty {
+            if isRouteSnapshotLoading {
+                loadingRecordState
+            } else if records.isEmpty {
                 emptyRecordState
             } else {
                 VStack(spacing: 10) {
@@ -1449,6 +1452,22 @@ struct PlantCareFeatureDetailView: View {
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .accessibilityIdentifier("plant-care-feature-empty-records")
+    }
+
+    private var loadingRecordState: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(l.tr(zh: "正在整理历史", en: "Preparing history", de: "Verlauf wird vorbereitet"))
+                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            Text(l.tr(zh: "首帧先展示操作区，记录会以快照补上。", en: "Actions render first; logs arrive as a snapshot.", de: "Aktionen erscheinen zuerst; Einträge folgen als Snapshot."))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+        .accessibilityIdentifier("plant-care-feature-loading-records")
     }
 
     private var emptyRecordHint: String {
@@ -1587,8 +1606,25 @@ struct PlantCareFeatureDetailView: View {
         .accessibilityElement(children: .combine)
     }
 
+    private var loadingWaterChartState: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(l.tr(zh: "正在整理浇水节奏", en: "Preparing watering rhythm", de: "Gießrhythmus wird vorbereitet"))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            Text(l.tr(zh: "先显示页面，历史趋势稍后补上。", en: "The page stays ready while history loads.", de: "Die Seite bleibt bereit, während der Verlauf lädt."))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
+        .padding(14)
+        .background(Color.ohanaControlFill.opacity(0.48), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("plant-care-feature-water-chart-loading")
+    }
+
     private func wateringTask(for plant: Plant) -> PlantCareTaskSnapshot? {
-        appServices.plantCarePlans.tasks(for: plant).first { $0.careType == .watering }
+        routeSnapshot.wateringTasksByPlantID[plant.id]
     }
 
     private func waterSignals(for plant: Plant, task: PlantCareTaskSnapshot?) -> [PlantWateringSignal] {
@@ -1673,19 +1709,19 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func wateringChartPoints(for plant: Plant) -> [PlantWateringChartPoint] {
-        let wateringLogs = plant.careLogs
-            .filter { $0.careType == .watering }
+        let wateringRecords = records
+            .filter { $0.plantID == plant.id && $0.careType == .watering }
             .sorted { $0.date < $1.date }
-        guard wateringLogs.count >= 2 else { return [] }
+        guard wateringRecords.count >= 2 else { return [] }
 
         var points: [PlantWateringChartPoint] = []
-        for index in wateringLogs.indices.dropFirst() {
-            let previous = Calendar.current.startOfDay(for: wateringLogs[index - 1].date)
-            let current = Calendar.current.startOfDay(for: wateringLogs[index].date)
+        for index in wateringRecords.indices.dropFirst() {
+            let previous = Calendar.current.startOfDay(for: wateringRecords[index - 1].date)
+            let current = Calendar.current.startOfDay(for: wateringRecords[index].date)
             let days = max(0, Calendar.current.dateComponents([.day], from: previous, to: current).day ?? 0)
             points.append(PlantWateringChartPoint(
-                id: wateringLogs[index].id.uuidString,
-                date: wateringLogs[index].date,
+                id: wateringRecords[index].id.uuidString,
+                date: wateringRecords[index].date,
                 intervalDays: days
             ))
         }
@@ -1704,7 +1740,7 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func wateringLogCount(for plant: Plant) -> Int {
-        plant.careLogs.count { $0.careType == .watering }
+        records.count { $0.plantID == plant.id && $0.careType == .watering }
     }
 
     private func waterReminderSummary(for plant: Plant, task: PlantCareTaskSnapshot?) -> String {
@@ -1917,17 +1953,13 @@ struct PlantCareFeatureDetailView: View {
         }
     }
 
-    private func featureRecords(for plant: Plant) -> [PlantCareLog] {
-        plant.careLogs.filter { matchesFocusedFeature($0.careType) }
+    private func featureRecords(for plant: Plant) -> [PlantCareFeatureRecord] {
+        records.filter { $0.plantID == plant.id && matchesFocusedFeature($0.careType) }
     }
 
     private var duePlantsForFeature: [Plant] {
         guard feature.category?.isSchedulable == true else { return [] }
-        return scopedPlants.filter { plant in
-            appServices.plantCarePlans.tasks(for: plant).contains {
-                matchesFocusedFeature($0.careType) && $0.daysUntilDue <= 0
-            }
-        }
+        return scopedPlants.filter { routeSnapshot.duePlantIDs.contains($0.id) }
     }
 
     private func roomName(for plant: Plant) -> String {
@@ -1952,18 +1984,10 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func plannedIntervalDays(for plant: Plant) -> Int {
-        switch feature {
-        case .water:
-            max(1, appServices.plantCarePlans.intervalDays(for: .watering, plant: plant))
-        case .fertilize:
-            max(1, appServices.plantCarePlans.intervalDays(for: .fertilizing, plant: plant))
-        case .maintenance, .health:
-            max(1, appServices.plantCarePlans.intervalDays(for: primaryCareType, plant: plant))
-        case .growth:
-            30
-        case .log:
-            30
-        }
+        routeSnapshot.primaryIntervalDaysByPlantID[plant.id] ?? PlantCareFeatureRouteSnapshotActor.fallbackIntervalDays(
+            for: primaryCareType,
+            plant: plant
+        )
     }
 
     private func overdueDays(for plant: Plant) -> Int {
@@ -1973,17 +1997,7 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func featureCadenceDates(for plant: Plant) -> [Date] {
-        plant.careLogs
-            .filter { log in
-                switch feature {
-                case .water:
-                    matchesFocusedFeature(log.careType)
-                case .fertilize:
-                    matchesFocusedFeature(log.careType)
-                case .maintenance, .health, .growth, .log:
-                    matchesFocusedFeature(log.careType)
-                }
-            }
+        featureRecords(for: plant)
             .map(\.date)
             .sorted()
     }
@@ -2027,6 +2041,54 @@ struct PlantCareFeatureDetailView: View {
             healthStatus: healthStatus
         )
         UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
+        if result.didPersist {
+            scheduleRouteSnapshotRefresh(force: true, delayMilliseconds: 0)
+        }
+    }
+
+    private func scheduleRouteSnapshotRefresh(force: Bool = false, delayMilliseconds: UInt64 = 24) {
+        let request = routeSnapshotRequest
+        guard force || routeSnapshot.requestKey != request.key || !routeSnapshot.hasLoaded else { return }
+        routeSnapshotRefreshTask?.cancel()
+        routeSnapshotRefreshGeneration += 1
+        let generation = routeSnapshotRefreshGeneration
+        let container = modelContext.container
+        routeSnapshot = PlantCareFeatureRouteSnapshot.loading(requestKey: request.key, preserving: routeSnapshot)
+        routeSnapshotRefreshTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: delayMilliseconds)
+            guard !Task.isCancelled,
+                  generation == routeSnapshotRefreshGeneration else {
+                return
+            }
+            let builder = PlantCareFeatureRouteSnapshotActor(modelContainer: container)
+            do {
+                let snapshot = try await builder.load(request: request)
+                guard !Task.isCancelled,
+                      generation == routeSnapshotRefreshGeneration,
+                      snapshot.requestKey == routeSnapshotRequest.key else {
+                    return
+                }
+                applyRouteSnapshot(snapshot)
+            } catch is CancellationError {
+                return
+            } catch {
+                OhanaLog.warning("Plant care feature route snapshot load failed: \(error)", category: "Plants")
+            }
+            clearRouteSnapshotRefreshTask(generation: generation)
+        }
+    }
+
+    private func applyRouteSnapshot(_ snapshot: PlantCareFeatureRouteSnapshot) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            routeSnapshot = snapshot
+        }
+    }
+
+    private func clearRouteSnapshotRefreshTask(generation: Int) {
+        guard generation == routeSnapshotRefreshGeneration else { return }
+        routeSnapshotRefreshTask = nil
     }
 
     private func plant(for id: UUID) -> Plant? {
