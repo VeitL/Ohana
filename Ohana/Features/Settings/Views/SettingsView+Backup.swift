@@ -5,6 +5,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 extension SettingsView {
@@ -36,16 +37,25 @@ extension SettingsView {
                     if isExporting {
                         ProgressView().tint(Color.goTeal).scaleEffect(0.8)
                     } else if let url = exportedJSONURL {
-                        ShareLink(item: url,
-                                  subject: Text(l.tr(zh: "Ohana 数据备份", en: "Ohana Data Backup", de: "Ohana Datensicherung")),
-                                  message: Text(l.tr(
-                                      zh: "该备份包含健康、位置、用药和家庭资料等敏感信息，请只分享给可信对象。",
-                                      en: "This backup contains sensitive health, location, medication, and family data. Share it only with trusted people.",
-                                      de: "Dieses Backup enthält sensible Gesundheits-, Standort-, Medikamenten- und Familiendaten. Nur vertrauenswürdig teilen."
-                                  ))) {
-                            backupPill(l.tr(zh: "分享", en: "Share", de: "Teilen"), icon: "square.and.arrow.up", color: Color.goTeal)
+                        VStack(alignment: .trailing, spacing: 6) {
+                            Button {
+                                showingBackupSavePicker = true
+                            } label: {
+                                backupPill(l.tr(zh: "保存到文件", en: "Save to Files", de: "In Dateien sichern"), icon: "folder", color: Color.goTeal)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            ShareLink(item: url,
+                                      subject: Text(l.tr(zh: "Ohana 数据备份", en: "Ohana Data Backup", de: "Ohana Datensicherung")),
+                                      message: Text(l.tr(
+                                          zh: "该备份包含健康、位置、用药和家庭资料等敏感信息，请只分享给可信对象。",
+                                          en: "This backup contains sensitive health, location, medication, and family data. Share it only with trusted people.",
+                                          de: "Dieses Backup enthält sensible Gesundheits-, Standort-, Medikamenten- und Familiendaten. Nur vertrauenswürdig teilen."
+                                      ))) {
+                                backupPill(l.tr(zh: "分享", en: "Share", de: "Teilen"), icon: "square.and.arrow.up", color: Color.goTeal)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
                         }
-                        .buttonStyle(ScaleButtonStyle())
                     } else {
                         Button {
                             isExporting = true
@@ -55,6 +65,7 @@ extension SettingsView {
                                     let password = try backupPasswordForExport()
                                     exportedJSONURL = try await appServices.backups
                                         .exportJSON(container: modelContext.container, password: password)
+                                    showingBackupSavePicker = true
                                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                                 } catch {
                                     importError = error.localizedDescription
@@ -69,6 +80,24 @@ extension SettingsView {
                     }
                 }
                 .frame(minHeight: 44)
+
+                if let url = exportedJSONURL {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill") // a11y: allow decorative success icon covered by status text
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.goTeal.opacity(0.85))
+                            .accessibilityHidden(true)
+                        Text(l.tr(
+                            zh: "已生成 \(url.lastPathComponent)。请保存到“文件”，恢复时选择同一个 .ohanabackup。",
+                            en: "\(url.lastPathComponent) is ready. Save it to Files, then choose the same .ohanabackup when restoring.",
+                            de: "\(url.lastPathComponent) ist bereit. Sichere es in Dateien und wähle dieselbe .ohanabackup beim Wiederherstellen."
+                        ))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium))
+                        .foregroundStyle(tertiaryText.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 4)
+                }
 
                 OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
 
@@ -146,9 +175,9 @@ extension SettingsView {
                             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                         Text(l.tr(
-                            zh: "选择 .ohanabackup，旧 .json 仍可恢复",
-                            en: "Choose .ohanabackup; legacy .json is still supported",
-                            de: ".ohanabackup auswählen; alte .json werden weiter unterstützt"
+                            zh: "选择刚才保存的 .ohanabackup，旧 .json 仍可恢复",
+                            en: "Choose the .ohanabackup you saved; legacy .json is still supported",
+                            de: "Gespeicherte .ohanabackup auswählen; alte .json werden weiter unterstützt"
                         ))
                             .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(tertiaryText)
@@ -180,6 +209,14 @@ extension SettingsView {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.vertical, 4)
+            }
+        }
+        .sheet(isPresented: $showingBackupSavePicker) {
+            if let url = exportedJSONURL {
+                BackupPackageFileExporter(url: url) { result in
+                    handleBackupSaveCompletion(result)
+                }
+                .ignoresSafeArea()
             }
         }
         .fileImporter(
@@ -435,6 +472,24 @@ extension SettingsView {
         }
     }
 
+    func handleBackupSaveCompletion(_ result: Result<[URL], Error>) {
+        showingBackupSavePicker = false
+        switch result {
+        case let .success(urls):
+            guard let savedURL = urls.first else { return }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            appServices.islandToasts.show(l.tr(
+                zh: "已保存：\(savedURL.lastPathComponent)",
+                en: "Saved: \(savedURL.lastPathComponent)",
+                de: "Gesichert: \(savedURL.lastPathComponent)"
+            ))
+        case let .failure(error):
+            importError = error.localizedDescription
+            showingImportErrorAlert = true
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        }
+    }
+
     func showAutomaticBackupReminderIfNeeded() {
         let now = Date()
         let status = appServices.automaticBackups.snapshot(now: now)
@@ -459,5 +514,39 @@ extension SettingsView {
         .padding(.horizontal, 12)
         .background(color.opacity(0.12), in: Capsule())
         .overlay(Capsule().strokeBorder(Color.clear, lineWidth: 1))
+    }
+}
+
+private struct BackupPackageFileExporter: UIViewControllerRepresentable {
+    let url: URL
+    let onCompletion: (Result<[URL], Error>) -> Void
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
+        picker.delegate = context.coordinator
+        picker.modalPresentationStyle = .formSheet
+        return picker
+    }
+
+    func updateUIViewController(_: UIDocumentPickerViewController, context _: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onCompletion: onCompletion)
+    }
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        private let onCompletion: (Result<[URL], Error>) -> Void
+
+        init(onCompletion: @escaping (Result<[URL], Error>) -> Void) {
+            self.onCompletion = onCompletion
+        }
+
+        func documentPicker(_: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            onCompletion(.success(urls))
+        }
+
+        func documentPickerWasCancelled(_: UIDocumentPickerViewController) {
+            onCompletion(.success([]))
+        }
     }
 }

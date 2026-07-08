@@ -32,7 +32,7 @@ extension AddPlantView {
         guard !isSaving else { return false }
         switch currentStep {
         case .plant:
-            return selectedCatalog != nil && !resolvedPlantName.isEmpty
+            return !selectedCatalogID.isEmpty && !resolvedPlantName.isEmpty
         case .avatar, .care:
             return true
         case .confirm:
@@ -79,12 +79,14 @@ extension AddPlantView {
         }
         .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        .overlay(alignment: .topLeading) {
+            PlantCreationAccessibilityMarker(identifier: "add-plant-step-flow")
+        }
         .onAppear {
             OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
                 media.prepareCameraIfNeeded()
             }
         }
-        .accessibilityIdentifier("add-plant-step-flow")
     }
 
     var plantTopChrome: some View {
@@ -217,13 +219,11 @@ extension AddPlantView {
                     Capsule()
                         .strokeBorder(enabled ? Color.goPrimary.opacity(0.42) : Color.ohanaCardSurface.opacity(0.18), lineWidth: 1)
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(actionTitle)
-                .accessibilityIdentifier(actionIdentifier)
             }
             .buttonStyle(ScaleButtonStyle(triggersHaptic: !isLastStep))
-            .disabled(!enabled)
             .accessibilityIdentifier(actionIdentifier)
+            .accessibilityLabel(actionTitle)
+            .disabled(!enabled)
         }
         .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
         .zIndex(10)

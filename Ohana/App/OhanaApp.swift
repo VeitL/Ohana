@@ -118,6 +118,7 @@ private struct OhanaBootstrapRootView: View {
             resetPersistentStateForUITestsIfNeeded(modelContainer: modelContainer)
             bootstrapStatus = .buildingServices
             let services = AppServices(modelContainer: modelContainer)
+            seedPlantBaselineForUITestsIfNeeded(modelContainer: modelContainer, services: services)
             OhanaStartupProbe.mark("bootstrap.services-ready")
             cloudSharingAppDelegate.configure(modelContainer: modelContainer, cloudSync: services.cloudSync)
             let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1000
@@ -176,17 +177,13 @@ private struct OhanaBootstrapRootView: View {
             }
         #endif
     }
-}
 
 #if DEBUG
-    private enum OhanaUITestLaunchOptions {
-        static var resetsPersistentState: Bool {
-            let arguments = ProcessInfo.processInfo.arguments
-            return arguments.contains("-OHANA_UI_TESTS")
-                && arguments.contains("-OHANA_RESET_PERSISTENT_STATE")
-        }
+    private func seedPlantBaselineForUITestsIfNeeded(modelContainer: ModelContainer, services: AppServices) {
+        UITestPlantBaselineSeeder.seedIfRequested(modelContainer: modelContainer, services: services)
     }
 #endif
+}
 
 private enum OhanaBootstrapStatus {
     case preparing

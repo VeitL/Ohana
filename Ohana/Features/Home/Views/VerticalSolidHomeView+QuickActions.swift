@@ -136,6 +136,8 @@ extension VerticalSolidHomeView {
                 routeCoordinator.openQuickMoment(pet.id)
             case "health":
                 routeCoordinator.openSheet(.petHealth(pet.id, initialSection: nil))
+            case "allFeatures":
+                routeCoordinator.openSheet(.petAllFeatures(pet.id))
             default:
                 routeCoordinator.openSheet(.petAllFeatures(pet.id))
             }
@@ -165,6 +167,8 @@ extension VerticalSolidHomeView {
             routeCoordinator.openSheet(.petExpense(pet.id))
         case .momentHistory:
             routeCoordinator.openSheet(.petMomentHistory(pet.id))
+        case .allFeatures:
+            routeCoordinator.openSheet(.petAllFeatures(pet.id))
         case .none:
             routeCoordinator.openSheet(.petAllFeatures(pet.id))
         }

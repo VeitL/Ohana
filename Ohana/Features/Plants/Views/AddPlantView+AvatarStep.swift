@@ -18,7 +18,9 @@ extension AddPlantView {
                 plantAvatarSourceActions
             }
         }
-        .accessibilityIdentifier("add-plant-step-avatar")
+        .overlay(alignment: .topLeading) {
+            PlantCreationAccessibilityMarker(identifier: "add-plant-step-avatar")
+        }
     }
 
     var plantAvatarHero: some View {

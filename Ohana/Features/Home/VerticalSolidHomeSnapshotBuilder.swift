@@ -241,7 +241,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             coconutText: "\(source.pets.reduce(0) { $0 + $1.coconutBalance } + source.humans.reduce(0) { $0 + $1.coconutBalance })",
             todayFocus: todayFocus,
             cards: cards,
-            firstPetEmptyState: firstPetEmptyState(activePets: activePets, activeHumans: activeHumans, l: l),
+            firstPetEmptyState: nil,
             plants: visiblePlants.sorted { $0.createdAt > $1.createdAt }.map { plant in
                 let plantTasks = PlantCarePlanService.tasks(for: plant, now: now)
                 let dueCareTypes = plantTasks
@@ -289,29 +289,6 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 )
             },
             heroPreparationRevision: heroPreparationRevision(for: cards)
-        )
-    }
-
-    private static func firstPetEmptyState(
-        activePets: [Pet],
-        activeHumans: [Human],
-        l: L10n
-    ) -> VerticalSolidHomeFirstPetEmptyState? {
-        guard activePets.isEmpty, !activeHumans.isEmpty else { return nil }
-        return VerticalSolidHomeFirstPetEmptyState(
-            eyebrow: l.tr(zh: "首日进度 1/3", en: "First day 1/3", de: "Erster Tag 1/3"),
-            title: l.tr(zh: "添加第一只宠物", en: "Add your first pet", de: "Erstes Haustier hinzufügen"),
-            subtitle: l.tr(
-                zh: "身份已准备好。添加宠物后记录首次体重照护，就能领取 50 椰子新人礼包。",
-                en: "Your identity is ready. Add a pet, log the first weight care, then claim the 50-coconut starter gift.",
-                de: "Dein Profil ist bereit. Füge ein Haustier hinzu, erfasse das erste Gewicht und erhalte das Startergeschenk mit 50 Kokosnüssen."
-            ),
-            progressText: l.tr(
-                zh: "下一步：宠物档案",
-                en: "Next: pet profile",
-                de: "Weiter: Haustierprofil"
-            ),
-            primaryActionTitle: l.tr(zh: "添加宠物", en: "Add pet", de: "Haustier hinzufügen")
         )
     }
 

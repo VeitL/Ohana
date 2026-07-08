@@ -46,7 +46,9 @@ extension AddPlantView {
                 plantSelectionRequirementHint
             }
         }
-        .accessibilityIdentifier("add-plant-step-plant-room")
+        .overlay(alignment: .topLeading) {
+            PlantCreationAccessibilityMarker(identifier: "add-plant-step-plant-room")
+        }
     }
 
     func selectedPlantSummaryCard(_ entry: PlantCatalogEntry) -> some View {

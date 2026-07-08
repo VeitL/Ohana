@@ -735,6 +735,7 @@ struct PlantDetailContentView: View {
                         advancedPlantDetailsSection
                         archiveSection
                         deleteSection
+                            .id(PlantDetailFeatureAnchor.delete)
                         Spacer(minLength: 40)
                     }
                     .padding(.top, 8)
@@ -772,6 +773,18 @@ struct PlantDetailContentView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
+                    #if DEBUG
+                    Button {
+                        showingDeleteConfirm = true
+                    } label: {
+                        Image(systemName: "trash") // a11y: allow decorative toolbar glyph; button label names the action.
+                            .accessibilityHidden(true)
+                            .foregroundStyle(Color.goRed)
+                    }
+                    .accessibilityLabel(l.tr(zh: "删除植物", en: "Delete plant", de: "Pflanze löschen"))
+                    .accessibilityIdentifier("plant-detail-delete-action")
+                    #endif
+
                     Button { showingAllFeaturesHub = true } label: {
                         Image(systemName: "square.grid.2x2.fill") // a11y: allow decorative all-features glyph; button label names the action.
                             .accessibilityHidden(true)

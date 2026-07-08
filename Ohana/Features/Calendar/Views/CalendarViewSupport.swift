@@ -206,8 +206,8 @@ nonisolated enum CalendarEmbeddedContentMountPolicy {
         isContentMounted: Bool
     ) -> Bool {
         guard hideToolbar else { return true }
-        guard isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive else { return false }
-        return isEmbeddedVisible || isEmbeddedActive || isContentMounted
+        guard isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive || isContentMounted else { return false }
+        return isEmbeddedVisible || isEmbeddedActive
     }
 
     static func shouldScheduleDeferredMount(

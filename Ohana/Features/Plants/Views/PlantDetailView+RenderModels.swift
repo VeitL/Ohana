@@ -65,6 +65,7 @@ enum PlantDetailFeatureAnchor: Hashable {
     case healthReview
     case growthDiary
     case timeline
+    case delete
 }
 
 nonisolated enum PlantDetailPhotoTint: Sendable {

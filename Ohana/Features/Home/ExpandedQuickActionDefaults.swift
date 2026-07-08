@@ -95,7 +95,7 @@ nonisolated enum ExpandedQuickActionDefaults {
         ])
     }
 
-    private enum DefaultAction {
+    private enum DefaultAction: Equatable {
         case feed
         case water
         case waterManagement
@@ -110,6 +110,7 @@ nonisolated enum ExpandedQuickActionDefaults {
         case freeFlight
         case misting
         case substrateChange
+        case allFeatures
     }
 
     private static func items(
@@ -118,7 +119,9 @@ nonisolated enum ExpandedQuickActionDefaults {
         waterManagementLabel: String,
         _ actions: [DefaultAction]
     ) -> [QuickActionItem] {
-        actions.map { item($0, for: pet, localization: l, waterManagementLabel: waterManagementLabel) }
+        var orderedActions = actions.filter { $0 != .allFeatures }
+        orderedActions.insert(.allFeatures, at: min(3, orderedActions.count))
+        return orderedActions.map { item($0, for: pet, localization: l, waterManagementLabel: waterManagementLabel) }
     }
 
     private static func item(
@@ -171,6 +174,9 @@ nonisolated enum ExpandedQuickActionDefaults {
         case .substrateChange:
             return QuickActionItem(label: l.tr(zh: "换垫材", en: "Substrate", de: "Substrat"), icon: "leaf.fill", colorHex: "07DB8B",
                                    petId: pet.id, actionType: "substrateChange", entityId: entityId, entityKind: .pet)
+        case .allFeatures:
+            return QuickActionItem(label: l.tr(zh: "全部", en: "All", de: "Alle"), icon: "square.grid.2x2.fill", colorHex: "5B6AFF",
+                                   petId: pet.id, actionType: "allFeatures", entityId: entityId, entityKind: .pet)
         }
     }
 }

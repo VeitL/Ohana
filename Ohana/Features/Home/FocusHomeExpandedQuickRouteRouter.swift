@@ -28,6 +28,7 @@ enum FocusHomeExpandedQuickRouteRouter {
         let petExpenseQuick: (Pet) -> Void
         let petMomentQuick: (Pet) -> Void
         let petHealth: (Pet) -> Void
+        let petAllFeatures: (Pet) -> Void
         let feedDetail: (Pet) -> Void
         let walk: (Pet) -> Void
         let playDetail: (Pet) -> Void
@@ -86,6 +87,8 @@ enum FocusHomeExpandedQuickRouteRouter {
             actions.petMomentQuick(pet)
         case .health:
             actions.petHealth(pet)
+        case .allFeatures:
+            actions.petAllFeatures(pet)
         case .none:
             break
         }
@@ -115,6 +118,8 @@ enum FocusHomeExpandedQuickRouteRouter {
             actions.petExpenseDetail(pet)
         case .momentHistory:
             actions.momentHistory(pet)
+        case .allFeatures:
+            actions.petAllFeatures(pet)
         case .none:
             break
         }

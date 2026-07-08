@@ -25,6 +25,7 @@ struct ContentView: View {
     @State private var activeHumanReactionTask: Task<Void, Never>?
     @State private var onboardingCreatedEntitySignalTask: Task<Void, Never>?
     @State private var uiTestRouteTask: Task<Void, Never>?
+    @State private var uiTestEconomyStateSeedTask: Task<Void, Never>?
     @State private var onboardingJourneyPhase: OnboardingJourneyPhase = .preOnboarding
     @State private var handledOnboardingPrimaryHumanID: String?
     @State private var signaledOnboardingPrimaryHumanID: String?
@@ -34,7 +35,6 @@ struct ContentView: View {
     @State private var homeSurfaceLanguageThawTask: Task<Void, Never>?
     @State private var routeSurfaceLanguage = AppLanguage.code
     @State private var routeSurfaceLanguageThawTask: Task<Void, Never>?
-    @State private var didAutoPresentFirstPetPrompt = false
     @State private var autoPresentedFirstCarePetID: UUID?
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
@@ -75,10 +75,8 @@ struct ContentView: View {
                     .zIndex(80)
             }
 
-            if !Self.shouldHideGlobalRewardFeedbackOverlay {
-                CoconutRewardFeedbackOverlay()
-                    .zIndex(120)
-            }
+            GlobalCoconutRewardFeedbackLayer()
+                .zIndex(120)
 
             if let starterGiftAmount {
                 StarterGiftCeremonyOverlay(
@@ -107,6 +105,8 @@ struct ContentView: View {
             onboardingCreatedEntitySignalTask = nil
             uiTestRouteTask?.cancel()
             uiTestRouteTask = nil
+            uiTestEconomyStateSeedTask?.cancel()
+            uiTestEconomyStateSeedTask = nil
             homeSurfaceLanguageThawTask?.cancel()
             homeSurfaceLanguageThawTask = nil
             routeSurfaceLanguageThawTask?.cancel()
@@ -132,6 +132,7 @@ struct ContentView: View {
             scheduleRootAppearHandoff()
             applyOnboardingPrimaryHumanIDIfNeeded()
             scheduleUITestHumanProfileRouteIfNeeded()
+            scheduleUITestEconomyStateSeedIfNeeded()
         }
         .onChange(of: onboardingPrimaryHumanID) { _, _ in
             applyOnboardingPrimaryHumanIDIfNeeded()
@@ -147,6 +148,7 @@ struct ContentView: View {
             onRequiredHumanSaved: { activateRequiredHuman($0) },
             onPetSavedFromAddEntity: { pet in
                 scheduleCreatedEntitySignalAfterHomeHandoff(pet.id)
+                scheduleUITestEconomyStateSeedIfNeeded()
                 scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
             },
             onHumanSavedFromAddEntity: { human in
@@ -155,6 +157,7 @@ struct ContentView: View {
                     createdHumanId: human.id
                 )
                 scheduleCreatedEntitySignalAfterHomeHandoff(human.id)
+                scheduleUITestEconomyStateSeedIfNeeded()
                 scheduleOnboardingJourneyEvaluationAfterHomeHandoff(activeHumanIDOverride: human.id.uuidString)
             },
             onFirstSuccessMomentCompleted: { _ in
@@ -315,6 +318,7 @@ struct ContentView: View {
             appServices.lifecycle.handle(.rootAppeared(scenePhase: scenePhase))
             appServices.cloudSync.startAfterFirstRender(modelContainer: modelContext.container)
             scheduleCoconutWalletBootstrap()
+            scheduleUITestEconomyStateSeedIfNeeded(delayMilliseconds: 120)
             reconcileHumanProfileRequirement()
             scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
             OnboardingHomeJoinHandoffGate.consume()
@@ -366,6 +370,7 @@ struct ContentView: View {
     private func activateRequiredHuman(_ human: Human) {
         currentActiveHumanId = human.id.uuidString
         scheduleCreatedEntitySignalAfterHomeHandoff(human.id)
+        scheduleUITestEconomyStateSeedIfNeeded()
         scheduleOnboardingJourneyEvaluationAfterHomeHandoff(activeHumanIDOverride: human.id.uuidString)
     }
 
@@ -404,9 +409,7 @@ struct ContentView: View {
 
         switch phase {
         case .needsFirstPet:
-            guard !didAutoPresentFirstPetPrompt else { return }
-            didAutoPresentFirstPetPrompt = true
-            appRoutes.presentAddEntity(.pet)
+            break
         case .firstCarePending:
             guard let petID = firstActivePetNeedingStarterWeightID(),
                   autoPresentedFirstCarePetID != petID else { return }
@@ -471,6 +474,7 @@ struct ContentView: View {
             appRoutes.dismissSheet(.requiredAccountSwitch)
             reconcileHumanProfileRequirement()
             scheduleOnboardingJourneyEvaluationForActiveHumanChange(humanID)
+            scheduleUITestEconomyStateSeedIfNeeded()
             activeHumanReactionTask = nil
         }
     }
@@ -526,6 +530,29 @@ struct ContentView: View {
 
     private func scheduleOnboardingCreatedEntitySignal(_ id: UUID) {
         scheduleCreatedEntitySignalAfterHomeHandoff(id, defaultDelayMilliseconds: 240)
+    }
+
+    private func scheduleUITestEconomyStateSeedIfNeeded(delayMilliseconds: UInt64 = 180) {
+        #if DEBUG
+            guard OhanaUITestLaunchOptions.requestedCoconutBalanceSeedAmount != nil
+                || OhanaUITestLaunchOptions.requestsRewardTierUnlock
+                || OhanaUITestLaunchOptions.requestsEconomyBudgetReset else {
+                return
+            }
+            uiTestEconomyStateSeedTask?.cancel()
+            uiTestEconomyStateSeedTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+                let activeHumanID = UITestEconomyStateSeeder.applyIfRequested(
+                    modelContext: modelContext,
+                    services: appServices,
+                    currentActiveHumanId: currentActiveHumanId,
+                    revisionNote: "content.uiTestEconomySeed"
+                )
+                if currentActiveHumanId.isEmpty, let activeHumanID {
+                    currentActiveHumanId = activeHumanID.uuidString
+                }
+                uiTestEconomyStateSeedTask = nil
+            }
+        #endif
     }
 
     private func completeStarterGiftCeremony() {
@@ -601,14 +628,6 @@ private extension ContentView {
         guard arguments.indices.contains(nameIndex) else { return nil }
         let name = arguments[nameIndex].trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? nil : name
-    }
-
-    static var shouldHideGlobalRewardFeedbackOverlay: Bool {
-        let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS") {
-            return false
-        }
-        return isRunningTests
     }
 
     static var isRunningTests: Bool {

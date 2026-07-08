@@ -264,22 +264,28 @@ enum PetMilestoneCommandService {
 struct PetMilestoneCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    let questManager: QuestManager
 
     init(context: ModelContext) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher())
+        self.init(context: context, revisions: SharedDomainRevisionPublisher(), questManager: QuestManager())
     }
 
     init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher(center: revisionCenter))
+        self.init(
+            context: context,
+            revisions: SharedDomainRevisionPublisher(center: revisionCenter),
+            questManager: QuestManager()
+        )
     }
 
     init(context: ModelContext, services: AppServices) {
-        self.init(context: context, revisions: services.domainRevisions)
+        self.init(context: context, revisions: services.domainRevisions, questManager: services.questManager)
     }
 
-    init(context: ModelContext, revisions: DomainRevisionPublishing) {
+    init(context: ModelContext, revisions: DomainRevisionPublishing, questManager: QuestManager) {
         self.context = context
         self.revisions = revisions
+        self.questManager = questManager
     }
 
     @discardableResult
@@ -295,7 +301,12 @@ struct PetMilestoneCommandExecutor {
         pet: Pet,
         note: String
     ) throws -> PetMilestoneCommandResult {
-        let result = try PetMilestoneCommandService.createMilestone(input: input, pet: pet, context: context)
+        let result = try PetMilestoneCommandService.createMilestone(
+            input: input,
+            pet: pet,
+            context: context,
+            questManager: questManager
+        )
         revisions.publishPetMilestoneRecord(result, note: note)
         return result
     }

@@ -40,6 +40,8 @@ final class CoconutRewardFeedbackCenter: ObservableObject {
 }
 
 struct CoconutRewardFeedbackOverlay: View {
+    var playsHaptics = true
+
     @StateObject private var center = CoconutRewardFeedbackCenter()
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @Environment(AppServices.self) private var appServices
@@ -70,7 +72,7 @@ struct CoconutRewardFeedbackOverlay: View {
             guard lastHandledEventID != event.id else { return }
             lastHandledEventID = event.id
             center.enqueue(event)
-            if animate {
+            if animate, playsHaptics {
                 hapticTask?.cancel()
                 hapticTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -113,6 +115,48 @@ struct CoconutRewardFeedbackOverlay: View {
         let coconutText = center.coalescedAmount > 0 ? "+\(center.coalescedAmount)🥥" : nil
         let xpText = center.coalescedGrowthXP > 0 ? "+\(center.coalescedGrowthXP)XP" : nil
         return [coconutText, xpText].compactMap(\.self).joined(separator: " · ")
+    }
+}
+
+struct GlobalCoconutRewardFeedbackLayer: View {
+    var playsHaptics = true
+
+    var body: some View {
+        if !Self.shouldHideGlobalRewardFeedbackOverlay {
+            CoconutRewardFeedbackOverlay(playsHaptics: playsHaptics)
+                .zIndex(120)
+        }
+    }
+
+    private static var shouldHideGlobalRewardFeedbackOverlay: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS") {
+            return false
+        }
+        return isRunningTests
+    }
+
+    private static var isRunningTests: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        let arguments = ProcessInfo.processInfo.arguments
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestBundlePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil
+            || arguments.contains("-OHANA_UI_TESTS")
+    }
+}
+
+private struct GlobalCoconutRewardFeedbackOverlayModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content.overlay {
+            GlobalCoconutRewardFeedbackLayer(playsHaptics: false)
+        }
+    }
+}
+
+extension View {
+    func globalCoconutRewardFeedbackOverlay() -> some View {
+        modifier(GlobalCoconutRewardFeedbackOverlayModifier())
     }
 }
 

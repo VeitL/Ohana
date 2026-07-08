@@ -37,6 +37,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                     homeModalDestination(for: route)
                 }
                 .appPresentationSheet(AppPresentationPolicyProvider.policy(for: route))
+                .globalCoconutRewardFeedbackOverlay()
                 .onAppear {
                     lastModalRoute = route
                 }
@@ -49,6 +50,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                     homeSheetDestination(for: route)
                 }
                 .appPresentationSheet(AppPresentationPolicyProvider.policy(for: route))
+                .globalCoconutRewardFeedbackOverlay()
             }
             .fullScreenCover(item: fullScreenRouteBinding) { route in
                 AppDeferredRouteContent(
@@ -57,6 +59,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 ) {
                     homeFullScreenDestination(for: route)
                 }
+                .globalCoconutRewardFeedbackOverlay()
             }
             .overlay {
                 homeOverlayLayer()
@@ -441,6 +444,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 }
             }
             .ignoresSafeArea()
+            .globalCoconutRewardFeedbackOverlay()
             .zIndex(100)
         }
     }

@@ -33,6 +33,7 @@ nonisolated enum QuickActionPickerCatalog {
             Option(id: "weight", label: l.quickActionLabel(for: "weight"), icon: "scalemass.fill", colorHex: "80FFEA"),
             Option(id: "play", label: l.quickActionLabel(for: "play"), icon: "tennisball.fill", colorHex: "FF6B6B"),
             Option(id: "moment", label: l.quickActionLabel(for: "moment"), icon: "camera.circle.fill", colorHex: "FF6B9D"),
+            Option(id: "allFeatures", label: l.quickActionLabel(for: "allFeatures"), icon: "square.grid.2x2.fill", colorHex: "5B6AFF"),
             Option(id: "cageCleaning", label: l.quickActionLabel(for: "cageCleaning"), icon: "basket.fill", colorHex: "FFD166"),
             Option(id: "freeFlight", label: l.quickActionLabel(for: "freeFlight"), icon: "bird.fill", colorHex: "06D6A0"),
             Option(id: "misting", label: l.quickActionLabel(for: "misting"), icon: "cloud.drizzle.fill", colorHex: "118AB2"),
@@ -44,6 +45,7 @@ nonisolated enum QuickActionPickerCatalog {
     static func allowedActionTypeIds(forSpecies species: String) -> Set<String> {
         var allowed = Set(QACardType.available(for: species).map(\.rawValue))
         if allowed.contains("care") { allowed.insert("groom") }
+        allowed.insert("allFeatures")
         allowed.insert("water")
         allowed.insert("moment")
         allowed.insert("medication")
@@ -157,6 +159,8 @@ extension L10n {
             tr(zh: "换垫材", en: "Substrate", de: "Substrat")
         case "humanWorkout":
             homeQASport
+        case "allFeatures":
+            tr(zh: "全部", en: "All", de: "Alle")
         default:
             fallback ?? actionType
         }

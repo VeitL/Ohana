@@ -51,6 +51,7 @@ struct SettingsView: View {
     @State var backupEncryptionEnabled = false
     @State var backupPassword = ""
     @State var backupPasswordConfirmation = ""
+    @State var showingBackupSavePicker = false
     @State var showingImportPicker = false
     @State var importError: String? = nil
     @State var showingImportSuccess = false

@@ -97,6 +97,18 @@ struct PlantCreationCardSurface<Content: View>: View {
     }
 }
 
+struct PlantCreationAccessibilityMarker: View {
+    let identifier: String
+
+    var body: some View {
+        Color.clear
+            .frame(width: 1, height: 1) // a11y: allow invisible UI-test marker; it is not a user control.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(identifier)
+            .accessibilityIdentifier(identifier)
+    }
+}
+
 struct PlantCreationBufferedTextField: View {
     let title: String
     @Binding var text: String

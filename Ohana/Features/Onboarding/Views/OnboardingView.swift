@@ -84,7 +84,6 @@ struct OnboardingView: View {
     @AppStorage("ohana_show_first_success_card") private var showFirstSuccessCard: Bool = false
     @AppStorage("ohana_first_quick_checkin_completed") private var firstQuickCheckInCompleted: Bool = false
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
-    @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @AppStorage("ohana_onboarding_has_pets") private var onboardingHasPets = true
     @AppStorage("ohana_onboarding_has_children") private var onboardingHasChildren = false
@@ -114,8 +113,6 @@ struct OnboardingView: View {
     @State private var isProfilePrepared = false
     @State private var isHomeJoinHandoffPreflightActive = false
     @State private var isHomeJoinHandoffPresentationActive = false
-    @State private var isSkippingProfile = false
-    @State private var skipProfileError = ""
     @State private var preferenceCoordinator = OnboardingPreferenceCoordinator()
     private let introPageCount = 4
 
@@ -320,15 +317,6 @@ struct OnboardingView: View {
 
     private func onboardingIntroActions(width: CGFloat) -> some View {
         VStack(spacing: 8) {
-            if !skipProfileError.isEmpty {
-                Text(skipProfileError)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.goRed)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
             HStack(spacing: 10) {
                 if isReplay {
                     Button {
@@ -344,24 +332,6 @@ struct OnboardingView: View {
                             .background(OnboardingPalette.mutedFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
-                } else if introPageIndex == introPageCount - 1 {
-                    Button {
-                        if preferenceCoordinator.validateBeforeLeavingPreferencePage() {
-                            skipProfileSetup()
-                        }
-                    } label: {
-                        Text(isSkippingProfile
-                            ? localized(zh: "准备中", en: "Preparing", de: "Bereit")
-                            : localized(zh: "暂时跳过", en: "Skip for now", de: "Vorerst überspringen"))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                            .font(OhanaFont.callout(.black))
-                            .foregroundStyle(OnboardingPalette.primaryText.opacity(0.72))
-                            .frame(width: 118, height: 54)
-                            .background(OnboardingPalette.mutedFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .disabled(isFlippingToProfile || isSkippingProfile)
                 }
 
                 Button(action: advanceFromWelcome) {
@@ -382,7 +352,7 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityIdentifier("onboarding-intro-primary-action")
-                .disabled(isFlippingToProfile || isSkippingProfile)
+                .disabled(isFlippingToProfile)
             }
         }
         .frame(width: width)
@@ -476,8 +446,6 @@ struct OnboardingView: View {
     private var onboardingPermissionPreferencePage: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
-                onboardingPreferenceHeader
-
                 onboardingLocationPreferenceCard
                 onboardingNotificationPreferenceCard
                 onboardingHouseholdPreferenceCard
@@ -489,33 +457,10 @@ struct OnboardingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var onboardingPreferenceHeader: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "slider.horizontal.3") // a11y: allow decorative onboarding heading glyph; heading text names the page.
-                .font(OhanaFont.adaptive(size: 50, weight: .black))
-                .foregroundStyle(Color.goPrimary)
-                .accessibilityHidden(true)
-            Text(localized(zh: "照护设置", en: "Care setup", de: "Pflege-Setup"))
-                .font(OhanaFont.title3(.black))
-                .foregroundStyle(OnboardingPalette.primaryText)
-                .multilineTextAlignment(.center)
-            Text(localized(
-                zh: "位置、提醒、家庭安全。",
-                en: "Location, reminders, home safety.",
-                de: "Standort, Erinnerungen, Sicherheit."
-            ))
-            .font(OhanaFont.caption(.semibold))
-            .foregroundStyle(OnboardingPalette.secondaryText)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
     private var onboardingLocationPreferenceCard: some View {
         onboardingPreferenceCard(
             icon: "location.fill.viewfinder",
             title: localized(zh: "位置", en: "Location", de: "Standort"),
-            subtitle: localized(zh: "用于本地天气风险。", en: "For local weather risk.", de: "Für lokale Wetterrisiken."),
             tint: Color.goBlue
         ) {
             VStack(spacing: 8) {
@@ -612,18 +557,6 @@ struct OnboardingView: View {
                         action: openSystemSettings
                     )
                 }
-
-                if preferenceCoordinator.shouldShowLocationValidation {
-                    onboardingInlineNotice(
-                        icon: "info.circle.fill",
-                        text: localized(
-                            zh: "允许位置，或填写国家和城市。",
-                            en: "Allow location, or enter country and city.",
-                            de: "Standort erlauben oder Land und Stadt eintragen."
-                        ),
-                        tint: Color.goRed
-                    )
-                }
             }
         }
     }
@@ -676,7 +609,6 @@ struct OnboardingView: View {
         onboardingPreferenceCard(
             icon: "bell.badge.fill",
             title: localized(zh: "通知", en: "Notifications", de: "Mitteilungen"),
-            subtitle: localized(zh: "用于护理提醒。", en: "For care reminders.", de: "Für Pflegeerinnerungen."),
             tint: Color.goOrange
         ) {
             VStack(spacing: 8) {
@@ -685,7 +617,6 @@ struct OnboardingView: View {
                     onboardingStatusRow(
                         icon: "checkmark.seal.fill",
                         title: localized(zh: "通知已开启", en: "Notifications allowed", de: "Mitteilungen erlaubt"),
-                        detail: localized(zh: "护理提醒可发送。", en: "Care reminders can send.", de: "Pflegeerinnerungen sind aktiv."),
                         tint: Color.goPrimary
                     )
                 case .requestable:
@@ -713,17 +644,7 @@ struct OnboardingView: View {
                 case .settingsRequired:
                     OnboardingNotificationOffRow(
                         title: localized(zh: "通知关闭", en: "Notifications off", de: "Mitteilungen aus"),
-                        subtitle: localized(zh: "开启后发送护理提醒。", en: "Turn on for care reminders.", de: "Für Pflegeerinnerungen aktivieren."),
                         isOn: notificationRetryBinding
-                    )
-                    onboardingInlineNotice(
-                        icon: "info.circle.fill",
-                        text: localized(
-                            zh: "通知已在系统中关闭。",
-                            en: "Notifications are off in iOS Settings.",
-                            de: "Mitteilungen sind in iOS deaktiviert."
-                        ),
-                        tint: Color.goOrange
                     )
                     onboardingPreferenceActionButton(
                         title: localized(zh: "打开系统设置", en: "Open Settings", de: "Einstellungen öffnen"),
@@ -740,14 +661,12 @@ struct OnboardingView: View {
         onboardingPreferenceCard(
             icon: "house.and.flag.fill",
             title: localized(zh: "家庭环境", en: "Home environment", de: "Zuhause"),
-            subtitle: localized(zh: "用于误食和摆放风险。", en: "For ingestion and placement risk.", de: "Für Verschluck- und Standortrisiken."),
             tint: Color.goTeal
         ) {
             VStack(spacing: 6) {
                 OnboardingPreferenceToggleRow(
                     icon: "pawprint.fill",
                     title: localized(zh: "家里有宠物", en: "Pets at home", de: "Tiere zu Hause"),
-                    subtitle: localized(zh: "提示宠物误食风险。", en: "Flags pet ingestion risk.", de: "Warnt vor Tier-Risiken."),
                     tint: Color.goOrange,
                     isOn: $onboardingHasPets
                 )
@@ -755,7 +674,6 @@ struct OnboardingView: View {
                 OnboardingPreferenceToggleRow(
                     icon: "figure.2.and.child.holdinghands",
                     title: localized(zh: "家里有小孩", en: "Children at home", de: "Kinder zu Hause"),
-                    subtitle: localized(zh: "提示儿童安全风险。", en: "Flags child safety risk.", de: "Warnt vor Kinderrisiken."),
                     tint: Color.goBlue,
                     isOn: $onboardingHasChildren
                 )
@@ -766,7 +684,6 @@ struct OnboardingView: View {
     private func onboardingPreferenceCard(
         icon: String,
         title: String,
-        subtitle: String,
         tint: Color,
         @ViewBuilder content: () -> some View
     ) -> some View {
@@ -783,10 +700,6 @@ struct OnboardingView: View {
                     Text(title)
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(OnboardingPalette.primaryText)
-                    Text(subtitle)
-                        .font(OhanaFont.caption2(.semibold))
-                        .foregroundStyle(OnboardingPalette.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
             }
@@ -805,7 +718,7 @@ struct OnboardingView: View {
     private func onboardingStatusRow(
         icon: String,
         title: String,
-        detail: String,
+        detail: String? = nil,
         tint: Color
     ) -> some View {
         HStack(spacing: 10) {
@@ -817,11 +730,13 @@ struct OnboardingView: View {
                 Text(title)
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(OnboardingPalette.primaryText)
-                Text(detail)
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(OnboardingPalette.secondaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let detail, !detail.isEmpty {
+                    Text(detail)
+                        .font(OhanaFont.caption2(.semibold))
+                        .foregroundStyle(OnboardingPalette.secondaryText)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -1111,7 +1026,6 @@ struct OnboardingView: View {
     private func startProfileSetup() {
         guard !isFlippingToProfile else { return }
         flipTask?.cancel()
-        skipProfileError = ""
         humanWizardSessionId = UUID()
         flipProgress = 0
         isProfilePrepared = true
@@ -1184,45 +1098,6 @@ struct OnboardingView: View {
         onPrimaryHumanSaved?(human)
     }
 
-    private func skipProfileSetup() {
-        guard !isReplay, !isSkippingProfile else { return }
-        isSkippingProfile = true
-        skipProfileError = ""
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-
-        var draft = MemberCreationDraft(kind: .human)
-        draft.name = skippedProfileName()
-        do {
-            let result = try appServices.memberCreation.save(
-                draft: draft,
-                existingPets: [],
-                existingHumans: [],
-                context: modelContext,
-                countryCode: appCountry
-            )
-            guard let human = result.human else {
-                throw MemberCreationError.saveFailed("Skipped profile did not create a human.")
-            }
-            recordOnboardingHumanSaved(human)
-            finishOnboarding(playsFeedback: false)
-        } catch {
-            isSkippingProfile = false
-            skipProfileError = localized(
-                zh: "暂时无法跳过，请先建立本人档案。",
-                en: "Skip is unavailable right now. Create a profile first.",
-                de: "Überspringen ist gerade nicht verfügbar. Erstelle zuerst ein Profil."
-            )
-            OhanaLog.warning(
-                "Onboarding skip profile failed: \(error.localizedDescription)",
-                category: "Onboarding"
-            )
-        }
-    }
-
-    private func skippedProfileName() -> String {
-        localized(zh: "我", en: "Me", de: "Ich")
-    }
-
     private func recoverInterruptedOnboardingIfNeeded() {
         guard !isReplay, !hasOnboarded else { return }
         if !currentActiveHumanId.isEmpty {
@@ -1269,7 +1144,6 @@ struct OnboardingView: View {
 private struct OnboardingPreferenceToggleRow: View {
     let icon: String
     let title: String
-    let subtitle: String
     let tint: Color
     @Binding var isOn: Bool
 
@@ -1286,10 +1160,6 @@ private struct OnboardingPreferenceToggleRow: View {
                 Text(title)
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(OnboardingPalette.primaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(subtitle)
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(OnboardingPalette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -1309,7 +1179,6 @@ private struct OnboardingPreferenceToggleRow: View {
 
 private struct OnboardingNotificationOffRow: View {
     let title: String
-    let subtitle: String
     @Binding var isOn: Bool
 
     var body: some View {
@@ -1326,10 +1195,6 @@ private struct OnboardingNotificationOffRow: View {
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(OnboardingPalette.primaryText)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(subtitle)
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(OnboardingPalette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 8)
@@ -1343,7 +1208,6 @@ private struct OnboardingNotificationOffRow: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
-        .accessibilityHint(subtitle)
         .accessibilityIdentifier("onboarding-notification-off-row")
     }
 }

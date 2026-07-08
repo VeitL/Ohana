@@ -38,12 +38,29 @@ nonisolated enum ExpandedQuickActionStore {
         let stored = decode(raw).filter { $0.petId == pet.id && $0.entityKind != .human }
         let items = (stored.isEmpty ? defaultItems : stored)
             .filter { $0.actionType != "litterChange" }
-        return WaterQuickActionPolicy.normalizedItems(
-            items,
-            for: pet,
-            waterLabel: waterLabel,
-            managementLabel: managementLabel
+        return petItemsWithRequiredAllFeatures(
+            WaterQuickActionPolicy.normalizedItems(
+                items,
+                for: pet,
+                waterLabel: waterLabel,
+                managementLabel: managementLabel
+            ),
+            defaultItems: defaultItems
         )
+    }
+
+    private static func petItemsWithRequiredAllFeatures(
+        _ items: [QuickActionItem],
+        defaultItems: [QuickActionItem]
+    ) -> [QuickActionItem] {
+        guard !items.contains(where: { $0.actionType == "allFeatures" }),
+              let allFeatures = defaultItems.first(where: { $0.actionType == "allFeatures" })
+        else {
+            return items
+        }
+        var merged = items
+        merged.insert(allFeatures, at: min(3, merged.count))
+        return merged
     }
 
     static func humanItems(raw: String, human: Human, localization l: L10n) -> [QuickActionItem] {

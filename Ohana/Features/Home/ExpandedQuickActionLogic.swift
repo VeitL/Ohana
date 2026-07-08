@@ -15,6 +15,7 @@ nonisolated enum ExpandedPetQuickTapRoute {
     case expense
     case moment
     case health
+    case allFeatures
     case none
 }
 
@@ -30,6 +31,7 @@ nonisolated enum ExpandedPetQuickLongPressRoute {
     case weightDetail
     case expenseDetail
     case momentHistory
+    case allFeatures
     case none
 }
 
@@ -758,6 +760,8 @@ enum ExpandedQuickActionLogic {
             .moment
         case "health":
             .health
+        case "allFeatures":
+            .allFeatures
         default:
             .none
         }
@@ -776,6 +780,7 @@ enum ExpandedQuickActionLogic {
         case "weight": .weightDetail
         case "expense": .expenseDetail
         case "moment": .momentHistory
+        case "allFeatures": .allFeatures
         default: .none
         }
     }

@@ -412,7 +412,7 @@ private struct SettingsPlantReminderPanelContent: View {
                             en: "Double tap to toggle calendar reminders for this plant",
                             de: "Doppeltippen, um Kalendererinnerungen für diese Pflanze umzuschalten"
                         ))
-                        .accessibilityIdentifier("settings-plant-reminders-plant-toggle-\(plant.name)")
+                        .accessibilityIdentifier("settings-plant-reminders-plant-toggle-\(plantReminderIdentifierSlug(for: plant))")
                     }
                     .frame(minHeight: 46)
                     .padding(.leading, 44)
@@ -634,6 +634,32 @@ private struct SettingsPlantReminderPanelContent: View {
         plantRemindersEnabled(for: plant)
             ? l.tr(zh: "开启", en: "On", de: "Ein")
             : l.tr(zh: "关闭", en: "Off", de: "Aus")
+    }
+
+    private func plantReminderIdentifierSlug(for plant: Plant) -> String {
+        let source = plant.name.isEmpty ? plant.id.uuidString : plant.name
+        let folded = source.folding(
+            options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+            locale: .current
+        ).lowercased()
+        var slug = ""
+        var didAppendSeparator = false
+
+        for scalar in folded.unicodeScalars {
+            let value = scalar.value
+            if (48 ... 57).contains(value) || (97 ... 122).contains(value) {
+                slug.unicodeScalars.append(scalar)
+                didAppendSeparator = false
+            } else if !slug.isEmpty, !didAppendSeparator {
+                slug.append("-")
+                didAppendSeparator = true
+            }
+        }
+
+        while slug.last == "-" {
+            slug.removeLast()
+        }
+        return slug.isEmpty ? plant.id.uuidString.lowercased() : slug
     }
 
     private func plantReminderToggleIndicator(isOn: Bool) -> some View {

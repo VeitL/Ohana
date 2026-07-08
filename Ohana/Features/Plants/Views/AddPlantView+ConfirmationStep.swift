@@ -75,7 +75,9 @@ extension AddPlantView {
                     .tint(Color.goPrimary)
             }
         }
-        .accessibilityIdentifier("add-plant-step-confirm")
+        .overlay(alignment: .topLeading) {
+            PlantCreationAccessibilityMarker(identifier: "add-plant-step-confirm")
+        }
     }
 
     var plantPlacementSummary: String {

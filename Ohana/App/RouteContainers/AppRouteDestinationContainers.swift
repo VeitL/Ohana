@@ -67,6 +67,7 @@ struct AppRoutePresentationHost: ViewModifier {
                     )
                 }
                 .ohanaLocalizedEnvironment(routeLanguageCode)
+                .globalCoconutRewardFeedbackOverlay()
             }
             .sheet(item: $coordinator.sheet, onDismiss: handleSheetDismissed) { route in
                 AppDeferredRouteContent(
@@ -85,6 +86,7 @@ struct AppRoutePresentationHost: ViewModifier {
                 }
                 .ohanaLocalizedEnvironment(routeLanguageCode)
                 .appRouteSheetPresentation(for: route)
+                .globalCoconutRewardFeedbackOverlay()
                 .onAppear {
                     lastSheetRoute = route
                 }
@@ -109,6 +111,7 @@ struct AppRoutePresentationHost: ViewModifier {
                     }
                     .ohanaLocalizedEnvironment(routeLanguageCode)
                     .ignoresSafeArea()
+                    .globalCoconutRewardFeedbackOverlay()
                     .zIndex(140)
                 }
             }

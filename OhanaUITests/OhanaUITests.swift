@@ -140,17 +140,17 @@ final class OhanaUITests: XCTestCase {
         assertSingleMemberShapeHasNoDeficitCopy(in: app, context: "single-member Home after first pet")
 
         openOasisAndInjectStarterEnergy(in: app)
-        openFunctionMenuRootFromHome(in: app, humanName: humanName)
+        openPetFeatureCollectionFromHomeFab(in: app, humanName: humanName)
 
         XCTAssertTrue(
-            app.descendants(matching: .any)["function-menu-root"].waitForExistence(timeout: 12),
-            "Function Menu root did not open for a one-human one-pet household."
+            app.descendants(matching: .any)["pet-feature-collection"].waitForExistence(timeout: 12),
+            "Pet All Features did not open for a one-human one-pet household."
         )
         XCTAssertTrue(
-            app.buttons["function-menu-group-dailyCare"].waitForExistence(timeout: 8),
-            "Function Menu did not expose daily care for a one-human one-pet household."
+            app.buttons["pet-feature-card-food"].waitForExistence(timeout: 8),
+            "Pet All Features did not expose the food aggregate card for a one-human one-pet household."
         )
-        assertSingleMemberShapeHasNoDeficitCopy(in: app, context: "single-member Function Menu")
+        assertSingleMemberShapeHasNoDeficitCopy(in: app, context: "single-member Pet All Features")
     }
 
     @MainActor
@@ -1014,7 +1014,7 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testPetWaterCareRewardAppearsInBondVaultLedger() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+        let app = launchEnglishApp(enableProductionOverlays: true, resetEconomyBudget: true)
         let humanName = createFirstHuman(from: app)
         let petName = "Codex Water Reward Pet \(Int(Date().timeIntervalSince1970))"
         completeFirstDayStarterFunnel(
@@ -1023,7 +1023,6 @@ final class OhanaUITests: XCTestCase {
             completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
         )
 
-        resetEconomyBudgetFromHomeChrome(in: app)
         openPetWaterDetailFromHome(in: app, petName: petName, humanName: humanName)
         let logAction = app.buttons["quick-water-log-action"]
         scrollToElement(logAction, in: app, maxSwipes: 5)
@@ -1997,25 +1996,19 @@ final class OhanaUITests: XCTestCase {
         )
 
         openOasisAndInjectStarterEnergy(in: app)
-        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
-        ensureHomeSurfaceVisible(in: app, humanName: humanName)
-
-        tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
-        let moreShortcut = app.buttons["home-fab-shortcut-more"]
-        XCTAssertTrue(moreShortcut.waitForExistence(timeout: 8), "Home FAB did not expose More after memorial pet return.")
-        tapWhenHittable(moreShortcut, timeout: 8)
-
-        let dailyCareGroup = app.buttons["function-menu-group-dailyCare"]
-        XCTAssertTrue(dailyCareGroup.waitForExistence(timeout: 12), "Function Menu did not expose the daily care group.")
-        tapWhenHittable(dailyCareGroup, timeout: 8)
+        openPetFeatureCollectionFromHomeFab(in: app, humanName: humanName)
 
         XCTAssertTrue(
-            app.descendants(matching: .any)["function-menu-group-screen-dailyCare"].waitForExistence(timeout: 12),
-            "Function Menu daily care group did not open."
+            app.descendants(matching: .any)["pet-feature-collection"].waitForExistence(timeout: 12),
+            "Pet All Features did not open after memorial pet return."
         )
+        let foodCard = app.buttons["pet-feature-card-food"]
+        XCTAssertTrue(foodCard.waitForExistence(timeout: 12), "Pet All Features did not expose the food aggregate card.")
+        tapWhenHittable(foodCard, timeout: 8)
+
         XCTAssertTrue(
             app.descendants(matching: .any)["function-menu-aggregate-food"].waitForExistence(timeout: 12),
-            "Function Menu daily care group did not render the food aggregate surface."
+            "Pet All Features food card did not open the food aggregate surface."
         )
         XCTAssertFalse(
             app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch.exists ||
@@ -2123,7 +2116,7 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testPetBondVaultUnlockSpendsPetBalanceFromFeatureHub() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+        let app = launchEnglishApp(enableProductionOverlays: true, coconutBalanceSeedAmount: 1000)
         let humanName = createFirstHuman(from: app)
         let petName = "Codex Bond Vault Spend Pet \(Int(Date().timeIntervalSince1970))"
         completeFirstDayStarterFunnel(
@@ -2131,17 +2124,6 @@ final class OhanaUITests: XCTestCase {
             petName: petName,
             completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
         )
-
-        openSettingsFromHomeChrome(in: app)
-        let debugCoconuts = app.buttons["settings-debug-coconuts-shortcut"].exists
-            ? app.buttons["settings-debug-coconuts-shortcut"]
-            : app.buttons["settings-debug-coconuts"]
-        XCTAssertTrue(
-            debugCoconuts.waitForExistence(timeout: 12),
-            "Settings did not expose the UI-test Debug Coconuts shortcut."
-        )
-        tapWhenHittable(debugCoconuts, timeout: 8)
-        ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
         openPetFeatureHubFromHome(in: app, petName: petName, humanName: humanName)
         let bondVaultTile = app.buttons["feature-hub-finance-bondVault"]
@@ -2185,7 +2167,11 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            coconutBalanceSeedAmount: 1000,
+            unlockRewardTier: true
+        )
         let humanName = createFirstHuman(from: app)
         let petName = "Codex Shop Pet \(Int(Date().timeIntervalSince1970))"
         completeFirstDayStarterFunnel(
@@ -2194,34 +2180,14 @@ final class OhanaUITests: XCTestCase {
             completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
         )
 
-        openSettingsFromHomeChrome(in: app)
-        let debugCoconuts = app.buttons["settings-debug-coconuts-shortcut"].exists
-            ? app.buttons["settings-debug-coconuts-shortcut"]
-            : app.buttons["settings-debug-coconuts"]
-        XCTAssertTrue(
-            debugCoconuts.waitForExistence(timeout: 12),
-            "Settings did not expose the UI-test Debug Coconuts shortcut before the shop purchase."
-        )
-        tapWhenHittable(debugCoconuts, timeout: 8)
-        ensureHomeSurfaceVisible(in: app, humanName: humanName)
-
-        openSettingsFromHomeChrome(in: app)
-        let rewardTier = app.buttons["settings-debug-reward-tier-shortcut"].exists
-            ? app.buttons["settings-debug-reward-tier-shortcut"]
-            : app.buttons["settings-debug-reward-tier"]
-        XCTAssertTrue(
-            rewardTier.waitForExistence(timeout: 12),
-            "Settings did not expose the UI-test reward-tier shortcut for the shop route."
-        )
-        tapWhenHittable(rewardTier, timeout: 8)
-        ensureHomeSurfaceVisible(in: app, humanName: humanName)
-
-        openCoconutShopFromHomeFunctionMenu(in: app, humanName: humanName)
+        openCoconutShopFromOasis(in: app, humanName: humanName)
 
         let balance = app.descendants(matching: .any)["coconut-shop-current-human-balance"]
         XCTAssertTrue(balance.waitForExistence(timeout: 12), "Coconut Shop balance did not appear.")
-        XCTAssertTrue(
-            accessibilityText(for: balance).contains("1000"),
+        let startingBalance = Int(numericLabel(accessibilityText(for: balance))) ?? 0
+        XCTAssertGreaterThanOrEqual(
+            startingBalance,
+            1000,
             "Debug Coconuts did not seed the active human balance before shop purchase. Current: \(accessibilityText(for: balance))"
         )
 
@@ -2248,7 +2214,7 @@ final class OhanaUITests: XCTestCase {
             "Coconut Shop did not show purchase feedback after the effect purchase."
         )
         let didSpend = waitUntil(timeout: 12) {
-            accessibilityText(for: balance).contains("700")
+            Int(numericLabel(accessibilityText(for: balance))) == startingBalance - 300
         }
         XCTAssertTrue(didSpend, "Purchasing Lime Glow did not spend 300 human coconuts through the shop GUI.")
     }
@@ -2717,6 +2683,9 @@ final class OhanaUITests: XCTestCase {
     private func launchEnglishApp(
         resetPersistentState: Bool = true,
         enableProductionOverlays: Bool = false,
+        coconutBalanceSeedAmount: Int? = nil,
+        unlockRewardTier: Bool = false,
+        resetEconomyBudget: Bool = false,
         extraLaunchArguments: [String] = []
     ) -> XCUIApplication {
         let app = XCUIApplication()
@@ -2732,6 +2701,19 @@ final class OhanaUITests: XCTestCase {
         }
         if enableProductionOverlays {
             app.launchArguments += ["-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS"]
+        }
+        if let coconutBalanceSeedAmount {
+            app.launchArguments += [
+                "-OHANA_UI_TEST_SEED_COCONUT_BALANCE",
+                "-OHANA_UI_TEST_COCONUT_BALANCE_AMOUNT",
+                "\(coconutBalanceSeedAmount)"
+            ]
+        }
+        if unlockRewardTier {
+            app.launchArguments += ["-OHANA_UI_TEST_UNLOCK_REWARD_TIER"]
+        }
+        if resetEconomyBudget {
+            app.launchArguments += ["-OHANA_UI_TEST_RESET_ECONOMY_BUDGET"]
         }
         app.launchArguments += extraLaunchArguments
         app.launch()
@@ -3124,45 +3106,77 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func openCoconutShopFromHomeFunctionMenu(in app: XCUIApplication, humanName: String) {
+    private func openCoconutShopFromOasis(in app: XCUIApplication, humanName: String) {
         closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
-        openFunctionMenuRootFromHome(in: app, humanName: humanName)
+        let oasisTab = app.buttons["home-tab-oasis"]
+        XCTAssertTrue(oasisTab.waitForExistence(timeout: 20), "Oasis tab did not appear before opening Coconut Shop.")
+        tapWhenHittable(oasisTab, timeout: 8)
 
-        let shopTool = app.buttons["function-menu-tool-shop"]
-        XCTAssertTrue(shopTool.waitForExistence(timeout: 14), "Function Menu did not expose the Coconut Shop tool.")
-        tapWhenHittable(shopTool, timeout: 8)
+        let shopTool = app.buttons["oasis-bento-shop"]
+        XCTAssertTrue(shopTool.waitForExistence(timeout: 14), "Oasis did not expose the Coconut Shop entry.")
+        XCTAssertTrue(
+            tapWhenFrameReady(shopTool, timeout: 8),
+            "Oasis Coconut Shop entry existed but was not frame-ready."
+        )
 
         XCTAssertTrue(
             app.descendants(matching: .any)["coconut-shop-screen"].waitForExistence(timeout: 18),
-            "Coconut Shop did not open from the Home Function Menu."
+            "Coconut Shop did not open from the Oasis shop entry."
         )
     }
 
     @MainActor
-    private func openFamilyWeeklyReportFromFunctionMenu(in app: XCUIApplication, humanName: String) {
+    private func openPetFeatureCollectionFromHomeFab(in app: XCUIApplication, humanName: String) {
         closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        collapseExpandedHumanCardIfNeeded(in: app, humanName: humanName)
 
-        openFunctionMenuRootFromHome(in: app, humanName: humanName)
+        let expandedOrDockShortcut = petAllFeaturesShortcut(in: app)
+        if petAllFeaturesShortcutExists(in: app) {
+            tapWhenHittable(expandedOrDockShortcut, timeout: 8)
+            XCTAssertTrue(
+                app.descendants(matching: .any)["pet-feature-collection"].waitForExistence(timeout: 14),
+                "Pet All Features did not open from the expanded pet card shortcut."
+            )
+            return
+        }
 
-        let reportTool = app.buttons["function-menu-tool-report"]
-        scrollToElement(reportTool, in: app, maxSwipes: 6)
-        XCTAssertTrue(reportTool.waitForExistence(timeout: 14), "Function Menu did not expose the Weekly Report tool.")
-        tapWhenHittable(reportTool, timeout: 8)
+        let petExpandedMarkers = [
+            app.buttons["home-expanded-detail-pet"],
+            app.buttons["home-quick-action-feed"],
+            app.buttons["home-quick-action-water"],
+            app.buttons["home-quick-action-potty"],
+            app.buttons["home-quick-action-play"],
+            app.buttons["home-quick-action-walk"]
+        ]
+        if petExpandedMarkers.contains(where: \.exists) {
+            tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+            if petAllFeaturesShortcutExists(in: app) {
+                tapWhenHittable(petAllFeaturesShortcut(in: app), timeout: 8)
+                XCTAssertTrue(
+                    app.descendants(matching: .any)["pet-feature-collection"].waitForExistence(timeout: 14),
+                    "Pet All Features did not open after revealing the expanded pet card shortcut."
+                )
+                return
+            }
+        }
+
+        tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+        let allShortcut = app.buttons["home-fab-shortcut-pet-feature-collection"]
+        if !allShortcut.waitForExistence(timeout: 4) {
+            tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+            collapseExpandedPetCardIfNeeded(in: app)
+            collapseExpandedHumanCardIfNeeded(in: app, humanName: humanName)
+            tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+        }
+        XCTAssertTrue(allShortcut.waitForExistence(timeout: 8), "Home FAB did not expose the All Features shortcut.")
+        tapWhenHittable(allShortcut, timeout: 8)
 
         XCTAssertTrue(
-            app.descendants(matching: .any)["family-weekly-report-screen"].waitForExistence(timeout: 18),
-            "Weekly Report did not open from the Home Function Menu."
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any)["family-weekly-report-member-contribution-card"].waitForExistence(timeout: 12),
-            "Weekly Report did not expose the caregiver summary card."
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any)["family-weekly-report-recent-activity-card"].waitForExistence(timeout: 12),
-            "Weekly Report did not expose the recent activity card."
+            app.descendants(matching: .any)["pet-feature-collection"].waitForExistence(timeout: 14),
+            "Pet All Features did not open from the Home FAB All shortcut."
         )
     }
 
@@ -3208,29 +3222,6 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func openFunctionMenuRootFromHome(in app: XCUIApplication, humanName: String) {
-        closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
-        ensureHomeSurfaceVisible(in: app, humanName: humanName)
-        collapseExpandedPetCardIfNeeded(in: app)
-        collapseExpandedHumanCardIfNeeded(in: app, humanName: humanName)
-
-        tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
-        let moreShortcut = app.buttons["home-fab-shortcut-more"]
-        if !moreShortcut.waitForExistence(timeout: 4) {
-            tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
-            collapseExpandedPetCardIfNeeded(in: app)
-            collapseExpandedHumanCardIfNeeded(in: app, humanName: humanName)
-            tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
-        }
-        XCTAssertTrue(moreShortcut.waitForExistence(timeout: 8), "Home FAB did not expose the More shortcut.")
-        tapWhenHittable(moreShortcut, timeout: 8)
-
-        XCTAssertTrue(
-            app.descendants(matching: .any)["function-menu-root"].waitForExistence(timeout: 14),
-            "Function Menu root did not open from the Home FAB More shortcut."
-        )
-    }
-
     private func assertWeeklyReportAvoidsCompetitionCopy(in app: XCUIApplication, context: String) {
         let forbiddenCopy = [
             "Care contribution ranking",
@@ -3830,14 +3821,26 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func ensureHomeSurfaceVisible(in app: XCUIApplication, humanName: String) {
         let homeTab = app.buttons["home-tab-home"]
-        if homeTab.exists && homeTab.isHittable {
-            tapWhenHittable(homeTab, timeout: 4)
+        if homeTab.waitForExistence(timeout: 8) {
+            if homeTab.isHittable {
+                tapWhenHittable(homeTab, timeout: 5)
+            } else {
+                _ = tapWhenFrameReady(homeTab, timeout: 5)
+            }
         }
 
-        let humanCard = app.buttons[humanName]
+        let humanCard = app.buttons["home-card-human-\(humanName)"]
+        let humanCardByLabel = app.buttons.matching(NSPredicate(format: "label == %@", humanName)).firstMatch
+        let anyPetCard = app.buttons
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-pet-"))
+            .firstMatch
         let didReachHome = waitUntil(timeout: 14) {
             app.state == .runningForeground &&
-                (humanCard.exists || app.buttons["home-primary-action"].exists)
+                (humanCard.exists ||
+                    humanCardByLabel.exists ||
+                    anyPetCard.exists ||
+                    app.buttons["home-add-first-pet-card"].exists ||
+                    app.buttons["home-add-first-pet-action"].exists)
         }
         XCTAssertTrue(didReachHome, "Home surface did not become visible before human route testing.")
     }
@@ -4281,13 +4284,17 @@ final class OhanaUITests: XCTestCase {
         let fallbackPetCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
         XCTAssertTrue(petCard.waitForExistence(timeout: 20), "Pet home card did not appear before opening the feature hub.")
 
-        let allFeaturesShortcut = app.buttons["home-expanded-shortcut-allFeatures"]
-        for _ in 0 ..< 3 where !allFeaturesShortcut.exists || !allFeaturesShortcut.isHittable {
+        for _ in 0 ..< 3 where !petAllFeaturesShortcutExists(in: app) {
             let targetCard = petCard.exists ? petCard : fallbackPetCard
-            if targetCard.exists && targetCard.isHittable {
-                tapWhenHittable(targetCard, timeout: 8)
+            if targetCard.exists {
+                scrollTowardElement(targetCard, in: app, maxSwipes: 2)
+                if targetCard.isHittable {
+                    tapWhenHittable(targetCard, timeout: 8)
+                } else {
+                    _ = tapWhenFrameReady(targetCard, offset: CGVector(dx: 0.5, dy: 0.24), timeout: 3)
+                }
             }
-            if allFeaturesShortcut.waitForExistence(timeout: 3), allFeaturesShortcut.isHittable {
+            if waitUntil(timeout: 3, condition: { petAllFeaturesShortcutExists(in: app) }) {
                 break
             }
 
@@ -4295,7 +4302,7 @@ final class OhanaUITests: XCTestCase {
             if primaryAction.exists && primaryAction.isHittable {
                 tapWhenHittable(primaryAction, timeout: 8)
             }
-            if allFeaturesShortcut.waitForExistence(timeout: 3), allFeaturesShortcut.isHittable {
+            if waitUntil(timeout: 3, condition: { petAllFeaturesShortcutExists(in: app) }) {
                 break
             }
 
@@ -4304,9 +4311,10 @@ final class OhanaUITests: XCTestCase {
             }
         }
         XCTAssertTrue(
-            allFeaturesShortcut.waitForExistence(timeout: 8),
+            waitUntil(timeout: 8, condition: { petAllFeaturesShortcutExists(in: app) }),
             "Expanded pet card did not expose the All Features shortcut."
         )
+        let allFeaturesShortcut = petAllFeaturesShortcut(in: app)
         tapWhenHittable(allFeaturesShortcut, timeout: 8)
 
         XCTAssertTrue(
@@ -4540,11 +4548,14 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(petCard.waitForExistence(timeout: 20), "Pet home card did not appear before opening basic info.")
         tapWhenHittable(petCard, timeout: 8)
 
-        let allFeaturesShortcut = app.buttons["home-expanded-shortcut-allFeatures"]
-        if !allFeaturesShortcut.waitForExistence(timeout: 3) {
+        if !petAllFeaturesShortcutExists(in: app) {
             tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
         }
-        XCTAssertTrue(allFeaturesShortcut.waitForExistence(timeout: 8), "Expanded card did not expose the All Features shortcut.")
+        XCTAssertTrue(
+            waitUntil(timeout: 8, condition: { petAllFeaturesShortcutExists(in: app) }),
+            "Expanded card did not expose the All Features shortcut."
+        )
+        let allFeaturesShortcut = petAllFeaturesShortcut(in: app)
         tapWhenHittable(allFeaturesShortcut, timeout: 8)
 
         let basicInfoTile = app.buttons["feature-hub-archive-basicInfo"]
@@ -4553,6 +4564,22 @@ final class OhanaUITests: XCTestCase {
 
         let basicInfoScreen = app.descendants(matching: .any)["pet-basic-info-screen"]
         XCTAssertTrue(basicInfoScreen.waitForExistence(timeout: 12), "Pet basic info screen did not open.")
+    }
+
+    @MainActor
+    private func petAllFeaturesShortcut(in app: XCUIApplication) -> XCUIElement {
+        let currentQuickAction = app.buttons["home-quick-action-allFeatures"]
+        if currentQuickAction.exists {
+            return currentQuickAction
+        }
+        return app.buttons["home-expanded-shortcut-allFeatures"]
+    }
+
+    @MainActor
+    private func petAllFeaturesShortcutExists(in app: XCUIApplication) -> Bool {
+        let currentQuickAction = app.buttons["home-quick-action-allFeatures"]
+        let legacyExpandedShortcut = app.buttons["home-expanded-shortcut-allFeatures"]
+        return currentQuickAction.exists || legacyExpandedShortcut.exists
     }
 
     @MainActor

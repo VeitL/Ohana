@@ -10,7 +10,11 @@ import SwiftUI
 
 enum SettingsDebugTools {
     static var isRunningUITests: Bool {
-        ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TESTS")
+        #if DEBUG
+            OhanaUITestLaunchOptions.isRunningUITests
+        #else
+            ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TESTS")
+        #endif
     }
 
     static var opensCoconutBalanceSheetInUITests: Bool {
@@ -18,13 +22,11 @@ enum SettingsDebugTools {
     }
 
     static var plantBaselineSeedCount: Int {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let flagIndex = arguments.firstIndex(of: "-OHANA_UI_TEST_PLANT_BASELINE_COUNT"),
-              arguments.indices.contains(arguments.index(after: flagIndex)),
-              let count = Int(arguments[arguments.index(after: flagIndex)]) else {
-            return 1
-        }
-            return min(max(count, 1), 12)
+        #if DEBUG
+            OhanaUITestLaunchOptions.plantBaselineSeedCount(defaultCount: 1)
+        #else
+            1
+        #endif
     }
 
     static var isVisible: Bool {
@@ -157,46 +159,12 @@ extension SettingsView {
 
     func applyUITestPlantBaselineShortcut() {
         #if DEBUG
-            let timestamp = Int(Date().timeIntervalSince1970)
-            let seedCount = SettingsDebugTools.plantBaselineSeedCount
-            var createdPlantIDs: [UUID] = []
-            for index in 0 ..< seedCount {
-                let plant = Plant(
-                    name: seedCount == 1 ? "Codex Pothos \(timestamp)" : "Codex Pothos \(timestamp)-\(index + 1)",
-                    species: "Epipremnum aureum",
-                    location: index.isMultiple(of: 2) ? "South window" : "Balcony shelf",
-                    avatarEmoji: "🪴",
-                    wateringIntervalDays: 7,
-                    fertilizingIntervalDays: 30,
-                    roomNameRaw: index.isMultiple(of: 2) ? "Living room" : "Balcony",
-                    potDiameterCm: 12,
-                    potMaterialRaw: "Ceramic",
-                    soilTypeRaw: "Well-draining potting mix",
-                    isIndoor: true,
-                    windowDirection: .south,
-                    lightLevel: .brightIndirect,
-                    currentHeightCm: 18,
-                    currentSpreadCm: 22,
-                    catalogSpeciesId: "epipremnum-aureum",
-                    remindersEnabled: true
-                )
-                plant.notes = "Seeded by UI tests"
-                modelContext.insert(plant)
-                createdPlantIDs.append(plant.id)
-            }
-            let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
-            guard saveResult.didSave else {
-                modelContext.rollback()
-                return
-            }
-            PlantUnlockPolicy.noteExistingPlantData()
-            for plantID in createdPlantIDs {
-                appServices.domainRevisions.publishMemberCreation(
-                    entityID: plantID,
-                    kind: EntityKind.plant.rawValue,
-                    note: "settings.plant.uiTestShortcut"
-                )
-            }
+            UITestPlantBaselineSeeder.seed(
+                modelContext: modelContext,
+                services: appServices,
+                desiredCount: SettingsDebugTools.plantBaselineSeedCount,
+                revisionNote: "settings.plant.uiTestShortcut"
+            )
         #endif
     }
 

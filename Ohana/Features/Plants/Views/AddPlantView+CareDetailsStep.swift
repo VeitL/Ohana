@@ -169,7 +169,9 @@ extension AddPlantView {
                 .foregroundStyle(Color.ohanaPrimaryText)
             }
         }
-        .accessibilityIdentifier("add-plant-step-care-details")
+        .overlay(alignment: .topLeading) {
+            PlantCreationAccessibilityMarker(identifier: "add-plant-step-care-details")
+        }
     }
 
     var plantMiniHeader: some View {

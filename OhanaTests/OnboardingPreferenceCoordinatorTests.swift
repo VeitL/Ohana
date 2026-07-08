@@ -31,18 +31,18 @@ struct OnboardingPreferenceCoordinatorTests {
         #expect(defaults.string(forKey: AppCountry.storageKey) == nil)
     }
 
-    @Test func deniedLocationRequiresCountryAndCityBeforeContinuing() {
+    @Test func deniedLocationKeepsManualFallbackButDoesNotBlockProfileCreation() {
         let defaults = makeDefaults()
         let coordinator = OnboardingPreferenceCoordinator(defaults: defaults)
 
         coordinator.syncLocationAuthorizationStatus(.denied)
 
         #expect(coordinator.showsManualLocationFields)
-        #expect(!coordinator.canContinueFromPreferencePage)
+        #expect(coordinator.canContinueFromPreferencePage)
 
         coordinator.selectCountry("中国")
 
-        #expect(!coordinator.canContinueFromPreferencePage)
+        #expect(coordinator.canContinueFromPreferencePage)
 
         coordinator.selectCity("上海")
 
@@ -189,32 +189,54 @@ struct OnboardingPreferenceCoordinatorTests {
         #expect(coordinator.notificationIntent)
     }
 
-    @Test func onboardingSourceRemovesOldPlantPreferenceControlsAndKeepsSkipFallback() throws {
+    @Test func onboardingSourceStaysMinimalAndRequiresHumanProfileCreation() throws {
         let source = try projectSource("Ohana/Features/Onboarding/Views/OnboardingView.swift")
 
         #expect(!source.contains("植物经验"))
         #expect(!source.contains("主要场景"))
         #expect(!source.contains("Detect location"))
         #expect(!source.contains("Plants at home"))
+        #expect(!source.contains("Care setup"))
+        #expect(!source.contains("照护设置"))
+        #expect(!source.contains("Location, reminders, home safety."))
+        #expect(!source.contains("For local weather risk."))
+        #expect(!source.contains("For care reminders."))
+        #expect(!source.contains("For ingestion and placement risk."))
+        #expect(!source.contains("Flags pet ingestion risk."))
+        #expect(!source.contains("Flags child safety risk."))
         #expect(source.contains("Allow location"))
         #expect(source.contains("Allow notifications"))
         #expect(source.contains("onboarding-notification-off-row"))
         #expect(!source.contains("Skip identity"))
-        #expect(source.contains("暂时跳过"))
-        #expect(source.contains("Skip for now"))
-        #expect(source.contains("MemberCreationDraft(kind: .human)"))
-        #expect(source.contains("draft.name = skippedProfileName()"))
+        #expect(!source.contains("暂时跳过"))
+        #expect(!source.contains("Skip for now"))
+        #expect(!source.contains("skipProfileSetup"))
+        #expect(!source.contains("MemberCreationDraft(kind: .human)"))
+        #expect(source.contains("startProfileSetup()"))
     }
 
     @Test func humanCreationUsesSharedInputAndOnboardingBackdrop() throws {
         let controls = try projectSource("Ohana/Features/Members/Views/MemberCardCreationContentView+Controls.swift")
         let steps = try projectSource("Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift")
         let shell = try projectSource("Ohana/Features/Members/Views/MemberCardCreationView.swift")
+        let layout = try projectSource("Ohana/Features/Members/Views/MemberCardCreationContentView+Layout.swift")
 
         #expect(controls.contains("func humanNameInput"))
         #expect(controls.contains("OhanaTextField("))
         #expect(steps.contains("humanNameInput(width: 148)"))
         #expect(shell.contains("presentationStyle != .onboarding && !usesTransparentHomeJoinHandoffBackdrop"))
+        #expect(layout.contains("presentationStyle != .onboarding"))
+        #expect(layout.contains("MemberCreationJoinHandoffCard(snapshot: joinHandoffSnapshot)"))
+    }
+
+    @Test func onboardingDoesNotAutoPresentFirstPetPromptAfterHumanProfile() throws {
+        let content = try projectSource("Ohana/App/ContentView.swift")
+        let snapshotBuilder = try projectSource("Ohana/Features/Home/VerticalSolidHomeSnapshotBuilder.swift")
+
+        #expect(!content.contains("didAutoPresentFirstPetPrompt"))
+        #expect(!content.contains("appRoutes.presentAddEntity(.pet)"))
+        #expect(!snapshotBuilder.contains("Add your first pet"))
+        #expect(snapshotBuilder.contains("firstPetEmptyState: nil"))
     }
 
     private func makeDefaults() -> UserDefaults {

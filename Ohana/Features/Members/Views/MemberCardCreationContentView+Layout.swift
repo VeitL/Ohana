@@ -22,7 +22,9 @@ extension MemberCardCreationContentView {
                 .allowsHitTesting(true)
             }
 
-            if let joinHandoffSnapshot, isJoinHandoffRunning {
+            if presentationStyle != .onboarding,
+               let joinHandoffSnapshot,
+               isJoinHandoffRunning {
                 MemberCreationJoinHandoffCard(snapshot: joinHandoffSnapshot)
                     .modifier(MemberCreationJoinHandoffModifier(
                         progress: joinHandoffProgress,

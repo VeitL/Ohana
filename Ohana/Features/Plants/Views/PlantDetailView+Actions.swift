@@ -212,7 +212,6 @@ extension PlantDetailContentView {
                 completedDetailQuickCareTypes.insert(type)
             }
             showQuickCareToast(type: type, result: result)
-            publishPlantCareVisualReward(type: type, result: result)
             schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
         }
     }
@@ -233,18 +232,6 @@ extension PlantDetailContentView {
             }
             quickCareToastClearTask = nil
         }
-    }
-
-    func publishPlantCareVisualReward(type: PlantCareType, result: PlantCareCommandResult) {
-        guard result.coconutDelta > 0 else { return }
-        appServices.domainRevisions.publishCoconutRewardFeedback(
-            OhanaCoconutRewardEvent(
-                amount: result.coconutDelta,
-                emoji: "🥥",
-                title: type.displayName(l: l),
-                actorId: currentExecutorId()
-            )
-        )
     }
 
     func recordCare(

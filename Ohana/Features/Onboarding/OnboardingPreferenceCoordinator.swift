@@ -398,14 +398,7 @@ final class OnboardingPreferenceCoordinator {
     }
 
     var canContinueFromPreferencePage: Bool {
-        guard !isResolvingLocation else { return false }
-        if hasResolvedAutomaticLocation {
-            return true
-        }
-        if showsManualLocationFields || locationSource == .manual {
-            return manualLocationIsComplete
-        }
-        return false
+        true
     }
 
     var notificationPreferenceState: OnboardingNotificationPreferenceState {
@@ -633,9 +626,8 @@ final class OnboardingPreferenceCoordinator {
     }
 
     func validateBeforeLeavingPreferencePage() -> Bool {
-        let canContinue = canContinueFromPreferencePage
-        shouldShowLocationValidation = !canContinue
-        return canContinue
+        shouldShowLocationValidation = false
+        return true
     }
 
     private func oneShotLocation(from provider: LocationProviding) async -> Result<CLLocation, Error> {

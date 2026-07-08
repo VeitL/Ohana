@@ -542,16 +542,14 @@ struct HomeSnapshotBuilderTests {
         #expect(card.equippedTitleBadgeText == "🛡️ 守护者")
     }
 
-    @Test func verticalSnapshotShowsFirstPetEmptyStateForHumanOnlyHome() {
+    @Test func verticalSnapshotDoesNotShowFirstPetEmptyStateForHumanOnlyHome() {
         let human = Human(name: "Owner")
 
         let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(humans: [human], activeHumanIdRaw: human.id.uuidString)
         )
 
-        #expect(snapshot.firstPetEmptyState?.title.isEmpty == false)
-        #expect(snapshot.firstPetEmptyState?.subtitle.contains("50") == true)
-        #expect(snapshot.firstPetEmptyState?.primaryActionTitle.isEmpty == false)
+        #expect(snapshot.firstPetEmptyState == nil)
     }
 
     @Test func verticalSnapshotHidesFirstPetEmptyStateWhenPetExists() {
