@@ -3,7 +3,7 @@ import SwiftData
 import SwiftUI
 
 struct HumanQuickSwitchPasscodeSheet: View {
-    let human: Human
+    let human: SettingsHumanSnapshot
     let onVerified: () -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -26,7 +26,7 @@ struct HumanQuickSwitchPasscodeSheet: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
                     header
-                    HumanPasscodePad(pin: $pin, accent: Color(hex: human.themeColor)) {
+                    HumanPasscodePad(pin: $pin, accent: Color(hex: human.themeColorHex)) {
                         verify()
                     }
                     .padding(.top, 8)
@@ -56,9 +56,9 @@ struct HumanQuickSwitchPasscodeSheet: View {
             avatar
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(
-                    zh: "切换到 \(displayName(human))",
-                    en: "Switch to \(displayName(human))",
-                    de: "Zu \(displayName(human)) wechseln"
+                    zh: "切换到 \(displayName)",
+                    en: "Switch to \(displayName)",
+                    de: "Zu \(displayName) wechseln"
                 ))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -116,17 +116,29 @@ struct HumanQuickSwitchPasscodeSheet: View {
     }
 
     private var avatar: some View {
-        HumanAvatarPipelineView(
-            human: human,
-            size: 48,
-            fallbackScale: 0.46,
-            backgroundOpacity: 0.18
-        )
+        ZStack {
+            Circle()
+                .fill(Color(hex: human.themeColorHex).opacity(0.18))
+                .frame(width: 48, height: 48)
+            Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
+                .font(OhanaFont.adaptive(size: 22))
+        }
     }
 
     private func verify() {
+        guard let liveHuman = fetchHumanForVerification() else {
+            pin = ""
+            isError = true
+            message = l.tr(
+                zh: "此成员暂时不可用，请重新打开设置后再试",
+                en: "This member is unavailable. Reopen Settings and try again.",
+                de: "Dieses Mitglied ist nicht verfügbar. Öffne die Einstellungen erneut."
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            return
+        }
         let now = Date()
-        switch HumanPrivacyCommandExecutor(context: modelContext, services: appServices).verifyPasscode(pin, for: human, now: now) {
+        switch HumanPrivacyCommandExecutor(context: modelContext, services: appServices).verifyPasscode(pin, for: liveHuman, now: now) {
         case .success, .noPasscode:
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onVerified()
@@ -187,9 +199,9 @@ struct HumanQuickSwitchPasscodeSheet: View {
         Task { @MainActor in
             let success = await MemberGateBiometricAuthenticator.authenticate(
                 reason: l.tr(
-                    zh: "验证后切换到 \(displayName(human))",
-                    en: "Authenticate to switch to \(displayName(human))",
-                    de: "Authentifizieren, um zu \(displayName(human)) zu wechseln"
+                    zh: "验证后切换到 \(displayName)",
+                    en: "Authenticate to switch to \(displayName)",
+                    de: "Authentifizieren, um zu \(displayName) zu wechseln"
                 )
             )
             isAuthenticatingBiometrics = false
@@ -209,8 +221,27 @@ struct HumanQuickSwitchPasscodeSheet: View {
         }
     }
 
-    private func displayName(_ human: Human) -> String {
+    private var displayName: String {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? l.tr(zh: "成员", en: "Member", de: "Mitglied") : name
+    }
+
+    private func fetchHumanForVerification() -> Human? {
+        let humanID = human.id
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { candidate in
+                candidate.id == humanID
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try modelContext.fetch(descriptor).first // smoothness: allow action-time rehydrate after explicit passcode submit
+        } catch {
+            OhanaLog.warning(
+                "Settings quick switch fetch failed: \(error.localizedDescription)",
+                category: "Settings"
+            )
+            return nil
+        }
     }
 }

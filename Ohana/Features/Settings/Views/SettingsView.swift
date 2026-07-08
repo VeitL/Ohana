@@ -11,10 +11,9 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     var onClose: (() -> Void)?
-    let homeHouseholds: [Household]?
-    let homePets: [Pet]?
-    let homeHumans: [Human]?
-    let homeElectronicPets: [OasisElectronicPet]?
+    let homeHouseholds: [SettingsHouseholdSnapshot]?
+    let homePets: [SettingsPetSnapshot]?
+    let homeHumans: [SettingsHumanSnapshot]?
     let isRouteDataLoaded: Bool
 
     @Environment(\.dismiss) var dismiss
@@ -60,7 +59,7 @@ struct SettingsView: View {
     @State var showingAccountSwitcher = false
     @State var showingBackgroundPicker = false
     @State var showingPetManagement = false
-    @State var quickSwitchHuman: Human? = nil
+    @State var quickSwitchHuman: SettingsHumanSnapshot? = nil
     @State var householdSharePresentation: CloudSyncHouseholdSharePresentation? = nil
     @State var isPreparingHouseholdShare = false
     @State var isBindingCloudIdentity = false
@@ -81,17 +80,15 @@ struct SettingsView: View {
     @State var isLanguageCommitInFlight = false
 
     init(
-        homeHouseholds: [Household]? = nil,
-        homePets: [Pet]? = nil,
-        homeHumans: [Human]? = nil,
-        homeElectronicPets: [OasisElectronicPet]? = nil,
+        homeHouseholds: [SettingsHouseholdSnapshot]? = nil,
+        homePets: [SettingsPetSnapshot]? = nil,
+        homeHumans: [SettingsHumanSnapshot]? = nil,
         isRouteDataLoaded: Bool = true,
         onClose: (() -> Void)? = nil
     ) {
         self.homeHouseholds = homeHouseholds
         self.homePets = homePets
         self.homeHumans = homeHumans
-        self.homeElectronicPets = homeElectronicPets
         self.isRouteDataLoaded = isRouteDataLoaded
         self.onClose = onClose
     }
@@ -212,12 +209,7 @@ struct SettingsView: View {
             }
         }
         .sheet(isPresented: $showingAccountSwitcher) {
-            HumanAccountSwitcherSheet(
-                humans: homeHumans ?? [],
-                homePets: homePets,
-                homeHumans: homeHumans,
-                homeElectronicPets: homeElectronicPets
-            )
+            AppAccountSwitcherRouteContainer(onSwitched: {})
             .ohanaCompactSheetPresentation(detents: [.medium, .large])
         }
         .sheet(isPresented: $showingBackgroundPicker) {

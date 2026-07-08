@@ -103,7 +103,7 @@ extension SettingsView {
     }
 
     // MARK: - Device Identity
-    func deviceIdentitySection(_ humans: [Human]) -> some View {
+    func deviceIdentitySection(_ humans: [SettingsHumanSnapshot]) -> some View {
         settingsSection(title: l.tr(zh: "设备身份", en: "Device Identity", de: "Geräteidentität")) {
             VStack(alignment: .leading, spacing: 12) {
                 Button {
@@ -148,16 +148,16 @@ extension SettingsView {
                                             isSelected: isSelected
                                         )
                                         if HumanLocalPrivacyPolicy.isEnabled,
-                                           appServices.passcodes.hasPasscode(human) {
+                                           human.hasPasscode {
                                             Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
                                                 .font(OhanaFont.adaptive(size: 8, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(Color.arkInk)
                                                 .frame(width: 16, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                                 .background(Color.goYellow, in: Circle())
                                                 .offset(x: 15, y: 15)
-                                        }
+                                            }
                                     }
-                                    Text(human.name.isEmpty ? l.tr(zh: "成员", en: "Member", de: "Mitglied") : human.name)
+                                    Text(human.displayName(fallback: l.tr(zh: "成员", en: "Member", de: "Mitglied")))
                                         .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(isSelected ? Color.goPrimary : tertiaryText)
                                         .lineLimit(1)
@@ -165,20 +165,21 @@ extension SettingsView {
                                 .frame(minWidth: 56, minHeight: 72)
                             }
                             .buttonStyle(ScaleButtonStyle())
-                            .accessibilityIdentifier("settings-human-identity-switch-\(human.name.isEmpty ? "Member" : human.name)")
+                            .accessibilityIdentifier("settings-human-identity-switch-\(human.displayName(fallback: "Member"))")
                         }
                     }
                 }
                 if !currentActiveHumanId.isEmpty,
                    let selected = humans.first(where: { $0.id.uuidString == currentActiveHumanId }) {
+                    let selectedName = selected.displayName(fallback: l.tr(zh: "成员", en: "Member", de: "Mitglied"))
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .foregroundStyle(Color.goPrimary)
                             .font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text(l.tr(
-                            zh: "打卡记录将关联到 \(selected.name)",
-                            en: "Check-ins will be linked to \(selected.name)",
-                            de: "Check-ins werden mit \(selected.name) verknüpft"
+                            zh: "打卡记录将关联到 \(selectedName)",
+                            en: "Check-ins will be linked to \(selectedName)",
+                            de: "Check-ins werden mit \(selectedName) verknüpft"
                         ))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText)
@@ -188,7 +189,7 @@ extension SettingsView {
         }
     }
 
-    func petManagementEntrySection(_ pets: [Pet]) -> some View {
+    func petManagementEntrySection(_ pets: [SettingsPetSnapshot]) -> some View {
         settingsSection(title: l.tr(zh: "宠物管理", en: "Pet Management", de: "Tierverwaltung")) {
             Button {
                 UISelectionFeedbackGenerator().selectionChanged()
@@ -225,35 +226,42 @@ extension SettingsView {
         AppBackgroundStyle(rawValue: appBackgroundStyle) ?? .goIsland
     }
 
-    func quickSwitch(to human: Human) {
+    func quickSwitch(to human: SettingsHumanSnapshot) {
         UISelectionFeedbackGenerator().selectionChanged()
         guard currentActiveHumanId != human.id.uuidString else { return }
         if HumanLocalPrivacyPolicy.isEnabled,
-           appServices.passcodes.hasPasscode(human) {
+           human.hasPasscode {
             quickSwitchHuman = human
         } else {
             switchActiveHuman(to: human)
         }
     }
 
-    func switchActiveHuman(to human: Human, emitSuccessFeedback: Bool = true) {
+    func switchActiveHuman(to human: SettingsHumanSnapshot, emitSuccessFeedback: Bool = true) {
+        guard let liveHuman = fetchSettingsHuman(id: human.id) else {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            return
+        }
         let oldHumanIdRaw = currentActiveHumanId
         guard oldHumanIdRaw != human.id.uuidString else { return }
         currentActiveHumanId = human.id.uuidString
-        syncHomeCardStackAfterAccountSwitch(from: oldHumanIdRaw, to: human)
+        syncHomeCardStackAfterAccountSwitch(from: oldHumanIdRaw, to: liveHuman)
         if emitSuccessFeedback {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
 
     func syncHomeCardStackAfterAccountSwitch(from oldHumanIdRaw: String, to human: Human) {
-        guard let homePets, let homeHumans else { return }
+        let pets = fetchSettingsPets()
+        let humans = fetchSettingsHumans()
+        let electronicPets = fetchSettingsElectronicPets()
+        guard !humans.isEmpty else { return }
         let result = SettingsCommandExecutor(context: modelContext, services: appServices).syncHomeCardStackAfterActiveHumanSwitch(
             from: oldHumanIdRaw,
             to: human,
-            pets: homePets,
-            humans: homeHumans,
-            electronicPets: homeElectronicPets ?? [],
+            pets: pets,
+            humans: humans,
+            electronicPets: electronicPets,
             hiddenPetIDsRaw: hiddenHomePetIDsRaw,
             homeCardOrderRaw: homeCardOrderRaw,
             note: "settings.activeHuman.switch"
@@ -264,6 +272,72 @@ extension SettingsView {
             if result.updatedHomeCardOrderRaw != homeCardOrderRaw {
                 homeCardOrderRaw = result.updatedHomeCardOrderRaw
             }
+        }
+    }
+
+    func fetchSettingsHuman(id: UUID) -> Human? {
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchSettingsModels(descriptor, name: "Settings.Action.Human").first
+    }
+
+    func fetchSettingsPet(id: UUID) -> Pet? {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { pet in
+                pet.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchSettingsModels(descriptor, name: "Settings.Action.Pet").first
+    }
+
+    func fetchSettingsHousehold(id: UUID) -> Household? {
+        var descriptor = FetchDescriptor<Household>(
+            predicate: #Predicate<Household> { household in
+                household.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return fetchSettingsModels(descriptor, name: "Settings.Action.Household").first
+    }
+
+    func fetchSettingsPets() -> [Pet] {
+        fetchSettingsModels(
+            FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
+            name: "Settings.Action.Pets"
+        )
+    }
+
+    func fetchSettingsHumans() -> [Human] {
+        fetchSettingsModels(
+            FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
+            name: "Settings.Action.Humans"
+        )
+    }
+
+    func fetchSettingsElectronicPets() -> [OasisElectronicPet] {
+        fetchSettingsModels(
+            FetchDescriptor<OasisElectronicPet>(),
+            name: "Settings.Action.OasisElectronicPets"
+        )
+    }
+
+    private func fetchSettingsModels<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        name: String
+    ) -> [T] {
+        do {
+            return try modelContext.fetch(descriptor) // smoothness: allow action-time rehydrate after explicit settings command
+        } catch {
+            OhanaLog.warning(
+                "Settings action fetch failed for \(name): \(error.localizedDescription)",
+                category: "Settings"
+            )
+            return []
         }
     }
 }

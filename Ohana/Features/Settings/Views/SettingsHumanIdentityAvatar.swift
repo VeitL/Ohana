@@ -4,12 +4,10 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct SettingsHumanIdentityAvatar: View {
-    let human: Human
+    let human: SettingsHumanSnapshot
     let isSelected: Bool
-    @State var avatarImage: UIImage?
 
     var body: some View {
         ZStack {
@@ -18,40 +16,8 @@ struct SettingsHumanIdentityAvatar: View {
                 .frame(width: 44, height: 44)
                 .overlay(Circle().strokeBorder(isSelected ? Color.goPrimary : Color.clear, lineWidth: 2))
 
-            if let image = avatarImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 44, height: 44)
-                    .clipShape(Circle())
-            } else {
-                Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
-                    .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            }
+            Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
+                .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
-        .task(id: avatarSignature) {
-            await loadAvatarImage()
-        }
-    }
-
-    var avatarSignature: String {
-        human.avatarThumbnailSignature
-    }
-
-    @MainActor
-    func loadAvatarImage() async {
-        guard !avatarSignature.isEmpty else {
-            avatarImage = nil
-            return
-        }
-        if let image = FocusWalletAvatarCache.cachedEntry(for: human.id, signature: avatarSignature)?.image {
-            avatarImage = image
-            return
-        }
-        await FocusWalletAvatarCache.preload(payloads: [
-            FocusWalletAvatarCache.Payload(id: human.id, data: human.hasAvatarImageAttachment ? human.avatarImageData : nil)
-        ])
-        guard !Task.isCancelled else { return }
-        avatarImage = FocusWalletAvatarCache.cachedEntry(for: human.id, signature: avatarSignature)?.image
     }
 }

@@ -49,7 +49,6 @@ struct AppSettingsSheetRouteContainer: View {
                     homeHouseholds: data.households,
                     homePets: data.pets,
                     homeHumans: data.humans,
-                    homeElectronicPets: data.electronicPets,
                     isRouteDataLoaded: data.hasLoaded,
                     onClose: onClose
                 )
@@ -230,34 +229,29 @@ private struct AccountSwitcherRouteData {
 }
 
 private struct SettingsRouteData {
-    var households: [Household]?
-    var pets: [Pet]?
-    var humans: [Human]?
-    var electronicPets: [OasisElectronicPet]?
+    var households: [SettingsHouseholdSnapshot]?
+    var pets: [SettingsPetSnapshot]?
+    var humans: [SettingsHumanSnapshot]?
     var hasLoaded = false
 
+    @MainActor
     static func load(from context: ModelContext) -> SettingsRouteData {
         SettingsRouteData(
             households: SettingsRouteFetch.fetch(
                 FetchDescriptor<Household>(sortBy: [SortDescriptor(\.createdAt)]),
                 context: context,
                 name: "Household"
-            ),
+            ).map(SettingsHouseholdSnapshot.init),
             pets: SettingsRouteFetch.fetch(
                 FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
                 context: context,
                 name: "Pet"
-            ),
+            ).map(SettingsPetSnapshot.init),
             humans: SettingsRouteFetch.fetch(
                 FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
                 context: context,
                 name: "Human"
-            ),
-            electronicPets: SettingsRouteFetch.fetch(
-                FetchDescriptor<OasisElectronicPet>(),
-                context: context,
-                name: "OasisElectronicPet"
-            ),
+            ).map(SettingsHumanSnapshot.init),
             hasLoaded: true
         )
     }

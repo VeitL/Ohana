@@ -79,6 +79,68 @@ struct SettingsRouteContainerTests {
 """))
     }
 
+    @Test func settingsMainRouteUsesValueSnapshotsForMemberData() throws {
+        let settingsSource = try source(
+            "Ohana/Features/Settings/Views/SettingsView.swift",
+            rootURL: repositoryRootURL()
+        )
+        let routeSource = try source(
+            "Ohana/Features/Settings/SettingsRouteContainer.swift",
+            rootURL: repositoryRootURL()
+        )
+        let snapshotSource = try source(
+            "Ohana/Features/Settings/SettingsRouteSnapshots.swift",
+            rootURL: repositoryRootURL()
+        )
+        let dataIdentitySource = try source(
+            "Ohana/Features/Settings/Views/SettingsView+DataIdentity.swift",
+            rootURL: repositoryRootURL()
+        )
+        let avatarSource = try source(
+            "Ohana/Features/Settings/Views/SettingsHumanIdentityAvatar.swift",
+            rootURL: repositoryRootURL()
+        )
+        let petManagementSource = try source(
+            "Ohana/Features/Settings/Views/SettingsPetManagementSheet.swift",
+            rootURL: repositoryRootURL()
+        )
+        let quickSwitchSource = try source(
+            "Ohana/Features/Settings/Views/HumanQuickSwitchPasscodeSheet.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(snapshotSource.contains("struct SettingsHumanSnapshot: Identifiable, Equatable, Sendable"))
+        #expect(snapshotSource.contains("hasPasscode: HumanPasscodeService.hasPasscode(human)"))
+        #expect(snapshotSource.contains("struct SettingsPetSnapshot: Identifiable, Equatable, Sendable"))
+        #expect(snapshotSource.contains("struct SettingsHouseholdSnapshot: Identifiable, Equatable, Sendable"))
+        #expect(settingsSource.contains("let homeHumans: [SettingsHumanSnapshot]?"))
+        #expect(settingsSource.contains("let homePets: [SettingsPetSnapshot]?"))
+        #expect(settingsSource.contains("let homeHouseholds: [SettingsHouseholdSnapshot]?"))
+        #expect(!settingsSource.contains("let homeHumans: [Human]?"))
+        #expect(!settingsSource.contains("let homePets: [Pet]?"))
+        #expect(!settingsSource.contains("let homeHouseholds: [Household]?"))
+        #expect(!settingsSource.contains("homeElectronicPets"))
+        #expect(routeSource.contains("var humans: [SettingsHumanSnapshot]?"))
+        #expect(routeSource.contains("var pets: [SettingsPetSnapshot]?"))
+        #expect(routeSource.contains("var households: [SettingsHouseholdSnapshot]?"))
+        #expect(routeSource.contains(".map(SettingsHumanSnapshot.init)"))
+        #expect(routeSource.contains(".map(SettingsPetSnapshot.init)"))
+        #expect(routeSource.contains(".map(SettingsHouseholdSnapshot.init)"))
+        #expect(!routeSource.contains("var humans: [Human]?"))
+        #expect(!routeSource.contains("var pets: [Pet]?"))
+        #expect(!routeSource.contains("var households: [Household]?"))
+        #expect(avatarSource.contains("let human: SettingsHumanSnapshot"))
+        #expect(!avatarSource.contains("HumanAvatarPipelineView"))
+        #expect(dataIdentitySource.contains("func fetchSettingsHuman(id: UUID) -> Human?"))
+        #expect(dataIdentitySource.contains("func fetchSettingsPets() -> [Pet]"))
+        #expect(!dataIdentitySource.contains("appServices.passcodes.hasPasscode(human)"))
+        #expect(petManagementSource.contains("let pets: [SettingsPetSnapshot]"))
+        #expect(petManagementSource.contains("fetchPet(id: pet.id)"))
+        #expect(!petManagementSource.contains("let pets: [Pet]"))
+        #expect(quickSwitchSource.contains("let human: SettingsHumanSnapshot"))
+        #expect(quickSwitchSource.contains("fetchHumanForVerification()"))
+    }
+
     @Test func settingsLanguageSwitchDefersGlobalLocaleCommitOffTapFrame() throws {
         let settingsSource = try source(
             "Ohana/Features/Settings/Views/SettingsView.swift",

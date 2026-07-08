@@ -203,7 +203,7 @@ extension SettingsView {
         )
     }
 
-    var activeHumanForCloudIdentity: Human? {
+    var activeHumanForCloudIdentity: SettingsHumanSnapshot? {
         guard let homeHumans else { return nil }
         if let activeId = UUID(uuidString: currentActiveHumanId),
            let active = homeHumans.first(where: { $0.id == activeId }) {
@@ -418,7 +418,8 @@ extension SettingsView {
     }
 
     private func householdForSharing() throws -> Household {
-        if let household = homeHouseholds?.first {
+        if let householdSnapshot = homeHouseholds?.first,
+           let household = fetchSettingsHousehold(id: householdSnapshot.id) {
             return household
         }
 

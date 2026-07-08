@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct SettingsPetManagementSheet: View {
-    let pets: [Pet]
+    let pets: [SettingsPetSnapshot]
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -11,10 +11,10 @@ struct SettingsPetManagementSheet: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var showingDeletePetAlert = false
-    @State private var petToDelete: Pet? = nil
+    @State private var petToDelete: SettingsPetSnapshot? = nil
     @State private var deleteConfirmName = ""
     @State private var showingResetPetData = false
-    @State private var petToReset: Pet? = nil
+    @State private var petToReset: SettingsPetSnapshot? = nil
 
     private var primaryText: Color { Color.ohanaPrimaryText }
     private var secondaryText: Color { Color.ohanaSecondaryText }
@@ -129,16 +129,16 @@ struct SettingsPetManagementSheet: View {
         }
     }
 
-    private func petRow(_ pet: Pet) -> some View {
+    private func petRow(_ pet: SettingsPetSnapshot) -> some View {
         HStack(spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)
                     .fill(Color.ohanaControlFill)
                     .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                Text(pet.avatarEmoji)
+                Text(pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji)
                     .font(OhanaFont.adaptive(size: 16)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
-            Text(pet.name)
+            Text(pet.displayName(fallback: l.tr(zh: "宠物", en: "Pet", de: "Haustier")))
                 .font(OhanaFont.body(.semibold))
                 .foregroundStyle(primaryText)
                 .lineLimit(1)
@@ -179,9 +179,15 @@ struct SettingsPetManagementSheet: View {
             deleteConfirmName = ""
             return
         }
+        guard let livePet = fetchPet(id: pet.id) else {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            petToDelete = nil
+            deleteConfirmName = ""
+            return
+        }
 
         let result = MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
-            pet,
+            livePet,
             note: "settings.pet.deleted"
         )
         UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
@@ -191,11 +197,33 @@ struct SettingsPetManagementSheet: View {
         }
     }
 
-    private func resetPetLogs(_ pet: Pet) {
+    private func resetPetLogs(_ pet: SettingsPetSnapshot) {
+        guard let livePet = fetchPet(id: pet.id) else {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            return
+        }
         let result = MemberCommandExecutor(context: modelContext, services: appServices).clearPetActivityRecords(
-            pet,
+            livePet,
             note: "settings.pet.lifecycle.records.clear"
         )
         UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
+    }
+
+    private func fetchPet(id: UUID) -> Pet? {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { pet in
+                pet.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try modelContext.fetch(descriptor).first // smoothness: allow action-time rehydrate after explicit pet management command
+        } catch {
+            OhanaLog.warning(
+                "Settings pet management fetch failed: \(error.localizedDescription)",
+                category: "Settings"
+            )
+            return nil
+        }
     }
 }

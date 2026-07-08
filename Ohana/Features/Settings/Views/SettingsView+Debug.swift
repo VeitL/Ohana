@@ -114,7 +114,8 @@ extension SettingsView {
     }
 
     func applyUITestCoconutBalanceShortcut(amount: Int) {
-        let human = homeHumans?.first { $0.id.uuidString == currentActiveHumanId } ?? homeHumans?.first
+        let humanSnapshot = homeHumans?.first { $0.id.uuidString == currentActiveHumanId } ?? homeHumans?.first
+        let human = humanSnapshot.flatMap { fetchSettingsHuman(id: $0.id) }
         let executor = SettingsCommandExecutor(context: modelContext, services: appServices)
         let result = executor.applyCoconutBalanceTest(
             amount: amount,
@@ -125,7 +126,8 @@ extension SettingsView {
             updatesProjection: false,
             publishesRevision: false
         )
-        if let pet = homePets?.first(where: { EconomyWalletWritePolicy.canWrite($0) }) {
+        if let petSnapshot = homePets?.first(where: { $0.canWriteWallet }),
+           let pet = fetchSettingsPet(id: petSnapshot.id) {
             executor.applyPetCoconutBalanceTest(
                 amount: amount,
                 pet: pet,
