@@ -341,7 +341,7 @@ struct HumanAllFeaturesSheet: View {
         }
         avatarSignature = signature
         let payload = FocusWalletAvatarCache.Payload(id: human.id, data: data)
-        avatarPipeline.seedPreviewEntries([payload])
+        avatarPipeline.seedPreviewEntries([payload], key: nextKey)
         avatarPipeline.preload(
             payloads: [payload],
             key: nextKey,

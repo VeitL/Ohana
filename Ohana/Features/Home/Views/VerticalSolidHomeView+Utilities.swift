@@ -159,7 +159,7 @@ extension VerticalSolidHomeView {
         guard !requests.isEmpty || !legacyPayloads.isEmpty || !legacyPopoutPayloads.isEmpty else { return }
 
         if !legacyPayloads.isEmpty || !legacyPopoutPayloads.isEmpty {
-            if FocusWalletAvatarCache.seedPreviewEntries(payloads: legacyPayloads) {
+            if await FocusWalletAvatarCache.seedPreviewEntries(payloads: legacyPayloads) {
                 bumpAvatarCacheRevision()
             }
             await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 72)

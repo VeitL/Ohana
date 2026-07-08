@@ -32,6 +32,8 @@ struct ContentView: View {
     @State private var homeCardStateResetToken = UUID()
     @State private var homeSurfaceLanguage = AppLanguage.code
     @State private var homeSurfaceLanguageThawTask: Task<Void, Never>?
+    @State private var routeSurfaceLanguage = AppLanguage.code
+    @State private var routeSurfaceLanguageThawTask: Task<Void, Never>?
     @State private var didAutoPresentFirstPetPrompt = false
     @State private var autoPresentedFirstCarePetID: UUID?
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
@@ -91,6 +93,7 @@ struct ContentView: View {
         .animation(GoMotion.sheetEnter, value: onboardingJourneyPhase)
         .onAppear {
             synchronizeHomeSurfaceLanguageIfAllowed(routeLanguageCode)
+            synchronizeRouteSurfaceLanguageIfAllowed(routeLanguageCode)
             scheduleRootAppearHandoff()
             applyOnboardingPrimaryHumanIDIfNeeded()
             scheduleUITestHumanProfileRouteIfNeeded()
@@ -106,17 +109,23 @@ struct ContentView: View {
             uiTestRouteTask = nil
             homeSurfaceLanguageThawTask?.cancel()
             homeSurfaceLanguageThawTask = nil
+            routeSurfaceLanguageThawTask?.cancel()
+            routeSurfaceLanguageThawTask = nil
         }
         .onChange(of: routeLanguageCode) { _, newValue in
             synchronizeHomeSurfaceLanguageIfAllowed(newValue)
+            synchronizeRouteSurfaceLanguageIfAllowed(newValue)
         }
         .onChange(of: appRoutes.sheet) { _, newValue in
             guard newValue != .settings else {
                 homeSurfaceLanguageThawTask?.cancel()
                 homeSurfaceLanguageThawTask = nil
+                routeSurfaceLanguageThawTask?.cancel()
+                routeSurfaceLanguageThawTask = nil
                 return
             }
             thawHomeSurfaceLanguageAfterSheetDismissal()
+            thawRouteSurfaceLanguageAfterSheetDismissal()
         }
         .onChange(of: hasOnboarded) { _, hasOnboarded in
             guard hasOnboarded else { return }
@@ -154,7 +163,7 @@ struct ContentView: View {
             onHumanDoseTaken: { _ in
                 completeFirstCareAfterHomeHandoff()
             },
-            routeLanguageCode: routeLanguageCode
+            routeLanguageCode: routeSurfaceLanguage
         )
         .onChange(of: currentActiveHumanId) { _, newValue in
             scheduleActiveHumanReaction(newValue)
@@ -176,6 +185,11 @@ struct ContentView: View {
         setHomeSurfaceLanguage(rawLanguage)
     }
 
+    private func synchronizeRouteSurfaceLanguageIfAllowed(_ rawLanguage: String) {
+        guard !isSettingsSheetPresented else { return }
+        setRouteSurfaceLanguage(rawLanguage)
+    }
+
     private func thawHomeSurfaceLanguageAfterSheetDismissal() {
         homeSurfaceLanguageThawTask?.cancel()
         let language = routeLanguageCode
@@ -189,6 +203,19 @@ struct ContentView: View {
         }
     }
 
+    private func thawRouteSurfaceLanguageAfterSheetDismissal() {
+        routeSurfaceLanguageThawTask?.cancel()
+        let language = routeLanguageCode
+        guard AppLanguage.normalize(routeSurfaceLanguage) != AppLanguage.normalize(language) else {
+            routeSurfaceLanguageThawTask = nil
+            return
+        }
+        routeSurfaceLanguageThawTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
+            setRouteSurfaceLanguage(language)
+            routeSurfaceLanguageThawTask = nil
+        }
+    }
+
     private func setHomeSurfaceLanguage(_ rawLanguage: String) {
         let normalized = AppLanguage.normalize(rawLanguage)
         guard homeSurfaceLanguage != normalized else { return }
@@ -196,6 +223,16 @@ struct ContentView: View {
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             homeSurfaceLanguage = normalized
+        }
+    }
+
+    private func setRouteSurfaceLanguage(_ rawLanguage: String) {
+        let normalized = AppLanguage.normalize(rawLanguage)
+        guard routeSurfaceLanguage != normalized else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            routeSurfaceLanguage = normalized
         }
     }
 

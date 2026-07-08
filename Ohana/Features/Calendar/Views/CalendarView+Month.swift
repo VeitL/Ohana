@@ -50,11 +50,7 @@ extension CalendarView {
             .padding(.horizontal, 20)
 
             // Weekday header
-            let weekdayFormatter = DateFormatter()
-            let weekdaySymbols = {
-                weekdayFormatter.locale = AppLanguage.effectiveLocale
-                return weekdayFormatter.veryShortStandaloneWeekdaySymbols ?? weekdayFormatter.shortStandaloneWeekdaySymbols ?? []
-            }()
+            let weekdaySymbols = CalendarDateTextFormatter.veryShortWeekdaySymbols()
             HStack(spacing: 0) {
                 ForEach(weekdaySymbols, id: \.self) { d in
                     Text(d)

@@ -130,6 +130,21 @@ struct PlantLaunchTests {
         #expect(PlantCareType.pestCheck.isSchedulablePlantCare)
     }
 
+    @Test func archivedPlantsAreExcludedFromActivePlantCreationAndBatchLoggingSurfaces() throws {
+        let rootURL = repositoryRootURL()
+        let batchQuickRecordSource = try source(
+            "Ohana/Features/Plants/Views/PlantBatchQuickRecordSheet.swift",
+            rootURL: rootURL
+        )
+        let addPlantDataSource = try source(
+            "Ohana/Features/Plants/AddPlantDataContainer.swift",
+            rootURL: rootURL
+        )
+
+        #expect(batchQuickRecordSource.contains(".filter { !$0.isArchived }"))
+        #expect(addPlantDataSource.contains("plants.filter { !$0.isArchived }.map"))
+    }
+
     @Test func carePlanReadsOneDayDeferralLog() throws {
         let now = makeDate(year: 2026, month: 6, day: 8)
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now) ?? now.addingTimeInterval(86400)
@@ -981,6 +996,39 @@ struct PlantLaunchTests {
         #expect(plant.currentSpreadCm == 36)
         #expect(plant.healthStatus == .watching)
         #expect(plant.catalogSpeciesId == "calathea-orbifolia")
+    }
+
+    @Test func creatingPlantSanitizesLargeAvatarBeforePersistence() throws {
+        let container = try makeInMemoryContainer()
+        let originalAvatar = largeOpaqueAvatarData(width: 1900, height: 1300)
+        let input = PlantCreationCommandInput(
+            name: "Fern",
+            species: "Boston fern",
+            location: "Window",
+            avatarEmoji: "🌿",
+            avatarImageData: originalAvatar,
+            wateringIntervalDays: 4,
+            fertilizingIntervalDays: 30,
+            roomNameRaw: "Living Room"
+        )
+
+        let result = PlantCreationCommandService.createPlant(
+            input: input,
+            context: container.mainContext,
+            scheduleNotifications: false
+        )
+
+        #expect(result.didPersist)
+        let plant = try #require(try container.mainContext.fetch(FetchDescriptor<Plant>()).first)
+        let persistedAvatar = try #require(plant.avatarImageData)
+        let persistedImage = try #require(UIImage(data: persistedAvatar))
+        let longestPixel = max(
+            persistedImage.size.width * persistedImage.scale,
+            persistedImage.size.height * persistedImage.scale
+        )
+        #expect(persistedAvatar != originalAvatar)
+        #expect(longestPixel <= 1200)
+        #expect(plant.avatarImageSignature == MediaPayloadSignature.signature(for: persistedAvatar))
     }
 
     @Test func plantCarePlanSyncMaterializesCalendarEventsAndReminders() throws {
@@ -2344,6 +2392,32 @@ struct PlantLaunchTests {
         #expect(ledger.coconutDelta == 0)
     }
 
+    @Test func archivedPlantsRejectDirectCareWrites() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 13, hour: 10)
+        let plant = Plant(name: "Archived Fern", wateringIntervalDays: 1)
+        plant.archivedAt = now
+        context.insert(plant)
+        try context.save()
+
+        let result = PlantCareCommandService.recordCare(
+            .watering,
+            plant: plant,
+            executorId: "human-1",
+            context: context,
+            now: now,
+            syncCarePlan: false
+        )
+
+        #expect(!result.didPersist)
+        #expect(result.persistenceError == "plantArchived")
+        #expect(plant.lastWateredDate == nil)
+        #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+    }
+
     @Test func differentPlantsHaveIndependentWateringCooldownBuckets() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -2659,6 +2733,47 @@ struct PlantLaunchTests {
         #expect(plants.allSatisfy { $0.lastWateredDate == now })
     }
 
+    @Test func plantBatchCareSkipsArchivedPlantsWithoutWritingFacts() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 7, day: 5, hour: 10)
+        let oldWateredDate = Calendar(identifier: .gregorian).date(byAdding: .day, value: -2, to: now) ?? now
+        let active = Plant(name: "Active Fern", wateringIntervalDays: 1)
+        active.createdAt = oldWateredDate
+        active.lastWateredDate = oldWateredDate
+        let archived = Plant(name: "Archived Fern", wateringIntervalDays: 1)
+        archived.createdAt = oldWateredDate
+        archived.lastWateredDate = oldWateredDate
+        archived.archivedAt = now
+        context.insert(active)
+        context.insert(archived)
+        try context.save()
+
+        let result = PlantBatchCareCommandService.recordQuickCare(
+            selections: [
+                PlantBatchCareSelection(plantID: archived.id, careType: .watering),
+                PlantBatchCareSelection(plantID: active.id, careType: .watering)
+            ],
+            context: context,
+            executorId: "human-1",
+            now: now,
+            syncCarePlan: false
+        )
+
+        #expect(result.didPersist)
+        #expect(result.completedCount == 1)
+        #expect(result.skipped.contains {
+            $0.selection.plantID == archived.id && $0.reason == .archivedPlant
+        })
+        #expect(active.lastWateredDate == now)
+        #expect(archived.lastWateredDate == oldWateredDate)
+        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
+        #expect(logs.count == 1)
+        #expect(logs.first?.plant?.id == active.id)
+        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
+    }
+
     @Test func plantBatchCareUndoDeletesGeneratedFactsAndRestoresPlantDates() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -2828,6 +2943,19 @@ struct PlantLaunchTests {
         return try ModelContainer(for: schema, migrationPlan: ArkMigrationPlan.self, configurations: [config])
     }
 
+    private func largeOpaqueAvatarData(width: CGFloat, height: CGFloat) -> Data {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let image = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { context in
+            UIColor.systemGreen.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+            UIColor.systemYellow.setFill()
+            context.fill(CGRect(x: width * 0.18, y: height * 0.2, width: width * 0.48, height: height * 0.46))
+        }
+        return image.jpegData(compressionQuality: 1) ?? Data()
+    }
+
     private func makeDate(year: Int, month: Int, day: Int, hour: Int = 9, minute: Int = 0) -> Date {
         var components = DateComponents()
         components.calendar = Calendar(identifier: .gregorian)
@@ -2838,6 +2966,16 @@ struct PlantLaunchTests {
         components.hour = hour
         components.minute = minute
         return components.date ?? Date(timeIntervalSince1970: 0)
+    }
+
+    private func repositoryRootURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    private func source(_ path: String, rootURL: URL) throws -> String {
+        try String(contentsOf: rootURL.appendingPathComponent(path), encoding: .utf8)
     }
 
     private func makePlantReminderDefaults() throws -> (UserDefaults, String) {

@@ -38,7 +38,8 @@ enum HumanWorkoutPetWalkSnapshotBuilder {
         )
         do {
             return try context.fetch(descriptor).compactMap { walk in
-                guard walk.endDate != nil,
+                guard !walk.isRecoveryCheckpoint,
+                      walk.endDate != nil,
                       walk.executorIds.contains(humanID) else {
                     return nil
                 }

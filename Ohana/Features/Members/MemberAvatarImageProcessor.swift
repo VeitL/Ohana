@@ -63,6 +63,11 @@ enum MemberAvatarImageProcessor {
         return downsample(normalized, maxPixel: 1200, preserveAlpha: false).jpegData(compressionQuality: 0.88)
     }
 
+    nonisolated static func persistableAvatarData(_ data: Data?) -> Data? {
+        guard let data, let image = image(from: data) else { return data }
+        return encodedAvatarData(from: image) ?? data
+    }
+
     nonisolated static func encodedCroppedAvatarData(
         image: UIImage,
         scale: CGFloat,

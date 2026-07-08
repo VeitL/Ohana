@@ -270,6 +270,7 @@ struct MemberProfileCommandResult: Equatable {
     let entityID: UUID
     let kind: String
     let changedFields: Set<String>
+    let persistedAvatarImageData: Data?
     let didPersist: Bool
     let persistenceError: String?
 
@@ -277,12 +278,14 @@ struct MemberProfileCommandResult: Equatable {
         entityID: UUID,
         kind: String,
         changedFields: Set<String>,
+        persistedAvatarImageData: Data? = nil,
         didPersist: Bool = true,
         persistenceError: String? = nil
     ) {
         self.entityID = entityID
         self.kind = kind
         self.changedFields = changedFields
+        self.persistedAvatarImageData = persistedAvatarImageData
         self.didPersist = didPersist
         self.persistenceError = persistenceError
     }
@@ -430,6 +433,7 @@ enum MemberProfileCommandService {
         entityID: UUID,
         kind: String,
         changedFields: Set<String>,
+        persistedAvatarImageData: Data? = nil,
         context: ModelContext
     ) -> MemberProfileCommandResult {
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
@@ -437,7 +441,12 @@ enum MemberProfileCommandService {
             context.rollback()
             return .failed(entityID: entityID, kind: kind, error: saveResult.errorDescription)
         }
-        return MemberProfileCommandResult(entityID: entityID, kind: kind, changedFields: changedFields)
+        return MemberProfileCommandResult(
+            entityID: entityID,
+            kind: kind,
+            changedFields: changedFields,
+            persistedAvatarImageData: persistedAvatarImageData
+        )
     }
 
     @discardableResult
@@ -451,8 +460,9 @@ enum MemberProfileCommandService {
             return MemberProfileCommandResult(entityID: pet.id, kind: EntityKind.pet.rawValue, changedFields: [])
         }
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let persistedAvatarImageData = MemberAvatarImageProcessor.persistableAvatarData(input.avatarImageData)
         pet.name = trimmedName.isEmpty ? pet.name : trimmedName
-        pet.updateAvatarImageData(input.avatarImageData)
+        pet.updateAvatarImageData(persistedAvatarImageData)
         if let avatarEmoji = input.avatarEmoji {
             let trimmedEmoji = avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
             pet.avatarEmoji = trimmedEmoji.isEmpty ? "🐾" : trimmedEmoji
@@ -545,6 +555,7 @@ enum MemberProfileCommandService {
             entityID: pet.id,
             kind: EntityKind.pet.rawValue,
             changedFields: changedFields,
+            persistedAvatarImageData: persistedAvatarImageData,
             context: context
         )
     }
@@ -560,8 +571,9 @@ enum MemberProfileCommandService {
             return MemberProfileCommandResult(entityID: human.id, kind: EntityKind.human.rawValue, changedFields: [])
         }
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let persistedAvatarImageData = MemberAvatarImageProcessor.persistableAvatarData(input.avatarImageData)
         human.name = trimmedName.isEmpty ? human.name : trimmedName
-        human.updateAvatarImageData(input.avatarImageData)
+        human.updateAvatarImageData(persistedAvatarImageData)
         human.avatarEmoji = input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "👤"
             : input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -607,6 +619,7 @@ enum MemberProfileCommandService {
             entityID: human.id,
             kind: EntityKind.human.rawValue,
             changedFields: changedFields,
+            persistedAvatarImageData: persistedAvatarImageData,
             context: context
         )
     }
@@ -619,8 +632,9 @@ enum MemberProfileCommandService {
         context: ModelContext
     ) -> MemberProfileCommandResult {
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let persistedAvatarImageData = MemberAvatarImageProcessor.persistableAvatarData(input.avatarImageData)
         plant.name = trimmedName.isEmpty ? plant.name : trimmedName
-        plant.updateAvatarImageData(input.avatarImageData)
+        plant.updateAvatarImageData(persistedAvatarImageData)
         plant.avatarEmoji = input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "🌱"
             : input.avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -672,6 +686,7 @@ enum MemberProfileCommandService {
             entityID: plant.id,
             kind: EntityKind.plant.rawValue,
             changedFields: changedFields,
+            persistedAvatarImageData: persistedAvatarImageData,
             context: context
         )
         guard profileResult.didPersist else { return profileResult }

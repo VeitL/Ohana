@@ -222,6 +222,36 @@ final class MediaBlobBoundaryTests: XCTestCase {
         XCTAssertTrue(walkBannerSource.contains("OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 64)"))
     }
 
+    func testAvatarPreviewCacheHitWorkStaysOffMainAndCancellable() throws {
+        let rootURL = repositoryRootURL()
+        let cacheSource = try source(
+            "Ohana/Shared/Media/FocusWalletAvatarCache.swift",
+            rootURL: rootURL
+        )
+        let pipelineSource = try source(
+            "Ohana/Shared/Media/AvatarPipeline.swift",
+            rootURL: rootURL
+        )
+        let homeUtilitiesSource = try source(
+            "Ohana/Features/Home/Views/VerticalSolidHomeView+Utilities.swift",
+            rootURL: rootURL
+        )
+
+        XCTAssertTrue(cacheSource.contains("static func seedPreviewEntries(payloads: [Payload]) async -> Bool"))
+        XCTAssertTrue(cacheSource.contains("Task.detached(priority: .utility)"))
+        XCTAssertTrue(cacheSource.contains("previewEntry(for: id, signature: signature)"))
+        XCTAssertTrue(cacheSource.contains("guard generation == evictionGeneration else { return didChange }"))
+
+        XCTAssertTrue(pipelineSource.contains("func seedPreviewEntries("))
+        XCTAssertTrue(pipelineSource.contains("await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: delayMilliseconds)"))
+        XCTAssertTrue(pipelineSource.contains("await FocusWalletAvatarCache.seedPreviewEntries(payloads: payloads)"))
+        XCTAssertTrue(pipelineSource.contains("private func previewTaskKey(for key: String) -> String"))
+        XCTAssertTrue(pipelineSource.contains("decodeTasks[taskKey]?.cancel()"))
+
+        XCTAssertTrue(homeUtilitiesSource.contains("if await FocusWalletAvatarCache.seedPreviewEntries(payloads: legacyPayloads)"))
+        XCTAssertFalse(homeUtilitiesSource.contains("if FocusWalletAvatarCache.seedPreviewEntries(payloads: legacyPayloads)"))
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

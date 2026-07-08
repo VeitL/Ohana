@@ -21,9 +21,10 @@ enum FocusWalletAvatarCache {
     private static var evictionGeneration = 0
 
     @discardableResult
-    static func seedPreviewEntries(payloads: [Payload]) -> Bool {
+    static func seedPreviewEntries(payloads: [Payload]) async -> Bool {
         ensureMemoryWarningEvictionRegistered()
         var didChange = false
+        var previewRequests: [(UUID, String)] = []
 
         for payload in payloads {
             guard let data = payload.data else {
@@ -40,10 +41,25 @@ enum FocusWalletAvatarCache {
                 continue
             }
 
-            guard let preview = previewEntry(for: payload.id, signature: signature) else {
-                continue
+            previewRequests.append((payload.id, signature))
+        }
+
+        guard !previewRequests.isEmpty else { return didChange }
+        let generation = evictionGeneration
+        let previews = await Task.detached(priority: .utility) { // smoothness: keep cache-hit disk IO, image decode, and alpha scan off the main actor.
+            previewRequests.compactMap { id, signature in
+                previewEntry(for: id, signature: signature).map { (id, $0) }
             }
-            entries[payload.id] = preview
+        }.value
+
+        guard generation == evictionGeneration else { return didChange }
+
+        for (id, preview) in previews {
+            if let cached = entries[id] {
+                guard cached.signature == preview.signature else { continue }
+                if cached.isFinal { continue }
+            }
+            entries[id] = preview
             didChange = true
         }
 

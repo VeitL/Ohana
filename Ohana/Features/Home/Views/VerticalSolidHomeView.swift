@@ -477,6 +477,7 @@ struct VerticalSolidHomeView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .zIndex(12)
+                        .allowsHitTesting(false)
                 }
 
                 if isCalendarAddEventPresented || calendarAddEventProgress > 0.001 {

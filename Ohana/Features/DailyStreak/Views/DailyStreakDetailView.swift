@@ -775,7 +775,7 @@ struct DailyStreakDetailView: View {
         }
         avatarIndex = nextIndex
         guard !nextIndex.payloads.isEmpty else { return }
-        avatarPipeline.seedPreviewEntries(nextIndex.payloads)
+        avatarPipeline.seedPreviewEntries(nextIndex.payloads, key: nextIndex.cacheKey)
         avatarPipeline.preload(
             payloads: nextIndex.payloads,
             key: nextIndex.cacheKey,

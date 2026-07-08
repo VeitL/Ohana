@@ -26,6 +26,18 @@ final class InputFocusResponsivenessTests: XCTestCase {
         XCTAssertTrue(source.contains("OhanaFeedback.prepareInteraction()"))
     }
 
+    func testStartupPlantCareOrphanMaintenanceScansOffMain() throws {
+        let rootURL = repositoryRootURL()
+        let startupSource = try source("Ohana/App/StartupMaintenanceCoordinator.swift", rootURL: rootURL)
+        let orphanServiceSource = try source("Ohana/Domain/Services/PlantCareOrphanMaintenanceService.swift", rootURL: rootURL)
+
+        XCTAssertTrue(startupSource.contains("await PlantCareOrphanMaintenanceService.runOffMainScan"))
+        XCTAssertFalse(startupSource.contains("PlantCareOrphanMaintenanceService.run(context: context"))
+        XCTAssertTrue(orphanServiceSource.contains("@ModelActor"))
+        XCTAssertTrue(orphanServiceSource.contains("PlantCareOrphanMaintenancePlanActor"))
+        XCTAssertTrue(orphanServiceSource.contains("PersistentIdentifier"))
+    }
+
     func testKeyboardFrameUpdatesDoNotAnimateFullSheets() throws {
         let rootURL = repositoryRootURL()
         let addEventSource = try source("Ohana/Features/Calendar/Views/AddEventView.swift", rootURL: rootURL)

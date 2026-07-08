@@ -258,7 +258,7 @@ extension FamilyCollaborationDashboardView {
         }
         petAvatarSignatures = signatures
         guard !payloads.isEmpty else { return }
-        avatarPipeline.seedPreviewEntries(payloads)
+        avatarPipeline.seedPreviewEntries(payloads, key: nextKey)
         avatarPipeline.preload(
             payloads: payloads,
             key: nextKey,

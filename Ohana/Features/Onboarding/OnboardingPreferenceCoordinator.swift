@@ -355,18 +355,29 @@ final class OnboardingPreferenceCoordinator {
     init(
         defaults: UserDefaults = .standard,
         locationResolver: (any OnboardingLocationResolving)? = nil,
-        locationRequestTimeoutNanoseconds: UInt64 = 4_000_000_000
+        locationRequestTimeoutNanoseconds: UInt64 = 4_000_000_000,
+        usesUITestDefaults: Bool? = nil
     ) {
         self.defaults = defaults
         self.locationResolver = locationResolver ?? LiveOnboardingLocationResolver()
         self.locationRequestTimeoutNanoseconds = locationRequestTimeoutNanoseconds
         let storedCountry = defaults.string(forKey: Self.countryKey) ?? ""
-        country = storedCountry
-        selectedCountryCode = defaults.string(forKey: Self.countryCodeKey) ?? OnboardingPlaceCatalog.countryOption(matching: storedCountry)?.countryCode ?? ""
-        city = defaults.string(forKey: Self.cityKey) ?? ""
-        usesCustomCountry = defaults.bool(forKey: Self.countryIsCustomKey)
-        usesCustomCity = defaults.bool(forKey: Self.cityIsCustomKey)
-        locationSource = OnboardingLocationSource(rawValue: defaults.string(forKey: Self.locationSourceKey) ?? "") ?? .unresolved
+        let storedCity = defaults.string(forKey: Self.cityKey) ?? ""
+        let storedLocationSource = OnboardingLocationSource(rawValue: defaults.string(forKey: Self.locationSourceKey) ?? "") ?? .unresolved
+        let shouldUseUITestDefaults = usesUITestDefaults ?? Self.usesUITestDefaultsFromLaunchArguments
+        let shouldSeedUITestLocation = shouldUseUITestDefaults &&
+            storedCountry.trimmedForOnboarding.isEmpty &&
+            storedCity.trimmedForOnboarding.isEmpty &&
+            storedLocationSource == .unresolved
+
+        country = shouldSeedUITestLocation ? "Germany" : storedCountry
+        selectedCountryCode = shouldSeedUITestLocation
+            ? ""
+            : defaults.string(forKey: Self.countryCodeKey) ?? OnboardingPlaceCatalog.countryOption(matching: storedCountry)?.countryCode ?? ""
+        city = shouldSeedUITestLocation ? "Berlin" : storedCity
+        usesCustomCountry = shouldSeedUITestLocation ? true : defaults.bool(forKey: Self.countryIsCustomKey)
+        usesCustomCity = shouldSeedUITestLocation ? true : defaults.bool(forKey: Self.cityIsCustomKey)
+        locationSource = shouldSeedUITestLocation ? .manual : storedLocationSource
         locationAuthorizationStatus = .notDetermined
         notificationIntent = defaults.bool(forKey: Self.notificationsIntentKey)
     }
@@ -641,6 +652,12 @@ final class OnboardingPreferenceCoordinator {
                 completion.resume(with: .failure(OnboardingLocationRequestError.timedOut))
             }
         }
+    }
+}
+
+private extension OnboardingPreferenceCoordinator {
+    static var usesUITestDefaultsFromLaunchArguments: Bool {
+        ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TESTS")
     }
 }
 

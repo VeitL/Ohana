@@ -114,6 +114,8 @@ nonisolated struct PlantBatchCareSkippedSelection: Equatable, Sendable {
         case missingPlant
         case notDue
         case unsupportedCareType
+        case archivedPlant
+        case commandRejected
     }
 
     let selection: PlantBatchCareSelection
@@ -242,16 +244,18 @@ enum PlantBatchCareCommandService {
                 skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .missingPlant))
                 continue
             }
+            guard !plant.isArchived else {
+                skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .archivedPlant))
+                continue
+            }
             let due = isDue(selection.careType, for: plant, now: now, calendar: calendar)
             guard !requiresDueTask || due else {
                 skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .notDue))
                 continue
             }
 
-            if restorePointsByPlantID[plant.id] == nil {
-                restorePointsByPlantID[plant.id] = restorePoint(for: plant)
-                touchedPlants.append(plant)
-            }
+            let existingRestorePoint = restorePointsByPlantID[plant.id]
+            let restorePointBeforeCommand = existingRestorePoint ?? restorePoint(for: plant)
 
             let result = PlantCareCommandService.recordCare(
                 selection.careType,
@@ -266,6 +270,14 @@ enum PlantBatchCareCommandService {
                 saveChanges: false,
                 awardRewards: false
             )
+            guard result.didPersist else {
+                skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .commandRejected))
+                continue
+            }
+            if existingRestorePoint == nil {
+                restorePointsByPlantID[plant.id] = restorePointBeforeCommand
+                touchedPlants.append(plant)
+            }
             let wasRewardEligible = due && PlantCareCommandService.rewardAction(for: selection.careType) != nil
             if wasRewardEligible, let action = PlantCareCommandService.rewardAction(for: selection.careType) {
                 let rewards = action.baseRewards

@@ -368,7 +368,7 @@ extension AchievementWallContentView {
         }
         humanAvatarSignatures = signatures
         guard !payloads.isEmpty else { return }
-        avatarPipeline.seedPreviewEntries(payloads)
+        avatarPipeline.seedPreviewEntries(payloads, key: cacheKey)
         avatarPipeline.preload(
             payloads: payloads,
             key: cacheKey,

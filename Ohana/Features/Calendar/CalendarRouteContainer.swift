@@ -49,7 +49,7 @@ struct CalendarRouteContainer: View {
             petMedications: routeData.petMedications,
             humanMedications: routeData.humanMedications,
             dataRevision: routeDataRevision,
-            routePreparedSnapshot: routeData.preparedSnapshot
+            routePreparedSnapshotReferences: routeData.preparedSnapshotReferences
         )
         .onAppear {
             scheduleRouteDataLoad(delayMilliseconds: routeDataLoadDelayMilliseconds)
@@ -178,7 +178,7 @@ private nonisolated struct CalendarRouteData {
     var insurances: [PetInsurance] = []
     var petMedications: [PetMedication] = []
     var humanMedications: [HumanMedication] = []
-    var preparedSnapshot: CalendarRoutePreparedSnapshot?
+    var preparedSnapshotReferences: [CalendarRoutePreparedSnapshotReference] = []
     var hasLoaded = false
 
     init() {}
@@ -192,8 +192,7 @@ private nonisolated struct CalendarRouteData {
         insurances = Self.rehydrate(reference.insurances, as: PetInsurance.self, context: context)
         petMedications = Self.rehydrate(reference.petMedications, as: PetMedication.self, context: context)
         humanMedications = Self.rehydrate(reference.humanMedications, as: HumanMedication.self, context: context)
-        let eventByModelID = Dictionary(uniqueKeysWithValues: events.map { ($0.persistentModelID, $0) })
-        preparedSnapshot = reference.preparedSnapshot?.rehydrated(eventByModelID: eventByModelID)
+        preparedSnapshotReferences = reference.preparedSnapshots
         hasLoaded = reference.hasLoaded
     }
 
@@ -215,7 +214,7 @@ private nonisolated struct CalendarRouteDataReference: Sendable {
     var insurances: [PersistentIdentifier] = []
     var petMedications: [PersistentIdentifier] = []
     var humanMedications: [PersistentIdentifier] = []
-    var preparedSnapshot: CalendarRoutePreparedSnapshotReference?
+    var preparedSnapshots: [CalendarRoutePreparedSnapshotReference] = []
     var hasLoaded = false
 }
 
@@ -263,7 +262,7 @@ private actor CalendarRouteDataActor {
             petMedications: petMedications,
             humanMedications: humanMedications
         )
-        let preparedSnapshot = preparedSnapshot(for: routeData, input: input)
+        let preparedSnapshots = preparedSnapshots(for: routeData, input: input)
         try Task.checkCancellation()
         return CalendarRouteDataReference(
             events: events.map(\.persistentModelID),
@@ -273,7 +272,7 @@ private actor CalendarRouteDataActor {
             insurances: insurances.map(\.persistentModelID),
             petMedications: petMedications.map(\.persistentModelID),
             humanMedications: humanMedications.map(\.persistentModelID),
-            preparedSnapshot: preparedSnapshot,
+            preparedSnapshots: preparedSnapshots,
             hasLoaded: true
         )
     }
@@ -329,19 +328,35 @@ private actor CalendarRouteDataActor {
         }
     }
 
-    private func preparedSnapshot(
+    private func preparedSnapshots(
         for routeData: CalendarActorRouteData,
         input: CalendarRouteDataLoadInput
+    ) -> [CalendarRoutePreparedSnapshotReference] {
+        prewarmedFilterSelections(for: routeData, initial: input.filterSelection).map { filter in
+            preparedSnapshot(
+                for: routeData,
+                selectedDate: input.selectedDate,
+                filter: filter,
+                dataRevision: input.dataRevision
+            )
+        }
+    }
+
+    private func preparedSnapshot(
+        for routeData: CalendarActorRouteData,
+        selectedDate: Date,
+        filter: CalendarFilterSelection,
+        dataRevision: Int
     ) -> CalendarRoutePreparedSnapshotReference {
         let key = CalendarPreparedSnapshotTriggerKey(
             monthKey: CalendarSnapshotBuilder.preparedSnapshotWindowKey,
-            filter: input.filterSelection,
-            dataRevision: input.dataRevision
+            filter: filter,
+            dataRevision: dataRevision
         )
         let filtered = filteredEvents(
             routeData.events,
             routeData: routeData,
-            filter: input.filterSelection
+            filter: filter
         )
         return CalendarRoutePreparedSnapshotReference(
             key: key,
@@ -350,9 +365,30 @@ private actor CalendarRouteDataActor {
                 allEvents: routeData.events,
                 pets: routeData.pets,
                 weekDays: weekDays(),
-                monthDays: monthDays(for: input.selectedDate)
+                monthDays: monthDays(for: selectedDate)
             )
         )
+    }
+
+    private func prewarmedFilterSelections(
+        for routeData: CalendarActorRouteData,
+        initial: CalendarFilterSelection
+    ) -> [CalendarFilterSelection] {
+        var selections: [CalendarFilterSelection] = [initial, .all]
+        selections.append(contentsOf: routeData.pets.map { CalendarFilterSelection.pet($0.id.uuidString) })
+        selections.append(contentsOf: routeData.humans.map { CalendarFilterSelection.human($0.id.uuidString) })
+        if !routeData.plants.isEmpty {
+            selections.append(.allPlants)
+        }
+        return uniqueFilterSelections(selections)
+    }
+
+    private func uniqueFilterSelections(_ selections: [CalendarFilterSelection]) -> [CalendarFilterSelection] {
+        var unique: [CalendarFilterSelection] = []
+        for selection in selections where !unique.contains(selection) {
+            unique.append(selection)
+        }
+        return unique
     }
 
     private func filteredEvents(
@@ -449,7 +485,6 @@ private actor CalendarRouteDataActor {
             calendar.date(byAdding: .day, value: day - 1, to: firstOfMonth)
         }
     }
-
 }
 
 @ModelActor
@@ -672,7 +707,6 @@ actor CalendarPreparedSnapshotActor {
             calendar.date(byAdding: .day, value: day - 1, to: firstOfMonth)
         }
     }
-
 }
 
 private nonisolated struct CalendarActorRouteData {

@@ -321,7 +321,9 @@ struct PetFeatureCollectionSummary: Equatable {
                     .contains($0.careType) && $0.date >= sevenDaysAgo
             }
 
-            let todayWalks = pet.walkLogs.filter { $0.startDate >= todayStart && $0.startDate < tomorrowStart }
+            let todayWalks = pet.walkLogs.filter {
+                !$0.isRecoveryCheckpoint && $0.startDate >= todayStart && $0.startDate < tomorrowStart
+            }
             todayWalkCount += todayWalks.count
             todayWalkDistanceMeters += todayWalks.reduce(0) { $0 + $1.distanceMeters }
 

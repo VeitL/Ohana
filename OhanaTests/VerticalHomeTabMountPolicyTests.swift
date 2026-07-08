@@ -1514,7 +1514,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(contentSource.contains("CalendarPreparedSnapshotActor(modelContainer: modelContext.container)"))
         #expect(contentSource.contains("applyPreparedSnapshotReference"))
         #expect(!contentSource.contains("CalendarSnapshotBuilder.preparedSnapshot("))
-        #expect(calendarSource.contains("routePreparedSnapshot: CalendarRoutePreparedSnapshot?"))
+        #expect(calendarSource.contains("routePreparedSnapshotReferences: [CalendarRoutePreparedSnapshotReference] = []"))
         #expect(calendarSource.contains("preparedCalendarSnapshot.timeline"))
         #expect(calendarSource.contains("preparedCalendarSnapshot.events(for: selectedDate)"))
         #expect(calendarSource.contains("monthKey: CalendarSnapshotBuilder.preparedSnapshotWindowKey"))
@@ -1523,6 +1523,11 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!supportSource.contains("var selectedDay: Date"))
         #expect(routeSource.contains("actor CalendarPreparedSnapshotActor"))
         #expect(routeSource.contains("monthKey: CalendarSnapshotBuilder.preparedSnapshotWindowKey"))
+        #expect(routeSource.contains("private func prewarmedFilterSelections("))
+        #expect(routeSource.contains("CalendarFilterSelection.pet($0.id.uuidString)"))
+        #expect(routeSource.contains("CalendarFilterSelection.human($0.id.uuidString)"))
+        #expect(contentSource.contains("routePreparedSnapshotReferences.first(where: { $0.key == key })"))
+        #expect(contentSource.contains("applyPreparedSnapshotReference(routePreparedSnapshotReference)"))
         #expect(snapshotSource.contains("private nonisolated struct CalendarOccurrenceDayIndex"))
         #expect(snapshotSource.contains("let occurrencesByDay: [Date: [CalendarEventOccurrence]]"))
         #expect(snapshotSource.contains("private static func buildOccurrenceDayIndex("))
@@ -1534,6 +1539,19 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!snapshotSource.contains("eventOccursOnDate("))
         #expect(!snapshotSource.contains("selectedDateEvents"))
         #expect(!monthSource.contains("let hasEvents = filteredEvents.contains"))
+    }
+
+    @Test func calendarRenderFilesAvoidPerBodyDateFormatterAllocation() throws {
+        let listSource = try source("Ohana/Features/Calendar/Views/CalendarView+List.swift")
+        let monthSource = try source("Ohana/Features/Calendar/Views/CalendarView+Month.swift")
+        let supportSource = try source("Ohana/Features/Calendar/Views/CalendarViewSupport.swift")
+
+        #expect(!listSource.contains("DateFormatter()"))
+        #expect(!monthSource.contains("DateFormatter()"))
+        #expect(listSource.contains("CalendarDateTextFormatter.weekdayShort(date)"))
+        #expect(listSource.contains("CalendarDateTextFormatter.relativeDate(date, l: l)"))
+        #expect(monthSource.contains("CalendarDateTextFormatter.veryShortWeekdaySymbols()"))
+        #expect(supportSource.contains("enum CalendarDateTextFormatter"))
     }
 
     private func maximumCollapsedCardOverlapRatio(offsets: [CGSize]) -> CGFloat {

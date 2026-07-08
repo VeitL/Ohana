@@ -29,7 +29,7 @@ struct CalendarView: View {
     var petMedications: [PetMedication] = []
     var humanMedications: [HumanMedication] = []
     var dataRevision = 0
-    var routePreparedSnapshot: CalendarRoutePreparedSnapshot?
+    var routePreparedSnapshotReferences: [CalendarRoutePreparedSnapshotReference] = []
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext

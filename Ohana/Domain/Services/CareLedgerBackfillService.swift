@@ -86,6 +86,7 @@ nonisolated enum CareLedgerBackfillService {
             context: context,
             operation: "fetch pet walk logs"
         ) { log in
+            guard !log.isRecoveryCheckpoint else { return }
             guard try shouldBackfill("PetWalkLog", log.id.uuidString) else { return }
             CareLedgerService.record(
                 occurredAt: log.startDate,

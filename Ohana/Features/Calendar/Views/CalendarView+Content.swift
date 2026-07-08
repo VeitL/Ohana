@@ -588,18 +588,11 @@ extension CalendarView {
         snapshotKey: CalendarPreparedSnapshotTriggerKey? = nil
     ) -> Bool {
         let key = snapshotKey ?? preparedCalendarSnapshotTriggerKey
-        guard let routePreparedSnapshot,
-              routePreparedSnapshot.key == key else {
+        guard let routePreparedSnapshotReference = routePreparedSnapshotReferences.first(where: { $0.key == key }) else {
             return false
         }
         guard preparedCalendarSnapshotKey != key else { return true }
-
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            preparedCalendarSnapshot = routePreparedSnapshot.snapshot
-            preparedCalendarSnapshotKey = key
-        }
+        applyPreparedSnapshotReference(routePreparedSnapshotReference)
         return true
     }
 

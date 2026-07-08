@@ -214,6 +214,58 @@ struct WalksLogicTests {
         #expect(location.startWalkSessionCount == 1)
     }
 
+    @Test func recoveryCheckpointsDoNotCountAsFeatureCollectionWalksOrTodayFocusCompletion() {
+        let now = Date()
+        let pet = Pet(name: "Piper", species: "狗")
+        let authoritativeWalk = PetWalkLog(startDate: now, pet: pet)
+        authoritativeWalk.distanceMeters = 120
+        let checkpoint = PetWalkLog(
+            startDate: now,
+            pet: pet,
+            sharedSessionId: WalkRecoveryCheckpoint.makeSharedSessionID()
+        )
+        checkpoint.distanceMeters = 900
+        pet.walkLogs = [authoritativeWalk, checkpoint]
+
+        let summary = PetFeatureCollectionSummary.load(
+            pets: [pet],
+            humans: [],
+            petAggregateSummaries: [:]
+        )
+
+        #expect(summary.todayWalkCount == 1)
+        #expect(summary.todayWalkDistanceMeters == 120)
+
+        let walkQuest = IslandQuest(
+            id: "q_walk_\(pet.id.uuidString)",
+            emoji: "walk",
+            title: "Walk",
+            subtitle: "",
+            isCompleted: false,
+            targetPetId: pet.id,
+            targetPlantId: nil
+        )
+        let checkpointOnly = TodayFocusService.refreshedQuests(
+            [walkQuest],
+            pets: [pet],
+            careLogs: [],
+            walkLogs: [checkpoint],
+            pottyLogs: [],
+            now: now
+        )
+        let authoritative = TodayFocusService.refreshedQuests(
+            [walkQuest],
+            pets: [pet],
+            careLogs: [],
+            walkLogs: [authoritativeWalk],
+            pottyLogs: [],
+            now: now
+        )
+
+        #expect(checkpointOnly.first?.isCompleted == false)
+        #expect(authoritative.first?.isCompleted == true)
+    }
+
     @Test func homeWalkQuickActionRevealsActiveWalkInsteadOfStartingAnotherSession() {
         let requestedPetID = UUID()
         let otherPetID = UUID()

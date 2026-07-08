@@ -585,6 +585,7 @@ nonisolated enum TodayFocusService {
                 actorId: log.executorId
             )
         } + walkLogs.compactMap { log in
+            guard !log.isRecoveryCheckpoint else { return nil }
             guard let petId = log.pet?.id else { return nil }
             return TodayFocusCareLedgerEntry(
                 id: log.id,

@@ -206,6 +206,37 @@ struct CareLedgerBackfillActorTests {
         #expect(event.actionType == HygieneType.brushing.rawValue)
     }
 
+    @Test func backfillSkipsWalkRecoveryCheckpoints() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Piper", species: "狗")
+        let authoritativeWalk = PetWalkLog(
+            startDate: Date(timeIntervalSince1970: 900),
+            pet: pet,
+            executorId: "human-walk"
+        )
+        authoritativeWalk.distanceMeters = 800
+        let checkpoint = PetWalkLog(
+            startDate: Date(timeIntervalSince1970: 950),
+            pet: pet,
+            executorId: "human-walk",
+            sharedSessionId: WalkRecoveryCheckpoint.makeSharedSessionID()
+        )
+        checkpoint.distanceMeters = 400
+        context.insert(pet)
+        context.insert(authoritativeWalk)
+        context.insert(checkpoint)
+        try context.save()
+
+        let actor = CareLedgerBackfillActor(modelContainer: container)
+        try await actor.run()
+
+        let ledger = try fetchLedgerEvents(in: container, legacyModelName: "PetWalkLog")
+        #expect(ledger.count == 1)
+        #expect(ledger.first?.legacyModelId == authoritativeWalk.id.uuidString)
+        #expect(!ledger.contains { $0.legacyModelId == checkpoint.id.uuidString })
+    }
+
     @Test func backfillProcessesPetCareLogsAcrossSourceBatches() async throws {
         let container = try makeContainer()
         let context = container.mainContext

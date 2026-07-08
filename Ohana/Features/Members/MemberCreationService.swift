@@ -225,7 +225,8 @@ final class MemberCreationService: MemberCreating {
             themeColorHex: draft.normalizedThemeHex,
             homeDate: draft.hasHomeDate ? draft.homeDate : nil
         )
-        pet.updateAvatarImageData(draft.avatarImageData)
+        let persistedAvatarImageData = MemberAvatarImageProcessor.persistableAvatarData(draft.avatarImageData)
+        pet.updateAvatarImageData(persistedAvatarImageData)
         pet.coatColor = draft.coatColor
         pet.eyeColor = draft.eyeColor
         pet.personalityTagsRaw = draft.personalityTagIds.joined(separator: ",")
@@ -367,7 +368,8 @@ final class MemberCreationService: MemberCreating {
             nationality: draft.nationality,
             city: residenceText(country: draft.residenceCountry, city: draft.residenceCity)
         )
-        human.updateAvatarImageData(draft.avatarImageData)
+        let persistedAvatarImageData = MemberAvatarImageProcessor.persistableAvatarData(draft.avatarImageData)
+        human.updateAvatarImageData(persistedAvatarImageData)
         human.themeColorHex = draft.normalizedThemeHex
         human.genderIdentityRaw = HumanProfileOptions.storedGenderIdentity(draft.humanGender)
         human.shouldShowOnHome = shouldShowNewMemberOnHome(

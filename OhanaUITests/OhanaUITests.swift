@@ -2847,7 +2847,10 @@ final class OhanaUITests: XCTestCase {
     private func openOasisAndInjectStarterEnergy(in app: XCUIApplication) {
         let oasisTab = app.buttons["home-tab-oasis"]
         XCTAssertTrue(oasisTab.waitForExistence(timeout: 20), "Oasis tab did not appear after member setup.")
-        tapWhenHittable(oasisTab, timeout: 8)
+        XCTAssertTrue(
+            tapWhenFrameReady(oasisTab, timeout: 8),
+            "Oasis tab existed but did not become frame-ready after member setup."
+        )
 
         let oasisScreen = app.otherElements["oasis-screen"]
         XCTAssertTrue(oasisScreen.waitForExistence(timeout: 20), "Oasis did not become visible from the home tab.")
@@ -2858,14 +2861,20 @@ final class OhanaUITests: XCTestCase {
 
         let injectEnergy = app.buttons["home-primary-action"]
         for attempt in 1 ... 4 {
-            tapWhenHittable(injectEnergy, timeout: 8)
+            XCTAssertTrue(
+                tapWhenFrameReady(injectEnergy, timeout: 8),
+                "Starter energy action existed but did not become frame-ready for injection \(attempt)."
+            )
             let reachedEarly = waitUntil(timeout: 0.8) {
                 app.descendants(matching: .any)["oasis-tree-level-control"].label.contains("level 1")
             }
             XCTAssertFalse(reachedEarly, "Starter energy reached Lv1 after only \(attempt) injection(s).")
         }
 
-        tapWhenHittable(injectEnergy, timeout: 8)
+        XCTAssertTrue(
+            tapWhenFrameReady(injectEnergy, timeout: 8),
+            "Starter energy action existed but did not become frame-ready for the final injection."
+        )
 
         let didReachLevelOne = waitUntil(timeout: 20) {
             app.descendants(matching: .any)["oasis-tree-level-control"].label.contains("level 1")
@@ -2877,7 +2886,10 @@ final class OhanaUITests: XCTestCase {
     private func openSettingsFromHomeChrome(in app: XCUIApplication) {
         let settings = app.buttons["home-settings-action"]
         XCTAssertTrue(settings.waitForExistence(timeout: 12), "Home settings action did not appear.")
-        tapWhenHittable(settings, timeout: 8)
+        XCTAssertTrue(
+            tapWhenFrameReady(settings, timeout: 8),
+            "Home settings action existed but did not become frame-ready."
+        )
 
         let settingsScreen = app.otherElements["settings-screen"]
         XCTAssertTrue(settingsScreen.waitForExistence(timeout: 12), "Settings screen did not open from home chrome.")
@@ -3927,7 +3939,7 @@ final class OhanaUITests: XCTestCase {
             "Pet home quick action did not have a tappable frame: \(actionType)"
         )
 
-        let detailAction = app.buttons["home-quick-action-menu-\(actionType)-detail"]
+        let detailAction = homeQuickActionMenuButton(in: app, actionType: actionType, suffix: "detail")
         XCTAssertTrue(
             detailAction.waitForExistence(timeout: 8),
             "Pet home quick action did not expose the detail route menu: \(actionType)"
@@ -3958,7 +3970,7 @@ final class OhanaUITests: XCTestCase {
             "Pet home quick action did not have a tappable frame: \(actionType)"
         )
 
-        let menuAction = app.buttons["home-quick-action-menu-\(actionType)"]
+        let menuAction = homeQuickActionMenuButton(in: app, actionType: actionType, suffix: "quick")
         if menuAction.waitForExistence(timeout: 2) {
             tapWhenHittable(menuAction, timeout: 8)
         }
@@ -3989,6 +4001,23 @@ final class OhanaUITests: XCTestCase {
             action.waitForExistence(timeout: 14),
             "Expanded pet card did not expose the \(actionType) quick action."
         )
+    }
+
+    @MainActor
+    private func homeQuickActionMenuButton(
+        in app: XCUIApplication,
+        actionType: String,
+        suffix: String
+    ) -> XCUIElement {
+        app.buttons
+            .matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                    "home-quick-action-menu-",
+                    "-\(actionType)-\(suffix)"
+                )
+            )
+            .firstMatch
     }
 
     @MainActor
@@ -4108,7 +4137,7 @@ final class OhanaUITests: XCTestCase {
             "Pet home water quick action did not have a tappable frame."
         )
 
-        let detailAction = app.buttons["home-quick-action-menu-water-detail"]
+        let detailAction = homeQuickActionMenuButton(in: app, actionType: "water", suffix: "detail")
         if detailAction.waitForExistence(timeout: 2) {
             tapWhenHittable(detailAction, timeout: 8)
         }
@@ -5264,12 +5293,18 @@ final class OhanaUITests: XCTestCase {
         let didBecomeHittable = waitUntil(timeout: timeout) {
             element.exists && element.isEnabled && element.isHittable
         }
+        if didBecomeHittable {
+            element.tap()
+            return
+        }
+
+        let didBecomeFrameReady = waitForFrameReady(element, timeout: 1)
         let elementValue = element.value.map { String(describing: $0) } ?? "nil"
         XCTAssertTrue(
-            didBecomeHittable,
-            "Element did not become hittable: \(element) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
+            didBecomeFrameReady,
+            "Element did not become hittable or frame-ready: \(element) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
         )
-        element.tap()
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     @MainActor

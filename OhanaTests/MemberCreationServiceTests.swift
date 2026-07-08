@@ -29,6 +29,33 @@ struct MemberCreationServiceTests {
         #expect(try context.fetch(FetchDescriptor<Pet>()).count == 1)
     }
 
+    @Test func petCreationSanitizesLargeAvatarBeforePersistence() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        let context = container.mainContext
+        let originalAvatar = largeOpaqueAvatarData(width: 1800, height: 1400)
+        var draft = petDraft(name: "Momo", source: .customImage)
+        draft.avatarImageData = originalAvatar
+
+        let result = try saveMember(
+            draft: draft,
+            existingPets: [],
+            existingHumans: [],
+            context: context,
+            countryCode: "CN"
+        )
+
+        let persistedAvatar = try #require(result.pet?.avatarImageData)
+        let persistedImage = try #require(UIImage(data: persistedAvatar))
+        let longestPixel = max(
+            persistedImage.size.width * persistedImage.scale,
+            persistedImage.size.height * persistedImage.scale
+        )
+        #expect(persistedAvatar != originalAvatar)
+        #expect(longestPixel <= 1200)
+        #expect(result.pet?.avatarImageSignature == MediaPayloadSignature.signature(for: persistedAvatar))
+    }
+
     @Test func memberMediaAttachmentRepairIndexesLegacyAvatarBlobs() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -643,6 +670,19 @@ struct MemberCreationServiceTests {
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
         return UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2), format: format).pngData { _ in }
+    }
+
+    private func largeOpaqueAvatarData(width: CGFloat, height: CGFloat) -> Data {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let image = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+            UIColor.systemPink.setFill()
+            context.fill(CGRect(x: width * 0.12, y: height * 0.18, width: width * 0.54, height: height * 0.42))
+        }
+        return image.jpegData(compressionQuality: 1) ?? Data()
     }
 
     private func petDraft(name: String, source: MemberAvatarSource) -> MemberCreationDraft {

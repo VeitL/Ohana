@@ -38,7 +38,11 @@ struct PlantBatchQuickRecordSheet: View {
     }
 
     private var l: L10n { L10n(appLanguage) }
-    private var activePlants: [Plant] { plants.sorted { $0.name < $1.name } }
+    private var activePlants: [Plant] {
+        plants
+            .filter { !$0.isArchived }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
     private var selectedCount: Int { selectedPlantIDs.count }
     private var visibleCareTypes: [PlantCareType] {
         quickCareTypes.filter { selectedCareCategory.contains($0) }

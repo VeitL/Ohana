@@ -839,7 +839,7 @@ struct CrewRosterProfilePanel: View {
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                     return
                 }
-                warmAvatarCache(id: result.entityID, data: input.avatarImageData)
+                warmAvatarCache(id: result.entityID, data: result.persistedAvatarImageData)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 withAnimation(GoMotion.feedback) { isEditing = false }
                 onSaved(result.entityID, result.kind)
@@ -875,7 +875,7 @@ struct CrewRosterProfilePanel: View {
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                     return
                 }
-                warmAvatarCache(id: result.entityID, data: input.avatarImageData)
+                warmAvatarCache(id: result.entityID, data: result.persistedAvatarImageData)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 withAnimation(GoMotion.feedback) { isEditing = false }
                 onSaved(result.entityID, result.kind)
@@ -915,7 +915,7 @@ struct CrewRosterProfilePanel: View {
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                     return
                 }
-                warmAvatarCache(id: result.entityID, data: input.avatarImageData)
+                warmAvatarCache(id: result.entityID, data: result.persistedAvatarImageData)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 withAnimation(GoMotion.feedback) { isEditing = false }
                 onSaved(result.entityID, result.kind)
@@ -1024,7 +1024,7 @@ struct CrewRosterProfilePanel: View {
         }
         humanAvatarSignature = signature
         let payload = FocusWalletAvatarCache.Payload(id: human.id, data: data)
-        avatarPipeline.seedPreviewEntries([payload])
+        avatarPipeline.seedPreviewEntries([payload], key: nextKey)
         avatarPipeline.preload(
             payloads: [payload],
             key: nextKey,
@@ -1034,10 +1034,11 @@ struct CrewRosterProfilePanel: View {
 
     private func warmAvatarCache(id: UUID, data: Data?) {
         let payload = FocusWalletAvatarCache.Payload(id: id, data: data)
-        avatarPipeline.seedPreviewEntries([payload])
+        let key = "crew-roster-profile-avatar-save-\(id.uuidString)-\(data?.count ?? 0)"
+        avatarPipeline.seedPreviewEntries([payload], key: key)
         avatarPipeline.preload(
             payloads: [payload],
-            key: "crew-roster-profile-avatar-save-\(id.uuidString)-\(data?.count ?? 0)",
+            key: key,
             delayMilliseconds: 48
         )
     }

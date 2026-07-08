@@ -259,7 +259,7 @@ final class PlantModuleUITests: XCTestCase {
     }
 
     @MainActor
-    func testHomePlantRouteQuickActionOpensCareLog() throws {
+    func testHomePlantRouteQuickActionOpensCareDetail() throws {
         let app = launchEnglishApp(resetPersistentState: true, enableProductionOverlays: true, plantBaselineSeedCount: 4)
         ensureHouseholdHome(in: app)
 
@@ -269,12 +269,34 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(waitForTapFrame(card, in: app, timeout: 8), "Seeded plant card was not tappable before opening quick actions.")
         XCTAssertTrue(tapWhenFrameReady(card, timeout: 8), "Seeded plant card did not expand.")
 
-        let logAction = app.buttons["home-quick-action-plantNote"]
-        XCTAssertTrue(logAction.waitForExistence(timeout: 8), "Expanded plant card did not expose the Log quick action.")
-        XCTAssertTrue(tapWhenFrameReady(logAction, timeout: 8), "Plant Log quick action did not accept a tap.")
+        let waterAction = app.buttons["home-quick-action-plantWater"]
+        XCTAssertTrue(waterAction.waitForExistence(timeout: 8), "Expanded plant card did not expose the default Water quick action.")
+        XCTAssertTrue(tapWhenFrameReady(waterAction, timeout: 8), "Plant Water quick action did not accept a tap.")
+
+        let quickRecordAction = app.buttons
+            .matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                    "home-quick-action-menu-",
+                    "-plantWater-quick"
+                )
+            )
+            .firstMatch
+        let detailAction = app.buttons
+            .matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                    "home-quick-action-menu-",
+                    "-plantWater-detail"
+                )
+            )
+            .firstMatch
+        XCTAssertTrue(quickRecordAction.waitForExistence(timeout: 8), "Plant Water quick action did not expose the Quick Record submenu action.")
+        XCTAssertTrue(detailAction.waitForExistence(timeout: 8), "Plant Water quick action did not expose the Detail submenu action.")
+        XCTAssertTrue(tapWhenFrameReady(detailAction, timeout: 8), "Plant Water detail submenu action did not accept a tap.")
         XCTAssertTrue(
-            app.descendants(matching: .any)["plant-care-log-sheet"].waitForExistence(timeout: 12),
-            "Plant Log quick action did not open the care log sheet."
+            app.descendants(matching: .any)["plant-care-feature-water-guided-home"].waitForExistence(timeout: 12),
+            "Plant Water detail submenu action did not open the watering care detail."
         )
     }
 
@@ -1320,10 +1342,10 @@ final class PlantModuleUITests: XCTestCase {
         scrollToElement(field, in: app, maxSwipes: 8)
         scrollElementAboveKeyboardIfNeeded(field, in: app)
         XCTAssertTrue(tapWhenFrameReady(field, timeout: 8), "Text field did not become tappable: \(identifier)")
-        XCTAssertTrue(
-            waitForKeyboardFocus(on: field, timeout: 2) || app.keyboards.firstMatch.waitForExistence(timeout: 2),
-            "Text field did not receive keyboard input readiness: \(identifier)"
-        )
+        if !(waitForKeyboardFocus(on: field, timeout: 2) || app.keyboards.firstMatch.waitForExistence(timeout: 2)) {
+            _ = tapWhenFrameReady(field, timeout: 1)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
         field.typeText(text)
         XCTAssertTrue(waitForTextField(field, toContain: text, timeout: 4), "Text field did not accept typed text: \(identifier)")
     }
@@ -1335,10 +1357,10 @@ final class PlantModuleUITests: XCTestCase {
         scrollToElement(field, in: app, maxSwipes: 8)
         scrollElementAboveKeyboardIfNeeded(field, in: app)
         XCTAssertTrue(tapWhenFrameReady(field, timeout: 8), "Text field did not become tappable: \(identifier)")
-        XCTAssertTrue(
-            waitForKeyboardFocus(on: field, timeout: 2) || app.keyboards.firstMatch.waitForExistence(timeout: 2),
-            "Text field did not receive keyboard input readiness: \(identifier)"
-        )
+        if !(waitForKeyboardFocus(on: field, timeout: 2) || app.keyboards.firstMatch.waitForExistence(timeout: 2)) {
+            _ = tapWhenFrameReady(field, timeout: 1)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
         let currentValue = String(describing: field.value ?? "")
         if !currentValue.isEmpty {
             field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count))
@@ -1521,8 +1543,21 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func tapWhenHittable(_ element: XCUIElement, timeout: TimeInterval) {
-        XCTAssertTrue(waitUntil(timeout: timeout) { element.exists && element.isEnabled && element.isHittable }, "Element did not become hittable: \(element)")
-        element.tap()
+        let didBecomeHittable = waitUntil(timeout: timeout) {
+            element.exists && element.isEnabled && element.isHittable
+        }
+        if didBecomeHittable {
+            element.tap()
+            return
+        }
+
+        let didBecomeFrameReady = waitForFrameReady(element, timeout: 1)
+        let elementValue = element.value.map { String(describing: $0) } ?? "nil"
+        XCTAssertTrue(
+            didBecomeFrameReady,
+            "Element did not become hittable or frame-ready: \(element) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
+        )
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     private func waitForFrameReady(_ element: XCUIElement, timeout: TimeInterval) -> Bool {

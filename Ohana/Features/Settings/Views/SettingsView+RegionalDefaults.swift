@@ -94,7 +94,7 @@ extension SettingsView {
             areDataSectionsMounted = false
             isLanguageCommitInFlight = true
         }
-        scheduleDataSectionsMount(delayMilliseconds: 1200, animated: false)
+        scheduleDataSectionsMount(delayMilliseconds: 320, animated: false)
     }
 
     func commitLanguageChange(_ languageCode: String, emitFeedback: Bool = true) {

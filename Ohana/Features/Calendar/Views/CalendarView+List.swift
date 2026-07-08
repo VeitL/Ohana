@@ -224,10 +224,7 @@ extension CalendarView {
     }
 
     func weekdayShort(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = AppLanguage.effectiveLocale
-        formatter.dateFormat = "EEE"
-        return formatter.string(from: date)
+        CalendarDateTextFormatter.weekdayShort(date)
     }
 
     func timelineDateID(_ date: Date) -> String {
@@ -435,24 +432,7 @@ extension CalendarView {
 
     func relativeDate(_ date: Date) -> String {
         let l = L10n(AppLanguage.code)
-        if Calendar.current.isDateInToday(date) {
-            return l.tr(zh: "今天", en: "Today", de: "Heute")
-        }
-        if Calendar.current.isDateInYesterday(date) {
-            return l.tr(zh: "昨天", en: "Yesterday", de: "Gestern")
-        }
-        let formatter = DateFormatter()
-        formatter.locale = AppLanguage.effectiveLocale
-        let sameYear = Calendar.current.isDate(date, equalTo: Date(), toGranularity: .year)
-        switch AppLanguage.code {
-        case "zh":
-            formatter.dateFormat = sameYear ? "M月d日 EEEE" : "yyyy年M月d日"
-        case "de":
-            formatter.dateFormat = sameYear ? "EEEE, d. MMM" : "d. MMM yyyy"
-        default:
-            formatter.dateFormat = sameYear ? "EEEE, MMM d" : "MMM d, yyyy"
-        }
-        return formatter.string(from: date)
+        return CalendarDateTextFormatter.relativeDate(date, l: l)
     }
 
     // MARK: - Go Event Row

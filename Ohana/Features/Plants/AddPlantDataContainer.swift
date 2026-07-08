@@ -66,7 +66,7 @@ private actor AddPlantDuplicateSnapshotActor {
             )
             let plants = try modelContext.fetch(descriptor)
             try Task.checkCancellation()
-            return plants.map {
+            return plants.filter { !$0.isArchived }.map {
                 PlantDuplicateScanSnapshot(
                     id: $0.id,
                     name: $0.name,

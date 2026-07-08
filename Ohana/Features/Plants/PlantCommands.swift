@@ -21,6 +21,23 @@ struct PlantCareCommandResult: Equatable, Sendable {
     var affectedEntityIDs: Set<UUID> {
         didPersist ? [plantID, logID, eventID, ledgerEventID] : []
     }
+
+    static func failed(
+        plantID: UUID,
+        careType: PlantCareType,
+        error: String
+    ) -> PlantCareCommandResult {
+        PlantCareCommandResult(
+            plantID: plantID,
+            logID: UUID(),
+            eventID: UUID(),
+            ledgerEventID: UUID(),
+            careType: careType,
+            coconutDelta: 0,
+            didPersist: false,
+            persistenceError: error
+        )
+    }
 }
 
 enum PlantCareCommandService {
@@ -43,6 +60,14 @@ enum PlantCareCommandService {
         saveChanges: Bool = true,
         awardRewards: Bool = true
     ) -> PlantCareCommandResult {
+        guard !plant.isArchived else {
+            return .failed(
+                plantID: plant.id,
+                careType: type,
+                error: "plantArchived"
+            )
+        }
+
         let careLedger = providedCareLedger ?? CareLedgerService()
         let l = L10n.current
         let careTypeName = type.displayName(l: l)
@@ -706,7 +731,7 @@ enum PlantCreationCommandService {
             remindersEnabled: input.remindersEnabled
         )
         plant.id = input.id
-        plant.updateAvatarImageData(input.avatarImageData)
+        plant.updateAvatarImageData(MemberAvatarImageProcessor.persistableAvatarData(input.avatarImageData))
         plant.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         context.insert(plant)
         CloudSyncMutationRecorder.markModified(plant, context: context)

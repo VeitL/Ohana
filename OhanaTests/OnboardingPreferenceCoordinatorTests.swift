@@ -49,6 +49,22 @@ struct OnboardingPreferenceCoordinatorTests {
         #expect(coordinator.canContinueFromPreferencePage)
     }
 
+    @Test func uiTestLaunchDefaultsProvideCompleteManualLocationWithoutSystemPermission() {
+        let defaults = makeDefaults()
+        let coordinator = OnboardingPreferenceCoordinator(
+            defaults: defaults,
+            usesUITestDefaults: true
+        )
+
+        #expect(coordinator.locationSource == .manual)
+        #expect(coordinator.usesCustomCountry)
+        #expect(coordinator.usesCustomCity)
+        #expect(coordinator.country == "Germany")
+        #expect(coordinator.city == "Berlin")
+        #expect(coordinator.manualLocationIsComplete)
+        #expect(coordinator.canContinueFromPreferencePage)
+    }
+
     @Test func unresolvedLocationRequestTimesOutToManualFields() async {
         let defaults = makeDefaults()
         let coordinator = OnboardingPreferenceCoordinator(

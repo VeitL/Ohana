@@ -16,11 +16,21 @@ final class AvatarPipeline: ObservableObject {
 
     init() {}
 
-    @discardableResult
-    func seedPreviewEntries(_ payloads: [FocusWalletAvatarCache.Payload]) -> Bool {
-        let changed = FocusWalletAvatarCache.seedPreviewEntries(payloads: payloads)
-        if changed { advanceRevision() }
-        return changed
+    func seedPreviewEntries(
+        _ payloads: [FocusWalletAvatarCache.Payload],
+        key: String,
+        delayMilliseconds: UInt64 = 16
+    ) {
+        let taskKey = previewTaskKey(for: key)
+        decodeTasks[taskKey]?.cancel()
+        decodeTasks[taskKey] = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: delayMilliseconds)
+            guard !Task.isCancelled else { return }
+            let changed = await FocusWalletAvatarCache.seedPreviewEntries(payloads: payloads)
+            guard !Task.isCancelled else { return }
+            if changed { advanceRevision() }
+            decodeTasks[taskKey] = nil
+        }
     }
 
     func cachedImage(for id: UUID, signature: String) -> UIImage? {
@@ -59,10 +69,17 @@ final class AvatarPipeline: ObservableObject {
     func cancel(key: String) {
         decodeTasks[key]?.cancel()
         decodeTasks[key] = nil
+        let taskKey = previewTaskKey(for: key)
+        decodeTasks[taskKey]?.cancel()
+        decodeTasks[taskKey] = nil
     }
 
     private func advanceRevision() {
         revision &+= 1
+    }
+
+    private func previewTaskKey(for key: String) -> String {
+        "preview:\(key)"
     }
 }
 

@@ -69,7 +69,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
 
             await runStep("plant_care_orphan_maintenance", delayMilliseconds: 30000) {
                 guard self.shouldRunPlantCareOrphanMaintenance else { return }
-                let result = PlantCareOrphanMaintenanceService.run(context: context, defaults: self.defaults)
+                let result = await PlantCareOrphanMaintenanceService.runOffMainScan(context: context, defaults: self.defaults)
                 if result.didPersist {
                     self.defaults.set(Date().timeIntervalSince1970, forKey: Keys.plantCareOrphanMaintenanceLastRunAt)
                 }

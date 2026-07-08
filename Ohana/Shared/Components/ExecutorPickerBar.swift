@@ -170,7 +170,7 @@ struct ExecutorPickerBar: View {
         }
 
         let payload = FocusWalletAvatarCache.Payload(id: humanID, data: data)
-        avatarPipeline.seedPreviewEntries([payload])
+        avatarPipeline.seedPreviewEntries([payload], key: nextKey)
         avatarPipeline.preload(
             payloads: [payload],
             key: nextKey,

@@ -120,6 +120,70 @@ nonisolated struct CalendarContentHandoffState: Equatable, Sendable {
     var viewModeRaw: String
 }
 
+@MainActor
+enum CalendarDateTextFormatter {
+    private static var weekdaySymbolCache: [String: [String]] = [:]
+    private static var weekdayFormatterCache: [String: DateFormatter] = [:]
+    private static var dateFormatterCache: [String: DateFormatter] = [:]
+
+    static func veryShortWeekdaySymbols() -> [String] {
+        let key = AppLanguage.code
+        if let cached = weekdaySymbolCache[key] {
+            return cached
+        }
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.effectiveLocale
+        let symbols = formatter.veryShortStandaloneWeekdaySymbols ?? formatter.shortStandaloneWeekdaySymbols ?? []
+        weekdaySymbolCache[key] = symbols
+        return symbols
+    }
+
+    static func weekdayShort(_ date: Date) -> String {
+        formatter(cache: &weekdayFormatterCache, key: "\(AppLanguage.code).weekday") { formatter in
+            formatter.dateFormat = "EEE"
+        }
+        .string(from: date)
+    }
+
+    static func relativeDate(_ date: Date, l: L10n, calendar: Calendar = .current) -> String {
+        if calendar.isDateInToday(date) {
+            return l.tr(zh: "今天", en: "Today", de: "Heute")
+        }
+        if calendar.isDateInYesterday(date) {
+            return l.tr(zh: "昨天", en: "Yesterday", de: "Gestern")
+        }
+        let sameYear = calendar.isDate(date, equalTo: Date(), toGranularity: .year)
+        let language = AppLanguage.code
+        let dateFormat: String = switch language {
+        case "zh":
+            sameYear ? "M月d日 EEEE" : "yyyy年M月d日"
+        case "de":
+            sameYear ? "EEEE, d. MMM" : "d. MMM yyyy"
+        default:
+            sameYear ? "EEEE, MMM d" : "MMM d, yyyy"
+        }
+        return formatter(cache: &dateFormatterCache, key: "\(language).\(dateFormat)") { formatter in
+            formatter.dateFormat = dateFormat
+        }
+        .string(from: date)
+    }
+
+    private static func formatter(
+        cache: inout [String: DateFormatter],
+        key: String,
+        configure: (DateFormatter) -> Void
+    ) -> DateFormatter {
+        if let cached = cache[key] {
+            return cached
+        }
+        let formatter = DateFormatter()
+        formatter.locale = AppLanguage.effectiveLocale
+        configure(formatter)
+        cache[key] = formatter
+        return formatter
+    }
+}
+
 nonisolated struct CalendarPreparedSnapshotTriggerKey: Equatable, Sendable {
     var monthKey: String
     var filter: CalendarFilterSelection

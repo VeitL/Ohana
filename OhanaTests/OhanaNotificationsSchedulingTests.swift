@@ -189,6 +189,31 @@ struct OhanaNotificationsSchedulingTests {
         #expect(NotificationPendingBudget.skippedBudgetMetadataJSON(existingPendingCount: 55).contains("\"reason\":\"iosPendingLimit\""))
     }
 
+    @Test func notificationRequestAddsStayBehindKnownSchedulingChokepoints() throws {
+        let appFiles = try swiftAppFiles()
+        let filesAddingRequests = try Set(appFiles.compactMap { fileURL -> String? in
+            let copy = try String(contentsOf: fileURL, encoding: .utf8)
+            guard copy.contains("center.add(request") ||
+                copy.contains("UNUserNotificationCenter.current().add") else {
+                return nil
+            }
+            return relativePath(for: fileURL)
+        })
+        let allowedFiles: Set<String> = [
+            "Ohana/Features/Notifications/NotificationManager.swift",
+            "Ohana/Features/Medication/MedicationReminderService.swift",
+            "Ohana/Features/FamilyReports/FamilyWeeklyReportService.swift"
+        ]
+
+        #expect(filesAddingRequests == allowedFiles)
+        let notificationManagerSource = try source("Ohana/Features/Notifications/NotificationManager.swift")
+        let medicationReminderSource = try source("Ohana/Features/Medication/MedicationReminderService.swift")
+        let weeklyReportSource = try source("Ohana/Features/FamilyReports/FamilyWeeklyReportService.swift")
+        #expect(notificationManagerSource.contains("NotificationPendingBudget.hasCapacity"))
+        #expect(medicationReminderSource.contains("MedicationNotificationBudget.reserve"))
+        #expect(weeklyReportSource.contains("family_weekly_report_sunday_2000"))
+    }
+
     @Test func medicationNotificationBudgetUsesSamePendingRequestCapacity() {
         var existingIds = Set((0 ..< NotificationPendingBudget.managedPendingRequestLimit - 1).map { "existing-\($0)" })
 
@@ -825,6 +850,30 @@ struct OhanaNotificationsSchedulingTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         return try String(contentsOf: rootURL.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    private func swiftAppFiles() throws -> [URL] {
+        let rootURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let appURL = rootURL.appendingPathComponent("Ohana")
+        guard let enumerator = FileManager.default.enumerator(
+            at: appURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+        return enumerator
+            .compactMap { $0 as? URL }
+            .filter { $0.pathExtension == "swift" }
+    }
+
+    private func relativePath(for fileURL: URL) -> String {
+        let rootURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return fileURL.path.replacingOccurrences(of: rootURL.path + "/", with: "")
     }
 
     private func restorePreference(_ previousValue: Any?, key: String, defaults: UserDefaults) {
