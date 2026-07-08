@@ -42,11 +42,20 @@ extension PlantDetailContentView {
                     .accessibilityIdentifier("plant-detail-name")
 
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        if !plant.species.isEmpty {
-                            profileChip(icon: "leaf.fill", text: plant.species)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) {
+                            if !plant.species.isEmpty {
+                                profileChip(icon: "leaf.fill", text: plant.species)
+                            }
+                            profileChip(icon: plant.isIndoor ? "house.fill" : "sun.max.fill", text: plant.isIndoor ? l.tr(zh: "室内", en: "Indoor", de: "Drinnen") : l.tr(zh: "户外", en: "Outdoor", de: "Draußen"))
                         }
-                        profileChip(icon: plant.isIndoor ? "house.fill" : "sun.max.fill", text: plant.isIndoor ? l.tr(zh: "室内", en: "Indoor", de: "Drinnen") : l.tr(zh: "户外", en: "Outdoor", de: "Draußen"))
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            if !plant.species.isEmpty {
+                                profileChip(icon: "leaf.fill", text: plant.species)
+                            }
+                            profileChip(icon: plant.isIndoor ? "house.fill" : "sun.max.fill", text: plant.isIndoor ? l.tr(zh: "室内", en: "Indoor", de: "Drinnen") : l.tr(zh: "户外", en: "Outdoor", de: "Draußen"))
+                        }
                     }
                     profileChip(icon: "mappin.and.ellipse", text: placementSummary)
                     if activeSafetyWarningCount > 0 {
@@ -82,8 +91,9 @@ extension PlantDetailContentView {
             Text(text)
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -97,7 +107,9 @@ extension PlantDetailContentView {
                 .accessibilityHidden(true)
             Text(title)
                 .font(OhanaFont.adaptive(size: 12, weight: .heavy, design: .rounded))
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(Color.arkInk)
         .padding(.horizontal, 10)
@@ -116,12 +128,13 @@ extension PlantDetailContentView {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(value)
                     .font(OhanaFont.adaptive(size: 13, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
-                    .minimumScaleFactor(0.82)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }

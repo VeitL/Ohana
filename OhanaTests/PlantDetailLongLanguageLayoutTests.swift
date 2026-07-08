@@ -47,6 +47,60 @@ struct PlantDetailLongLanguageLayoutTests {
         #expect(!source.contains(".frame(minHeight: 42)"))
     }
 
+    @Test func plantDetailHeroAndStatusSummaryWrapLongLocalizedText() throws {
+        let heroSource = try source(
+            "Ohana/Features/Plants/Views/PlantDetailView+HeroTimelineDelete.swift",
+            rootURL: repositoryRootURL()
+        )
+        let careSource = try source(
+            "Ohana/Features/Plants/Views/PlantDetailView+CareSections.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(heroSource.contains("ViewThatFits(in: .horizontal)"))
+        #expect(heroSource.contains(".lineLimit(2)"))
+        #expect(heroSource.contains(".multilineTextAlignment(.leading)"))
+        #expect(heroSource.contains(".multilineTextAlignment(.center)"))
+        #expect(heroSource.contains(".fixedSize(horizontal: false, vertical: true)"))
+        #expect(!heroSource.contains(".lineLimit(1)\n                .minimumScaleFactor(0.8)"))
+        #expect(careSource.contains("var careOverviewMetricColumns: [GridItem]"))
+        #expect(careSource.contains("GridItem(.adaptive(minimum: 132)"))
+        #expect(careSource.contains("LazyVGrid(columns: careOverviewMetricColumns"))
+        #expect(careSource.contains("var careOverviewTitleBlock: some View"))
+        #expect(careSource.contains("ViewThatFits(in: .horizontal)"))
+        #expect(!careSource.contains("LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14)"))
+    }
+
+    @Test func plantCareFeatureDetailUsesAdaptiveSummaryAndDiscoveryGrids() throws {
+        let source = try source(
+            "Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains("plantCareFeatureMetricColumns"))
+        #expect(source.contains("plantCareFeatureInsightColumns"))
+        #expect(source.contains("plantCareFeatureWaterSignalColumns"))
+        #expect(source.contains("plantCareFeatureDiscoveryColumns"))
+        #expect(source.contains("GridItem(.adaptive(minimum: 132)"))
+        #expect(source.contains("GridItem(.adaptive(minimum: 156)"))
+        #expect(source.contains("GridItem(.adaptive(minimum: 118)"))
+        #expect(source.contains("GridItem(.adaptive(minimum: 150)"))
+        #expect(!source.contains("LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10)"))
+    }
+
+    @Test func plantCareLogTypePickerUsesAdaptiveGridAndWrappingChips() throws {
+        let source = try source(
+            "Ohana/Features/Plants/Views/PlantCareLogSheet.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(source.contains("var careTypeGridColumns: [GridItem]"))
+        #expect(source.contains("GridItem(.adaptive(minimum: 112)"))
+        #expect(source.contains("LazyVGrid(columns: careTypeGridColumns"))
+        #expect(source.contains(".multilineTextAlignment(.center)"))
+        #expect(!source.contains("LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8)"))
+    }
+
     @Test func plantCareLogSuggestionsAvoidFixedWidthCards() throws {
         let source = try source(
             "Ohana/Features/Plants/Views/PlantCareLogSheet.swift",

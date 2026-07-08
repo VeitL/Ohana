@@ -10,24 +10,20 @@ import SwiftUI
 extension PlantDetailContentView {
     var careOverviewCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(l.tr(zh: "植物状态", en: "Plant status", de: "Pflanzenstatus"))
-                        .font(OhanaFont.adaptive(size: 16, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(healthSummaryText)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline) {
+                    careOverviewTitleBlock
+                    Spacer(minLength: 12)
+                    careOverviewStatusPill
                 }
-                Spacer(minLength: 12)
-                statusPill(
-                    icon: plant.healthStatus == .stressed ? "exclamationmark.triangle.fill" : "leaf.fill",
-                    title: plant.healthStatus.displayName,
-                    tint: healthTone
-                )
+
+                VStack(alignment: .leading, spacing: 10) {
+                    careOverviewTitleBlock
+                    careOverviewStatusPill
+                }
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
+            LazyVGrid(columns: careOverviewMetricColumns, spacing: 14) {
                 overviewMetric(
                     icon: "calendar.badge.clock",
                     title: l.tr(zh: "待办", en: "Due", de: "Fällig"),
@@ -60,6 +56,31 @@ extension PlantDetailContentView {
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .accessibilityIdentifier("plant-detail-health-summary")
         .padding(.horizontal, 16)
+    }
+
+    var careOverviewMetricColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 132), spacing: 14)]
+    }
+
+    var careOverviewTitleBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(l.tr(zh: "植物状态", en: "Plant status", de: "Pflanzenstatus"))
+                .font(OhanaFont.adaptive(size: 16, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            Text(healthSummaryText)
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    var careOverviewStatusPill: some View {
+        statusPill(
+            icon: plant.healthStatus == .stressed ? "exclamationmark.triangle.fill" : "leaf.fill",
+            title: plant.healthStatus.displayName,
+            tint: healthTone
+        )
     }
 
     var todayCarePanelTasks: [PlantCareTaskSnapshot] {

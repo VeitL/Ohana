@@ -275,8 +275,8 @@ struct PlantCareFeatureDetailView: View {
                 Text(focusedPlant == nil ? subtitle : pageTitle)
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 8)
@@ -286,7 +286,7 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private var summaryBand: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+        LazyVGrid(columns: plantCareFeatureMetricColumns, spacing: 10) {
             metricTile(
                 id: "plants",
                 icon: "leaf.fill",
@@ -318,6 +318,22 @@ struct PlantCareFeatureDetailView: View {
         }
     }
 
+    private var plantCareFeatureMetricColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 132), spacing: 10)]
+    }
+
+    private var plantCareFeatureInsightColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 156), spacing: 10)]
+    }
+
+    private var plantCareFeatureWaterSignalColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 118), spacing: 10)]
+    }
+
+    private var plantCareFeatureDiscoveryColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 150), spacing: 10)]
+    }
+
     private var duePlantCount: Int {
         duePlantsForFeature.count
     }
@@ -326,7 +342,7 @@ struct PlantCareFeatureDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle(l.tr(zh: "照护比较", en: "Care comparison", de: "Pflegevergleich"))
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            LazyVGrid(columns: plantCareFeatureInsightColumns, spacing: 10) {
                 ForEach(aggregateInsights) { insight in
                     aggregateInsightTile(insight)
                 }
@@ -474,21 +490,21 @@ struct PlantCareFeatureDetailView: View {
                 Text(insight.title)
                     .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Text(insight.value)
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.62)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
             Text(insight.detail)
                 .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaTertiaryText)
                 .lineLimit(2)
-                .minimumScaleFactor(0.72)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
         .padding(12)
@@ -510,13 +526,13 @@ struct PlantCareFeatureDetailView: View {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaTertiaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.74)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(value)
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.68)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 0)
@@ -746,12 +762,13 @@ struct PlantCareFeatureDetailView: View {
             Text(signal.title)
                 .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(1)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Text(signal.value)
                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(signal.tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.62)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .contentTransition(.numericText())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -791,7 +808,7 @@ struct PlantCareFeatureDetailView: View {
 
             waterQuickActionRail(for: plant)
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            LazyVGrid(columns: plantCareFeatureWaterSignalColumns, spacing: 10) {
                 ForEach(signals) { signal in
                     waterSignalPill(signal)
                 }
@@ -1131,7 +1148,7 @@ struct PlantCareFeatureDetailView: View {
         let task = wateringTask(for: plant)
         let adviceItems = waterAdviceItems(for: plant, task: task)
         return VStack(spacing: 10) {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            LazyVGrid(columns: plantCareFeatureDiscoveryColumns, spacing: 10) {
                 waterCompactDiscoveryCard(
                     id: "habit",
                     icon: "humidity.fill",
@@ -1228,8 +1245,8 @@ struct PlantCareFeatureDetailView: View {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 if isInteractive {
                     Image(systemName: "chevron.right") // a11y: allow decorative affordance; card label names the action.
@@ -1243,7 +1260,7 @@ struct PlantCareFeatureDetailView: View {
                 .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
                 .lineLimit(2)
-                .minimumScaleFactor(0.68)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
         .padding(12)

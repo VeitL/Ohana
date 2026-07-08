@@ -223,7 +223,7 @@ struct PlantCareLogSheet: View {
             }
             .accessibilityElement(children: .contain)
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            LazyVGrid(columns: careTypeGridColumns, spacing: 8) {
                 ForEach(visibleCareTypes) { type in
                     chipButton(
                         title: type.displayName(l: l),
@@ -240,6 +240,10 @@ struct PlantCareLogSheet: View {
         .padding(14)
         .plantCareLogFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
         .accessibilityIdentifier("plant-care-log-type-picker")
+    }
+
+    private var careTypeGridColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 112), spacing: 8)]
     }
 
     private func categoryChip(_ category: PlantCareCategory) -> some View {
@@ -485,8 +489,9 @@ struct PlantCareLogSheet: View {
                     .accessibilityHidden(true)
                 Text(title)
                     .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity)
