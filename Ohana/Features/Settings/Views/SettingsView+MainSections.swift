@@ -10,12 +10,7 @@ extension SettingsView {
     var settingsBodySections: some View {
         AnyView(settingsHeader)
         AnyView(settingsDataSections)
-        if SettingsDebugTools.isVisible {
-            AnyView(settingsDebugSection)
-        }
-        if OnlineFeatureGate.allows(.onlineCollaboration) {
-            AnyView(householdSyncSection)
-        }
+        AnyView(settingsDeferredHeavySections)
         AnyView(settingsPreferencesSection)
         if isLanguageCommitInFlight {
             AnyView(settingsLanguageCommitPlaceholderSection)
@@ -27,6 +22,18 @@ extension SettingsView {
             AnyView(settingsResetSection)
         }
         Spacer(minLength: 40)
+    }
+
+    @ViewBuilder
+    var settingsDeferredHeavySections: some View {
+        if !isLanguageCommitInFlight {
+            if SettingsDebugTools.isVisible {
+                settingsDebugSection
+            }
+            if OnlineFeatureGate.allows(.onlineCollaboration) {
+                householdSyncSection
+            }
+        }
     }
 
     var settingsPreferencesSection: some View {
