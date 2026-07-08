@@ -796,7 +796,7 @@ struct PlantDetailContentView: View {
             PlantAllFeaturesSheet(
                 plant: plant,
                 careTasks: careTasks,
-                logCount: logSummary?.logCount ?? 0,
+                activitySummary: PlantAllFeaturesActivitySummary(logSummary: logSummary),
                 photoCount: galleryPhotoItems.count,
                 profileCompletionPercent: profileCompletionPercent,
                 safetyWarningCount: activeSafetyWarningCount,

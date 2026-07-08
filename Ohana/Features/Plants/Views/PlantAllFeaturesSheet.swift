@@ -125,10 +125,34 @@ private struct PlantHubFocusAction {
     let destination: PlantFeatureDestination
 }
 
+nonisolated struct PlantAllFeaturesActivitySummary: Equatable, Sendable {
+    let logCount: Int
+    let recentStressSignalCount: Int
+    let recentObservationLogCount: Int
+
+    init(
+        logCount: Int = 0,
+        recentStressSignalCount: Int = 0,
+        recentObservationLogCount: Int = 0
+    ) {
+        self.logCount = logCount
+        self.recentStressSignalCount = recentStressSignalCount
+        self.recentObservationLogCount = recentObservationLogCount
+    }
+
+    init(logSummary: PlantDetailLogSummary?) {
+        self.init(
+            logCount: logSummary?.logCount ?? 0,
+            recentStressSignalCount: logSummary?.recentStressSignalCount ?? 0,
+            recentObservationLogCount: logSummary?.recentObservationLogCount ?? 0
+        )
+    }
+}
+
 struct PlantAllFeaturesSheet: View {
     let plant: Plant
     let careTasks: [PlantCareTaskSnapshot]
-    let logCount: Int
+    let activitySummary: PlantAllFeaturesActivitySummary
     let photoCount: Int
     let profileCompletionPercent: Int
     let safetyWarningCount: Int
@@ -142,32 +166,12 @@ struct PlantAllFeaturesSheet: View {
         let trimmed = plant.themeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? Color.goTeal : Color(hex: trimmed)
     }
+    private var logCount: Int { activitySummary.logCount }
     private var dueTaskCount: Int { careTasks.count { $0.daysUntilDue <= 0 } }
     private var nextTask: PlantCareTaskSnapshot? { careTasks.first }
     private var nextDueTask: PlantCareTaskSnapshot? { careTasks.first { $0.daysUntilDue <= 0 } }
-    private var recentObservationWindowStart: Date {
-        Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date().addingTimeInterval(-30 * 86400)
-    }
-    private var recentStressSignalCount: Int {
-        plant.careLogs.count { log in
-            log.date >= recentObservationWindowStart &&
-                (log.careType == .yellowLeaf || log.careType == .pestFound)
-        }
-    }
-    private var recentHealthReviewCount: Int {
-        plant.careLogs.count { log in
-            log.date >= recentObservationWindowStart &&
-                [
-                    PlantCareType.pestCheck,
-                    .pestFound,
-                    .yellowLeaf,
-                    .newLeaf,
-                    .leafCleaning,
-                    .photo,
-                    .customNote
-                ].contains(log.careType)
-        }
-    }
+    private var recentStressSignalCount: Int { activitySummary.recentStressSignalCount }
+    private var recentHealthReviewCount: Int { activitySummary.recentObservationLogCount }
     private var healthReviewSignalCount: Int {
         let statusSignal = plant.healthStatus == .stressed || plant.healthStatus == .watching ? 1 : 0
         let environmentSignal = plant.isNearClimateSource || !plant.potHasDrainage ? 1 : 0
