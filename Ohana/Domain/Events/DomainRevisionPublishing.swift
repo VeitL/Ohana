@@ -29,7 +29,9 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
     private let center: ReadModelRevisionCenter
 
     init() {
-        center = ReadModelRevisionCenter()
+        // Converge on the app-wide center: a fresh center here would swallow every
+        // publish from convenience-constructed executors (wallet spends went dark this way).
+        center = .shared
     }
 
     init(center: ReadModelRevisionCenter) {

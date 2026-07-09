@@ -126,7 +126,12 @@ struct MemberCardCreationContentView: View {
             && !isJoinHandoffRunning
             && !draft.trimmedName.isEmpty
             && !duplicateName
-            && (!requiresStarterPetWeight || hasValidInitialPetWeight)
+            && (kind != .pet || hasRequiredPetIdentity)
+    }
+
+    // 宠物必选:物种 + 品种。
+    var hasRequiredPetIdentity: Bool {
+        !draft.species.isEmpty && !draft.resolvedBreed.isEmpty
     }
 
     var creationSteps: [MemberCreationStep] { MemberCreationStep.steps(for: kind) }
@@ -135,23 +140,11 @@ struct MemberCardCreationContentView: View {
     var canAdvanceStep: Bool {
         guard !isSaving, !isJoinHandoffRunning else { return false }
         if currentStep == .basicInfo {
-            return !draft.trimmedName.isEmpty && !duplicateName
-        }
-        if currentStep == .petProfile, requiresStarterPetWeight {
-            return hasValidInitialPetWeight
+            guard !draft.trimmedName.isEmpty, !duplicateName else { return false }
+            // 宠物:物种与品种在此步,设为必选后才能进入下一步。
+            return kind != .pet || hasRequiredPetIdentity
         }
         return true
-    }
-
-    var requiresStarterPetWeight: Bool {
-        kind == .pet && existingPets.isEmpty && starterGiftPending && !starterGiftClaimed
-    }
-
-    var hasValidInitialPetWeight: Bool {
-        guard let weight = CountryDecimalInput.parse(draft.weightText, countryCode: appCountry) else {
-            return false
-        }
-        return weight > 0
     }
 
     var canRunHomeJoinHandoff: Bool {

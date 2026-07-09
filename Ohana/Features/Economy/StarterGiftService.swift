@@ -48,13 +48,14 @@ enum StarterGiftService {
 
         let hasPendingGift = defaults.bool(forKey: StarterGiftStorageKey.pending)
         let counts = dataCounts(context: context)
-        let hasFirstPetWeight = hasRecordedPetWeight(context: context)
+        // 礼包改为「创建首只宠物即发」:不再要求先录体重(添加宠物已去掉体重字段)。
+        let hasFirstPet = counts.pets >= 1
 
         if let human = activeHuman(matching: activeHumanID ?? "", context: context) {
             if hasPendingGift || counts.humans == 1 && counts.pets == 0 && counts.ledger == 0 && counts.petWeights == 0 {
                 defaults.set(true, forKey: StarterGiftStorageKey.pending)
-                guard hasFirstPetWeight else {
-                    AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_pet_weight", valueMS: 0)
+                guard hasFirstPet else {
+                    AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_pet", valueMS: 0)
                     return .pendingFirstCare(humanID: human.id)
                 }
                 return claim(for: human, context: context, defaults: defaults, careLedger: careLedger, wallet: wallet, projectionManager: projectionManager)
@@ -222,22 +223,6 @@ enum StarterGiftService {
             )
             return []
         }
-    }
-
-    @MainActor
-    private static func hasRecordedPetWeight(context: ModelContext) -> Bool {
-        var weightDescriptor = FetchDescriptor<PetWeightLog>()
-        weightDescriptor.fetchLimit = 1
-        if fetchModelsOrLog(weightDescriptor, context: context, operation: "fetch starter gift pet weight").isEmpty == false {
-            return true
-        }
-        var ledgerDescriptor = FetchDescriptor<CareLedgerEvent>(
-            predicate: #Predicate<CareLedgerEvent> { event in
-                event.eventKind == "weight" && event.actionType == "petWeight"
-            }
-        )
-        ledgerDescriptor.fetchLimit = 1
-        return fetchModelsOrLog(ledgerDescriptor, context: context, operation: "fetch starter gift pet weight ledger").isEmpty == false
     }
 
     @MainActor

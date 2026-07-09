@@ -306,6 +306,9 @@ final class OnboardingPreferenceCoordinator {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let locationResolver: any OnboardingLocationResolving
     @ObservationIgnored private let locationRequestTimeoutNanoseconds: UInt64
+    // 首次授权会弹系统对话框,用户读+点击常超过 GPS 超时。这个更宽的窗口只覆盖
+    // "对话框 + 首个定位",避免把用户读对话框的时间误判为定位失败。
+    @ObservationIgnored private let permissionPromptTimeoutNanoseconds: UInt64
     @ObservationIgnored private var locationRequestGeneration = 0
 
     var country: String {
@@ -356,11 +359,13 @@ final class OnboardingPreferenceCoordinator {
         defaults: UserDefaults = .standard,
         locationResolver: (any OnboardingLocationResolving)? = nil,
         locationRequestTimeoutNanoseconds: UInt64 = 4_000_000_000,
+        permissionPromptTimeoutNanoseconds: UInt64 = 30_000_000_000,
         usesUITestDefaults: Bool? = nil
     ) {
         self.defaults = defaults
         self.locationResolver = locationResolver ?? LiveOnboardingLocationResolver()
         self.locationRequestTimeoutNanoseconds = locationRequestTimeoutNanoseconds
+        self.permissionPromptTimeoutNanoseconds = permissionPromptTimeoutNanoseconds
         let storedCountry = defaults.string(forKey: Self.countryKey) ?? ""
         let storedCity = defaults.string(forKey: Self.cityKey) ?? ""
         let storedLocationSource = OnboardingLocationSource(rawValue: defaults.string(forKey: Self.locationSourceKey) ?? "") ?? .unresolved
@@ -571,7 +576,12 @@ final class OnboardingPreferenceCoordinator {
             }
         }
 
-        let result = await oneShotLocation(from: locationProvider)
+        // 首次请求会先弹系统权限对话框——超时须覆盖用户读+点击的时间,否则会把
+        // 对话框停留误判为定位失败(第一次报错、第二次才成功的经典竞态)。
+        let timeout = locationAuthorizationStatus == .notDetermined
+            ? permissionPromptTimeoutNanoseconds
+            : locationRequestTimeoutNanoseconds
+        let result = await oneShotLocation(from: locationProvider, timeoutNanoseconds: timeout)
         guard requestGeneration == locationRequestGeneration else { return }
         switch result {
         case let .success(location):
@@ -630,17 +640,22 @@ final class OnboardingPreferenceCoordinator {
         return true
     }
 
-    private func oneShotLocation(from provider: LocationProviding) async -> Result<CLLocation, Error> {
+    private func oneShotLocation(
+        from provider: LocationProviding,
+        timeoutNanoseconds: UInt64
+    ) async -> Result<CLLocation, Error> {
         await withCheckedContinuation { continuation in
             let completion = OnboardingOneShotLocationCompletion(continuation: continuation)
-            provider.requestOneShotLocation(accuracy: kCLLocationAccuracyHundredMeters) { result in
+            // 只需定位国家/城市:公里级精度靠 WiFi/基站即可秒回,无需等精确 GPS 卫星锁定
+            // (100 米精度会让首次/室内定位慢十几秒)。反向地理编码城市级足够。
+            provider.requestOneShotLocation(accuracy: kCLLocationAccuracyKilometer) { result in
                 Task { @MainActor in
                     completion.resume(with: result)
                 }
             }
 
             Task { @MainActor in
-                try? await Task.sleep(nanoseconds: locationRequestTimeoutNanoseconds)
+                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
                 completion.resume(with: .failure(OnboardingLocationRequestError.timedOut))
             }
         }

@@ -72,6 +72,10 @@ nonisolated struct HomeRevision: Equatable, Hashable, Sendable {
 
 @MainActor
 final class ReadModelRevisionCenter: ObservableObject {
+    /// App-wide default center. Default-constructed publishers must converge here;
+    /// a publisher wrapping any other ad-hoc center is invisible to UI observers.
+    static let shared = ReadModelRevisionCenter()
+
     @Published private(set) var homeRevision = HomeRevision()
     @Published private(set) var walletProjectionRevision = HomeRevision()
     @Published private(set) var lastMutation: DomainMutationResult?

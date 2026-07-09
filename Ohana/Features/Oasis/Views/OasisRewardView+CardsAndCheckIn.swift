@@ -11,6 +11,8 @@ extension OasisRewardView {
     var progressCard: some View {
         OasisProgressCard(
             totalEnergy: treeVisualTotalEnergy,
+            careGrowthEnergy: treeMgr.careGrowthEnergy,
+            injectedEnergy: treeMgr.injectedEnergy,
             nextLevelThreshold: treeVisualNextLevelThreshold,
             progressToNextLevel: CGFloat(treeVisualProgressToNextLevel),
             passiveIncomeAmount: treePassiveIncomeAmount,

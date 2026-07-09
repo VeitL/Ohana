@@ -196,6 +196,8 @@ struct OhanaTests {
 
     @MainActor
     @Test func coconutRewardFeedbackCenterSurfacesRecordOnlyMessageWithoutCoconuts() {
+        // 气泡只报椰子数(不报养分数字),但保留预算耗尽的安慰消息:
+        // 0 椰子的 record-only 事件仍弹气泡显示消息,金额区为空。
         let event = OhanaCoconutRewardEvent(entry: CoconutLogEntry(
             emoji: "🥥",
             title: "今日椰子已装满，明天继续～",
@@ -211,7 +213,22 @@ struct OhanaTests {
 
         #expect(center.activeEvent == event)
         #expect(center.coalescedAmount == 0)
-        #expect(center.coalescedGrowthXP == 2)
+    }
+
+    @MainActor
+    @Test func defaultDomainRevisionPublisherSurfacesRewardOnSharedCenter() {
+        let event = OhanaCoconutRewardEvent(
+            amount: 7,
+            growthXP: 3,
+            emoji: "🥥",
+            title: "测试奖励",
+            actorId: nil
+        )
+        let revisions = SharedDomainRevisionPublisher()
+
+        revisions.publishCoconutRewardFeedback(event)
+
+        #expect(ReadModelRevisionCenter.shared.lastCoconutRewardEvent == event)
     }
 
     @MainActor

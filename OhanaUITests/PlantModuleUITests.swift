@@ -1339,6 +1339,9 @@ final class PlantModuleUITests: XCTestCase {
         nameField.typeText("\n")
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
 
+        // 品种现为必选:宠物创建需选品种才能推进(人类无品种菜单,此步优雅跳过)。
+        selectFirstPetBreedIfPresent(in: app)
+
         tapThroughMemberCreationSteps(in: app, starterPetWeight: starterPetWeight)
 
         let handoffTitle = app.staticTexts[flowTitle]
@@ -1383,22 +1386,22 @@ final class PlantModuleUITests: XCTestCase {
     }
 
     @MainActor
-    private func fillStarterPetWeightIfNeeded(in app: XCUIApplication, value: String, waitForInput: Bool) {
-        let weightInput = app.buttons["member-creation-pet-weight-input"]
-        if waitForInput {
-            XCTAssertTrue(weightInput.waitForExistence(timeout: 8), "Starter pet weight input did not appear.")
-        } else {
-            guard weightInput.exists else { return }
-        }
-        guard !weightInput.label.contains(value) else { return }
-        tapWhenHittable(weightInput, timeout: 8)
-        for key in value.map(String.init) {
-            tapWhenHittable(app.buttons[key], timeout: 4)
-        }
-        if app.buttons["OK"].exists {
-            tapWhenHittable(app.buttons["OK"], timeout: 4)
-        }
-        XCTAssertTrue(waitUntil(timeout: 8) { app.buttons["member-creation-primary-action"].isEnabled }, "Starter pet weight did not enable member creation.")
+    private func fillStarterPetWeightIfNeeded(in app: XCUIApplication, value _: String, waitForInput _: Bool) {
+        // 体重已从添加宠物流程移除:此步不再存在,保留为无操作以兼容既有调用点。
+        _ = app
+    }
+
+    @MainActor
+    private func selectFirstPetBreedIfPresent(in app: XCUIApplication) {
+        let breedMenu = app.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS %@ OR label CONTAINS %@", "Breed", "品种", "Rasse"))
+            .firstMatch
+        guard breedMenu.waitForExistence(timeout: 4) else { return } // 人类创建无品种菜单
+        tapWhenHittable(breedMenu, timeout: 8)
+        // 物种默认为 dog;品种名当前仅中文,选狗品种库首项。
+        let option = app.buttons["阿富汗猎犬"]
+        guard option.waitForExistence(timeout: 6) else { return }
+        tapWhenHittable(option, timeout: 8)
     }
 
     @MainActor

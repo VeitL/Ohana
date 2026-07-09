@@ -81,6 +81,38 @@ struct OnboardingPreferenceCoordinatorTests {
         #expect(coordinator.locationError == "location_request_failed")
     }
 
+    @Test func firstTimePermissionGrantDoesNotTimeOutDuringSystemDialog() async {
+        // 首次授权(.notDetermined)会弹系统对话框;即使 GPS 紧超时极短,也不能在用户
+        // 授予前把对话框停留误判为定位失败(第一次报错、第二次才成功的经典竞态)。
+        let defaults = makeDefaults()
+        let coordinator = OnboardingPreferenceCoordinator(
+            defaults: defaults,
+            locationResolver: FakeOnboardingLocationResolver(
+                resolved: OnboardingResolvedLocation(country: "United States", city: "San Francisco")
+            ),
+            locationRequestTimeoutNanoseconds: 1, // GPS 紧超时:若被误用于对话框阶段会立即失败
+            permissionPromptTimeoutNanoseconds: 10_000_000_000 // 首次授权宽窗口
+        )
+        let provider = DeferredOnboardingLocationProvider(authorizationStatus: .notDetermined)
+
+        let task = Task {
+            await coordinator.requestAutomaticLocation(locationProvider: provider)
+        }
+        while !coordinator.isResolvingLocation {
+            await Task.yield()
+        }
+        // 模拟用户在对话框停留:给被误用的紧超时充分机会触发。
+        for _ in 0 ..< 20 { await Task.yield() }
+        // 用户授予后定位到达。
+        provider.complete(.success(CLLocation(latitude: 37.7749, longitude: -122.4194)))
+        await task.value
+
+        #expect(coordinator.locationError == nil)
+        #expect(coordinator.locationSource == .automatic)
+        #expect(coordinator.country == "United States")
+        #expect(coordinator.city == "San Francisco")
+    }
+
     @Test func manualLocationCancelsStaleAutomaticLocationCallback() async {
         let defaults = makeDefaults()
         let coordinator = OnboardingPreferenceCoordinator(

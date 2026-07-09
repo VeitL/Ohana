@@ -97,15 +97,19 @@ struct OasisDailyTreeCoconutSnapshot: Equatable {
 
 @Observable
 final class OasisTreeManager {
-    // Current tree levels are driven only by explicit energy injection.
-    // Legacy/activity growth is kept out of totalEnergy so care actions cannot level the tree.
+    // 树的等级 = 照护养分 + 注入养分。照护是主升级路径(自然养大一棵树),
+    // 注入(消耗椰子)是可选加速器。照护养分的每日增量已由预算递减防刷。
     private(set) var islandEnergy: Int = 0
+    // 照护养分累计能量(照护打卡自然获得,迁移基线之后的新增计入)
+    private(set) var careGrowthEnergy: Int = 0 {
+        didSet { OasisTreePreferenceStore.careGrowthEnergy = careGrowthEnergy }
+    }
     // 额外注入经验（消耗椰子所得）
     private(set) var injectedEnergy: Int = 0 {
         didSet { OasisTreePreferenceStore.injectedEnergy = injectedEnergy }
     }
 
-    var totalEnergy: Int { injectedEnergy }
+    var totalEnergy: Int { careGrowthEnergy + injectedEnergy }
     private let questManager: QuestManager
     private let careLedger: CareLedgerRecording
     private let oasisRewards: OasisRewardManaging
@@ -320,6 +324,7 @@ final class OasisTreeManager {
             questManager: questManager
         )
         injectedEnergy = OasisTreePreferenceStore.injectedEnergy
+        careGrowthEnergy = OasisTreePreferenceStore.careGrowthEnergy
     }
 
     private static func dailyTreeCoconutSnapshot(
@@ -398,6 +403,7 @@ final class OasisTreeManager {
         )
         islandEnergy = 0
         refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
+        refreshCareGrowthEnergy(ledgerGrowthXP: snapshot.growthXP, legacyXP: snapshot.legacyXP)
     }
 
     func refreshEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant] = []) {
@@ -409,6 +415,7 @@ final class OasisTreeManager {
         )
         islandEnergy = 0
         refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
+        refreshCareGrowthEnergy(ledgerGrowthXP: snapshot.growthXP, legacyXP: snapshot.legacyXP)
         checkAndRewardLevelUp(modelContext: modelContext)
     }
 
@@ -422,6 +429,7 @@ final class OasisTreeManager {
         )
         islandEnergy = 0
         refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
+        refreshCareGrowthEnergy(ledgerGrowthXP: snapshot.growthXP, legacyXP: snapshot.legacyXP)
         checkAndRewardLevelUp(modelContext: modelContext)
         return treeLevel
     }
@@ -610,6 +618,23 @@ final class OasisTreeManager {
         let recoveredXP = max(0, ledgerInjectedXP)
         if injectedEnergy != recoveredXP {
             injectedEnergy = recoveredXP
+        }
+    }
+
+    private func refreshCareGrowthEnergy(ledgerGrowthXP: Int, legacyXP: Int) {
+        let historicalTotal = max(0, ledgerGrowthXP) + max(0, legacyXP)
+        let baseline: Int
+        if let stored = OasisTreePreferenceStore.careGrowthBaseline() {
+            baseline = stored
+        } else {
+            // 首次接入"照护养树":以当前历史养分为基线,只有之后的新增计入树,
+            // 避免既有存档因历史照护一次性爆级(新用户此值为 0,照护全额计入)。
+            baseline = historicalTotal
+            OasisTreePreferenceStore.storeCareGrowthBaseline(baseline)
+        }
+        let recovered = max(0, historicalTotal - baseline)
+        if careGrowthEnergy != recovered {
+            careGrowthEnergy = recovered
         }
     }
 
@@ -810,6 +835,7 @@ final class OasisTreeManager {
                 ),
                 limitKey: OasisTreePreferenceStore.weeklyInjectionWeekKey,
                 isAvailable: currentLevel >= .lv5,
+                // 注入不限次:经济自限(花椰子换养分比照护更亏),硬性限购是多余摩擦。
                 enforcesPeriodLimit: false
             )
         }
@@ -823,6 +849,7 @@ final class OasisTreeManager {
             ),
             limitKey: OasisTreePreferenceStore.dailyInjectionDayKey,
             isAvailable: true,
+            // 注入不限次:经济自限(花椰子换养分比照护更亏),硬性限购是多余摩擦。
             enforcesPeriodLimit: false
         )
     }

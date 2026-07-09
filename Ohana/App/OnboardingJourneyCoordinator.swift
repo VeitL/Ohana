@@ -80,8 +80,8 @@ enum OnboardingJourneyCoordinator {
         }
 
         if defaults.bool(forKey: StarterGiftStorageKey.pending) {
+            // 礼包改为「创建首只宠物即发」:有首宠即可,不再等待录体重(首个照护)。
             guard hasActivePet(context: context) else { return .needsFirstPet }
-            guard hasRecordedPetWeight(context: context) else { return .firstCarePending }
             return .starterGiftPending
         }
 
@@ -155,21 +155,6 @@ enum OnboardingJourneyCoordinator {
         return fetchModelsOrLog(descriptor, context: context, operation: "fetch starter active pet").isEmpty == false
     }
 
-    @MainActor
-    private static func hasRecordedPetWeight(context: ModelContext) -> Bool {
-        var weightDescriptor = FetchDescriptor<PetWeightLog>()
-        weightDescriptor.fetchLimit = 1
-        if fetchModelsOrLog(weightDescriptor, context: context, operation: "fetch starter pet weight logs").isEmpty == false {
-            return true
-        }
-        var ledgerDescriptor = FetchDescriptor<CareLedgerEvent>(
-            predicate: #Predicate<CareLedgerEvent> { event in
-                event.eventKind == "weight" && event.actionType == "petWeight"
-            }
-        )
-        ledgerDescriptor.fetchLimit = 1
-        return fetchModelsOrLog(ledgerDescriptor, context: context, operation: "fetch starter pet weight ledger").isEmpty == false
-    }
 
     @MainActor
     private static func fetchModelsOrLog<T: PersistentModel>(

@@ -15,7 +15,13 @@ struct CoconutRulesSheet: View {
     private var l: L10n { L10n(appLanguage) }
 
     private var treeInjectionRewardText: String {
-        "\(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 -> \(OasisTreeEnergyInjectionPolicy.starterPackageXP)XP"
+        let cost = OasisTreeEnergyInjectionPolicy.starterPackageCost
+        let xp = OasisTreeEnergyInjectionPolicy.starterPackageXP
+        return l.tr(
+            zh: "\(cost)🥥 → \(xp)养分",
+            en: "\(cost)🥥 → \(xp) nutrients",
+            de: "\(cost)🥥 → \(xp) Nährstoffe"
+        )
     }
 
     private struct RuleCard: Identifiable {
@@ -52,28 +58,28 @@ struct CoconutRulesSheet: View {
                 title: l.tr(zh: "清洁", en: "Cleanup", de: "Reinigung"),
                 desc: l.tr(zh: "记录如厕和清洁", en: "Log potty and cleanup", de: "Toilette und Reinigung erfassen"),
                 glowColor: Color(hex: "A8E6CF"),
-                reward: l.tr(zh: "2-3🥥 · 5-7XP", en: "2-3🥥 · 5-7XP", de: "2-3🥥 · 5-7XP")
+                reward: l.tr(zh: "2-3🥥 · 5-7养分", en: "2-3🥥 · 5-7 nutrients", de: "2-3🥥 · 5-7 Nährstoffe")
             ),
             RuleCard(
                 icon: "scissors",
                 title: l.tr(zh: "护理·梳毛", en: "Grooming", de: "Pflege"),
                 desc: l.tr(zh: "精心打理日常护理", en: "Track care routines", de: "Pflegeabläufe erfassen"),
                 glowColor: Color(hex: "DDA0DD"),
-                reward: l.tr(zh: "5-8🥥 · 10-14XP", en: "5-8🥥 · 10-14XP", de: "5-8🥥 · 10-14XP")
+                reward: l.tr(zh: "5-8🥥 · 10-14养分", en: "5-8🥥 · 10-14 nutrients", de: "5-8🥥 · 10-14 Nährstoffe")
             ),
             RuleCard(
                 icon: "cross.case.fill",
                 title: l.tr(zh: "健康打卡", en: "Health log", de: "Gesundheit"),
                 desc: l.tr(zh: "关注健康，守护生命", en: "Care for health", de: "Gesundheit schützen"),
                 glowColor: Color(hex: "FF6B6B"),
-                reward: l.tr(zh: "10🥥 · 16XP", en: "10🥥 · 16XP", de: "10🥥 · 16XP")
+                reward: l.tr(zh: "10🥥 · 16养分", en: "10🥥 · 16 nutrients", de: "10🥥 · 16 Nährstoffe")
             ),
             RuleCard(
                 icon: "creditcard.fill",
                 title: l.tr(zh: "记一笔账", en: "Expense log", de: "Ausgabe"),
                 desc: l.tr(zh: "记录爱的花销", en: "Track care spending", de: "Ausgaben erfassen"),
                 glowColor: Color(hex: "FFD93D"),
-                reward: l.tr(zh: "2🥥 · 4XP", en: "2🥥 · 4XP", de: "2🥥 · 4XP")
+                reward: l.tr(zh: "2🥥 · 4养分", en: "2🥥 · 4 nutrients", de: "2🥥 · 4 Nährstoffe")
             ),
             RuleCard(
                 icon: "gamecontroller.fill",

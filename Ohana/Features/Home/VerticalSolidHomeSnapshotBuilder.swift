@@ -238,7 +238,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             isReady: true,
             greeting: greetingText(l, now: now),
             activeName: source.activeHuman?.name ?? l.tr(zh: "家人", en: "Family", de: "Familie"),
-            coconutText: "\(source.pets.reduce(0) { $0 + $1.coconutBalance } + source.humans.reduce(0) { $0 + $1.coconutBalance })",
+            coconutText: "\(EconomyWalletWritePolicy.familyCoconutTotal(pets: source.pets, humans: source.humans))",
             todayFocus: todayFocus,
             cards: cards,
             firstPetEmptyState: nil,

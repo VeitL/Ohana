@@ -50,20 +50,9 @@ struct OnboardingJourneyCoordinatorTests {
         #expect(needsFirstPet.starterGiftResult == .pendingFirstCare(humanID: human.id))
         #expect(needsFirstPet.phase == .needsFirstPet)
 
+        // 礼包改为「创建首只宠物即发」:插入首宠后立即领取,不再等待录体重。
         let pet = Pet(name: "Momo", species: "cat")
         context.insert(pet)
-        context.safeSave()
-
-        let needsFirstCare = OnboardingJourneyCoordinator.evaluate(
-            hasOnboarded: true,
-            activeHumanID: human.id.uuidString,
-            context: context,
-            defaults: defaults
-        )
-        #expect(needsFirstCare.starterGiftResult == .pendingFirstCare(humanID: human.id))
-        #expect(needsFirstCare.phase == .firstCarePending)
-
-        context.insert(PetWeightLog(weight: 4.2, pet: pet))
         context.safeSave()
 
         let claimed = OnboardingJourneyCoordinator.evaluate(

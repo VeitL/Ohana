@@ -150,7 +150,7 @@ assert_good scripts/audit-localization-coverage.sh "$fixtures/LocalizationHardco
 
 assert_bad scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeBad.swift" \
   location-manager background-location always-location-request idle-timer \
-  raw-timer-publisher repeat-forever timeline-animation
+  raw-timer-publisher repeat-forever timeline-animation orphan-revision-center
 assert_good scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeGood.swift"
 
 cp "$fixtures/ArchitectureBoundariesBad.swift" "$architecture_fixture_path"

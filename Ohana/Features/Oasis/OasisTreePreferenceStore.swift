@@ -14,6 +14,8 @@ enum OasisTreePreferenceStore {
     static let weeklyInjectionWeekKey = "oasis_v2WeeklyTreeInjectionWeek"
 
     private nonisolated static let injectedEnergyKey = "oasis_injectedEnergy"
+    private nonisolated static let careGrowthEnergyKey = "oasis_careGrowthEnergy"
+    private static let careGrowthBaselineKey = "oasis_careGrowthBaselineXP"
     private static let lastRewardedLevelKey = "oasis_lastRewardedLevel"
     private static let dailyTreeCoconutDayKey = "oasis_dailyTreeCoconutDay"
     private static let dailyTreeCoconutCountKey = "oasis_dailyTreeCoconutCount"
@@ -33,6 +35,24 @@ enum OasisTreePreferenceStore {
     nonisolated static var injectedEnergy: Int {
         get { UserDefaults.standard.integer(forKey: injectedEnergyKey) }
         set { UserDefaults.standard.set(newValue, forKey: injectedEnergyKey) }
+    }
+
+    /// 照护养分累计能量(计入树等级)。派生自账本,持久化仅为冷启动即时显示。
+    nonisolated static var careGrowthEnergy: Int {
+        get { UserDefaults.standard.integer(forKey: careGrowthEnergyKey) }
+        set { UserDefaults.standard.set(max(0, newValue), forKey: careGrowthEnergyKey) }
+    }
+
+    /// 迁移基线:接入"照护养树"当刻的历史养分总量;之后只有超过基线的新增养分
+    /// 才计入树,避免既有存档因历史照护一次性爆级。nil 表示尚未设立基线。
+    static func careGrowthBaseline() -> Int? {
+        defaults.object(forKey: careGrowthBaselineKey) == nil
+            ? nil
+            : defaults.integer(forKey: careGrowthBaselineKey)
+    }
+
+    static func storeCareGrowthBaseline(_ value: Int) {
+        defaults.set(max(0, value), forKey: careGrowthBaselineKey)
     }
 
     static var lastRewardedLevel: Int {

@@ -1416,6 +1416,8 @@ struct VerticalHomeTabMountPolicyTests {
     }
 
     @Test @MainActor func treeInjectionPackageStaysAvailableAfterUseWhenCoconutsRemain() {
+        // 模型 A(照护养树):注入不限次,经济自限(花椰子换养分比照护更亏)。
+        // 即使当日已注入,只要还有椰子就可继续注入。
         let defaults = UserDefaults.standard
         let oldPeriod = defaults.string(forKey: OasisTreePreferenceStore.dailyInjectionDayKey)
         defer {

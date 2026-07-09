@@ -8,6 +8,7 @@ import UIKit
 
 final class RuntimeBadFixture: NSObject {
     let manager = CLLocationManager() // rule: location-manager
+    let orphanRevisionCenter = ReadModelRevisionCenter() // rule: orphan-revision-center
 
     func start() {
         manager.allowsBackgroundLocationUpdates = true // rule: background-location

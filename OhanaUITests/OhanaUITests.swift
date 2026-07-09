@@ -5134,6 +5134,8 @@ final class OhanaUITests: XCTestCase {
 
         if let petSpeciesLabel {
             selectMemberCreationPetSpecies(petSpeciesLabel, in: app)
+            // 物种/品种现为必选:选完物种后必须选品种才能进入下一步。
+            selectMemberCreationPetBreed(for: petSpeciesLabel, in: app)
         }
 
         tapThroughMemberCreationSteps(in: app, starterPetWeight: starterPetWeight)
@@ -5179,6 +5181,24 @@ final class OhanaUITests: XCTestCase {
             option.waitForExistence(timeout: 8),
             "Pet creation species option did not appear: \(optionLabels)."
         )
+        tapWhenHittable(option, timeout: 8)
+    }
+
+    @MainActor
+    private func selectMemberCreationPetBreed(for speciesLabel: String, in app: XCUIApplication) {
+        let breedMenu = app.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS %@ OR label CONTAINS %@", "Breed", "品种", "Rasse"))
+            .firstMatch
+        XCTAssertTrue(breedMenu.waitForExistence(timeout: 8), "Pet creation breed menu did not appear.")
+        tapWhenHittable(breedMenu, timeout: 8)
+
+        // 品种名当前仅中文;测试仅覆盖 Dog/Cat,选各自品种库首项。
+        let breedName: String = switch speciesLabel.lowercased() {
+        case "cat", "猫", "katze": "阿比西尼亚猫"
+        default: "阿富汗猎犬"
+        }
+        let option = app.buttons[breedName]
+        XCTAssertTrue(option.waitForExistence(timeout: 8), "Pet creation breed option did not appear: \(breedName).")
         tapWhenHittable(option, timeout: 8)
     }
 
@@ -5290,29 +5310,9 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func fillStarterPetWeightIfNeeded(in app: XCUIApplication, value: String, waitForInput: Bool) {
-        let weightInput = app.buttons["member-creation-pet-weight-input"]
-        if waitForInput {
-            XCTAssertTrue(weightInput.waitForExistence(timeout: 8), "Starter pet weight input did not appear.")
-        } else {
-            guard weightInput.exists else { return }
-        }
-        guard !weightInput.label.contains(value) else { return }
-
-        tapWhenHittable(weightInput, timeout: 8)
-        for key in value.map(String.init) {
-            tapWhenHittable(app.buttons[key], timeout: 4)
-        }
-
-        let ok = app.buttons["OK"]
-        if ok.exists {
-            tapWhenHittable(ok, timeout: 4)
-        }
-
-        let didEnablePrimary = waitUntil(timeout: 8) {
-            app.buttons["member-creation-primary-action"].isEnabled
-        }
-        XCTAssertTrue(didEnablePrimary, "Starter pet weight did not enable member creation.")
+    private func fillStarterPetWeightIfNeeded(in app: XCUIApplication, value _: String, waitForInput _: Bool) {
+        // 体重已从添加宠物流程移除:此步不再存在,保留为无操作以兼容既有调用点。
+        _ = app
     }
 
     @MainActor

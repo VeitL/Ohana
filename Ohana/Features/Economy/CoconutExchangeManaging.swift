@@ -12,6 +12,13 @@ nonisolated enum EconomyWalletWritePolicy {
     static func canWrite(_ pet: Pet) -> Bool {
         MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsEconomyDerivation
     }
+
+    /// 家庭椰子总额的唯一口径:排除纪念(经济写入被冻结)成员。
+    /// 顶部胶囊与椰子记录弹窗必须共用此函数,避免两处对"总额"定义分叉。
+    static func familyCoconutTotal(pets: [Pet], humans: [Human]) -> Int {
+        pets.filter(canWrite).reduce(0) { $0 + $1.coconutBalance }
+            + humans.filter(canWrite).reduce(0) { $0 + $1.coconutBalance }
+    }
 }
 
 @MainActor

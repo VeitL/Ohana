@@ -59,7 +59,7 @@ final class AppServices {
         let activeHumanSelection = UserDefaultsActiveHumanSelection()
         let notificationRouteCenter = OhanaNotificationRouteCenter()
         let notificationManager = NotificationManager(routeCenter: notificationRouteCenter)
-        let revisionCenter = ReadModelRevisionCenter()
+        let revisionCenter = ReadModelRevisionCenter.shared
         let avatarPipeline = AvatarPipeline()
         let coconutWallet = SwiftDataCoconutWalletManager()
         let domainRevisions = SharedDomainRevisionPublisher(center: revisionCenter)

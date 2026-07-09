@@ -13,16 +13,17 @@ import UIKit
 final class CoconutRewardFeedbackCenter: ObservableObject {
     @Published private(set) var activeEvent: OhanaCoconutRewardEvent?
     @Published private(set) var coalescedAmount = 0
-    @Published private(set) var coalescedGrowthXP = 0
 
     private var hideTask: Task<Void, Never>?
 
     func enqueue(_ event: OhanaCoconutRewardEvent) {
+        // 气泡只报椰子数,不报养分数字;但保留消息(如每日预算耗尽的"今日椰子已满"安慰语)。
         guard event.amount > 0 || event.growthXP > 0 else { return }
-        let shouldMerge = activeEvent != nil
+        // 仅当同一成员的奖励气泡仍在屏时才累加;跨成员奖励另起气泡,
+        // 否则标题显示后来者、数额却是两人之和,与账本对不上。
+        let shouldMerge = activeEvent != nil && activeEvent?.actorId == event.actorId
         activeEvent = event
         coalescedAmount = shouldMerge ? coalescedAmount + event.amount : event.amount
-        coalescedGrowthXP = shouldMerge ? coalescedGrowthXP + event.growthXP : event.growthXP
 
         hideTask?.cancel()
         hideTask = Task { @MainActor in
@@ -34,7 +35,6 @@ final class CoconutRewardFeedbackCenter: ObservableObject {
             try? await Task.sleep(nanoseconds: 240_000_000)
             guard !Task.isCancelled else { return }
             self.coalescedAmount = 0
-            self.coalescedGrowthXP = 0
         }
     }
 }
@@ -74,7 +74,7 @@ struct CoconutRewardFeedbackOverlay: View {
             center.enqueue(event)
             if animate, playsHaptics {
                 hapticTask?.cancel()
-                hapticTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
+                hapticTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 16) {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     hapticTask = nil
                 }
@@ -91,8 +91,10 @@ struct CoconutRewardFeedbackOverlay: View {
         HStack(spacing: 8) {
             Text(event.emoji)
                 .font(OhanaFont.adaptive(size: 20))
-            Text(rewardAmountText)
-                .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+            if !rewardAmountText.isEmpty {
+                Text(rewardAmountText)
+                    .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+            }
             Text(event.title)
                 .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                 .lineLimit(2)
@@ -112,9 +114,8 @@ struct CoconutRewardFeedbackOverlay: View {
     }
 
     private var rewardAmountText: String {
-        let coconutText = center.coalescedAmount > 0 ? "+\(center.coalescedAmount)🥥" : nil
-        let xpText = center.coalescedGrowthXP > 0 ? "+\(center.coalescedGrowthXP)XP" : nil
-        return [coconutText, xpText].compactMap(\.self).joined(separator: " · ")
+        // 气泡只报椰子。树的养分静默累积、在椰子树页展示,不在此和椰子并排造成对账混淆。
+        center.coalescedAmount > 0 ? "+\(center.coalescedAmount)🥥" : ""
     }
 }
 

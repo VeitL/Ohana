@@ -173,6 +173,12 @@ scan \
   "Animation timelines should be paused by AppWorkloadPolicy or visibility." \
   "AppWorkloadPolicy"
 
+scan \
+  "orphan-revision-center" \
+  'ReadModelRevisionCenter\s*\(\s*\)' \
+  "Ad-hoc revision centers publish into the void; use ReadModelRevisionCenter.shared so AppServices-subscribed UI observers see every mutation." \
+  "Ohana/Domain/Events/DomainCommandPipeline.swift"
+
 if [[ ! -s "$warnings_file" ]]; then
   echo "Runtime guardrails: passed (${#files[@]} file(s))."
   exit 0

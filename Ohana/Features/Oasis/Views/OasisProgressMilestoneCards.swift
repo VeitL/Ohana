@@ -9,26 +9,35 @@ import SwiftUI
 
 struct OasisProgressCard: View {
     let totalEnergy: Int
+    let careGrowthEnergy: Int
+    let injectedEnergy: Int
     let nextLevelThreshold: Int
     let progressToNextLevel: CGFloat
     let passiveIncomeAmount: Int
     let memberCount: Int
     let localization: L10n
 
+    private var isMaxLevel: Bool { totalEnergy >= nextLevelThreshold }
+    private var nutrientsToNextLevel: Int { max(0, nextLevelThreshold - totalEnergy) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(localization.tr(zh: "成长进度", en: "Growth progress", de: "Wachstumsfortschritt"))
+                Text(localization.tr(zh: "养分进度", en: "Nutrient progress", de: "Nährstofffortschritt"))
                     .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                Text(localization.tr(
-                    zh: "能量 \(totalEnergy) · 下一级 \(nextLevelThreshold)",
-                    en: "Energy \(totalEnergy) · next \(nextLevelThreshold)",
-                    de: "Energie \(totalEnergy) · nächstes Level \(nextLevelThreshold)"
-                ))
+                Text(isMaxLevel
+                    ? localization.tr(zh: "已满级", en: "Max level", de: "Max. Level")
+                    : localization.tr(
+                        zh: "距下一级还差 \(nutrientsToNextLevel) 养分",
+                        en: "\(nutrientsToNextLevel) nutrients to next level",
+                        de: "\(nutrientsToNextLevel) Nährstoffe bis zum nächsten Level"
+                    ))
                 .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             }
 
             GeometryReader { geo in
@@ -67,10 +76,12 @@ struct OasisProgressCard: View {
                 )
                 progressStatCell(
                     value: "\(totalEnergy)",
-                    label: localization.tr(zh: "岛屿能量", en: "Island energy", de: "Inselenergie"),
+                    label: localization.tr(zh: "养分总量", en: "Total nutrients", de: "Nährstoffe gesamt"),
                     color: Color(hex: "A855F7")
                 )
             }
+
+            compositionRow
         }
         .padding(18)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
@@ -78,6 +89,47 @@ struct OasisProgressCard: View {
             RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    private var compositionRow: some View {
+        HStack(spacing: 8) {
+            compositionChip(
+                icon: "heart.fill",
+                label: localization.tr(zh: "照护养分", en: "Care nutrients", de: "Pflege-Nährstoffe"),
+                value: careGrowthEnergy,
+                tint: Color.goPrimary
+            )
+            compositionChip(
+                icon: "bolt.fill",
+                label: localization.tr(zh: "喂食养分", en: "Fed nutrients", de: "Zugeführt"),
+                value: injectedEnergy,
+                tint: Color(hex: "F59E0B")
+            )
+        }
+    }
+
+    private func compositionChip(icon: String, label: String, value: Int, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon) // a11y: decorative; adjacent label names the nutrient source.
+                .font(OhanaFont.adaptive(size: 10, weight: .black))
+                .foregroundStyle(tint)
+                .accessibilityHidden(true)
+            Text(label)
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 2)
+            Text("\(value)")
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity)
+        .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label) \(value)")
     }
 
     private func progressStatCell(value: String, label: String, color: Color) -> some View {
