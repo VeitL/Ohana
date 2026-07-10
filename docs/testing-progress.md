@@ -20,7 +20,7 @@
 - Open P1: 5 total; remaining P1s are CloudKit 1.x enablement validation or
   real-device validation.
 - Solo Release P0/P1 preflight: the targeted iPhone 17 simulator aggregate
-  passed 90 tests with 0 failures at
+  passed 93 tests with 0 failures at
   `.build/DerivedData/tests/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.10_00-22-49-+0200.xcresult`;
   the Solo Release whole-module-optimization simulator build also passed at
   `.build/DerivedData/release-final-b6cf423d5931`;

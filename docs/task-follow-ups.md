@@ -76,7 +76,7 @@
 ### TFU-20260709-001 - Validate Solo Release P0/P1 Fix Path On A Real iPhone
 
 - Priority / bucket: P1, external/manual validation.
-- Status: Open; the iPhone 17 simulator P0/P1 aggregate suite passed 90 tests with 0 failures, the Solo Release whole-module-optimization simulator build passed, and changed-file, P0 data-safety, runtime-guardrail, smoothness, route-first-frame, UI, and accessibility preflight gates passed. The physical iPhone remained offline/unavailable on 2026-07-10, so no true-device or signed-Release result is asserted.
+- Status: Open; the iPhone 17 simulator P0/P1 aggregate suite passed 93 tests with 0 failures, the Solo Release whole-module-optimization simulator build passed, and changed-file, P0 data-safety, runtime-guardrail, smoothness, route-first-frame, UI, and accessibility preflight gates passed. The physical iPhone remained offline/unavailable on 2026-07-10, so no true-device or signed-Release result is asserted.
 - Why still open: simulator and static evidence cannot prove the public policy/support destinations, finger-response and refresh coalescing under real hardware load, large-photo memory/energy behavior, locked-screen background location, or the iCloud Drive failure/retry UI.
 - Next action: connect and unlock a real iPhone, install a signed Release build, then execute and record R1–R6 in `docs/release-true-device-test-plan.md#2026-07-09-solo-release-p0p1-专项验收`.
 - Close when: every R1–R6 result is recorded on a real iPhone; any device-specific defect is fixed or split into a scoped follow-up.
