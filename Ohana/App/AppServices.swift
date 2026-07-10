@@ -179,14 +179,14 @@ final class AppServices {
     }
 
     private static func makeCloudSyncService() -> any CloudSyncManaging {
-        guard OnlineFeatureGate.allows(.onlineCollaboration) else {
+        guard AppCapabilityProfile.permitsCloudSyncRuntime else {
             return LocalDeviceCloudSyncService()
         }
 
-        #if OHANA_LOCAL_DEVICE
-            return LocalDeviceCloudSyncService()
-        #else
+        #if OHANA_FAMILY_CAPABILITIES
             return CloudSyncEngineService()
+        #else
+            return LocalDeviceCloudSyncService()
         #endif
     }
 

@@ -61,6 +61,49 @@ struct AppWorkloadPolicyTests {
         #expect(policy.ambientMotionBudget() == .static)
         #expect(policy.refreshBudget() == .throttled)
     }
+
+    @Test func backgroundWorkBudgetBoundsAndDefersMaintenanceByRuntimeState() {
+        let normal = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        let normalBudget = normal.backgroundWorkBudget(
+            operation: "test",
+            requestedItemCount: 200
+        )
+        #expect(normalBudget.hasWorkCapacity)
+        #expect(normalBudget.maximumItemCount == 64)
+        #expect(normalBudget.allowsExpensiveWork)
+
+        let lowPower = AppWorkloadPolicy(
+            lowPowerModeProvider: { true },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        let lowPowerBudget = lowPower.backgroundWorkBudget(
+            operation: "test",
+            requestedItemCount: 200
+        )
+        #expect(lowPowerBudget.hasWorkCapacity)
+        #expect(lowPowerBudget.maximumItemCount == 12)
+        #expect(!lowPowerBudget.allowsExpensiveWork)
+
+        let critical = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .critical }
+        )
+        let criticalBudget = critical.backgroundWorkBudget(
+            operation: "test",
+            requestedItemCount: 1
+        )
+        #expect(!criticalBudget.hasWorkCapacity)
+        #expect(criticalBudget.isDeferred)
+    }
 }
 
 private final class ThermalStateProbe {

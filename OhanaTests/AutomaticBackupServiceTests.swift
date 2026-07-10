@@ -77,6 +77,8 @@ struct AutomaticBackupServiceTests {
         #expect(status.lastSuccessAt == now)
         #expect(status.consecutiveFailureCount == 0)
         #expect(status.fileName == "Ohana Automatic Backup.ohanabackup")
+        #expect(status.lastExportScope == DataBackupExportScope.automaticICloudDriveRestricted.rawValue)
+        #expect(!status.requiresRestrictedBackupReplacement)
         #expect(!status.isDue(now: now.addingTimeInterval(AutomaticBackupPolicy.dailyInterval - 1)))
         #expect(status.isDue(now: now.addingTimeInterval(AutomaticBackupPolicy.dailyInterval)))
     }
@@ -139,7 +141,7 @@ struct AutomaticBackupServiceTests {
         #expect(fileStore.writeCount == 1)
     }
 
-    @Test func automaticBackupUsesManualProjectionAndRestoresAfterWipe() async throws {
+    @Test func manualAndAutomaticBackupsExcludeHumanHealthDataAndRestoreRestrictedProjection() async throws {
         let (suiteName, defaults) = try isolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -147,6 +149,9 @@ struct AutomaticBackupServiceTests {
         let context = source.mainContext
         let human = Human(name: "Backup Guardian")
         try HumanPasscodeService.setPasscode("2468", for: human)
+        human.bloodType = "AB+"
+        human.heightCm = 172
+        human.notes = "scope-only-private-health-note"
         let pet = Pet(name: "Backup Miso")
         let careLog = PetCareLog(type: .feeding, amountGrams: 28, pet: pet, executorId: human.id.uuidString)
         let purchase = ShopPurchaseRecord(
@@ -155,11 +160,155 @@ struct AutomaticBackupServiceTests {
             buyerHumanId: human.id.uuidString,
             purchasedAt: now
         )
+        let humanMedication = HumanMedication(
+            humanId: human.id.uuidString,
+            name: "scope-only-medicine",
+            dosage: "10 mg"
+        )
+        let humanMedicationLog = HumanMedicationLog(
+            humanId: human.id.uuidString,
+            medicationId: humanMedication.id.uuidString,
+            scheduledTime: now,
+            status: .taken,
+            recordedTime: now
+        )
+        let healthMetric = HumanHealthMetricLog(
+            metricKey: "scope-only-metric",
+            unitCode: "mg_dL",
+            value: 91,
+            notes: "scope-only-metric-note",
+            human: human
+        )
+        let healthReport = HumanHealthReport(
+            humanId: human.id.uuidString,
+            hospitalName: "Scope-only Clinic",
+            summary: "scope-only-report-summary"
+        )
+        let medicationEvent = Event(
+            title: "scope-only-medication-event",
+            eventType: EventType.medication.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.humanMedicationPlan,
+            relatedEntityId: humanMedication.id.uuidString
+        )
+        let healthEvent = Event(
+            title: "scope-only-health-event",
+            eventType: EventType.health.rawValue,
+            relatedEntityType: "human",
+            relatedEntityId: human.id.uuidString
+        )
+        let unclassifiedHumanReminder = Event(
+            title: "scope-only-private-task",
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: human.id.uuidString
+        )
+        let petHealthEvent = Event(
+            title: "pet-health-plan-stays-local-to-pet-scope",
+            eventType: EventType.health.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let medicationReminder = Reminder(event: medicationEvent, scheduledAt: now)
+        let healthTask = FamilyCollaborationTask(
+            title: "scope-only-medication-task",
+            note: "scope-only-medication-task-note",
+            kind: .careReminder,
+            relatedEventId: medicationEvent.id.uuidString,
+            relatedReminderId: medicationReminder.id.uuidString,
+            createdById: human.id.uuidString,
+            createdByName: human.name
+        )
+        let unlinkedHealthTask = FamilyCollaborationTask(
+            title: "scope-only-unlinked-health-task",
+            note: "scope-only-unlinked-health-task-note",
+            kind: .careReminder,
+            createdById: human.id.uuidString,
+            createdByName: human.name
+        )
+        let healthLedger = CareLedgerEvent(
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .human,
+            subjectId: human.id.uuidString,
+            eventKind: .workout,
+            actionType: "scopeOnlyHealthLedger",
+            amountValue: 1,
+            note: "scope-only-ledger-note"
+        )
+        let healthCoconutLedgerEntry = CoconutLedgerEntry(
+            transactionKey: "scope-only-health-wallet-entry",
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            ownerName: human.name,
+            delta: 1,
+            balanceBefore: 0,
+            balanceAfter: 1,
+            entryKind: .reward,
+            source: .careEvent,
+            title: "scope-only-health-wallet-title",
+            emoji: "❤️",
+            actorId: human.id.uuidString,
+            actorName: human.name,
+            subjectKind: .human,
+            subjectId: human.id.uuidString,
+            sourceModelName: String(describing: CareLedgerEvent.self),
+            sourceModelId: healthLedger.id.uuidString,
+            careLedgerEventId: healthLedger.id.uuidString,
+            metadataJSON: #"{"note":"scope-only-health-wallet-metadata"}"#
+        )
+        let healthBudgetUsage = EconomyBudgetUsageEvent(
+            dayKey: "scope-only-health-budget-day",
+            householdKey: "scope-only-health-budget-household",
+            memberKey: human.id.uuidString,
+            careObjectKey: human.id.uuidString,
+            scope: .member,
+            scopeKey: human.id.uuidString,
+            growthXPUsed: 1,
+            coconutUsed: 1,
+            actionKey: "scope-only-health-budget-action",
+            source: "scope-only-health-budget-source",
+            metadataJSON: #"{"note":"scope-only-health-budget-metadata"}"#
+        )
         context.insert(human)
         context.insert(pet)
         context.insert(careLog)
         context.insert(purchase)
+        context.insert(HumanWeightLog(weight: 57, human: human))
+        context.insert(HumanWorkoutLog(
+            type: .running,
+            durationMinutes: 30,
+            notes: "scope-only-workout-note",
+            sourceHealthKit: true,
+            healthKitWorkoutUUID: "scope-only-healthkit-workout",
+            human: human
+        ))
+        context.insert(humanMedication)
+        context.insert(humanMedicationLog)
+        context.insert(healthMetric)
+        context.insert(healthReport)
+        context.insert(medicationEvent)
+        context.insert(healthEvent)
+        context.insert(unclassifiedHumanReminder)
+        context.insert(petHealthEvent)
+        context.insert(medicationReminder)
+        context.insert(healthTask)
+        context.insert(unlinkedHealthTask)
+        context.insert(healthLedger)
+        context.insert(healthCoconutLedgerEntry)
+        context.insert(healthBudgetUsage)
         try context.save()
+
+        let manualBackup = try DataBackupManager().buildBackup(context: context)
+        #expect(manualBackup.exportScope == DataBackupExportScope.manualExternalRestricted.rawValue)
+        #expect(manualBackup.humanWeightLogs.isEmpty)
+        #expect(manualBackup.humanWorkoutLogs.isEmpty)
+        #expect(manualBackup.humanMedications?.isEmpty == true)
+        #expect(manualBackup.humanHealthMetricLogs?.isEmpty == true)
+        #expect(manualBackup.humanHealthReports?.isEmpty == true)
+        #expect(manualBackup.coconutLedgerEntries?.isEmpty == true)
+        #expect(manualBackup.economyBudgetUsageEvents?.isEmpty == true)
+        #expect(manualBackup.appState.coconutLogsJSON == "[]")
 
         let store = AutomaticBackupStatusStore(defaults: defaults)
         let fileStore = FakeAutomaticBackupFileStore(writeToTemporaryFile: true)
@@ -178,10 +327,47 @@ struct AutomaticBackupServiceTests {
 
         let data = try Data(contentsOf: url.appendingPathComponent(DataBackupManager.manifestFileName, isDirectory: false))
         let exported = try #require(String(data: data, encoding: .utf8))
+        let restrictedBackup = try JSONDecoder().decode(OhanaBackup.self, from: data)
         #expect(url.pathExtension == DataBackupManager.packageFileExtension)
+        #expect(restrictedBackup.exportScope == DataBackupExportScope.automaticICloudDriveRestricted.rawValue)
         #expect(!exported.contains("pinHash"))
         #expect(!exported.contains("pinSalt"))
         #expect(!exported.contains(human.pinHash))
+        #expect(!exported.contains("scope-only-private-health-note"))
+        #expect(!exported.contains("scope-only-healthkit-workout"))
+        #expect(!exported.contains("scope-only-medicine"))
+        #expect(!exported.contains("scope-only-metric"))
+        #expect(!exported.contains("scope-only-report-summary"))
+        #expect(!exported.contains("scope-only-ledger-note"))
+        #expect(!exported.contains("scope-only-health-wallet-title"))
+        #expect(!exported.contains("scope-only-health-wallet-metadata"))
+        #expect(!exported.contains("scope-only-health-budget-action"))
+        #expect(!exported.contains("scope-only-health-budget-metadata"))
+        #expect(!exported.contains("scope-only-private-task"))
+        #expect(!exported.contains("scope-only-medication-task"))
+        #expect(!exported.contains("scope-only-unlinked-health-task"))
+        #expect(!exported.contains("scope-only-unlinked-health-task-note"))
+        #expect(restrictedBackup.humans.first?.bloodType == "")
+        #expect(restrictedBackup.humans.first?.heightCm == nil)
+        #expect(restrictedBackup.humans.first?.notes == "")
+        #expect(restrictedBackup.humanWeightLogs.isEmpty)
+        #expect(restrictedBackup.humanWorkoutLogs.isEmpty)
+        #expect(restrictedBackup.humanMedications?.isEmpty == true)
+        #expect(restrictedBackup.humanMedicationLogs?.isEmpty == true)
+        #expect(restrictedBackup.humanHealthMetricLogs?.isEmpty == true)
+        #expect(restrictedBackup.humanHealthReports?.isEmpty == true)
+        #expect(restrictedBackup.events.allSatisfy {
+            $0.id != medicationEvent.id.uuidString &&
+                $0.id != healthEvent.id.uuidString &&
+                $0.id != unclassifiedHumanReminder.id.uuidString
+        })
+        #expect(restrictedBackup.events.contains { $0.id == petHealthEvent.id.uuidString })
+        #expect(restrictedBackup.reminders.allSatisfy { $0.eventId != medicationEvent.id.uuidString })
+        #expect(restrictedBackup.careLedgerEvents?.isEmpty == true)
+        #expect(restrictedBackup.coconutLedgerEntries?.isEmpty == true)
+        #expect(restrictedBackup.economyBudgetUsageEvents?.isEmpty == true)
+        #expect(restrictedBackup.appState.coconutLogsJSON == "[]")
+        #expect(restrictedBackup.familyCollaborationTasks?.isEmpty == true)
 
         try AppResetService.reset(
             context: context,
@@ -201,6 +387,69 @@ struct AutomaticBackupServiceTests {
         #expect(try context.fetch(FetchDescriptor<Pet>()).first?.name == "Backup Miso")
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).first?.amountGrams == 28)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).first?.itemId == "fx_lime_glow")
+        #expect(try context.fetch(FetchDescriptor<HumanWeightLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanMedication>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanHealthMetricLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanHealthReport>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<FamilyCollaborationTask>()).isEmpty)
+    }
+
+    @Test func resetCleanupFailurePersistsUntilRetrySucceeds() async throws {
+        let (suiteName, defaults) = try isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let store = AutomaticBackupStatusStore(defaults: defaults)
+        let exporter = try FakeAutomaticBackupExporter(data: Data("{}".utf8))
+        let failingService = AutomaticBackupService(
+            statusStore: store,
+            exporter: exporter,
+            fileStore: FakeAutomaticBackupFileStore(cleanupError: AutomaticBackupFileStoreError.iCloudUnavailable),
+            now: { now }
+        )
+
+        await failingService.removeManagedAutomaticBackupsForReset()
+        let failedStatus = store.snapshot(now: now)
+        #expect(!failedStatus.isEnabled)
+        #expect(failedStatus.resetCleanupPending)
+        #expect(failedStatus.resetCleanupFailureMessage?.contains("iCloud Drive") == true)
+
+        let retryingService = AutomaticBackupService(
+            statusStore: store,
+            exporter: exporter,
+            fileStore: FakeAutomaticBackupFileStore(),
+            now: { now }
+        )
+        let retryResult = await retryingService.retryManagedAutomaticBackupCleanup()
+        #expect(retryResult == .removed)
+        #expect(!store.snapshot(now: now).resetCleanupPending)
+    }
+
+    @Test func legacyAutomaticBackupStatusHasReplacementAndRemovalPath() async throws {
+        let (suiteName, defaults) = try isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        // Releases before the explicit scope key wrote a last-success status but
+        // cannot prove that the managed package excluded human health data.
+        defaults.set(now.timeIntervalSinceReferenceDate, forKey: "automaticBackup.lastSuccessAt.v1")
+        defaults.set("Ohana Automatic Backup.ohanabackup", forKey: "automaticBackup.fileName.v1")
+        let store = AutomaticBackupStatusStore(defaults: defaults)
+        #expect(store.snapshot(now: now).requiresRestrictedBackupReplacement)
+
+        let service = AutomaticBackupService(
+            statusStore: store,
+            exporter: try FakeAutomaticBackupExporter(data: Data("{}".utf8)),
+            fileStore: FakeAutomaticBackupFileStore(),
+            now: { now }
+        )
+        let removal = await service.removeLegacyAutomaticBackupForHealthSafety()
+
+        #expect(removal == .removed)
+        let status = store.snapshot(now: now)
+        #expect(status.lastSuccessAt == nil)
+        #expect(status.fileName == nil)
+        #expect(!status.requiresRestrictedBackupReplacement)
     }
 
     @Test func rootViewSurfacesAutomaticBackupFailureReminderOutsideSettings() throws {
@@ -219,7 +468,7 @@ struct AutomaticBackupServiceTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV71.models)
+        let schema = Schema(ArkSchemaV85.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -265,13 +514,19 @@ private final class FakeAutomaticBackupExporter: AutomaticBackupExporting {
 @MainActor
 private final class FakeAutomaticBackupFileStore: AutomaticBackupFileStoring {
     private let error: Error?
+    private let cleanupError: Error?
     private let writeToTemporaryFile: Bool
     private(set) var writeCount = 0
     private(set) var cleanupCount = 0
     private(set) var lastWrittenURL: URL?
 
-    init(error: Error? = nil, writeToTemporaryFile: Bool = false) {
+    init(
+        error: Error? = nil,
+        cleanupError: Error? = nil,
+        writeToTemporaryFile: Bool = false
+    ) {
         self.error = error
+        self.cleanupError = cleanupError
         self.writeToTemporaryFile = writeToTemporaryFile
     }
 
@@ -303,6 +558,9 @@ private final class FakeAutomaticBackupFileStore: AutomaticBackupFileStoring {
 
     func removeManagedAutomaticBackups() async throws {
         cleanupCount += 1
+        if let cleanupError {
+            throw cleanupError
+        }
     }
 
     private func packageByteCount(_ packageURL: URL) throws -> Int {

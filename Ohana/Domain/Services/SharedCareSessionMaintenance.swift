@@ -22,7 +22,7 @@ struct SharedCareSessionDeleteResult: Equatable {
     }
 }
 
-struct SharedCareLegacyNoteCleanupResult: Equatable {
+nonisolated struct SharedCareLegacyNoteCleanupResult: Equatable {
     let sessionIDs: [UUID]
     let careLogIDs: [UUID]
     let hygieneLogIDs: [UUID]
@@ -34,6 +34,9 @@ struct SharedCareLegacyNoteCleanupResult: Equatable {
     let skippedOrphanExpenseLogIDs: [UUID]
     let skippedOrphanWalkLogIDs: [UUID]
     let skippedOrphanLedgerEventIDs: [UUID]
+    /// `false` means the caller's mutations were rolled back and a durable
+    /// version marker must not be advanced.
+    var didPersist: Bool = true
 
     static let empty = SharedCareLegacyNoteCleanupResult(
         sessionIDs: [],
@@ -58,9 +61,51 @@ struct SharedCareLegacyNoteCleanupResult: Equatable {
     }
 }
 
-struct SharedCareLegacyNoteMaintenanceResult: Equatable {
+nonisolated struct SharedCareLegacyNoteMaintenanceResult: Equatable {
     let didRun: Bool
     let cleanup: SharedCareLegacyNoteCleanupResult
+}
+
+/// The startup migration walks stable source tables rather than repeatedly
+/// materializing every legacy note. A source/offset cursor stays valid because
+/// this cleanup only changes note and relationship fields, never the sort keys.
+nonisolated enum SharedCareLegacyNoteCleanupSource: String, Codable, Equatable, Sendable {
+    case session
+    case careLog
+    case expenseLog
+    case walkLog
+    case ledgerEvent
+    case complete
+}
+
+nonisolated struct SharedCareLegacyNoteCleanupCursor: Codable, Equatable, Sendable {
+    var source: SharedCareLegacyNoteCleanupSource
+    var offset: Int
+
+    static let initial = SharedCareLegacyNoteCleanupCursor(source: .session, offset: 0)
+
+    var isComplete: Bool {
+        source == .complete
+    }
+
+    func normalized() -> SharedCareLegacyNoteCleanupCursor {
+        guard source != .complete else {
+            return SharedCareLegacyNoteCleanupCursor(source: .complete, offset: 0)
+        }
+        return SharedCareLegacyNoteCleanupCursor(source: source, offset: max(0, offset))
+    }
+}
+
+nonisolated struct SharedCareLegacyNoteCleanupBatchResult: Equatable, Sendable {
+    let nextCursor: SharedCareLegacyNoteCleanupCursor
+    let scannedRecordCount: Int
+    let cleanedRecordCount: Int
+    let skippedOrphanCount: Int
+    let didComplete: Bool
+}
+
+private nonisolated struct SharedCareLegacyNoteCleanupPersistenceFailure: LocalizedError {
+    let errorDescription: String?
 }
 
 enum SharedCareSessionMaintenanceError: LocalizedError, Equatable {
@@ -116,12 +161,281 @@ enum SharedCareLegacyNoteMaintenanceService {
             context: context,
             cleanedAt: cleanedAt
         )
+        guard cleanup.didPersist else {
+            return SharedCareLegacyNoteMaintenanceResult(didRun: false, cleanup: cleanup)
+        }
         defaults.set(currentVersion, forKey: completedVersionKey)
         return SharedCareLegacyNoteMaintenanceResult(didRun: true, cleanup: cleanup)
     }
 }
 
+/// Startup-only bounded replacement for the historical one-shot cleanup. It
+/// pages immutable sort keys from each legacy source and keeps all live models
+/// inside the caller's SwiftData actor until one atomic save succeeds.
+nonisolated enum SharedCareLegacyNoteStartupMaintenanceService {
+    static func runBatch(
+        context: ModelContext,
+        cursor: SharedCareLegacyNoteCleanupCursor,
+        maximumRecordCount: Int,
+        deadline: Date,
+        cleanedAt: Date
+    ) throws -> SharedCareLegacyNoteCleanupBatchResult {
+        var nextCursor = cursor.normalized()
+        var remainingRecordCount = max(1, maximumRecordCount)
+        var scannedRecordCount = 0
+        var cleanedRecordCount = 0
+        var skippedOrphanCount = 0
+
+        do {
+            maintenanceLoop: while remainingRecordCount > 0,
+                                   !nextCursor.isComplete,
+                                   Date() < deadline {
+                try Task.checkCancellation()
+                let batchLimit = remainingRecordCount
+
+                switch nextCursor.source {
+                case .session:
+                    var descriptor = FetchDescriptor<SharedCareSession>(sortBy: [SortDescriptor(\.date)])
+                    descriptor.fetchOffset = nextCursor.offset
+                    descriptor.fetchLimit = batchLimit
+                    let sessions = try context.fetch(descriptor)
+                    guard !sessions.isEmpty else {
+                        nextCursor = SharedCareLegacyNoteCleanupCursor(source: .careLog, offset: 0)
+                        continue
+                    }
+                    for session in sessions {
+                        try Task.checkCancellation()
+                        guard Date() < deadline else { break maintenanceLoop }
+                        if SharedCareMetadata.hasLegacyMetadata(session.note) {
+                            let cleanup = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(
+                                sessionID: session.id,
+                                context: context,
+                                cleanedAt: cleanedAt,
+                                persistChanges: false
+                            )
+                            cleanedRecordCount += cleanup.cleanedCount
+                            skippedOrphanCount += cleanup.missingSessionIDs.count
+                        }
+                        scannedRecordCount += 1
+                        remainingRecordCount -= 1
+                        nextCursor.offset += 1
+                    }
+                    if sessions.count < batchLimit {
+                        nextCursor = SharedCareLegacyNoteCleanupCursor(source: .careLog, offset: 0)
+                    }
+
+                case .careLog:
+                    var descriptor = FetchDescriptor<PetCareLog>(sortBy: [SortDescriptor(\.date)])
+                    descriptor.fetchOffset = nextCursor.offset
+                    descriptor.fetchLimit = batchLimit
+                    let logs = try context.fetch(descriptor)
+                    guard !logs.isEmpty else {
+                        nextCursor = SharedCareLegacyNoteCleanupCursor(source: .expenseLog, offset: 0)
+                        continue
+                    }
+                    for log in logs {
+                        try Task.checkCancellation()
+                        guard Date() < deadline else { break maintenanceLoop }
+                        if SharedCareMetadata.hasLegacyMetadata(log.note) {
+                            guard let sessionID = SharedCareSessionMaintenance.legacySessionID(raw: log.sharedSessionId, note: log.note) else {
+                                skippedOrphanCount += 1
+                                scannedRecordCount += 1
+                                remainingRecordCount -= 1
+                                nextCursor.offset += 1
+                                continue
+                            }
+                            let cleanup = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(
+                                sessionID: sessionID,
+                                supplement: .init(careLogs: [log]),
+                                context: context,
+                                cleanedAt: cleanedAt,
+                                persistChanges: false
+                            )
+                            cleanedRecordCount += cleanup.cleanedCount
+                            skippedOrphanCount += cleanup.missingSessionIDs.count
+                        }
+                        scannedRecordCount += 1
+                        remainingRecordCount -= 1
+                        nextCursor.offset += 1
+                    }
+                    if logs.count < batchLimit {
+                        nextCursor = SharedCareLegacyNoteCleanupCursor(source: .expenseLog, offset: 0)
+                    }
+
+                case .expenseLog:
+                    var descriptor = FetchDescriptor<PetExpenseLog>(sortBy: [SortDescriptor(\.date)])
+                    descriptor.fetchOffset = nextCursor.offset
+                    descriptor.fetchLimit = batchLimit
+                    let logs = try context.fetch(descriptor)
+                    guard !logs.isEmpty else {
+                        nextCursor = SharedCareLegacyNoteCleanupCursor(source: .walkLog, offset: 0)
+                        continue
+                    }
+                    for log in logs {
+                        try Task.checkCancellation()
+                        guard Date() < deadline else { break maintenanceLoop }
+                        if SharedCareMetadata.hasLegacyMetadata(log.note) {
+                            guard let sessionID = SharedCareSessionMaintenance.legacySessionID(raw: log.sharedSessionId, note: log.note) else {
+                                skippedOrphanCount += 1
+                                scannedRecordCount += 1
+                                remainingRecordCount -= 1
+                                nextCursor.offset += 1
+                                continue
+                            }
+                            let cleanup = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(
+                                sessionID: sessionID,
+                                supplement: .init(expenseLogs: [log]),
+                                context: context,
+                                cleanedAt: cleanedAt,
+                                persistChanges: false
+                            )
+                            cleanedRecordCount += cleanup.cleanedCount
+                            skippedOrphanCount += cleanup.missingSessionIDs.count
+                        }
+                        scannedRecordCount += 1
+                        remainingRecordCount -= 1
+                        nextCursor.offset += 1
+                    }
+                    if logs.count < batchLimit {
+                        nextCursor = SharedCareLegacyNoteCleanupCursor(source: .walkLog, offset: 0)
+                    }
+
+                case .walkLog:
+                    var descriptor = FetchDescriptor<PetWalkLog>(sortBy: [SortDescriptor(\.startDate)])
+                    descriptor.fetchOffset = nextCursor.offset
+                    descriptor.fetchLimit = batchLimit
+                    let logs = try context.fetch(descriptor)
+                    guard !logs.isEmpty else {
+                        nextCursor = SharedCareLegacyNoteCleanupCursor(source: .ledgerEvent, offset: 0)
+                        continue
+                    }
+                    for log in logs {
+                        try Task.checkCancellation()
+                        guard Date() < deadline else { break maintenanceLoop }
+                        let note = log.behaviorNotes ?? ""
+                        if SharedCareMetadata.hasLegacyMetadata(note) {
+                            guard let sessionID = SharedCareSessionMaintenance.legacySessionID(raw: log.sharedSessionId, note: note) else {
+                                skippedOrphanCount += 1
+                                scannedRecordCount += 1
+                                remainingRecordCount -= 1
+                                nextCursor.offset += 1
+                                continue
+                            }
+                            let cleanup = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(
+                                sessionID: sessionID,
+                                supplement: .init(walkLogs: [log]),
+                                context: context,
+                                cleanedAt: cleanedAt,
+                                persistChanges: false
+                            )
+                            cleanedRecordCount += cleanup.cleanedCount
+                            skippedOrphanCount += cleanup.missingSessionIDs.count
+                        }
+                        scannedRecordCount += 1
+                        remainingRecordCount -= 1
+                        nextCursor.offset += 1
+                    }
+                    if logs.count < batchLimit {
+                        nextCursor = SharedCareLegacyNoteCleanupCursor(source: .ledgerEvent, offset: 0)
+                    }
+
+                case .ledgerEvent:
+                    var descriptor = FetchDescriptor<CareLedgerEvent>(sortBy: [SortDescriptor(\.occurredAt)])
+                    descriptor.fetchOffset = nextCursor.offset
+                    descriptor.fetchLimit = batchLimit
+                    let events = try context.fetch(descriptor)
+                    guard !events.isEmpty else {
+                        nextCursor = SharedCareLegacyNoteCleanupCursor(source: .complete, offset: 0)
+                        continue
+                    }
+                    for event in events {
+                        try Task.checkCancellation()
+                        guard Date() < deadline else { break maintenanceLoop }
+                        if SharedCareMetadata.hasLegacyMetadata(event.note) {
+                            guard let sessionID = SharedCareMetadata.legacySessionId(from: event.note) else {
+                                skippedOrphanCount += 1
+                                scannedRecordCount += 1
+                                remainingRecordCount -= 1
+                                nextCursor.offset += 1
+                                continue
+                            }
+                            let cleanup = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(
+                                sessionID: sessionID,
+                                supplement: .init(ledgerEvents: [event]),
+                                context: context,
+                                cleanedAt: cleanedAt,
+                                persistChanges: false
+                            )
+                            cleanedRecordCount += cleanup.cleanedCount
+                            skippedOrphanCount += cleanup.missingSessionIDs.count
+                        }
+                        scannedRecordCount += 1
+                        remainingRecordCount -= 1
+                        nextCursor.offset += 1
+                    }
+                    if events.count < batchLimit {
+                        nextCursor = SharedCareLegacyNoteCleanupCursor(source: .complete, offset: 0)
+                    }
+
+                case .complete:
+                    break maintenanceLoop
+                }
+            }
+
+            try Task.checkCancellation()
+            if cleanedRecordCount > 0 {
+                let saveResult = context.safeSaveResult(publishFailureEvent: true)
+                guard saveResult.didSave else {
+                    context.rollback()
+                    throw SharedCareLegacyNoteCleanupPersistenceFailure(errorDescription: saveResult.errorDescription)
+                }
+            }
+
+            return SharedCareLegacyNoteCleanupBatchResult(
+                nextCursor: nextCursor,
+                scannedRecordCount: scannedRecordCount,
+                cleanedRecordCount: cleanedRecordCount,
+                skippedOrphanCount: skippedOrphanCount,
+                didComplete: nextCursor.isComplete
+            )
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+}
+
+/// The actor performs all scan, recovery, and persistence work off the visible
+/// startup coordinator, then returns only a Sendable cursor/result summary.
+@ModelActor
+actor SharedCareLegacyNoteMaintenanceActor {
+    func runBatch(
+        cursor: SharedCareLegacyNoteCleanupCursor,
+        maximumRecordCount: Int,
+        deadline: Date,
+        cleanedAt: Date
+    ) throws -> SharedCareLegacyNoteCleanupBatchResult {
+        try SharedCareLegacyNoteStartupMaintenanceService.runBatch(
+            context: modelContext,
+            cursor: cursor,
+            maximumRecordCount: maximumRecordCount,
+            deadline: deadline,
+            cleanedAt: cleanedAt
+        )
+    }
+}
+
 nonisolated enum SharedCareSessionMaintenance {
+    /// Live models remain inside the maintenance actor. This small carrier is
+    /// intentionally not Sendable and is used only to attach one legacy source
+    /// row whose `sharedSessionId` has not yet been restored.
+    struct LegacyNoteCleanupSupplement {
+        var careLogs: [PetCareLog] = []
+        var expenseLogs: [PetExpenseLog] = []
+        var walkLogs: [PetWalkLog] = []
+        var ledgerEvents: [CareLedgerEvent] = []
+    }
+
     struct LegacyMetadataScan {
         let sessionIDs: [UUID]
         let missingSessionIDs: [UUID]
@@ -433,14 +747,13 @@ nonisolated enum SharedCareSessionMaintenance {
         CloudSyncMutationRecorder.markModified(changedExpenseLogs, context: context, modifiedAt: cleanedAt)
         CloudSyncMutationRecorder.markModified(changedWalkLogs, context: context, modifiedAt: cleanedAt)
         CloudSyncMutationRecorder.markModified(changedLedgerEvents, context: context, modifiedAt: cleanedAt)
-        if !changedSessions.isEmpty ||
+        let didChange = !changedSessions.isEmpty ||
             !changedCareLogs.isEmpty ||
             !changedHygieneLogs.isEmpty ||
             !changedExpenseLogs.isEmpty ||
             !changedWalkLogs.isEmpty ||
-            !changedLedgerEvents.isEmpty {
-            _ = saveSharedCareMaintenanceChanges(context: context)
-        }
+            !changedLedgerEvents.isEmpty
+        let didPersist = !didChange || saveSharedCareMaintenanceChanges(context: context)
 
         return SharedCareLegacyNoteCleanupResult(
             sessionIDs: changedSessions.map(\.id),
@@ -453,7 +766,170 @@ nonisolated enum SharedCareSessionMaintenance {
             skippedOrphanCareLogIDs: scan.skippedOrphanCareLogIDs,
             skippedOrphanExpenseLogIDs: scan.skippedOrphanExpenseLogIDs,
             skippedOrphanWalkLogIDs: scan.skippedOrphanWalkLogIDs,
-            skippedOrphanLedgerEventIDs: scan.skippedOrphanLedgerEventIDs
+            skippedOrphanLedgerEventIDs: scan.skippedOrphanLedgerEventIDs,
+            didPersist: didPersist
+        )
+    }
+
+    /// Cleans one known shared-care session without doing the legacy full-table
+    /// discovery scan. Startup calls this from a bounded source-page actor and
+    /// saves the whole page once; the original public one-shot API above keeps
+    /// its existing compatibility behavior for manual repair/restore paths.
+    static func cleanLegacyNoteMetadata(
+        sessionID: UUID,
+        supplement: LegacyNoteCleanupSupplement = .init(),
+        context: ModelContext,
+        cleanedAt: Date = Date(),
+        persistChanges: Bool
+    ) -> SharedCareLegacyNoteCleanupResult {
+        guard let session = fetchSession(id: sessionID, context: context) else {
+            return SharedCareLegacyNoteCleanupResult(
+                sessionIDs: [],
+                careLogIDs: [],
+                hygieneLogIDs: [],
+                expenseLogIDs: [],
+                walkLogIDs: [],
+                ledgerEventIDs: [],
+                missingSessionIDs: [sessionID],
+                skippedOrphanCareLogIDs: [],
+                skippedOrphanExpenseLogIDs: [],
+                skippedOrphanWalkLogIDs: [],
+                skippedOrphanLedgerEventIDs: []
+            )
+        }
+
+        let sessionIDString = session.id.uuidString
+        let careLogs = uniqueByID(
+            fetchCareLogs(sessionID: sessionIDString, context: context) + supplement.careLogs,
+            id: { $0.id }
+        )
+        let pottyLogs = fetchPottyLogs(sessionID: sessionIDString, context: context)
+        let hygieneLogs = fetchHygieneLogs(session: session, context: context)
+        let expenseLogs = uniqueByID(
+            fetchExpenseLogs(sessionID: sessionIDString, context: context) + supplement.expenseLogs,
+            id: { $0.id }
+        )
+        let walkLogs = uniqueByID(
+            fetchWalkLogs(sessionID: sessionIDString, context: context) + supplement.walkLogs,
+            id: { $0.id }
+        )
+        let ledgerEvents = uniqueByID(
+            ledgerEvents(
+                careLogs: careLogs,
+                pottyLogs: pottyLogs,
+                hygieneLogs: hygieneLogs,
+                expenseLogs: expenseLogs,
+                walkLogs: walkLogs,
+                context: context
+            ) + supplement.ledgerEvents,
+            id: { $0.id }
+        )
+
+        var changedSessions: [SharedCareSession] = []
+        var changedCareLogs: [PetCareLog] = []
+        var changedHygieneLogs: [PetHygieneLog] = []
+        var changedExpenseLogs: [PetExpenseLog] = []
+        var changedWalkLogs: [PetWalkLog] = []
+        var changedLedgerEvents: [CareLedgerEvent] = []
+
+        var sessionChanged = recoverStructuredMetadata(
+            session: session,
+            careLogs: careLogs,
+            pottyLogs: pottyLogs,
+            hygieneLogs: hygieneLogs,
+            expenseLogs: expenseLogs,
+            walkLogs: walkLogs
+        )
+        if cleanNoteIfSafe(&session.note, session: session) {
+            sessionChanged = true
+        }
+        if sessionChanged {
+            changedSessions.append(session)
+        }
+
+        for log in careLogs {
+            var logChanged = restoreSharedSessionIdIfNeeded(
+                &log.sharedSessionId,
+                note: log.note,
+                sessionID: session.id
+            )
+            if cleanNoteIfSafe(&log.note, session: session) {
+                logChanged = true
+            }
+            if logChanged {
+                changedCareLogs.append(log)
+            }
+        }
+        for log in hygieneLogs where log.sharedSessionId != sessionIDString {
+            log.sharedSessionId = sessionIDString
+            changedHygieneLogs.append(log)
+        }
+        for log in expenseLogs {
+            var logChanged = restoreSharedSessionIdIfNeeded(
+                &log.sharedSessionId,
+                note: log.note,
+                sessionID: session.id
+            )
+            if cleanNoteIfSafe(&log.note, session: session) {
+                logChanged = true
+            }
+            if logChanged {
+                changedExpenseLogs.append(log)
+            }
+        }
+        for log in walkLogs {
+            var logChanged = restoreSharedSessionIdIfNeeded(
+                &log.sharedSessionId,
+                note: log.behaviorNotes ?? "",
+                sessionID: session.id
+            )
+            if let notes = log.behaviorNotes,
+               SharedCareMetadata.hasLegacyMetadata(notes),
+               canStripLegacyMetadata(notes, session: session) {
+                let cleaned = SharedCareMetadata.userNoteForStorage(notes)
+                log.behaviorNotes = cleaned.isEmpty ? nil : cleaned
+                if cleaned != notes {
+                    logChanged = true
+                }
+            }
+            if logChanged {
+                changedWalkLogs.append(log)
+            }
+        }
+        for event in ledgerEvents where cleanNoteIfSafe(&event.note, session: session) {
+            changedLedgerEvents.append(event)
+        }
+
+        for changedSession in changedSessions {
+            CloudSyncMutationRecorder.markModified(changedSession, context: context, modifiedAt: cleanedAt)
+        }
+        CloudSyncMutationRecorder.markModified(changedCareLogs, context: context, modifiedAt: cleanedAt)
+        CloudSyncMutationRecorder.markModified(changedHygieneLogs, context: context, modifiedAt: cleanedAt)
+        CloudSyncMutationRecorder.markModified(changedExpenseLogs, context: context, modifiedAt: cleanedAt)
+        CloudSyncMutationRecorder.markModified(changedWalkLogs, context: context, modifiedAt: cleanedAt)
+        CloudSyncMutationRecorder.markModified(changedLedgerEvents, context: context, modifiedAt: cleanedAt)
+
+        let didChange = !changedSessions.isEmpty ||
+            !changedCareLogs.isEmpty ||
+            !changedHygieneLogs.isEmpty ||
+            !changedExpenseLogs.isEmpty ||
+            !changedWalkLogs.isEmpty ||
+            !changedLedgerEvents.isEmpty
+        let didPersist = !persistChanges || !didChange || saveSharedCareMaintenanceChanges(context: context)
+
+        return SharedCareLegacyNoteCleanupResult(
+            sessionIDs: changedSessions.map(\.id),
+            careLogIDs: changedCareLogs.map(\.id),
+            hygieneLogIDs: changedHygieneLogs.map(\.id),
+            expenseLogIDs: changedExpenseLogs.map(\.id),
+            walkLogIDs: changedWalkLogs.map(\.id),
+            ledgerEventIDs: changedLedgerEvents.map(\.id),
+            missingSessionIDs: [],
+            skippedOrphanCareLogIDs: [],
+            skippedOrphanExpenseLogIDs: [],
+            skippedOrphanWalkLogIDs: [],
+            skippedOrphanLedgerEventIDs: [],
+            didPersist: didPersist
         )
     }
 
@@ -652,7 +1128,6 @@ nonisolated enum SharedCareSessionMaintenance {
         return changedName || changedId
     }
 
-    @MainActor
     private static func cleanNoteIfSafe(_ note: inout String, session: SharedCareSession) -> Bool {
         guard SharedCareMetadata.hasLegacyMetadata(note),
               canStripLegacyMetadata(note, session: session) else {

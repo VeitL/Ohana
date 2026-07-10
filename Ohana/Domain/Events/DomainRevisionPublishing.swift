@@ -4,9 +4,11 @@ import Foundation
 @MainActor
 protocol DomainRevisionPublishing {
     var homeRevision: HomeRevision { get }
+    var homeSurfaceInvalidation: HomeSurfaceInvalidationToken { get }
     var walletProjectionRevision: HomeRevision { get }
     var lastMutation: DomainMutationResult? { get }
     var homeRevisionUpdates: AnyPublisher<HomeRevision, Never> { get }
+    var homeSurfaceInvalidationUpdates: AnyPublisher<HomeSurfaceInvalidationToken, Never> { get }
     var walletProjectionUpdates: AnyPublisher<HomeRevision, Never> { get }
     var coconutRewardEvents: AnyPublisher<OhanaCoconutRewardEvent, Never> { get }
 
@@ -42,6 +44,10 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
         center.homeRevision
     }
 
+    var homeSurfaceInvalidation: HomeSurfaceInvalidationToken {
+        center.homeSurfaceInvalidation
+    }
+
     var walletProjectionRevision: HomeRevision {
         center.walletProjectionRevision
     }
@@ -52,6 +58,10 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
 
     var homeRevisionUpdates: AnyPublisher<HomeRevision, Never> {
         center.homeRevisionUpdates
+    }
+
+    var homeSurfaceInvalidationUpdates: AnyPublisher<HomeSurfaceInvalidationToken, Never> {
+        center.homeSurfaceInvalidationUpdates
     }
 
     var walletProjectionUpdates: AnyPublisher<HomeRevision, Never> {

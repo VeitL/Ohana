@@ -17,6 +17,19 @@ nonisolated enum DataBackupPackageFormat {
     static let staleExportAge: TimeInterval = 60 * 60
 }
 
+/// Defines the data boundary for a backup package that can leave the device.
+/// Health data must not be present in any package that can be saved to Files or
+/// shared through system providers, including iCloud Drive. The two values keep
+/// the delivery path auditable while enforcing the same restricted payload.
+nonisolated enum DataBackupExportScope: String, Codable, Equatable, Sendable {
+    case manualExternalRestricted
+    case automaticICloudDriveRestricted
+
+    var excludesHumanHealthData: Bool {
+        true
+    }
+}
+
 // MARK: - DataBackupManager
 //
 // Isolation-agnostic: the build/encode/apply logic only does ModelContext
@@ -43,11 +56,17 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
     static let mediaDirectoryName = DataBackupPackageFormat.mediaDirectoryName
     static let staleExportAge: TimeInterval = DataBackupPackageFormat.staleExportAge
 
-    /// Builds and writes a full backup. The unbounded full-table fetch + JSON
-    /// encode run on a dedicated background SwiftData context (`DataBackupActor`)
-    /// so the main thread is never blocked; only the final file write happens
-    /// here.
-    func exportJSON(container: ModelContainer, password: String? = nil) async throws -> URL {
+    /// Builds and writes a restricted backup package for a user-visible
+    /// destination. Both manual export and automatic iCloud Drive backup omit
+    /// structured human-health data so no file that can leave the device carries
+    /// HealthKit-derived records. The unbounded fetch + JSON encode run on a
+    /// dedicated background SwiftData context (`DataBackupActor`) so the main
+    /// thread is never blocked; only the final file write happens here.
+    func exportJSON(
+        container: ModelContainer,
+        password: String? = nil,
+        scope: DataBackupExportScope = .manualExternalRestricted
+    ) async throws -> URL {
         let flowStartedAt = await MainActor.run {
             AppFlowPerformance.start(AppPerformanceFlows.backupExport)
         }
@@ -55,11 +74,11 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             let trimmedPassword = password?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let shouldEncrypt = !trimmedPassword.isEmpty
 
-            // The export contains full plaintext health / medication / insurance /
-            // document / location data, so it must be written atomically and with
-            // complete file protection (encrypted at rest while the device is
-            // locked). Old exports are purged by age so concurrent export/import
-            // flows cannot delete each other's active backup files.
+            // External packages exclude human-health data, but can still contain
+            // sensitive household, pet, document, route, and location data. They
+            // are written atomically with complete file protection while the
+            // device is locked. Old exports are purged by age so concurrent
+            // export/import flows cannot delete each other's active backup files.
             Self.purgeStaleExports()
 
             let f = DateFormatter()
@@ -75,7 +94,8 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             let result = try await DataBackupActor(modelContainer: container).exportPackage(
                 to: url,
                 encryptMedia: shouldEncrypt,
-                password: shouldEncrypt ? trimmedPassword : nil
+                password: shouldEncrypt ? trimmedPassword : nil,
+                scope: scope
             )
             let manifestData = if shouldEncrypt {
                 try DataBackupEncryption.encrypt(result.manifestData, password: trimmedPassword)
@@ -95,7 +115,8 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                         "bytes": "\(result.mediaBytes)",
                         "mediaCount": "\(result.mediaCount)",
                         "encrypted": "\(shouldEncrypt)",
-                        "format": "package"
+                        "format": "package",
+                        "scope": scope.rawValue
                     ]
                 )
             }
@@ -108,7 +129,8 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                         "bytes": "\(result.mediaBytes)",
                         "mediaCount": "\(result.mediaCount)",
                         "encrypted": "\(shouldEncrypt)",
-                        "format": "package"
+                        "format": "package",
+                        "scope": scope.rawValue
                     ]
                 )
             }
@@ -212,7 +234,8 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
     func buildBackup(
         context: ModelContext,
         mediaWriter: DataBackupMediaWriting? = nil,
-        mediaPackageEncrypted: Bool = false
+        mediaPackageEncrypted: Bool = false,
+        scope: DataBackupExportScope = .manualExternalRestricted
     ) throws -> OhanaBackup {
         let pets = try context.fetch(FetchDescriptor<Pet>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let humans = try context.fetch(FetchDescriptor<Human>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
@@ -238,12 +261,24 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let petMeds = try context.fetch(FetchDescriptor<PetMedication>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let symptoms = try context.fetch(FetchDescriptor<SymptomLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let heatCycles = try context.fetch(FetchDescriptor<HeatCycleLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let hWeightLogs = try context.fetch(FetchDescriptor<HumanWeightLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let hWorkouts = try context.fetch(FetchDescriptor<HumanWorkoutLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let humanMeds = try context.fetch(FetchDescriptor<HumanMedication>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let humanMedLogs = try context.fetch(FetchDescriptor<HumanMedicationLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let humanHealthMetricLogs = try context.fetch(FetchDescriptor<HumanHealthMetricLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let humanHealthReports = try context.fetch(FetchDescriptor<HumanHealthReport>()) // smoothness: explicit backup/export scan only
+        let hWeightLogs = scope.excludesHumanHealthData
+            ? []
+            : try context.fetch(FetchDescriptor<HumanWeightLog>()) // smoothness: explicit manual-export scan only
+        let hWorkouts = scope.excludesHumanHealthData
+            ? []
+            : try context.fetch(FetchDescriptor<HumanWorkoutLog>()) // smoothness: explicit manual-export scan only
+        let humanMeds = scope.excludesHumanHealthData
+            ? []
+            : try context.fetch(FetchDescriptor<HumanMedication>()) // smoothness: explicit manual-export scan only
+        let humanMedLogs = scope.excludesHumanHealthData
+            ? []
+            : try context.fetch(FetchDescriptor<HumanMedicationLog>()) // smoothness: explicit manual-export scan only
+        let humanHealthMetricLogs = scope.excludesHumanHealthData
+            ? []
+            : try context.fetch(FetchDescriptor<HumanHealthMetricLog>()) // smoothness: explicit manual-export scan only
+        let humanHealthReports = scope.excludesHumanHealthData
+            ? []
+            : try context.fetch(FetchDescriptor<HumanHealthReport>()) // smoothness: explicit manual-export scan only
         let waterLogs = try context.fetch(FetchDescriptor<WaterLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let wishlist = try context.fetch(FetchDescriptor<WishlistItem>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
@@ -267,7 +302,37 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             .ownedItemIDs(from: shopPurchaseRecords)
             .sorted()
             .joined(separator: ",")
-        let coconutLogProjection = coconutLedgerEntries
+        let backupEvents = scope.excludesHumanHealthData
+            ? events.filter { !Self.isHumanHealthEvent($0) }
+            : events
+        let backupEventIDs = Set(backupEvents.map(\.id))
+        let backupReminders = scope.excludesHumanHealthData
+            ? reminders.filter { reminder in
+                guard let event = reminder.event else { return true }
+                return backupEventIDs.contains(event.id)
+            }
+            : reminders
+        let backupLedger = scope.excludesHumanHealthData
+            ? ledger.filter { !Self.isHumanHealthLedgerEvent($0) }
+            : ledger
+        // Wallet and budget records carry free-form titles and metadata. Their
+        // historical schema has no complete, durable health-source link, so a
+        // restricted external package omits the entire derived economy sidecar
+        // instead of trying to infer which records might repeat health facts.
+        let backupCoconutLedgerEntries = scope.excludesHumanHealthData
+            ? []
+            : coconutLedgerEntries
+        let backupEconomyBudgetUsageEvents = scope.excludesHumanHealthData
+            ? []
+            : economyBudgetUsageEvents
+        // Family-task titles and notes are free-form and older tasks can have
+        // no durable event/reminder link at all. A restricted external package
+        // therefore omits the full task sidecar rather than inferring whether
+        // a personal-health fact was written into the task text.
+        let backupFamilyTasks = scope.excludesHumanHealthData
+            ? []
+            : familyTasks
+        let coconutLogProjection = backupCoconutLedgerEntries
             .sorted { $0.occurredAt > $1.occurredAt }
             .prefix(200)
             .filter { $0.delta != 0 }
@@ -297,7 +362,13 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         )
 
         let petBackups = try pets.map { try encodePet($0, mediaWriter: mediaWriter) }
-        let humanBackups = try humans.map { try encodeHuman($0, mediaWriter: mediaWriter) }
+        let humanBackups = try humans.map {
+            try encodeHuman(
+                $0,
+                mediaWriter: mediaWriter,
+                redactingHealthData: scope.excludesHumanHealthData
+            )
+        }
         let plantBackups = try plants.map { try encodePlant($0, mediaWriter: mediaWriter) }
         let plantCareLogBackups = try plantCareLogs.map { try encodePlantCareLog($0, mediaWriter: mediaWriter) }
         let petWalkLogBackups = try walkLogs.map { try encodeWalkLog($0, mediaWriter: mediaWriter) }
@@ -317,11 +388,12 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
 
         return OhanaBackup(
             exportedAt: iso.string(from: Date()),
+            exportScope: scope.rawValue,
             mediaPackage: mediaPackage,
             pets: petBackups,
             humans: humanBackups,
-            events: events.map(encodeEvent),
-            reminders: reminders.map(encodeReminder),
+            events: backupEvents.map(encodeEvent),
+            reminders: backupReminders.map(encodeReminder),
             households: households.map(encodeHousehold),
             plants: plantBackups,
             petRelationships: petRelationships.map(encodePetRelationship),
@@ -351,11 +423,11 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             humanHealthReports: humanHealthReports.map(encodeHumanHealthReport),
             waterLogs: waterLogs.map(encodeWaterLog),
             wishlistItems: wishlist.map(encodeWishlist),
-            careLedgerEvents: ledger.map(encodeCareLedgerEvent),
+            careLedgerEvents: backupLedger.map(encodeCareLedgerEvent),
             coconutAccounts: coconutAccounts.map(encodeCoconutAccount),
-            coconutLedgerEntries: coconutLedgerEntries.map(encodeCoconutLedgerEntry),
-            economyBudgetUsageEvents: economyBudgetUsageEvents.map(encodeEconomyBudgetUsageEvent),
-            familyCollaborationTasks: familyTasks.map(encodeFamilyCollaborationTask),
+            coconutLedgerEntries: backupCoconutLedgerEntries.map(encodeCoconutLedgerEntry),
+            economyBudgetUsageEvents: backupEconomyBudgetUsageEvents.map(encodeEconomyBudgetUsageEvent),
+            familyCollaborationTasks: backupFamilyTasks.map(encodeFamilyCollaborationTask),
             sharedCareSessions: sharedCareSessions.map(encodeSharedCareSession),
             coconutExchangeRequests: exchanges.map(encodeCoconutExchangeRequest),
             oasisUpgradeCoconuts: oasisUpgradeCoconuts.map(encodeOasisUpgradeCoconut),
@@ -368,6 +440,47 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             shopPurchaseRecords: shopPurchaseRecords.map(encodeShopPurchaseRecord),
             appState: appState
         )
+    }
+
+    private static func isHumanHealthEvent(_ event: Event) -> Bool {
+        let role = DomainEntityLinkRegistry.role(for: event)
+        switch role {
+        case .humanMedicationPlan, .humanNote:
+            // Medication schedules and free-form human-note reminders can
+            // include health data in their title or note body.
+            return true
+        case .directHuman:
+            // A direct-human schedule has free-form text and no reliable
+            // health classifier. Preserve only the two structured,
+            // non-health lifecycle entries; omit everything else rather than
+            // allowing a personal-health reminder to leave the device.
+            switch event.eventType {
+            case EventType.birthday.rawValue, EventType.anniversary.rawValue:
+                return false
+            default:
+                return true
+            }
+        case .directPet, .directPlant, .plantScoped, .petFoodStock,
+             .petAutoFeeder, .petWaterPlan, .petInsurance,
+             .petMedicationPlan, .petMedicationDose, .unscoped, .unknown:
+            // `.medication` is the human-only event type. Keeping this check
+            // also protects malformed historical records without excluding
+            // pet-health plans, which use a direct-pet relation.
+            return event.eventType == EventType.medication.rawValue
+        }
+    }
+
+    private static func isHumanHealthLedgerEvent(_ event: CareLedgerEvent) -> Bool {
+        if event.subjectKind == CareLedgerSubjectKind.human.rawValue {
+            return true
+        }
+        guard event.actorKind == CareLedgerActorKind.human.rawValue else { return false }
+        switch event.eventKindEnum {
+        case .health, .weight, .medication, .workout:
+            return true
+        default:
+            return false
+        }
     }
 
     // MARK: - Apply Backup

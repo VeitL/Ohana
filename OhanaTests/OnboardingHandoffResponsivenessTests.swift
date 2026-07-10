@@ -23,9 +23,11 @@ struct OnboardingHandoffResponsivenessTests {
         )
 
         #expect(source.contains("guard currentDayToken != token else { return }"))
-        #expect(source.contains("guard observedHomeRevision != revision else { return }"))
-        #expect(source.contains("pendingObservedHomeRevision"))
+        #expect(source.contains("guard observedHomeInvalidation != invalidation else { return }"))
+        #expect(source.contains("pendingHomeInvalidation"))
         #expect(source.contains("pendingDayTokenRefresh"))
+        #expect(source.contains("homeSurfaceInvalidationUpdates"))
+        #expect(source.contains("readModelStore.cancel()"))
         #expect(source.contains("scheduleRefreshKeyStateSync"))
     }
 

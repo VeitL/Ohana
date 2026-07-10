@@ -273,14 +273,16 @@ nonisolated extension SharedCareSessionMaintenance {
         }
 
         let sessionID = session.id
+        let sessionIDString = sessionID.uuidString
         let descriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
-                event.legacyModelName == "PetHygieneLog"
+                event.legacyModelName == "PetHygieneLog" &&
+                    event.metadataJSON.contains(sessionIDString)
             },
             sortBy: [SortDescriptor(\.occurredAt)]
         )
         let events = fetchOrLog(descriptor, context: context, operation: "fetch shared hygiene ledger events")
-        for event in events where sharedSessionID(from: event.metadataJSON) == sessionID || event.metadataJSON.contains(sessionID.uuidString) {
+        for event in events where sharedSessionID(from: event.metadataJSON) == sessionID || event.metadataJSON.contains(sessionIDString) {
             if let idString = event.legacyModelId,
                let id = UUID(uuidString: idString) {
                 ids.insert(id)
@@ -393,6 +395,10 @@ nonisolated extension SharedCareSessionMaintenance {
         deletedAt: Date,
         deletedByHumanId: String?
     ) {
+        guard AppCapabilityProfile.permitsCloudSyncDirtyWrites else {
+            return
+        }
+
         do {
             try CloudSyncMetadataService.markDeleted(
                 entityName: String(describing: SharedCareSession.self),

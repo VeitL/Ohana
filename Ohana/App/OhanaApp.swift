@@ -118,7 +118,9 @@ private struct OhanaBootstrapRootView: View {
             resetPersistentStateForUITestsIfNeeded(modelContainer: modelContainer)
             bootstrapStatus = .buildingServices
             let services = AppServices(modelContainer: modelContainer)
+#if DEBUG
             seedPlantBaselineForUITestsIfNeeded(modelContainer: modelContainer, services: services)
+#endif
             OhanaStartupProbe.mark("bootstrap.services-ready")
             cloudSharingAppDelegate.configure(modelContainer: modelContainer, cloudSync: services.cloudSync)
             let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1000

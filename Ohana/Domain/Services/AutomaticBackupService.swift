@@ -98,6 +98,21 @@ enum AutomaticBackupRunResult: Equatable {
     }
 }
 
+/// The durable result of removing the app-managed iCloud Drive backup during a
+/// privacy reset. A reset must not claim that the remote file disappeared when
+/// iCloud is unavailable; a pending result stays visible until the user retries
+/// or the next cleanup succeeds.
+enum AutomaticBackupResetCleanupResult: Equatable, Sendable {
+    case notRequested
+    case removed
+    case pending(message: String)
+
+    var needsRetry: Bool {
+        if case .pending = self { return true }
+        return false
+    }
+}
+
 struct AutomaticBackupStatus: Equatable, Sendable {
     var isEnabled: Bool
     var lastAttemptAt: Date?
@@ -108,8 +123,20 @@ struct AutomaticBackupStatus: Equatable, Sendable {
     var fileName: String?
     var filePath: String?
     var byteCount: Int
+    var lastExportScope: String?
     var consecutiveFailureCount: Int
     var lastReminderShownAt: Date?
+    var resetCleanupPending: Bool
+    var resetCleanupFailureAt: Date?
+    var resetCleanupFailureMessage: String?
+
+    /// A pre-scope automatic backup could have been written by an earlier
+    /// release. Until it is overwritten by a restricted package or removed, the
+    /// managed iCloud file needs a visible remediation path.
+    var requiresRestrictedBackupReplacement: Bool {
+        guard lastSuccessAt != nil || fileName != nil || filePath != nil else { return false }
+        return lastExportScope != DataBackupExportScope.automaticICloudDriveRestricted.rawValue
+    }
 
     func isDue(now: Date) -> Bool {
         guard isEnabled else { return false }
@@ -148,8 +175,12 @@ final class AutomaticBackupStatusStore {
         static let fileName = "automaticBackup.fileName.v1"
         static let filePath = "automaticBackup.filePath.v1"
         static let byteCount = "automaticBackup.byteCount.v1"
+        static let lastExportScope = "automaticBackup.lastExportScope.v1"
         static let consecutiveFailureCount = "automaticBackup.consecutiveFailureCount.v1"
         static let lastReminderShownAt = "automaticBackup.lastReminderShownAt.v1"
+        static let resetCleanupPending = "automaticBackup.resetCleanupPending.v1"
+        static let resetCleanupFailureAt = "automaticBackup.resetCleanupFailureAt.v1"
+        static let resetCleanupFailureMessage = "automaticBackup.resetCleanupFailureMessage.v1"
     }
 
     private let defaults: UserDefaults
@@ -176,8 +207,12 @@ final class AutomaticBackupStatusStore {
             fileName: defaults.string(forKey: Key.fileName),
             filePath: defaults.string(forKey: Key.filePath),
             byteCount: defaults.integer(forKey: Key.byteCount),
+            lastExportScope: defaults.string(forKey: Key.lastExportScope),
             consecutiveFailureCount: defaults.integer(forKey: Key.consecutiveFailureCount),
-            lastReminderShownAt: date(forKey: Key.lastReminderShownAt)
+            lastReminderShownAt: date(forKey: Key.lastReminderShownAt),
+            resetCleanupPending: defaults.bool(forKey: Key.resetCleanupPending),
+            resetCleanupFailureAt: date(forKey: Key.resetCleanupFailureAt),
+            resetCleanupFailureMessage: defaults.string(forKey: Key.resetCleanupFailureMessage)
         )
     }
 
@@ -189,7 +224,11 @@ final class AutomaticBackupStatusStore {
         setDate(now, forKey: Key.lastAttemptAt)
     }
 
-    func markSuccess(reference: AutomaticBackupFileReference, now: Date) {
+    func markSuccess(
+        reference: AutomaticBackupFileReference,
+        scope: DataBackupExportScope,
+        now: Date
+    ) {
         setDate(now, forKey: Key.lastAttemptAt)
         setDate(now, forKey: Key.lastSuccessAt)
         defaults.removeObject(forKey: Key.lastFailureAt)
@@ -198,7 +237,9 @@ final class AutomaticBackupStatusStore {
         defaults.set(reference.fileName, forKey: Key.fileName)
         defaults.set(reference.path, forKey: Key.filePath)
         defaults.set(reference.byteCount, forKey: Key.byteCount)
+        defaults.set(scope.rawValue, forKey: Key.lastExportScope)
         defaults.set(0, forKey: Key.consecutiveFailureCount)
+        clearResetCleanupFailure()
     }
 
     func markFailure(kind: AutomaticBackupFailureKind, message: String, now: Date) {
@@ -215,6 +256,30 @@ final class AutomaticBackupStatusStore {
 
     func resetAfterAppReset(now _: Date = Date()) {
         Self.resetAfterAppReset(defaults: defaults)
+    }
+
+    func markResetCleanupFailure(message: String, now: Date) {
+        defaults.set(true, forKey: Key.resetCleanupPending)
+        setDate(now, forKey: Key.resetCleanupFailureAt)
+        defaults.set(message, forKey: Key.resetCleanupFailureMessage)
+    }
+
+    func clearResetCleanupFailure() {
+        defaults.removeObject(forKey: Key.resetCleanupPending)
+        defaults.removeObject(forKey: Key.resetCleanupFailureAt)
+        defaults.removeObject(forKey: Key.resetCleanupFailureMessage)
+    }
+
+    func markManagedBackupRemoved() {
+        defaults.removeObject(forKey: Key.lastSuccessAt)
+        defaults.removeObject(forKey: Key.fileName)
+        defaults.removeObject(forKey: Key.filePath)
+        defaults.removeObject(forKey: Key.byteCount)
+        defaults.removeObject(forKey: Key.lastExportScope)
+        defaults.removeObject(forKey: Key.lastFailureAt)
+        defaults.removeObject(forKey: Key.lastFailureKind)
+        defaults.removeObject(forKey: Key.lastFailureMessage)
+        defaults.set(0, forKey: Key.consecutiveFailureCount)
     }
 
     private var isEnabled: Bool {
@@ -244,7 +309,10 @@ protocol AutomaticBackupExporting {
 @MainActor
 struct LiveAutomaticBackupExporter: AutomaticBackupExporting {
     func exportBackupPackage(container: ModelContainer) async throws -> URL {
-        try await DataBackupManager().exportJSON(container: container)
+        try await DataBackupManager().exportJSON(
+            container: container,
+            scope: .automaticICloudDriveRestricted
+        )
     }
 }
 
@@ -378,6 +446,15 @@ struct ICloudDriveAutomaticBackupFileStore: AutomaticBackupFileStoring {
     }
 }
 
+/// Lets the synchronous privacy-reset boundary be tested without accessing a
+/// real iCloud account. The asynchronous service path continues to use
+/// `AutomaticBackupFileStoring`.
+protocol AutomaticBackupResetCleaning {
+    func removeManagedAutomaticBackupsSynchronously() throws
+}
+
+extension ICloudDriveAutomaticBackupFileStore: AutomaticBackupResetCleaning {}
+
 @MainActor
 protocol AutomaticBackupManaging {
     func snapshot(now: Date) -> AutomaticBackupStatus
@@ -386,6 +463,8 @@ protocol AutomaticBackupManaging {
     func runIfDue(container: ModelContainer, trigger: AutomaticBackupTrigger) async -> AutomaticBackupRunResult
     func runNow(container: ModelContainer, trigger: AutomaticBackupTrigger) async -> AutomaticBackupRunResult
     func removeManagedAutomaticBackupsForReset() async
+    func retryManagedAutomaticBackupCleanup() async -> AutomaticBackupResetCleanupResult
+    func removeLegacyAutomaticBackupForHealthSafety() async -> AutomaticBackupResetCleanupResult
 }
 
 @MainActor
@@ -448,7 +527,11 @@ final class AutomaticBackupService: AutomaticBackupManaging {
         do {
             let packageURL = try await exporter.exportBackupPackage(container: container)
             let reference = try await fileStore.writeAutomaticBackup(packageURL: packageURL, now: currentDate)
-            statusStore.markSuccess(reference: reference, now: currentDate)
+            statusStore.markSuccess(
+                reference: reference,
+                scope: .automaticICloudDriveRestricted,
+                now: currentDate
+            )
             return .success(reference)
         } catch {
             let failure = classify(error)
@@ -459,7 +542,32 @@ final class AutomaticBackupService: AutomaticBackupManaging {
 
     func removeManagedAutomaticBackupsForReset() async {
         statusStore.resetAfterAppReset(now: now())
-        try? await fileStore.removeManagedAutomaticBackups()
+        _ = await retryManagedAutomaticBackupCleanup()
+    }
+
+    func retryManagedAutomaticBackupCleanup() async -> AutomaticBackupResetCleanupResult {
+        do {
+            try await fileStore.removeManagedAutomaticBackups()
+            statusStore.clearResetCleanupFailure()
+            return .removed
+        } catch {
+            let failure = classify(error)
+            statusStore.markResetCleanupFailure(message: failure.message, now: now())
+            return .pending(message: failure.message)
+        }
+    }
+
+    func removeLegacyAutomaticBackupForHealthSafety() async -> AutomaticBackupResetCleanupResult {
+        do {
+            try await fileStore.removeManagedAutomaticBackups()
+            statusStore.markManagedBackupRemoved()
+            statusStore.clearResetCleanupFailure()
+            return .removed
+        } catch {
+            let failure = classify(error)
+            statusStore.markFailure(kind: .cleanupFailed, message: failure.message, now: now())
+            return .pending(message: failure.message)
+        }
     }
 
     private func classify(_ error: Error) -> (kind: AutomaticBackupFailureKind, message: String) {

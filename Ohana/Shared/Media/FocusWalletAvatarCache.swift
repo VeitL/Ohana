@@ -16,8 +16,18 @@ enum FocusWalletAvatarCache {
         let data: Data?
     }
 
+    private typealias PreviewDecodeResult = [(UUID, Entry)]
+    private typealias FullDecodeResult = [(UUID, UIImage?, Bool, String, Bool, Data?, String)]
+
     private static var entries: [UUID: Entry] = [:]
     private static var inFlightKeys: Set<String> = []
+    /// These are the actual detached workers, rather than bookkeeping-only
+    /// keys. Memory pressure and the owning route can therefore cancel decode
+    /// and alpha/preview generation before more images are processed.
+    private static var previewDecodeTasks: [UUID: Task<PreviewDecodeResult, Never>] = [:]
+    private static var fullDecodeTasks: [UUID: Task<FullDecodeResult, Never>] = [:]
+    private static var accessTicks: [UUID: UInt64] = [:]
+    private static var nextAccessTick: UInt64 = 0
     private static var evictionGeneration = 0
 
     @discardableResult
@@ -25,12 +35,18 @@ enum FocusWalletAvatarCache {
         ensureMemoryWarningEvictionRegistered()
         var didChange = false
         var previewRequests: [(UUID, String)] = []
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "avatar_preview_decode",
+            requestedItemCount: payloads.count
+        )
+        guard budget.hasWorkCapacity else { return false }
 
-        for payload in payloads {
+        for payload in payloads.prefix(budget.maximumItemCount) {
             guard let data = payload.data else {
                 if entries.removeValue(forKey: payload.id) != nil {
                     didChange = true
                 }
+                accessTicks.removeValue(forKey: payload.id)
                 continue
             }
 
@@ -38,6 +54,7 @@ enum FocusWalletAvatarCache {
             if let cached = entries[payload.id],
                cached.signature == signature,
                cached.image != nil {
+                recordAccess(for: payload.id)
                 continue
             }
 
@@ -46,13 +63,29 @@ enum FocusWalletAvatarCache {
 
         guard !previewRequests.isEmpty else { return didChange }
         let generation = evictionGeneration
-        let previews = await Task.detached(priority: .utility) { // smoothness: keep cache-hit disk IO, image decode, and alpha scan off the main actor.
-            previewRequests.compactMap { id, signature in
-                previewEntry(for: id, signature: signature).map { (id, $0) }
+        let startedAt = Date()
+        let priority: TaskPriority = budget.allowsExpensiveWork ? .utility : .background
+        let taskID = UUID()
+        let task = Task.detached(priority: priority) { () -> PreviewDecodeResult in // smoothness: retained bounded cache-hit disk IO, image decode, and alpha scan stay off the main actor.
+            var resolved: [(UUID, Entry)] = []
+            for (id, signature) in previewRequests {
+                guard !Task.isCancelled, budget.hasTimeRemaining(since: startedAt) else { break }
+                if let entry = previewEntry(for: id, signature: signature) {
+                    guard !Task.isCancelled else { break }
+                    resolved.append((id, entry))
+                }
             }
-        }.value
+            return resolved
+        }
+        previewDecodeTasks[taskID] = task
+        let previews = await withTaskCancellationHandler(operation: {
+            await task.value
+        }, onCancel: {
+            task.cancel()
+        })
+        previewDecodeTasks.removeValue(forKey: taskID)
 
-        guard generation == evictionGeneration else { return didChange }
+        guard !Task.isCancelled, generation == evictionGeneration else { return didChange }
 
         for (id, preview) in previews {
             if let cached = entries[id] {
@@ -60,8 +93,10 @@ enum FocusWalletAvatarCache {
                 if cached.isFinal { continue }
             }
             entries[id] = preview
+            recordAccess(for: id)
             didChange = true
         }
+        trimToCapacity()
 
         return didChange
     }
@@ -73,6 +108,7 @@ enum FocusWalletAvatarCache {
               cached.signature == signature else {
             return nil
         }
+        recordAccess(for: cardId)
         return cached
     }
 
@@ -86,6 +122,8 @@ enum FocusWalletAvatarCache {
             signature: signature,
             isFinal: true
         )
+        recordAccess(for: cardId)
+        trimToCapacity()
     }
 
     @discardableResult
@@ -93,17 +131,24 @@ enum FocusWalletAvatarCache {
         ensureMemoryWarningEvictionRegistered()
         var didChange = false
         let generation = evictionGeneration
-        let decodePayloads: [(UUID, Data, String, String)] = payloads.compactMap { payload in
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "avatar_full_decode",
+            requestedItemCount: payloads.count
+        )
+        guard budget.hasWorkCapacity else { return false }
+        let decodePayloads: [(UUID, Data, String, String)] = payloads.prefix(budget.maximumItemCount).compactMap { payload in
             guard let data = payload.data else {
                 if entries.removeValue(forKey: payload.id) != nil {
                     didChange = true
                 }
+                accessTicks.removeValue(forKey: payload.id)
                 return nil
             }
             let signature = signature(for: data)
             if let cached = entries[payload.id],
                cached.signature == signature,
                cached.isFinal {
+                recordAccess(for: payload.id)
                 return nil
             }
             let inFlightKey = "\(payload.id.uuidString):\(signature)"
@@ -114,11 +159,18 @@ enum FocusWalletAvatarCache {
         guard !decodePayloads.isEmpty else { return didChange }
 
         let decodeStartedAt = CFAbsoluteTimeGetCurrent()
-        let decoded = await Task.detached(priority: .userInitiated) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
-            decodePayloads.map { id, data, signature, inFlightKey in
+        let startedAt = Date()
+        let priority: TaskPriority = budget.allowsExpensiveWork ? .utility : .background
+        let taskID = UUID()
+        let task = Task.detached(priority: priority) { () -> FullDecodeResult in // smoothness: retained bounded off-main media/compute worker; cancellation and runtime budget stop long preload batches.
+            var resolved: [(UUID, UIImage?, Bool, String, Bool, Data?, String)] = []
+            for (id, data, signature, inFlightKey) in decodePayloads {
+                guard !Task.isCancelled, budget.hasTimeRemaining(since: startedAt) else { break }
                 let entry = decodedEntry(from: data, signature: signature)
+                guard !Task.isCancelled, budget.hasTimeRemaining(since: startedAt) else { break }
                 let previewData = entry.image.flatMap { previewPNGData(from: $0) }
-                return (
+                guard !Task.isCancelled else { break }
+                resolved.append((
                     id,
                     entry.image,
                     entry.isTransparent,
@@ -126,24 +178,39 @@ enum FocusWalletAvatarCache {
                     entry.isFinal,
                     previewData,
                     inFlightKey
-                )
+                ))
             }
-        }.value
+            return resolved
+        }
+        fullDecodeTasks[taskID] = task
+        let decoded = await withTaskCancellationHandler(operation: {
+            await task.value
+        }, onCancel: {
+            task.cancel()
+        })
+        fullDecodeTasks.removeValue(forKey: taskID)
 
-        guard generation == evictionGeneration else {
+        guard !Task.isCancelled, generation == evictionGeneration else {
             for (_, _, _, inFlightKey) in decodePayloads {
                 inFlightKeys.remove(inFlightKey)
             }
             return didChange
         }
 
+        let completedInFlightKeys = Set(decoded.map(\.6))
+        for (_, _, _, inFlightKey) in decodePayloads where !completedInFlightKeys.contains(inFlightKey) {
+            inFlightKeys.remove(inFlightKey)
+        }
+
         for (id, image, isTransparent, signature, isFinal, previewData, inFlightKey) in decoded {
             inFlightKeys.remove(inFlightKey)
             entries[id] = Entry(image: image, isTransparent: isTransparent, signature: signature, isFinal: isFinal)
+            recordAccess(for: id)
             if let previewData {
                 writePreviewData(previewData, cardId: id, signature: signature)
             }
         }
+        trimToCapacity()
         AppPerformanceMonitor.shared.record("首页头像解码", startedAt: decodeStartedAt, note: "\(decoded.count) 张")
         return true
     }
@@ -158,10 +225,41 @@ enum FocusWalletAvatarCache {
         }
     }
 
+    private static func recordAccess(for id: UUID) {
+        nextAccessTick &+= 1
+        accessTicks[id] = nextAccessTick
+    }
+
+    private static func trimToCapacity() {
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "avatar_cache",
+            requestedItemCount: 24
+        )
+        let capacity = budget.allowsExpensiveWork ? 24 : 8
+        guard entries.count > capacity else { return }
+        let evictionIDs = accessTicks
+            .sorted { $0.value < $1.value }
+            .prefix(entries.count - capacity)
+            .map(\.key)
+        for id in evictionIDs {
+            entries.removeValue(forKey: id)
+            accessTicks.removeValue(forKey: id)
+        }
+    }
+
     private static func evictDecodedCacheForMemoryWarning() {
-        guard !entries.isEmpty || !inFlightKeys.isEmpty else { return }
+        guard !entries.isEmpty || !inFlightKeys.isEmpty || !previewDecodeTasks.isEmpty || !fullDecodeTasks.isEmpty else { return }
         entries.removeAll(keepingCapacity: false)
         inFlightKeys.removeAll(keepingCapacity: false)
+        accessTicks.removeAll(keepingCapacity: false)
+        for task in previewDecodeTasks.values {
+            task.cancel()
+        }
+        for task in fullDecodeTasks.values {
+            task.cancel()
+        }
+        previewDecodeTasks.removeAll(keepingCapacity: false)
+        fullDecodeTasks.removeAll(keepingCapacity: false)
         evictionGeneration &+= 1
     }
 
@@ -169,6 +267,15 @@ enum FocusWalletAvatarCache {
         static func resetForTesting() {
             entries.removeAll(keepingCapacity: false)
             inFlightKeys.removeAll(keepingCapacity: false)
+            accessTicks.removeAll(keepingCapacity: false)
+            for task in previewDecodeTasks.values {
+                task.cancel()
+            }
+            for task in fullDecodeTasks.values {
+                task.cancel()
+            }
+            previewDecodeTasks.removeAll(keepingCapacity: false)
+            fullDecodeTasks.removeAll(keepingCapacity: false)
             evictionGeneration &+= 1
         }
     #endif

@@ -77,19 +77,76 @@ struct WalksLogicTests {
         #expect(summarySource.contains("finishedCoconutDelta(for:"))
     }
 
-    @Test func walkMapSnapshotRehydratesLogBeforeWritingAsyncImageData() throws {
+    @Test func walkMapSnapshotUsesBoundedCancellableBackgroundPersistence() throws {
         let rootURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let managerSource = try String(
             contentsOf: rootURL.appending(path: "Ohana/Features/Walks/PetWalkingManager.swift"),
             encoding: .utf8
         )
+        let workSource = try String(
+            contentsOf: rootURL.appending(path: "Ohana/Features/Walks/WalkMapSnapshotWork.swift"),
+            encoding: .utf8
+        )
 
-        #expect(managerSource.contains("let walkLogID = walkLog.id"))
+        #expect(managerSource.contains("WalkMapSnapshotPointCursor.sample"))
+        #expect(managerSource.contains("WalkMapSnapshotMarkerCursor.sample"))
+        #expect(managerSource.contains("mapSnapshotTask?.cancel()"))
+        #expect(managerSource.contains("WalkMapSnapshotPersistenceActor"))
         #expect(managerSource.contains("let modelContainer = modelContext.container"))
-        #expect(managerSource.contains("let snapshotContext = ModelContext(modelContainer)"))
-        #expect(managerSource.contains("FetchDescriptor<PetWalkLog>"))
-        #expect(managerSource.contains("persistedWalkLog.mapSnapshotData = jpegData"))
-        #expect(!managerSource.contains("walkLog.mapSnapshotData = jpegData"))
+        #expect(managerSource.contains("deadline: snapshotDeadline"))
+        #expect(managerSource.contains("defer {"))
+        #expect(workSource.contains("@ModelActor"))
+        #expect(workSource.contains("withTaskCancellationHandler"))
+        #expect(workSource.contains("routeCursorStride"))
+        #expect(workSource.contains("poopMarkerCursorStride"))
+        #expect(workSource.contains("maximumPointCount"))
+        #expect(workSource.contains("maximumMarkerCount"))
+        #expect(workSource.contains("let deadlineTask = Task"))
+        #expect(workSource.contains("operation.cancelSnapshotterIfInstalled()"))
+        #expect(workSource.contains("guard Date() < deadline else { throw CancellationError() }"))
+        #expect(workSource.contains("modelContext.safeSaveResult"))
+    }
+
+    @Test func walkMapSnapshotPointCursorBoundsDenseRouteAndKeepsEndpoints() {
+        let locations = (0 ..< 600).map { index in
+            CLLocation(latitude: 37 + Double(index) * 0.0001, longitude: -122 - Double(index) * 0.0001)
+        }
+
+        let sample = WalkMapSnapshotPointCursor.sample(
+            locations: locations,
+            maximumPointCount: 64
+        )
+
+        #expect(sample.points.count <= 64)
+        #expect(sample.stride > 1)
+        #expect(sample.points.first == WalkMapSnapshotPoint(locations[0]))
+        #expect(sample.points.last == WalkMapSnapshotPoint(locations[locations.count - 1]))
+    }
+
+    @Test func walkMapSnapshotMarkerCursorBoundsDenseMarkersAndKeepsEndpoints() {
+        let markers = (0 ..< 80).map { index in
+            WalkMapSnapshotMarker(
+                latitude: 37 + Double(index) * 0.0001,
+                longitude: -122 - Double(index) * 0.0001
+            )
+        }
+
+        let sample = WalkMapSnapshotMarkerCursor.sample(
+            markers: markers,
+            maximumMarkerCount: 8
+        )
+
+        #expect(sample.markers.count <= 8)
+        #expect(sample.stride > 1)
+        #expect(sample.markers.first == markers.first)
+        #expect(sample.markers.last == markers.last)
+    }
+
+    @Test func walkMapSnapshotQualityShrinksRouteAndMarkerBudgetsInReducedMode() {
+        #expect(WalkMapSnapshotQuality.standard.maximumRoutePointCount == 240)
+        #expect(WalkMapSnapshotQuality.reduced.maximumRoutePointCount == 64)
+        #expect(WalkMapSnapshotQuality.standard.maximumMarkerCount == 24)
+        #expect(WalkMapSnapshotQuality.reduced.maximumMarkerCount == 8)
     }
 
     @Test func managerStartNoOpsForIneligiblePetsBeforeStartingLocation() {

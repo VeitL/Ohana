@@ -1,6 +1,6 @@
 {
   "schema": "ohana.governance.cache-ownership.v1",
-  "updated": "2026-07-04",
+  "updated": "2026-07-09",
   "policyDocuments": [
     "AGENTS.md",
     "docs/data-cache-sync-policy.md",
@@ -28,9 +28,9 @@
       "owner": "Home feature owner",
       "scope": "process",
       "sourceOfTruth": "Human and pet avatar image data plus cached preview PNG files derived from those payload signatures.",
-      "invalidation": "Avatar payload signature changes, explicit nil payloads, and UIApplication memory warnings invalidate decoded UIImage entries; in-flight decodes are generation-checked so memory warning evictions do not get repopulated by stale work.",
-      "expiry": "Decoded memory entries live only while process memory pressure allows; preview files remain lazy fallback cache data.",
-      "recovery": "Render placeholders or preview entries, then rebuild decoded images through the existing deferred AvatarPipeline / FocusWalletAvatarCache preload path after the first frame.",
+      "invalidation": "Avatar payload signature changes, explicit nil payloads, LRU capacity eviction (24 entries normally, 8 under low-power/reduced-work policy), and UIApplication memory warnings invalidate decoded UIImage entries; bounded in-flight decodes are generation-checked so stale work cannot repopulate an eviction.",
+      "expiry": "Decoded entries are an LRU working set only; preview files remain a lazy fallback cache data source.",
+      "recovery": "Render placeholders or preview entries, then rebuild only a bounded deferred batch through AvatarPipeline / FocusWalletAvatarCache after the first frame.",
       "paths": [
         "Ohana/Shared/Media/FocusWalletAvatarCache.swift",
         "Ohana/Shared/Media/AvatarPipeline.swift",
@@ -42,9 +42,9 @@
       "owner": "Home feature owner",
       "scope": "process",
       "sourceOfTruth": "Card popout image data keyed by payload signature.",
-      "invalidation": "Popout payload signature changes, explicit nil or empty payloads, and UIApplication memory warnings invalidate decoded UIImage entries; generation checks prevent stale in-flight decodes from restoring evicted entries.",
-      "expiry": "Decoded memory entries live only while process memory pressure allows.",
-      "recovery": "Render without the popout image until route-scoped preload rebuilds it through the existing detached decode path.",
+      "invalidation": "Popout payload signature changes, explicit nil or empty payloads, LRU capacity eviction (16 entries normally, 6 under low-power/reduced-work policy), and UIApplication memory warnings invalidate decoded UIImage entries; generation checks prevent stale in-flight decodes from restoring evicted entries.",
+      "expiry": "Decoded memory entries are a bounded LRU working set, not a gallery-wide cache.",
+      "recovery": "Render without the popout image until route-scoped bounded preload rebuilds it through the detached decode path.",
       "paths": [
         "Ohana/Shared/Media/FocusPopoutImageCache.swift",
         "OhanaTests/DecodedImageCacheMemoryWarningTests.swift"
@@ -55,9 +55,9 @@
       "owner": "Shared media owner",
       "scope": "process",
       "sourceOfTruth": "User-imported media bytes resolved by visible routes and keyed by a stable item id, source payload signature, and requested max pixel size.",
-      "invalidation": "Source payload signature changes create a new thumbnail key; UIApplication memory warnings cancel in-flight decode tasks and clear decoded UIImage and transparency-flag entries through MemoryWarningEvictionRegistry.",
-      "expiry": "Decoded thumbnail and transparency entries live only while process memory pressure allows; routes recover by showing placeholders and lazily requesting thumbnails for visible media.",
-      "recovery": "Render lightweight placeholders, then rebuild downsampled thumbnails and derived transparency flags through MediaThumbnailProvider when tiles appear.",
+      "invalidation": "Source payload signature changes create a new thumbnail key; LRU capacity eviction (48 entries normally, 16 under low-power/reduced-work policy) and UIApplication memory warnings cancel in-flight decode tasks and clear decoded UIImage and transparency-flag entries through MemoryWarningEvictionRegistry.",
+      "expiry": "Decoded thumbnail and transparency entries are a bounded visible-media working set; routes recover by showing placeholders and lazily requesting thumbnails for visible media.",
+      "recovery": "Render lightweight placeholders, then rebuild downsampled thumbnails and derived transparency flags through a cancellable, budgeted MediaThumbnailProvider task when tiles appear.",
       "paths": [
         "Ohana/Shared/Media/MediaThumbnailProvider.swift",
         "Ohana/Shared/Media/AttachmentImageDecoder.swift",

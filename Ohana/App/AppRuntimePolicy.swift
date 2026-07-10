@@ -47,6 +47,27 @@ enum OhanaVisualEffectsBudget: Equatable {
     var usesFullEffects: Bool { self == .full }
 }
 
+/// A small, Sendable work contract passed from the app runtime policy to
+/// maintenance actors and deferred media work. It prevents a background queue
+/// from inventing its own power or thermal policy and gives long scans one
+/// bounded batch to finish before persisting a continuation cursor.
+nonisolated struct OhanaBackgroundWorkBudget: Sendable, Equatable {
+    let operation: String
+    let maximumItemCount: Int
+    let maximumWallClockSeconds: TimeInterval
+    let allowsExpensiveWork: Bool
+    let isDeferred: Bool
+
+    var hasWorkCapacity: Bool {
+        !isDeferred && maximumItemCount > 0
+    }
+
+    func hasTimeRemaining(since startedAt: Date = Date()) -> Bool {
+        guard hasWorkCapacity else { return false }
+        return Date().timeIntervalSince(startedAt) < maximumWallClockSeconds
+    }
+}
+
 enum OhanaFrameScheduler {
     @MainActor
     @discardableResult
@@ -345,6 +366,50 @@ final class AppWorkloadPolicy: ObservableObject {
         case .throttled: throttledInterval
         case .paused: pausedInterval
         }
+    }
+
+    /// Produces one explicit, finite batch for deferred work. Callers must
+    /// persist a continuation cursor when `maximumItemCount` is exhausted;
+    /// they must not loop until completion while the app is hidden.
+    func backgroundWorkBudget(
+        operation: String,
+        requestedItemCount: Int,
+        allowWhileBackground: Bool = false
+    ) -> OhanaBackgroundWorkBudget {
+        let requestedItemCount = max(1, requestedItemCount)
+        let isCritical = thermalState == .critical
+        let mustDefer = isCritical || (!isForeground && !allowWhileBackground)
+        guard !mustDefer else {
+            return OhanaBackgroundWorkBudget(
+                operation: operation,
+                maximumItemCount: 0,
+                maximumWallClockSeconds: 0,
+                allowsExpensiveWork: false,
+                isDeferred: true
+            )
+        }
+
+        let constrained = isLowPowerModeEnabled ||
+            isUserPowerSavingMode ||
+            thermalState == .serious ||
+            isReduceMotionEnabled
+        if constrained {
+            return OhanaBackgroundWorkBudget(
+                operation: operation,
+                maximumItemCount: min(requestedItemCount, 12),
+                maximumWallClockSeconds: 3,
+                allowsExpensiveWork: false,
+                isDeferred: false
+            )
+        }
+
+        return OhanaBackgroundWorkBudget(
+            operation: operation,
+            maximumItemCount: min(requestedItemCount, 64),
+            maximumWallClockSeconds: 10,
+            allowsExpensiveWork: true,
+            isDeferred: false
+        )
     }
 
     private func reductionReason(isVisible: Bool, allowDuringActiveWalk: Bool) -> String? {

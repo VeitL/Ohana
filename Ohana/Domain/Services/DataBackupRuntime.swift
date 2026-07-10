@@ -87,7 +87,8 @@ actor DataBackupActor {
     func exportPackage(
         to packageURL: URL,
         encryptMedia: Bool,
-        password: String?
+        password: String?,
+        scope: DataBackupExportScope
     ) throws -> DataBackupPackageBuildResult {
         let mediaWriter = DataBackupMediaPackageWriter(
             packageURL: packageURL,
@@ -99,7 +100,8 @@ actor DataBackupActor {
         let backup = try manager.buildBackup(
             context: modelContext,
             mediaWriter: mediaWriter,
-            mediaPackageEncrypted: encryptMedia
+            mediaPackageEncrypted: encryptMedia,
+            scope: scope
         )
         return DataBackupPackageBuildResult(
             manifestData: try manager.encode(backup),

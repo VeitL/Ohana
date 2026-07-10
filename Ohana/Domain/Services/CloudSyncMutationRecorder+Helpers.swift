@@ -8,7 +8,8 @@ import SwiftData
 
 nonisolated extension CloudSyncMutationRecorder {
     static func supportsLocalMutationRecording(for entityName: String) -> Bool {
-        CloudSyncEntityRegistry.descriptor(for: entityName)?.uploadsToCloudKit == true
+        AppCapabilityProfile.permitsCloudSyncDirtyWrites &&
+            CloudSyncEntityRegistry.descriptor(for: entityName)?.uploadsToCloudKit == true
     }
 
     static func markPetScopedModified<T>(
@@ -104,6 +105,10 @@ nonisolated extension CloudSyncMutationRecorder {
     }
 
     static func sharedHouseholdId(context: ModelContext, now: Date) -> UUID? {
+        guard AppCapabilityProfile.permitsCloudSyncDirtyWrites else {
+            return nil
+        }
+
         do {
             var descriptor = FetchDescriptor<Household>(
                 sortBy: [SortDescriptor(\.createdAt)]

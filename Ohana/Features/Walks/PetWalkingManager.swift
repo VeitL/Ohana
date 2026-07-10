@@ -125,6 +125,8 @@ final class PetWalkingManager {
     private var recoveredDistanceMeters: Double = 0
     private var restoredCheckpointNeedsLocationStart = false
     private var walkStopStartedAt: CFAbsoluteTime?
+    private var mapSnapshotTask: Task<Void, Never>?
+    private var mapSnapshotGeneration = 0
     private let locationManager: any WalkLocationManaging
     private let questManager: QuestManager
     private let careLedger: CareLedgerRecording
@@ -403,7 +405,6 @@ final class PetWalkingManager {
 
         for walkLog in walkLogs {
             walkLog.routeLocationsData = routeData
-            generateMapSnapshot(for: walkLog, routeLocations: routeLocations, poopMarkers: poopMarkers, modelContext: modelContext)
         }
 
         let sourceWalkLog = walkLogs.first { $0.pet?.id == pet.id } ?? walkLogs.first
@@ -504,6 +505,13 @@ final class PetWalkingManager {
             return .failed(saveResult.errorDescription)
         }
 
+        generateMapSnapshot(
+            for: walkLogs,
+            routeLocations: routeLocations,
+            poopMarkers: poopMarkers,
+            modelContext: modelContext
+        )
+
         deleteRecoveryCheckpointIfPossible(modelContext: modelContext)
 
         lastCompletedPetId = pet.id
@@ -535,6 +543,9 @@ final class PetWalkingManager {
     }
 
     func reset() {
+        mapSnapshotTask?.cancel()
+        mapSnapshotTask = nil
+        mapSnapshotGeneration &+= 1
         stopTimer()
         locationManager.stopAllLocationActivity()
         phase = .idle
@@ -775,87 +786,94 @@ final class PetWalkingManager {
     }
 
     // MARK: - Map Snapshot
-    private func generateMapSnapshot(for walkLog: PetWalkLog, routeLocations: [CLLocation], poopMarkers: [WalkPoopMarker], modelContext: ModelContext) {
-        let walkLogID = walkLog.id
+    private func generateMapSnapshot(
+        for walkLogs: [PetWalkLog],
+        routeLocations: [CLLocation],
+        poopMarkers: [WalkPoopMarker],
+        modelContext: ModelContext
+    ) {
+        let walkLogIDs = walkLogs.map(\.id)
+        guard !walkLogIDs.isEmpty, routeLocations.count >= 2 else { return }
+
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "walk_map_snapshot",
+            requestedItemCount: 1
+        )
+        guard budget.hasWorkCapacity else {
+            AppPerformanceMonitor.shared.record(
+                "walk_map_snapshot_deferred",
+                valueMS: 0,
+                note: "runtime budget deferred"
+            )
+            return
+        }
+
+        let quality: WalkMapSnapshotQuality = budget.allowsExpensiveWork ? .standard : .reduced
+        let sampledRoute = WalkMapSnapshotPointCursor.sample(
+            locations: routeLocations,
+            maximumPointCount: quality.maximumRoutePointCount
+        )
+        let sampledMarkers = WalkMapSnapshotMarkerCursor.sample(
+            markers: poopMarkers.compactMap(WalkMapSnapshotMarker.init),
+            maximumMarkerCount: quality.maximumMarkerCount
+        )
+        let request = WalkMapSnapshotRequest(
+            walkLogIDs: walkLogIDs,
+            route: sampledRoute.points,
+            poopMarkers: sampledMarkers.markers,
+            routeCursorStride: sampledRoute.stride,
+            poopMarkerCursorStride: sampledMarkers.stride,
+            quality: quality,
+            isRainbowRoute: WalkEffectPreferenceStore.isRainbowRouteEnabled(),
+            isRainbowPoop: WalkEffectPreferenceStore.isRainbowPoopEnabled()
+        )
         let modelContainer = modelContext.container
-        let locations = routeLocations
-        guard locations.count >= 2 else { return }
-
-        let coordinates = locations.map(\.coordinate)
-        let poopCoordinates = poopMarkers.compactMap(\.coordinate)
-        let regionCoordinates = coordinates + poopCoordinates
-        var region = MKCoordinateRegion()
-
-        let lats = regionCoordinates.map(\.latitude)
-        let lons = regionCoordinates.map(\.longitude)
-        let center = CLLocationCoordinate2D(
-            latitude: (lats.min()! + lats.max()!) / 2,
-            longitude: (lons.min()! + lons.max()!) / 2
-        )
-        let span = MKCoordinateSpan(
-            latitudeDelta: max(0.005, (lats.max()! - lats.min()!) * 1.5),
-            longitudeDelta: max(0.005, (lons.max()! - lons.min()!) * 1.5)
-        )
-        region = MKCoordinateRegion(center: center, span: span)
-
-        let options = MKMapSnapshotter.Options()
-        options.region = region
-        options.size = CGSize(width: 400, height: 300)
-        options.mapType = .standard
-
-        let snapshotter = MKMapSnapshotter(options: options)
-        snapshotter.start { snapshot, error in
-            guard let snapshot, error == nil else { return }
-
-            let image = UIGraphicsImageRenderer(size: snapshot.image.size).image { ctx in
-                snapshot.image.draw(at: .zero)
-
-                MapSnapshotRainbowRenderer.drawRoute(
-                    coordinates: coordinates,
-                    on: snapshot,
-                    in: ctx.cgContext,
-                    isRainbow: WalkEffectPreferenceStore.isRainbowRouteEnabled(),
-                    lineWidth: 3
-                )
-
-                // 起点绿点
-                let startPoint = snapshot.point(for: coordinates.first!)
-                UIColor.green.setFill()
-                UIBezierPath(arcCenter: startPoint, radius: 5, startAngle: 0, endAngle: .pi * 2, clockwise: true).fill()
-
-                // 终点蓝点
-                let endPoint = snapshot.point(for: coordinates.last!)
-                UIColor.blue.setFill()
-                UIBezierPath(arcCenter: endPoint, radius: 6, startAngle: 0, endAngle: .pi * 2, clockwise: true).fill()
-
-                for marker in poopMarkers {
-                    guard let coordinate = marker.coordinate else { continue }
-                    MapSnapshotRainbowRenderer.drawPoopMarker(
-                        at: snapshot.point(for: coordinate),
-                        in: ctx.cgContext,
-                        isRainbow: WalkEffectPreferenceStore.isRainbowPoopEnabled()
-                    )
+        mapSnapshotTask?.cancel()
+        mapSnapshotGeneration &+= 1
+        let generation = mapSnapshotGeneration
+        let startedAt = CFAbsoluteTimeGetCurrent()
+        let budgetStartedAt = Date()
+        let snapshotDeadline = budgetStartedAt.addingTimeInterval(budget.maximumWallClockSeconds)
+        let priority: TaskPriority = budget.allowsExpensiveWork ? .utility : .background
+        mapSnapshotTask = Task(priority: priority) { [weak self] in
+            defer {
+                if self?.mapSnapshotGeneration == generation {
+                    self?.mapSnapshotTask = nil
                 }
             }
+            guard !Task.isCancelled,
+                  budget.hasTimeRemaining(since: budgetStartedAt) else { return }
+            guard let jpegData = await WalkMapSnapshotRenderer.render(
+                request: request,
+                deadline: snapshotDeadline
+            ),
+                  !Task.isCancelled,
+                  Date() < snapshotDeadline
+            else { return }
 
-            let jpegData = image.jpegData(compressionQuality: 0.7)
-            // F2: SwiftData 模型必须在 MainActor 上写入
-            DispatchQueue.main.async {
-                let snapshotContext = ModelContext(modelContainer)
-                var descriptor = FetchDescriptor<PetWalkLog>(
-                    predicate: #Predicate { candidate in
-                        candidate.id == walkLogID
-                    }
+            do {
+                let persistence = WalkMapSnapshotPersistenceActor(modelContainer: modelContainer)
+                try await persistence.persist(
+                    jpegData: jpegData,
+                    to: request.walkLogIDs,
+                    deadline: snapshotDeadline
                 )
-                descriptor.fetchLimit = 1
-                guard let persistedWalkLog = try? snapshotContext.fetch(descriptor).first else {
-                    return
-                }
-                persistedWalkLog.mapSnapshotData = jpegData
-                let saveResult = snapshotContext.safeSaveResult(publishFailureEvent: true)
-                if !saveResult.didSave {
-                    snapshotContext.rollback()
-                }
+                guard !Task.isCancelled,
+                      self?.mapSnapshotGeneration == generation
+                else { return }
+                AppPerformanceMonitor.shared.record(
+                    "walk_map_snapshot_completed",
+                    startedAt: startedAt,
+                    note: "logs=\(request.walkLogIDs.count), points=\(request.route.count), routeStride=\(request.routeCursorStride), markers=\(request.poopMarkers.count), markerStride=\(request.poopMarkerCursorStride), quality=\(quality)"
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                AppPerformanceMonitor.shared.record(
+                    "walk_map_snapshot_failed",
+                    startedAt: startedAt,
+                    note: error.localizedDescription
+                )
             }
         }
     }

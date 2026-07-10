@@ -18,6 +18,20 @@ final class StartupMaintenanceCoordinator: ObservableObject {
     private let defaults: UserDefaults
     private var maintenanceTask: Task<Void, Never>?
     private var didStart = false
+    private var resumeFromMaintenanceStep: String?
+
+    private static let maintenanceStepNames: Set<String> = [
+        "input_warmup",
+        "auto_feeder_materialization",
+        "reminder_refill",
+        "media_attachment_presence_backfill",
+        "member_theme_normalization",
+        "plant_care_orphan_maintenance",
+        "care_ledger_backfill",
+        "shared_care_note_cleanup",
+        "shop_purchase_defaults_migration",
+        "avatar_asset_compaction"
+    ]
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -26,6 +40,12 @@ final class StartupMaintenanceCoordinator: ObservableObject {
     func startAfterFirstRender(context: ModelContext) {
         guard !didStart else { return }
         didStart = true
+        let persistedCursor = defaults.string(forKey: Keys.maintenanceCursor)
+        if let persistedCursor, Self.maintenanceStepNames.contains(persistedCursor) {
+            resumeFromMaintenanceStep = persistedCursor
+        } else if persistedCursor != nil {
+            clearMaintenanceCursor(ifMatching: persistedCursor ?? "")
+        }
 
         maintenanceTask = Task { @MainActor in
             AppPerformanceMonitor.shared.record(
@@ -45,29 +65,47 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 note: "startup maintenance deferred"
             )
 
-            await runStep("input_warmup", delayMilliseconds: 700) {
+            guard await runStep("input_warmup", delayMilliseconds: 700, operation: {
                 InputLatencyWarmupService.warmUpOnce()
+            }) else {
+                maintenanceTask = nil
+                return
             }
 
-            await runStep("media_attachment_presence_backfill", delayMilliseconds: 2500) {
-                self.backfillMediaAttachmentPresenceIfNeeded(context: context)
+            guard await runStep("auto_feeder_materialization", delayMilliseconds: 2500, operation: {
+                await self.materializeAutoFeederLogsIfNeeded(context: context)
+            }) else {
+                maintenanceTask = nil
+                return
             }
 
-            await runStep("member_theme_and_auto_feeder", delayMilliseconds: 16000) {
-                MemberThemeColorMaintenanceService.normalizeReservedColors(context: context)
+            guard await runStep("reminder_refill", delayMilliseconds: 16000, operation: {
                 FamilyWeeklyReportService().scheduleWeeklyReminder()
-                self.materializeAutoFeederLogsIfNeeded(context: context)
-            }
-
-            await runStep("reminder_refill", delayMilliseconds: 25000) {
                 guard self.shouldRunReminderMaintenance else { return }
-                let result = await ReminderMaintenanceService.runPendingReminderMaintenance(context: context)
+                let result = await self.runReminderMaintenanceIfNeeded(context: context)
                 if result.completed {
                     self.defaults.set(Date().timeIntervalSince1970, forKey: Keys.reminderMaintenanceLastRunAt)
                 }
+            }) else {
+                maintenanceTask = nil
+                return
             }
 
-            await runStep("plant_care_orphan_maintenance", delayMilliseconds: 30000) {
+            guard await runStep("media_attachment_presence_backfill", delayMilliseconds: 2500, requiresExpensiveBudget: true, operation: {
+                await self.backfillMediaAttachmentPresenceIfNeeded(context: context)
+            }) else {
+                maintenanceTask = nil
+                return
+            }
+
+            guard await runStep("member_theme_normalization", delayMilliseconds: 5000, requiresExpensiveBudget: true, operation: {
+                await self.normalizeMemberThemeColorsIfNeeded(context: context)
+            }) else {
+                maintenanceTask = nil
+                return
+            }
+
+            guard await runStep("plant_care_orphan_maintenance", delayMilliseconds: 30000, requiresExpensiveBudget: true, operation: {
                 guard self.shouldRunPlantCareOrphanMaintenance else { return }
                 let result = await PlantCareOrphanMaintenanceService.runOffMainScan(context: context, defaults: self.defaults)
                 if result.didPersist {
@@ -79,22 +117,37 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                     valueMS: 0,
                     note: "\(result.removedEventCount) events, \(result.removedReminderCount) reminders, \(result.cleanedPreferencePlantCount) pref scopes"
                 )
+            }) else {
+                maintenanceTask = nil
+                return
             }
 
-            await runStep("care_ledger_backfill", delayMilliseconds: 45000) {
+            guard await runStep("care_ledger_backfill", delayMilliseconds: 45000, requiresExpensiveBudget: true, operation: {
                 await self.runCareLedgerBackfillIfNeeded(context: context)
+            }) else {
+                maintenanceTask = nil
+                return
             }
 
-            await runStep("shared_care_note_cleanup", delayMilliseconds: 5000) {
-                self.cleanLegacySharedCareNotesIfNeeded(context: context)
+            guard await runStep("shared_care_note_cleanup", delayMilliseconds: 5000, requiresExpensiveBudget: true, operation: {
+                await self.cleanLegacySharedCareNotesIfNeeded(context: context)
+            }) else {
+                maintenanceTask = nil
+                return
             }
 
-            await runStep("shop_purchase_defaults_migration", delayMilliseconds: 5000) {
-                self.migrateLegacyShopPurchasesIfNeeded(context: context)
+            guard await runStep("shop_purchase_defaults_migration", delayMilliseconds: 5000, requiresExpensiveBudget: true, operation: {
+                await self.migrateLegacyShopPurchasesIfNeeded(context: context)
+            }) else {
+                maintenanceTask = nil
+                return
             }
 
-            await runStep("avatar_asset_compaction", delayMilliseconds: 90000) {
+            guard await runStep("avatar_asset_compaction", delayMilliseconds: 90000, requiresExpensiveBudget: true, operation: {
                 await self.compactAvatarAssetsIfNeeded(context: context)
+            }) else {
+                maintenanceTask = nil
+                return
             }
 
             maintenanceTask = nil
@@ -109,12 +162,37 @@ final class StartupMaintenanceCoordinator: ObservableObject {
     private func runStep(
         _ name: String,
         delayMilliseconds: UInt64,
+        requiresExpensiveBudget: Bool = false,
         operation: @escaping @MainActor () async -> Void
-    ) async {
+    ) async -> Bool {
+        if let resumeFromMaintenanceStep,
+           resumeFromMaintenanceStep != name {
+            return true
+        }
+        if resumeFromMaintenanceStep == name {
+            resumeFromMaintenanceStep = nil
+        }
         await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: delayMilliseconds)
         guard !Task.isCancelled else {
+            recordMaintenanceCursor(name)
             recordCancelled(name)
-            return
+            return false
+        }
+
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "startup_\(name)",
+            requestedItemCount: 64
+        )
+        guard budget.hasWorkCapacity,
+              !requiresExpensiveBudget || budget.allowsExpensiveWork
+        else {
+            recordMaintenanceCursor(name)
+            AppPerformanceMonitor.shared.record(
+                "startup_maintenance_deferred",
+                valueMS: 0,
+                note: "\(name), low-cost continuation on next eligible launch"
+            )
+            return false
         }
 
         let startedAt = CFAbsoluteTimeGetCurrent()
@@ -126,14 +204,17 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         await operation()
 
         guard !Task.isCancelled else {
+            recordMaintenanceCursor(name)
             recordCancelled(name)
-            return
+            return false
         }
+        clearMaintenanceCursor(ifMatching: name)
         AppPerformanceMonitor.shared.record(
             "startup_maintenance_completed",
             startedAt: startedAt,
             note: name
         )
+        return true
     }
 
     private var shouldRunReminderMaintenance: Bool {
@@ -148,14 +229,68 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         return Date().timeIntervalSince1970 - lastRun >= oneDay
     }
 
+    private func runReminderMaintenanceIfNeeded(context: ModelContext) async -> ReminderMaintenanceRunResult {
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "startup_reminder_refill",
+            requestedItemCount: 64
+        )
+        guard budget.hasWorkCapacity else {
+            return ReminderMaintenanceRunResult(pendingCount: 0, completed: false, hasMoreWork: true)
+        }
+        do {
+            let plan = try await ReminderMaintenanceService.makeBackgroundPlan(
+                context: context,
+                budget: budget,
+                futureOffset: ReminderMaintenanceCursorStore.futureOffset(defaults: defaults)
+            )
+            guard !Task.isCancelled else {
+                return ReminderMaintenanceRunResult(
+                    pendingCount: plan.reminderModelIDs.count,
+                    completed: false,
+                    hasMoreWork: plan.hasMoreWork
+                )
+            }
+            let result = await ReminderMaintenanceService.run(plan: plan, context: context)
+            ReminderMaintenanceCursorStore.record(result, plan: plan, defaults: defaults)
+            return result
+        } catch is CancellationError {
+            return ReminderMaintenanceRunResult(pendingCount: 0, completed: false, hasMoreWork: true)
+        } catch {
+            #if DEBUG
+                OhanaLog.error("Startup reminder maintenance plan failed: \(error.localizedDescription)", category: "StartupMaintenance")
+            #endif
+            return ReminderMaintenanceRunResult(pendingCount: 0, completed: false, hasMoreWork: true)
+        }
+    }
+
     private func runCareLedgerBackfillIfNeeded(context: ModelContext) async {
         guard !defaults.bool(forKey: Keys.careLedgerBackfillCompleted) else { return }
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "startup_care_ledger_backfill",
+            requestedItemCount: 64
+        )
+        guard budget.hasWorkCapacity, budget.allowsExpensiveWork else { return }
         do {
-            // Run the unbounded full-table backfill on a background SwiftData
-            // context so it never blocks the main thread.
             let actor = CareLedgerBackfillActor(modelContainer: context.container)
-            try await actor.run()
-            defaults.set(true, forKey: Keys.careLedgerBackfillCompleted)
+            let result = try await actor.runBatch(
+                cursor: CareLedgerBackfillCursorStore.cursor(defaults: defaults),
+                maximumSourceRecordCount: budget.maximumItemCount,
+                deadline: Date().addingTimeInterval(budget.maximumWallClockSeconds)
+            )
+            guard !Task.isCancelled else { return }
+            if result.didComplete {
+                defaults.set(true, forKey: Keys.careLedgerBackfillCompleted)
+                CareLedgerBackfillCursorStore.clear(defaults: defaults)
+            } else {
+                CareLedgerBackfillCursorStore.store(result.nextCursor, defaults: defaults)
+                AppPerformanceMonitor.shared.record(
+                    "startup_care_ledger_backfill_continuation",
+                    valueMS: 0,
+                    note: "processed=\(result.processedSourceRecordCount), source=\(result.nextCursor.sourceIndex), offset=\(result.nextCursor.sourceOffset)"
+                )
+            }
+        } catch is CancellationError {
+            return
         } catch {
             #if DEBUG
                 OhanaLog.error("CareLedger backfill failed: \(error.localizedDescription)", category: "StartupMaintenance")
@@ -163,54 +298,217 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         }
     }
 
-    private func materializeAutoFeederLogsIfNeeded(context: ModelContext) {
-        let inserted = StartupFeedAutoLogMaintenanceService.materializeDueAutoFeederLogs(context: context)
-        if inserted > 0 {
+    private func materializeAutoFeederLogsIfNeeded(context: ModelContext) async {
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "startup_auto_feeder_materialization",
+            requestedItemCount: 64
+        )
+        guard budget.hasWorkCapacity else { return }
+
+        let actor = StartupAutoFeederMaintenanceActor(modelContainer: context.container)
+        do {
+            let result = try await actor.runBatch(
+                cursor: StartupAutoFeederCursorStore.cursor(defaults: defaults),
+                maximumPetCount: budget.maximumItemCount,
+                deadline: Date().addingTimeInterval(budget.maximumWallClockSeconds),
+                now: Date(),
+                calendar: .current
+            )
+            guard !Task.isCancelled else { return }
+            if result.didComplete {
+                StartupAutoFeederCursorStore.clear(defaults: defaults)
+            } else {
+                StartupAutoFeederCursorStore.store(result.nextCursor, defaults: defaults)
+                AppPerformanceMonitor.shared.record(
+                    "startup_auto_feeder_materialization_continuation",
+                    valueMS: 0,
+                    note: "pets=\(result.processedPetCount), offset=\(result.nextCursor.petOffset)"
+                )
+            }
+            guard result.insertedLogCount > 0 else { return }
             AppPerformanceMonitor.shared.record(
                 "startup_auto_feeder_materialized",
                 valueMS: 0,
-                note: "\(inserted) logs"
+                note: "\(result.insertedLogCount) logs"
             )
+        } catch is CancellationError {
+            return
+        } catch {
+            #if DEBUG
+                OhanaLog.error("Startup auto-feeder materialization failed: \(error.localizedDescription)", category: "StartupMaintenance")
+            #endif
         }
     }
 
-    private func backfillMediaAttachmentPresenceIfNeeded(context: ModelContext) {
-        guard !defaults.bool(forKey: Keys.mediaAttachmentPresenceBackfillCompleted) else { return }
-        let result = MediaAttachmentPresenceBackfillService.run(context: context)
-        defaults.set(true, forKey: Keys.mediaAttachmentPresenceBackfillCompleted)
-        AppPerformanceMonitor.shared.record(
-            "startup_media_attachment_presence_backfill",
-            valueMS: 0,
-            note: result.performanceNote
+    private func normalizeMemberThemeColorsIfNeeded(context: ModelContext) async {
+        guard !defaults.bool(forKey: Keys.memberThemeColorNormalizationCompleted) else { return }
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "startup_member_theme_normalization",
+            requestedItemCount: 64
         )
-    }
+        guard budget.hasWorkCapacity, budget.allowsExpensiveWork else { return }
 
-    private func cleanLegacySharedCareNotesIfNeeded(context: ModelContext) {
-        let result = SharedCareLegacyNoteMaintenanceService.runIfNeeded(
-            context: context,
-            defaults: defaults
-        )
-        guard result.didRun else { return }
-        AppPerformanceMonitor.shared.record(
-            "startup_shared_care_note_cleanup",
-            valueMS: 0,
-            note: "\(result.cleanup.cleanedCount) cleaned, \(result.cleanup.skippedOrphanCount) skipped"
-        )
-    }
-
-    private func migrateLegacyShopPurchasesIfNeeded(context: ModelContext) {
+        let actor = MemberThemeColorMaintenanceActor(modelContainer: context.container)
         do {
-            let inserted = try ShopPurchaseRecordStore.migrateLegacyDefaultsIfNeeded(
-                context: context,
-                defaults: defaults
+            let result = try await actor.runBatch(
+                cursor: MemberThemeColorNormalizationCursorStore.cursor(defaults: defaults),
+                maximumRecordCount: budget.maximumItemCount,
+                deadline: Date().addingTimeInterval(budget.maximumWallClockSeconds)
             )
+            guard !Task.isCancelled else { return }
+            if result.didComplete {
+                defaults.set(true, forKey: Keys.memberThemeColorNormalizationCompleted)
+                MemberThemeColorNormalizationCursorStore.clear(defaults: defaults)
+            } else {
+                MemberThemeColorNormalizationCursorStore.store(result.nextCursor, defaults: defaults)
+                AppPerformanceMonitor.shared.record(
+                    "startup_member_theme_normalization_continuation",
+                    valueMS: 0,
+                    note: "scanned=\(result.scannedRecordCount), source=\(result.nextCursor.source.rawValue), offset=\(result.nextCursor.offset)"
+                )
+            }
+            guard result.normalizedRecordCount > 0 else { return }
+            AppPerformanceMonitor.shared.record(
+                "startup_member_theme_normalization",
+                valueMS: 0,
+                note: "\(result.normalizedRecordCount) members"
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            #if DEBUG
+                OhanaLog.error("Member theme normalization failed: \(error.localizedDescription)", category: "StartupMaintenance")
+            #endif
+        }
+    }
+
+    private func backfillMediaAttachmentPresenceIfNeeded(context: ModelContext) async {
+        guard !defaults.bool(forKey: Keys.mediaAttachmentPresenceBackfillCompleted) else { return }
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "startup_media_attachment_presence_backfill",
+            requestedItemCount: 64
+        )
+        guard budget.hasWorkCapacity, budget.allowsExpensiveWork else { return }
+        let actor = MediaAttachmentPresenceBackfillActor(modelContainer: context.container)
+        do {
+            let batch = try await actor.runBatch(
+                cursor: MediaAttachmentPresenceBackfillCursorStore.cursor(defaults: defaults),
+                maximumRecordCount: budget.maximumItemCount,
+                deadline: Date().addingTimeInterval(budget.maximumWallClockSeconds)
+            )
+            guard !Task.isCancelled else { return }
+            if batch.didComplete {
+                defaults.set(true, forKey: Keys.mediaAttachmentPresenceBackfillCompleted)
+                MediaAttachmentPresenceBackfillCursorStore.clear(defaults: defaults)
+            } else {
+                MediaAttachmentPresenceBackfillCursorStore.store(batch.nextCursor, defaults: defaults)
+                AppPerformanceMonitor.shared.record(
+                    "startup_media_attachment_presence_backfill_continuation",
+                    valueMS: 0,
+                    note: "scanned=\(batch.scannedRecordCount), source=\(batch.nextCursor.source.rawValue), \(batch.backfillResult.performanceNote)"
+                )
+            }
+            AppPerformanceMonitor.shared.record(
+                "startup_media_attachment_presence_backfill",
+                valueMS: 0,
+                note: batch.backfillResult.performanceNote
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            #if DEBUG
+                OhanaLog.error("Media attachment presence backfill failed: \(error.localizedDescription)", category: "StartupMaintenance")
+            #endif
+        }
+    }
+
+    private func cleanLegacySharedCareNotesIfNeeded(context: ModelContext) async {
+        guard defaults.integer(forKey: SharedCareLegacyNoteMaintenanceService.completedVersionKey) < SharedCareLegacyNoteMaintenanceService.currentVersion else {
+            return
+        }
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "startup_shared_care_note_cleanup",
+            requestedItemCount: 64
+        )
+        guard budget.hasWorkCapacity, budget.allowsExpensiveWork else { return }
+
+        let actor = SharedCareLegacyNoteMaintenanceActor(modelContainer: context.container)
+        do {
+            let result = try await actor.runBatch(
+                cursor: SharedCareLegacyNoteCleanupCursorStore.cursor(defaults: defaults),
+                maximumRecordCount: budget.maximumItemCount,
+                deadline: Date().addingTimeInterval(budget.maximumWallClockSeconds),
+                cleanedAt: Date()
+            )
+            guard !Task.isCancelled else { return }
+            if result.didComplete {
+                defaults.set(SharedCareLegacyNoteMaintenanceService.currentVersion, forKey: SharedCareLegacyNoteMaintenanceService.completedVersionKey)
+                SharedCareLegacyNoteCleanupCursorStore.clear(defaults: defaults)
+            } else {
+                SharedCareLegacyNoteCleanupCursorStore.store(result.nextCursor, defaults: defaults)
+                AppPerformanceMonitor.shared.record(
+                    "startup_shared_care_note_cleanup_continuation",
+                    valueMS: 0,
+                    note: "scanned=\(result.scannedRecordCount), source=\(result.nextCursor.source.rawValue), offset=\(result.nextCursor.offset)"
+                )
+            }
+            AppPerformanceMonitor.shared.record(
+                "startup_shared_care_note_cleanup",
+                valueMS: 0,
+                note: "\(result.cleanedRecordCount) cleaned, \(result.skippedOrphanCount) skipped"
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            #if DEBUG
+                OhanaLog.error("Shared-care legacy cleanup failed: \(error.localizedDescription)", category: "StartupMaintenance")
+            #endif
+        }
+    }
+
+    private func migrateLegacyShopPurchasesIfNeeded(context: ModelContext) async {
+        guard !defaults.bool(forKey: ShopPurchaseRecordStore.legacyMigrationDefaultsKey) else { return }
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "startup_shop_purchase_defaults_migration",
+            requestedItemCount: 64
+        )
+        guard budget.hasWorkCapacity, budget.allowsExpensiveWork else { return }
+
+        let itemIDs = ShopPurchaseRecordStore
+            .legacyPurchasedItemIDs(raw: defaults.string(forKey: ShopPurchaseRecordStore.legacyDefaultsKey) ?? "")
+            .filter { itemID in
+                guard let item = ShopCatalog.item(id: itemID) else { return false }
+                return !item.isConsumable && item.id != AppIconCatalog.defaultItemId
+            }
+        let actor = StartupShopPurchaseMigrationActor(modelContainer: context.container)
+        do {
+            let result = try await actor.runBatch(
+                eligibleItemIDs: itemIDs,
+                cursor: StartupShopPurchaseMigrationCursorStore.cursor(defaults: defaults),
+                maximumItemCount: budget.maximumItemCount,
+                deadline: Date().addingTimeInterval(budget.maximumWallClockSeconds),
+                now: Date()
+            )
+            guard !Task.isCancelled else { return }
+            if result.didComplete {
+                defaults.set(true, forKey: ShopPurchaseRecordStore.legacyMigrationDefaultsKey)
+                StartupShopPurchaseMigrationCursorStore.clear(defaults: defaults)
+            } else {
+                StartupShopPurchaseMigrationCursorStore.store(result.nextCursor, defaults: defaults)
+                AppPerformanceMonitor.shared.record(
+                    "startup_shop_purchase_defaults_migration_continuation",
+                    valueMS: 0,
+                    note: "processed=\(result.processedItemCount), offset=\(result.nextCursor.itemOffset)"
+                )
+            }
             AppPerformanceMonitor.shared.record(
                 "startup_shop_purchase_defaults_migration",
                 valueMS: 0,
-                note: "\(inserted) records"
+                note: "\(result.insertedRecordCount) records"
             )
+        } catch is CancellationError {
+            return
         } catch {
-            context.rollback()
             #if DEBUG
                 OhanaLog.error("Shop purchase defaults migration failed: \(error.localizedDescription)", category: "StartupMaintenance")
             #endif
@@ -219,8 +517,37 @@ final class StartupMaintenanceCoordinator: ObservableObject {
 
     private func compactAvatarAssetsIfNeeded(context: ModelContext) async {
         guard !defaults.bool(forKey: Keys.avatarAssetCompactionCompleted) else { return }
-        await AvatarAssetMaintenanceService.compactStoredAvatars(context: context)
-        defaults.set(true, forKey: Keys.avatarAssetCompactionCompleted)
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "startup_avatar_asset_compaction",
+            requestedItemCount: 64
+        )
+        guard budget.hasWorkCapacity, budget.allowsExpensiveWork else { return }
+        let actor = AvatarAssetMaintenanceActor(modelContainer: context.container)
+        do {
+            let result = try await actor.runBatch(
+                cursor: AvatarAssetCompactionCursorStore.cursor(defaults: defaults),
+                maximumRecordCount: budget.maximumItemCount,
+                deadline: Date().addingTimeInterval(budget.maximumWallClockSeconds)
+            )
+            guard !Task.isCancelled else { return }
+            if result.didComplete {
+                defaults.set(true, forKey: Keys.avatarAssetCompactionCompleted)
+                AvatarAssetCompactionCursorStore.clear(defaults: defaults)
+            } else {
+                AvatarAssetCompactionCursorStore.store(result.nextCursor, defaults: defaults)
+                AppPerformanceMonitor.shared.record(
+                    "startup_avatar_asset_compaction_continuation",
+                    valueMS: 0,
+                    note: "scanned=\(result.scannedRecordCount), compacted=\(result.compactedRecordCount), source=\(result.nextCursor.source.rawValue), offset=\(result.nextCursor.offset)"
+                )
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            #if DEBUG
+                OhanaLog.error("Avatar asset compaction failed: \(error.localizedDescription)", category: "StartupMaintenance")
+            #endif
+        }
     }
 
     private func recordCancelled(_ name: String) {
@@ -231,12 +558,183 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         )
     }
 
+    /// One durable cursor tells the next eligible launch which deferred
+    /// maintenance step still needs a bounded retry. Individual services retain
+    /// their own completion markers; this cursor never stores model data.
+    private func recordMaintenanceCursor(_ name: String) {
+        defaults.set(name, forKey: Keys.maintenanceCursor)
+        defaults.set(Date().timeIntervalSince1970, forKey: Keys.maintenanceCursorUpdatedAt)
+    }
+
+    private func clearMaintenanceCursor(ifMatching name: String) {
+        guard defaults.string(forKey: Keys.maintenanceCursor) == name else { return }
+        defaults.removeObject(forKey: Keys.maintenanceCursor)
+        defaults.removeObject(forKey: Keys.maintenanceCursorUpdatedAt)
+    }
+
     private enum Keys {
         static let reminderMaintenanceLastRunAt = "ohana_startup_maintenance_last_run_at"
         static let plantCareOrphanMaintenanceLastRunAt = "ohana_plant_care_orphan_maintenance_last_run_at"
         static let avatarAssetCompactionCompleted = "ohana_avatar_asset_compaction_v1_completed"
         static let careLedgerBackfillCompleted = "careLedgerBackfill_v1_completed"
         static let mediaAttachmentPresenceBackfillCompleted = "ohana_media_attachment_presence_backfill_v1_completed"
+        static let memberThemeColorNormalizationCompleted = "ohana_member_theme_color_normalization_v1_completed"
+        static let maintenanceCursor = "ohana_startup_maintenance_cursor"
+        static let maintenanceCursorUpdatedAt = "ohana_startup_maintenance_cursor_updated_at"
+    }
+}
+
+private enum CareLedgerBackfillCursorStore {
+    private static let key = "ohana_care_ledger_backfill_cursor_v2"
+
+    static func cursor(defaults: UserDefaults) -> CareLedgerBackfillCursor {
+        guard let data = defaults.data(forKey: key),
+              let cursor = try? JSONDecoder().decode(CareLedgerBackfillCursor.self, from: data)
+        else {
+            return .initial
+        }
+        return cursor
+    }
+
+    static func store(_ cursor: CareLedgerBackfillCursor, defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(cursor) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    static func clear(defaults: UserDefaults) {
+        defaults.removeObject(forKey: key)
+    }
+}
+
+private enum AvatarAssetCompactionCursorStore {
+    private static let key = "ohana_avatar_asset_compaction_cursor_v2"
+
+    static func cursor(defaults: UserDefaults) -> AvatarAssetCompactionCursor {
+        guard let data = defaults.data(forKey: key),
+              let cursor = try? JSONDecoder().decode(AvatarAssetCompactionCursor.self, from: data)
+        else {
+            return .initial
+        }
+        return cursor
+    }
+
+    static func store(_ cursor: AvatarAssetCompactionCursor, defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(cursor) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    static func clear(defaults: UserDefaults) {
+        defaults.removeObject(forKey: key)
+    }
+}
+
+private enum MediaAttachmentPresenceBackfillCursorStore {
+    private static let key = "ohana_media_attachment_presence_backfill_cursor_v2"
+
+    static func cursor(defaults: UserDefaults) -> MediaAttachmentPresenceBackfillCursor {
+        guard let data = defaults.data(forKey: key),
+              let cursor = try? JSONDecoder().decode(MediaAttachmentPresenceBackfillCursor.self, from: data)
+        else {
+            return .initial
+        }
+        return cursor
+    }
+
+    static func store(_ cursor: MediaAttachmentPresenceBackfillCursor, defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(cursor) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    static func clear(defaults: UserDefaults) {
+        defaults.removeObject(forKey: key)
+    }
+}
+
+private enum MemberThemeColorNormalizationCursorStore {
+    private static let key = "ohana_member_theme_color_normalization_cursor_v1"
+
+    static func cursor(defaults: UserDefaults) -> MemberThemeColorNormalizationCursor {
+        guard let data = defaults.data(forKey: key),
+              let cursor = try? JSONDecoder().decode(MemberThemeColorNormalizationCursor.self, from: data)
+        else {
+            return .initial
+        }
+        return cursor
+    }
+
+    static func store(_ cursor: MemberThemeColorNormalizationCursor, defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(cursor) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    static func clear(defaults: UserDefaults) {
+        defaults.removeObject(forKey: key)
+    }
+}
+
+private enum StartupAutoFeederCursorStore {
+    private static let key = "ohana_startup_auto_feeder_cursor_v1"
+
+    static func cursor(defaults: UserDefaults) -> StartupAutoFeederCursor {
+        guard let data = defaults.data(forKey: key),
+              let cursor = try? JSONDecoder().decode(StartupAutoFeederCursor.self, from: data)
+        else {
+            return .initial
+        }
+        return cursor
+    }
+
+    static func store(_ cursor: StartupAutoFeederCursor, defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(cursor) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    static func clear(defaults: UserDefaults) {
+        defaults.removeObject(forKey: key)
+    }
+}
+
+private enum SharedCareLegacyNoteCleanupCursorStore {
+    private static let key = "ohana_shared_care_legacy_note_cleanup_cursor_v1"
+
+    static func cursor(defaults: UserDefaults) -> SharedCareLegacyNoteCleanupCursor {
+        guard let data = defaults.data(forKey: key),
+              let cursor = try? JSONDecoder().decode(SharedCareLegacyNoteCleanupCursor.self, from: data)
+        else {
+            return .initial
+        }
+        return cursor
+    }
+
+    static func store(_ cursor: SharedCareLegacyNoteCleanupCursor, defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(cursor) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    static func clear(defaults: UserDefaults) {
+        defaults.removeObject(forKey: key)
+    }
+}
+
+private enum StartupShopPurchaseMigrationCursorStore {
+    private static let key = "ohana_startup_shop_purchase_migration_cursor_v1"
+
+    static func cursor(defaults: UserDefaults) -> StartupShopPurchaseMigrationCursor {
+        guard let data = defaults.data(forKey: key),
+              let cursor = try? JSONDecoder().decode(StartupShopPurchaseMigrationCursor.self, from: data)
+        else {
+            return .initial
+        }
+        return cursor
+    }
+
+    static func store(_ cursor: StartupShopPurchaseMigrationCursor, defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(cursor) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    static func clear(defaults: UserDefaults) {
+        defaults.removeObject(forKey: key)
     }
 }
 

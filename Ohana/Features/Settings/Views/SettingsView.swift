@@ -48,6 +48,9 @@ struct SettingsView: View {
     @State var isImporting = false
     @State var automaticBackupStatus = AutomaticBackupStatusStore().snapshot()
     @State var isRunningAutomaticBackup = false
+    @State var isRetryingAutomaticBackupCleanup = false
+    @State var isRemovingLegacyAutomaticBackup = false
+    @State var automaticBackupCleanupError: String? = nil
     @State var backupEncryptionEnabled = false
     @State var backupPassword = ""
     @State var backupPasswordConfirmation = ""
@@ -174,6 +177,24 @@ struct SettingsView: View {
             }
         } message: {
             Text(appResetErrorMessage ?? l.tr(zh: "未知错误", en: "Unknown error", de: "Unbekannter Fehler"))
+        }
+        .alert(l.tr(
+            zh: "iCloud 备份需要处理",
+            en: "iCloud Backup Needs Attention",
+            de: "iCloud-Backup braucht Aufmerksamkeit"
+        ), isPresented: Binding(
+            get: { automaticBackupCleanupError != nil },
+            set: { if !$0 { automaticBackupCleanupError = nil } }
+        )) {
+            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {
+                automaticBackupCleanupError = nil
+            }
+        } message: {
+            Text(automaticBackupCleanupError ?? l.tr(
+                zh: "请在数据备份中重试删除旧的自动备份。",
+                en: "Retry removing the previous automatic backup in Data Backup.",
+                de: "Versuche in Datensicherung erneut, das vorherige automatische Backup zu entfernen."
+            ))
         }
         .onAppear {
             syncStoredRegionalDefaultsIfNeeded()

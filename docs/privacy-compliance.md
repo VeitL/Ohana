@@ -23,16 +23,16 @@ in-app member-privacy/PIN rules in `docs/app-architecture-governance.md`.
   (analytics, accounts, CloudKit family sync, support uploads, third-party SDKs),
   update the label in the same change.
 - **Privacy policy URL:** App Store Connect requires a public privacy policy URL
-  for iOS. Draft copy lives in `docs/privacy-policy-draft.md`; do not treat it
-  as the final published URL until owner/legal review and support contact are
-  filled in. The published policy for the current build must state that Ohana is
+  for iOS. The release policy is `docs/privacy-policy.md`, and the in-app
+  Settings link targets its public repository URL. It states that Ohana is
   local-first, does not track users, does not run analytics, does not create a
-  developer account, and does not transmit app data to the developer. It must
-  also disclose that automatic iCloud Drive backups are currently on by default
-  and user-controlled exports/backups may contain sensitive pet, family, health,
-  medication, document, photo, expense, and location data; users choose where to
-  store or share those files; and deleting/resetting app data removes local
-  records under the app's control but not external copies the user created.
+  developer account, and does not transmit app data to the developer. Automatic
+  iCloud Drive backups and every user-initiated external backup/export use the
+  restricted export scope: human health/HealthKit records, free-text family
+  tasks, and derived economy/ledger sidecars are excluded before an archive can
+  reach iCloud or a share target.
+  Reset cleanup reports a failed managed-iCloud-file deletion and offers retry;
+  copies a user exported outside the app remain under that user's control.
 - **Permission strings:** Camera / Photo / Location / Face ID usage descriptions
   live only in `Ohana/Info.plist` plus `en.lproj`/`de.lproj`
   `InfoPlist.strings`; the default `Info.plist` strings are Chinese. Do not

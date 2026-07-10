@@ -276,6 +276,26 @@ extension SettingsView {
                         UIApplication.shared.open(url)
                     }
                 }
+                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                settingsRow(
+                    icon: "hand.raised.fill",
+                    title: l.tr(zh: "隐私政策", en: "Privacy Policy", de: "Datenschutzrichtlinie"),
+                    subtitle: l.tr(zh: "公开说明", en: "Public policy", de: "Offentliche Richtlinie"),
+                    iconColor: Color.goTeal
+                ) {
+                    UIApplication.shared.open(OhanaPublicLinks.privacyPolicy)
+                }
+                .accessibilityIdentifier("settings-privacy-policy-action")
+                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                settingsRow(
+                    icon: "questionmark.bubble.fill",
+                    title: l.tr(zh: "获取支持", en: "Get Support", de: "Support erhalten"),
+                    subtitle: "guanchen.li.119@gmail.com",
+                    iconColor: Color.goPrimary
+                ) {
+                    UIApplication.shared.open(OhanaPublicLinks.support)
+                }
+                .accessibilityIdentifier("settings-support-action")
             }
         }
     }

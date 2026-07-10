@@ -34,9 +34,16 @@ Out of scope:
 
 ## Invariants
 
-BR-001. Manual export and automatic backup use the same `OhanaBackup` projection
-owned by `DataBackupManager` / `DataBackupActor`. A model added to one backup
-path must be considered for the other path.
+BR-001. Manual export and automatic backup use the same `OhanaBackup` package
+format owned by `DataBackupManager` / `DataBackupActor`, with explicit
+destination scopes. Every user-visible package is restricted: manual export is
+`manualExternalRestricted`, while automatic iCloud Drive backup is
+`automaticICloudDriveRestricted`. Both must exclude structured human-health
+data, HealthKit-derived workouts, human weight/workout/medication/health
+records, human-scoped free-form calendar/reminder items (except structured
+birthdays and anniversaries), linked family-task sidecars, and human-health
+ledger facts. A model added to either path must be explicitly classified for
+both scopes.
 
 BR-002. Export must omit local-only secrets such as human PIN hash/salt or data
 that can recover a PIN.
@@ -61,11 +68,18 @@ boundary, and failure visibility.
 
 BR-007. Reset/delete-all disables automatic backup and attempts to remove
 Ohana-managed automatic backup files. Manual files the user explicitly exported
-or shared are not touched.
+or shared are not touched. If iCloud cleanup fails, the reset still completes
+locally, but the failure is persisted, user-visible, and retryable; Ohana must
+never report that the remote file was removed without a successful cleanup.
 
 BR-008. Backup, restore, and automatic-backup diagnostics are privacy-safe. Do
 not log names, health values, precise routes, raw notes, PIN fields, or backup
 passwords.
+
+BR-009. A managed automatic-backup status written before the restricted scope
+marker is treated as potentially unsafe. Settings must offer one-tap restricted
+replacement (which overwrites the same managed iCloud Drive file) and one-tap
+managed-file removal. The warning clears only after either operation succeeds.
 
 ## Validation
 
@@ -76,7 +90,9 @@ Required launch evidence:
   weak-password failures.
 - PIN omission test.
 - Automatic backup default-on, toggle-off no-op, success metadata, failure
-  visibility, concurrent trigger suppression, and cleanup behavior.
+  visibility, concurrent trigger suppression, restricted-scope health-data
+  exclusion, legacy managed-package replacement/removal, and cleanup/retry
+  behavior.
 - Backup-to-wipe-to-restore acceptance covering at least one human, one pet,
   care facts, reminders/events, wallet/ledger state, and app preferences.
 - Backup coverage tests for any newly added SwiftData model or backup DTO field.

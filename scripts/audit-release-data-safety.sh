@@ -220,8 +220,11 @@ require_pattern "$automatic_backup" 'DataBackupManager\.packageFileExtension' \
 require_pattern "$automatic_backup" 'func exportBackupPackage\(container: ModelContainer\) async throws -> URL' \
   "Automatic backup exporting should return a package URL, not a single in-memory JSON blob."
 
-require_pattern "$automatic_backup" 'DataBackupManager\(\)\.exportJSON\(container: container\)' \
+require_pattern "$automatic_backup" 'DataBackupManager\(\)\.exportJSON\(' \
   "Live automatic backups should use DataBackupManager package export."
+
+require_pattern "$automatic_backup" 'scope: \.automaticICloudDriveRestricted' \
+  "Live automatic backups must use the restricted iCloud Drive export scope."
 
 require_pattern "$automatic_backup" 'writeAutomaticBackup\(packageURL: URL, now: Date\)' \
   "Automatic backup file storage should receive and copy a backup package URL."
@@ -310,8 +313,23 @@ require_pattern "$data_backup_dtos" 'var coconutLedgerEntries: \[CoconutLedgerEn
 require_backup_pattern 'coconutAccounts: coconutAccounts\.map\(encodeCoconutAccount\)' \
   "buildBackup should export V58 CoconutAccount rows."
 
-require_backup_pattern 'coconutLedgerEntries: coconutLedgerEntries\.map\(encodeCoconutLedgerEntry\)' \
-  "buildBackup should export V58 CoconutLedgerEntry rows."
+require_backup_pattern 'let backupCoconutLedgerEntries = scope\.excludesHumanHealthData' \
+  "Restricted exports must explicitly scope CoconutLedgerEntry sidecars before encoding."
+
+require_backup_pattern 'coconutLedgerEntries: backupCoconutLedgerEntries\.map\(encodeCoconutLedgerEntry\)' \
+  "buildBackup should encode only the export-scoped CoconutLedgerEntry rows."
+
+require_backup_pattern 'let backupEconomyBudgetUsageEvents = scope\.excludesHumanHealthData' \
+  "Restricted exports must explicitly scope derived economy-budget sidecars."
+
+require_backup_pattern 'economyBudgetUsageEvents: backupEconomyBudgetUsageEvents\.map\(encodeEconomyBudgetUsageEvent\)' \
+  "buildBackup should encode only the export-scoped economy-budget rows."
+
+require_backup_pattern 'let backupFamilyTasks = scope\.excludesHumanHealthData' \
+  "Restricted exports must explicitly scope free-text family tasks."
+
+require_backup_pattern 'let coconutLogProjection = backupCoconutLedgerEntries' \
+  "Legacy wallet-log projection must use the same restricted wallet scope."
 
 require_backup_pattern 'insertCoconutAccountIfNeeded' \
   "applyBackup should import V58 CoconutAccount rows through the general rehydrate writer."

@@ -295,8 +295,20 @@ struct ContentView: View {
             onPresentWalk: { petID in
                 appRoutes.presentWalk(petID: petID)
             },
-            cardStateResetToken: homeCardStateResetToken
+            cardStateResetToken: homeCardStateResetToken,
+            isHomeSurfaceVisible: isHomeSurfaceVisible
         )
+    }
+
+    /// Home remains mounted behind global presentations. Pass the actual route
+    /// visibility down so its read-model work is suspended instead of merely
+    /// hiding the resulting updates behind a sheet.
+    private var isHomeSurfaceVisible: Bool {
+        (!showsEmbeddedOnboarding || hasOnboarded) &&
+            appRoutes.path.isEmpty &&
+            appRoutes.sheet == nil &&
+            appRoutes.fullScreen == nil &&
+            appRoutes.overlay == nil
     }
 
     private var starterGiftAmount: Int? {

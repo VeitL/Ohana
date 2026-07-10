@@ -13,9 +13,13 @@ enum OnlineFeature: String, CaseIterable, Sendable {
 
 enum OnlineFeatureGate {
     nonisolated static func allows(_ feature: OnlineFeature) -> Bool {
+        guard AppCapabilityProfile.shipsCloudFamilyCapabilities else {
+            return false
+        }
+
         switch feature {
         case .onlineCollaboration:
-            false
+            return false
         }
     }
 }

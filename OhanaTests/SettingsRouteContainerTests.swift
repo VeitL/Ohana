@@ -3,6 +3,24 @@ import Testing
 @testable import Ohana
 
 struct SettingsRouteContainerTests {
+    @Test func settingsAboutExposesPublicPrivacyAndSupportDestinations() throws {
+        let aboutSource = try source(
+            "Ohana/Features/Settings/Views/SettingsView+MainSections.swift",
+            rootURL: repositoryRootURL()
+        )
+        let linkSource = try source(
+            "Ohana/App/OhanaPublicLinks.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(aboutSource.contains("settings-privacy-policy-action"))
+        #expect(aboutSource.contains("settings-support-action"))
+        #expect(aboutSource.contains("OhanaPublicLinks.privacyPolicy"))
+        #expect(aboutSource.contains("OhanaPublicLinks.support"))
+        #expect(linkSource.contains("https://github.com/VeitL/Ohana/blob/main/docs/privacy-policy.md"))
+        #expect(linkSource.contains("mailto:guanchen.li.119@gmail.com"))
+    }
+
     @Test func settingsBiometricAvailabilityIsRefreshedOnAppear() throws {
         let source = try source(
             "Ohana/Features/Settings/Views/SettingsView.swift",

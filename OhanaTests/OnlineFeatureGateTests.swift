@@ -4,7 +4,20 @@ import Testing
 
 struct OnlineFeatureGateTests {
     @Test func launchGateIsClosed() {
+        #expect(AppCapabilityProfile.current == .solo)
+        #expect(!AppCapabilityProfile.shipsCloudFamilyCapabilities)
+        #expect(!AppCapabilityProfile.permitsCloudSyncRuntime)
+        #expect(!AppCapabilityProfile.shippingPermitsCloudSyncDirtyWrites)
         #expect(!OnlineFeatureGate.allows(.onlineCollaboration))
+    }
+
+    @Test func initialMergeCannotBypassTheSoloDirtyWriteBoundary() throws {
+        let source = try source(
+            repositoryRootURL().appendingPathComponent(
+                "Ohana/Domain/Services/CloudSyncInitialMergeRuntime.swift"
+            )
+        )
+        #expect(source.contains("guard AppCapabilityProfile.permitsCloudSyncDirtyWrites else"))
     }
 
     @Test func routeGuardBlocksOnlineSurfacesButKeepsWeeklyReport() {

@@ -241,6 +241,9 @@ enum CloudSyncInitialHouseholdMergeRuntime {
         context: ModelContext,
         summary: inout CloudSyncInitialHouseholdMergeSummary
     ) throws {
+        guard AppCapabilityProfile.permitsCloudSyncDirtyWrites else {
+            return
+        }
         let normalizedEntityName = CloudSyncRecordState.normalizedEntityName(entityName)
         guard CloudSyncEntityRegistry.descriptor(for: normalizedEntityName)?.uploadsToCloudKit == true,
               CloudSyncEntityRegistry.supportsUploadPipeline(for: normalizedEntityName) else {

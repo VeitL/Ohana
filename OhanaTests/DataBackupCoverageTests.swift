@@ -5,9 +5,9 @@ import Testing
 
 @MainActor
 struct DataBackupCoverageTests {
-    @Test func latestSwiftDataModelsHaveBackupCoverageOrExplicitExemption() {
+    @Test func latestSwiftDataModelsHaveExternalBackupCoverageOrExplicitHealthExemption() {
         let schemaModels = Set(ArkSchemaV85.models.map { String(describing: $0) })
-        let coveredModels: Set<String> = [
+        let externallyCoveredModels: Set<String> = [
             String(describing: Pet.self),
             String(describing: Human.self),
             String(describing: Plant.self),
@@ -26,12 +26,8 @@ struct DataBackupCoverageTests {
             String(describing: WaterLog.self),
             String(describing: PetRelationship.self),
             String(describing: PetCareLog.self),
-            String(describing: HumanWeightLog.self),
-            String(describing: HumanWorkoutLog.self),
             String(describing: WishlistItem.self),
             String(describing: PetDocumentAttachment.self),
-            String(describing: HumanMedication.self),
-            String(describing: HumanHealthReport.self),
             String(describing: PetMedication.self),
             String(describing: PetInsurance.self),
             String(describing: PetPhotoLog.self),
@@ -39,9 +35,7 @@ struct DataBackupCoverageTests {
             String(describing: SymptomLog.self),
             String(describing: HeatCycleLog.self),
             String(describing: InsuranceClaim.self),
-            String(describing: HumanMedicationLog.self),
             String(describing: CareLedgerEvent.self),
-            String(describing: FamilyCollaborationTask.self),
             String(describing: CoconutExchangeRequest.self),
             String(describing: OasisUpgradeCoconut.self),
             String(describing: OasisElectronicPet.self),
@@ -51,29 +45,42 @@ struct DataBackupCoverageTests {
             String(describing: SharedCareSession.self),
             String(describing: GachaOwnedItem.self),
             String(describing: GachaDrawLog.self),
-            String(describing: HumanHealthMetricLog.self),
             String(describing: CoconutAccount.self),
-            String(describing: CoconutLedgerEntry.self),
-            String(describing: EconomyBudgetUsageEvent.self),
             String(describing: ShopPurchaseRecord.self)
         ]
-        let explicitlyExemptModels: Set<String> = [
+        let intentionallyExcludedFromExternalBackup: Set<String> = [
+            // P0: no human health / HealthKit data may enter an externally
+            // shareable package such as iCloud Drive or Files providers.
+            String(describing: HumanWeightLog.self),
+            String(describing: HumanWorkoutLog.self),
+            String(describing: HumanMedication.self),
+            String(describing: HumanMedicationLog.self),
+            String(describing: HumanHealthReport.self),
+            String(describing: HumanHealthMetricLog.self),
+            // Family-task text is free-form and legacy tasks may not link to
+            // a structured source, so restricted external exports omit it.
+            String(describing: FamilyCollaborationTask.self),
+            // Derived economy sidecars retain free-form titles/metadata but
+            // their legacy schema cannot prove whether a record repeats a
+            // Human health fact. Restricted external packages omit them.
+            String(describing: CoconutLedgerEntry.self),
+            String(describing: EconomyBudgetUsageEvent.self),
             String(describing: CloudSyncRecordState.self),
             String(describing: RecycleBinBatch.self)
         ]
-        let classifiedModels = coveredModels.union(explicitlyExemptModels)
+        let classifiedModels = externallyCoveredModels.union(intentionallyExcludedFromExternalBackup)
         let missingModels = schemaModels.subtracting(classifiedModels)
-        let staleCoverageModels = coveredModels.subtracting(schemaModels)
-        let staleExemptModels = explicitlyExemptModels.subtracting(schemaModels)
+        let staleCoverageModels = externallyCoveredModels.subtracting(schemaModels)
+        let staleExemptModels = intentionallyExcludedFromExternalBackup.subtracting(schemaModels)
 
         if !missingModels.isEmpty {
-            Issue.record("SwiftData models missing backup coverage or explicit exemption: \(missingModels.sorted())")
+            Issue.record("SwiftData models missing external backup coverage or explicit classification: \(missingModels.sorted())")
         }
         if !staleCoverageModels.isEmpty {
-            Issue.record("Backup coverage lists models no longer in ArkSchemaV85: \(staleCoverageModels.sorted())")
+            Issue.record("External backup coverage lists models no longer in ArkSchemaV85: \(staleCoverageModels.sorted())")
         }
         if !staleExemptModels.isEmpty {
-            Issue.record("Backup exemption list contains stale models: \(staleExemptModels.sorted())")
+            Issue.record("External backup exclusion list contains stale models: \(staleExemptModels.sorted())")
         }
 
         #expect(missingModels.isEmpty)
@@ -82,7 +89,7 @@ struct DataBackupCoverageTests {
         #expect(schemaModels == classifiedModels)
     }
 
-    @Test func backupRoundTripsPetRelationshipAndEconomyBudgetUsageEvents() throws {
+    @Test func restrictedBackupPreservesPetRelationshipAndOmitsEconomyBudgetUsageEvents() throws {
         let source = try makeInMemoryContainer()
         let sourceContext = source.mainContext
         let createdAt = Date(timeIntervalSinceReferenceDate: 7000)
@@ -129,8 +136,8 @@ struct DataBackupCoverageTests {
 
         #expect(backup.petRelationships?.count == 1)
         #expect(backup.petRelationships?.first?.relationshipTypeRaw == PetRelationshipType.sibling.rawValue)
-        #expect(backup.economyBudgetUsageEvents?.count == 1)
-        #expect(backup.economyBudgetUsageEvents?.first?.luckyCoconutUsed == 1)
+        #expect(backup.exportScope == DataBackupExportScope.manualExternalRestricted.rawValue)
+        #expect(backup.economyBudgetUsageEvents?.isEmpty == true)
 
         let target = try makeInMemoryContainer()
         try TestDataBackupManagerProjection.manager.applyBackup(
@@ -141,7 +148,6 @@ struct DataBackupCoverageTests {
         )
 
         let restoredRelationship = try #require(try target.mainContext.fetch(FetchDescriptor<PetRelationship>()).first)
-        let restoredBudgetEvent = try #require(try target.mainContext.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).first)
 
         #expect(restoredRelationship.id == relationship.id)
         #expect(restoredRelationship.fromPetId == firstPet.id)
@@ -149,17 +155,7 @@ struct DataBackupCoverageTests {
         #expect(restoredRelationship.relationshipTypeRaw == PetRelationshipType.sibling.rawValue)
         #expect(restoredRelationship.note == "same litter")
         #expect(restoredRelationship.createdAt == createdAt)
-        #expect(restoredBudgetEvent.id == budgetEvent.id)
-        #expect(restoredBudgetEvent.dayKey == "2026-07-07")
-        #expect(restoredBudgetEvent.memberKey == human.id.uuidString)
-        #expect(restoredBudgetEvent.careObjectKey == firstPet.id.uuidString)
-        #expect(restoredBudgetEvent.scopeRaw == EconomyBudgetUsageScope.careObject.rawValue)
-        #expect(restoredBudgetEvent.growthXPUsed == 3)
-        #expect(restoredBudgetEvent.coconutUsed == 5)
-        #expect(restoredBudgetEvent.luckyCoconutUsed == 1)
-        #expect(restoredBudgetEvent.metadataJSON == #"{"kind":"coverage"}"#)
-        #expect(restoredBudgetEvent.occurredAt == occurredAt)
-        #expect(restoredBudgetEvent.createdAt == createdAt)
+        #expect(try target.mainContext.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
     }
 
     @Test func backupPackageRoundTripsAllExternalStorageMediaFields() async throws {

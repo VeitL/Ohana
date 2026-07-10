@@ -160,7 +160,8 @@ final nonisolated class CareLedgerService {
         modifiedAt: Date
     ) {
         let entityName = String(describing: CareLedgerEvent.self)
-        guard CloudSyncEntityRegistry.descriptor(for: entityName)?.uploadsToCloudKit == true else {
+        guard AppCapabilityProfile.permitsCloudSyncDirtyWrites,
+              CloudSyncEntityRegistry.descriptor(for: entityName)?.uploadsToCloudKit == true else {
             return
         }
         do {
@@ -180,6 +181,10 @@ final nonisolated class CareLedgerService {
     }
 
     private static func sharedHouseholdId(context: ModelContext, now: Date) -> UUID? {
+        guard AppCapabilityProfile.permitsCloudSyncDirtyWrites else {
+            return nil
+        }
+
         do {
             var descriptor = FetchDescriptor<Household>(
                 sortBy: [SortDescriptor(\.createdAt)]

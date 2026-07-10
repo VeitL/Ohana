@@ -268,6 +268,44 @@ struct CareLedgerBackfillActorTests {
         #expect(ledger.contains { $0.amountValue == Double(count) && $0.actorId == "human-\((count - 1) % 3)" })
     }
 
+    @Test func backfillBatchPersistsCursorBeforeMarkingMigrationComplete() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        for index in 0 ..< 3 {
+            context.insert(
+                PetCareLog(
+                    date: Date(timeIntervalSince1970: Double(index)),
+                    type: .feeding,
+                    amountGrams: Double(index + 1),
+                    pet: pet,
+                    executorId: "human-\(index)"
+                )
+            )
+        }
+        try context.save()
+
+        let actor = CareLedgerBackfillActor(modelContainer: container)
+        let first = try await actor.runBatch(
+            cursor: .initial,
+            maximumSourceRecordCount: 2,
+            deadline: .distantFuture
+        )
+        #expect(!first.didComplete)
+        #expect(first.processedSourceRecordCount == 2)
+        #expect(first.nextCursor.sourceIndex == 0)
+        #expect(first.nextCursor.sourceOffset == 2)
+
+        let second = try await actor.runBatch(
+            cursor: first.nextCursor,
+            maximumSourceRecordCount: 2,
+            deadline: .distantFuture
+        )
+        #expect(second.didComplete)
+        #expect(try fetchLedgerEvents(in: container, legacyModelName: "PetCareLog").count == 3)
+    }
+
     private func fetchLedgerEvents(in container: ModelContainer, legacyModelName: String) throws -> [CareLedgerEvent] {
         try ModelContext(container)
             .fetch(FetchDescriptor<CareLedgerEvent>())

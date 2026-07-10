@@ -3,7 +3,7 @@
 Status: Draft for App Store review notes, in-app rationale copy, and
 `Info.plist` usage-description review.
 
-Last updated: 2026-07-06
+Last updated: 2026-07-09
 
 ## Current Permission Inventory
 
@@ -182,18 +182,18 @@ Recommended Settings support text:
 
 Chinese:
 
-> 自动备份会把一份 Ohana 备份文件保存到你的 iCloud Drive。备份可能包含家庭、宠物、健康、用药、照片、文件、路线和账单数据；不会发送给开发者。你可以关闭自动备份或删除 iCloud Drive 中的备份文件。
+> 自动备份会把一份受限的 Ohana 备份文件保存到你的 iCloud Drive。它可包含家庭、宠物、照片、文件、路线和账单数据，但不包含人类健康、HealthKit、体重、运动、用药或健康报告。手动导出同样受此限制，因为它也可能保存到 iCloud 或其他文件服务。不会发送给开发者。你可以关闭自动备份或删除 iCloud Drive 中的备份文件。
 
 English:
 
-> Automatic backup saves an Ohana backup file to your iCloud Drive. The file may include household, pet, health, medication, photo, document, route, and expense data. It is not sent to the developer. You can turn automatic backup off or delete the file from iCloud Drive.
+> Automatic backup saves a restricted Ohana backup file to your iCloud Drive. It may include household, pet, photo, document, route, and expense data, but it does not include human health, HealthKit, weight, workout, medication, or health-report data. Manual export uses the same restriction because it can also be saved to iCloud or another file provider. The file is not sent to the developer. You can turn automatic backup off or delete the file from iCloud Drive.
 
 Review rationale:
 
 - Backup is user-controlled and stored in the user's Apple iCloud account.
 - The developer does not receive the file.
-- Backup excludes PIN hash/salt/lockout fields, but still contains sensitive app
-  content.
+- Automatic backup excludes human-health/HealthKit data and PIN
+  hash/salt/lockout fields, but may still contain other sensitive app content.
 
 ## App Review Notes
 
@@ -223,7 +223,8 @@ Do not claim the following until implemented and revalidated:
   match the final approved wording.
 - If a `zh-Hans.lproj/InfoPlist.strings` file is added later, keep it in sync
   with the default Chinese `Info.plist` wording.
-- `docs/privacy-policy-draft.md` is updated before App Store submission.
+- `docs/privacy-policy.md` is published at the Settings privacy-policy URL
+  before App Store submission.
 - App Store Connect privacy answers are updated if CloudKit sync, analytics,
   tracking, support upload, or any third-party SDK data collection is enabled.
 

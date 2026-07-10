@@ -11,6 +11,10 @@ import Foundation
 nonisolated struct OhanaBackup: Codable {
     var schemaVersion: Int = 30
     var exportedAt: String
+    /// Records the destination policy for auditability. Older backups decode as
+    /// `nil`; both current user-visible export paths are restricted, while
+    /// automatic iCloud Drive exports use `automaticICloudDriveRestricted`.
+    var exportScope: String? = nil
     var mediaPackage: BackupMediaPackageInfo? = nil
     // 核心实体
     var pets: [PetBackup]

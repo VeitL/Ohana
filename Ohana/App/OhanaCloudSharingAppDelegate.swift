@@ -5,40 +5,50 @@
 //  Handles system CloudKit share acceptance outside the SwiftUI route tree.
 //
 
-import CloudKit
 import SwiftData
 import UIKit
 
+#if OHANA_FAMILY_CAPABILITIES
+import CloudKit
+#endif
+
 final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
+#if OHANA_FAMILY_CAPABILITIES
     private var modelContainer: ModelContainer?
     private var cloudSync: (any CloudSyncManaging)?
     private var accountChangedObserver: NSObjectProtocol?
-    #if !OHANA_LOCAL_DEVICE
-        private let shareService = CloudSyncHouseholdShareService()
-    #endif
+    private let shareService = CloudSyncHouseholdShareService()
+#endif
 
     @MainActor
     func configure(
         modelContainer: ModelContainer,
         cloudSync: any CloudSyncManaging
     ) {
+#if OHANA_FAMILY_CAPABILITIES
+        guard AppCapabilityProfile.permitsCloudSyncRuntime else { return }
         self.modelContainer = modelContainer
         self.cloudSync = cloudSync
-        #if !OHANA_LOCAL_DEVICE
-            startObservingCloudKitAccountChanges()
-        #endif
+        startObservingCloudKitAccountChanges()
+#else
+        _ = modelContainer
+        _ = cloudSync
+#endif
     }
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        #if !OHANA_LOCAL_DEVICE
+#if OHANA_FAMILY_CAPABILITIES
+        if AppCapabilityProfile.permitsCloudSyncRuntime {
             application.registerForRemoteNotifications()
-        #endif
+        }
+#endif
         return true
     }
 
+#if OHANA_FAMILY_CAPABILITIES
     func application(
         _: UIApplication,
         userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
@@ -54,49 +64,42 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
             return
         }
 
-        #if OHANA_LOCAL_DEVICE
-            OhanaLog.info(
-                "Cloud sync share acceptance skipped in local device build.",
-                category: "CloudSync"
-            )
-        #else
-            Task { @MainActor in
-                guard let modelContainer else { return }
-                do {
-                    let share = try await shareService.acceptShare(metadata: cloudKitShareMetadata)
-                    let context = ModelContext(modelContainer)
-                    guard let householdId = try CloudSyncAcceptedShareStateUpdater.markAcceptedShare(share, context: context) else {
-                        OhanaLog.warning(
-                            "Cloud sync ignored a CloudKit share that was not an Ohana household share.",
-                            category: "CloudSync"
-                        )
-                        return
-                    }
-                    let summary = try CloudSyncInitialHouseholdMergeRuntime.stageLocalSnapshotForHouseholdShare(
-                        householdId: householdId,
-                        context: context
-                    )
-                    OhanaLog.info(
-                        "Cloud sync staged \(summary.stagedRecordCount) local records after accepting household share",
+        Task { @MainActor in
+            guard let modelContainer else { return }
+            do {
+                let share = try await shareService.acceptShare(metadata: cloudKitShareMetadata)
+                let context = ModelContext(modelContainer)
+                guard let householdId = try CloudSyncAcceptedShareStateUpdater.markAcceptedShare(share, context: context) else {
+                    OhanaLog.warning(
+                        "Cloud sync ignored a CloudKit share that was not an Ohana household share.",
                         category: "CloudSync"
                     )
-                    try Self.saveCloudShareAcceptanceChanges(context: context)
-
-                    cloudSync?.setEnabled(true)
-                    cloudSync?.setDatabaseScope(
-                        .sharedCloudDatabase,
-                        zoneOwnerName: share.recordID.zoneID.ownerName
-                    )
-                    cloudSync?.clearSharedZoneAccessRevokedNotice()
-                    await cloudSync?.startIfNeeded(modelContainer: modelContainer)
-                    _ = await cloudSync?.registerDirtyLocalChanges()
-                    await cloudSync?.sendPendingLocalChanges()
-                    await cloudSync?.fetchRemoteChanges()
-                } catch {
-                    OhanaLog.error("Cloud sync failed to accept household share: \(error)", category: "CloudSync")
+                    return
                 }
+                let summary = try CloudSyncInitialHouseholdMergeRuntime.stageLocalSnapshotForHouseholdShare(
+                    householdId: householdId,
+                    context: context
+                )
+                OhanaLog.info(
+                    "Cloud sync staged \(summary.stagedRecordCount) local records after accepting household share",
+                    category: "CloudSync"
+                )
+                try Self.saveCloudShareAcceptanceChanges(context: context)
+
+                cloudSync?.setEnabled(true)
+                cloudSync?.setDatabaseScope(
+                    .sharedCloudDatabase,
+                    zoneOwnerName: share.recordID.zoneID.ownerName
+                )
+                cloudSync?.clearSharedZoneAccessRevokedNotice()
+                await cloudSync?.startIfNeeded(modelContainer: modelContainer)
+                _ = await cloudSync?.registerDirtyLocalChanges()
+                await cloudSync?.sendPendingLocalChanges()
+                await cloudSync?.fetchRemoteChanges()
+            } catch {
+                OhanaLog.error("Cloud sync failed to accept household share: \(error)", category: "CloudSync")
             }
-        #endif
+        }
     }
 
     func application(
@@ -104,23 +107,19 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        #if OHANA_LOCAL_DEVICE
+        guard shouldHandleCloudSyncRemoteNotification(userInfo) else {
             completionHandler(.noData)
-        #else
-            guard shouldHandleCloudSyncRemoteNotification(userInfo) else {
-                completionHandler(.noData)
+            return
+        }
+
+        Task { @MainActor in
+            guard let modelContainer, let cloudSync else {
+                completionHandler(.failed)
                 return
             }
-
-            Task { @MainActor in
-                guard let modelContainer, let cloudSync else {
-                    completionHandler(.failed)
-                    return
-                }
-                let result = await cloudSync.handleRemoteNotification(modelContainer: modelContainer)
-                completionHandler(backgroundFetchResult(for: result))
-            }
-        #endif
+            let result = await cloudSync.handleRemoteNotification(modelContainer: modelContainer)
+            completionHandler(backgroundFetchResult(for: result))
+        }
     }
 
     private func shouldHandleCloudSyncRemoteNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
@@ -188,8 +187,10 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
             throw OhanaCloudSharingPersistenceError.persistenceFailed(saveResult.errorDescription)
         }
     }
+#endif
 }
 
+#if OHANA_FAMILY_CAPABILITIES
 enum OhanaCloudSharingPersistenceError: LocalizedError, Equatable {
     case persistenceFailed(String?)
 
@@ -204,3 +205,4 @@ enum OhanaCloudSharingPersistenceError: LocalizedError, Equatable {
         }
     }
 }
+#endif

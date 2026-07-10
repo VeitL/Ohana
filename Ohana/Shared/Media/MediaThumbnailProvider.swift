@@ -35,9 +35,25 @@ enum MediaThumbnailProvider {
         let isTransparent: Bool
     }
 
+    private struct InFlightImageDecode {
+        let id: UUID
+        let task: Task<UIImage?, Never>
+    }
+
+    private struct InFlightTransparencyScan {
+        let id: UUID
+        let task: Task<Bool?, Never>
+    }
+
     private static var images: [MediaThumbnailKey: UIImage] = [:]
     private static var transparencyFlags: [MediaThumbnailKey: Bool] = [:]
-    private static var inFlight: [MediaThumbnailKey: Task<UIImage?, Never>] = [:]
+    /// Each handle is the task that performs the actual off-main work. This is
+    /// deliberately not a parent wrapper around a detached decode, so route
+    /// cancellation and memory pressure reach the decoder itself.
+    private static var inFlight: [MediaThumbnailKey: InFlightImageDecode] = [:]
+    private static var transparencyInFlight: [MediaThumbnailKey: InFlightTransparencyScan] = [:]
+    private static var accessTicks: [MediaThumbnailKey: UInt64] = [:]
+    private static var nextAccessTick: UInt64 = 0
     private static var evictionGeneration = 0
 
     nonisolated static func signature(for data: Data) -> String {
@@ -47,7 +63,9 @@ enum MediaThumbnailProvider {
     static func cachedImage(for key: MediaThumbnailKey) -> UIImage? {
         ensureMemoryWarningEvictionRegistered()
         guard !key.sourceSignature.isEmpty else { return nil }
-        return images[key]
+        guard let image = images[key] else { return nil }
+        recordAccess(for: key)
+        return image
     }
 
     static func image(
@@ -68,34 +86,58 @@ enum MediaThumbnailProvider {
         ensureMemoryWarningEvictionRegistered()
         guard !key.sourceSignature.isEmpty else { return nil }
         if let cached = images[key] {
+            recordAccess(for: key)
             return cached
         }
-        if let task = inFlight[key] {
-            return await task.value
+        if let inFlightDecode = inFlight[key] {
+            return await withTaskCancellationHandler(operation: {
+                await inFlightDecode.task.value
+            }, onCancel: {
+                inFlightDecode.task.cancel()
+            })
         }
 
         let generation = evictionGeneration
-        let task = Task(priority: .utility) { () -> UIImage? in // smoothness: allow shared thumbnail worker; data loading chooses its actor, decode stays off-main.
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "media_thumbnail_decode",
+            requestedItemCount: 1
+        )
+        guard budget.hasWorkCapacity else { return nil }
+        let priority: TaskPriority = budget.allowsExpensiveWork ? .utility : .background
+        let startedAt = Date()
+        let task = Task.detached(priority: priority) { () -> UIImage? in // smoothness: bounded shared thumbnail worker; the retained task performs both loading and decode off-main.
+            guard !Task.isCancelled else { return nil }
             guard let data = await asyncDataProvider() else {
                 return nil
             }
-            return await Task.detached(priority: .utility) { () -> UIImage? in
-                AttachmentImageDecoder.image(from: data, maxPixel: CGFloat(key.maxPixel))
-            }.value
+            guard !Task.isCancelled, budget.hasTimeRemaining(since: startedAt) else { return nil }
+            let image = AttachmentImageDecoder.image(from: data, maxPixel: CGFloat(key.maxPixel))
+            guard !Task.isCancelled else { return nil }
+            return image
         }
-        inFlight[key] = task
+        let inFlightDecode = InFlightImageDecode(id: UUID(), task: task)
+        inFlight[key] = inFlightDecode
 
-        let decoded = await task.value
-        inFlight.removeValue(forKey: key)
+        let decoded = await withTaskCancellationHandler(operation: {
+            await task.value
+        }, onCancel: {
+            task.cancel()
+        })
+        if inFlight[key]?.id == inFlightDecode.id {
+            inFlight.removeValue(forKey: key)
+        }
         guard !Task.isCancelled,
               generation == evictionGeneration else {
             return nil
         }
         guard let decoded else {
             images.removeValue(forKey: key)
+            accessTicks.removeValue(forKey: key)
             return nil
         }
         images[key] = decoded
+        recordAccess(for: key)
+        trimToCapacity()
         return decoded
     }
 
@@ -120,19 +162,68 @@ enum MediaThumbnailProvider {
         }
 
         if let cachedTransparency = transparencyFlags[key] {
+            recordAccess(for: key)
             return Result(image: image, isTransparent: cachedTransparency)
         }
 
         let generation = evictionGeneration
-        let isTransparent = await Task.detached(priority: .utility) { // smoothness: allow shared off-main thumbnail alpha scan; keyed cache evicts on memory pressure.
-            ImageCutoutService.imageHasTransparentPixels(image)
-        }.value
+        let inFlightScan: InFlightTransparencyScan
+        if let existingScan = transparencyInFlight[key] {
+            inFlightScan = existingScan
+        } else {
+            let task = Task.detached(priority: .utility) { () -> Bool? in // smoothness: retained off-main alpha scan is cancelled by route teardown or memory pressure.
+                guard !Task.isCancelled else { return nil }
+                let isTransparent = ImageCutoutService.imageHasTransparentPixels(image)
+                guard !Task.isCancelled else { return nil }
+                return isTransparent
+            }
+            let createdScan = InFlightTransparencyScan(id: UUID(), task: task)
+            transparencyInFlight[key] = createdScan
+            inFlightScan = createdScan
+        }
+        let transparencyResult = await withTaskCancellationHandler(operation: {
+            await inFlightScan.task.value
+        }, onCancel: {
+            inFlightScan.task.cancel()
+        })
+        if transparencyInFlight[key]?.id == inFlightScan.id {
+            transparencyInFlight.removeValue(forKey: key)
+        }
+        guard let isTransparent = transparencyResult else { return nil }
         guard !Task.isCancelled,
               generation == evictionGeneration else {
-            return Result(image: image, isTransparent: isTransparent)
+            return nil
         }
         transparencyFlags[key] = isTransparent
+        trimToCapacity()
         return Result(image: image, isTransparent: isTransparent)
+    }
+
+    private static func recordAccess(for key: MediaThumbnailKey) {
+        nextAccessTick &+= 1
+        accessTicks[key] = nextAccessTick
+    }
+
+    /// Bounded LRU keeps a long 500-image scroll from retaining every decoded
+    /// thumbnail. Low Power / app power-saving mode deliberately retains a
+    /// smaller working set and lets off-screen tiles rebuild lazily.
+    private static func trimToCapacity() {
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "media_thumbnail_cache",
+            requestedItemCount: 48
+        )
+        let capacity = budget.allowsExpensiveWork ? 48 : 16
+        guard images.count > capacity else { return }
+
+        let evictionKeys = accessTicks
+            .sorted { $0.value < $1.value }
+            .prefix(images.count - capacity)
+            .map(\.key)
+        for key in evictionKeys {
+            images.removeValue(forKey: key)
+            transparencyFlags.removeValue(forKey: key)
+            accessTicks.removeValue(forKey: key)
+        }
     }
 
     private static func ensureMemoryWarningEvictionRegistered() {
@@ -142,13 +233,18 @@ enum MediaThumbnailProvider {
     }
 
     private static func evictDecodedCacheForMemoryWarning() {
-        guard !images.isEmpty || !transparencyFlags.isEmpty || !inFlight.isEmpty else { return }
+        guard !images.isEmpty || !transparencyFlags.isEmpty || !inFlight.isEmpty || !transparencyInFlight.isEmpty else { return }
         images.removeAll(keepingCapacity: false)
         transparencyFlags.removeAll(keepingCapacity: false)
-        for task in inFlight.values {
-            task.cancel()
+        accessTicks.removeAll(keepingCapacity: false)
+        for inFlightDecode in inFlight.values {
+            inFlightDecode.task.cancel()
+        }
+        for inFlightScan in transparencyInFlight.values {
+            inFlightScan.task.cancel()
         }
         inFlight.removeAll(keepingCapacity: false)
+        transparencyInFlight.removeAll(keepingCapacity: false)
         evictionGeneration &+= 1
     }
 
@@ -156,10 +252,15 @@ enum MediaThumbnailProvider {
         static func resetForTesting() {
             images.removeAll(keepingCapacity: false)
             transparencyFlags.removeAll(keepingCapacity: false)
-            for task in inFlight.values {
-                task.cancel()
+            accessTicks.removeAll(keepingCapacity: false)
+            for inFlightDecode in inFlight.values {
+                inFlightDecode.task.cancel()
+            }
+            for inFlightScan in transparencyInFlight.values {
+                inFlightScan.task.cancel()
             }
             inFlight.removeAll(keepingCapacity: false)
+            transparencyInFlight.removeAll(keepingCapacity: false)
             evictionGeneration &+= 1
         }
     #endif

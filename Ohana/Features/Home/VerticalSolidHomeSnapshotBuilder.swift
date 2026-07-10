@@ -197,7 +197,6 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
     ) -> VerticalSolidHomeSnapshot {
         let l = L10n(source.language)
         let activePets = source.pets.filter { !$0.hasPassedAway }
-        let activeHumans = source.humans.filter { !$0.hasPassedAway }
         let cards = enrichCardsWithAvatarData(
             HomeSnapshotBuilder.buildCards(
                 pets: source.pets,

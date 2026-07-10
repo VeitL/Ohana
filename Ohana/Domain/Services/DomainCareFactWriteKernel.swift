@@ -174,6 +174,46 @@ enum DomainCareFactWriteAuthorizer {
         )
     }
 
+    /// Startup auto-feeder materialization has no human executor and must be
+    /// allowed to run inside a background SwiftData actor. Keep the existing
+    /// interactive authorizer on the main actor; this narrow variant only
+    /// issues the same policy-backed token for a system-owned care fact.
+    nonisolated static func authorizeSystemPetFact(
+        pet: Pet,
+        intent: DomainCareFactCreateIntent,
+        context: ModelContext
+    ) -> AuthorizedDomainCareFactWrite? {
+        guard let mutationPlan = DomainPolicyAuthorizer.authorize(
+            DomainMutationAuthorizationRequest(
+                scope: .careFact,
+                source: intent.source,
+                subjectRequest: DomainSubjectResolutionRequest(
+                    relatedEntityType: EntityKind.pet.rawValue,
+                    relatedEntityId: pet.id.uuidString
+                ),
+                writeKind: intent.writeKind
+            ),
+            context: context
+        ),
+            mutationPlan.allowsCareFactWrite
+        else {
+            return nil
+        }
+
+        return AuthorizedDomainCareFactWrite(
+            mutationPlan: mutationPlan,
+            intent: intent,
+            pet: pet,
+            actor: EconomyRewardOwnerResolution(
+                requestedExecutorId: nil,
+                effectiveExecutorId: nil,
+                rewardExecutorId: nil,
+                usedFallback: false
+            ),
+            disposition: .active
+        )
+    }
+
     static func authorizeHumanExpense(
         human: Human,
         intent: DomainCareFactCreateIntent,

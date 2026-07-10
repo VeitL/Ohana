@@ -40,7 +40,8 @@ final class AppResetServiceTests: XCTestCase {
             options: AppResetService.Options(
                 cancelPendingNotifications: false,
                 deleteCustomBackground: false,
-                resetSharedRuntimeState: false
+                resetSharedRuntimeState: false,
+                cleanUpAutomaticBackups: false
             )
         )
 
@@ -93,7 +94,8 @@ final class AppResetServiceTests: XCTestCase {
             options: AppResetService.Options(
                 cancelPendingNotifications: false,
                 deleteCustomBackground: false,
-                resetSharedRuntimeState: false
+                resetSharedRuntimeState: false,
+                cleanUpAutomaticBackups: false
             )
         )
 
@@ -102,9 +104,53 @@ final class AppResetServiceTests: XCTestCase {
         }
     }
 
+    func testResetPersistsAutomaticBackupCleanupFailureInsteadOfReportingSuccess() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let defaultsSuiteName = "AppResetServiceTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defer {
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+        }
+
+        let pet = Pet(name: "Miso")
+        context.insert(pet)
+        try context.save()
+
+        let result = try AppResetService.reset(
+            context: context,
+            defaults: defaults,
+            options: AppResetService.Options(
+                cancelPendingNotifications: false,
+                deleteCustomBackground: false,
+                resetSharedRuntimeState: false,
+                cleanUpAutomaticBackups: true
+            ),
+            automaticBackupResetCleaner: FailingAutomaticBackupResetCleaner()
+        )
+
+        guard case let .pending(message) = result.automaticBackupCleanup else {
+            return XCTFail("Expected the automatic backup cleanup failure to be returned")
+        }
+        XCTAssertFalse(message.isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
+
+        let status = AutomaticBackupStatusStore(defaults: defaults).snapshot()
+        XCTAssertFalse(status.isEnabled)
+        XCTAssertTrue(status.resetCleanupPending)
+        XCTAssertNotNil(status.resetCleanupFailureAt)
+        XCTAssertEqual(status.resetCleanupFailureMessage, message)
+    }
+
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV67.models)
+        let schema = Schema(ArkSchemaV85.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+}
+
+private struct FailingAutomaticBackupResetCleaner: AutomaticBackupResetCleaning {
+    func removeManagedAutomaticBackupsSynchronously() throws {
+        throw AutomaticBackupFileStoreError.iCloudUnavailable
     }
 }

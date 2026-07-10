@@ -345,7 +345,7 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
-    @Test func cloudSyncProjectConfigurationKeepsRequiredCloudKitCapabilities() throws {
+    @Test func soloProjectConfigurationKeepsOnlyICloudDocumentsCapability() throws {
         let rootURL = repositoryRootURL()
         let entitlements = try propertyListDictionary(
             rootURL.appendingPathComponent("Ohana/Ohana.entitlements")
@@ -363,10 +363,12 @@ struct CloudSyncMetadataServiceTests {
         let backgroundModes = try #require(infoPlist["UIBackgroundModes"] as? [String])
 
         #expect(containers.contains(CloudSyncEngineRuntime.containerIdentifier))
-        #expect(services.contains("CloudKit"))
-        #expect((entitlements["aps-environment"] as? String)?.isEmpty == false)
-        #expect(backgroundModes.contains("remote-notification"))
-        #expect(infoPlist["CKSharingSupported"] as? Bool == true)
+        #expect(services == ["CloudDocuments"])
+        #expect(entitlements["aps-environment"] == nil)
+        #expect(!backgroundModes.contains("remote-notification"))
+        #expect(infoPlist["CKSharingSupported"] == nil)
+        #expect(!project.contains("INFOPLIST_KEY_CKSharingSupported = YES;"))
+        #expect(project.contains("SWIFT_ACTIVE_COMPILATION_CONDITIONS = \"OHANA_SOLO_CAPABILITIES $(inherited)\";"))
         #expect(project.contains("CODE_SIGN_ENTITLEMENTS = Ohana/Ohana.entitlements;"))
     }
 

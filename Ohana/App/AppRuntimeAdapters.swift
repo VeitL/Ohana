@@ -58,7 +58,11 @@ final class SharedDataBackupManagerAdapter: DataBackupManaging {
     }
 
     func exportJSON(container: ModelContainer, password: String?) async throws -> URL {
-        try await manager.exportJSON(container: container, password: password)
+        try await manager.exportJSON(
+            container: container,
+            password: password,
+            scope: .manualExternalRestricted
+        )
     }
 
     func importJSON(from url: URL, context: ModelContext, password: String?) async throws {
@@ -68,8 +72,8 @@ final class SharedDataBackupManagerAdapter: DataBackupManaging {
 
 @MainActor
 protocol AppResetting {
-    func reset(context: ModelContext) throws
-    func reset(context: ModelContext, options: AppResetService.Options) throws
+    func reset(context: ModelContext) throws -> AppResetService.ResetResult
+    func reset(context: ModelContext, options: AppResetService.Options) throws -> AppResetService.ResetResult
     func resetForUITests(context: ModelContext) throws
 }
 
@@ -81,7 +85,7 @@ final class StaticAppResetter: AppResetting {
         self.questManager = questManager
     }
 
-    func reset(context: ModelContext) throws {
+    func reset(context: ModelContext) throws -> AppResetService.ResetResult {
         try AppResetService.reset(
             context: context,
             options: AppResetService.Options(),
@@ -89,7 +93,7 @@ final class StaticAppResetter: AppResetting {
         )
     }
 
-    func reset(context: ModelContext, options: AppResetService.Options) throws {
+    func reset(context: ModelContext, options: AppResetService.Options) throws -> AppResetService.ResetResult {
         try AppResetService.reset(
             context: context,
             options: options,
@@ -98,7 +102,7 @@ final class StaticAppResetter: AppResetting {
     }
 
     func resetForUITests(context: ModelContext) throws {
-        try reset(
+        _ = try reset(
             context: context,
             options: AppResetService.Options(
                 preserveLocalePreferences: false,

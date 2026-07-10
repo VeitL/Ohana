@@ -9,7 +9,7 @@ import SwiftData
 import SwiftUI
 
 struct HomeReadModelRefreshKey: Hashable {
-    let revisionValue: Int
+    let homeInvalidationValue: Int
     let walletProjectionRevisionValue: Int
     let dayToken: Int
     let activeHumanIdRaw: String
@@ -20,6 +20,7 @@ struct HomeReadModelRefreshKey: Hashable {
     let equippedTitleRaw: String
     let quickActionItemsRaw: String
     let language: String
+    let surfaceResumeRefreshGeneration: Int
 
     static func dayToken(for date: Date, calendar: Calendar = .current) -> Int {
         Int(calendar.startOfDay(for: date).timeIntervalSince1970)
@@ -59,8 +60,12 @@ struct VerticalSolidHomeDataContainer: View {
     let onPresentStreakDetail: () -> Void
     let onPresentWalk: (UUID) -> Void
     let cardStateResetToken: UUID
+    /// The root route host owns this value. A covered Home surface must retain
+    /// its frozen snapshot rather than continuing broad SwiftData aggregation.
+    let isHomeSurfaceVisible: Bool
 
     @StateObject private var readModelStore = HomeReadModelStore()
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -72,15 +77,18 @@ struct VerticalSolidHomeDataContainer: View {
     @AppStorage(PetBondVaultStore.revisionKey) private var petBondVaultRevision = 0
     @AppStorage("shop_equipped_title") private var equippedTitleRaw = ""
     @AppStorage("quickActionItems_v2") private var quickActionItemsRaw = ""
-    @State private var observedHomeRevision = HomeRevision()
+    @State private var observedHomeInvalidation = HomeSurfaceInvalidationToken.empty
     @State private var observedWalletProjectionRevision = HomeRevision()
     @State private var currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
     @State private var refreshKeyStateTask: Task<Void, Never>?
     @State private var languageRefreshTask: Task<Void, Never>?
     @State private var readModelLanguage = AppLanguage.code
-    @State private var pendingObservedHomeRevision: HomeRevision?
+    @State private var pendingHomeInvalidation: HomeSurfaceInvalidationToken?
     @State private var pendingObservedWalletProjectionRevision: HomeRevision?
     @State private var pendingDayTokenRefresh = false
+    @State private var pendingReadModelLanguage: String?
+    @State private var pendingSurfaceResumeRefresh = false
+    @State private var surfaceResumeRefreshGeneration = 0
 
     init(
         onOpenPet: @escaping (UUID, PetDetailTab) -> Void,
@@ -101,7 +109,8 @@ struct VerticalSolidHomeDataContainer: View {
         onPresentSettings: @escaping () -> Void,
         onPresentStreakDetail: @escaping () -> Void,
         onPresentWalk: @escaping (UUID) -> Void,
-        cardStateResetToken: UUID
+        cardStateResetToken: UUID,
+        isHomeSurfaceVisible: Bool
     ) {
         self.onOpenPet = onOpenPet
         self.onOpenHuman = onOpenHuman
@@ -122,6 +131,7 @@ struct VerticalSolidHomeDataContainer: View {
         self.onPresentStreakDetail = onPresentStreakDetail
         self.onPresentWalk = onPresentWalk
         self.cardStateResetToken = cardStateResetToken
+        self.isHomeSurfaceVisible = isHomeSurfaceVisible
     }
 
     var body: some View {
@@ -149,6 +159,12 @@ struct VerticalSolidHomeDataContainer: View {
             payload: payload
         )
         .task(id: refreshKey) {
+            guard HomeSurfaceRefreshPolicy.allowsReadModelRefresh(
+                isHomeSurfaceVisible: isHomeSurfaceVisible,
+                isRuntimeRefreshAllowed: homeSurfaceGate.allowsRefresh
+            ) else {
+                return
+            }
             readModelStore.requestRefresh(
                 context: modelContext,
                 activeHumanIdRaw: activeHumanIdRaw,
@@ -159,27 +175,41 @@ struct VerticalSolidHomeDataContainer: View {
                 equippedTitleRaw: equippedTitleRaw,
                 quickActionItemsRaw: quickActionItemsRaw,
                 language: readModelLanguage,
-                externalRevision: observedHomeRevision,
+                externalRevision: observedHomeInvalidation.revision,
                 force: !payload.snapshot.isReady
             )
         }
         .onAppear {
             scheduleRefreshKeyStateSync(
-                revision: appServices.domainRevisions.homeRevision,
+                homeInvalidation: appServices.domainRevisions.homeSurfaceInvalidation,
                 walletProjectionRevision: appServices.domainRevisions.walletProjectionRevision,
                 refreshDayToken: true
             )
         }
-        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
-            scheduleRefreshKeyStateSync(revision: revision, walletProjectionRevision: nil, refreshDayToken: false)
+        .onReceive(appServices.domainRevisions.homeSurfaceInvalidationUpdates) { invalidation in
+            scheduleRefreshKeyStateSync(
+                homeInvalidation: invalidation,
+                walletProjectionRevision: nil,
+                refreshDayToken: false
+            )
         }
         .onReceive(appServices.domainRevisions.walletProjectionUpdates) { revision in
-            scheduleRefreshKeyStateSync(revision: nil, walletProjectionRevision: revision, refreshDayToken: false)
+            scheduleRefreshKeyStateSync(
+                homeInvalidation: nil,
+                walletProjectionRevision: revision,
+                refreshDayToken: false
+            )
+        }
+        .onChange(of: isHomeSurfaceVisible) { _, isVisible in
+            handleHomeSurfaceVisibilityChange(isVisible)
+        }
+        .onChange(of: homeSurfaceGate.allowsRefresh) { _, allowsRefresh in
+            handleHomeSurfaceRefreshAllowanceChange(allowsRefresh)
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             scheduleRefreshKeyStateSync(
-                revision: appServices.domainRevisions.homeRevision,
+                homeInvalidation: appServices.domainRevisions.homeSurfaceInvalidation,
                 walletProjectionRevision: appServices.domainRevisions.walletProjectionRevision,
                 refreshDayToken: true
             )
@@ -188,7 +218,11 @@ struct VerticalSolidHomeDataContainer: View {
             scheduleReadModelLanguageSync(newValue)
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
-            scheduleRefreshKeyStateSync(revision: nil, walletProjectionRevision: nil, refreshDayToken: true)
+            scheduleRefreshKeyStateSync(
+                homeInvalidation: nil,
+                walletProjectionRevision: nil,
+                refreshDayToken: true
+            )
         }
         .task(id: currentDayToken) {
             await updateDayTokenAfterNextMidnight()
@@ -204,7 +238,7 @@ struct VerticalSolidHomeDataContainer: View {
 
     private var refreshKey: HomeReadModelRefreshKey {
         HomeReadModelRefreshKey(
-            revisionValue: observedHomeRevision.value,
+            homeInvalidationValue: observedHomeInvalidation.value,
             walletProjectionRevisionValue: observedWalletProjectionRevision.value,
             dayToken: currentDayToken,
             activeHumanIdRaw: activeHumanIdRaw,
@@ -214,12 +248,19 @@ struct VerticalSolidHomeDataContainer: View {
             petBondVaultRevision: petBondVaultRevision,
             equippedTitleRaw: equippedTitleRaw,
             quickActionItemsRaw: quickActionItemsRaw,
-            language: readModelLanguage
+            language: readModelLanguage,
+            surfaceResumeRefreshGeneration: surfaceResumeRefreshGeneration
         )
     }
 
     private func scheduleReadModelLanguageSync(_ rawLanguage: String) {
         let normalized = AppLanguage.normalize(rawLanguage)
+        guard canRefreshHomeSurface else {
+            pendingReadModelLanguage = normalized
+            languageRefreshTask?.cancel()
+            languageRefreshTask = nil
+            return
+        }
         guard readModelLanguage != normalized else {
             languageRefreshTask?.cancel()
             languageRefreshTask = nil
@@ -228,7 +269,7 @@ struct VerticalSolidHomeDataContainer: View {
 
         languageRefreshTask?.cancel()
         languageRefreshTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: Self.postLanguageRefreshDelayMilliseconds) {
-            guard readModelLanguage != normalized else {
+            guard canRefreshHomeSurface, readModelLanguage != normalized else {
                 languageRefreshTask = nil
                 return
             }
@@ -243,9 +284,33 @@ struct VerticalSolidHomeDataContainer: View {
         currentDayToken = token
     }
 
-    private func setObservedHomeRevision(_ revision: HomeRevision) {
-        guard observedHomeRevision != revision else { return }
-        observedHomeRevision = revision
+    private var visibleHomeEntityIDs: Set<UUID> {
+        var ids = Set(readModelStore.payload.snapshot.cards.map(\.id))
+        ids.formUnion(readModelStore.payload.snapshot.plants.map(\.id))
+        if let activeHumanID = UUID(uuidString: activeHumanIdRaw) {
+            ids.insert(activeHumanID)
+        }
+        return ids
+    }
+
+    private var homeSurfaceGate: SurfaceActivityGate {
+        workloadPolicy.surfaceGate(
+            isVisible: isHomeSurfaceVisible,
+            isCovered: !isHomeSurfaceVisible,
+            isLive: scenePhase == .active
+        )
+    }
+
+    private var canRefreshHomeSurface: Bool {
+        HomeSurfaceRefreshPolicy.allowsReadModelRefresh(
+            isHomeSurfaceVisible: isHomeSurfaceVisible,
+            isRuntimeRefreshAllowed: homeSurfaceGate.allowsRefresh
+        )
+    }
+
+    private func setObservedHomeInvalidation(_ invalidation: HomeSurfaceInvalidationToken) {
+        guard observedHomeInvalidation != invalidation else { return }
+        observedHomeInvalidation = invalidation
     }
 
     private func setObservedWalletProjectionRevision(_ revision: HomeRevision) {
@@ -254,31 +319,44 @@ struct VerticalSolidHomeDataContainer: View {
     }
 
     private func scheduleRefreshKeyStateSync(
-        revision: HomeRevision?,
+        homeInvalidation: HomeSurfaceInvalidationToken?,
         walletProjectionRevision: HomeRevision?,
         refreshDayToken: Bool
     ) {
-        if let revision {
-            pendingObservedHomeRevision = revision
+        if let homeInvalidation,
+           homeInvalidation.isRelevant(toVisibleEntityIDs: visibleHomeEntityIDs) {
+            pendingHomeInvalidation = pendingHomeInvalidation
+                .map { $0.merging(homeInvalidation) }
+                ?? homeInvalidation
         }
         if let walletProjectionRevision {
             pendingObservedWalletProjectionRevision = walletProjectionRevision
         }
         pendingDayTokenRefresh = pendingDayTokenRefresh || refreshDayToken
+        guard canRefreshHomeSurface else { return }
         guard refreshKeyStateTask == nil else { return }
-        let delayMilliseconds: UInt64 = pendingObservedHomeRevision == nil && pendingObservedWalletProjectionRevision == nil
+        let delayMilliseconds: UInt64 = pendingHomeInvalidation == nil && pendingObservedWalletProjectionRevision == nil
             ? 0
             : Self.postRevisionRefreshDelayMilliseconds
         refreshKeyStateTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
-            let revision = pendingObservedHomeRevision
+            guard canRefreshHomeSurface else {
+                refreshKeyStateTask = nil
+                return
+            }
+
+            let homeInvalidation = pendingHomeInvalidation
             let walletProjectionRevision = pendingObservedWalletProjectionRevision
             let shouldRefreshDayToken = pendingDayTokenRefresh
-            pendingObservedHomeRevision = nil
+            let pendingLanguage = pendingReadModelLanguage
+            let shouldResumeSurfaceRefresh = pendingSurfaceResumeRefresh
+            pendingHomeInvalidation = nil
             pendingObservedWalletProjectionRevision = nil
             pendingDayTokenRefresh = false
+            pendingReadModelLanguage = nil
+            pendingSurfaceResumeRefresh = false
 
-            if let revision {
-                setObservedHomeRevision(revision)
+            if let homeInvalidation {
+                setObservedHomeInvalidation(homeInvalidation)
             }
             if let walletProjectionRevision {
                 setObservedWalletProjectionRevision(walletProjectionRevision)
@@ -286,8 +364,51 @@ struct VerticalSolidHomeDataContainer: View {
             if shouldRefreshDayToken {
                 refreshCurrentDayToken()
             }
+            if let pendingLanguage, readModelLanguage != pendingLanguage {
+                readModelLanguage = pendingLanguage
+            }
+            if shouldResumeSurfaceRefresh {
+                surfaceResumeRefreshGeneration &+= 1
+            }
             refreshKeyStateTask = nil
         }
+    }
+
+    private func handleHomeSurfaceVisibilityChange(_ isVisible: Bool) {
+        guard !isVisible else {
+            pendingSurfaceResumeRefresh = !readModelStore.payload.snapshot.isReady
+            scheduleRefreshKeyStateSync(
+                homeInvalidation: appServices.domainRevisions.homeSurfaceInvalidation,
+                walletProjectionRevision: appServices.domainRevisions.walletProjectionRevision,
+                refreshDayToken: true
+            )
+            return
+        }
+
+        refreshKeyStateTask?.cancel()
+        refreshKeyStateTask = nil
+        languageRefreshTask?.cancel()
+        languageRefreshTask = nil
+        pendingReadModelLanguage = AppLanguage.normalize(appLanguage)
+        readModelStore.cancel()
+    }
+
+    private func handleHomeSurfaceRefreshAllowanceChange(_ allowsRefresh: Bool) {
+        guard allowsRefresh else {
+            refreshKeyStateTask?.cancel()
+            refreshKeyStateTask = nil
+            languageRefreshTask?.cancel()
+            languageRefreshTask = nil
+            pendingReadModelLanguage = AppLanguage.normalize(appLanguage)
+            readModelStore.cancel()
+            return
+        }
+
+        scheduleRefreshKeyStateSync(
+            homeInvalidation: appServices.domainRevisions.homeSurfaceInvalidation,
+            walletProjectionRevision: appServices.domainRevisions.walletProjectionRevision,
+            refreshDayToken: true
+        )
     }
 
     private func updateDayTokenAfterNextMidnight() async {
@@ -298,7 +419,22 @@ struct VerticalSolidHomeDataContainer: View {
         try? await Task.sleep(nanoseconds: nanoseconds)
         guard !Task.isCancelled else { return }
         await MainActor.run {
-            refreshCurrentDayToken()
+            scheduleRefreshKeyStateSync(
+                homeInvalidation: nil,
+                walletProjectionRevision: nil,
+                refreshDayToken: true
+            )
         }
+    }
+}
+
+/// Pure visibility gate so the expensive Home read model never starts beneath a
+/// sheet, overlay, full-screen flow, or pushed destination.
+nonisolated enum HomeSurfaceRefreshPolicy {
+    static func allowsReadModelRefresh(
+        isHomeSurfaceVisible: Bool,
+        isRuntimeRefreshAllowed: Bool
+    ) -> Bool {
+        isHomeSurfaceVisible && isRuntimeRefreshAllowed
     }
 }

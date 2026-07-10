@@ -55,7 +55,11 @@ nonisolated extension DataBackupManager {
         )
     }
 
-    func encodeHuman(_ h: Human, mediaWriter: DataBackupMediaWriting? = nil) throws -> HumanBackup {
+    func encodeHuman(
+        _ h: Human,
+        mediaWriter: DataBackupMediaWriting? = nil,
+        redactingHealthData: Bool = false
+    ) throws -> HumanBackup {
         let avatarImageRef = try mediaWriter?.write(
             h.avatarImageData,
             purpose: .humanAvatar,
@@ -63,18 +67,22 @@ nonisolated extension DataBackupManager {
         )
         return HumanBackup(
             id: h.id.uuidString, name: h.name, birthday: d(h.birthday),
-            bloodType: h.bloodType, avatarEmoji: h.avatarEmoji, role: h.role,
+            bloodType: redactingHealthData ? "" : h.bloodType,
+            avatarEmoji: h.avatarEmoji,
+            role: h.role,
             appleUserIdentifier: nil,
             genderIdentityRaw: HumanProfileOptions.storedGenderIdentity(raw: h.genderIdentityRaw, notes: h.notes),
-            notes: HumanProfileOptions.visibleNoteParts(from: h.notes).joined(separator: "｜"),
+            notes: redactingHealthData ? "" : HumanProfileOptions.visibleNoteParts(from: h.notes).joined(separator: "｜"),
             createdAt: d(h.createdAt), nationality: h.nationality, city: h.city,
             coconutBalance: h.coconutBalance, shouldShowOnHome: h.shouldShowOnHome,
             mbti: h.mbti.isEmpty ? nil : h.mbti,
-            privateFieldsRaw: h.privateFieldsRaw.isEmpty ? nil : h.privateFieldsRaw,
+            privateFieldsRaw: redactingHealthData || h.privateFieldsRaw.isEmpty ? nil : h.privateFieldsRaw,
             themeColorHex: h.themeColorHex,
-            heightCm: h.heightCm,
+            heightCm: redactingHealthData ? nil : h.heightCm,
             avatarImageBase64: avatarImageRef == nil ? h.avatarImageData?.base64EncodedString() : nil,
             avatarImageRef: avatarImageRef,
+            // Memorial lifecycle is not human-health data and must survive a
+            // restricted backup/restore even while health fields are omitted.
             passedAwayDate: d(h.passedAwayDate)
         )
     }

@@ -1156,7 +1156,7 @@ struct OhanaTests {
         )
         let restored = try target.mainContext.fetch(FetchDescriptor<Human>()).first
         #expect(restored?.name == "Sensitive Ava")
-        #expect(restored?.notes == "private health note")
+        #expect(restored?.notes == "")
     }
 
     @MainActor
@@ -1179,7 +1179,8 @@ struct OhanaTests {
         #expect(!exported.contains("appleUserIdentifier"))
         #expect(!exported.contains("性别:"))
         #expect(backup.humans.first?.genderIdentityRaw == "female")
-        #expect(backup.humans.first?.notes == "visible note")
+        #expect(backup.exportScope == DataBackupExportScope.manualExternalRestricted.rawValue)
+        #expect(backup.humans.first?.notes == "")
 
         let target = try makeInMemoryContainer()
         try await TestDataBackupManagerProjection.manager.importJSON(
@@ -1189,7 +1190,7 @@ struct OhanaTests {
         let restored = try target.mainContext.fetch(FetchDescriptor<Human>()).first
         #expect(restored?.appleUserIdentifier == "")
         #expect(restored?.genderRaw == "女")
-        #expect(restored?.notes == "visible note")
+        #expect(restored?.notes == "")
     }
 
     @MainActor
@@ -2303,7 +2304,7 @@ struct OhanaTests {
     }
 
     @MainActor
-    @Test func backupRestoresHumanFieldsAndLogRelationships() async throws {
+    @Test func externalBackupExcludesHumanHealthFieldsAndLogRelationships() async throws {
         let source = try makeInMemoryContainer()
         let sourceContext = source.mainContext
         let human = Human(name: "Ava", avatarEmoji: "A")
@@ -2378,12 +2379,13 @@ struct OhanaTests {
         #expect(url.pathExtension == DataBackupManager.packageFileExtension)
         #expect(FileManager.default.fileExists(atPath: url.appendingPathComponent(DataBackupManager.mediaDirectoryName, isDirectory: true).path))
         #expect(manifest.contains("\"mediaPackage\""))
-        #expect(manifest.contains("\"imageRef\""))
-        #expect(manifest.contains("\"dataRef\""))
-        #expect(manifest.contains("\"photoRef\""))
-        #expect(!manifest.contains(Data([9, 8, 7]).base64EncodedString()))
-        #expect(!manifest.contains(Data([1, 1, 2]).base64EncodedString()))
-        #expect(!manifest.contains(Data([4, 5]).base64EncodedString()))
+        #expect(manifest.contains("\"avatarImageRef\""))
+        #expect(!manifest.contains(Data([1, 2, 3]).base64EncodedString()))
+        #expect(!manifest.contains("hk-backup-001"))
+        #expect(!manifest.contains("hba1c"))
+        #expect(!manifest.contains("City Clinic"))
+        #expect(!manifest.contains("Vitamin D low"))
+        #expect(!manifest.contains("annual check"))
 
         let target = try makeInMemoryContainer()
         let targetContext = target.mainContext
@@ -2393,48 +2395,22 @@ struct OhanaTests {
         let restored = try #require(restoredHumans.first)
         #expect(restored.mbti == "INTJ")
         #expect(restored.themeColorHex == "FF8800")
-        #expect(restored.heightCm == 168)
-        #expect(restored.privateFields.contains(HumanPrivateField.weight.rawValue))
-        #expect(!restored.isPrivate(.weight, viewedBy: UUID()))
+        #expect(restored.heightCm == 0)
+        #expect(restored.privateFields.isEmpty)
         #expect(restored.avatarImageData == Data([1, 2, 3]))
-        #expect(restored.passedAwayDate == passedAwayDate)
+        #expect(restored.passedAwayDate == nil)
 
         let weights = try targetContext.fetch(FetchDescriptor<HumanWeightLog>())
         let workouts = try targetContext.fetch(FetchDescriptor<HumanWorkoutLog>())
         let healthMetrics = try targetContext.fetch(FetchDescriptor<HumanHealthMetricLog>())
         let healthReports = try targetContext.fetch(FetchDescriptor<HumanHealthReport>())
-        #expect(weights.first?.human?.id == restored.id)
-        #expect(workouts.first?.human?.id == restored.id)
-        #expect(workouts.first?.distanceKm == 5.2)
-        #expect(workouts.first?.calories == 320)
-        #expect(workouts.first?.steps == 6400)
-        #expect(workouts.first?.notes == "park run")
-        #expect(workouts.first?.sourceHealthKit == true)
-        #expect(workouts.first?.healthKitWorkoutUUID == "hk-backup-001")
-        #expect(workouts.first?.healthKitSourceBundleID == "com.apple.Health")
-        #expect(workouts.first?.healthKitSourceName == "Apple Health")
-        #expect(workouts.first?.sourcePetWalkLogID == "pet-walk-backup-001")
-        #expect(healthMetrics.first?.human?.id == restored.id)
-        #expect(healthMetrics.first?.metricKey == "hba1c")
-        #expect(healthMetrics.first?.unitCode == "percent")
-        #expect(healthMetrics.first?.value == 5.4)
-        #expect(healthMetrics.first?.date == metricDate)
-        #expect(healthMetrics.first?.notes == "annual check")
-        #expect(healthReports.count == 1)
-        #expect(healthReports.first?.humanId == restored.id.uuidString)
-        #expect(healthReports.first?.reportType == .bloodTest)
-        #expect(healthReports.first?.conclusion == .attention)
-        #expect(healthReports.first?.hospitalName == "City Clinic")
-        #expect(healthReports.first?.doctorName == "Dr Lee")
-        #expect(healthReports.first?.reportDate == reportDate)
-        #expect(healthReports.first?.nextCheckDate == nextCheckDate)
-        #expect(healthReports.first?.summary == "Vitamin D low")
-        #expect(healthReports.first?.notes == "Review supplements")
-        #expect(healthReports.first?.colorHex == "FFAA00")
+        #expect(weights.isEmpty)
+        #expect(workouts.isEmpty)
+        #expect(healthMetrics.isEmpty)
+        #expect(healthReports.isEmpty)
 
         let ledger = try targetContext.fetch(FetchDescriptor<CareLedgerEvent>())
-        #expect(ledger.first?.eventKindEnum == .weight)
-        #expect(ledger.first?.subjectId == restored.id.uuidString)
+        #expect(ledger.isEmpty)
     }
 
     @MainActor
@@ -2506,7 +2482,7 @@ struct OhanaTests {
     }
 
     @MainActor
-    @Test func backupRestoresRetentionAndMedicationModels() async throws {
+    @Test func backupRestoresPetRetentionModelsAndExcludesHumanMedication() async throws {
         let source = try makeInMemoryContainer()
         let sourceContext = source.mainContext
         let pet = Pet(name: "Momo", species: "猫")
@@ -2553,8 +2529,8 @@ struct OhanaTests {
         #expect(try targetContext.fetch(FetchDescriptor<PetInsurance>()).first?.claims.first?.approvedAmount == 80)
         #expect(try targetContext.fetch(FetchDescriptor<PetMedication>()).first?.customFrequencyNote == "Sunday")
         #expect(try targetContext.fetch(FetchDescriptor<PetMedication>()).first?.remainingAmount == 6)
-        #expect(try targetContext.fetch(FetchDescriptor<HumanMedication>()).first?.name == "Vitamin")
-        #expect(try targetContext.fetch(FetchDescriptor<HumanMedicationLog>()).first?.status == .taken)
+        #expect(try targetContext.fetch(FetchDescriptor<HumanMedication>()).isEmpty)
+        #expect(try targetContext.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
         #expect(try targetContext.fetch(FetchDescriptor<SymptomLog>()).first?.photoData == Data([4, 5]))
         #expect(try targetContext.fetch(FetchDescriptor<HeatCycleLog>()).first?.isMated == true)
     }

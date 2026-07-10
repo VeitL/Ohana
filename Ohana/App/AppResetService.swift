@@ -12,12 +12,16 @@ enum AppResetService {
         var cleanUpAutomaticBackups = true
     }
 
+    struct ResetResult: Equatable {
+        let automaticBackupCleanup: AutomaticBackupResetCleanupResult
+    }
+
     static func reset(
         context: ModelContext,
         defaults: UserDefaults = .standard
-    ) throws {
+    ) throws -> ResetResult {
         let options = Options()
-        try reset(
+        return try reset(
             context: context,
             defaults: defaults,
             options: options
@@ -28,13 +32,30 @@ enum AppResetService {
         context: ModelContext,
         defaults: UserDefaults = .standard,
         options: Options
-    ) throws {
+    ) throws -> ResetResult {
         let questManager = options.resetSharedRuntimeState ? QuestManager() : nil
-        try resetInternal(
+        return try resetInternal(
             context: context,
             defaults: defaults,
             options: options,
-            questManager: questManager
+            questManager: questManager,
+            automaticBackupResetCleaner: ICloudDriveAutomaticBackupFileStore()
+        )
+    }
+
+    static func reset(
+        context: ModelContext,
+        defaults: UserDefaults = .standard,
+        options: Options,
+        automaticBackupResetCleaner: any AutomaticBackupResetCleaning
+    ) throws -> ResetResult {
+        let questManager = options.resetSharedRuntimeState ? QuestManager() : nil
+        return try resetInternal(
+            context: context,
+            defaults: defaults,
+            options: options,
+            questManager: questManager,
+            automaticBackupResetCleaner: automaticBackupResetCleaner
         )
     }
 
@@ -43,12 +64,13 @@ enum AppResetService {
         defaults: UserDefaults = .standard,
         options: Options,
         questManager: QuestManager
-    ) throws {
+    ) throws -> ResetResult {
         try resetInternal(
             context: context,
             defaults: defaults,
             options: options,
-            questManager: questManager
+            questManager: questManager,
+            automaticBackupResetCleaner: ICloudDriveAutomaticBackupFileStore()
         )
     }
 
@@ -56,17 +78,19 @@ enum AppResetService {
         context: ModelContext,
         defaults: UserDefaults,
         options: Options,
-        questManager: QuestManager?
-    ) throws {
+        questManager: QuestManager?,
+        automaticBackupResetCleaner: any AutomaticBackupResetCleaning
+    ) throws -> ResetResult {
         let preservedDefaults = preservedDefaultValues(in: defaults, options: options)
         try deleteAllPersistentModels(in: context)
         try saveResetChanges(context: context)
 
         resetLocalDefaults(defaults, preservedValues: preservedDefaults)
-        if options.cleanUpAutomaticBackups {
-            AutomaticBackupStatusStore.resetAfterAppReset(defaults: defaults)
-            try? ICloudDriveAutomaticBackupFileStore().removeManagedAutomaticBackupsSynchronously()
-        }
+        let automaticBackupCleanup = cleanUpAutomaticBackupsAfterReset(
+            defaults: defaults,
+            isEnabled: options.cleanUpAutomaticBackups,
+            cleaner: automaticBackupResetCleaner
+        )
         if options.deleteCustomBackground {
             CustomAppBackgroundStore.deleteImage()
         }
@@ -82,6 +106,28 @@ enum AppResetService {
         defaults.set("", forKey: "currentActiveHumanId")
         defaults.set(false, forKey: "ohana_show_first_success_card")
         defaults.set(false, forKey: "ohana_first_quick_checkin_completed")
+
+        return ResetResult(automaticBackupCleanup: automaticBackupCleanup)
+    }
+
+    private static func cleanUpAutomaticBackupsAfterReset(
+        defaults: UserDefaults,
+        isEnabled: Bool,
+        cleaner: any AutomaticBackupResetCleaning,
+        now: Date = Date()
+    ) -> AutomaticBackupResetCleanupResult {
+        guard isEnabled else { return .notRequested }
+        let statusStore = AutomaticBackupStatusStore(defaults: defaults)
+        statusStore.resetAfterAppReset(now: now)
+        do {
+            try cleaner.removeManagedAutomaticBackupsSynchronously()
+            statusStore.clearResetCleanupFailure()
+            return .removed
+        } catch {
+            let message = error.localizedDescription
+            statusStore.markResetCleanupFailure(message: message, now: now)
+            return .pending(message: message)
+        }
     }
 
     private static func deleteAllPersistentModels(in context: ModelContext) throws {

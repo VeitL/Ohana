@@ -26,9 +26,9 @@ extension SettingsView {
                             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                         Text(l.tr(
-                            zh: "备份包，媒体分离存储",
-                            en: "Backup package with separate media",
-                            de: "Backup-Paket mit separaten Medien"
+                            zh: "受限备份包，媒体分离存储",
+                            en: "Restricted backup package with separate media",
+                            de: "Eingeschränktes Backup-Paket mit separaten Medien"
                         ))
                             .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(tertiaryText)
@@ -48,9 +48,9 @@ extension SettingsView {
                             ShareLink(item: url,
                                       subject: Text(l.tr(zh: "Ohana 数据备份", en: "Ohana Data Backup", de: "Ohana Datensicherung")),
                                       message: Text(l.tr(
-                                          zh: "该备份包含健康、位置、用药和家庭资料等敏感信息，请只分享给可信对象。",
-                                          en: "This backup contains sensitive health, location, medication, and family data. Share it only with trusted people.",
-                                          de: "Dieses Backup enthält sensible Gesundheits-, Standort-, Medikamenten- und Familiendaten. Nur vertrauenswürdig teilen."
+                                          zh: "该受限备份不包含人类健康或 HealthKit 数据，但仍可能包含家庭、宠物、位置和账单等敏感资料，请只分享给可信对象。",
+                                          en: "This restricted backup does not contain human health or HealthKit data, but it may still contain sensitive household, pet, location, and expense data. Share it only with trusted people.",
+                                          de: "Dieses eingeschränkte Backup enthält keine menschlichen Gesundheits- oder HealthKit-Daten, kann aber weiterhin sensible Familien-, Haustier-, Standort- und Ausgabendaten enthalten. Teile es nur mit vertrauenswürdigen Personen."
                                       ))) {
                                 backupPill(l.tr(zh: "分享", en: "Share", de: "Teilen"), icon: "square.and.arrow.up", color: Color.goTeal)
                             }
@@ -106,9 +106,9 @@ extension SettingsView {
                         .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                         .foregroundStyle(Color.goYellow.opacity(0.8))
                     Text(l.tr(
-                        zh: "备份包含健康、位置、用药和家庭资料。",
-                        en: "Backups include health, location, medication, and family data.",
-                        de: "Backups enthalten Gesundheits-, Standort-, Medikamenten- und Familiendaten."
+                        zh: "导出和自动备份均不包含人类健康、HealthKit、体重、运动、用药或健康报告；这样这些数据不会写入 iCloud 或其他文件服务。",
+                        en: "Neither export nor automatic backup includes human health, HealthKit, weight, workout, medication, or health-report data, so those records are not written to iCloud or another file provider.",
+                        de: "Weder Export noch automatisches Backup enthalten menschliche Gesundheits-, HealthKit-, Gewichts-, Trainings-, Medikations- oder Gesundheitsberichtsdaten. Diese Daten werden daher nicht in iCloud oder einen anderen Dateidienst geschrieben."
                     ))
                     .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(tertiaryText.opacity(0.85))
@@ -323,6 +323,84 @@ extension SettingsView {
             }
             .frame(minHeight: 34)
 
+            Text(l.tr(
+                zh: "自动备份不会写入人类健康、HealthKit、体重、运动、用药或健康报告；手动导出同样受此安全限制。",
+                en: "Automatic backup does not include human health, HealthKit, weight, workout, medication, or health-report data. Manual export has the same safety restriction.",
+                de: "Das automatische Backup enthält keine menschlichen Gesundheits-, HealthKit-, Gewichts-, Trainings-, Medikations- oder Gesundheitsberichtsdaten. Für den manuellen Export gilt dieselbe Sicherheitsbeschränkung."
+            ))
+            .font(OhanaFont.adaptive(size: 11, weight: .medium))
+            .foregroundStyle(tertiaryText.opacity(0.9))
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if automaticBackupStatus.requiresRestrictedBackupReplacement {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.shield.fill") // a11y: allow decorative icon covered by safety warning text
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.goYellow.opacity(0.9))
+                            .accessibilityHidden(true)
+                        Text(l.tr(
+                            zh: "检测到早期版本的 Ohana 自动备份。它可能仍含有人类健康数据；请立即生成受限备份以原位替换，或删除旧备份。",
+                            en: "An automatic backup from an earlier Ohana version was detected. It may still contain human health data; replace it now with a restricted backup or remove it.",
+                            de: "Es wurde ein automatisches Backup aus einer früheren Ohana-Version erkannt. Es kann noch menschliche Gesundheitsdaten enthalten; ersetze es jetzt durch ein eingeschränktes Backup oder entferne es."
+                        ))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium))
+                        .foregroundStyle(tertiaryText.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Button {
+                        replaceLegacyAutomaticBackup()
+                    } label: {
+                        if isRunningAutomaticBackup {
+                            ProgressView()
+                                .tint(Color.goPrimary)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        } else {
+                            backupPill(
+                                l.tr(zh: "立即替换为受限备份", en: "Replace with Restricted Backup", de: "Durch eingeschränktes Backup ersetzen"),
+                                icon: "arrow.triangle.2.circlepath",
+                                color: Color.goPrimary
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .disabled(isRunningAutomaticBackup || isRemovingLegacyAutomaticBackup)
+                    .accessibilityHint(l.tr(
+                        zh: "生成新的受限自动备份，并替换 Ohana 管理的旧 iCloud Drive 文件",
+                        en: "Creates a restricted automatic backup and replaces Ohana's managed previous iCloud Drive file",
+                        de: "Erstellt ein eingeschränktes automatisches Backup und ersetzt Ohanas verwaltete vorherige iCloud-Drive-Datei"
+                    ))
+
+                    Button {
+                        removeLegacyAutomaticBackup()
+                    } label: {
+                        if isRemovingLegacyAutomaticBackup {
+                            ProgressView()
+                                .tint(Color.goRed)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        } else {
+                            backupPill(
+                                l.tr(zh: "删除旧自动备份", en: "Remove Previous Backup", de: "Vorheriges Backup entfernen"),
+                                icon: "trash",
+                                color: Color.goRed
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .disabled(isRunningAutomaticBackup || isRemovingLegacyAutomaticBackup)
+                    .accessibilityHint(l.tr(
+                        zh: "删除 Ohana 管理的早期 iCloud Drive 自动备份",
+                        en: "Removes Ohana's managed earlier automatic iCloud Drive backup",
+                        de: "Entfernt Ohanas verwaltetes früheres automatisches iCloud-Drive-Backup"
+                    ))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             if automaticBackupHasCurrentFailure {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative icon covered by failure message text
@@ -337,6 +415,50 @@ extension SettingsView {
                     .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(tertiaryText.opacity(0.9))
                     .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if automaticBackupStatus.resetCleanupPending {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "icloud.slash.fill") // a11y: allow decorative icon covered by cleanup warning text
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.goYellow.opacity(0.9))
+                            .accessibilityHidden(true)
+                        Text(l.tr(
+                            zh: "上次重置已清除本机数据，但未能删除 iCloud Drive 中 Ohana 管理的旧自动备份。该文件可能仍保留原来的数据。",
+                            en: "The last reset cleared this device, but could not remove Ohana's previous automatic backup from iCloud Drive. That file may still contain the earlier data.",
+                            de: "Der letzte Reset hat dieses Gerät gelöscht, konnte aber Ohanas vorheriges automatisches Backup nicht aus iCloud Drive entfernen. Diese Datei kann noch frühere Daten enthalten."
+                        ))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium))
+                        .foregroundStyle(tertiaryText.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Button {
+                        retryAutomaticBackupCleanup()
+                    } label: {
+                        if isRetryingAutomaticBackupCleanup {
+                            ProgressView()
+                                .tint(Color.goPrimary)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        } else {
+                            backupPill(
+                                l.tr(zh: "重试删除旧备份", en: "Retry Backup Removal", de: "Backup-Loeschung erneut versuchen"),
+                                icon: "trash",
+                                color: Color.goPrimary
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .disabled(isRetryingAutomaticBackupCleanup)
+                    .accessibilityHint(l.tr(
+                        zh: "重新尝试删除重置前的 iCloud Drive 自动备份",
+                        en: "Attempts to remove the automatic iCloud Drive backup from before the reset",
+                        de: "Versucht erneut, das automatische iCloud-Drive-Backup vor dem Reset zu entfernen"
+                    ))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -375,7 +497,7 @@ extension SettingsView {
 
     var automaticBackupSubtitle: String {
         automaticBackupStatus.isEnabled
-            ? l.tr(zh: "每天自动保存到 iCloud Drive 文件", en: "Daily file in iCloud Drive", de: "Tägliche Datei in iCloud Drive")
+            ? l.tr(zh: "每天保存受限数据到 iCloud Drive 文件", en: "Daily restricted-data file in iCloud Drive", de: "Tägliche Datei mit eingeschränkten Daten in iCloud Drive")
             : l.tr(zh: "已关闭", en: "Off", de: "Aus")
     }
 
@@ -469,6 +591,63 @@ extension SettingsView {
                 ))
             }
             isRunningAutomaticBackup = false
+        }
+    }
+
+    func retryAutomaticBackupCleanup() {
+        guard !isRetryingAutomaticBackupCleanup else { return }
+        isRetryingAutomaticBackupCleanup = true
+        Task {
+            let result = await appServices.automaticBackups.retryManagedAutomaticBackupCleanup()
+            refreshAutomaticBackupStatus()
+            switch result {
+            case .removed:
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                appServices.islandToasts.show(l.tr(
+                    zh: "旧自动备份已删除",
+                    en: "Previous automatic backup removed",
+                    de: "Vorheriges automatisches Backup entfernt"
+                ))
+            case let .pending(message):
+                automaticBackupCleanupError = message
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            case .notRequested:
+                break
+            }
+            isRetryingAutomaticBackupCleanup = false
+        }
+    }
+
+    func replaceLegacyAutomaticBackup() {
+        guard !isRunningAutomaticBackup, !isRemovingLegacyAutomaticBackup else { return }
+        if !automaticBackupStatus.isEnabled {
+            appServices.automaticBackups.setEnabled(true, now: Date())
+            refreshAutomaticBackupStatus()
+        }
+        runAutomaticBackupNow()
+    }
+
+    func removeLegacyAutomaticBackup() {
+        guard !isRunningAutomaticBackup, !isRemovingLegacyAutomaticBackup else { return }
+        isRemovingLegacyAutomaticBackup = true
+        Task {
+            let result = await appServices.automaticBackups.removeLegacyAutomaticBackupForHealthSafety()
+            refreshAutomaticBackupStatus()
+            switch result {
+            case .removed:
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                appServices.islandToasts.show(l.tr(
+                    zh: "旧自动备份已删除",
+                    en: "Previous automatic backup removed",
+                    de: "Vorheriges automatisches Backup entfernt"
+                ))
+            case let .pending(message):
+                automaticBackupCleanupError = message
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            case .notRequested:
+                break
+            }
+            isRemovingLegacyAutomaticBackup = false
         }
     }
 

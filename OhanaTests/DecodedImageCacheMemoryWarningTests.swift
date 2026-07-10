@@ -84,6 +84,48 @@ struct DecodedImageCacheMemoryWarningTests {
         #expect(!source.contains("dataProvider: { data }"))
     }
 
+    @Test func cancellingThumbnailRequestCancelsTheRetainedDecodeWorker() async {
+        FocusWalletAvatarCache.resetForTesting()
+        FocusPopoutImageCache.resetForTesting()
+        MediaThumbnailProvider.resetForTesting()
+
+        let probe = DecodeCancellationProbe()
+        let key = MediaThumbnailKey(id: "cancel-test", sourceSignature: "pending", maxPixel: 48)
+        let request = Task { @MainActor in
+            await MediaThumbnailProvider.image(for: key, asyncDataProvider: {
+                await probe.value()
+            })
+        }
+
+        for _ in 0 ..< 100 {
+            if await probe.didStart() {
+                break
+            }
+            await Task.yield()
+        }
+        #expect(await probe.didStart())
+
+        request.cancel()
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        let cancelledWorker = await probe.wasCancelled()
+        await probe.finish()
+        _ = await request.value
+
+        #expect(cancelledWorker)
+    }
+
+    @Test func decodedCachesRetainAndCancelActualOffMainWorkers() throws {
+        let thumbnailSource = try Self.source("Ohana/Shared/Media/MediaThumbnailProvider.swift")
+        let avatarSource = try Self.source("Ohana/Shared/Media/FocusWalletAvatarCache.swift")
+        let popoutSource = try Self.source("Ohana/Shared/Media/FocusPopoutImageCache.swift")
+
+        #expect(thumbnailSource.contains("withTaskCancellationHandler"))
+        #expect(thumbnailSource.contains("transparencyInFlight"))
+        #expect(avatarSource.contains("previewDecodeTasks"))
+        #expect(avatarSource.contains("fullDecodeTasks"))
+        #expect(popoutSource.contains("decodeTasks"))
+    }
+
     private static func makePNGData() throws -> Data {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 16))
         let image = renderer.image { context in
@@ -107,5 +149,48 @@ struct DecodedImageCacheMemoryWarningTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         return try String(contentsOf: rootURL.appendingPathComponent(path), encoding: .utf8)
+    }
+}
+
+private actor DecodeCancellationProbe {
+    private var started = false
+    private var cancelled = false
+    private var continuation: CheckedContinuation<Data?, Never>?
+
+    func didStart() -> Bool {
+        started
+    }
+
+    func wasCancelled() -> Bool {
+        cancelled
+    }
+
+    func value() async -> Data? {
+        started = true
+
+        return await withTaskCancellationHandler(operation: {
+            await withCheckedContinuation { continuation in
+                if self.cancelled {
+                    continuation.resume(returning: nil)
+                } else {
+                    self.continuation = continuation
+                }
+            }
+        }, onCancel: {
+            Task {
+                await self.cancel()
+            }
+        })
+    }
+
+    func finish() {
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume(returning: nil)
+    }
+
+    private func cancel() {
+        cancelled = true
+        finish()
     }
 }
