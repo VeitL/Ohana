@@ -144,6 +144,13 @@ enum OasisTreePreferenceStore {
         defaults.removeObject(forKey: ledgerEnergyInjectedXPKey)
     }
 
+    #if DEBUG
+        static func resetCareGrowthProjectionForTesting() {
+            defaults.removeObject(forKey: careGrowthBaselineKey)
+            defaults.removeObject(forKey: careGrowthEnergyKey)
+        }
+    #endif
+
     static func injectionUsedPeriod(for limitKey: String) -> String? {
         defaults.string(forKey: limitKey)
     }

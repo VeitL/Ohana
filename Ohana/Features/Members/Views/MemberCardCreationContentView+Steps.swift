@@ -180,7 +180,6 @@ extension MemberCardCreationContentView {
         }
     }
 
-
     var avatarSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {

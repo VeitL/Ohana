@@ -365,26 +365,12 @@ nonisolated enum StartupAutoFeederMaintenanceService {
                         value: log.autoFeedDedupKey,
                         to: feedMetadataJSON
                     )
-                    _ = CareLedgerService.record(
-                        occurredAt: log.date,
-                        actorKind: log.executorId == nil ? .unknown : .human,
-                        actorId: log.executorId,
-                        subjectKind: .pet,
-                        subjectId: pet.id.uuidString,
-                        eventKind: .care,
-                        actionType: log.careType.rawValue,
-                        amountValue: log.amountGrams,
-                        amountUnit: "g",
-                        note: log.note,
-                        source: .service,
-                        sourceEventId: event.id.uuidString,
-                        sourceReminderId: nil,
-                        legacyModelName: "PetCareLog",
-                        legacyModelId: log.id.uuidString,
-                        coconutDelta: 0,
+                    DomainCareFactWriter.createCareLedgerEvent(
+                        plan: write,
+                        log: log,
+                        sourceEventID: event.id,
                         metadataJSON: metadataJSON,
-                        context: context,
-                        save: false
+                        context: context
                     )
                 }
                 stagedKeys.insert(key)

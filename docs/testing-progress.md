@@ -19,6 +19,17 @@
 - Open follow-ups: 7 total in `docs/task-follow-ups.md`.
 - Open P1: 5 total; remaining P1s are CloudKit 1.x enablement validation or
   real-device validation.
+- CI recovery recheck on 2026-07-10: the CI-equivalent `OhanaUnitTests` scheme
+  passed 1,509 tests with 0 failures on the pinned `iPhone 17` simulator
+  (`.build/TestResults-ci-full-20260710-r2.xcresult`). Whole-repo audit fixture,
+  UI V4, accessibility, smoothness, route-first-frame, runtime, architecture,
+  economy, member-lifecycle, derived-state, shared-care, localization,
+  release-data-safety, governance, resource, size, and secret-scan gates passed;
+  full SwiftLint and SwiftFormat lint passed. The Release simulator build also
+  passed with whole-module optimization at
+  `.build/DerivedData/release-ci-fix-20260710`. The dense Home snapshot fixture
+  that previously took about 346 seconds now passes its 3-second budget after
+  card status aggregation was changed to a one-pass member event index.
 - Solo Release P0/P1 preflight: the targeted iPhone 17 simulator aggregate
   passed 93 tests with 0 failures at
   `.build/DerivedData/tests/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.10_00-22-49-+0200.xcresult`;

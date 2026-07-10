@@ -106,6 +106,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     static func petWarning(
         for pet: Pet,
         events: [Event],
+        feedRuleEvents: [Event]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current,
         waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
@@ -113,6 +114,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         allWarnings(
             for: pet,
             events: events,
+            feedRuleEvents: feedRuleEvents,
             now: now,
             calendar: calendar,
             waterCycleLogSnapshot: waterCycleLogSnapshot
@@ -122,6 +124,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     static func petWarningCount(
         for pet: Pet,
         events: [Event],
+        feedRuleEvents: [Event]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current,
         waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
@@ -129,6 +132,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         allWarnings(
             for: pet,
             events: events,
+            feedRuleEvents: feedRuleEvents,
             now: now,
             calendar: calendar,
             waterCycleLogSnapshot: waterCycleLogSnapshot
@@ -139,6 +143,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         for actionType: String,
         pet: Pet,
         events: [Event],
+        feedRuleEvents: [Event]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current,
         waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
@@ -147,6 +152,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         return allWarnings(
             for: pet,
             events: events,
+            feedRuleEvents: feedRuleEvents,
             now: now,
             calendar: calendar,
             waterCycleLogSnapshot: waterCycleLogSnapshot
@@ -158,6 +164,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         for actionType: String? = nil,
         pet: Pet,
         events: [Event],
+        feedRuleEvents: [Event]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current,
         waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
@@ -166,6 +173,7 @@ nonisolated enum CarePlanOverdueStatusCalculator {
         return petDueTodayStatuses(
             for: pet,
             events: events,
+            feedRuleEvents: feedRuleEvents,
             now: now,
             calendar: calendar,
             waterCycleLogSnapshot: waterCycleLogSnapshot
@@ -319,11 +327,12 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     private static func allWarnings(
         for pet: Pet,
         events: [Event],
+        feedRuleEvents: [Event]? = nil,
         now: Date,
         calendar: Calendar,
         waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
     ) -> [CarePlanOverdueStatus] {
-        let feedRules = FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar)
+        let feedRules = FeedRuleState(pet: pet, allEvents: feedRuleEvents ?? events, now: now, calendar: calendar)
         let feedMode = feedRules.operatingMode
         let hasExpiredFeedMiss = !feedRules.expiredMissedManualReminders.isEmpty
         let reminderWarnings = events.flatMap { event -> [CarePlanOverdueStatus] in
@@ -381,11 +390,12 @@ nonisolated enum CarePlanOverdueStatusCalculator {
     private static func petDueTodayStatuses(
         for pet: Pet,
         events: [Event],
+        feedRuleEvents: [Event]? = nil,
         now: Date,
         calendar: Calendar,
         waterCycleLogSnapshot: WaterCareCycleLogSnapshot? = nil
     ) -> [CarePlanOverdueStatus] {
-        let feedRules = FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar)
+        let feedRules = FeedRuleState(pet: pet, allEvents: feedRuleEvents ?? events, now: now, calendar: calendar)
         let reminderStatuses = events.flatMap { event -> [CarePlanOverdueStatus] in
             guard event.isActionableTask,
                   MemberLifecycleActiveScheduleResolver.eventBelongsToPet(

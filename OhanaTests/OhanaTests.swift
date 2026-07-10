@@ -364,10 +364,12 @@ struct OhanaTests {
 
     @MainActor
     @Test func oasisTreeIgnoresCareGrowthXPFromLedgerMetadata() async throws {
+        OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
         OasisTreePreferenceStore.clearLedgerEnergyCache()
         defer {
+            OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
             UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
             UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
             OasisTreePreferenceStore.clearLedgerEnergyCache()
@@ -385,20 +387,23 @@ struct OhanaTests {
         ))
         try context.save()
 
-        TestOasisTreeManagerProjection.manager.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
+        let manager = OasisTreeManager()
+        manager.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
 
-        #expect(TestOasisTreeManagerProjection.manager.islandEnergy == 0)
-        #expect(TestOasisTreeManagerProjection.manager.injectedEnergy == 0)
-        #expect(TestOasisTreeManagerProjection.manager.totalEnergy == 0)
-        #expect(TestOasisTreeManagerProjection.manager.treeLevel == .lv0)
+        #expect(manager.islandEnergy == 0)
+        #expect(manager.injectedEnergy == 0)
+        #expect(manager.totalEnergy == 0)
+        #expect(manager.treeLevel == .lv0)
     }
 
     @MainActor
     @Test func oasisLegacyActivityBaselineDoesNotAdvanceTreeLevel() async throws {
+        OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
         OasisTreePreferenceStore.clearLedgerEnergyCache()
         defer {
+            OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
             UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
             UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
             OasisTreePreferenceStore.clearLedgerEnergyCache()
@@ -462,11 +467,13 @@ struct OhanaTests {
 
     @MainActor
     @Test func oasisTreeIgnoresInjectedXPOutsideManualTreeInjectionLedger() async throws {
+        OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
         UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
         OasisTreePreferenceStore.clearLedgerEnergyCache()
         defer {
+            OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
             UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
             UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
             UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
@@ -505,12 +512,14 @@ struct OhanaTests {
 
     @MainActor
     @Test func openingLegacyUpgradeCoconutDoesNotInjectTreeEnergy() throws {
+        OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
         let defaults = UserDefaults.standard
         let oldActiveHumanId = defaults.object(forKey: "currentActiveHumanId")
         let oldInjectedEnergy = OasisTreePreferenceStore.injectedEnergy
         let oldRewardedLevel = OasisTreePreferenceStore.lastRewardedLevel
         let oldTreeManager = OasisTreeManagerRegistry.current
         defer {
+            OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
             if let oldActiveHumanId {
                 defaults.set(oldActiveHumanId, forKey: "currentActiveHumanId")
             } else {
@@ -2398,7 +2407,7 @@ struct OhanaTests {
         #expect(restored.heightCm == 0)
         #expect(restored.privateFields.isEmpty)
         #expect(restored.avatarImageData == Data([1, 2, 3]))
-        #expect(restored.passedAwayDate == nil)
+        #expect(restored.passedAwayDate == passedAwayDate)
 
         let weights = try targetContext.fetch(FetchDescriptor<HumanWeightLog>())
         let workouts = try targetContext.fetch(FetchDescriptor<HumanWorkoutLog>())

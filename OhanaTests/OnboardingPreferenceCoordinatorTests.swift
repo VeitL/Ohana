@@ -102,7 +102,9 @@ struct OnboardingPreferenceCoordinatorTests {
             await Task.yield()
         }
         // 模拟用户在对话框停留:给被误用的紧超时充分机会触发。
-        for _ in 0 ..< 20 { await Task.yield() }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
         // 用户授予后定位到达。
         provider.complete(.success(CLLocation(latitude: 37.7749, longitude: -122.4194)))
         await task.value

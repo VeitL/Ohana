@@ -186,7 +186,6 @@ final class PlantDetailExperienceTests: XCTestCase {
         let expandedCardActionsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeExpandedCardActions.swift", rootURL: rootURL)
         let containerSource = try source("Ohana/Features/Home/HomePlantCareLogRouteContainer.swift", rootURL: rootURL)
         let plantDetailSource = try source("Ohana/Features/Plants/Views/PlantDetailView.swift", rootURL: rootURL)
-        let plantDetailSupportSource = try source("Ohana/Features/Plants/Views/PlantDetailView+Support.swift", rootURL: rootURL)
         let plantReminderPreferenceSource = try source("Ohana/Domain/Services/PlantReminderPreferenceStore.swift", rootURL: rootURL)
         let plantScheduleSource = try source("Ohana/Domain/Services/PlantCarePlanScheduleService.swift", rootURL: rootURL)
 
@@ -304,7 +303,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(containerSource.contains("HomeCommandExecutor(modelContext: modelContext, services: appServices).recordPlantCare("))
         XCTAssertTrue(plantDetailSource.contains("plantSectionHeader(l.tr(zh: \"今日护理\""))
         XCTAssertTrue(plantDetailSource.contains("节奏 · 位置 · 安全"))
-        XCTAssertTrue(plantDetailSupportSource.contains(".lineLimit(1)"))
+        XCTAssertTrue(plantDetailSource.contains(".lineLimit(1)"))
     }
 
     func testPlantCareTypeCopyUsesViewLanguageAcrossHighTrafficSurfaces() throws {
@@ -362,7 +361,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         let dashboardRoomRailSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+RoomRail.swift", rootURL: rootURL)
         let dashboardEmptyStatesSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+EmptyStates.swift", rootURL: rootURL)
         let plantUITestSource = try source("OhanaUITests/PlantModuleUITests.swift", rootURL: rootURL)
-        let settingsDebugSource = try source("Ohana/Features/Settings/Views/SettingsView+Debug.swift", rootURL: rootURL)
+        let plantBaselineSeederSource = try source("Ohana/App/UITestPlantBaselineSeeder.swift", rootURL: rootURL)
         let dashboardSource = [
             dashboardBaseSource,
             dashboardSectionsSource,
@@ -570,7 +569,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(dashboardRoomRailSource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)"))
         XCTAssertFalse(dashboardBaseSource.contains("alignment: .topTrailing"))
         XCTAssertFalse(dashboardBaseSource.contains(".padding(.top, 78)"))
-        XCTAssertTrue(settingsDebugSource.contains("return min(max(count, 1), 12)"))
+        XCTAssertTrue(plantBaselineSeederSource.contains("return min(max(count, 1), 12)"))
         XCTAssertTrue(plantUITestSource.contains("testPlantWalletLongListKeepsCardsInOneBalancedDeck"))
         XCTAssertTrue(plantUITestSource.contains("plantBaselineSeedCount: 8"))
         XCTAssertTrue(plantUITestSource.contains("Eight seeded plant cards should stay mounted in one balanced deck."))
@@ -1010,7 +1009,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(careFeatureDetailSource.contains("matchesFocusedFeature(_ careType: PlantCareType)"))
         XCTAssertTrue(detailSource.contains("openPlantCareFeatureDetail(for: task.careType)"))
         XCTAssertTrue(detailSource.contains("recordQuickCare(_ type: PlantCareType)"))
-        XCTAssertTrue(detailSource.contains("publishPlantCareVisualReward(type: type, result: result)"))
+        XCTAssertTrue(detailSource.contains("showQuickCareToast(type: type, result: result)"))
         XCTAssertTrue(detailSource.contains("destination.careFeatureDestination"))
         XCTAssertTrue(detailSource.contains("openPlantCareFeatureDetail"))
         XCTAssertFalse(actionsSource.contains("case .water:\n            openCareLogSheet(.watering)"))

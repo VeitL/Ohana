@@ -31,6 +31,14 @@ nonisolated struct FeedRuleState {
             .sorted { $0.startDate < $1.startDate }
     }
 
+    var hasManualReminderEvents: Bool {
+        allEvents.contains { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }
+    }
+
+    var hasAutoFeederEvents: Bool {
+        allEvents.contains { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }
+    }
+
     var todayManualReminders: [Reminder] {
         allManualReminders
             .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }

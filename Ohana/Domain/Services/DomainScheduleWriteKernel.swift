@@ -494,7 +494,8 @@ nonisolated enum DomainScheduleWriter {
         _ = mutation.token
         mutation.mutationPlan.consumeAuthorization()
         guard mutation.allowsScheduleDeletion else { return .notDeleted }
-        let eventID = reminder.event?.id
+        let ownerEvent = reminder.event
+        let eventID = ownerEvent?.id
         let notificationIds = cancellableNotificationId(for: reminder).map { [$0] } ?? []
         CloudSyncMutationRecorder.markDeleted(
             reminder,
@@ -502,6 +503,8 @@ nonisolated enum DomainScheduleWriter {
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId
         )
+        ownerEvent?.reminders.removeAll { $0.id == reminder.id }
+        reminder.event = nil
         context.delete(reminder)
         return DomainScheduleDeleteResult(
             eventID: eventID,

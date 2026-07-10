@@ -314,13 +314,13 @@ nonisolated enum FeedOperatingMode: String, CaseIterable, Identifiable, Equatabl
             case .manual:
                 return .manual
             case .manualReminder:
-                return rules.manualReminderEvents.isEmpty ? .manual : .manualReminder
+                return rules.hasManualReminderEvents ? .manualReminder : .manual
             case .autoFeeder:
-                return rules.autoFeederEvents.isEmpty ? .manual : .autoFeeder
+                return rules.hasAutoFeederEvents ? .autoFeeder : .manual
             }
         }
-        if !rules.autoFeederEvents.isEmpty { return .autoFeeder }
-        if !rules.manualReminderEvents.isEmpty { return .manualReminder }
+        if rules.hasAutoFeederEvents { return .autoFeeder }
+        if rules.hasManualReminderEvents { return .manualReminder }
         return .manual
     }
 }

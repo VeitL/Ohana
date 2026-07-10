@@ -298,6 +298,43 @@ nonisolated enum DomainCareFactWriter {
         return DomainCareLogWriteResult(log: log, linkedPottyLog: linkedPottyLog)
     }
 
+    /// Creates the ledger projection for a previously authorized care fact.
+    /// Keeping this writer beside the fact writer lets background model actors
+    /// persist one atomic batch without reaching through a static service
+    /// facade or crossing live models onto the main actor.
+    @discardableResult
+    static func createCareLedgerEvent(
+        plan: AuthorizedDomainCareFactWrite,
+        log: PetCareLog,
+        sourceEventID: UUID?,
+        metadataJSON: String,
+        context: ModelContext
+    ) -> CareLedgerEvent? {
+        _ = plan.token
+        guard plan.allowsDerivedEffects else { return nil }
+
+        let event = CareLedgerEvent(
+            occurredAt: log.date,
+            actorKind: log.executorId == nil ? .unknown : .human,
+            actorId: log.executorId,
+            subjectKind: .pet,
+            subjectId: plan.pet.id.uuidString,
+            eventKind: .care,
+            actionType: log.careType.rawValue,
+            amountValue: log.amountGrams,
+            amountUnit: "g",
+            note: log.note,
+            source: .service,
+            sourceEventId: sourceEventID?.uuidString,
+            legacyModelName: "PetCareLog",
+            legacyModelId: log.id.uuidString,
+            metadataJSON: metadataJSON
+        )
+        context.insert(event)
+        CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: log.date)
+        return event
+    }
+
     @discardableResult
     static func createPottyLog(
         plan: AuthorizedDomainCareFactWrite,

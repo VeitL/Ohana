@@ -52,7 +52,7 @@ struct ReminderMaintenanceServiceTests {
         let container = try makeContainer()
         let context = container.mainContext
         for offset in 0 ..< 3 {
-            context.insert(Reminder(scheduledAt: Date().addingTimeInterval(TimeInterval(offset + 1))))
+            context.insert(Reminder(scheduledAt: Date().addingTimeInterval(3600 + TimeInterval(offset))))
         }
         try context.save()
 

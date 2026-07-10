@@ -302,15 +302,15 @@ private struct QuickAccessRemovalPlan {
 }
 
 private final class DeferredNotificationCancellationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
-    private let delegate: ReminderNotificationScheduling
+    private let scheduler: ReminderNotificationScheduling
     private var pendingCancelIds: [String] = []
 
     init(delegate: ReminderNotificationScheduling) {
-        self.delegate = delegate
+        scheduler = delegate
     }
 
     func schedule(reminder: Reminder) {
-        delegate.schedule(reminder: reminder)
+        scheduler.schedule(reminder: reminder)
     }
 
     func schedule(
@@ -318,7 +318,7 @@ private final class DeferredNotificationCancellationScheduler: ReminderNotificat
         existingNotificationIds: Set<String>?,
         completion: ((ReminderNotificationScheduleResult) -> Void)?
     ) {
-        delegate.schedule(reminder: reminder, existingNotificationIds: existingNotificationIds, completion: completion)
+        scheduler.schedule(reminder: reminder, existingNotificationIds: existingNotificationIds, completion: completion)
     }
 
     func schedule(
@@ -327,7 +327,7 @@ private final class DeferredNotificationCancellationScheduler: ReminderNotificat
         existingNotificationIds: Set<String>?,
         completion: ((ReminderNotificationScheduleResult) -> Void)?
     ) {
-        delegate.schedule(
+        scheduler.schedule(
             reminder: reminder,
             deliveryDate: deliveryDate,
             existingNotificationIds: existingNotificationIds,
@@ -336,15 +336,15 @@ private final class DeferredNotificationCancellationScheduler: ReminderNotificat
     }
 
     func pendingNotificationIds() async -> Set<String> {
-        await delegate.pendingNotificationIds()
+        await scheduler.pendingNotificationIds()
     }
 
     func scheduleRollingWindow(reminders: [Reminder]) {
-        delegate.scheduleRollingWindow(reminders: reminders)
+        scheduler.scheduleRollingWindow(reminders: reminders)
     }
 
     func refillWindowIfNeeded(allReminders: [Reminder]) {
-        delegate.refillWindowIfNeeded(allReminders: allReminders)
+        scheduler.refillWindowIfNeeded(allReminders: allReminders)
     }
 
     func cancel(notificationId: String) {
@@ -359,12 +359,12 @@ private final class DeferredNotificationCancellationScheduler: ReminderNotificat
     }
 
     func compensate(reminders: [Reminder]) {
-        delegate.compensate(reminders: reminders)
+        scheduler.compensate(reminders: reminders)
     }
 
     func flush() {
         for notificationId in Set(pendingCancelIds) {
-            delegate.cancel(notificationId: notificationId)
+            scheduler.cancel(notificationId: notificationId)
         }
         pendingCancelIds.removeAll()
     }

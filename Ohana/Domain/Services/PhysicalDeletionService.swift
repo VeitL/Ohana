@@ -936,5 +936,4 @@ nonisolated enum PhysicalDeletionService {
         CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: modifiedAt)
         return true
     }
-
 }

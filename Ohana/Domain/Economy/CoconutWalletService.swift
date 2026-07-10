@@ -39,7 +39,7 @@ private enum CoconutWalletPersistenceError: LocalizedError {
     }
 }
 
-nonisolated private func saveWalletChanges(context: ModelContext) throws {
+private nonisolated func saveWalletChanges(context: ModelContext) throws {
     let saveResult = context.safeSaveResult(publishFailureEvent: true)
     guard saveResult.didSave else {
         context.rollback()
@@ -47,7 +47,7 @@ nonisolated private func saveWalletChanges(context: ModelContext) throws {
     }
 }
 
-nonisolated private func saveWalletChangesIfNeeded(context: ModelContext) -> Bool {
+private nonisolated func saveWalletChangesIfNeeded(context: ModelContext) -> Bool {
     let saveResult = context.safeSaveResult(publishFailureEvent: true)
     guard saveResult.didSave else {
         context.rollback()

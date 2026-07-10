@@ -184,7 +184,7 @@ nonisolated enum MemberLifecycleActiveScheduleResolver {
     static func isActiveSchedule(_ event: Event, now: Date = Date()) -> Bool {
         guard !isMemorialInformationEvent(event) else { return false }
         if event.recurrenceDays > 0 {
-            guard event.recurrenceEndDate.map({ $0 < now }) != true else {
+            guard event.recurrenceEndDate.map({ $0 <= now }) != true else {
                 return event.reminders.contains { isFutureActionableReminder($0, now: now) }
             }
             return true

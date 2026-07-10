@@ -203,6 +203,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 humans: source.humans,
                 electronicPets: source.electronicPets,
                 events: source.events,
+                statusReminders: source.pendingReminders,
                 humanMedications: source.humanMedications,
                 humanMedicationLogs: source.humanMedicationLogs,
                 careLedgerEntries: source.careLedgerEntries,

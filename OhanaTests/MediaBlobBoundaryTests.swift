@@ -241,9 +241,10 @@ final class MediaBlobBoundaryTests: XCTestCase {
         )
 
         XCTAssertTrue(cacheSource.contains("static func seedPreviewEntries(payloads: [Payload]) async -> Bool"))
-        XCTAssertTrue(cacheSource.contains("Task.detached(priority: .utility)"))
+        XCTAssertTrue(cacheSource.contains("let priority: TaskPriority = budget.allowsExpensiveWork ? .utility : .background"))
+        XCTAssertTrue(cacheSource.contains("Task.detached(priority: priority)"))
         XCTAssertTrue(cacheSource.contains("previewEntry(for: id, signature: signature)"))
-        XCTAssertTrue(cacheSource.contains("guard generation == evictionGeneration else { return didChange }"))
+        XCTAssertTrue(cacheSource.contains("guard !Task.isCancelled, generation == evictionGeneration else { return didChange }"))
 
         XCTAssertTrue(pipelineSource.contains("func seedPreviewEntries("))
         XCTAssertTrue(pipelineSource.contains("await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: delayMilliseconds)"))

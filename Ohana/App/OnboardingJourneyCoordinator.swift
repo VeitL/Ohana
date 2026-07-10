@@ -155,7 +155,6 @@ enum OnboardingJourneyCoordinator {
         return fetchModelsOrLog(descriptor, context: context, operation: "fetch starter active pet").isEmpty == false
     }
 
-
     @MainActor
     private static func fetchModelsOrLog<T: PersistentModel>(
         _ descriptor: FetchDescriptor<T>,

@@ -13,6 +13,7 @@ nonisolated enum HomeSnapshotBuilder {
         humans: [Human],
         electronicPets: [OasisElectronicPet],
         events: [Event],
+        statusReminders: [Reminder]? = nil,
         humanMedications: [HumanMedication],
         humanMedicationLogs: [HumanMedicationLog],
         careLedgerEntries: [HomeCareQuickActionEntry]? = nil,
@@ -23,6 +24,13 @@ nonisolated enum HomeSnapshotBuilder {
         l: L10n = .current
     ) -> [FocusCard] {
         let medicationLogs = recentHumanMedicationLogs(from: humanMedicationLogs, now: now)
+        let eventIndex = HomeCarePlanEventIndex(
+            pets: pets,
+            humans: humans,
+            events: events,
+            statusReminders: statusReminders,
+            humanMedications: humanMedications
+        )
         return FocusHomeCardDataSource.buildSnapshot(
             pets: pets,
             humans: humans,
@@ -37,7 +45,7 @@ nonisolated enum HomeSnapshotBuilder {
                 $0,
                 pets: pets,
                 humans: humans,
-                events: events,
+                eventIndex: eventIndex,
                 humanMedications: humanMedications,
                 humanMedicationLogs: medicationLogs,
                 careLedgerEntries: careLedgerEntries,
@@ -65,11 +73,11 @@ nonisolated enum HomeSnapshotBuilder {
         return logs.filter { $0.scheduledTime >= cutoff }
     }
 
-    static func decoratedStatusCard(
+    private static func decoratedStatusCard(
         _ card: FocusCard,
         pets: [Pet],
         humans: [Human],
-        events: [Event],
+        eventIndex: HomeCarePlanEventIndex,
         humanMedications: [HumanMedication],
         humanMedicationLogs: [HumanMedicationLog],
         careLedgerEntries: [HomeCareQuickActionEntry]? = nil,
@@ -83,6 +91,7 @@ nonisolated enum HomeSnapshotBuilder {
         let urgentCount: Int
         let dueCount: Int
         if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
+            let events = eventIndex.statusEvents(for: .human(human.id))
             urgentCount = CarePlanOverdueStatusCalculator.humanWarningCount(
                 for: human,
                 events: events,
@@ -98,16 +107,20 @@ nonisolated enum HomeSnapshotBuilder {
                 now: now
             )
         } else if let pet = pets.first(where: { $0.id == card.id }) {
+            let events = eventIndex.statusEvents(for: .pet(pet.id))
+            let feedRuleEvents = eventIndex.feedRuleEvents(for: pet.id)
             let waterCycleSnapshot = careLedgerEntries.map { waterCycleLogSnapshot(for: pet, careLedgerEntries: $0) }
             urgentCount = CarePlanOverdueStatusCalculator.petWarningCount(
                 for: pet,
                 events: events,
+                feedRuleEvents: feedRuleEvents,
                 now: now,
                 waterCycleLogSnapshot: waterCycleSnapshot
             )
             dueCount = CarePlanOverdueStatusCalculator.petDueTodayCount(
                 pet: pet,
                 events: events,
+                feedRuleEvents: feedRuleEvents,
                 now: now,
                 waterCycleLogSnapshot: waterCycleSnapshot
             )
@@ -140,5 +153,62 @@ nonisolated enum HomeSnapshotBuilder {
             .filter { $0.petId == pet.id && $0.actionType == type.rawValue }
             .map(\.date)
             .max()
+    }
+}
+
+private nonisolated struct HomeCarePlanEventIndex {
+    private var statusEventsByTarget: [DomainMemberReference: [Event]] = [:]
+    private var feedRuleEventsByPetID: [UUID: [Event]] = [:]
+
+    init(
+        pets: [Pet],
+        humans: [Human],
+        events: [Event],
+        statusReminders: [Reminder]?,
+        humanMedications: [HumanMedication]
+    ) {
+        let catalog = DomainSubjectResolutionCatalog(
+            pets: pets,
+            petMedications: pets.flatMap(\.medications),
+            humanMedications: humanMedications,
+            insurances: pets.flatMap(\.insurances),
+            humans: humans
+        )
+        let statusEvents = statusReminders.map(Self.uniqueEvents(from:)) ?? events
+
+        for event in statusEvents {
+            let resolution = DomainSubjectResolver.resolve(
+                request: DomainSubjectResolutionRequest(event: event),
+                catalog: catalog
+            )
+            for target in resolution.lifecycleTargets {
+                statusEventsByTarget[target, default: []].append(event)
+            }
+        }
+
+        for event in events where event.eventType == EventType.foodChange.rawValue {
+            let resolution = DomainSubjectResolver.resolve(
+                request: DomainSubjectResolutionRequest(event: event),
+                catalog: catalog
+            )
+            guard case let .pet(petID) = resolution.owner else { continue }
+            feedRuleEventsByPetID[petID, default: []].append(event)
+        }
+    }
+
+    func statusEvents(for target: DomainMemberReference) -> [Event] {
+        statusEventsByTarget[target] ?? []
+    }
+
+    func feedRuleEvents(for petID: UUID) -> [Event] {
+        feedRuleEventsByPetID[petID] ?? []
+    }
+
+    private static func uniqueEvents(from reminders: [Reminder]) -> [Event] {
+        var seen = Set<UUID>()
+        return reminders.compactMap { reminder in
+            guard let event = reminder.event, seen.insert(event.id).inserted else { return nil }
+            return event
+        }
     }
 }
