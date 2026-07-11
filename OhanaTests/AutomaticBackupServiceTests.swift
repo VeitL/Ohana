@@ -141,6 +141,155 @@ struct AutomaticBackupServiceTests {
         #expect(fileStore.writeCount == 1)
     }
 
+    @Test func resetDuringNonCooperativeExportFencesOldGenerationAndAllowsANewBackup() async throws {
+        let (suiteName, defaults) = try isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let statusStore = AutomaticBackupStatusStore(defaults: defaults)
+        let exporter = try PausingAutomaticBackupExporter(data: Data("{\"schemaVersion\":1}".utf8))
+        let fileStore = FakeAutomaticBackupFileStore()
+        let service = AutomaticBackupService(
+            statusStore: statusStore,
+            exporter: exporter,
+            fileStore: fileStore,
+            now: { now },
+            resetExportCancellationWaitNanoseconds: 1_000_000
+        )
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        context.insert(Pet(name: "Miso"))
+        try context.save()
+        let resetter = StaticAppResetter(
+            questManager: QuestManager(),
+            automaticBackups: service,
+            defaults: defaults
+        )
+
+        let oldRun = Task { @MainActor in
+            await service.runNow(container: container, trigger: .settingsManual)
+        }
+        await exporter.waitUntilStarted()
+
+        let resetResult = try await resetter.reset(
+            context: context,
+            options: resetOptions()
+        )
+
+        #expect(resetResult.automaticBackupCleanup == .removed)
+        #expect(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
+        #expect(fileStore.cleanupCount == 1)
+        #expect(fileStore.writeCount == 0)
+        let resetStatus = statusStore.snapshot(now: now)
+        #expect(!resetStatus.isEnabled)
+        #expect(resetStatus.lastSuccessAt == nil)
+
+        statusStore.setEnabled(true, now: now)
+        let newRun = await service.runNow(container: container, trigger: .settingsManual)
+        guard case .success = newRun else {
+            Issue.record("Expected a new-generation backup to succeed, got \(newRun)")
+            return
+        }
+        #expect(fileStore.writeCount == 1)
+        #expect(fileStore.cleanupCount == 1)
+        #expect(statusStore.snapshot(now: now).lastSuccessAt == now)
+
+        exporter.release()
+        #expect(await oldRun.value == .skipped(.cancelledByReset))
+        #expect(fileStore.writeCount == 1)
+        #expect(fileStore.cleanupCount == 1)
+        #expect(statusStore.snapshot(now: now).lastSuccessAt == now)
+    }
+
+    @Test func resetWaitsForAnInFlightManagedWriteThenRemovesItsFileAndStatus() async throws {
+        let (suiteName, defaults) = try isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let statusStore = AutomaticBackupStatusStore(defaults: defaults)
+        let exporter = try FakeAutomaticBackupExporter(data: Data("{\"schemaVersion\":1}".utf8))
+        let fileStore = PausingAutomaticBackupFileStore()
+        let service = AutomaticBackupService(
+            statusStore: statusStore,
+            exporter: exporter,
+            fileStore: fileStore,
+            now: { now }
+        )
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        context.insert(Pet(name: "Miso"))
+        try context.save()
+        let resetter = StaticAppResetter(
+            questManager: QuestManager(),
+            automaticBackups: service,
+            defaults: defaults
+        )
+
+        let oldRun = Task { @MainActor in
+            await service.runNow(container: container, trigger: .settingsManual)
+        }
+        await fileStore.waitUntilWriteStarted()
+        let reset = Task { @MainActor in
+            try await resetter.reset(context: context, options: resetOptions())
+        }
+
+        for _ in 0 ..< 5 {
+            await Task.yield()
+        }
+        #expect(fileStore.cleanupCount == 0)
+        #expect(!(try context.fetch(FetchDescriptor<Pet>())).isEmpty)
+
+        fileStore.releaseWrite()
+        #expect(await oldRun.value == .skipped(.cancelledByReset))
+        let resetResult = try await reset.value
+
+        #expect(resetResult.automaticBackupCleanup == .removed)
+        #expect(fileStore.writeCount == 1)
+        #expect(fileStore.cleanupCount == 1)
+        #expect(!fileStore.managedBackupExists)
+        #expect(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
+        let status = statusStore.snapshot(now: now)
+        #expect(!status.isEnabled)
+        #expect(status.lastSuccessAt == nil)
+        #expect(status.fileName == nil)
+    }
+
+    @Test func coordinatedResetPersistsManagedBackupCleanupFailure() async throws {
+        let (suiteName, defaults) = try isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let statusStore = AutomaticBackupStatusStore(defaults: defaults)
+        let service = AutomaticBackupService(
+            statusStore: statusStore,
+            exporter: try FakeAutomaticBackupExporter(data: Data("{}".utf8)),
+            fileStore: FakeAutomaticBackupFileStore(
+                cleanupError: AutomaticBackupFileStoreError.iCloudUnavailable
+            ),
+            now: { now }
+        )
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        context.insert(Pet(name: "Miso"))
+        try context.save()
+        let resetter = StaticAppResetter(
+            questManager: QuestManager(),
+            automaticBackups: service,
+            defaults: defaults
+        )
+
+        let result = try await resetter.reset(context: context, options: resetOptions())
+
+        guard case let .pending(message) = result.automaticBackupCleanup else {
+            Issue.record("Expected the automatic backup cleanup failure to remain visible")
+            return
+        }
+        #expect(!message.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
+        let status = statusStore.snapshot(now: now)
+        #expect(!status.isEnabled)
+        #expect(status.resetCleanupPending)
+        #expect(status.resetCleanupFailureAt == now)
+        #expect(status.resetCleanupFailureMessage == message)
+    }
+
     @Test func manualAndAutomaticBackupsExcludeHumanHealthDataAndRestoreRestrictedProjection() async throws {
         let (suiteName, defaults) = try isolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -409,7 +558,7 @@ struct AutomaticBackupServiceTests {
             now: { now }
         )
 
-        await failingService.removeManagedAutomaticBackupsForReset()
+        _ = await failingService.removeManagedAutomaticBackupsForReset()
         let failedStatus = store.snapshot(now: now)
         #expect(!failedStatus.isEnabled)
         #expect(failedStatus.resetCleanupPending)
@@ -473,6 +622,15 @@ struct AutomaticBackupServiceTests {
         return try ModelContainer(for: schema, configurations: [config])
     }
 
+    private func resetOptions() -> AppResetService.Options {
+        AppResetService.Options(
+            cancelPendingNotifications: false,
+            deleteCustomBackground: false,
+            resetSharedRuntimeState: false,
+            cleanUpAutomaticBackups: true
+        )
+    }
+
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -508,6 +666,54 @@ private final class FakeAutomaticBackupExporter: AutomaticBackupExporting {
             try await Task.sleep(nanoseconds: delayNanoseconds)
         }
         return packageURL
+    }
+}
+
+@MainActor
+private final class PausingAutomaticBackupExporter: AutomaticBackupExporting {
+    private let packageURL: URL
+    private var didStart = false
+    private var isReleased = false
+    private var startWaiter: CheckedContinuation<Void, Never>?
+    private var releaseWaiter: CheckedContinuation<Void, Never>?
+    private(set) var callCount = 0
+
+    init(data: Data) throws {
+        let packageURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PausingAutomaticBackupExporter.\(UUID().uuidString).\(DataBackupManager.packageFileExtension)", isDirectory: true)
+        try FileManager.default.createDirectory(at: packageURL, withIntermediateDirectories: true)
+        try data.write(
+            to: packageURL.appendingPathComponent(DataBackupManager.manifestFileName, isDirectory: false),
+            options: [.atomic, .completeFileProtection]
+        )
+        self.packageURL = packageURL
+    }
+
+    func exportBackupPackage(container _: ModelContainer) async throws -> URL {
+        callCount += 1
+        didStart = true
+        startWaiter?.resume()
+        startWaiter = nil
+        if callCount == 1, !isReleased {
+            await withCheckedContinuation { continuation in
+                releaseWaiter = continuation
+            }
+        }
+        return packageURL
+    }
+
+    func waitUntilStarted() async {
+        guard !didStart else { return }
+        await withCheckedContinuation { continuation in
+            startWaiter = continuation
+        }
+    }
+
+    func release() {
+        guard !isReleased else { return }
+        isReleased = true
+        releaseWaiter?.resume()
+        releaseWaiter = nil
     }
 }
 
@@ -576,5 +782,53 @@ private final class FakeAutomaticBackupFileStore: AutomaticBackupFileStoring {
             total += values.fileSize ?? 0
         }
         return total
+    }
+}
+
+@MainActor
+private final class PausingAutomaticBackupFileStore: AutomaticBackupFileStoring {
+    private var didStartWrite = false
+    private var isWriteReleased = false
+    private var writeStartWaiter: CheckedContinuation<Void, Never>?
+    private var writeReleaseWaiter: CheckedContinuation<Void, Never>?
+    private(set) var writeCount = 0
+    private(set) var cleanupCount = 0
+    private(set) var managedBackupExists = false
+
+    func writeAutomaticBackup(packageURL _: URL, now _: Date) async throws -> AutomaticBackupFileReference {
+        writeCount += 1
+        didStartWrite = true
+        writeStartWaiter?.resume()
+        writeStartWaiter = nil
+        if !isWriteReleased {
+            await withCheckedContinuation { continuation in
+                writeReleaseWaiter = continuation
+            }
+        }
+        managedBackupExists = true
+        return AutomaticBackupFileReference(
+            fileName: AutomaticBackupPolicy.fileName,
+            path: "/tmp/\(AutomaticBackupPolicy.fileName)",
+            byteCount: 1
+        )
+    }
+
+    func removeManagedAutomaticBackups() async throws {
+        cleanupCount += 1
+        managedBackupExists = false
+    }
+
+    func waitUntilWriteStarted() async {
+        guard !didStartWrite else { return }
+        await withCheckedContinuation { continuation in
+            writeStartWaiter = continuation
+        }
+    }
+
+    func releaseWrite() {
+        guard !isWriteReleased else { return }
+        isWriteReleased = true
+        writeReleaseWaiter?.resume()
+        writeReleaseWaiter = nil
     }
 }

@@ -125,7 +125,21 @@ enum BackgroundTaskCoordinator {
                 note: "\(reminderRefillTaskID), batch=\(budget.maximumItemCount)"
             )
 
-            let modelContext = ModelContext(SharedModelContainer.make())
+            let modelContainer: ModelContainer
+            do {
+                modelContainer = try SharedModelContainer.make()
+            } catch {
+                AppPerformanceMonitor.shared.record(
+                    "background_reminder_refill_store_unavailable",
+                    valueMS: 0,
+                    note: "primary store unavailable"
+                )
+                ReminderMaintenanceCursorStore.markRetry()
+                scheduleReminderRefill()
+                complete(false)
+                return
+            }
+            let modelContext = ModelContext(modelContainer)
             let plan: ReminderMaintenancePlan
             do {
                 plan = try await ReminderMaintenanceService.makeBackgroundPlan(

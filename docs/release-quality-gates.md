@@ -2,6 +2,18 @@
 
 Ohana changes must be safe to ship, diagnose, and recover.
 
+## Test Portfolio Contract
+
+- Business rules are owned by Unit/Integration tests; UI tests do not inspect
+  persistence internals or stand in for ledger, migration, reward, or cache
+  assertions.
+- The normal change lane runs at most one high-value UI path for each affected
+  module. Exhaustive UI shards are retained for nightly/RC regression.
+- Closing a P0/P1 risk requires failure, recovery/retry, and repeat/idempotency
+  evidence at the lowest trustworthy layer.
+- Frequency follows risk; low-risk visual/copy changes do not start the full
+  unit or UI portfolio.
+
 ## Change Risk Levels
 
 Start with `scripts/dev-check-changed.sh` for changed files. Escalate only when
@@ -62,6 +74,45 @@ Required:
 | Performance/smoothness | Code-first smell review; one focused Instruments/ETTrace capture when runtime evidence is needed | "Feels fast" or conclusions from mixed/unsymbolicated traces |
 | Leak/memory growth | Same-flow before/after memgraph, app-owned leaked type counts, ownership path or retaining edge | Leak fixed because total memory is smaller |
 | Persistence/schema | In-memory migration/compatibility tests, recovery path, backup/export impact, targeted simulator test when user-visible | Data safety from a build-only pass |
+
+## Efficient Test Lanes
+
+Use the smallest lane that can prove the changed behavior. Do not start the
+full UI suite as a default response to a local code edit.
+
+| Lane | Command | Use when |
+|---|---|---|
+| Changed-file preflight | `scripts/dev-check-changed.sh` | Every local change; it dispatches syntax and applicable repository audits without starting Xcode by default. |
+| Targeted unit/integration | `scripts/test-simulator.sh -only-testing:OhanaTests/<RelevantTests>` | One service, command, read model, persistence boundary, or regression test changed. |
+| Full unit suite | `scripts/test-unit.sh` or `scripts/module-exit-gate.sh --unit` | Broad module handoff or phase boundary; it does not pull in the UI target. |
+| Release UI smoke | `scripts/test-ui-release-smoke.sh smoke` | First-release onboarding and first-pet path changed. |
+| Domain UI shard | `scripts/test-ui-shard.sh <shard>` | One user-facing domain changed; use `--list` to see the available shards. |
+| Full UI regression | `scripts/test-ui-nightly.sh` | Nightly, release candidate, or an explicitly requested whole-app UI pass. It builds once, then runs sequential shards with one xcresult per shard. |
+| Real-device acceptance | `docs/release-true-device-test-plan.md` | Permissions, HealthKit, background delivery, location, energy, iCloud, biometrics, camera, keyboard, and device-only behavior. |
+
+## Frequency Matrix
+
+| Trigger | Required lane | UI allowance |
+|---|---|---|
+| Copy, color, spacing, radius, non-interactive token | Changed-file preflight and relevant static UI/accessibility audit | None unless visual acceptance itself is requested |
+| One business rule, command, service, read model, or persistence behavior | Targeted Unit/Integration selector plus build when compiler/startup/persistence risk requires it | One high-value path only when navigation or visible integration changed |
+| P0/P1 repair | Targeted failure + recovery/retry + repeat/idempotency tests, relevant audits, and build | One high-value recovery/user path; UI must not assert database internals |
+| Broad module handoff | Full unit lane plus module-relevant audits | One module path, not every button |
+| Nightly | Full unit as scheduled plus sequential UI shards | Complete shard manifest |
+| RC / release candidate | Whole-repo audits, full unit, sequential full UI, and applicable real-device plan | Complete release paths and device-owned behavior |
+
+`scripts/module-exit-gate.sh` defaults to the fast changed/static lane. Repeat
+`--test <target/test>` for targeted Unit/Integration selectors and, only when
+needed, one UI selector. Use `--unit` for the full unit lane and `--full` for
+whole-repository audits plus full unit tests. The complete UI suite remains
+`scripts/test-ui-nightly.sh`.
+
+UI shards intentionally run sequentially with parallel testing disabled. The UI
+tests launch, reset, seed, and sometimes preserve state in the same simulator;
+parallel runners would compete for the app process and persistence container.
+`scripts/audit-ui-test-shards.sh` requires every source UI test to appear in
+exactly one shard so a newly added test cannot silently disappear from the full
+regression lane.
 
 ## Rollback and Recovery
 

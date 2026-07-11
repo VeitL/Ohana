@@ -11,7 +11,7 @@ import SwiftUI
 
 struct ContentView: View {
     var showsEmbeddedOnboarding = true
-    var onboardingPrimaryHumanID: String?
+    var onboardingFirstPetID: String?
     var routeLanguageCode: String = AppLanguage.code
 
     @Environment(\.scenePhase) private var scenePhase
@@ -27,8 +27,9 @@ struct ContentView: View {
     @State private var uiTestRouteTask: Task<Void, Never>?
     @State private var uiTestEconomyStateSeedTask: Task<Void, Never>?
     @State private var onboardingJourneyPhase: OnboardingJourneyPhase = .preOnboarding
-    @State private var handledOnboardingPrimaryHumanID: String?
-    @State private var signaledOnboardingPrimaryHumanID: String?
+    @State private var embeddedOnboardingFirstPetID: String?
+    @State private var handledOnboardingFirstPetID: String?
+    @State private var signaledOnboardingFirstPetID: String?
     @State private var handledUITestHumanProfileRouteName: String?
     @State private var homeCardStateResetToken = UUID()
     @State private var homeSurfaceLanguage = AppLanguage.code
@@ -43,7 +44,9 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             if showsEmbeddedOnboarding, !hasOnboarded {
-                OnboardingView()
+                OnboardingView(onFirstPetSaved: { pet in
+                    onboardingFirstPetDidPersist(pet.id)
+                })
                     .transition(.opacity)
                     .zIndex(100)
             }
@@ -93,12 +96,14 @@ struct ContentView: View {
             synchronizeHomeSurfaceLanguageIfAllowed(routeLanguageCode)
             synchronizeRouteSurfaceLanguageIfAllowed(routeLanguageCode)
             scheduleRootAppearHandoff()
-            applyOnboardingPrimaryHumanIDIfNeeded()
+            applyOnboardingFirstPetIDIfNeeded()
             scheduleUITestHumanProfileRouteIfNeeded()
         }
         .onDisappear {
             rootAppearHandoffTask?.cancel()
             rootAppearHandoffTask = nil
+            onboardingJourneyEvaluationTask?.cancel()
+            onboardingJourneyEvaluationTask = nil
             activeHumanReactionTask?.cancel()
             activeHumanReactionTask = nil
             onboardingCreatedEntitySignalTask?.cancel()
@@ -126,16 +131,27 @@ struct ContentView: View {
             }
             thawHomeSurfaceLanguageAfterSheetDismissal()
             thawRouteSurfaceLanguageAfterSheetDismissal()
+            if newValue == nil {
+                advanceFirstDayFunnelIfNeeded(phase: onboardingJourneyPhase)
+                scheduleOnboardingJourneyEvaluation(delayMilliseconds: 180)
+            }
         }
         .onChange(of: hasOnboarded) { _, hasOnboarded in
             guard hasOnboarded else { return }
             scheduleRootAppearHandoff()
-            applyOnboardingPrimaryHumanIDIfNeeded()
+            applyOnboardingFirstPetIDIfNeeded()
             scheduleUITestHumanProfileRouteIfNeeded()
             scheduleUITestEconomyStateSeedIfNeeded()
         }
-        .onChange(of: onboardingPrimaryHumanID) { _, _ in
-            applyOnboardingPrimaryHumanIDIfNeeded()
+        .onChange(of: onboardingFirstPetID) { _, _ in
+            applyOnboardingFirstPetIDIfNeeded()
+        }
+        .onChange(of: embeddedOnboardingFirstPetID) { _, _ in
+            applyOnboardingFirstPetIDIfNeeded()
+        }
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
+            guard hasOnboarded, onboardingJourneyNeedsObservation else { return }
+            scheduleOnboardingJourneyEvaluation(delayMilliseconds: 180)
         }
         .onReceive(appServices.notificationRoutes.routeEvents) { published in
             scheduleHomeCardStateResetIfNeeded(for: published.event)
@@ -356,7 +372,7 @@ struct ContentView: View {
         case let .activateHuman(id):
             currentActiveHumanId = id
             appRoutes.dismissFullScreen(.requiredHumanProfile)
-        case .ready:
+        case .readyWithoutHuman, .ready:
             appRoutes.dismissFullScreen(.requiredHumanProfile)
         }
     }
@@ -426,9 +442,8 @@ struct ContentView: View {
             guard let petID = firstActivePetNeedingStarterWeightID(),
                   autoPresentedFirstCarePetID != petID else { return }
             autoPresentedFirstCarePetID = petID
-            appRoutes.presentSheet(.petWeight(petID))
+            appRoutes.presentSheet(.petWeightQuick(petID))
         case .preOnboarding,
-             .needsPrimaryHuman,
              .starterGiftPending,
              .starterGiftReadyForCeremony,
              .roadmapPromptPending,
@@ -457,9 +472,6 @@ struct ContentView: View {
         if !currentActiveHumanId.isEmpty {
             return currentActiveHumanId
         }
-        if let onboardingPrimaryHumanID, !onboardingPrimaryHumanID.isEmpty {
-            return onboardingPrimaryHumanID
-        }
         return appServices.onboardingJourney.interruptedOnboardingPrimaryHumanID(context: modelContext)
     }
 
@@ -468,7 +480,7 @@ struct ContentView: View {
         let handoffDelay = OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds(
             defaultDelayMilliseconds: 480
         )
-        if onboardingPrimaryHumanID == humanID || handoffDelay > 480 {
+        if handoffDelay > 480 {
             scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay, activeHumanIDOverride: humanID)
         } else {
             scheduleOnboardingJourneyEvaluation()
@@ -491,22 +503,34 @@ struct ContentView: View {
         }
     }
 
-    private func applyOnboardingPrimaryHumanIDIfNeeded() {
-        guard let humanID = onboardingPrimaryHumanID, !humanID.isEmpty else { return }
-        if currentActiveHumanId != humanID {
-            currentActiveHumanId = humanID
-        }
-        if let id = UUID(uuidString: humanID),
-           signaledOnboardingPrimaryHumanID != humanID {
-            signaledOnboardingPrimaryHumanID = humanID
+    private func applyOnboardingFirstPetIDIfNeeded() {
+        guard let petID = onboardingFirstPetID ?? embeddedOnboardingFirstPetID,
+              !petID.isEmpty else { return }
+        if let id = UUID(uuidString: petID),
+           signaledOnboardingFirstPetID != petID {
+            signaledOnboardingFirstPetID = petID
             scheduleOnboardingCreatedEntitySignal(id)
         }
-        guard hasOnboarded, handledOnboardingPrimaryHumanID != humanID else { return }
-        handledOnboardingPrimaryHumanID = humanID
+        guard hasOnboarded, handledOnboardingFirstPetID != petID else { return }
+        handledOnboardingFirstPetID = petID
         let handoffDelay = OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds(
             defaultDelayMilliseconds: 480
         )
-        scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay, activeHumanIDOverride: humanID)
+        scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay)
+    }
+
+    private func onboardingFirstPetDidPersist(_ petID: UUID) {
+        embeddedOnboardingFirstPetID = petID.uuidString
+        applyOnboardingFirstPetIDIfNeeded()
+    }
+
+    private var onboardingJourneyNeedsObservation: Bool {
+        switch onboardingJourneyPhase {
+        case .preOnboarding, .needsFirstPet, .firstCarePending, .starterGiftPending:
+            true
+        case .starterGiftReadyForCeremony, .roadmapPromptPending, .complete, .existingUser:
+            false
+        }
     }
 
     private func scheduleOnboardingJourneyEvaluationAfterHomeHandoff(activeHumanIDOverride: String? = nil) {
@@ -659,6 +683,8 @@ private extension View {
 }
 
 #Preview {
-    ContentView()
-        .modelContainer(SharedModelContainer.make())
+    if let modelContainer = try? SharedModelContainer.makePreview() {
+        ContentView()
+            .modelContainer(modelContainer)
+    }
 }

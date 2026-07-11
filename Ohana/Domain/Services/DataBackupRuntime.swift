@@ -9,6 +9,16 @@ import Foundation
 import SwiftData
 
 // MARK: - Error
+nonisolated enum BackupRestoreValidationCategory: String, Equatable, Sendable {
+    case identity
+    case duplicateIdentity
+    case date
+    case relationship
+    case media
+    case sizeLimit
+    case pendingChanges
+}
+
 enum BackupError: LocalizedError {
     case unsupportedVersion(Int)
     case missingPassword
@@ -18,6 +28,7 @@ enum BackupError: LocalizedError {
     case invalidEncryptedBackup
     case encryptionUnavailable
     case invalidBackupPackage
+    case invalidRestoreData(BackupRestoreValidationCategory)
 
     var errorDescription: String? {
         localizedMessage(l: .current)
@@ -73,6 +84,51 @@ enum BackupError: LocalizedError {
                 en: "The backup package is invalid or missing media files. Choose the backup again.",
                 de: "Das Backup-Paket ist ungültig oder Mediendateien fehlen. Wähle das Backup erneut aus."
             )
+        case let .invalidRestoreData(category):
+            switch category {
+            case .identity:
+                l.tr(
+                    zh: "备份包含无效的记录身份，未对现有数据进行任何更改。",
+                    en: "The backup contains an invalid record identity. Existing data was not changed.",
+                    de: "Das Backup enthält eine ungültige Datensatz-ID. Vorhandene Daten wurden nicht geändert."
+                )
+            case .duplicateIdentity:
+                l.tr(
+                    zh: "备份包含重复的记录身份，未对现有数据进行任何更改。",
+                    en: "The backup contains duplicate record identities. Existing data was not changed.",
+                    de: "Das Backup enthält doppelte Datensatz-IDs. Vorhandene Daten wurden nicht geändert."
+                )
+            case .date:
+                l.tr(
+                    zh: "备份包含无效的必要日期，未对现有数据进行任何更改。",
+                    en: "The backup contains an invalid required date. Existing data was not changed.",
+                    de: "Das Backup enthält ein ungültiges erforderliches Datum. Vorhandene Daten wurden nicht geändert."
+                )
+            case .relationship:
+                l.tr(
+                    zh: "备份包含断开的必要关系，未对现有数据进行任何更改。",
+                    en: "The backup contains a broken required relationship. Existing data was not changed.",
+                    de: "Das Backup enthält eine unterbrochene erforderliche Beziehung. Vorhandene Daten wurden nicht geändert."
+                )
+            case .media:
+                l.tr(
+                    zh: "备份中的媒体引用无效，未对现有数据进行任何更改。",
+                    en: "The backup contains an invalid media reference. Existing data was not changed.",
+                    de: "Das Backup enthält einen ungültigen Medienverweis. Vorhandene Daten wurden nicht geändert."
+                )
+            case .sizeLimit:
+                l.tr(
+                    zh: "备份超出安全恢复限制，未对现有数据进行任何更改。",
+                    en: "The backup exceeds the safe restore limit. Existing data was not changed.",
+                    de: "Das Backup überschreitet das sichere Wiederherstellungslimit. Vorhandene Daten wurden nicht geändert."
+                )
+            case .pendingChanges:
+                l.tr(
+                    zh: "仍有尚未保存的数据，请稍后重新恢复备份。",
+                    en: "Some changes are still pending. Try restoring the backup again shortly.",
+                    de: "Einige Änderungen stehen noch aus. Versuche die Wiederherstellung in Kürze erneut."
+                )
+            }
         }
     }
 }

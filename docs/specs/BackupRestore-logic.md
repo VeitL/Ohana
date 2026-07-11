@@ -81,6 +81,29 @@ marker is treated as potentially unsafe. Settings must offer one-tap restricted
 replacement (which overwrites the same managed iCloud Drive file) and one-tap
 managed-file removal. The warning clears only after either operation succeeds.
 
+BR-010. Restore performs a strict, read-only preflight before the first live
+write. Every required primary UUID and required date must parse without a
+fallback; duplicate primary identities, broken required relationships, unsafe
+media paths, mismatched media sizes, unsupported versions, and packages beyond
+the documented restore limits are rejected with a category-level localized
+error. Missing optional legacy fields may use only the defaults already encoded
+by optional DTO properties; required identity or history must never be invented.
+
+BR-011. Restore requires a clean live `ModelContext`, disables autosave while
+preparing changes, and commits all SwiftData work through one
+`ModelContext.transaction`. Rehydrate writers, legacy economy bootstrap,
+shared-care note cleanup, and plant-plan reconciliation must not perform an
+inner save on this path. A thrown phase fault, cancellation, or transaction
+save failure rolls the context back. UserDefaults, notification cancellation or
+scheduling, and projection refresh occur only after the transaction succeeds.
+Preference-dependent derived planning uses an in-memory defaults overlay; it
+must not create a crash-leftover staging preferences domain.
+
+BR-012. Launch restore limits are a 32 MiB manifest, 100,000 model records,
+64 MiB per media item, and 512 MiB declared media in one package. Raising a
+limit requires dense-data memory and disk evidence; a restore must not silently
+skip records or media to fit a budget.
+
 ## Validation
 
 Required launch evidence:
@@ -96,6 +119,11 @@ Required launch evidence:
 - Backup-to-wipe-to-restore acceptance covering at least one human, one pet,
   care facts, reminders/events, wallet/ledger state, and app preferences.
 - Backup coverage tests for any newly added SwiftData model or backup DTO field.
+- Invalid required UUID/date, duplicate identity, broken required relation,
+  unsafe/oversized media, and oversized manifest rejection before live writes.
+- Fault injection at every restore phase, transaction-save failure,
+  cancellation, and repeated-restore idempotency with original-store,
+  UserDefaults, and notification assertions.
 
 Do not close a backup/restore item with only a successful build. Data safety
 requires projection, import, error, and wipe-restore evidence.

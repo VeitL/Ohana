@@ -23,6 +23,14 @@ enum AppPerformanceMode {
         UserDefaults.standard.bool(forKey: reducedVisualEffectsKey)
             || ProcessInfo.processInfo.arguments.contains("-OHANA_REDUCED_VISUAL_EFFECTS")
     }
+
+    static var uiTestsDisableAnimations: Bool {
+        #if DEBUG
+            OhanaUITestLaunchOptions.disablesAnimations
+        #else
+            false
+        #endif
+    }
 }
 
 enum OhanaMotionBudget: Equatable {
@@ -309,6 +317,7 @@ final class AppWorkloadPolicy: ObservableObject {
     func interactionMotionBudget(isVisible: Bool = true) -> OhanaMotionBudget {
         guard isVisible else { return .static }
         guard isForeground else { return .static }
+        guard !AppPerformanceMode.uiTestsDisableAnimations else { return .static }
         let base: OhanaMotionBudget = isReduceMotionEnabled ? .efficient : .full
         return stricterMotionBudget(base, thermalInteractionMotionBudget)
     }
@@ -316,6 +325,7 @@ final class AppWorkloadPolicy: ObservableObject {
     func ambientMotionBudget(isVisible: Bool = true, allowDuringActiveWalk: Bool = false) -> OhanaMotionBudget {
         guard isVisible else { return .static }
         guard isForeground || (allowDuringActiveWalk && hasRunningWalk) else { return .static }
+        guard !AppPerformanceMode.uiTestsDisableAnimations else { return .static }
         let base: OhanaMotionBudget = if isLowPowerModeEnabled || isReduceMotionEnabled || userPowerSavingMode {
             .static
         } else {

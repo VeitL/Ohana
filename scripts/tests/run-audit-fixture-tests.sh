@@ -96,6 +96,7 @@ member_view_revision_fixture_path="Ohana/Features/Members/Views/__MemberProfileR
 save_failure_fixture_path="Ohana/Features/Settings/__SaveFailureBoundaryFixture.swift"
 governance_manifest_path="docs/governance/manifests/feature-ownership.json"
 governance_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-feature-ownership.XXXXXX")"
+ui_shard_manifest_fixture=""
 cp "$governance_manifest_path" "$governance_manifest_backup"
 
 cleanup_architecture_fixture() {
@@ -111,9 +112,35 @@ cleanup_governance_fixture() {
     cp "$governance_manifest_backup" "$governance_manifest_path"
     rm -f "$governance_manifest_backup"
   fi
+  if [[ -n "$ui_shard_manifest_fixture" ]]; then
+    rm -f "$ui_shard_manifest_fixture"
+  fi
 }
 
 trap 'cleanup_architecture_fixture; cleanup_governance_fixture' EXIT
+
+run_audit scripts/audit-ui-test-shards.sh
+if [[ "$status" -ne 0 ]]; then
+  fail "scripts/audit-ui-test-shards.sh: expected current UI test manifest to pass, got $status: $output"
+else
+  echo "ok  scripts/audit-ui-test-shards.sh assigns every current UI test exactly once"
+fi
+
+ui_shard_manifest_fixture="$(mktemp "${TMPDIR:-/tmp}/ohana-ui-test-shards-bad.XXXXXX")"
+grep -v 'testLaunchPerformance$' scripts/ui-test-shards.tsv > "$ui_shard_manifest_fixture"
+set +e
+output="$(OHANA_UI_TEST_SHARD_MANIFEST="$ui_shard_manifest_fixture" scripts/audit-ui-test-shards.sh 2>&1)"
+status=$?
+set -e
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-ui-test-shards.sh missing-test fixture: expected exit 1, got $status"
+elif ! grep -qF "source tests missing from the manifest" <<<"$output"; then
+  fail "scripts/audit-ui-test-shards.sh missing-test fixture: completeness guard no longer fires"
+else
+  echo "ok  scripts/audit-ui-test-shards.sh catches a source test omitted from the manifest"
+fi
+rm -f "$ui_shard_manifest_fixture"
+ui_shard_manifest_fixture=""
 
 assert_bad scripts/audit-ui-v4.sh "$fixtures/UiV4Bad.swift" \
   background system-text-color hardcoded-white-black material shadow \

@@ -1,4 +1,4 @@
-# CODING AGENTS: READ THIS FIRST
+# Archived Design Export — Read Only When Explicitly Targeted
 
 > **OHANA REPO NOTICE (overrides the instructions below):** Inside this
 > repository, the UI source of truth is `ui规范.selection.json` (root) plus the
@@ -9,21 +9,34 @@
 > When in conflict, translate the idea into existing V4 tokens or stop and ask.
 > See `AGENTS.md` → "UI Design Source of Truth".
 
+Do not load this bundle for ordinary Ohana implementation or review work. Read
+the transcripts and prototype files only when the current user explicitly asks
+to inspect this historical export or create an external artifact from it. This
+bundle has no authority over product behavior, native SwiftUI structure,
+accessibility, localization, or current UI tokens.
+
 This is a **handoff bundle** from Claude Design (claude.ai/design).
 
 A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported this bundle so a coding agent can implement the designs for real.
 
 ## What you should do — IMPORTANT
 
-**Read the chat transcripts first.** There are 1 chat transcript(s) in `ohana-design-system/chats/`. The transcripts show the full back-and-forth between the user and the design assistant — they tell you **what the user actually wants** and **where they landed** after iterating. Don't skip them. The final HTML files are the output, but the chat is where the intent lives.
+**When the task explicitly targets this export, read the chat transcripts
+first.** There is 1 historical transcript in `ohana-design-system/chats/`.
+Treat it as dated design context, not current product authority.
 
-**Find the primary design file under `ohana-design-system/project/` and read it top to bottom.** The chat transcripts will tell you which file the user was last iterating on. Then **follow its imports**: open every file it pulls in (shared components, CSS, scripts) so you understand how the pieces fit together before you start implementing.
+Then inspect only the task-relevant files under `ohana-design-system/project/`
+and their imports. Revalidate every production decision against `AGENTS.md`,
+`docs/specs/product-foundation.md`, and `ui规范.selection.json`.
 
 **If anything is ambiguous, ask the user to confirm before you start implementing.** It's much cheaper to clarify scope up front than to build the wrong thing.
 
 ## About the design files
 
-The design medium is **HTML/CSS/JS** — these are prototypes, not production code. Your job is to **recreate them pixel-perfectly** in whatever technology makes sense for the target codebase (React, Vue, native, whatever fits). Match the visual output; don't copy the prototype's internal structure unless it happens to fit.
+The design medium is **HTML/CSS/JS** — these are prototypes, not production
+code. They may inform an explicitly requested artifact, but they are not a
+pixel-perfect contract for the native app. Translate accepted ideas into the
+current Ohana tokens, components, platform behavior, and accessibility rules.
 
 **Don't render these files in a browser or take screenshots unless the user asks you to.** Everything you need — dimensions, colors, layout rules — is spelled out in the source. Read the HTML and CSS directly; a screenshot won't tell you anything they don't.
 

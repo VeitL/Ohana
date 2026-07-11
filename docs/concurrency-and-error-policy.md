@@ -37,17 +37,20 @@ data races or main-thread stalls. This document defines the rules.
   from services; do not return silent `nil` for real failures that the user needs
   to know about.
 - **Surface user-facing failures.** A failed business write (save, import,
-  schedule) must produce a localized message (zh/en/de via `L10n`) and a safe
-  recovery path, not a silent no-op. See the recovery questions in
+  schedule) must produce Chinese and English source copy through `L10n`, use the
+  registered-language fallback chain, and provide a safe recovery path rather
+  than a silent no-op. See the recovery questions in
   `docs/release-quality-gates.md`.
 - **`try?` is for genuinely optional reads.** Do not use `try?` to swallow errors
   on writes or on data the user expects to persist.
 - **No `fatalError`/force-unwrap on user data paths.** Force unwrap and
   `fatalError` are only acceptable for true programmer invariants, never for
   optional model data, parsing, or I/O.
-- **Recovery over crash.** Persistence/migration/startup failures must degrade
-  gracefully (disk fallback, placeholder, safe empty state), per
-  `docs/app-architecture-governance.md` and the startup policy.
+- **Recovery over crash without identity forks.** Persistence/migration/startup
+  failures may retry a different opening strategy only against the same primary
+  store identity. If that store remains unavailable, stop before mounting any
+  writable app surface and show the retry/support recovery shell; never create
+  an automatic secondary disk or memory store.
 
 ## Logging
 

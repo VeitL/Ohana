@@ -191,6 +191,13 @@ extension HumanDetailView {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return
             }
+            if case .pending = result.attachmentCleanup {
+                appServices.islandToasts.show(l.tr(
+                    zh: "成员已删除，但其本地备注附件未能完全清理。请联系支持。",
+                    en: "The member was deleted, but local note attachments could not be fully removed. Contact support.",
+                    de: "Das Mitglied wurde gelöscht, aber lokale Notizanhänge konnten nicht vollständig entfernt werden. Kontaktiere den Support."
+                ))
+            }
             if result.clearsActiveHumanID {
                 activeHumanIdStr = ""
             }

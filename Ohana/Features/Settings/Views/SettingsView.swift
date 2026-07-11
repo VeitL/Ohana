@@ -141,13 +141,14 @@ struct SettingsView: View {
                 OhanaStaticAppBackground()
 
                 ScrollView {
-                    LazyVStack(spacing: 14) {
+                    VStack(spacing: 14) {
                         settingsBodySections
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, max(10, inlinePageSafeAreaInsets.top + 10))
                     .padding(.bottom, inlinePageSafeAreaInsets.bottom)
                 }
+                .accessibilityIdentifier("settings-main-scroll")
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)

@@ -50,7 +50,11 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     func testExistingPlantReminderToggleWithoutReset() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true, plantBaselineSeedCount: 1)
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            enableAnimations: true,
+            plantBaselineSeedCount: 1
+        )
         ensureHouseholdHome(in: app)
 
         let plantName = seedPlantBaselineAndReturnHomePlantName(in: app)
@@ -158,7 +162,7 @@ final class PlantModuleUITests: XCTestCase {
     }
 
     @MainActor
-    func testPlantRoomRailFiltersAndCollapsesExpandedCard() throws {
+    func testPlantRoomRailFiltersAfterCollapsingExpandedCard() throws {
         let app = launchEnglishApp(resetPersistentState: true, enableProductionOverlays: true, plantBaselineSeedCount: 4)
         ensureHouseholdHome(in: app)
 
@@ -190,9 +194,24 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(tapWhenFrameReady(livingRoomCard, timeout: 8), "Living room plant card did not expand before room filtering.")
         let expandedDetail = app.buttons["home-expanded-detail-plant"]
         XCTAssertTrue(expandedDetail.waitForExistence(timeout: 8), "Expanded plant card did not expose detail before room filtering.")
+        XCTAssertFalse(
+            balconyFilter.exists || allFilter.exists,
+            "Room rail should stay hidden while a plant card is expanded."
+        )
+
+        let expandedCollapse = app.buttons["home-expanded-collapse-plant"]
+        XCTAssertTrue(
+            tapWhenFrameReady(expandedCollapse, timeout: 8),
+            "Expanded plant card did not expose a stable collapse action before room filtering."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                !expandedDetail.exists && balconyFilter.exists && allFilter.exists
+            },
+            "Collapsing the plant card did not restore the room rail."
+        )
 
         XCTAssertTrue(tapWhenFrameReady(balconyFilter, timeout: 8), "Balcony room rail button did not accept a tap.")
-        XCTAssertTrue(waitUntil(timeout: 8) { !expandedDetail.exists }, "Room filtering did not collapse the expanded plant card.")
         XCTAssertTrue(
             waitUntil(timeout: 8) {
                 plantCard(named: balconyPlant, in: app).exists &&
@@ -305,28 +324,43 @@ final class PlantModuleUITests: XCTestCase {
         ensureHouseholdHome(in: app)
 
         _ = seedPlantWalletBaselineAndReturnVisibleNames(count: 4, in: app)
-        openFunctionMenuPlantsGroupFromPlantsTab(in: app)
+        openPlantFeatureCollectionFromPlantsTab(in: app)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["plant-feature-collection"].waitForExistence(timeout: 12),
+            "Plant FAB All did not open the current Plant Feature Collection."
+        )
+        XCTAssertFalse(
+            app.buttons["plant-feature-card-calendar"].waitForExistence(timeout: 1),
+            "Plant Feature Collection should not expose a Plant Calendar card."
+        )
+
+        let dashboardCard = app.buttons["plant-feature-card-dashboard"]
+        scrollToElement(dashboardCard, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            tapWhenFrameReady(dashboardCard, timeout: 8),
+            "Plant Feature Collection did not expose a tappable Plant Management card."
+        )
 
         XCTAssertTrue(
             app.descendants(matching: .any)["plant-dashboard-sites-view"].waitForExistence(timeout: 12),
-            "Function Menu Plants group did not open the Plant Overview dashboard."
+            "Plant Management did not open the Plant Overview dashboard."
         )
-        openPlantFunctionMenuSegment(
-            named: "Plant List",
+        openPlantDashboardDestination(
+            actionIdentifier: "plant-dashboard-mode-plants",
+            description: "Plants",
             expectedScreen: "plant-dashboard-plants-view",
             in: app
         )
-        openPlantFunctionMenuSegment(
-            named: "Growth Photos",
+        openPlantDashboardDestination(
+            actionIdentifier: "plant-dashboard-quick-action-photos",
+            description: "Photos",
             expectedScreen: "plant-dashboard-photos-view",
             in: app
         )
-        XCTAssertFalse(
-            app.buttons["function-menu-group-segment-plants-calendar"].waitForExistence(timeout: 1),
-            "Function Menu Plants group should not expose a Plant Calendar segment."
-        )
-        openPlantFunctionMenuSegment(
-            named: "Plant Overview",
+        openPlantDashboardDestination(
+            actionIdentifier: "plant-dashboard-mode-sites",
+            description: "Sites",
             expectedScreen: "plant-dashboard-sites-view",
             in: app
         )
@@ -383,16 +417,26 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     func testExistingPlantSettingsBulkDeferAndEditCancelSaveWithoutReset() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true, plantBaselineSeedCount: 1)
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            enableAnimations: true,
+            plantBaselineSeedCount: 1
+        )
         ensureHouseholdHome(in: app)
 
         let originalPlantName = seedPlantBaselineAndReturnHomePlantName(in: app)
         openSettingsFromHomeChrome(in: app)
         openPlantReminderPanel(in: app)
-        let bulkDefer = app.buttons["settings-plant-reminders-defer-all"]
-        scrollToElement(bulkDefer, in: app, maxSwipes: 4)
-        XCTAssertTrue(bulkDefer.waitForExistence(timeout: 8), "Plant reminder bulk defer action did not appear.")
-        tapWhenFrameReady(bulkDefer, timeout: 8)
+        let bulkDefer = app.descendants(matching: .any)["settings-plant-reminders-defer-all"]
+        for _ in 0 ..< 6 where !isTapFrameVisible(bulkDefer, in: app) {
+            scrollSettingsDown(in: app)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        XCTAssertTrue(
+            waitForTapFrame(bulkDefer, in: app, timeout: 8),
+            "Plant reminder bulk defer action did not expose a visible touch frame."
+        )
+        bulkDefer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 
         closeSettingsToHome(in: app)
         openPlantDetail(named: originalPlantName, in: app)
@@ -403,6 +447,7 @@ final class PlantModuleUITests: XCTestCase {
     private func launchEnglishApp(
         resetPersistentState: Bool = false,
         enableProductionOverlays: Bool = false,
+        enableAnimations: Bool = false,
         unlockRewardTier: Bool = false,
         plantBaselineSeedCount: Int? = nil
     ) -> XCUIApplication {
@@ -421,6 +466,9 @@ final class PlantModuleUITests: XCTestCase {
         }
         if enableProductionOverlays {
             app.launchArguments += ["-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS"]
+        }
+        if enableAnimations {
+            app.launchArguments += ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
         }
         if unlockRewardTier {
             app.launchArguments += ["-OHANA_UI_TEST_UNLOCK_REWARD_TIER"]
@@ -446,8 +494,7 @@ final class PlantModuleUITests: XCTestCase {
             flowTitle: "Create Member Card",
             missingFieldMessage: "Human creation name field did not appear.",
             completionMessage: "Creating the first human did not leave the creation flow in time.",
-            postSaveMarkerIdentifiers: ["home-add-first-pet-card", "home-add-first-pet-action"],
-            postSaveTextMarkers: ["Create Pet Card", "制作宠物卡", "Tierkarte erstellen"]
+            postSaveMarkerIdentifiers: ["home-add-first-pet-card"]
         )
     }
 
@@ -529,7 +576,7 @@ final class PlantModuleUITests: XCTestCase {
     }
 
     @MainActor
-    private func openFunctionMenuPlantsGroupFromPlantsTab(in app: XCUIApplication) {
+    private func openPlantFeatureCollectionFromPlantsTab(in app: XCUIApplication) {
         let plantsTab = app.buttons["home-tab-plants"]
         XCTAssertTrue(plantsTab.waitForExistence(timeout: 14), "Plants tab did not appear before opening the plant module.")
         XCTAssertTrue(tapWhenFrameReady(plantsTab, timeout: 8), "Plants tab did not become frame-ready before opening the plant module.")
@@ -542,31 +589,33 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(primaryAction.waitForExistence(timeout: 12), "Plant primary action did not appear before opening the plant module.")
         tapWhenHittable(primaryAction, timeout: 8)
 
-        let moreShortcut = app.buttons["home-fab-shortcut-feature-group-plants"]
-        if !moreShortcut.waitForExistence(timeout: 4) {
+        let allShortcut = app.buttons["home-fab-shortcut-plant-feature-collection"]
+        if !allShortcut.waitForExistence(timeout: 4) {
             tapWhenHittable(primaryAction, timeout: 8)
             tapWhenHittable(primaryAction, timeout: 8)
         }
-        XCTAssertTrue(moreShortcut.waitForExistence(timeout: 8), "Plant FAB did not expose More before opening the plant module.")
-        XCTAssertTrue(tapWhenFrameReady(moreShortcut, timeout: 8), "Plant FAB More shortcut did not become frame-ready.")
+        XCTAssertTrue(allShortcut.waitForExistence(timeout: 8), "Plant FAB did not expose All before opening the plant module.")
+        XCTAssertTrue(tapWhenFrameReady(allShortcut, timeout: 8), "Plant FAB All shortcut did not become frame-ready.")
         XCTAssertTrue(
-            app.descendants(matching: .any)["function-menu-group-screen-plants"].waitForExistence(timeout: 12),
-            "Plant FAB More did not open the Function Menu Plants group screen."
+            app.descendants(matching: .any)["plant-feature-collection"].waitForExistence(timeout: 12),
+            "Plant FAB All did not open the Plant Feature Collection."
         )
     }
 
     @MainActor
-    private func openPlantFunctionMenuSegment(
-        named label: String,
+    private func openPlantDashboardDestination(
+        actionIdentifier: String,
+        description: String,
         expectedScreen identifier: String,
         in app: XCUIApplication
     ) {
-        let segment = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", label)).firstMatch
-        XCTAssertTrue(segment.waitForExistence(timeout: 10), "Function Menu Plants segment did not appear: \(label).")
-        XCTAssertTrue(tapWhenFrameReady(segment, timeout: 8), "Function Menu Plants segment was not tappable: \(label).")
+        let action = app.buttons[actionIdentifier]
+        scrollToElement(action, in: app, maxSwipes: 6)
+        XCTAssertTrue(action.waitForExistence(timeout: 10), "Plant dashboard action did not appear: \(description).")
+        XCTAssertTrue(tapWhenFrameReady(action, timeout: 8), "Plant dashboard action was not tappable: \(description).")
         XCTAssertTrue(
             app.descendants(matching: .any)[identifier].waitForExistence(timeout: 12),
-            "Function Menu Plants segment \(label) did not open \(identifier)."
+            "Plant dashboard action \(description) did not open \(identifier)."
         )
     }
 
@@ -789,7 +838,8 @@ final class PlantModuleUITests: XCTestCase {
     private func plantCard(named plantName: String, in app: XCUIApplication) -> XCUIElement {
         let page = app.descendants(matching: .any)["home-plants-page"]
         if page.exists {
-            return page.buttons["home-card-plant-\(plantName)"]
+            let pageCard = page.buttons["home-card-plant-\(plantName)"]
+            if pageCard.exists { return pageCard }
         }
 
         let walletCard = app.buttons["home-card-plant-\(plantName)"]
@@ -967,8 +1017,9 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func findPlantReminderToggle(named plantName: String, in app: XCUIApplication, maxSwipes: Int) -> XCUIElement {
-        let identified = app.buttons["settings-plant-reminders-plant-toggle-\(plantName)"]
-        let row = app.buttons.matching(NSPredicate(
+        let slug = plantReminderIdentifierSlug(for: plantName)
+        let identified = app.descendants(matching: .any)["settings-plant-reminders-plant-toggle-\(slug)"]
+        let row = app.otherElements.matching(NSPredicate(
             format: "identifier BEGINSWITH %@ AND label CONTAINS[c] %@",
             "settings-plant-reminders-plant-row-",
             plantName
@@ -988,7 +1039,7 @@ final class PlantModuleUITests: XCTestCase {
                 if isTapFrameVisible(identified, in: app) { return identified }
                 if isTapFrameVisible(row, in: app) { return row }
             }
-            scrollTowardTapFrame(of: identified, in: app)
+            scrollSettingsDown(in: app)
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
 
@@ -996,6 +1047,31 @@ final class PlantModuleUITests: XCTestCase {
             XCTFail("Settings plant reminder panel loaded with no plants after creating \(plantName).")
         }
         return identified
+    }
+
+    private func plantReminderIdentifierSlug(for plantName: String) -> String {
+        let folded = plantName.folding(
+            options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+            locale: .current
+        ).lowercased()
+        var slug = ""
+        var didAppendSeparator = false
+
+        for scalar in folded.unicodeScalars {
+            let value = scalar.value
+            if (48 ... 57).contains(value) || (97 ... 122).contains(value) {
+                slug.unicodeScalars.append(scalar)
+                didAppendSeparator = false
+            } else if !slug.isEmpty, !didAppendSeparator {
+                slug.append("-")
+                didAppendSeparator = true
+            }
+        }
+
+        while slug.last == "-" {
+            slug.removeLast()
+        }
+        return slug
     }
 
     @MainActor
@@ -1014,7 +1090,7 @@ final class PlantModuleUITests: XCTestCase {
             if isTapFrameVisible(identified, in: app) { return identified }
             if isTapFrameVisible(row, in: app) { return row }
             if emptyState.exists { return identified }
-            scrollTowardTapFrame(of: identified, in: app)
+            scrollSettingsDown(in: app)
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
 
@@ -1305,10 +1381,25 @@ final class PlantModuleUITests: XCTestCase {
     private func openFirstPetCreationFromTodayFocus(in app: XCUIApplication) {
         let nameField = app.textFields["member-name-input"]
         let addPetCard = app.buttons["home-add-first-pet-card"]
-        let addPetAction = app.buttons["home-add-first-pet-action"]
-        XCTAssertTrue(waitUntil(timeout: 20) { nameField.exists || addPetCard.exists || addPetAction.exists }, "Today Focus first-pet action did not appear.")
+        XCTAssertTrue(
+            waitUntil(timeout: 20) {
+                guard !nameField.exists else { return true }
+                guard addPetCard.exists, addPetCard.isEnabled else { return false }
+                let frame = addPetCard.frame
+                return frame.width > 1 && frame.height > 1 && isFiniteFrame(frame)
+            },
+            "Today Focus first-pet action did not appear."
+        )
         if nameField.exists { return }
-        XCTAssertTrue(tapWhenFrameReady(addPetCard, timeout: 6) || tapWhenFrameReady(addPetAction, timeout: 6), "Today Focus first-pet action was visible but not tappable.")
+        XCTAssertTrue(
+            addPetCard.label.hasPrefix("Add your first pet") &&
+                addPetCard.label.count > "Add your first pet".count,
+            "Today Focus first-pet action did not expose its complete English accessibility label: \(addPetCard.label)"
+        )
+        XCTAssertTrue(
+            tapWhenFrameReady(addPetCard, timeout: 4),
+            "Today Focus first-pet action did not expose a stable touch frame."
+        )
         XCTAssertTrue(nameField.waitForExistence(timeout: 12), "Pet creation did not open from Today Focus.")
     }
 
@@ -1329,9 +1420,12 @@ final class PlantModuleUITests: XCTestCase {
         missingFieldMessage: String,
         completionMessage: String,
         starterPetWeight: String? = nil,
-        postSaveMarkerIdentifiers: [String] = [],
-        postSaveTextMarkers: [String] = []
+        postSaveMarkerIdentifiers: [String]
     ) {
+        XCTAssertFalse(
+            postSaveMarkerIdentifiers.isEmpty,
+            "Member creation requires an explicit post-save marker."
+        )
         let nameField = app.textFields["member-name-input"]
         XCTAssertTrue(waitUntil(timeout: 12) { nameField.exists && nameField.isHittable }, missingFieldMessage)
         nameField.tap()
@@ -1348,9 +1442,11 @@ final class PlantModuleUITests: XCTestCase {
         let creationPrimary = app.buttons["member-creation-primary-action"]
         let didLeaveCreation = waitUntil(timeout: 30) {
             let didReachExpectedMarker = containsAnyElement(in: app, identifiers: postSaveMarkerIdentifiers)
-            let didReachExpectedTextMarker = containsAnyText(in: app, texts: postSaveTextMarkers)
             return app.state == .runningForeground &&
-                (didReachExpectedMarker || didReachExpectedTextMarker || (!nameField.exists && !creationPrimary.exists && !handoffTitle.exists))
+                didReachExpectedMarker &&
+                !nameField.exists &&
+                !creationPrimary.exists &&
+                !handoffTitle.exists
         }
         XCTAssertTrue(didLeaveCreation, completionMessage)
     }
@@ -1371,10 +1467,8 @@ final class PlantModuleUITests: XCTestCase {
             let actionLabel = creationPrimary.label
             tapWhenHittable(creationPrimary, timeout: 8)
             if actionLabel.contains("Join Island") || actionLabel.contains("加入岛屿") || actionLabel.contains("Insel beitreten") {
-                if waitUntil(timeout: 4, condition: { !creationPrimary.exists }) {
-                    didTapFinalSave = true
-                    break
-                }
+                didTapFinalSave = true
+                break
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.45))
             if !creationPrimary.exists {
@@ -1397,11 +1491,27 @@ final class PlantModuleUITests: XCTestCase {
             .matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS %@ OR label CONTAINS %@", "Breed", "品种", "Rasse"))
             .firstMatch
         guard breedMenu.waitForExistence(timeout: 4) else { return } // 人类创建无品种菜单
-        tapWhenHittable(breedMenu, timeout: 8)
-        // 物种默认为 dog;品种名当前仅中文,选狗品种库首项。
-        let option = app.buttons["阿富汗猎犬"]
-        guard option.waitForExistence(timeout: 6) else { return }
-        tapWhenHittable(option, timeout: 8)
+        let placeholderLabel = breedMenu.label
+        let creationPrimary = app.buttons["member-creation-primary-action"]
+        let selectionWasRequired = creationPrimary.exists && !creationPrimary.isEnabled
+
+        for _ in 0 ..< 3 {
+            guard tapWhenFrameReady(breedMenu, timeout: 8) else { continue }
+            let breedMenuList = app.collectionViews.firstMatch
+            guard breedMenuList.waitForExistence(timeout: 6) else { continue }
+            let option = breedMenuList.cells.element(boundBy: 0).buttons.firstMatch
+            guard option.waitForExistence(timeout: 6) else { continue }
+            guard tapWhenFrameReady(option, timeout: 8) else { continue }
+
+            if waitUntil(timeout: 4, condition: {
+                (breedMenu.exists && breedMenu.label != placeholderLabel) ||
+                    (selectionWasRequired && creationPrimary.exists && creationPrimary.isEnabled)
+            }) {
+                return
+            }
+        }
+
+        XCTFail("Pet creation breed selection did not apply. Current menu label: \(breedMenu.label)")
     }
 
     @MainActor
@@ -1430,12 +1540,21 @@ final class PlantModuleUITests: XCTestCase {
             _ = tapWhenFrameReady(field, timeout: 1)
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
-        let currentValue = String(describing: field.value ?? "")
-        if !currentValue.isEmpty {
-            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count))
+        field.press(forDuration: 0.8)
+        let selectAllButton = app.buttons["Select All"]
+        let selectAllMenuItem = app.menuItems["Select All"]
+        if tapWhenFrameReady(selectAllButton, timeout: 2) {
+            // Selection is ready for replacement.
+        } else if tapWhenFrameReady(selectAllMenuItem, timeout: 2) {
+            // Selection is ready for replacement.
+        } else {
+            field.tap(withNumberOfTaps: 3, numberOfTouches: 1)
         }
         field.typeText(text)
-        XCTAssertTrue(waitForTextField(field, toContain: text, timeout: 4), "Text field did not accept replacement text: \(identifier)")
+        XCTAssertTrue(
+            waitUntil(timeout: 4) { String(describing: field.value ?? "") == text },
+            "Text field did not accept the exact replacement text: \(identifier) value=\(String(describing: field.value ?? ""))"
+        )
     }
 
     @MainActor
@@ -1682,6 +1801,16 @@ final class PlantModuleUITests: XCTestCase {
             app.swipeDown()
         } else {
             app.swipeUp()
+        }
+    }
+
+    @MainActor
+    private func scrollSettingsDown(in app: XCUIApplication) {
+        let settingsScroll = app.scrollViews["settings-main-scroll"]
+        if settingsScroll.exists {
+            settingsScroll.swipeUp(velocity: .fast)
+        } else {
+            app.swipeUp(velocity: .fast)
         }
     }
 

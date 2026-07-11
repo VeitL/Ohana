@@ -107,7 +107,19 @@ final nonisolated class DataBackupMediaPackageReader: DataBackupMediaResolving {
         let url = packageURL
             .appendingPathComponent(components[0], isDirectory: true)
             .appendingPathComponent(components[1], isDirectory: false)
+        let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        guard values.isRegularFile == true,
+              let fileSize = values.fileSize,
+              fileSize >= 0,
+              fileSize <= DataBackupRestoreLimits.maximumMediaItemBytes + DataBackupRestoreLimits.maximumEncryptionOverheadBytes else {
+            throw BackupError.invalidRestoreData(.media)
+        }
         let fileData = try Data(contentsOf: url)
-        return try DataBackupEncryption.decryptIfNeeded(fileData, password: password)
+        let data = try DataBackupEncryption.decryptIfNeeded(fileData, password: password)
+        guard data.count == reference.byteCount,
+              data.count <= DataBackupRestoreLimits.maximumMediaItemBytes else {
+            throw BackupError.invalidRestoreData(.media)
+        }
+        return data
     }
 }

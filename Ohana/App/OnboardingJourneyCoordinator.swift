@@ -12,7 +12,6 @@ import SwiftData
 
 enum OnboardingJourneyPhase: Equatable {
     case preOnboarding
-    case needsPrimaryHuman
     case needsFirstPet
     case starterGiftPending
     case starterGiftReadyForCeremony(amount: Int)
@@ -29,9 +28,24 @@ struct OnboardingJourneyEvaluation: Equatable {
 
 enum OnboardingJourneyCoordinator {
     enum Key {
+        static let journeyStartedAt = "ohanaStarterJourneyStartedAtV1"
         static let firstCareCompleted = "ohanaStarterFirstCareCompletedV1"
         static let roadmapPromptSeen = "ohanaStarterRoadmapPromptSeenV1"
         static let existingUserUpgradeSeen = "ohanaExistingUserGrowthUpgradeSeenV1"
+    }
+
+    @MainActor
+    static func beginFreshJourney(
+        context: ModelContext,
+        defaults: UserDefaults = .standard,
+        now: Date = Date()
+    ) {
+        let didBegin = StarterGiftService.beginFreshJourney(context: context, defaults: defaults)
+        guard didBegin || defaults.bool(forKey: StarterGiftStorageKey.pending) else { return }
+        if defaults.object(forKey: Key.journeyStartedAt) == nil {
+            defaults.set(now.timeIntervalSince1970, forKey: Key.journeyStartedAt)
+            AppPerformanceMonitor.shared.record("onboarding_pet_first_started", valueMS: 0)
+        }
     }
 
     @MainActor
@@ -52,6 +66,10 @@ enum OnboardingJourneyCoordinator {
             defaults: defaults,
             projectionManager: projectionManager
         )
+
+        if hasRecordedCareBusinessFact(context: context) {
+            markFirstCareCompleted(defaults: defaults)
+        }
 
         if result == .markedExistingUser {
             defaults.set(true, forKey: Key.firstCareCompleted)
@@ -75,17 +93,29 @@ enum OnboardingJourneyCoordinator {
             return .starterGiftReadyForCeremony(amount: StarterGiftService.giftAmount)
         }
 
-        if activeHumanID?.isEmpty != false {
-            return defaults.bool(forKey: StarterGiftStorageKey.pending) ? .starterGiftPending : .needsPrimaryHuman
-        }
-
         if defaults.bool(forKey: StarterGiftStorageKey.pending) {
-            // 礼包改为「创建首只宠物即发」:有首宠即可,不再等待录体重(首个照护)。
             guard hasActivePet(context: context) else { return .needsFirstPet }
+            guard hasRecordedCareBusinessFact(context: context) else { return .firstCarePending }
             return .starterGiftPending
         }
 
         return .complete
+    }
+
+    @MainActor
+    static func interruptedOnboardingFirstPetID(context: ModelContext) -> String? {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { pet in
+                pet.passedAwayDate == nil
+            },
+            sortBy: [SortDescriptor(\Pet.createdAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 1
+        return fetchModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "recover interrupted onboarding first pet"
+        ).first?.id.uuidString
     }
 
     @MainActor
@@ -107,8 +137,28 @@ enum OnboardingJourneyCoordinator {
     }
 
     @MainActor
-    static func markStarterCeremonySeen(defaults: UserDefaults = .standard) {
+    static func markStarterCeremonySeen(
+        defaults: UserDefaults = .standard,
+        now: Date = Date()
+    ) {
+        let elapsedMilliseconds = journeyElapsedMilliseconds(defaults: defaults, now: now)
         StarterGiftService.markCeremonySeen(defaults: defaults)
+        if let elapsedMilliseconds {
+            AppPerformanceMonitor.shared.record(
+                "onboarding_pet_first_value_completed",
+                valueMS: elapsedMilliseconds
+            )
+        }
+    }
+
+    static func journeyElapsedMilliseconds(
+        defaults: UserDefaults = .standard,
+        now: Date = Date()
+    ) -> Double? {
+        guard defaults.object(forKey: Key.journeyStartedAt) != nil else { return nil }
+        let startedAt = defaults.double(forKey: Key.journeyStartedAt)
+        guard startedAt > 0 else { return nil }
+        return max(0, now.timeIntervalSince1970 - startedAt) * 1000
     }
 
     @MainActor
@@ -131,10 +181,20 @@ enum OnboardingJourneyCoordinator {
         defaults.removeObject(forKey: Key.firstCareCompleted)
         defaults.removeObject(forKey: Key.roadmapPromptSeen)
         defaults.removeObject(forKey: Key.existingUserUpgradeSeen)
+        defaults.removeObject(forKey: Key.journeyStartedAt)
     }
 
     @MainActor
     private static func hasRecordedCareBusinessFact(context: ModelContext) -> Bool {
+        var weightDescriptor = FetchDescriptor<PetWeightLog>()
+        weightDescriptor.fetchLimit = 1
+        if !fetchModelsOrLog(
+            weightDescriptor,
+            context: context,
+            operation: "fetch recorded starter weight facts"
+        ).isEmpty {
+            return true
+        }
         var descriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.actionType != "starterGift" && event.eventKind != "coconut"
@@ -175,12 +235,14 @@ enum OnboardingJourneyCoordinator {
 
 @MainActor
 protocol OnboardingJourneyCoordinating {
+    func beginFreshJourney(context: ModelContext)
     func evaluate(
         hasOnboarded: Bool,
         activeHumanID: String?,
         context: ModelContext,
         projectionManager: QuestManager?
     ) -> OnboardingJourneyEvaluation
+    func interruptedOnboardingFirstPetID(context: ModelContext) -> String?
     func interruptedOnboardingPrimaryHumanID(context: ModelContext) -> String?
     func markStarterCeremonySeen()
     func markFirstCareCompleted()
@@ -188,6 +250,10 @@ protocol OnboardingJourneyCoordinating {
 }
 
 struct LiveOnboardingJourneyCoordinator: OnboardingJourneyCoordinating {
+    func beginFreshJourney(context: ModelContext) {
+        OnboardingJourneyCoordinator.beginFreshJourney(context: context)
+    }
+
     func evaluate(
         hasOnboarded: Bool,
         activeHumanID: String?,
@@ -200,6 +266,10 @@ struct LiveOnboardingJourneyCoordinator: OnboardingJourneyCoordinating {
             context: context,
             projectionManager: projectionManager
         )
+    }
+
+    func interruptedOnboardingFirstPetID(context: ModelContext) -> String? {
+        OnboardingJourneyCoordinator.interruptedOnboardingFirstPetID(context: context)
     }
 
     func interruptedOnboardingPrimaryHumanID(context: ModelContext) -> String? {

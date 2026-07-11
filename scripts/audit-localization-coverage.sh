@@ -92,6 +92,49 @@ for lproj in "${lprojs[@]:-}"; do
 done
 
 echo
+echo "== Protected-resource prompt localization =="
+info_plist_base="Ohana/en.lproj/InfoPlist.strings"
+info_plist_keys="$(mktemp)"
+declared_localizations="$(mktemp)"
+plutil -extract CFBundleLocalizations xml1 -o "$declared_localizations" Ohana/Info.plist
+if [[ -f "$info_plist_base" ]]; then
+  perl -ne 'print "$1\n" if /^"((?:\\"|[^"])*)"\s*=/' "$info_plist_base" | sort -u > "$info_plist_keys"
+else
+  echo "missing  $info_plist_base"
+  status=1
+fi
+for lproj in "${lprojs[@]:-}"; do
+  if ! grep -q "<string>${lproj}</string>" "$declared_localizations"; then
+    echo "missing  CFBundleLocalizations entry for $lproj"
+    status=1
+  fi
+  if [[ "$lproj" == "zh-Hans" ]]; then
+    echo "ok  Ohana/Info.plist provides zh-Hans protected-resource prompts"
+    continue
+  fi
+  file="Ohana/${lproj}.lproj/InfoPlist.strings"
+  if [[ ! -f "$file" ]]; then
+    echo "missing  $file"
+    status=1
+    continue
+  fi
+  plutil -lint "$file"
+  if [[ -s "$info_plist_keys" ]]; then
+    keys="$(mktemp)"
+    perl -ne 'print "$1\n" if /^"((?:\\"|[^"])*)"\s*=/' "$file" | sort -u > "$keys"
+    if ! cmp -s "$info_plist_keys" "$keys"; then
+      echo "mismatch  $file protected-resource keys differ from en"
+      status=1
+    else
+      echo "ok  $file"
+    fi
+    rm -f "$keys"
+  fi
+done
+rm -f "$info_plist_keys"
+rm -f "$declared_localizations"
+
+echo
 echo "== Key parity =="
 base="Ohana/en.lproj/Localizable.strings"
 if [[ -f "$base" ]]; then

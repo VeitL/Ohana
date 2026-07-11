@@ -1,6 +1,6 @@
 # 首发真机测试清单
 
-更新日期：2026-07-09
+更新日期：2026-07-11
 
 本文件给真机执行使用，目的是让你一眼看清：哪些已经由自动化或模拟器预检覆盖，哪些还必须由你在真实 iPhone 上签收。
 
@@ -35,6 +35,20 @@
 - GAP-6、GAP-7、GAP-9 的详细要求来自 `docs/planning/gap-acceptance-track-list.md`。
 - CloudKit live apply 来自 TFU-20260614-014 和 `docs/cloud-sync-todo.md`，首发关闭 CloudKit 时不进入真机测试轮。
 - 本清单只用于你执行和打勾；最终通过 / 失败状态仍要同步回对应总账。
+
+## 2026-07-11 模拟器预检补充
+
+- 快速发布 UI smoke 已通过 3/3；首宠创建路径在每轮重启 App 的条件下
+  连续通过 10/10。证据见
+  `docs/audits/2026-07-11/UI_SMOKE_GATE_CLOSURE.md`。
+- 自动辅助功能契约已确认首宠 Today Focus 卡片只有一个具名主动作，保留
+  Button role、完整标题/说明和稳定 activation frame。
+- XCUITest 的调试树仍会列出 SwiftUI 用于绘制的 `Text`，即使父辅助功能元素
+  已声明忽略子元素；因此模拟器自动化不能替代真实 VoiceOver 的逐项朗读顺序、
+  焦点移动、Voice Control 或 Switch Control 验收。
+- 上述证据只关闭仓库内 UI smoke gate，不勾选本文件任何真机项目。请在真机
+  RC 轮继续检查首宠卡片的朗读顺序、主动作与右上角收起动作是否各出现一次，
+  并保留 Reduce Motion、Dynamic Type 和真实触摸手感证据。
 
 ## 完成打卡板
 
@@ -542,7 +556,7 @@
 - 2026-07-03 植物 wallet 卡片展开 / 收起位置稳定性已做 GUI 复测并追加根因修复：6 张植物卡片同屏时，展开一张植物卡再收起后，6 张卡片都会回到原始 frame 附近；8 张植物长列表时，首屏只有 6 张卡片处于可点击区域，第 7 张以后需要向下滚动，滚动到的卡片仍可展开 / 收起且后续卡片仍可继续到达；植物 deck 已对齐 Home 植物卡片的 collapsed anchor，当前根因修复是在植物页启用共享 scene 的本地 inactive freeze，让非选中卡片在 hero 动画期间冻结 frame / rotation 并禁用隐式动画 / 缩放，同时仍不恢复植物页专用 frozen inactive 外部状态；最新复跑还确认 wallet 代码拆到 `PlantDashboardView+WalletDeck.swift` 后源码守卫覆盖该文件和 scene-local inactive freeze 开关。
 - 2026-07-03 最新顺序 GUI 复跑再次确认植物 wallet：6 张卡片展开 / 收起后全部回到原始 frame 附近；8 张植物时首屏只有 6 张处于可点区域，第 7 张以后需要滚动，滚动后的卡片仍可展开 / 收起且后续卡片仍可继续到达。并发跑 UI 测试会抢同一个模拟器 app 进程，已丢弃不作为失败证据。
 - 2026-07-03 植物照护类型文案已做显式语言预检：Dashboard、wallet 快捷操作、护理计划、位置详情、植物详情时间线、通知 intent 标题和成长日记导出都走 `displayName(l:)`，中文 / 英文 / 德文单测和源码守卫通过；真机只需按当前语言目检关键入口文案不串语言。
-- 2026-07-03 右侧房间 rail 已做 GUI 复测：4 株植物分布在 Living room / Balcony，展开 Living room 植物后点击 Balcony rail 会收起展开卡片、只显示 Balcony 植物，并把 Balcony 卡片从原 All deck 位置重新排到过滤后前排；切回 All 后恢复原 All deck 位置。
+- 2026-07-03 右侧房间 rail 的旧交互曾做 GUI 复测：展开 Living room 植物后直接点击 Balcony rail 会收起卡片并完成筛选。当前显式策略已改为“卡片展开时隐藏 rail”；现行自动化会先收起卡片、等待 rail 恢复，再筛选并验证重排。旧结果只保留为历史证据，现行 GUI 复跑仍待完成。
 - 2026-07-03 后续产品口径已移除植物详情 -> 护理日历入口；植物相关 Calendar 事项改为通过首页日历 tab 的“植物”聚合筛选验收。
 
 真机还要测：
@@ -560,7 +574,7 @@
 - [ ] 在添加植物搜索框分别搜中文名、英文名、拉丁名和别名；确认结果能点选，且不知道品种时仍可跳过手动建档。
 - [ ] Plants 视图中点击植物卡片能展开为 wallet 卡片；再次点击或上滑能收起；展开 / 收起过程中其他卡片不能跳位；6 张以内按宠物卡片位置铺开，7 张及以上从第 7 张开始需要向下滚动；展开后浇水、施肥、笔记 / 成长记录、详情四个快捷操作都能点到正确页面或记录页。
 - [ ] 植物卡图片优先显示用户照片；没有用户照片时，Pothos / Monstera / 空气凤梨等目录品种显示品种库本地图；手动创建未知 / 非目录品种时使用通用叶子图且不破版。
-- [ ] 用屏幕右边缘房间 rail 切换“全部”和各房间；确认 44pt 命中不难点、不挡底部导航 / FAB；切到不包含当前展开植物的房间时，展开卡片会自动收起。
+- [ ] 展开植物卡片时确认屏幕右边缘房间 rail 隐藏；收起卡片后确认 rail 恢复，再切换“全部”和各房间；确认 44pt 命中不难点、不挡底部导航 / FAB，筛选后的卡片会重新排布，切回“全部”后恢复完整 deck。
 - [ ] 从 Home FAB -> More -> Plants 打开 Function Menu 植物分组，依次点 Plant Overview / Plant List / Growth Photos；确认三者切换到对应植物页，并确认不再出现 Plant Calendar 分段。
 - [ ] 从植物详情页打开功能中心；确认不再出现“护理日历”卡片；回到首页日历 tab 点“植物”聚合筛选，确认植物事项仍可查看。
 - [ ] 多房间、多植物、空房间、长英文 / 德文 / 中文名称、动态字体放大时不重叠、不挡按钮。
@@ -577,7 +591,7 @@
 
 - 设备 / iOS：
 - 构建：
-- 结果：2026-07-01 周报、植物核心长链路、植物 Settings bulk defer 入口和 Plant Detail 编辑取消 / 保存均已有模拟器 GUI 预检；2026-07-02 植物品种库 / wallet 卡片 / 右侧房间 rail 已有代码预检和 Debug build；2026-07-03 添加植物目录优先无键盘主路径、248 个目录品种本地头像接入、植物 wallet 展开 / 收起、8 张植物长列表滚动、右侧房间 rail、以及“植物页不再提供独立植物日历入口，植物事项只从首页日历 tab 的植物聚合筛选查看”均已有模拟器 GUI 或单元预检；真实照片、纪念历史真实样本、历史植物样本和真机手感仍待测。
+- 结果：2026-07-01 周报、植物核心长链路、植物 Settings bulk defer 入口和 Plant Detail 编辑取消 / 保存均已有模拟器 GUI 预检；2026-07-02 植物品种库 / wallet 卡片 / 右侧房间 rail 已有代码预检和 Debug build；2026-07-03 添加植物目录优先无键盘主路径、248 个目录品种本地头像接入、植物 wallet 展开 / 收起、8 张植物长列表滚动，以及“植物页不再提供独立植物日历入口，植物事项只从首页日历 tab 的植物聚合筛选查看”均已有模拟器 GUI 或单元预检。房间 rail 的旧 GUI 结果不再代表当前“展开时隐藏”的交互；当前策略已有单元预检，修订后的 GUI 用例仍待复跑。真实照片、纪念历史真实样本、历史植物样本和真机手感仍待测。
 - 预检证据：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-gui-broad-20260701-a scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testPlantModuleUnlockCreateCareReminderCalendarAndDelete' ... '-only-testing:OhanaUITests/OhanaUITests/testFamilyWeeklyReportOpensFromDebugSettingsWithoutCompetitionCopy' ...`，`iPhone 17` simulator，7 条 GUI 用例合跑 `Executed 7 tests, with 0 failures`，xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-a/Logs/Test/Test-Ohana-2026.07.01_00-39-04-+0200.xcresult`。
 - 预检证据：2026-07-01 broad GUI 批次 J 初跑 18 条中 17 条通过，唯一失败为植物 Calendar 首屏查找测试脚本问题；修复后 `PlantModuleUITests.testPlantModuleUnlockCreateCareReminderCalendarAndDelete` 单条复跑通过，覆盖植物解锁、创建、Settings 提醒、Calendar 植物计划行查找、详情护理、删除撤销和永久删除；初跑 xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-j/Logs/Test/Test-Ohana-2026.07.01_06-26-43-+0200.xcresult`，复跑 xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-j/Logs/Test/Test-Ohana-2026.07.01_06-52-42-+0200.xcresult`。
 - 预检证据：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-gui-broad-20260701-c scripts/test-simulator.sh '-only-testing:OhanaTests/PlantLaunchTests/plantBulkDeferAppliesToMutedVisibleCareTasksWithoutRecreatingReminders()'`，`iPhone 17` simulator，植物 bulk defer 业务单测通过；xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-c/Logs/Test/Test-Ohana-2026.07.01_02-43-45-+0200.xcresult`。
@@ -594,7 +608,8 @@
 - 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaTests/PlantDetailExperienceTests'`，`iPhone 17` simulator，12 条植物体验源码测试通过，确认植物 dashboard 源码守卫已包含 `PlantDashboardView+WalletDeck.swift`、8 张植物 seed 数量和长列表 GUI 断言；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_07-45-54-+0200.xcresult`。
 - 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testExistingPlantWalletExpandCollapseReturnsToStableDeckWithoutReset()'`，`iPhone 17` simulator，1 条 GUI 用例通过；测试 seed 6 张植物卡片，展开第一张植物卡、等待 `home-expanded-detail-plant`、点击 `home-expanded-collapse-plant` 收起，并断言 6 张植物卡都恢复到稳定可点击 collapsed frame；最新复跑通过，xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_07-46-12-+0200.xcresult`。
 - 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testPlantWalletLongListScrollsPastSixCardsWithoutCrowdingTopViewport()'`，`iPhone 17` simulator，1 条 GUI 用例通过；测试 seed 8 张植物卡片，断言首屏顶部可点击区域正好 6 张卡片、至少 1 张卡片需要滚动才能到达，滚动到第 7 张以后仍能展开 / 收起，且另一张后续卡片仍可继续滚动到达；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_07-42-52-+0200.xcresult`。
-- 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testPlantRoomRailFiltersAndCollapsesExpandedCard'`，`iPhone 17` simulator，1 条 GUI 用例通过；测试 seed 4 张植物卡片，点击右侧 Balcony rail 后确认展开卡片收起、Living room 植物隐藏、Balcony 植物显示并从 All deck 旧位置重排到过滤后前排，再点击 All rail 恢复原 All deck frame；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_05-00-34-+0200.xcresult`。
+- 历史预检证据：2026-07-03 `testPlantRoomRailFiltersAndCollapsesExpandedCard` 在 `iPhone 17` simulator 通过，xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_05-00-34-+0200.xcresult`；该用例验证的是已被当前策略取代的“展开时 rail 仍可点击”交互，不作为现行 GUI 通过证据。现行用例名为 `testPlantRoomRailFiltersAfterCollapsingExpandedCard`，先验证展开时 rail 隐藏，再收起并筛选；GUI 复跑待完成。
+- 当前策略证据：2026-07-10 `scripts/test-simulator.sh '-only-testing:OhanaTests/VerticalHomeTabMountPolicyTests/plantRoomRailShowsWhenPlantPageHasPlants()'`，`iPhone 17` simulator，通过；确认有植物且无展开卡片时显示 rail，卡片选中或 hero 动画期间隐藏。xcresult `.build/DerivedData/tests/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.10_23-58-26-+0200.xcresult`。
 - 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaTests/PlantDetailExperienceTests' '-only-testing:OhanaTests/PlantLaunchTests' '-only-testing:OhanaTests/AppRouteCoordinatorTests' '-only-testing:OhanaTests/HomeRouteCoordinatorTests' '-only-testing:OhanaTests/VerticalHomeTabMountPolicyTests'`，`iPhone 17` simulator，176 条 selected 源码 / 路由 / 植物策略测试通过；其中 `PlantDetailExperienceTests/testPlantCalendarEntrypointsAreRemovedButGlobalFilterRemains` 确认植物详情 / Function Menu 植物日历入口已移除，首页日历的“植物”聚合筛选仍保留；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_13-48-26-+0200.xcresult`。
 - 预检证据：2026-07-03 `scripts/test-simulator.sh '-only-testing:OhanaUITests/PlantModuleUITests/testPlantDetailDoesNotExposeCareCalendarEntrypointWithoutReset'`，`iPhone 17` simulator，1 条 GUI 用例通过；测试 seed 植物后进入植物详情，确认 `plant-detail-action-tool-calendar` 不存在，打开功能中心后确认 `feature-hub-plan-calendar` 不存在；xcresult `/var/folders/9j/7ldcxzn91d947mg4p_7wxmz40000gn/T/OhanaDerivedData/main-b6cf423d5931-tests/Logs/Test/Test-Ohana-2026.07.03_13-48-48-+0200.xcresult`。
 - 问题：

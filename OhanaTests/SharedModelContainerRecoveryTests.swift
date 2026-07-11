@@ -3,11 +3,142 @@ import XCTest
 @testable import Ohana
 
 final class SharedModelContainerRecoveryTests: XCTestCase {
-    func testDiskAndMemoryFallbackStoresKeepFallbackIndicatorActive() {
-        XCTAssertFalse(SharedModelContainer.fallbackIndicatorIsActive(for: .primaryWithMigrationPlan))
-        XCTAssertFalse(SharedModelContainer.fallbackIndicatorIsActive(for: .defaultStoreWithoutMigrationPlan))
-        XCTAssertTrue(SharedModelContainer.fallbackIndicatorIsActive(for: .diskFallback))
-        XCTAssertTrue(SharedModelContainer.fallbackIndicatorIsActive(for: .memoryFallback))
+    func testEveryAutomaticOpenAttemptUsesOneWritablePrimaryIdentity() {
+        XCTAssertEqual(
+            SharedModelContainerOpenPolicy.orderedAttempts,
+            [.primaryWithMigrationPlan, .primaryWithoutMigrationPlan]
+        )
+        XCTAssertEqual(
+            Set(SharedModelContainerOpenPolicy.orderedAttempts.map(\.identity)),
+            [.primary]
+        )
+        XCTAssertEqual(SharedModelContainerOpenPolicy.writableStoreIdentities, [.primary])
+    }
+
+    func testMigrationFailureRetriesTheSamePrimaryIdentity() throws {
+        var attemptedStoreKinds: [SharedModelContainerStoreKind] = []
+
+        let openedIdentity = try SharedModelContainerOpenPolicy.open { storeKind -> SharedModelContainerStoreIdentity in
+            attemptedStoreKinds.append(storeKind)
+            if storeKind == .primaryWithMigrationPlan {
+                throw StoreOpenTestError.migrationPlanRejected
+            }
+            return storeKind.identity
+        }
+
+        XCTAssertEqual(openedIdentity, .primary)
+        XCTAssertEqual(
+            attemptedStoreKinds,
+            [.primaryWithMigrationPlan, .primaryWithoutMigrationPlan]
+        )
+    }
+
+    func testBothPrimaryOpenModesFailClosedBeforeAnyDiskOrMemoryFallbackWrite() {
+        var attemptedStoreKinds: [SharedModelContainerStoreKind] = []
+
+        XCTAssertThrowsError(try SharedModelContainerOpenPolicy.open { storeKind -> String in
+            attemptedStoreKinds.append(storeKind)
+            throw StoreOpenTestError.primaryUnavailable
+        }) { error in
+            XCTAssertEqual(
+                error as? SharedModelContainerOpenFailure,
+                SharedModelContainerOpenFailure(
+                    attemptedStoreKinds: [.primaryWithMigrationPlan, .primaryWithoutMigrationPlan]
+                )
+            )
+        }
+
+        XCTAssertEqual(
+            attemptedStoreKinds,
+            [.primaryWithMigrationPlan, .primaryWithoutMigrationPlan]
+        )
+        XCTAssertEqual(Set(attemptedStoreKinds.map(\.identity)), [.primary])
+    }
+
+    func testDiskFullFailureCanRecoverAndRepeatOnlyOnThePrimaryIdentity() throws {
+        var diskIsFull = true
+        var attemptedStoreKinds: [SharedModelContainerStoreKind] = []
+
+        XCTAssertThrowsError(try SharedModelContainerOpenPolicy.open { storeKind -> SharedModelContainerStoreIdentity in
+            attemptedStoreKinds.append(storeKind)
+            if diskIsFull {
+                throw StoreOpenTestError.diskFull
+            }
+            return storeKind.identity
+        })
+
+        diskIsFull = false
+        let recoveredIdentities = try (0 ..< 3).map { _ in
+            try SharedModelContainerOpenPolicy.open { storeKind -> SharedModelContainerStoreIdentity in
+                attemptedStoreKinds.append(storeKind)
+                return storeKind.identity
+            }
+        }
+
+        XCTAssertEqual(recoveredIdentities, [.primary, .primary, .primary])
+        XCTAssertEqual(
+            Array(attemptedStoreKinds.prefix(2)),
+            [.primaryWithMigrationPlan, .primaryWithoutMigrationPlan]
+        )
+        XCTAssertTrue(attemptedStoreKinds.allSatisfy { $0.identity == .primary })
+    }
+
+    @MainActor
+    func testSamePrimaryStorePreservesFallbackWriteAcrossRelaunch() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaStoreIdentityTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let petID = UUID()
+        let schema = Schema(ArkSchemaV85.models)
+
+        do {
+            let container = try SharedModelContainerOpenPolicy.open { storeKind -> ModelContainer in
+                if storeKind == .primaryWithMigrationPlan {
+                    throw StoreOpenTestError.migrationPlanRejected
+                }
+                let configuration = ModelConfiguration(
+                    "OhanaPrimary",
+                    schema: schema,
+                    url: storeURL,
+                    cloudKitDatabase: .none
+                )
+                return try ModelContainer(for: schema, configurations: [configuration])
+            }
+            let pet = Pet(name: "Miso", species: "Cat", breed: "Domestic")
+            pet.id = petID
+            container.mainContext.insert(pet)
+            try container.mainContext.save()
+        }
+
+        do {
+            let container = try SharedModelContainerOpenPolicy.open { storeKind -> ModelContainer in
+                let configuration = ModelConfiguration(
+                    "OhanaPrimary",
+                    schema: schema,
+                    url: storeURL,
+                    cloudKitDatabase: .none
+                )
+                switch storeKind {
+                case .primaryWithMigrationPlan:
+                    return try ModelContainer(
+                        for: schema,
+                        migrationPlan: ArkMigrationPlan.self,
+                        configurations: [configuration]
+                    )
+                case .primaryWithoutMigrationPlan:
+                    return try ModelContainer(for: schema, configurations: [configuration])
+                }
+            }
+            var descriptor = FetchDescriptor<Pet>(predicate: #Predicate<Pet> { $0.id == petID })
+            descriptor.fetchLimit = 1
+            let restoredPet = try container.mainContext.fetch(descriptor).first
+
+            XCTAssertEqual(restoredPet?.id, petID)
+            XCTAssertEqual(restoredPet?.name, "Miso")
+        }
     }
 
     func testCloudSyncDeletionTombstoneDefaultsMirrorLegacyDeletionFlag() {
@@ -230,6 +361,12 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
             XCTAssertEqual(migratedPlant.avatarAttachmentState, .absent)
         }
     }
+}
+
+private enum StoreOpenTestError: Error {
+    case migrationPlanRejected
+    case primaryUnavailable
+    case diskFull
 }
 
 private enum ArkSchemaV67OnlyMigrationPlan: SchemaMigrationPlan {

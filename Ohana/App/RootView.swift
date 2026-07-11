@@ -17,10 +17,8 @@ struct RootView: View {
     @AppStorage("ohana_has_onboarded") private var hasOnboarded = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @AppStorage(AppPrivacySnapshotProtectionStore.hideSnapshotKey) private var hideAppSwitcherSnapshot = AppPrivacySnapshotProtectionStore.defaultHideSnapshot
-    // F3: 数据库降级警告
-    @State private var showDBFallbackAlert = DatabaseFallbackPreferenceStore.isFallbackActive()
     @State private var appSwitcherSnapshotCoverRequested = false
-    @State private var onboardingPrimaryHumanID: String?
+    @State private var onboardingFirstPetID: String?
     @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
     @State private var plantBatchCareRewardSettlementTask: Task<Void, Never>?
@@ -35,15 +33,15 @@ struct RootView: View {
             if hasOnboarded {
                 ContentView(
                     showsEmbeddedOnboarding: false,
-                    onboardingPrimaryHumanID: onboardingPrimaryHumanID,
+                    onboardingFirstPetID: onboardingFirstPetID,
                     routeLanguageCode: appLanguage
                 )
             }
 
             if !hasOnboarded {
                 OnboardingView(
-                    onPrimaryHumanSaved: { human in
-                        onboardingPrimaryHumanID = human.id.uuidString
+                    onFirstPetSaved: { pet in
+                        onboardingFirstPetID = pet.id.uuidString
                     },
                     onHomeJoinHandoffPreflight: beginOnboardingHomePreflight
                 )
@@ -101,17 +99,6 @@ struct RootView: View {
         }
         .onReceive(OnlineFeatureGateNoticeCenter.notices) { reason in
             onlineGateNoticeReason = reason
-        }
-        .alert(Text(l.tr(zh: "数据异常", en: "Data issue", de: "Datenproblem")), isPresented: $showDBFallbackAlert) {
-            Button(l.tr(zh: "我知道了", en: "Got it", de: "Verstanden"), role: .cancel) {
-                DatabaseFallbackPreferenceStore.clearFallbackActive()
-            }
-        } message: {
-            Text(l.tr(
-                zh: "数据库加载失败，当前为临时模式。本次会话的数据不会被保存。请尝试重启 App，如问题持续请联系开发者。",
-                en: "The database could not be loaded, so Ohana is running in temporary mode. Data from this session will not be saved. Please restart the app, and contact the developer if the issue continues.",
-                de: "Die Datenbank konnte nicht geladen werden. Ohana läuft vorübergehend im temporären Modus. Daten aus dieser Sitzung werden nicht gespeichert. Bitte starte die App neu und kontaktiere den Entwickler, falls das Problem weiterhin besteht."
-            ))
         }
         .alert(Text(onlineGateNoticeTitle), isPresented: onlineGateNoticeBinding) {
             Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {
@@ -241,6 +228,8 @@ struct RootView: View {
 }
 
 #Preview {
-    RootView()
-        .modelContainer(SharedModelContainer.make())
+    if let modelContainer = try? SharedModelContainer.makePreview() {
+        RootView()
+            .modelContainer(modelContainer)
+    }
 }

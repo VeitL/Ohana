@@ -119,7 +119,8 @@ extension MemberCardCreationContentView {
         switch HumanProfileOptions.normalizedGender(gender) {
         case "男": "♂"
         case "女": "♀"
-        default: "?"
+        case "非二元": "⚧"
+        default: "•"
         }
     }
 

@@ -70,9 +70,11 @@ product checks.
 - `Ohana/Domain/Services/CloudSyncShareRuntime.swift`: share helpers stay as the
   future implementation detail. Launch acceptance is blocked at the app-delegate
   handoff.
-- Remote notification registration and iCloud account observation may remain
-  inert in launch builds because `CloudSyncEngineRuntime` defaults to disabled;
-  no user-reachable enable path may bypass the gate.
+- The Solo target must not register for APNs and must not declare the
+  `remote-notification` background mode or CloudKit service entitlement.
+  Dormant account-observation and CloudKit implementation code may remain for
+  future work, but no user-reachable path may enable it or write sync-dirty
+  state while the gate is closed.
 
 ## Blocked UX
 

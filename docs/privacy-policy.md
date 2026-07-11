@@ -1,6 +1,6 @@
 # Ohana Privacy Policy / Ohana 隐私政策
 
-Last updated / 更新日期：2026-07-09
+Last updated / 更新日期：2026-07-10
 Support / 支持：[guanchen.li.119@gmail.com](mailto:guanchen.li.119@gmail.com?subject=Ohana%20Support)
 
 ## Summary / 摘要
@@ -47,6 +47,15 @@ logs, health metrics, and health reports.
 
 Ohana **不会**将个人的人类健康信息存入 iCloud，包括 HealthKit 衍生运动数据、
 人类体重、用药及用药记录、健康指标和健康报告。
+
+Ohana marks its local Application Support persistence root, including the
+SwiftData store and Human Note attachment directories, as excluded from
+OS-managed device backups. The only app-managed iCloud path in the Solo release
+is the restricted iCloud Drive package described below.
+
+Ohana 会将本地 Application Support 持久化根目录（包括 SwiftData 存储和
+人类笔记附件目录）标记为不参与系统管理的设备备份。Solo 版本中唯一由
+应用管理的 iCloud 路径，是下文所述的受限 iCloud Drive 备份包。
 
 ## Backups and Exports / 备份与导出
 

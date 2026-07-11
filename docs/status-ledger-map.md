@@ -12,6 +12,7 @@
 | `docs/cloud-sync-todo.md` | CloudKit and real-device sync work that is deferred while CloudKit is disabled or unproven. | General app P1/P2 backlog outside sync. |
 | `docs/planning/gap-acceptance-track-list.md` | Manual acceptance debt that cannot be proven in repo tests or simulator-only runs. | Normal code follow-ups that can be closed by repo changes. |
 | `docs/release-true-device-test-plan.md` | Chinese operator checklist for first-release physical-device testing, derived from the active ledgers. | Canonical release status, historical evidence, or follow-up ownership. |
+| `docs/audits/<date>/` | Dated audit, market, release-classification, roadmap, and PR evidence for one commit. | Current release status, open-count ownership, or authority over later source changes. |
 | `docs/archive/*-full-2026-06-25.md` | Full pre-compaction history for lookup. | Current status. |
 
 ## Update Rules
@@ -28,6 +29,10 @@
 - If the user needs to execute true-device validation, keep
   `docs/release-true-device-test-plan.md` as the concise Chinese checklist and
   backfill pass/fail results to the owning ledger above.
+- When a dated audit confirms a new current finding, add or update the owning
+  active ledger in the same documentation batch. If the finding is rejected,
+  record that disposition in the audit package instead. Never leave an audit
+  report and the active release read asserting opposite current states.
 - Do not paste full command logs into active ledgers. Keep the command name,
   result, and why it matters; archive long history during compaction.
 

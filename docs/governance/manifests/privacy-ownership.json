@@ -1,6 +1,6 @@
 {
   "schema": "ohana.governance.privacy-ownership.v1",
-  "updated": "2026-06-08",
+  "updated": "2026-07-10",
   "policyDocuments": [
     "AGENTS.md",
     "docs/privacy-compliance.md",
@@ -16,7 +16,7 @@
         "UserDefaults runtime preferences",
         "privacy-safe MetricKit diagnostics"
       ],
-      "storage": "Local device storage and app group container only unless a future feature explicitly adds network sync.",
+      "storage": "Local Application Support storage excluded from OS-managed backup; no App Group. Restricted automatic backup uses the user's iCloud Drive container.",
       "userControl": "Settings privacy/account flows, backup export, backup import, delete-my-data reset.",
       "manifestEvidence": "Ohana/PrivacyInfo.xcprivacy must match actual required-reason API usage and collected data posture.",
       "deletionPaths": [
@@ -30,6 +30,8 @@
         "Ohana/Domain/Services/DataBackupManager.swift",
         "Ohana/Domain/Services/DataBackupDTOs.swift",
         "Ohana/App/AppResetService.swift",
+        "Ohana/Shared/Utilities/LocalBackupExclusionPolicy.swift",
+        "OhanaTests/LocalBackupExclusionPolicyTests.swift",
         "scripts/audit-release-data-safety.sh"
       ]
     },
@@ -42,7 +44,7 @@
         "private health/medication/account fields"
       ],
       "storage": "SwiftData local store; PIN secrets must not be exported in backups.",
-      "userControl": "Human account privacy UI and member privacy toggle controls.",
+      "userControl": "Field-level privacy controls and local member PIN flows where currently reachable; same-device identity is attribution, not a developer account or security vault.",
       "manifestEvidence": "Backups reject PIN hash/salt fields and UI surfaces must use privacy placeholders.",
       "deletionPaths": [
         "AppResetService delete-my-data flow",

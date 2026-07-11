@@ -12,6 +12,10 @@ struct AddPetWizardContentView: View {
     let onComplete: () -> Void
     var onCancel: (() -> Void)?
     var onPetSaved: ((Pet) -> Void)?
+    var presentationStyle: MemberCreationPresentationStyle = .standard
+    var onHomeJoinHandoffPreflight: (() -> Void)?
+    var onHomeJoinHandoffStarted: (() -> Void)?
+    var onHomeJoinHandoffEnded: (() -> Void)?
 
     @State private var memberCreationSessionId = UUID()
 
@@ -21,12 +25,18 @@ struct AddPetWizardContentView: View {
             onComplete: onComplete,
             onCancel: onCancel,
             onPetSaved: onPetSaved,
-            recoverySessionId: memberCreationSessionId
+            recoverySessionId: memberCreationSessionId,
+            presentationStyle: presentationStyle,
+            onHomeJoinHandoffPreflight: onHomeJoinHandoffPreflight,
+            onHomeJoinHandoffStarted: onHomeJoinHandoffStarted,
+            onHomeJoinHandoffEnded: onHomeJoinHandoffEnded
         )
     }
 }
 
 #Preview {
-    AddPetWizardView(onComplete: {})
-        .modelContainer(SharedModelContainer.make())
+    if let modelContainer = try? SharedModelContainer.makePreview() {
+        AddPetWizardView(onComplete: {})
+            .modelContainer(modelContainer)
+    }
 }

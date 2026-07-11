@@ -17,8 +17,22 @@ struct SettingsRouteContainerTests {
         #expect(aboutSource.contains("settings-support-action"))
         #expect(aboutSource.contains("OhanaPublicLinks.privacyPolicy"))
         #expect(aboutSource.contains("OhanaPublicLinks.support"))
+        #expect(aboutSource.contains("OhanaReleaseIdentity.currentVersionDisplay"))
+        #expect(aboutSource.contains("OhanaPublicLinks.appStoreReview"))
+        #expect(!aboutSource.contains("id6742117937"))
         #expect(linkSource.contains("https://github.com/VeitL/Ohana/blob/main/docs/privacy-policy.md"))
         #expect(linkSource.contains("mailto:guanchen.li.119@gmail.com"))
+    }
+
+    @Test func releaseIdentityUsesBundleVersionAndBuildWithoutHardcodedMarketingCopy() {
+        #expect(OhanaReleaseIdentity.versionDisplay(infoDictionary: [
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "7"
+        ]) == "v1.0 (7)")
+        #expect(OhanaReleaseIdentity.versionDisplay(infoDictionary: [
+            "CFBundleShortVersionString": "1.0"
+        ]) == "v1.0")
+        #expect(OhanaReleaseIdentity.versionDisplay(infoDictionary: [:]) == "—")
     }
 
     @Test func settingsBiometricAvailabilityIsRefreshedOnAppear() throws {

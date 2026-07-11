@@ -1,0 +1,8 @@
+/* English fallback for protected-resource prompts until reviewed Spanish copy is approved. */
+"NSCameraUsageDescription" = "Used when you choose to take a member or pet avatar, Moment photo, or receipt attachment.";
+"NSPhotoLibraryUsageDescription" = "Used to import avatars, Moment images, or receipt attachments that you select.";
+"NSHealthShareUsageDescription" = "Used when you connect Apple Health to read steps, distance, active energy, and workouts for this member's local summary.";
+"NSLocationWhenInUseUsageDescription" = "Used when you add a location to a Moment or start a walk so Ohana can record that route.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Used only during an active walk to keep recording the current route when the app is in the background or the screen is locked.";
+"NSLocationAlwaysUsageDescription" = "Used only during an active walk to keep recording the current route when the app is in the background or the screen is locked.";
+"NSFaceIDUsageDescription" = "Used to verify protected member switching with Face ID instead of entering the local PIN.";

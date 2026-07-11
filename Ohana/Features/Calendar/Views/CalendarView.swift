@@ -310,6 +310,8 @@ struct CalendarView: View {
 }
 
 #Preview {
-    CalendarView()
-        .modelContainer(SharedModelContainer.make())
+    if let modelContainer = try? SharedModelContainer.makePreview() {
+        CalendarView()
+            .modelContainer(modelContainer)
+    }
 }

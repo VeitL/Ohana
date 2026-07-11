@@ -18,7 +18,7 @@ struct HumanRequirementCoordinatorTests {
         #expect(resolution == .notOnboarded)
     }
 
-    @Test func onboardedWithoutHumansRequiresProfile() throws {
+    @Test func onboardedWithoutHumansKeepsPetFirstAppUsable() throws {
         let container = try makeContainer()
 
         let resolution = HumanRequirementCoordinator.resolve(
@@ -28,7 +28,7 @@ struct HumanRequirementCoordinatorTests {
             context: container.mainContext
         )
 
-        #expect(resolution == .needsRequiredProfile)
+        #expect(resolution == .readyWithoutHuman)
     }
 
     @Test func accountSwitchPresentationIsPreserved() throws {

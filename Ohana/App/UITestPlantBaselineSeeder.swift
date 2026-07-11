@@ -24,6 +24,14 @@ enum OhanaUITestLaunchOptions {
         return isRunningUITests && arguments.contains("-OHANA_RESET_PERSISTENT_STATE")
     }
 
+    static var disablesAnimations: Bool {
+        isRunningUITests && !ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_ENABLE_ANIMATIONS")
+    }
+
+    static var requestsSingleStoreOpenFailure: Bool {
+        isRunningUITests && ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_FAIL_STORE_OPEN_ONCE")
+    }
+
     static var requestedPlantBaselineSeedCount: Int? {
         let arguments = ProcessInfo.processInfo.arguments
         guard isRunningUITests,
@@ -42,6 +50,21 @@ enum OhanaUITestLaunchOptions {
             return nil
         }
         return coconutBalanceSeedAmount(defaultAmount: 1000)
+    }
+
+    static var requestedHumanBaselineName: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard isRunningUITests,
+              arguments.contains("-OHANA_UI_TEST_SEED_HUMAN_BASELINE") else {
+            return nil
+        }
+        guard let flagIndex = arguments.firstIndex(of: "-OHANA_UI_TEST_HUMAN_BASELINE_NAME"),
+              arguments.indices.contains(arguments.index(after: flagIndex)) else {
+            return "Codex Human Baseline"
+        }
+        let name = arguments[arguments.index(after: flagIndex)]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return String((name.isEmpty ? "Codex Human Baseline" : name).prefix(80))
     }
 
     static var requestsRewardTierUnlock: Bool {
@@ -70,6 +93,50 @@ enum OhanaUITestLaunchOptions {
             return defaultAmount
         }
         return min(max(amount, 0), 100_000)
+    }
+}
+
+@MainActor
+enum UITestHumanBaselineSeeder {
+    static func seedIfRequested(modelContainer: ModelContainer, services: AppServices) {
+        guard let name = OhanaUITestLaunchOptions.requestedHumanBaselineName else { return }
+        let context = modelContainer.mainContext
+        do {
+            var descriptor = FetchDescriptor<Human>(
+                predicate: #Predicate<Human> { human in
+                    human.name == name
+                }
+            )
+            descriptor.fetchLimit = 1
+            let human: Human
+            if let existing = try context.fetch(descriptor).first {
+                human = existing
+            } else {
+                human = Human(name: name)
+                context.insert(human)
+                let saveResult = context.safeSaveResult(publishFailureEvent: true)
+                guard saveResult.didSave else {
+                    context.rollback()
+                    return
+                }
+                services.domainRevisions.publishMemberCreation(
+                    entityID: human.id,
+                    kind: EntityKind.human.rawValue,
+                    note: "startup.human.uiTestBaseline"
+                )
+            }
+            UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
+            // Module UI tests start with a Human baseline but still exercise the
+            // real Pet-first onboarding. Preserve the fresh-journey checkpoint
+            // that production establishes before its first member is written.
+            UserDefaults.standard.set(true, forKey: StarterGiftStorageKey.pending)
+        } catch {
+            context.rollback()
+            OhanaLog.warning(
+                "UI test Human baseline seed failed: \(error.localizedDescription)",
+                category: "Startup"
+            )
+        }
     }
 }
 

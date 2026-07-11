@@ -13,6 +13,8 @@ SDK="${SDK:-iphonesimulator}"
 CODE_SIGNING_ALLOWED_VALUE="${CODE_SIGNING_ALLOWED:-NO}"
 REQUIRED_SIMULATOR_NAME="${OHANA_SIMULATOR_NAME:-iPhone 17}"
 STRIP_XATTRS_SCRIPT="${REPO_ROOT}/scripts/strip-build-xattrs.sh"
+TEST_ACTION="${OHANA_TEST_ACTION:-test}"
+RESULT_BUNDLE_PATH="${OHANA_RESULT_BUNDLE_PATH:-}"
 
 BRANCH_NAME="$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo detached)"
 if [[ "${BRANCH_NAME}" == "HEAD" ]]; then
@@ -26,6 +28,16 @@ DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-${DEFAULT_DERIVED_DATA_ROOT}/${BUILD_ID}
 LOCK_ROOT="${LOCK_ROOT:-${REPO_ROOT}/.build/locks}"
 LOCK_DIR="${LOCK_DIR:-${LOCK_ROOT}/test-${BUILD_ID}.lock}"
 LOCK_ACQUIRED=0
+
+case "${TEST_ACTION}" in
+  test|build-for-testing|test-without-building)
+    ;;
+  *)
+    echo "Unsupported OHANA_TEST_ACTION=${TEST_ACTION}." >&2
+    echo "Allowed actions: test, build-for-testing, test-without-building." >&2
+    exit 2
+    ;;
+esac
 
 if [[ "${SDK}" != "iphonesimulator" ]]; then
   echo "Refusing to test with SDK=${SDK}. Use the fixed simulator SDK: iphonesimulator." >&2
@@ -111,6 +123,14 @@ sanitize_derived_data_products() {
 
 resolve_simulator_destination
 
+if [[ -n "${RESULT_BUNDLE_PATH}" ]]; then
+  if [[ -e "${RESULT_BUNDLE_PATH}" ]]; then
+    echo "Refusing to overwrite existing result bundle: ${RESULT_BUNDLE_PATH}" >&2
+    exit 2
+  fi
+  mkdir -p "$(dirname "${RESULT_BUNDLE_PATH}")"
+fi
+
 mkdir -p "${LOCK_ROOT}" "$(dirname "${DERIVED_DATA_PATH}")"
 while ! mkdir "${LOCK_DIR}" 2>/dev/null; do
   if [[ -f "${LOCK_DIR}/pid" ]]; then
@@ -134,26 +154,39 @@ done
 LOCK_ACQUIRED=1
 printf '%s\n' "$$" > "${LOCK_DIR}/pid"
 
-echo "Testing ${SCHEME}"
+echo "Xcode action: ${TEST_ACTION} (${SCHEME})"
 echo "SDK: ${SDK}"
 echo "Destination: ${DESTINATION}"
 echo "DerivedData: ${DERIVED_DATA_PATH}"
 echo "Code signing: CODE_SIGNING_ALLOWED=${CODE_SIGNING_ALLOWED_VALUE}"
+if [[ -n "${RESULT_BUNDLE_PATH}" ]]; then
+  echo "Result bundle: ${RESULT_BUNDLE_PATH}"
+fi
 
 sanitize_derived_data_products
 
+xcodebuild_args=(
+  -project Ohana.xcodeproj
+  -scheme "${SCHEME}"
+  -sdk "${SDK}"
+  -destination "${DESTINATION}"
+  -derivedDataPath "${DERIVED_DATA_PATH}"
+  -disableAutomaticPackageResolution
+  -skipPackagePluginValidation
+  CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED_VALUE}"
+  "${TEST_ACTION}"
+)
+if [[ -n "${RESULT_BUNDLE_PATH}" ]]; then
+  xcodebuild_args+=(
+    -resultBundlePath "${RESULT_BUNDLE_PATH}"
+  )
+fi
+if [[ $# -gt 0 ]]; then
+  xcodebuild_args+=("$@")
+fi
+
 set +e
-xcodebuild \
-  -project Ohana.xcodeproj \
-  -scheme "${SCHEME}" \
-  -sdk "${SDK}" \
-  -destination "${DESTINATION}" \
-  -derivedDataPath "${DERIVED_DATA_PATH}" \
-  -disableAutomaticPackageResolution \
-  -skipPackagePluginValidation \
-  CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED_VALUE}" \
-  test \
-  "$@"
+xcodebuild "${xcodebuild_args[@]}"
 test_status=$?
 set -e
 

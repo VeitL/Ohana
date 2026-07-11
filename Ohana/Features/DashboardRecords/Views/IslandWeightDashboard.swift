@@ -1033,6 +1033,8 @@ private extension IslandWeightDashboardContentView.WeightTimeFilter {
 }
 
 #Preview {
-    IslandWeightDashboard()
-        .modelContainer(SharedModelContainer.make())
+    if let modelContainer = try? SharedModelContainer.makePreview() {
+        IslandWeightDashboard()
+            .modelContainer(modelContainer)
+    }
 }

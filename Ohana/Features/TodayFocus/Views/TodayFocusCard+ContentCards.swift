@@ -21,59 +21,76 @@ extension TodayFocusCard {
     func carouselCardContent(_ content: TodayFocusContent, selected: Int, count: Int) -> some View {
         let shape = RoundedRectangle(cornerRadius: TodayFocusCardLayout.carouselCornerRadius, style: .continuous)
         return ZStack(alignment: .topTrailing) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .firstTextBaseline, spacing: 7) {
-                    Text(carouselTitle(for: content))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk.opacity(0.92))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
+            ZStack {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .firstTextBaseline, spacing: 7) {
+                        Text(carouselTitle(for: content))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.arkInk.opacity(0.92))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
 
-                    Image(systemName: "chevron.right") // a11y: allow decorative chevron; card label carries the action
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
-                        .foregroundStyle(Color.arkInk.opacity(0.88))
-                        .accessibilityHidden(true)
+                        Image(systemName: "chevron.right") // a11y: allow decorative chevron; card label carries the action
+                            .font(OhanaFont.adaptive(size: 13, weight: .black))
+                            .foregroundStyle(Color.arkInk.opacity(0.88))
+                            .accessibilityHidden(true)
 
-                    Spacer(minLength: 26)
+                        Spacer(minLength: 26)
+                    }
+
+                    Text(carouselSubtitle(for: content))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.arkInk.opacity(0.48))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 7)
+
+                    Spacer(minLength: 0)
+
+                    carouselPageIndicator(count: count, selected: selected)
+                        .padding(.bottom, 2)
                 }
+                .padding(.leading, 18)
+                .padding(.trailing, 38)
+                .padding(.top, 16)
+                .padding(.bottom, 10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .background {
+                    carouselBackground(shape: shape)
+                        .allowsHitTesting(false)
+                }
+                .overlay {
+                    shape
+                        .strokeBorder(Color.arkInk.opacity(0.06), lineWidth: 1)
+                        .allowsHitTesting(false)
+                }
+                .clipShape(shape)
+                .shadow( // ui-v4: allow reference-matched floating Today Focus banner shadow
+                    color: Color.arkInk.opacity(0.12),
+                    radius: 18,
+                    x: 0,
+                    y: 10
+                )
+                .allowsHitTesting(false)
 
-                Text(carouselSubtitle(for: content))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.arkInk.opacity(0.48))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 7)
-
-                Spacer(minLength: 0)
-
-                carouselPageIndicator(count: count, selected: selected)
-                    .padding(.bottom, 2)
-            }
-            .padding(.leading, 18)
-            .padding(.trailing, 38)
-            .padding(.top, 16)
-            .padding(.bottom, 10)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .background {
-                carouselBackground(shape: shape)
-            }
-            .overlay {
-                shape.strokeBorder(Color.arkInk.opacity(0.06), lineWidth: 1)
-            }
-            .clipShape(shape)
-            .shadow( // ui-v4: allow reference-matched floating Today Focus banner shadow
-                color: Color.arkInk.opacity(0.12),
-                radius: 18,
-                x: 0,
-                y: 10
-            )
-            .contentShape(shape)
-            .onTapGesture {
-                activateCarouselContent(content)
+                Button {
+                    activateCarouselContent(content)
+                } label: {
+                    shape
+                        .fill(Color.goCardWhite.opacity(0.001))
+                        .contentShape(shape)
+                }
+                .buttonStyle(.plain) // ui-v4: allow transparent hit proxy; activation supplies the visible card transition
+                .accessibilityHidden(true)
+                .zIndex(1)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(carouselTitle(for: content)). \(carouselSubtitle(for: content))")
+            .accessibilityIdentifier(carouselCardAccessibilityIdentifier(for: content))
             .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                activateCarouselContent(content)
+            }
 
             if canDismissFocusContent(content) {
                 Button {
@@ -90,6 +107,7 @@ extension TodayFocusCard {
                 .accessibilityLabel(l.tr(zh: "收起这张卡片", en: "Dismiss this card", de: "Diese Karte ausblenden"))
                 .padding(.top, 8)
                 .padding(.trailing, 10)
+                .zIndex(2)
             }
         }
     }
@@ -184,6 +202,17 @@ extension TodayFocusCard {
             }
         case .welcome:
             onTapOasis()
+        }
+    }
+
+    func carouselCardAccessibilityIdentifier(for content: TodayFocusContent) -> String {
+        switch content {
+        case let .quest(quest):
+            questCardAccessibilityIdentifier(for: quest)
+        case .welcome:
+            "home-add-first-pet-card"
+        default:
+            "today-focus-carousel-card-\(contentKey(content))"
         }
     }
 

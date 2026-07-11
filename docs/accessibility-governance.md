@@ -34,8 +34,9 @@ quality — it only catches common omissions. Treat it as a floor.
 8. **Respect system settings.** Reduce Motion (via `AppWorkloadPolicy`), Bold
    Text, Reduce Transparency, and Increase Contrast must not break layout or
    hide critical affordances.
-9. **Localized accessibility copy.** All a11y labels/hints are zh/en/de via
-   `L10n` / `AppLocalizedText`, never hardcoded Chinese.
+9. **Localized accessibility copy.** Author Chinese and English labels/hints via
+   `L10n` / `AppLocalizedText`; every other registered language must resolve
+   through the shared fallback chain. Never hardcode Chinese in a view.
 
 ## Shared Component Requirement
 

@@ -7,6 +7,28 @@ import UIKit
 @MainActor
 @Suite(.serialized)
 struct MemberCreationServiceTests {
+    @Test func newHumanDraftRequiresOnlyNameAndPersistsOptionalFieldsAsNil() throws {
+        resetGlobalState()
+        var draft = MemberCreationDraft(kind: .human)
+        #expect(draft.hasBirthday == false)
+        #expect(draft.humanGender.isEmpty)
+
+        draft.name = "Ava"
+        let container = try makeContainer()
+        let result = try saveMember(
+            draft: draft,
+            existingPets: [],
+            existingHumans: [],
+            context: container.mainContext,
+            countryCode: "CN"
+        )
+        let human = try #require(result.human)
+
+        #expect(human.name == "Ava")
+        #expect(human.birthday == nil)
+        #expect(human.genderIdentityRaw == nil)
+    }
+
     @Test func firstPetSaves2DAvatarWithoutConsumingInventoryPass() throws {
         resetGlobalState()
         let container = try makeContainer()

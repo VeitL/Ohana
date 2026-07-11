@@ -130,19 +130,3 @@ enum SettingsPreferenceStore {
         defaults.set(value, forKey: key)
     }
 }
-
-enum DatabaseFallbackPreferenceStore {
-    static func isFallbackActive(defaults: UserDefaults = .standard) -> Bool {
-        defaults.bool(forKey: fallbackActiveKey)
-    }
-
-    static func clearFallbackActive(defaults: UserDefaults = .standard) {
-        defaults.removeObject(forKey: fallbackActiveKey)
-    }
-
-    static func markFallbackActive(defaults: UserDefaults = .standard) {
-        defaults.set(true, forKey: fallbackActiveKey)
-    }
-
-    private static let fallbackActiveKey = "ohana_db_fallback_active"
-}

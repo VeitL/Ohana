@@ -1,10 +1,17 @@
 # Ohana Design System — Agent Skill
 
+> **Archived advisory export.** This is not an active Codex skill and does not
+> govern the Ohana repository. Use it only when the current user explicitly
+> requests an external design artifact based on this export. Native app work
+> must follow `AGENTS.md`, `docs/specs/product-foundation.md`, and the root
+> `ui规范.selection.json`.
+
 Reference the Ohana design system when producing design artifacts (slides, mock screens, landing pages, prototypes) for the **Ohana** iOS pet/family tracker app.
 
 ## Quick start
 
-1. Always include `colors_and_type.css` — it provides all color/type/spacing/radius tokens plus utility classes.
+1. For an explicitly requested external web/mock artifact, include
+   `colors_and_type.css`; never import it into the native app.
 2. Use SF Pro Rounded when available. On non-Apple surfaces, `colors_and_type.css` imports **Nunito** (rounded-sans, stand-in for SF Pro Rounded) + **Inter** (body).
 3. Use **SF Symbols** on iOS; **Lucide** on web (closest stroke match).
 4. Default background is `oh-bg-island` (navy gradient) — the app is a dark-mode-first experience with lime accent.
@@ -37,5 +44,6 @@ Reference the Ohana design system when producing design artifacts (slides, mock 
 - **No Figma, no original logo PNG** — the wordmark/icon in `assets/` are reconstructions.
 - **SF Pro Rounded** isn't licensable off-Apple → Nunito substitute.
 - **SF Symbols** are Apple-only → Lucide substitute.
-- **GO Club** screenshots in source couldn't be accessed due to spaces in filenames; the design direction came from `GO_Club_UI_Design_Reference.md` + `UIRules.md`.
+- **GO Club** and `UIRules.md` references are historical inputs, not current
+  repository sources of truth.
 - Ohana is **primarily Chinese-language** — keep zh-CN strings when designing for Chinese-speaking audiences.

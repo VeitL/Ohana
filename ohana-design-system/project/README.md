@@ -1,5 +1,12 @@
 # Ohana Design System
 
+> **HISTORICAL PORTABLE EXTRACT — NOT CURRENT APP DOCUMENTATION.** The paths,
+> platform baseline, colors, routes, managers, copy, and product claims below
+> describe an old design export and may no longer exist. For current Ohana work,
+> use the repository `AGENTS.md`, `docs/specs/product-foundation.md`, and root
+> `ui规范.selection.json`. Do not copy a fact from this file without verifying it
+> in current source.
+
 > iOS family life-tracker for pets (🐕), humans (🧑), and plants (🌱) — collectively called **Critters**. Gamified with a coconut 🥥 reward economy, streak bonds, and a "Life Tree" that grows with the family's activity.
 
 Ohana (欧哈纳, "family" in Hawaiian) is a **SwiftUI + SwiftData** iOS app. The design language is called **Go UI** — a dark, glassy, gamey layout built on iOS 26 Liquid Glass (`.glassEffect`), with a single punchy accent color (`#FF7600` orange in light mode, `#C8FF00` lime in dark mode) set against a deep navy gradient background with floating blurred blobs.
@@ -8,15 +15,16 @@ This design system is a **portable extract** of Ohana's visual identity — toke
 
 ---
 
-## Sources
+## Historical Extraction Sources
 
-Everything in this system was extracted from the `Ohana/` codebase mounted locally.
+The following table records the export's original inputs. These are historical
+labels, not valid current paths or authorities.
 
 | Source | Path |
 |---|---|
 | Root reference doc | `docs/reference/OHANA_COMPLETE_REFERENCE.md` (1776 lines, v8.0.0) |
 | AI navigation file | `Ohana/CONTEXT.md` (ArkSchemaV19, Phase 1–76) |
-| UI rules (authoritative) | `Ohana/UIRules.md` (415 lines, iOS 26 Liquid Glass) |
+| UI rules (historical export) | `Ohana/UIRules.md` (415 lines, iOS 26 Liquid Glass) |
 | GO Club visual reference | `Ohana/GO_Club_UI_Design_Reference.md` (the "Go UI" style guide — blue + lime + glass cards) |
 | Design system source | `Ohana/Ohana/Views/OhanaDesignSystem.swift` (fonts, modifiers, components) |
 | Color tokens | `Ohana/Ohana/Utilities/ColorExtensions.swift` |
@@ -28,7 +36,7 @@ No Figma was provided. No marketing website exists. The **only** product is the 
 
 ---
 
-## The product
+## Historical Product Snapshot
 
 **Platform:** iOS 17+, Swift 6, SwiftUI + SwiftData + Swift Charts
 **Primary market:** Chinese-speaking pet owners (most copy is Simplified Chinese; app has an `en.lproj` too)

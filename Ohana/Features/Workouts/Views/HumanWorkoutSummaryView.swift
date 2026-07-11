@@ -86,6 +86,8 @@ struct HumanWorkoutSummaryView: View {
                     ) {
                         HumanPrivacyToggleButton(human: human, field: .workout)
                     }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("human-workout-summary-view")
                     .padding(.horizontal, 16)
                     .padding(.top, 14)
 
@@ -124,7 +126,6 @@ struct HumanWorkoutSummaryView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .toolbar(.hidden, for: .navigationBar)
-            .accessibilityIdentifier("human-workout-summary-view")
             .task { await prepareHealthSnapshot() }
             .sheet(isPresented: $showAddSheet) {
                 AddWorkoutSheet(human: human) {

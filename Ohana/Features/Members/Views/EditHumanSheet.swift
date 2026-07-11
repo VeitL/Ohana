@@ -21,7 +21,7 @@ struct EditHumanSheet: View {
     @State private var hasBirthday = false
     @State private var bloodType: String = ""
     @State private var role: String = "owner"
-    @State private var gender: String = "private"
+    @State private var gender: String = ""
     @State private var notes: String = ""
     @State private var nationality: String = ""
     @State private var city: String = ""
@@ -106,7 +106,7 @@ struct EditHumanSheet: View {
             hasBirthday = human.birthday != nil
             bloodType = human.bloodType
             role = HumanProfileOptions.normalizedRole(human.role)
-            gender = HumanProfileOptions.storedGenderIdentity(human.genderRaw) ?? "private"
+            gender = HumanProfileOptions.storedGenderIdentity(human.genderRaw) ?? ""
             notes = HumanProfileOptions.visibleNoteParts(from: human.notes).joined(separator: "｜")
             nationality = human.nationality
             city = human.city
@@ -183,7 +183,8 @@ struct EditHumanSheet: View {
     }
 
     private func localizedGenderTitle(for raw: String) -> String {
-        HumanProfileOptions.localizedGenderTitle(raw, l: l)
+        let title = HumanProfileOptions.localizedGenderTitle(raw, l: l)
+        return title.isEmpty ? l.notSet : title
     }
 
     private func editPrivacyRow(_ title: String, binding: Binding<Bool>) -> some View {

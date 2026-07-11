@@ -44,6 +44,7 @@ nonisolated enum HumanProfileOptions {
     ]
 
     static let genderOptions: [(key: String, icon: String)] = [
+        ("", "•"),
         ("female", "♀"),
         ("male", "♂"),
         ("nonbinary", "⚧"),

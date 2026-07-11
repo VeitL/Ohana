@@ -35,6 +35,31 @@ struct MemberDeletionCommandResult: Equatable {
     let clearsActiveHumanID: Bool
     let didPersist: Bool
     let persistenceErrorDescription: String?
+    let attachmentCleanup: HumanNoteAttachmentCleanupResult
+
+    init(
+        entityID: UUID,
+        kind: String,
+        removedRelatedEventIDs: [UUID],
+        removedQuickActionCount: Int,
+        requiresReplacementHuman: Bool,
+        requiresAccountSwitch: Bool,
+        clearsActiveHumanID: Bool,
+        didPersist: Bool,
+        persistenceErrorDescription: String?,
+        attachmentCleanup: HumanNoteAttachmentCleanupResult = .notRequired
+    ) {
+        self.entityID = entityID
+        self.kind = kind
+        self.removedRelatedEventIDs = removedRelatedEventIDs
+        self.removedQuickActionCount = removedQuickActionCount
+        self.requiresReplacementHuman = requiresReplacementHuman
+        self.requiresAccountSwitch = requiresAccountSwitch
+        self.clearsActiveHumanID = clearsActiveHumanID
+        self.didPersist = didPersist
+        self.persistenceErrorDescription = persistenceErrorDescription
+        self.attachmentCleanup = attachmentCleanup
+    }
 
     var didWrite: Bool { didPersist }
 }
@@ -108,7 +133,11 @@ enum MemberDeletionCommandService {
         _ human: Human,
         activeHumanID: String,
         context: ModelContext,
-        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
+        attachmentStorage: HumanNoteAttachmentStorage = .live,
+        saveChanges: (ModelContext) -> ModelContextSaveResult = {
+            $0.safeSaveResult(publishFailureEvent: true)
+        }
     ) -> MemberDeletionCommandResult {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let humanID = human.id
@@ -125,7 +154,9 @@ enum MemberDeletionCommandService {
         )
         let hasRemainingHuman = !remainingHumans.isEmpty
         let deletedCurrentHuman = activeHumanID == humanIDString
-        let requiresReplacementHuman = !hasRemainingHuman
+        // D17 keeps Human optional. Deleting the last Human clears local
+        // identity state but must not force a replacement profile.
+        let requiresReplacementHuman = false
         let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
 
         let now = Date()
@@ -147,7 +178,7 @@ enum MemberDeletionCommandService {
             deletedByHumanId: activeHumanID,
             notifications: notificationCancels
         )
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        let saveResult = saveChanges(context)
         guard saveResult.didSave else {
             context.rollback()
             return MemberDeletionCommandResult(
@@ -163,6 +194,11 @@ enum MemberDeletionCommandService {
             )
         }
         notificationCancels.flush()
+        let attachmentCleanup = cleanDeletedHumanAttachments(
+            humanID: humanID,
+            context: context,
+            storage: attachmentStorage
+        )
 
         return MemberDeletionCommandResult(
             entityID: humanID,
@@ -171,10 +207,37 @@ enum MemberDeletionCommandService {
             removedQuickActionCount: 0,
             requiresReplacementHuman: requiresReplacementHuman,
             requiresAccountSwitch: requiresAccountSwitch,
-            clearsActiveHumanID: deletedCurrentHuman || requiresReplacementHuman,
+            clearsActiveHumanID: deletedCurrentHuman || !hasRemainingHuman,
             didPersist: true,
-            persistenceErrorDescription: nil
+            persistenceErrorDescription: nil,
+            attachmentCleanup: attachmentCleanup
         )
+    }
+
+    @MainActor
+    private static func cleanDeletedHumanAttachments(
+        humanID: UUID,
+        context: ModelContext,
+        storage: HumanNoteAttachmentStorage
+    ) -> HumanNoteAttachmentCleanupResult {
+        do {
+            let survivingHumans = try context.fetch(FetchDescriptor<Human>())
+            let referencedPaths = HumanNoteAttachmentStore.referencedRelativePaths(
+                in: survivingHumans.map(\.notes)
+            )
+            return HumanNoteAttachmentStore.deleteHumanDirectory(
+                humanID: humanID,
+                preservingRelativePaths: referencedPaths,
+                storage: storage
+            )
+        } catch {
+            OhanaLog.error(
+                "Human note attachment reference scan failed after member deletion.",
+                category: "Privacy",
+                privacy: .publicText
+            )
+            return .pending("Local attachment references could not be verified: \(error.localizedDescription)")
+        }
     }
 
     @discardableResult

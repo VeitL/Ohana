@@ -5,19 +5,12 @@ import Testing
 
 @MainActor
 struct OnboardingJourneyCoordinatorTests {
-    @Test func freshInstallJourneyClaimsStarterGiftAfterFirstPetWeight() throws {
+    @Test func freshInstallJourneyIsPetFirstAndCompletesWithinNinetySecondBudget() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
         let defaults = try makeDefaults(suiteName: suiteName)
-        let oldCount = TestQuestManagerProjection.manager.coconutCount
-        let oldLogs = TestQuestManagerProjection.manager.coconutLogs
-        defer {
-            TestQuestManagerProjection.manager.coconutCount = oldCount
-            TestQuestManagerProjection.manager.coconutLogs = oldLogs
-            TestQuestManagerProjection.manager.persistQuestFlags()
-            defaults.removePersistentDomain(forName: suiteName)
-        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let preOnboarding = OnboardingJourneyCoordinator.evaluate(
             hasOnboarded: false,
@@ -27,92 +20,97 @@ struct OnboardingJourneyCoordinatorTests {
         )
         #expect(preOnboarding.phase == .preOnboarding)
 
+        let startedAt = Date(timeIntervalSince1970: 1000)
+        OnboardingJourneyCoordinator.beginFreshJourney(
+            context: context,
+            defaults: defaults,
+            now: startedAt
+        )
         let pending = OnboardingJourneyCoordinator.evaluate(
             hasOnboarded: true,
             activeHumanID: nil,
             context: context,
             defaults: defaults
         )
-        #expect(pending.phase == .starterGiftPending)
+        #expect(pending.starterGiftResult == .pendingFirstPet)
+        #expect(pending.phase == .needsFirstPet)
 
-        let human = Human(name: "Guan")
-        context.insert(human)
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
         context.safeSave()
-        TestQuestManagerProjection.manager.coconutCount = 0
-        TestQuestManagerProjection.manager.coconutLogs = []
-
-        let needsFirstPet = OnboardingJourneyCoordinator.evaluate(
+        let needsFirstCare = OnboardingJourneyCoordinator.evaluate(
             hasOnboarded: true,
-            activeHumanID: human.id.uuidString,
+            activeHumanID: nil,
             context: context,
             defaults: defaults
         )
-        #expect(needsFirstPet.starterGiftResult == .pendingFirstCare(humanID: human.id))
-        #expect(needsFirstPet.phase == .needsFirstPet)
+        #expect(needsFirstCare.starterGiftResult == .pendingFirstCare(recipient: .pet(pet.id)))
+        #expect(needsFirstCare.phase == .firstCarePending)
+        #expect(pet.coconutBalance == 0)
 
-        // 礼包改为「创建首只宠物即发」:插入首宠后立即领取,不再等待录体重。
-        let pet = Pet(name: "Momo", species: "cat")
-        context.insert(pet)
+        context.insert(PetWeightLog(weight: 4.2, pet: pet))
         context.safeSave()
 
         let claimed = OnboardingJourneyCoordinator.evaluate(
             hasOnboarded: true,
-            activeHumanID: human.id.uuidString,
+            activeHumanID: nil,
             context: context,
             defaults: defaults
         )
-        #expect(claimed.starterGiftResult == .claimed(humanID: human.id, amount: StarterGiftService.giftAmount))
+        #expect(claimed.starterGiftResult == .claimed(recipient: .pet(pet.id), amount: StarterGiftService.giftAmount))
         #expect(claimed.phase == .starterGiftReadyForCeremony(amount: StarterGiftService.giftAmount))
+        #expect(defaults.bool(forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted))
+        #expect(pet.coconutBalance == StarterGiftService.giftAmount)
 
-        OnboardingJourneyCoordinator.markStarterCeremonySeen(defaults: defaults)
+        let completedAt = Date(timeIntervalSince1970: 1089)
+        #expect(OnboardingJourneyCoordinator.journeyElapsedMilliseconds(
+            defaults: defaults,
+            now: completedAt
+        ) == 89000)
+        OnboardingJourneyCoordinator.markStarterCeremonySeen(
+            defaults: defaults,
+            now: completedAt
+        )
         let complete = OnboardingJourneyCoordinator.currentPhase(
-            activeHumanID: human.id.uuidString,
+            activeHumanID: nil,
             context: context,
             defaults: defaults
         )
         #expect(complete == .complete)
     }
 
-    @Test func starterGiftCeremonyDoesNotWaitForActiveHumanPropagation() throws {
+    @Test func interruptedOnboardingRecoversPersistedFirstPetWithoutHuman() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
         let defaults = try makeDefaults(suiteName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let pending = OnboardingJourneyCoordinator.evaluate(
+        OnboardingJourneyCoordinator.beginFreshJourney(
+            context: context,
+            defaults: defaults,
+            now: Date(timeIntervalSince1970: 2000)
+        )
+        let first = Pet(name: "First", species: "cat")
+        first.createdAt = Date(timeIntervalSince1970: 100)
+        let second = Pet(name: "Second", species: "dog")
+        second.createdAt = Date(timeIntervalSince1970: 200)
+        context.insert(second)
+        context.insert(first)
+        context.safeSave()
+
+        let recoveredID = OnboardingJourneyCoordinator.interruptedOnboardingFirstPetID(context: context)
+        let evaluation = OnboardingJourneyCoordinator.evaluate(
             hasOnboarded: true,
             activeHumanID: nil,
             context: context,
             defaults: defaults
         )
-        #expect(pending.phase == .starterGiftPending)
 
-        let human = Human(name: "First")
-        context.insert(human)
-        context.safeSave()
-
-        let pet = Pet(name: "Momo", species: "cat")
-        context.insert(pet)
-        context.insert(PetWeightLog(weight: 4.2, pet: pet))
-        context.safeSave()
-
-        let claimedBeforeActiveHumanPropagates = OnboardingJourneyCoordinator.evaluate(
-            hasOnboarded: true,
-            activeHumanID: nil,
-            context: context,
-            defaults: defaults
-        )
-
-        #expect(claimedBeforeActiveHumanPropagates.starterGiftResult == .claimed(
-            humanID: human.id,
-            amount: StarterGiftService.giftAmount
-        ))
-        #expect(
-            claimedBeforeActiveHumanPropagates.phase == .starterGiftReadyForCeremony(
-                amount: StarterGiftService.giftAmount
-            )
-        )
+        #expect(recoveredID == first.id.uuidString)
+        #expect(evaluation.phase == .firstCarePending)
+        #expect(evaluation.starterGiftResult == .pendingFirstCare(recipient: .pet(first.id)))
+        #expect(try context.fetch(FetchDescriptor<Human>()).isEmpty)
     }
 
     @Test func existingUserIsMarkedCompleteWithoutStarterCeremony() throws {
@@ -140,22 +138,6 @@ struct OnboardingJourneyCoordinatorTests {
         #expect(defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
         #expect(defaults.bool(forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted))
         #expect(defaults.bool(forKey: OnboardingJourneyCoordinator.Key.roadmapPromptSeen))
-    }
-
-    @Test func interruptedOnboardingRecoversPersistedPrimaryHuman() throws {
-        let container = try makeContainer()
-        let context = ModelContext(container)
-        let first = Human(name: "First")
-        first.createdAt = Date(timeIntervalSince1970: 100)
-        let second = Human(name: "Second")
-        second.createdAt = Date(timeIntervalSince1970: 200)
-        context.insert(second)
-        context.insert(first)
-        context.safeSave()
-
-        let recoveredID = OnboardingJourneyCoordinator.interruptedOnboardingPrimaryHumanID(context: context)
-
-        #expect(recoveredID == first.id.uuidString)
     }
 
     private func makeDefaultsSuiteName() -> String {

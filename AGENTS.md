@@ -26,6 +26,10 @@ decides how agents should change, validate, and navigate the code. Keep product
 rules and engineering rules in their own lanes instead of treating one as a
 replacement for the other.
 
+Start repository orientation at `README.md`; use `docs/README.md` to distinguish
+active source-of-truth documents from dated audit evidence, planning material,
+and historical references.
+
 ## Follow-up Tracking
 
 Use `docs/task-follow-ups.md` only for real blockers, external actions,
@@ -40,18 +44,17 @@ step, and close condition. Do not add noise when no meaningful follow-up remains
   needs one, use `group.com.guanchen.li.Ohana`; never revive older `Ark`
   app-group identifiers.
 - The latest SwiftData schema lives in
-  `Ohana/Models/SharedModelContainer.swift`. As of this consolidation it is
-  `ArkSchemaV85`, but always verify the current `ArkSchemaV*` in that file and
-  update this line whenever a schema version lands.
+  `Ohana/Models/SharedModelContainer.swift`. Always derive the current
+  `ArkSchemaV*` from that file; do not copy a version number into a rule file.
 - Before changing a SwiftData model or adding one, inspect the latest
   `ArkSchemaV*`, add the next schema version, append it to
   `ArkMigrationPlan.schemas`, and keep added fields lightweight-migration
   friendly with defaults when possible. Keep `ArkMigrationPlan.stages` empty
   unless custom migration logic is actually needed.
 - User-facing copy must support the registered app languages in
-  `Ohana/Shared/LocalizationSettings.swift` (currently Chinese, English,
-  German, Spanish, Portuguese, French, Japanese, Korean, Italian). Chinese and
-  English are mandatory at authoring time; other languages may fall back.
+  `Ohana/Shared/LocalizationSettings.swift`. Chinese and English are mandatory
+  at authoring time; other registered languages may use the defined fallback
+  chain. Do not copy the current language list into governance rules.
 
 ## Business Fact Rules
 
@@ -59,7 +62,7 @@ step, and close condition. Do not add noise when no meaningful follow-up remains
   reminders, family tasks, rewards, or ledger side effects.
 - Quick care actions enter one domain service or command executor, write one
   business fact, then let services synchronize rewards, reminders, tasks,
-  ledger entries, widgets, and read-model revisions.
+  ledger entries, enabled external projections, and read-model revisions.
 - Coconut rewards are awarded through `QuestManager` under the audited economy
   chokepoints `EconomyRewardDiscipline` and `CareEventEconomyAwarding`, not by
   ad-hoc balance edits in views.
@@ -96,6 +99,8 @@ fixture self-tests protect against scan-scope collapse.
 - Cheap changed-file gate: `scripts/dev-check-changed.sh`
 - Quick Debug build: `scripts/build-debug-fast.sh`
 - Simulator tests: `scripts/test-simulator.sh`
+- Unit wrappers use the `OhanaUnitTests` scheme; UI wrappers use the
+  `OhanaUITests` scheme. App builds continue to use `Ohana`.
 - Direct build fallback:
   `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' build`
 - Direct test fallback:
@@ -121,7 +126,8 @@ Validation route:
   path-specific UI audit first. Compile only when the change touches Swift
   types/APIs, shared components, navigation/sheets/routes, runtime policy,
   localization plumbing, or the user asks.
-- Feature-local logic uses the narrowest relevant unit test or one quick build.
+- Feature-local business logic uses the narrowest relevant Unit/Integration
+  test; a build proves compilation only and cannot replace rule evidence.
 - Cross-feature, persistence, runtime, startup, privacy, route, reward,
   reminder, notification, SwiftData, App Intent, or shared-component changes use
   targeted tests plus `scripts/build-debug-fast.sh`, unless a targeted
@@ -138,7 +144,7 @@ confirm launch with a screenshot or UI snapshot, drive the reported path, patch
 the smallest fix, and rerun the same path. Prefer accessibility identifiers over
 coordinates; report coordinate fallbacks as testability gaps.
 
-## CI And Push Cadence
+## CI And Remote Actions
 
 CI runs on push and pull request:
 
@@ -154,11 +160,13 @@ CI runs on push and pull request:
 Treat red CI as blocking. Encode new rules as audits, lint rules, or tests with
 bad/good fixtures whenever possible.
 
-Push every completed work item or coherent fix batch promptly after local cheap
-gates pass. `main` must not lead `origin` by more than one completed work item
-or one working day. Do not push broken or mid-task trees just to sample CI, and
-do not repeatedly poll known tracked external blockers. After a push, inspect
-the newest run once and record the URL/result.
+Local validation is the default stopping point. Commit, push, pull-request,
+remote-CI, signing, provisioning, entitlement, App Store Connect, and release
+actions require an explicit request from the current user; a general request to
+review, diagnose, fix, or finish work does not grant those authorities. When a
+push is explicitly requested, run the relevant local gates first, never push a
+broken or mid-task tree merely to sample CI, inspect the newest run once, and
+record its URL/result. Do not repeatedly poll a known tracked external blocker.
 
 ## Parallel Work And Git Safety
 
@@ -433,6 +441,19 @@ MetricKit hang/launch summaries flow through `Ohana/App/MetricKitObserver.swift`
 For perf-sensitive changes, check the next payload instead of assuming success.
 
 ## Testing
+
+Four rules govern the test portfolio:
+
+1. Every business rule is proved by Unit/Integration tests. UI tests do not
+   audit SwiftData rows, ledgers, migrations, rewards, or other business facts.
+2. Each module keeps one high-value UI path for navigation and user-visible
+   integration. Button-by-button permutations belong at lower layers.
+3. Every P0/P1 regression test set covers failure, recovery/retry, and repeated
+   operation or idempotency when the risk can recur.
+4. Frequency follows risk: cheap changed-file checks per edit, targeted tests
+   per behavior change, full unit tests at broad module/phase boundaries, full
+   UI shards nightly or for RC, and physical-device checks only for device-owned
+   behavior. A cosmetic edit does not trigger the whole-app UI suite.
 
 Tests use Swift Testing (`import Testing`) with `@Test` and `#expect`. Add unit
 coverage in `OhanaTests/` for service, model, persistence, privacy, route, and

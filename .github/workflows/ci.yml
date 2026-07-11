@@ -52,6 +52,8 @@ jobs:
       # collapsed scan scope), every later "passed" line is meaningless.
       - name: Audit self-tests (fixtures + scope floor)
         run: scripts/tests/run-audit-fixture-tests.sh
+      - name: UI test shard completeness
+        run: scripts/audit-ui-test-shards.sh
       # Full-scope strict gates for UI V4 + accessibility + smoothness +
       # route first-frame safety. The
       # ratchet baseline is now zero; keep these direct `--all` scans required.

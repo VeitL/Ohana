@@ -262,7 +262,8 @@ nonisolated enum SharedCareSessionMaintenance {
     @MainActor
     static func cleanLegacyNoteMetadata(
         context: ModelContext,
-        cleanedAt: Date = Date()
+        cleanedAt: Date = Date(),
+        persistChanges: Bool = true
     ) -> SharedCareLegacyNoteCleanupResult {
         let scan = legacyMetadataScan(context: context)
         var changedSessions: [SharedCareSession] = []
@@ -384,7 +385,7 @@ nonisolated enum SharedCareSessionMaintenance {
             !changedExpenseLogs.isEmpty ||
             !changedWalkLogs.isEmpty ||
             !changedLedgerEvents.isEmpty
-        let didPersist = !didChange || saveSharedCareMaintenanceChanges(context: context)
+        let didPersist = !persistChanges || !didChange || saveSharedCareMaintenanceChanges(context: context)
 
         return SharedCareLegacyNoteCleanupResult(
             sessionIDs: changedSessions.map(\.id),

@@ -172,6 +172,13 @@ struct MemberCreationDraft: Equatable {
     init(kind: MemberCreationKind) {
         self.kind = kind
         themeColorHex = kind.fallbackThemeHex
+        if kind == .human {
+            // A Human profile is optional in Solo. If the user creates one,
+            // only its display name is required; birthday and gender stay
+            // genuinely absent until the user chooses to add them.
+            hasBirthday = false
+            humanGender = ""
+        }
     }
 
     var trimmedName: String {

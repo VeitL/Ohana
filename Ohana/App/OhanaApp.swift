@@ -24,6 +24,11 @@ struct OhanaApp: App {
     @AppStorage(AppCurrency.storageKey) private var appCurrency: String = AppCurrency.fallbackCode
 
     init() {
+        #if DEBUG
+            if OhanaUITestLaunchOptions.disablesAnimations {
+                UIView.setAnimationsEnabled(false)
+            }
+        #endif
         AppCountry.ensureInitialized()
         BackgroundTaskCoordinator.registerTasks()
     }
@@ -113,12 +118,26 @@ private struct OhanaBootstrapRootView: View {
             OhanaStartupProbe.mark("bootstrap.first-frame-yield-complete")
             let containerStartedAt = CFAbsoluteTimeGetCurrent()
             bootstrapStatus = .openingStore
-            let modelContainer = await Self.openModelContainerOffMain()
+            let openResult = await Self.openModelContainerOffMain()
+            guard !Task.isCancelled else { return }
+            let modelContainer: ModelContainer
+            switch openResult {
+            case let .success(openedContainer):
+                modelContainer = openedContainer
+            case .failure:
+                OhanaStartupProbe.mark("bootstrap.container-failed-closed")
+                bootstrapStatus = .storeUnavailable
+                bootstrapWatchdogTask?.cancel()
+                bootstrapWatchdogTask = nil
+                bootstrapTask = nil
+                return
+            }
             OhanaStartupProbe.mark("bootstrap.container-ready")
             resetPersistentStateForUITestsIfNeeded(modelContainer: modelContainer)
             bootstrapStatus = .buildingServices
             let services = AppServices(modelContainer: modelContainer)
 #if DEBUG
+            seedHumanBaselineForUITestsIfNeeded(modelContainer: modelContainer, services: services)
             seedPlantBaselineForUITestsIfNeeded(modelContainer: modelContainer, services: services)
 #endif
             OhanaStartupProbe.mark("bootstrap.services-ready")
@@ -157,21 +176,54 @@ private struct OhanaBootstrapRootView: View {
         }
     }
 
-    private static func openModelContainerOffMain() async -> ModelContainer {
+    private static func openModelContainerOffMain() async -> Result<ModelContainer, SharedModelContainerOpenFailure> {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 OhanaStartupProbe.mark("bootstrap.container-start")
-                let modelContainer = SharedModelContainer.make()
-                continuation.resume(returning: modelContainer)
+                #if DEBUG
+                    if consumeUITestStoreOpenFailureIfRequested() {
+                        continuation.resume(returning: .failure(SharedModelContainerOpenFailure(
+                            attemptedStoreKinds: SharedModelContainerOpenPolicy.orderedAttempts
+                        )))
+                        return
+                    }
+                #endif
+                do {
+                    let modelContainer = try SharedModelContainer.make()
+                    continuation.resume(returning: .success(modelContainer))
+                } catch let failure as SharedModelContainerOpenFailure {
+                    continuation.resume(returning: .failure(failure))
+                } catch {
+                    continuation.resume(returning: .failure(SharedModelContainerOpenFailure(
+                        attemptedStoreKinds: SharedModelContainerOpenPolicy.orderedAttempts
+                    )))
+                }
             }
         }
     }
+
+    #if DEBUG
+        private static let uiTestStoreOpenFaultLock = NSLock()
+        private static var didConsumeUITestStoreOpenFailure = false
+
+        private static func consumeUITestStoreOpenFailureIfRequested() -> Bool {
+            guard OhanaUITestLaunchOptions.requestsSingleStoreOpenFailure else { return false }
+            uiTestStoreOpenFaultLock.lock()
+            defer { uiTestStoreOpenFaultLock.unlock() }
+            guard !didConsumeUITestStoreOpenFailure else { return false }
+            didConsumeUITestStoreOpenFailure = true
+            return true
+        }
+    #endif
 
     private func resetPersistentStateForUITestsIfNeeded(modelContainer: ModelContainer) {
         #if DEBUG
             guard OhanaUITestLaunchOptions.resetsPersistentState else { return }
             do {
-                try StaticAppResetter(questManager: QuestManager()).resetForUITests(context: modelContainer.mainContext)
+                try StaticAppResetter(
+                    questManager: QuestManager(),
+                    automaticBackups: AutomaticBackupService()
+                ).resetForUITests(context: modelContainer.mainContext)
                 OhanaStartupProbe.mark("ui-test-reset.complete")
             } catch {
                 OhanaStartupProbe.mark("ui-test-reset.failed")
@@ -181,6 +233,10 @@ private struct OhanaBootstrapRootView: View {
     }
 
 #if DEBUG
+    private func seedHumanBaselineForUITestsIfNeeded(modelContainer: ModelContainer, services: AppServices) {
+        UITestHumanBaselineSeeder.seedIfRequested(modelContainer: modelContainer, services: services)
+    }
+
     private func seedPlantBaselineForUITestsIfNeeded(modelContainer: ModelContainer, services: AppServices) {
         UITestPlantBaselineSeeder.seedIfRequested(modelContainer: modelContainer, services: services)
     }
@@ -192,6 +248,16 @@ private enum OhanaBootstrapStatus {
     case openingStore
     case buildingServices
     case slowOpeningStore
+    case storeUnavailable
+
+    var allowsRetry: Bool {
+        switch self {
+        case .slowOpeningStore, .storeUnavailable:
+            true
+        case .preparing, .openingStore, .buildingServices:
+            false
+        }
+    }
 }
 
 private struct OhanaBootstrapShell: View {
@@ -212,24 +278,46 @@ private struct OhanaBootstrapShell: View {
                 Text("Ohana")
                     .font(OhanaFont.largeTitle(.heavy))
                     .foregroundStyle(Color.white.opacity(0.96)) // ui-v4: allow bootstrap shell ink on dark gradient
-                ProgressView()
-                    .tint(Color.white.opacity(0.86)) // ui-v4: allow bootstrap shell ink on dark gradient
-                    .scaleEffect(0.86)
-                    .accessibilityLabel(l.tr(zh: "正在准备 Ohana", en: "Preparing Ohana", de: "Ohana wird vorbereitet"))
+                if case .storeUnavailable = status {
+                    Image(systemName: "externaldrive.badge.exclamationmark") // a11y: allow decorative icon; adjacent status text names the failure
+                        .font(OhanaFont.title(.bold))
+                        .foregroundStyle(Color.white.opacity(0.9)) // ui-v4: allow bootstrap shell ink on dark gradient
+                        .accessibilityHidden(true)
+                } else {
+                    ProgressView()
+                        .tint(Color.white.opacity(0.86)) // ui-v4: allow bootstrap shell ink on dark gradient
+                        .scaleEffect(0.86)
+                        .accessibilityLabel(l.tr(
+                            zh: "正在准备 Ohana",
+                            en: "Preparing Ohana",
+                            de: "Ohana wird vorbereitet"
+                        ))
+                }
                 Text(statusMessage)
                     .font(OhanaFont.footnote(.bold))
                     .foregroundStyle(Color.white.opacity(0.68)) // ui-v4: allow bootstrap shell ink on dark gradient
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
-                if case .slowOpeningStore = status {
+                if status.allowsRetry {
                     Button(action: onRetry) {
                         Text(l.tr(zh: "重试启动", en: "Retry startup", de: "Start erneut versuchen"))
                             .font(OhanaFont.footnote(.black))
                             .foregroundStyle(Color(red: 0.05, green: 0.09, blue: 0.25))
                             .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
+                            .frame(minHeight: 44)
                             .background(Color.white.opacity(0.88), in: Capsule()) // ui-v4: allow bootstrap retry pill on dark gradient
                     }
+                    .accessibilityIdentifier("bootstrap-retry-button")
+                }
+                if case .storeUnavailable = status {
+                    Link(destination: OhanaPublicLinks.support) {
+                        Text(l.tr(zh: "联系支持", en: "Contact support", de: "Support kontaktieren"))
+                            .font(OhanaFont.footnote(.bold))
+                            .foregroundStyle(Color.white.opacity(0.9)) // ui-v4: allow bootstrap shell ink on dark gradient
+                            .frame(minHeight: 44)
+                            .padding(.horizontal, 14)
+                    }
+                    .accessibilityIdentifier("bootstrap-support-action")
                 }
             }
         }
@@ -248,6 +336,12 @@ private struct OhanaBootstrapShell: View {
                 zh: "本地数据打开较慢，Ohana 仍在继续准备。",
                 en: "Local data is taking longer to open. Ohana is still preparing.",
                 de: "Lokale Daten brauchen länger. Ohana bereitet sich weiter vor."
+            )
+        case .storeUnavailable:
+            l.tr(
+                zh: "无法打开本地数据。为避免创建第二套数据库，Ohana 已停在不可写恢复界面。请释放设备空间后重试；现有数据不会被删除。",
+                en: "Ohana could not open local data. To avoid creating a second database, the app has stopped at a read-only recovery screen. Free device storage and retry; existing data has not been deleted.",
+                de: "Ohana konnte die lokalen Daten nicht öffnen. Um keine zweite Datenbank anzulegen, bleibt die App in einer nicht beschreibbaren Wiederherstellungsansicht. Gib Speicher frei und versuche es erneut; vorhandene Daten wurden nicht gelöscht."
             )
         }
     }

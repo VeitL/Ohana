@@ -29,6 +29,7 @@ struct HumanNoteDeleteResult: Equatable {
     let didDelete: Bool
     let didPersist: Bool
     let persistenceErrorDescription: String?
+    let attachmentCleanup: HumanNoteAttachmentCleanupResult
 }
 
 enum HumanNoteCommandService {
@@ -44,7 +45,11 @@ enum HumanNoteCommandService {
         appLanguage: String,
         context: ModelContext,
         scheduleNotification: Bool = true,
-        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
+        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
+        attachmentStorage: HumanNoteAttachmentStorage = .live,
+        saveChanges: (ModelContext) -> ModelContextSaveResult = {
+            $0.safeSaveResult(publishFailureEvent: true)
+        }
     ) -> HumanNoteCommandResult? {
         let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanNote.isEmpty || !imageAttachments.isEmpty || !fileAttachments.isEmpty || reminderDate != nil else {
@@ -59,7 +64,8 @@ enum HumanNoteCommandService {
         let attachments = persistAttachments(
             images: imageAttachments,
             files: fileAttachments,
-            humanID: human.id
+            humanID: human.id,
+            storage: attachmentStorage
         )
         let l = L10n(appLanguage)
         let effectiveReminderDate = disposition.allowsDerivedEffects ? reminderDate : nil
@@ -83,9 +89,12 @@ enum HumanNoteCommandService {
             )
         }
 
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        let saveResult = saveChanges(context)
         guard saveResult.didSave else {
-            HumanNoteAttachmentStore.deletePendingAttachments(attachments)
+            HumanNoteAttachmentStore.deletePendingAttachments(
+                attachments,
+                storage: attachmentStorage
+            )
             context.rollback()
             return HumanNoteCommandResult(
                 subjectID: human.id,
@@ -126,14 +135,19 @@ enum HumanNoteCommandService {
     static func deleteNote(
         human: Human,
         rawString: String,
-        context: ModelContext
+        context: ModelContext,
+        attachmentStorage: HumanNoteAttachmentStorage = .live,
+        saveChanges: (ModelContext) -> ModelContextSaveResult = {
+            $0.safeSaveResult(publishFailureEvent: true)
+        }
     ) -> HumanNoteDeleteResult {
         guard MemberLifecycleGate.disposition(human: human, writeKind: .memorial).writesContent else {
             return HumanNoteDeleteResult(
                 subjectID: human.id,
                 didDelete: false,
                 didPersist: false,
-                persistenceErrorDescription: nil
+                persistenceErrorDescription: nil,
+                attachmentCleanup: .notRequired
             )
         }
         let target = rawString.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -142,11 +156,15 @@ enum HumanNoteCommandService {
                 subjectID: human.id,
                 didDelete: false,
                 didPersist: false,
-                persistenceErrorDescription: nil
+                persistenceErrorDescription: nil,
+                attachmentCleanup: .notRequired
             )
         }
 
         let parts = human.notes.components(separatedBy: "\n\n")
+        let removedParts = parts.filter { part in
+            part.trimmingCharacters(in: .whitespacesAndNewlines) == target
+        }
         let remaining = parts.filter { part in
             part.trimmingCharacters(in: .whitespacesAndNewlines) != target
         }
@@ -156,39 +174,56 @@ enum HumanNoteCommandService {
                 subjectID: human.id,
                 didDelete: false,
                 didPersist: false,
-                persistenceErrorDescription: nil
+                persistenceErrorDescription: nil,
+                attachmentCleanup: .notRequired
             )
         }
 
         human.notes = remaining
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: "\n\n")
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        let removedAttachments = removedParts.flatMap {
+            HumanNoteAttachmentStore.visibleTextAndAttachments(from: $0).attachments
+        }
+        let saveResult = saveChanges(context)
         guard saveResult.didSave else {
             context.rollback()
             return HumanNoteDeleteResult(
                 subjectID: human.id,
                 didDelete: false,
                 didPersist: false,
-                persistenceErrorDescription: saveResult.errorDescription
+                persistenceErrorDescription: saveResult.errorDescription,
+                attachmentCleanup: .notRequired
             )
         }
+        let attachmentCleanup = cleanDeletedAttachments(
+            removedAttachments,
+            context: context,
+            storage: attachmentStorage
+        )
         return HumanNoteDeleteResult(
             subjectID: human.id,
             didDelete: true,
             didPersist: true,
-            persistenceErrorDescription: nil
+            persistenceErrorDescription: nil,
+            attachmentCleanup: attachmentCleanup
         )
     }
 
     private static func persistAttachments(
         images: [UIImage],
         files: [HumanNoteFileAttachmentPayload],
-        humanID: UUID
+        humanID: UUID,
+        storage: HumanNoteAttachmentStorage
     ) -> [HumanNoteAttachmentReference] {
         var references: [HumanNoteAttachmentReference] = []
         for (index, image) in images.enumerated() {
-            if let ref = HumanNoteAttachmentStore.saveImage(image, humanId: humanID, index: index + 1) {
+            if let ref = HumanNoteAttachmentStore.saveImage(
+                image,
+                humanId: humanID,
+                index: index + 1,
+                storage: storage
+            ) {
                 references.append(ref)
             }
         }
@@ -197,12 +232,42 @@ enum HumanNoteCommandService {
                 data: file.data,
                 originalFileName: file.fileName,
                 isImage: file.isImage,
-                humanId: humanID
+                humanId: humanID,
+                storage: storage
             ) {
                 references.append(ref)
             }
         }
         return references
+    }
+
+    @MainActor
+    private static func cleanDeletedAttachments(
+        _ attachments: [HumanNoteAttachmentReference],
+        context: ModelContext,
+        storage: HumanNoteAttachmentStorage
+    ) -> HumanNoteAttachmentCleanupResult {
+        guard !attachments.isEmpty else {
+            return .completed(removedFileCount: 0)
+        }
+        do {
+            let humans = try context.fetch(FetchDescriptor<Human>())
+            let referencedPaths = HumanNoteAttachmentStore.referencedRelativePaths(
+                in: humans.map(\.notes)
+            )
+            return HumanNoteAttachmentStore.deleteUnreferencedAttachments(
+                attachments,
+                preservingRelativePaths: referencedPaths,
+                storage: storage
+            )
+        } catch {
+            OhanaLog.error(
+                "Human note attachment reference scan failed after note deletion.",
+                category: "Privacy",
+                privacy: .publicText
+            )
+            return .pending("Local attachment references could not be verified: \(error.localizedDescription)")
+        }
     }
 
     private static func noteEntry(

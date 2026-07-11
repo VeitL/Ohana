@@ -2,18 +2,20 @@ import Foundation
 import Testing
 
 struct OnboardingHandoffResponsivenessTests {
-    @Test func freshPrimaryHumanTriggersImmediateStarterGiftEvaluation() throws {
+    @Test func freshFirstPetTriggersDeferredStarterJourneyEvaluation() throws {
         let source = try source(
             "Ohana/App/ContentView.swift",
             rootURL: repositoryRootURL()
         )
 
-        #expect(source.contains("scheduleActiveHumanReaction(newValue)"))
-        #expect(source.contains("guard hasOnboarded else { return }"))
-        #expect(source.contains("if onboardingPrimaryHumanID == humanID"))
+        #expect(source.contains("applyOnboardingFirstPetIDIfNeeded()"))
+        #expect(source.contains("handledOnboardingFirstPetID"))
+        #expect(source.contains("onboardingJourneyNeedsObservation"))
         #expect(source.contains("OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds"))
-        #expect(source.contains("activeHumanReactionTask = OhanaFrameScheduler.runAfterNextFrame"))
-        #expect(!source.contains("scheduleOnboardingJourneyEvaluation(delayMilliseconds: 120, activeHumanIDOverride: humanID)"))
+        #expect(source.contains("scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay)"))
+        #expect(source.contains("appRoutes.presentSheet(.petWeightQuick(petID))"))
+        #expect(!source.contains("appRoutes.presentSheet(.petWeight(petID))"))
+        #expect(!source.contains("onboardingPrimaryHumanID"))
     }
 
     @Test func homeRefreshStateWritesAreDeduplicated() throws {

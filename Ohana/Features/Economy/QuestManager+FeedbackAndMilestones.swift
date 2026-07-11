@@ -181,7 +181,13 @@ extension QuestManager {
         rewardKey: String,
         context: ModelContext?
     ) -> Bool {
-        let writeContext = context ?? ModelContext(SharedModelContainer.make())
+        let writeContext: ModelContext
+        if let context {
+            writeContext = context
+        } else {
+            guard let container = try? SharedModelContainer.make() else { return false }
+            writeContext = ModelContext(container)
+        }
         do {
             let awarded = try stageSpecialCoconutReward(
                 amount: amount,

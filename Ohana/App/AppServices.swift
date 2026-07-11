@@ -141,7 +141,10 @@ final class AppServices {
             metricKit: MetricKitObserver(),
             backups: SharedDataBackupManagerAdapter(projectionManager: questManager),
             automaticBackups: automaticBackups,
-            appReset: StaticAppResetter(questManager: questManager),
+            appReset: StaticAppResetter(
+                questManager: questManager,
+                automaticBackups: automaticBackups
+            ),
             medicationReminders: medicationReminders,
             userNotifications: SharedUserNotificationManager(manager: notificationManager),
             notificationRoutes: SharedNotificationRoutePublisher(center: notificationRouteCenter),

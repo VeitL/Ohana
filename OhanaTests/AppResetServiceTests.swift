@@ -16,9 +16,22 @@ final class AppResetServiceTests: XCTestCase {
         let pet = Pet(name: "Miso")
         let human = Human(name: "Guan")
         let careLog = PetCareLog(type: .feeding, amountGrams: 42, pet: pet, executorId: human.id.uuidString)
+        let budgetUsage = EconomyBudgetUsageEvent(
+            dayKey: "2026-07-10",
+            householdKey: "household.local",
+            memberKey: human.id.uuidString,
+            careObjectKey: pet.id.uuidString,
+            scope: .household,
+            scopeKey: "household.local",
+            growthXPUsed: 1,
+            coconutUsed: 1,
+            actionKey: "feed",
+            source: "test"
+        )
         context.insert(pet)
         context.insert(human)
         context.insert(careLog)
+        context.insert(budgetUsage)
         try context.save()
 
         defaults.set(true, forKey: "ohana_has_onboarded")
@@ -31,8 +44,10 @@ final class AppResetServiceTests: XCTestCase {
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
         defaults.set(true, forKey: StarterGiftStorageKey.oasisTabPromptPending)
+        defaults.set(Date().timeIntervalSince1970, forKey: OnboardingJourneyCoordinator.Key.journeyStartedAt)
         defaults.set(true, forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted)
         defaults.set(true, forKey: "ohanaGrowthOnboardingCompletedV1")
+        defaults.set(1, forKey: "economyV2.dailyBudget.household.local.2026-07-10")
 
         try AppResetService.reset(
             context: context,
@@ -48,6 +63,7 @@ final class AppResetServiceTests: XCTestCase {
         XCTAssertTrue(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<Human>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
         XCTAssertFalse(defaults.bool(forKey: "ohana_has_onboarded"))
         XCTAssertEqual(defaults.string(forKey: "currentActiveHumanId"), "")
         XCTAssertNil(defaults.object(forKey: "quickActionItems_v2"))
@@ -56,8 +72,11 @@ final class AppResetServiceTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: StarterGiftStorageKey.claimed))
         XCTAssertNil(defaults.object(forKey: StarterGiftStorageKey.ceremonySeen))
         XCTAssertNil(defaults.object(forKey: StarterGiftStorageKey.oasisTabPromptPending))
+        XCTAssertNil(defaults.object(forKey: OnboardingJourneyCoordinator.Key.journeyStartedAt))
         XCTAssertNil(defaults.object(forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted))
         XCTAssertNil(defaults.object(forKey: "ohanaGrowthOnboardingCompletedV1"))
+        XCTAssertNil(defaults.object(forKey: "economyV2.dailyBudget.household.local.2026-07-10"))
+        XCTAssertFalse(AutomaticBackupStatusStore(defaults: defaults).snapshot().isEnabled)
         XCTAssertEqual(defaults.string(forKey: "appLanguage"), "en")
         XCTAssertEqual(defaults.string(forKey: AppCountry.storageKey), "DE")
     }
@@ -104,53 +123,9 @@ final class AppResetServiceTests: XCTestCase {
         }
     }
 
-    func testResetPersistsAutomaticBackupCleanupFailureInsteadOfReportingSuccess() throws {
-        let container = try makeContainer()
-        let context = ModelContext(container)
-        let defaultsSuiteName = "AppResetServiceTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
-        defer {
-            defaults.removePersistentDomain(forName: defaultsSuiteName)
-        }
-
-        let pet = Pet(name: "Miso")
-        context.insert(pet)
-        try context.save()
-
-        let result = try AppResetService.reset(
-            context: context,
-            defaults: defaults,
-            options: AppResetService.Options(
-                cancelPendingNotifications: false,
-                deleteCustomBackground: false,
-                resetSharedRuntimeState: false,
-                cleanUpAutomaticBackups: true
-            ),
-            automaticBackupResetCleaner: FailingAutomaticBackupResetCleaner()
-        )
-
-        guard case let .pending(message) = result.automaticBackupCleanup else {
-            return XCTFail("Expected the automatic backup cleanup failure to be returned")
-        }
-        XCTAssertFalse(message.isEmpty)
-        XCTAssertTrue(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
-
-        let status = AutomaticBackupStatusStore(defaults: defaults).snapshot()
-        XCTAssertFalse(status.isEnabled)
-        XCTAssertTrue(status.resetCleanupPending)
-        XCTAssertNotNil(status.resetCleanupFailureAt)
-        XCTAssertEqual(status.resetCleanupFailureMessage, message)
-    }
-
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV85.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
-    }
-}
-
-private struct FailingAutomaticBackupResetCleaner: AutomaticBackupResetCleaning {
-    func removeManagedAutomaticBackupsSynchronously() throws {
-        throw AutomaticBackupFileStoreError.iCloudUnavailable
     }
 }

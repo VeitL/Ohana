@@ -671,7 +671,7 @@ nonisolated struct L10n {
         case "女": tr(zh: "女", en: "Woman", de: "Frau")
         case "非二元": tr(zh: "非二元", en: "Non-binary", de: "Nichtbinär")
         case "不透露": tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
-        default: key
+        default: key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? notSet : key
         }
     }
 

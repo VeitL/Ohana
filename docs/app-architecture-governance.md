@@ -166,7 +166,9 @@ Never protect prefetch, decoration, or dashboard freshness at the cost of curren
 - UI token 唯一来源是 `ui规范.selection.json`。
 - 新页面从 `docs/ui-v4-new-page-template.md` 开始。
 - 短记录/确认/管理弹窗使用 inline overlay，不用系统 sheet 冒充小弹窗。
-- 所有用户文案同时提供中文、英文、德文；动态字符串走 `L10n` / `AppLocalizedText`。
+- 新增用户文案在编写时必须同时提供中文和英文；其他已注册语言按
+  `LocalizationSettings` 的 fallback 链运行。动态字符串走 `L10n` /
+  `AppLocalizedText`。
 
 ## 构建与验证
 

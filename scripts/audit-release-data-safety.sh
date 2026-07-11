@@ -42,16 +42,30 @@ fi
 
 data_backup="Ohana/Domain/Services/DataBackupManager.swift"
 data_backup_dtos="Ohana/Domain/Services/DataBackupDTOs.swift"
+data_backup_preflight="Ohana/Domain/Services/DataBackupPreflightValidator.swift"
 automatic_backup="Ohana/Domain/Services/AutomaticBackupService.swift"
 physical_deletion="Ohana/Domain/Services/PhysicalDeletionService.swift"
+app_reset="Ohana/App/AppResetService.swift"
+app_runtime_adapters="Ohana/App/AppRuntimeAdapters.swift"
+app_services="Ohana/App/AppServices.swift"
 data_backup_files=(
   "Ohana/Domain/Services/DataBackupManager.swift"
   "Ohana/Domain/Services/DataBackupManager+Encode.swift"
   "Ohana/Domain/Services/DataBackupManager+Decode.swift"
   "Ohana/Domain/Services/DataBackupMediaPackage.swift"
+  "Ohana/Domain/Services/DataBackupPreflightValidator.swift"
+  "Ohana/Domain/Services/DataBackupRuntime.swift"
   "Ohana/Domain/Services/DataBackupDTOs.swift"
 )
 shared_container="Ohana/Models/SharedModelContainer.swift"
+local_backup_exclusion="Ohana/Shared/Utilities/LocalBackupExclusionPolicy.swift"
+human_note_attachments="Ohana/Features/HumanNotes/HumanNoteAttachmentStore.swift"
+human_note_commands="Ohana/Features/HumanNotes/HumanNoteCommands.swift"
+member_deletion_commands="Ohana/Features/Members/MemberDeletionCommands.swift"
+human_note_attachment_tests="OhanaTests/HumanNoteAttachmentLifecycleTests.swift"
+data_backup_atomic_tests="OhanaTests/DataBackupAtomicRestoreTests.swift"
+settings_backup="Ohana/Features/Settings/Views/SettingsView+Backup.swift"
+settings_chrome="Ohana/Features/Settings/Views/SettingsView+Chrome.swift"
 save_failure_baseline="docs/governance/manifests/swiftdata-save-failure-baseline.json"
 
 failures=()
@@ -83,7 +97,22 @@ require_section_pattern() {
     $0 ~ start { flag = 1 }
     $0 ~ end { flag = 0 }
     flag { print }
-  ' "$file" | rg -q --pcre2 "$pattern"; then
+  ' "$file" | rg --pcre2 "$pattern" >/dev/null; then
+    failures+=("$message")
+  fi
+}
+
+reject_section_pattern() {
+  local file="$1"
+  local start="$2"
+  local end="$3"
+  local pattern="$4"
+  local message="$5"
+  if awk -v start="$start" -v end="$end" '
+    $0 ~ start { flag = 1 }
+    $0 ~ end { flag = 0 }
+    flag { print }
+  ' "$file" | rg --pcre2 "$pattern" >/dev/null; then
     failures+=("$message")
   fi
 }
@@ -190,11 +219,114 @@ done
 require_pattern "$shared_container" 'Schema\(ArkSchemaV85\.models\)' \
   "SharedModelContainer should open the current ArkSchemaV85 model set."
 
+require_pattern "$local_backup_exclusion" 'values\.isExcludedFromBackup = true' \
+  "Local persistence must set URLResourceValues.isExcludedFromBackup before storing private data."
+
+require_pattern "$local_backup_exclusion" 'forKeys: \[\.isExcludedFromBackupKey\]' \
+  "Local backup exclusion must be read back and verified after it is applied."
+
+require_pattern "$shared_container" 'LocalBackupExclusionPolicy\.prepareApplicationSupportDirectory\(\)' \
+  "SharedModelContainer must exclude the Application Support persistence root from OS-managed backup before opening SwiftData."
+
+require_pattern "$human_note_attachments" 'LocalBackupExclusionPolicy\.excludeFromDeviceBackup\(directory\)' \
+  "Human Note attachment directories must be excluded from OS-managed backup."
+
+require_pattern "$human_note_attachments" 'LocalBackupExclusionPolicy\.excludeFromDeviceBackup\(url\)' \
+  "Human Note attachment files must be excluded after atomic writes."
+
+require_pattern "$human_note_commands" 'let attachmentCleanup = cleanDeletedAttachments\(' \
+  "Human Note deletion must run attachment cleanup only after its SwiftData commit succeeds."
+
+require_pattern "$human_note_commands" 'HumanNoteAttachmentStore\.deleteUnreferencedAttachments\(' \
+  "Human Note deletion must preserve attachment paths still referenced by surviving notes."
+
+require_pattern "$member_deletion_commands" 'let attachmentCleanup = cleanDeletedHumanAttachments\(' \
+  "Human deletion must clean its attachment directory only after its SwiftData commit succeeds."
+
+require_pattern "$member_deletion_commands" 'HumanNoteAttachmentStore\.deleteHumanDirectory\(' \
+  "Human deletion must use the Human Notes directory cleanup boundary."
+
+require_section_pattern "$app_reset" 'let preservedDefaults' 'resetLocalDefaults' \
+  'HumanNoteAttachmentStore\.deleteAll\(storage: attachmentStorage\)' \
+  "Delete-all Reset must remove the Human Notes root after the database commit."
+
+require_pattern "$human_note_attachment_tests" 'noteDeletionPreservesSharedReferenceThenRemovesItWhenLastReferenceIsDeleted' \
+  "Release data safety must test shared Human Note attachment references and repeated deletion."
+
+require_pattern "$human_note_attachment_tests" 'noteDeletionSaveFailurePreservesDatabaseReferenceAndFile' \
+  "Release data safety must prove failed note deletion saves do not remove live attachment files."
+
+require_pattern "$human_note_attachment_tests" 'humanDeletionClearsOwnedAndOrphanFilesButPreservesSharedReference' \
+  "Release data safety must test Human-directory cleanup without breaking surviving shared references."
+
+require_pattern "$human_note_attachment_tests" 'appResetSaveFailureLeavesDatabaseAndAttachmentRootUntouched' \
+  "Release data safety must prove failed Reset commits leave the Human Notes root intact."
+
+require_pattern "OhanaTests/LocalBackupExclusionPolicyTests.swift" 'marksDirectoriesAndFilesAsExcludedFromDeviceBackup' \
+  "Release data safety must test directory and file backup-exclusion resource values."
+
+require_section_pattern "$app_reset" 'private static func deleteAllPersistentModels' 'private static func delete<' \
+  'delete\(EconomyBudgetUsageEvent\.self' \
+  "Delete-all reset must remove bounded local economy budget guardrail events instead of retaining user-linked rows."
+
+require_pattern "$app_reset" '"economyV2\."' \
+  "Delete-all reset must clear economyV2 daily-budget defaults together with persistent guardrail events."
+
+require_pattern "OhanaTests/AppResetServiceTests.swift" 'fetch\(FetchDescriptor<EconomyBudgetUsageEvent>\(\)\)\.isEmpty' \
+  "AppResetService tests must prove economy budget guardrail rows are deleted."
+
+require_pattern "$automatic_backup" 'private var activeRunTask: Task<AutomaticBackupRunResult, Never>\?' \
+  "AutomaticBackupService must own the active run task instead of guarding it with an unowned Boolean."
+
+require_pattern "$automatic_backup" 'func prepareForAppReset\(\) async' \
+  "AutomaticBackupService must expose the shared asynchronous Reset quiescence boundary."
+
+require_pattern "$automatic_backup" 'generation &\+= 1' \
+  "Reset must invalidate the active automatic-backup generation before local deletion."
+
+require_pattern "$automatic_backup" 'guard checkpoint\(runID: runID, generation: runGeneration\)' \
+  "Automatic backup must check its generation after suspended export/write stages before publishing files or success status."
+
+reject_pattern "$automatic_backup" 'removeManagedAutomaticBackupsSynchronously' \
+  "Delete-all must not bypass the shared asynchronous backup coordinator with a second synchronous cleaner."
+
+reject_pattern "$app_reset" 'ICloudDriveAutomaticBackupFileStore' \
+  "AppResetService must not construct a second iCloud backup cleaner outside the shared coordinator."
+
+require_pattern "$app_runtime_adapters" 'await automaticBackups\.prepareForAppReset\(\)' \
+  "The production Reset adapter must quiesce the shared automatic-backup instance before deleting local data."
+
+require_pattern "$app_runtime_adapters" 'await automaticBackups\.removeManagedAutomaticBackupsForReset\(\)' \
+  "The production Reset adapter must remove the managed file through the same automatic-backup instance."
+
+require_pattern "$app_services" 'automaticBackups: automaticBackups' \
+  "AppServices must inject one AutomaticBackupService instance into both lifecycle backup and Reset ownership."
+
+require_pattern "$settings_chrome" 'try await appServices\.appReset\.reset\(context: modelContext\)' \
+  "Settings Delete-All must await the coordinated asynchronous Reset result."
+
+require_pattern "OhanaTests/AutomaticBackupServiceTests.swift" 'resetDuringNonCooperativeExportFencesOldGenerationAndAllowsANewBackup' \
+  "Release data safety must deterministically test Reset during a non-cooperative export."
+
+require_pattern "OhanaTests/AutomaticBackupServiceTests.swift" 'resetWaitsForAnInFlightManagedWriteThenRemovesItsFileAndStatus' \
+  "Release data safety must deterministically test Reset during the managed-file write."
+
+require_pattern "$settings_backup" 'free-text family tasks' \
+  "Settings backup disclosure must name free-text family-task exclusion, not only Human health data."
+
+require_pattern "$settings_backup" 'derived economy/ledger sidecars' \
+  "Settings backup disclosure must name derived economy/ledger sidecar exclusion."
+
+while IFS= read -r localized_strings; do
+  reject_pattern "$localized_strings" '备份含全部宠物、家庭成员、日志、健康档案及应用状态' \
+    "Localized resources must not retain the obsolete claim that backups include all Human health records."
+done < <(find Ohana -name Localizable.strings -type f -print)
+
 require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 30' \
   "OhanaBackup.schemaVersion should be 30 after externalizing backup media."
 
-require_pattern "$data_backup" 'guard backup\.schemaVersion <= 30' \
-  "DataBackupManager import guard should allow backup schemaVersion 30."
+require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 30' \
+  "Restore preflight should accept supported backup schema versions through 30."
 
 require_pattern "$data_backup_dtos" 'struct BackupMediaPackageInfo' \
   "OhanaBackup should describe the out-of-line backup media package."
@@ -228,6 +360,57 @@ require_pattern "$automatic_backup" 'scope: \.automaticICloudDriveRestricted' \
 
 require_pattern "$automatic_backup" 'writeAutomaticBackup\(packageURL: URL, now: Date\)' \
   "Automatic backup file storage should receive and copy a backup package URL."
+
+require_pattern "$data_backup" 'DataBackupPreflightValidator\.validate\(backup, existing: existingIdentities\)' \
+  "Restore must strictly validate the decoded backup before opening the live transaction."
+
+require_pattern "$data_backup_preflight" 'fieldName == "id"' \
+  "Restore preflight must validate every primary record UUID."
+
+require_pattern "$data_backup_preflight" 'Set\(ids\)\.count == ids\.count' \
+  "Restore preflight must reject duplicate primary record identities."
+
+require_pattern "$data_backup_preflight" 'isDateField\(fieldName\)' \
+  "Restore preflight must reject malformed required dates."
+
+require_pattern "$data_backup_preflight" 'validateRequiredRelationships' \
+  "Restore preflight must validate required relationship references."
+
+require_pattern "$data_backup" 'context\.autosaveEnabled = false' \
+  "Restore must disable main-context autosave while preparing its single transaction."
+
+require_pattern "$data_backup" 'DataBackupRestoreDefaults\(snapshot: defaults\.dictionaryRepresentation\(\)\)' \
+  "Restore must stage preference-dependent planning in memory instead of writing a temporary defaults domain."
+
+reject_pattern "$data_backup" 'UserDefaults\(suiteName: .*restore-staging' \
+  "Restore must not persist a crash-leftover staging UserDefaults domain."
+
+require_pattern "$data_backup" 'context\.transaction\(block: changes\)' \
+  "Restore must use one SwiftData transaction as its live-store commit boundary."
+
+reject_section_pattern "$data_backup" 'private func prepareBackupChanges' 'private func applyAppStateDefaults' \
+  'safeSave(Result)?|context\.save\(|saveRestoreCheckpoint' \
+  "Restore preparation must not save intermediate SwiftData checkpoints."
+
+require_section_pattern "$data_backup" 'private func prepareBackupChanges' 'private func applyAppStateDefaults' \
+  'persistChanges: false' \
+  "Restore must keep shared-care legacy cleanup inside the outer transaction."
+
+require_section_pattern "$data_backup" 'private func prepareBackupChanges' 'private func applyAppStateDefaults' \
+  'saveChanges: false' \
+  "Restore must keep legacy economy and plant reconciliation inside the outer transaction."
+
+require_pattern "$data_backup_atomic_tests" 'DataBackupRestorePhase\.allCases' \
+  "Restore atomicity tests must inject a failure at every declared restore phase."
+
+require_pattern "$data_backup_atomic_tests" 'malformedRequiredValuesFailBeforeAnyLiveMutation' \
+  "Restore tests must prove malformed identity/date/relationship inputs fail before live mutation."
+
+require_pattern "$data_backup_atomic_tests" 'transactionSaveFailureRollsBackPreparedChanges' \
+  "Restore tests must prove commit failure preserves the original store and defaults."
+
+require_pattern "$data_backup_atomic_tests" 'restoreLimitsAndMediaReaderRejectOversizeOrTampering' \
+  "Restore tests must prove manifest limits and media byte-count tampering are rejected."
 
 reject_pattern "$physical_deletion" 'deleteRows\(fetchAll\(CoconutLedgerEntry\.self' \
   "PhysicalDeletionService must preserve append-only CoconutLedgerEntry rows during member deletion."

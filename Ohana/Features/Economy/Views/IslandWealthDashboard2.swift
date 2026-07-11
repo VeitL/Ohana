@@ -470,8 +470,10 @@ struct IslandWealthDashboardContentView: View {
 }
 
 #Preview {
-    NavigationStack {
-        IslandWealthDashboardView()
+    if let modelContainer = try? SharedModelContainer.makePreview() {
+        NavigationStack {
+            IslandWealthDashboardView()
+        }
+        .modelContainer(modelContainer)
     }
-    .modelContainer(SharedModelContainer.make())
 }

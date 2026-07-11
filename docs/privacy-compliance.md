@@ -34,14 +34,18 @@ in-app member-privacy/PIN rules in `docs/app-architecture-governance.md`.
   Reset cleanup reports a failed managed-iCloud-file deletion and offers retry;
   copies a user exported outside the app remain under that user's control.
 - **Permission strings:** Camera / Photo / Location / Face ID usage descriptions
-  live only in `Ohana/Info.plist` plus `en.lproj`/`de.lproj`
-  `InfoPlist.strings`; the default `Info.plist` strings are Chinese. Do not
+  live only in `Ohana/Info.plist` plus per-language `InfoPlist.strings`; the
+  default `Info.plist` strings are Chinese, English/German are reviewed, and the
+  other registered languages currently use explicit English fallbacks. Do not
   reintroduce duplicate `INFOPLIST_KEY_*` permission strings in build settings —
   they override the localized strings. Draft review copy and in-app rationale
   live in `docs/permission-rationale-draft.md`.
 - **No unused permissions/capabilities:** Do not declare a permission, entitlement,
   or background mode that the code does not actually use (e.g., HealthKit strings
-  with no HealthKit integration). Remove or implement.
+  with no HealthKit integration). The Solo profile keeps CloudDocuments for the
+  restricted iCloud Drive backup, and declares no APNs entitlement,
+  `remote-notification` background mode, CloudKit sharing service, or App Group.
+  Remove or implement any future mismatch.
 - **Encryption export compliance:** Set `ITSAppUsesNonExemptEncryption`
   appropriately in `Info.plist`/App Store Connect (standard OS crypto only ⇒
   typically exempt).
@@ -54,10 +58,15 @@ Even though data is local, the user has rights over it:
   `DataBackupManager.exportJSON` (atomic, file-protected) satisfies portability;
   surface it as a clear user-facing "export my data" action.
 - **Right to erasure:** Provide a clear, complete "delete all my data" path that
-  removes SwiftData stores, the disk fallback (`ohana_disk_fallback`), the App
-  Group container, cached avatars/images, exported backups, and relevant
+  removes the SwiftData primary store, any legacy `ohana_disk_fallback` files, local
+  attachment/cache directories, app-managed iCloud backups, and relevant
   `UserDefaults`. Verify nothing sensitive survives a reset
   (see `AppResetService` and `scripts/audit-release-data-safety.sh`).
+- **OS backup exclusion:** `LocalBackupExclusionPolicy` marks the local
+  Application Support root and Human Note attachment paths as excluded from
+  OS-managed device backup and verifies the resource value after writing it.
+  Keep `LocalBackupExclusionPolicyTests` and
+  `scripts/audit-release-data-safety.sh` aligned with this boundary.
 - **Data minimization:** Only persist what a feature needs. Backups must continue
   to exclude PIN hash/salt and other recovery-sensitive fields.
 - **No silent collection:** No analytics/telemetry that leaves the device without
@@ -85,5 +94,7 @@ Before shipping a change that touches data, permissions, or background work:
   zero-upload behavior.
 - No unused permission/entitlement/background mode.
 - Export and delete-my-data paths still complete (`audit-release-data-safety.sh`).
+- Local persistence and Human Note attachment backup-exclusion guards still
+  pass, followed by a real-device encrypted-backup/restore check before release.
 - Diagnostics still privacy-safe.
 - Background location only during a running walk.

@@ -3293,12 +3293,15 @@ struct HomeCommandExecutorTests {
         #expect(commandSource.contains("let didPersist: Bool"))
         #expect(commandSource.contains("let persistenceErrorDescription: String?"))
         #expect(!commandSource.contains("context.safeSave()"))
-        #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
-        #expect(commandSource.contains("HumanNoteAttachmentStore.deletePendingAttachments(attachments)"))
+        #expect(commandSource.contains("safeSaveResult(publishFailureEvent: true)"))
+        #expect(commandSource.contains("HumanNoteAttachmentStore.deletePendingAttachments("))
+        #expect(commandSource.contains("HumanNoteAttachmentStore.deleteUnreferencedAttachments("))
         #expect(commandSource.contains("context.rollback()"))
         #expect(commandSource.contains("guard result.didPersist else { return result }"))
         #expect(commandSource.contains("if result.didPersist"))
         #expect(attachmentSource.contains("static func deletePendingAttachments(_ references: [HumanNoteAttachmentReference])"))
+        #expect(attachmentSource.contains("static func deleteHumanDirectory("))
+        #expect(attachmentSource.contains("static func deleteAll("))
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist"))
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist && result.didDelete"))
     }
@@ -3519,7 +3522,7 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func memberDeletionServiceDeletesLastHumanAndRequestsReplacement() throws {
+    @Test func memberDeletionServiceDeletesLastHumanWithoutForcingReplacement() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
@@ -3535,7 +3538,7 @@ struct HomeCommandExecutorTests {
         let humans = try context.fetch(FetchDescriptor<Human>())
         #expect(result.clearsActiveHumanID == true)
         #expect(result.requiresAccountSwitch == false)
-        #expect(result.requiresReplacementHuman == true)
+        #expect(result.requiresReplacementHuman == false)
         #expect(humans.isEmpty)
         #expect(try cloudSyncState(entityName: String(describing: Human.self), id: human.id, context: context)?.isDeletionTombstone == true)
     }
@@ -6609,6 +6612,13 @@ struct HomeCommandExecutorTests {
 
     @MainActor
     @Test func humanNoteServiceWritesNoteFactAttachmentsAndReminder() throws {
+        let applicationSupportDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("HomeCommandExecutorTests.HumanNote.\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: applicationSupportDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: applicationSupportDirectory) }
+        let attachmentStorage = HumanNoteAttachmentStorage(
+            applicationSupportDirectory: applicationSupportDirectory
+        )
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
@@ -6632,7 +6642,8 @@ struct HomeCommandExecutorTests {
             reminderDate: reminderDate,
             appLanguage: "en",
             context: context,
-            scheduleNotification: false
+            scheduleNotification: false,
+            attachmentStorage: attachmentStorage
         ))
 
         let events = try context.fetch(FetchDescriptor<Event>())
@@ -6648,6 +6659,12 @@ struct HomeCommandExecutorTests {
         #expect(human.notes.contains("Files: lab.pdf"))
         #expect(parsed.attachments.count == 1)
         #expect(parsed.attachments.first?.fileName == "lab.pdf")
+        let attachment = try #require(parsed.attachments.first)
+        let attachmentURL = try #require(HumanNoteAttachmentStore.url(
+            for: attachment,
+            storage: attachmentStorage
+        ))
+        #expect(FileManager.default.fileExists(atPath: attachmentURL.path))
         #expect(events.count == 1)
         #expect(events.first?.title == "remember meds")
         #expect(events.first?.eventType == EventType.task.rawValue)

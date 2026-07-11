@@ -8,18 +8,29 @@ enum AppResetService {
         var preserveLocalePreferences = true
         var cancelPendingNotifications = true
         var deleteCustomBackground = true
+        var deleteHumanNoteAttachments = true
         var resetSharedRuntimeState = true
         var cleanUpAutomaticBackups = true
     }
 
     struct ResetResult: Equatable {
         let automaticBackupCleanup: AutomaticBackupResetCleanupResult
+        let humanNoteAttachmentCleanup: HumanNoteAttachmentCleanupResult
+
+        init(
+            automaticBackupCleanup: AutomaticBackupResetCleanupResult,
+            humanNoteAttachmentCleanup: HumanNoteAttachmentCleanupResult = .notRequired
+        ) {
+            self.automaticBackupCleanup = automaticBackupCleanup
+            self.humanNoteAttachmentCleanup = humanNoteAttachmentCleanup
+        }
     }
 
+    @discardableResult
     static func reset(
         context: ModelContext,
         defaults: UserDefaults = .standard
-    ) throws -> ResetResult {
+    ) throws -> HumanNoteAttachmentCleanupResult {
         let options = Options()
         return try reset(
             context: context,
@@ -28,49 +39,56 @@ enum AppResetService {
         )
     }
 
+    @discardableResult
     static func reset(
         context: ModelContext,
         defaults: UserDefaults = .standard,
         options: Options
-    ) throws -> ResetResult {
+    ) throws -> HumanNoteAttachmentCleanupResult {
         let questManager = options.resetSharedRuntimeState ? QuestManager() : nil
         return try resetInternal(
             context: context,
             defaults: defaults,
             options: options,
             questManager: questManager,
-            automaticBackupResetCleaner: ICloudDriveAutomaticBackupFileStore()
+            attachmentStorage: .live,
+            saveChanges: { $0.safeSaveResult(publishFailureEvent: true) }
         )
     }
 
-    static func reset(
-        context: ModelContext,
-        defaults: UserDefaults = .standard,
-        options: Options,
-        automaticBackupResetCleaner: any AutomaticBackupResetCleaning
-    ) throws -> ResetResult {
-        let questManager = options.resetSharedRuntimeState ? QuestManager() : nil
-        return try resetInternal(
-            context: context,
-            defaults: defaults,
-            options: options,
-            questManager: questManager,
-            automaticBackupResetCleaner: automaticBackupResetCleaner
-        )
-    }
-
+    @discardableResult
     static func reset(
         context: ModelContext,
         defaults: UserDefaults = .standard,
         options: Options,
         questManager: QuestManager
-    ) throws -> ResetResult {
+    ) throws -> HumanNoteAttachmentCleanupResult {
         try resetInternal(
             context: context,
             defaults: defaults,
             options: options,
             questManager: questManager,
-            automaticBackupResetCleaner: ICloudDriveAutomaticBackupFileStore()
+            attachmentStorage: .live,
+            saveChanges: { $0.safeSaveResult(publishFailureEvent: true) }
+        )
+    }
+
+    @discardableResult
+    static func reset(
+        context: ModelContext,
+        defaults: UserDefaults,
+        options: Options,
+        attachmentStorage: HumanNoteAttachmentStorage,
+        saveChanges: (ModelContext) -> ModelContextSaveResult
+    ) throws -> HumanNoteAttachmentCleanupResult {
+        let questManager = options.resetSharedRuntimeState ? QuestManager() : nil
+        return try resetInternal(
+            context: context,
+            defaults: defaults,
+            options: options,
+            questManager: questManager,
+            attachmentStorage: attachmentStorage,
+            saveChanges: saveChanges
         )
     }
 
@@ -79,18 +97,21 @@ enum AppResetService {
         defaults: UserDefaults,
         options: Options,
         questManager: QuestManager?,
-        automaticBackupResetCleaner: any AutomaticBackupResetCleaning
-    ) throws -> ResetResult {
+        attachmentStorage: HumanNoteAttachmentStorage,
+        saveChanges: (ModelContext) -> ModelContextSaveResult
+    ) throws -> HumanNoteAttachmentCleanupResult {
         let preservedDefaults = preservedDefaultValues(in: defaults, options: options)
         try deleteAllPersistentModels(in: context)
-        try saveResetChanges(context: context)
+        try saveResetChanges(context: context, saveChanges: saveChanges)
+        let humanNoteAttachmentCleanup = options.deleteHumanNoteAttachments
+            ? HumanNoteAttachmentStore.deleteAll(storage: attachmentStorage)
+            : .notRequired
 
         resetLocalDefaults(defaults, preservedValues: preservedDefaults)
-        let automaticBackupCleanup = cleanUpAutomaticBackupsAfterReset(
-            defaults: defaults,
-            isEnabled: options.cleanUpAutomaticBackups,
-            cleaner: automaticBackupResetCleaner
-        )
+        // The local reset boundary always disables future automatic backups.
+        // The shared asynchronous coordinator owns cancellation and removal of
+        // the existing managed iCloud Drive file.
+        AutomaticBackupStatusStore.resetAfterAppReset(defaults: defaults)
         if options.deleteCustomBackground {
             CustomAppBackgroundStore.deleteImage()
         }
@@ -106,28 +127,7 @@ enum AppResetService {
         defaults.set("", forKey: "currentActiveHumanId")
         defaults.set(false, forKey: "ohana_show_first_success_card")
         defaults.set(false, forKey: "ohana_first_quick_checkin_completed")
-
-        return ResetResult(automaticBackupCleanup: automaticBackupCleanup)
-    }
-
-    private static func cleanUpAutomaticBackupsAfterReset(
-        defaults: UserDefaults,
-        isEnabled: Bool,
-        cleaner: any AutomaticBackupResetCleaning,
-        now: Date = Date()
-    ) -> AutomaticBackupResetCleanupResult {
-        guard isEnabled else { return .notRequested }
-        let statusStore = AutomaticBackupStatusStore(defaults: defaults)
-        statusStore.resetAfterAppReset(now: now)
-        do {
-            try cleaner.removeManagedAutomaticBackupsSynchronously()
-            statusStore.clearResetCleanupFailure()
-            return .removed
-        } catch {
-            let message = error.localizedDescription
-            statusStore.markResetCleanupFailure(message: message, now: now)
-            return .pending(message: message)
-        }
+        return humanNoteAttachmentCleanup
     }
 
     private static func deleteAllPersistentModels(in context: ModelContext) throws {
@@ -139,7 +139,7 @@ enum AppResetService {
         try delete(CareLedgerEvent.self, in: context)
         try delete(CoconutLedgerEntry.self, in: context)
         try delete(CoconutAccount.self, in: context)
-        // Keep EconomyBudgetUsageEvent and economyV2.dailyBudget defaults through reset so same-day resets cannot mint a fresh reward budget.
+        try delete(EconomyBudgetUsageEvent.self, in: context)
         try delete(FamilyCollaborationTask.self, in: context)
         try delete(CoconutExchangeRequest.self, in: context)
         try delete(SharedCareSession.self, in: context)
@@ -236,8 +236,11 @@ enum AppResetService {
             || resetDefaultPrefixes.contains { key.hasPrefix($0) }
     }
 
-    private static func saveResetChanges(context: ModelContext) throws {
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+    private static func saveResetChanges(
+        context: ModelContext,
+        saveChanges: (ModelContext) -> ModelContextSaveResult
+    ) throws {
+        let saveResult = saveChanges(context)
         guard saveResult.didSave else {
             context.rollback()
             throw AppResetPersistenceError.persistenceFailed(saveResult.errorDescription)
@@ -258,6 +261,7 @@ enum AppResetService {
         "lastTreeHarvestDate",
         OnboardingJourneyCoordinator.Key.existingUserUpgradeSeen,
         OnboardingJourneyCoordinator.Key.firstCareCompleted,
+        OnboardingJourneyCoordinator.Key.journeyStartedAt,
         OnboardingJourneyCoordinator.Key.roadmapPromptSeen,
         StarterGiftStorageKey.ceremonySeen,
         StarterGiftStorageKey.claimed,
@@ -279,6 +283,7 @@ enum AppResetService {
         "avatar2d_",
         "calendar_",
         "checkIn_",
+        "economyV2.",
         "feedGoal_",
         "feedOperatingMode_",
         "feedRecordMode_",

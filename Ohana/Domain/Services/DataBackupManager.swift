@@ -30,6 +30,52 @@ nonisolated enum DataBackupExportScope: String, Codable, Equatable, Sendable {
     }
 }
 
+nonisolated enum DataBackupRestorePhase: String, CaseIterable, Equatable, Sendable {
+    case preflightCompleted
+    case membersAndSchedulesPrepared
+    case careFactsPrepared
+    case extendedDataPrepared
+    case derivedStatePrepared
+    case beforeCommit
+}
+
+typealias DataBackupRestoreFaultInjector = (DataBackupRestorePhase) throws -> Void
+typealias DataBackupRestoreTransaction = (ModelContext, () throws -> Void) throws -> Void
+
+private struct DataBackupRestorePendingEffects {
+    let notificationIDsToCancel: [String]
+    let plantReconciliation: PlantBackupRestoreReconcileResult?
+}
+
+private final class DataBackupRestoreDefaults: UserDefaults {
+    private var values: [String: Any]
+
+    init(snapshot: [String: Any]) {
+        values = snapshot
+        super.init(suiteName: nil)!
+    }
+
+    override func object(forKey defaultName: String) -> Any? {
+        values[defaultName]
+    }
+
+    override func set(_ value: Any?, forKey defaultName: String) {
+        if let value {
+            values[defaultName] = value
+        } else {
+            values.removeValue(forKey: defaultName)
+        }
+    }
+
+    override func removeObject(forKey defaultName: String) {
+        values.removeValue(forKey: defaultName)
+    }
+
+    override func dictionaryRepresentation() -> [String: Any] {
+        values
+    }
+}
+
 // MARK: - DataBackupManager
 //
 // Isolation-agnostic: the build/encode/apply logic only does ModelContext
@@ -195,7 +241,11 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         projectionManager: CoconutProjectionManaging? = nil,
         password: String? = nil,
         schedulePlantNotifications: Bool = true,
-        plantNotifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+        plantNotifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
+        restoreFaultInjector: DataBackupRestoreFaultInjector? = nil,
+        restoreTransaction: DataBackupRestoreTransaction = { context, changes in
+            try context.transaction(block: changes)
+        }
     ) async throws {
         let packageURL = try Self.packageURLIfNeeded(url)
         let fileData: Data
@@ -205,9 +255,11 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             guard FileManager.default.fileExists(atPath: manifestURL.path) else {
                 throw BackupError.invalidBackupPackage
             }
+            try DataBackupPreflightValidator.validateManifestSize(at: manifestURL)
             fileData = try Data(contentsOf: manifestURL) // smoothness: explicit user restore file read
             mediaResolver = DataBackupMediaPackageReader(packageURL: packageURL, password: password)
         } else {
+            try DataBackupPreflightValidator.validateManifestSize(at: url)
             fileData = try Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
             mediaResolver = nil
         }
@@ -215,17 +267,15 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 30 else {
-            throw BackupError.unsupportedVersion(backup.schemaVersion)
-        }
-
         try applyBackup(
             backup,
             context: context,
             projectionManager: projectionManager,
             schedulePlantNotifications: schedulePlantNotifications,
             plantNotifications: plantNotifications,
-            mediaResolver: mediaResolver
+            mediaResolver: mediaResolver,
+            restoreFaultInjector: restoreFaultInjector,
+            restoreTransaction: restoreTransaction
         )
     }
 
@@ -510,8 +560,88 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         projectionManager: CoconutProjectionManaging?,
         schedulePlantNotifications: Bool = true,
         plantNotifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
-        mediaResolver: DataBackupMediaResolving? = nil
+        mediaResolver: DataBackupMediaResolving? = nil,
+        restoreFaultInjector: DataBackupRestoreFaultInjector? = nil,
+        restoreTransaction: DataBackupRestoreTransaction = { context, changes in
+            try context.transaction(block: changes)
+        }
     ) throws {
+        guard !context.hasChanges else {
+            throw BackupError.invalidRestoreData(.pendingChanges)
+        }
+
+        let existingIdentities = try DataBackupRestoreExistingIdentities(context: context)
+        try DataBackupPreflightValidator.validate(backup, existing: existingIdentities)
+        try runRestoreBoundary(.preflightCompleted, faultInjector: restoreFaultInjector)
+
+        let stagedDefaults = DataBackupRestoreDefaults(snapshot: defaults.dictionaryRepresentation())
+        applyAppStateDefaults(backup.appState, to: stagedDefaults)
+
+        let previousAutosaveState = context.autosaveEnabled
+        context.autosaveEnabled = false
+        defer { context.autosaveEnabled = previousAutosaveState }
+
+        var pendingEffects: DataBackupRestorePendingEffects?
+        var reachedCommitBoundary = false
+        do {
+            try restoreTransaction(context) {
+                pendingEffects = try prepareBackupChanges(
+                    backup,
+                    context: context,
+                    schedulePlantNotifications: schedulePlantNotifications,
+                    plantNotifications: plantNotifications,
+                    mediaResolver: mediaResolver,
+                    restoreDefaults: stagedDefaults,
+                    restoreBoundary: { phase in
+                        try self.runRestoreBoundary(phase, faultInjector: restoreFaultInjector)
+                    }
+                )
+                try runRestoreBoundary(.beforeCommit, faultInjector: restoreFaultInjector)
+                reachedCommitBoundary = true
+            }
+        } catch {
+            context.rollback()
+            if reachedCommitBoundary {
+                PersistenceSaveFailureCenter.publish(error: error, file: #file, line: #line)
+                throw DataBackupRestorePersistenceError.persistenceFailed(error.localizedDescription)
+            }
+            throw error
+        }
+
+        guard let pendingEffects else {
+            context.rollback()
+            throw DataBackupRestorePersistenceError.persistenceFailed(nil)
+        }
+
+        // Only nonthrowing side effects run after SwiftData's single transaction
+        // commits. A failed/cancelled transaction therefore cannot alter
+        // UserDefaults, notifications, projections, or the live persistent store.
+        applyAppStateDefaults(backup.appState, to: defaults)
+        DomainRehydrateEffectsDispatcher.cancelNotifications(
+            pendingEffects.notificationIDsToCancel,
+            notifications: plantNotifications
+        )
+        CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
+        if let plantReconciliation = pendingEffects.plantReconciliation {
+            PlantBackupRestoreReconcileService.commitSideEffects(
+                plantReconciliation,
+                context: context,
+                notifications: plantNotifications,
+                defaults: defaults
+            )
+        }
+    }
+
+    @MainActor
+    private func prepareBackupChanges(
+        _ backup: OhanaBackup,
+        context: ModelContext,
+        schedulePlantNotifications: Bool,
+        plantNotifications: ReminderNotificationScheduling,
+        mediaResolver: DataBackupMediaResolving?,
+        restoreDefaults: UserDefaults,
+        restoreBoundary: (DataBackupRestorePhase) throws -> Void
+    ) throws -> DataBackupRestorePendingEffects {
         // 以 UUID 为主键去重：先构建现有 ID 集合，再 upsert。
         // Event/Reminder 不能在 writer 前过滤；rehydrate writer 必须重新解析已有 schedule aggregate。
         var rehydrateNotificationIdsToCancel: [String] = []
@@ -560,7 +690,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             )
             rehydrateNotificationIdsToCancel.append(contentsOf: result.notificationIdsToCancel)
         }
-        try saveRestoreCheckpoint(context: context)
+        try restoreBoundary(.membersAndSchedulesPrepared)
 
         for dto in backup.reminders {
             let result = try DomainScheduleRehydrateWriter.upsertReminder(
@@ -684,7 +814,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 context: context
             )
         }
-        try saveRestoreCheckpoint(context: context)
+        try restoreBoundary(.careFactsPrepared)
 
         for dto in backup.petDocumentAttachments ?? [] {
             try DomainMemberContentRehydrateWriter.insertPetDocumentAttachmentIfNeeded(
@@ -869,51 +999,65 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 context: context
             )
         }
-        try saveRestoreCheckpoint(context: context)
-        SharedCareSessionMaintenance.cleanLegacyNoteMetadata(context: context)
-        DomainRehydrateEffectsDispatcher.cancelNotifications(rehydrateNotificationIdsToCancel)
+        try restoreBoundary(.extendedDataPrepared)
+        _ = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(
+            context: context,
+            persistChanges: false
+        )
 
-        // 恢复 UserDefaults appState
-        let ud = defaults
         let s = backup.appState
         let isLegacyCoconutBackup = backup.coconutAccounts?.isEmpty != false
-        if !s.bountyTasksJSON.isEmpty { ud.set(s.bountyTasksJSON, forKey: "bountyTasks") }
-        if !s.purchasedShopItems.isEmpty { ud.set(s.purchasedShopItems, forKey: "purchasedShopItems") }
-        if let selectedAppIcon = s.selectedAppIcon, !selectedAppIcon.isEmpty {
-            ud.set(selectedAppIcon, forKey: AppIconCatalog.selectedIconKey)
-        }
-        if !s.gachaHistoryJSON.isEmpty { ud.set(s.gachaHistoryJSON, forKey: "gachaHistory") }
-        if !s.celebratedMilestoneDays.isEmpty { ud.set(s.celebratedMilestoneDays, forKey: "celebratedMilestoneDays") }
-        if let inventory = s.shopConsumableInventory {
-            ud.set(max(0, inventory.backdatePassCount), forKey: CheckInStreakStore.makeupPackKey)
-            ud.set(max(0, inventory.avatar2DExtraPassCount), forKey: ShopInventoryDefaultsKeys.avatar2DExtraPassInventory)
-            ud.set(inventory.doubleRewardBoostActive, forKey: ShopInventoryDefaultsKeys.doubleRewardBoost)
-            if let expiry = parseDate(inventory.streakShieldExpiry) {
-                ud.set(expiry, forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
-            } else {
-                ud.removeObject(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
-            }
-        }
-        if let plantReminderPreferences = s.plantReminderPreferences {
-            applyPlantReminderPreferences(plantReminderPreferences, defaults: ud)
-        }
         if isLegacyCoconutBackup {
-            try? CoconutEconomyBootstrapService.bootstrapIfNeeded(
+            try CoconutEconomyBootstrapService.bootstrapIfNeeded(
                 context: context,
                 legacyIslandCount: s.coconutCount,
                 legacyLogsJSON: s.coconutLogsJSON,
-                projectionManager: projectionManager
+                projectionManager: nil,
+                saveChanges: false,
+                updatesProjection: false
             )
-        } else {
-            CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
         }
-        if !backup.plants.isEmpty || backup.plantCareLogs?.isEmpty == false {
+
+        let plantReconciliation: PlantBackupRestoreReconcileResult? = if !backup.plants.isEmpty || backup.plantCareLogs?.isEmpty == false {
             try PlantBackupRestoreReconcileService.rebuildPlantCarePlans(
                 context: context,
                 scheduleNotifications: schedulePlantNotifications,
                 notifications: plantNotifications,
-                defaults: ud
+                defaults: restoreDefaults,
+                saveChanges: false
             )
+        } else {
+            nil
+        }
+        try restoreBoundary(.derivedStatePrepared)
+        return DataBackupRestorePendingEffects(
+            notificationIDsToCancel: rehydrateNotificationIdsToCancel,
+            plantReconciliation: plantReconciliation
+        )
+    }
+
+    private func applyAppStateDefaults(_ state: AppStateBackup, to target: UserDefaults) {
+        if !state.bountyTasksJSON.isEmpty { target.set(state.bountyTasksJSON, forKey: "bountyTasks") }
+        if !state.purchasedShopItems.isEmpty { target.set(state.purchasedShopItems, forKey: "purchasedShopItems") }
+        if let selectedAppIcon = state.selectedAppIcon, !selectedAppIcon.isEmpty {
+            target.set(selectedAppIcon, forKey: AppIconCatalog.selectedIconKey)
+        }
+        if !state.gachaHistoryJSON.isEmpty { target.set(state.gachaHistoryJSON, forKey: "gachaHistory") }
+        if !state.celebratedMilestoneDays.isEmpty {
+            target.set(state.celebratedMilestoneDays, forKey: "celebratedMilestoneDays")
+        }
+        if let inventory = state.shopConsumableInventory {
+            target.set(max(0, inventory.backdatePassCount), forKey: CheckInStreakStore.makeupPackKey)
+            target.set(max(0, inventory.avatar2DExtraPassCount), forKey: ShopInventoryDefaultsKeys.avatar2DExtraPassInventory)
+            target.set(inventory.doubleRewardBoostActive, forKey: ShopInventoryDefaultsKeys.doubleRewardBoost)
+            if let expiry = parseDate(inventory.streakShieldExpiry) {
+                target.set(expiry, forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
+            } else {
+                target.removeObject(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
+            }
+        }
+        if let plantReminderPreferences = state.plantReminderPreferences {
+            applyPlantReminderPreferences(plantReminderPreferences, defaults: target)
         }
     }
 
@@ -1103,12 +1247,14 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             itemID.hasPrefix("title_")
     }
 
-    private func saveRestoreCheckpoint(context: ModelContext) throws {
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
-        guard saveResult.didSave else {
-            context.rollback()
-            throw DataBackupRestorePersistenceError.persistenceFailed(saveResult.errorDescription)
+    private func runRestoreBoundary(
+        _ phase: DataBackupRestorePhase,
+        faultInjector: DataBackupRestoreFaultInjector?
+    ) throws {
+        if Task<Never, Never>.isCancelled {
+            throw CancellationError()
         }
+        try faultInjector?(phase)
     }
 }
 

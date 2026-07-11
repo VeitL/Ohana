@@ -12,10 +12,17 @@ extension QuestManager {
     // 这些方法仍保留，内部调用不再触发个人账户分润，仅用于无上下文场景（如首日登录奖励）
 
     /// 仅更新全岛总库（用于无实体关联的全局奖励）
-    func addCoconuts(_ amount: Int, emoji: String = "🥥", title: String = "打卡奖励", reason: String? = nil,
-                     actorId: String? = nil, actorName: String? = nil) {
+    func addCoconuts(
+        _ amount: Int,
+        emoji: String = "🥥",
+        title: String = "打卡奖励",
+        reason: String? = nil,
+        actorId: String? = nil,
+        actorName: String? = nil
+    ) {
         let finalTitle = reason ?? title
-        let context = ModelContext(SharedModelContainer.make())
+        guard let container = try? SharedModelContainer.make() else { return }
+        let context = ModelContext(container)
         addCoconuts(
             amount,
             emoji: emoji,
@@ -124,7 +131,8 @@ extension QuestManager {
         postsRewardFeedback: Bool = true
     ) {
         guard amount != 0 else { return }
-        let context = ModelContext(SharedModelContainer.make())
+        guard let container = try? SharedModelContainer.make() else { return }
+        let context = ModelContext(container)
         do {
             guard let actor = try legacyWalletActor(actorId: actorId, actorName: actorName, context: context) else {
                 return
@@ -308,7 +316,8 @@ extension QuestManager {
             humanGet = 0
             petGet = 0
         }
-        let context = ModelContext(SharedModelContainer.make())
+        guard let container = try? SharedModelContainer.make() else { return }
+        let context = ModelContext(container)
         let fallbackHuman = (human == nil && pet == nil)
             ? EconomyRewardOwnerResolver.activeHuman(
                 selection: activeHumanSelection,

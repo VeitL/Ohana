@@ -5,12 +5,49 @@ import Testing
 
 @MainActor
 struct StarterGiftServiceTests {
-    @Test func freshInstallMarksGiftPendingUntilHumanExists() throws {
+    @Test func freshInstallMarksGiftPendingUntilFirstPetExists() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
         let defaults = try makeDefaults(suiteName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
+        let result = StarterGiftService.prepareOrClaim(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+
+        #expect(result == .pendingFirstPet)
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
+    }
+
+    @Test func petFirstJourneyWaitsForCareThenClaimsIntoPetWallet() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        context.safeSave()
+        let waitingForCare = StarterGiftService.prepareOrClaim(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+
+        #expect(waitingForCare == .pendingFirstCare(recipient: .pet(pet.id)))
+        #expect(pet.coconutBalance == 0)
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
+
+        context.insert(PetWeightLog(weight: 4.2, pet: pet))
+        context.safeSave()
 
         let result = StarterGiftService.prepareOrClaim(
             activeHumanID: nil,
@@ -18,107 +55,83 @@ struct StarterGiftServiceTests {
             defaults: defaults
         )
 
-        #expect(result == .pendingHuman)
-        #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
-        #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
-    }
-
-    @Test func pendingGiftClaimsAfterFirstPetWeight() throws {
-        let container = try makeContainer()
-        let context = ModelContext(container)
-        let suiteName = makeDefaultsSuiteName()
-        let defaults = try makeDefaults(suiteName: suiteName)
-        let oldCount = TestQuestManagerProjection.manager.coconutCount
-        let oldLogs = TestQuestManagerProjection.manager.coconutLogs
-        defer {
-            TestQuestManagerProjection.manager.coconutCount = oldCount
-            TestQuestManagerProjection.manager.coconutLogs = oldLogs
-            TestQuestManagerProjection.manager.persistQuestFlags()
-            defaults.removePersistentDomain(forName: suiteName)
-        }
-
-        _ = StarterGiftService.prepareOrClaim(activeHumanID: nil, context: context, defaults: defaults)
-
-        let human = Human(name: "Guan")
-        context.insert(human)
-        context.safeSave()
-        TestQuestManagerProjection.manager.coconutCount = 0
-        TestQuestManagerProjection.manager.coconutLogs = []
-
-        let waitingForCare = StarterGiftService.prepareOrClaim(
-            activeHumanID: human.id.uuidString,
-            context: context,
-            defaults: defaults,
-            projectionManager: TestQuestManagerProjection.manager
-        )
-
-        #expect(waitingForCare == .pendingFirstCare(humanID: human.id))
-        #expect(human.coconutBalance == 0)
-        #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
-        #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
-
-        let pet = Pet(name: "Momo", species: "cat")
-        context.insert(pet)
-        context.insert(PetWeightLog(weight: 4.2, pet: pet))
-        context.safeSave()
-
-        let result = StarterGiftService.prepareOrClaim(
-            activeHumanID: human.id.uuidString,
-            context: context,
-            defaults: defaults,
-            projectionManager: TestQuestManagerProjection.manager
-        )
-
-        #expect(result == .claimed(humanID: human.id, amount: StarterGiftService.giftAmount))
-        #expect(human.coconutBalance == StarterGiftService.giftAmount)
-        #expect(TestQuestManagerProjection.manager.coconutCount == StarterGiftService.giftAmount)
+        #expect(result == .claimed(recipient: .pet(pet.id), amount: StarterGiftService.giftAmount))
+        #expect(pet.coconutBalance == StarterGiftService.giftAmount)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.pending))
 
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledger.count == 1)
         #expect(ledger.first?.actionType == "starterGift")
+        #expect(ledger.first?.subjectKind == CareLedgerSubjectKind.pet.rawValue)
+        #expect(ledger.first?.subjectId == pet.id.uuidString)
         #expect(ledger.first?.coconutDelta == StarterGiftService.giftAmount)
         #expect(ledger.first?.metadataJSON.contains("\"growthXP\":0") == true)
     }
 
-    @Test func firstPetWeightClaimsGiftEvenBeforeActiveHumanIDPropagates() throws {
+    @Test func existingHumanRemainsTheRecipientWhenOneIsAvailable() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
         let defaults = try makeDefaults(suiteName: suiteName)
-        let oldCount = TestQuestManagerProjection.manager.coconutCount
-        let oldLogs = TestQuestManagerProjection.manager.coconutLogs
-        defer {
-            TestQuestManagerProjection.manager.coconutCount = oldCount
-            TestQuestManagerProjection.manager.coconutLogs = oldLogs
-            TestQuestManagerProjection.manager.persistQuestFlags()
-            defaults.removePersistentDomain(forName: suiteName)
-        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        _ = StarterGiftService.prepareOrClaim(activeHumanID: nil, context: context, defaults: defaults)
-
+        #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
         let human = Human(name: "Fresh")
         let pet = Pet(name: "Momo", species: "cat")
         context.insert(human)
         context.insert(pet)
         context.insert(PetWeightLog(weight: 4.2, pet: pet))
         context.safeSave()
-        TestQuestManagerProjection.manager.coconutCount = 0
-        TestQuestManagerProjection.manager.coconutLogs = []
 
         let result = StarterGiftService.prepareOrClaim(
-            activeHumanID: nil,
+            activeHumanID: human.id.uuidString,
             context: context,
-            defaults: defaults,
-            projectionManager: TestQuestManagerProjection.manager
+            defaults: defaults
         )
 
-        #expect(result == .claimed(humanID: human.id, amount: StarterGiftService.giftAmount))
+        #expect(result == .claimed(recipient: .human(human.id), amount: StarterGiftService.giftAmount))
         #expect(human.coconutBalance == StarterGiftService.giftAmount)
+        #expect(pet.coconutBalance == 0)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
         #expect(StarterGiftService.shouldShowCeremony(defaults: defaults))
+    }
+
+    @Test func persistedGiftRecoversDefaultsWithoutMintingTwice() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        context.insert(PetWeightLog(weight: 4.2, pet: pet))
+        context.safeSave()
+
+        let first = StarterGiftService.prepareOrClaim(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+        #expect(first == .claimed(recipient: .pet(pet.id), amount: StarterGiftService.giftAmount))
+
+        defaults.removeObject(forKey: StarterGiftStorageKey.claimed)
+        defaults.set(true, forKey: StarterGiftStorageKey.pending)
+        let recovered = StarterGiftService.prepareOrClaim(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+
+        #expect(recovered == .alreadyHandled)
+        #expect(pet.coconutBalance == StarterGiftService.giftAmount)
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.pending))
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).count == 1)
     }
 
     @Test func existingUserIsMarkedHandledWithoutGift() throws {

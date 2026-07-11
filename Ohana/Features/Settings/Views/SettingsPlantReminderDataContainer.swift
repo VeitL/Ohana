@@ -405,6 +405,7 @@ private struct SettingsPlantReminderPanelContent: View {
                             transaction.animation = nil
                         }
                         .frame(width: 50, height: 30)
+                        .accessibilityElement(children: .ignore)
                         .accessibilityLabel(plantReminderAccessibilityLabel(plant))
                         .accessibilityValue(plantReminderAccessibilityValue(plant))
                         .accessibilityHint(l.tr(

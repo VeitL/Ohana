@@ -1008,11 +1008,46 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
 }
 
 // MARK: - Shared Container
-enum SharedModelContainerStoreKind {
+enum SharedModelContainerStoreIdentity: String, Hashable, Sendable {
+    case primary
+}
+
+enum SharedModelContainerStoreKind: String, CaseIterable, Equatable, Sendable {
     case primaryWithMigrationPlan
-    case defaultStoreWithoutMigrationPlan
-    case diskFallback
-    case memoryFallback
+    case primaryWithoutMigrationPlan
+
+    var identity: SharedModelContainerStoreIdentity {
+        .primary
+    }
+}
+
+struct SharedModelContainerOpenFailure: Error, Equatable, Sendable {
+    let attemptedStoreKinds: [SharedModelContainerStoreKind]
+}
+
+enum SharedModelContainerOpenPolicy {
+    static let orderedAttempts: [SharedModelContainerStoreKind] = [
+        .primaryWithMigrationPlan,
+        .primaryWithoutMigrationPlan
+    ]
+
+    static let writableStoreIdentities = Set(orderedAttempts.map(\.identity))
+
+    static func open<Value>(
+        using opener: (SharedModelContainerStoreKind) throws -> Value
+    ) throws -> Value {
+        var attemptedStoreKinds: [SharedModelContainerStoreKind] = []
+
+        for storeKind in orderedAttempts {
+            do {
+                return try opener(storeKind)
+            } catch {
+                attemptedStoreKinds.append(storeKind)
+            }
+        }
+
+        throw SharedModelContainerOpenFailure(attemptedStoreKinds: attemptedStoreKinds)
+    }
 }
 
 enum SharedModelContainer {
@@ -1020,126 +1055,103 @@ enum SharedModelContainer {
     private static var _shared: ModelContainer?
 
     /// 全 App + 后台回调共用**一个**容器，对应同一套磁盘库。
-    static func make() -> ModelContainer {
+    static func make() throws -> ModelContainer {
         lock.lock()
         defer { lock.unlock() }
         if let existing = _shared { return existing }
-        let created = createPersistentContainer()
+        let created = try createPersistentContainer()
         _shared = created
         return created
     }
 
-    private static func createPersistentContainer() -> ModelContainer {
-        ensureApplicationSupportDirectory()
+    static func makePreview() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV85.models)
-        let defaultConfig = ModelConfiguration(
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .none
-        )
-
-        do {
-            let container = try ModelContainer(
-                for: schema,
-                migrationPlan: ArkMigrationPlan.self,
-                configurations: [defaultConfig]
-            )
-            recordStoreOpen(.primaryWithMigrationPlan)
-            #if DEBUG
-                OhanaLog.info("SwiftData: primary store opened with migrationPlan", category: "SwiftData")
-            #endif
-            return container
-        } catch {
-            #if DEBUG
-                OhanaLog.warning("SwiftData: migrationPlan open failed - \(error)", category: "SwiftData")
-                OhanaLog.warning("SwiftData: retrying default store without migrationPlan", category: "SwiftData")
-            #endif
-        }
-
-        do {
-            let container = try ModelContainer(
-                for: schema,
-                configurations: [defaultConfig]
-            )
-            recordStoreOpen(.defaultStoreWithoutMigrationPlan)
-            #if DEBUG
-                OhanaLog.info("SwiftData: default store opened without migrationPlan", category: "SwiftData")
-            #endif
-            return container
-        } catch {
-            #if DEBUG
-                OhanaLog.warning("SwiftData: default store without migrationPlan failed - \(error)", category: "SwiftData")
-            #endif
-        }
-
-        // 第三层：独立命名的磁盘库（仍落 Application Support，**非内存**），避免杀进程后数据蒸发
-        let diskFallback = ModelConfiguration(
-            "ohana_disk_fallback",
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .none
-        )
-        do {
-            let container = try ModelContainer(for: schema, configurations: [diskFallback])
-            recordStoreOpen(.diskFallback)
-            #if DEBUG
-                OhanaLog.warning("SwiftData: using disk fallback store ohana_disk_fallback", category: "SwiftData")
-            #endif
-            return container
-        } catch {
-            #if DEBUG
-                OhanaLog.warning("SwiftData: disk fallback store failed - \(error)", category: "SwiftData")
-            #endif
-        }
-
-        #if DEBUG
-            OhanaLog.error("SwiftData: all disk stores failed; falling back to in-memory store", category: "SwiftData")
-        #endif
-        let memoryConfig = ModelConfiguration(
+        let configuration = ModelConfiguration(
             isStoredInMemoryOnly: true,
             cloudKitDatabase: .none
         )
+        return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    private static func createPersistentContainer() throws -> ModelContainer {
+        ensureApplicationSupportDirectory()
+        let schema = Schema(ArkSchemaV85.models)
+        let primaryConfiguration = ModelConfiguration(
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .none
+        )
+
         do {
-            let container = try ModelContainer(for: schema, configurations: [memoryConfig])
-            recordStoreOpen(.memoryFallback)
-            return container
+            return try SharedModelContainerOpenPolicy.open { storeKind in
+                switch storeKind {
+                case .primaryWithMigrationPlan:
+                    do {
+                        let container = try ModelContainer(
+                            for: schema,
+                            migrationPlan: ArkMigrationPlan.self,
+                            configurations: [primaryConfiguration]
+                        )
+                        #if DEBUG
+                            OhanaLog.info(
+                                "SwiftData: primary store opened with migrationPlan",
+                                category: "SwiftData"
+                            )
+                        #endif
+                        return container
+                    } catch {
+                        #if DEBUG
+                            OhanaLog.warning(
+                                "SwiftData: migrationPlan open failed - \(error)",
+                                category: "SwiftData"
+                            )
+                            OhanaLog.warning(
+                                "SwiftData: retrying the same primary store without migrationPlan",
+                                category: "SwiftData"
+                            )
+                        #endif
+                        throw error
+                    }
+                case .primaryWithoutMigrationPlan:
+                    do {
+                        let container = try ModelContainer(
+                            for: schema,
+                            configurations: [primaryConfiguration]
+                        )
+                        #if DEBUG
+                            OhanaLog.info(
+                                "SwiftData: same primary store opened without migrationPlan",
+                                category: "SwiftData"
+                            )
+                        #endif
+                        return container
+                    } catch {
+                        #if DEBUG
+                            OhanaLog.warning(
+                                "SwiftData: same primary store without migrationPlan failed - \(error)",
+                                category: "SwiftData"
+                            )
+                        #endif
+                        throw error
+                    }
+                }
+            }
         } catch {
-            #if DEBUG
-                OhanaLog.error("SwiftData: in-memory fallback failed - \(error)", category: "SwiftData")
-            #endif
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }
-
-    static func fallbackIndicatorIsActive(for storeKind: SharedModelContainerStoreKind) -> Bool {
-        switch storeKind {
-        case .primaryWithMigrationPlan, .defaultStoreWithoutMigrationPlan:
-            false
-        case .diskFallback, .memoryFallback:
-            true
-        }
-    }
-
-    private static func recordStoreOpen(_ storeKind: SharedModelContainerStoreKind) {
-        if fallbackIndicatorIsActive(for: storeKind) {
-            DatabaseFallbackPreferenceStore.markFallbackActive()
-        } else {
-            DatabaseFallbackPreferenceStore.clearFallbackActive()
+            OhanaLog.error(
+                "SwiftData: primary store unavailable; stopped before creating an alternate writable store",
+                category: "SwiftData"
+            )
+            throw error
         }
     }
 
     private static func ensureApplicationSupportDirectory() {
-        guard let url = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else { return }
         do {
-            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            try LocalBackupExclusionPolicy.prepareApplicationSupportDirectory()
         } catch {
-            #if DEBUG
-                OhanaLog.warning(
-                    "SwiftData: could not prepare Application Support directory - \(error.localizedDescription)",
-                    category: "SwiftData"
-                )
-            #endif
+            OhanaLog.error(
+                "SwiftData: Application Support backup exclusion failed - \(error.localizedDescription)",
+                category: "Privacy"
+            )
         }
     }
 }

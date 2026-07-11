@@ -503,23 +503,32 @@ extension SettingsView {
     }
 
     func resetApp() {
-        do {
-            let resetResult = try appServices.appReset.reset(context: modelContext)
-            currentActiveHumanId = ""
-            withAnimation(GoMotion.page) {
-                hasOnboarded = false
+        Task { @MainActor in
+            do {
+                let resetResult = try await appServices.appReset.reset(context: modelContext)
+                currentActiveHumanId = ""
+                withAnimation(GoMotion.page) {
+                    hasOnboarded = false
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                if case .pending = resetResult.humanNoteAttachmentCleanup {
+                    appServices.islandToasts.show(l.tr(
+                        zh: "App 数据已删除，但部分本地备注附件未能清理。请联系支持。",
+                        en: "App data was deleted, but some local note attachments could not be removed. Contact support.",
+                        de: "Die App-Daten wurden gelöscht, aber einige lokale Notizanhänge konnten nicht entfernt werden. Kontaktiere den Support."
+                    ))
+                }
+                if case let .pending(message) = resetResult.automaticBackupCleanup {
+                    automaticBackupCleanupError = l.tr(
+                        zh: "App 内的数据已删除，但 iCloud Drive 中的旧自动备份尚未删除。请恢复网络后在“数据备份”中重试。\n\n\(message)",
+                        en: "App data was deleted, but the previous automatic backup in iCloud Drive was not removed. Restore connectivity and retry from Data Backup.\n\n\(message)",
+                        de: "Die App-Daten wurden gelöscht, aber das vorherige automatische Backup in iCloud Drive wurde nicht entfernt. Stelle die Verbindung wieder her und versuche es in Datensicherung erneut.\n\n\(message)"
+                    )
+                }
+            } catch {
+                appResetErrorMessage = error.localizedDescription
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            if case let .pending(message) = resetResult.automaticBackupCleanup {
-                automaticBackupCleanupError = l.tr(
-                    zh: "App 内的数据已删除，但 iCloud Drive 中的旧自动备份尚未删除。请恢复网络后在“数据备份”中重试。\n\n\(message)",
-                    en: "App data was deleted, but the previous automatic backup in iCloud Drive was not removed. Restore connectivity and retry from Data Backup.\n\n\(message)",
-                    de: "Die App-Daten wurden gelöscht, aber das vorherige automatische Backup in iCloud Drive wurde nicht entfernt. Stelle die Verbindung wieder her und versuche es in Datensicherung erneut.\n\n\(message)"
-                )
-            }
-        } catch {
-            appResetErrorMessage = error.localizedDescription
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 

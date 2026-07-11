@@ -13,6 +13,7 @@ enum HumanRequirementResolution: Equatable {
     case needsRequiredProfile
     case preserveAccountSwitch
     case activateHuman(String)
+    case readyWithoutHuman
     case ready
 }
 
@@ -46,7 +47,7 @@ enum HumanRequirementCoordinator {
         }
 
         guard let firstHuman = firstHuman(context: context) else {
-            return .needsRequiredProfile
+            return .readyWithoutHuman
         }
 
         if isAccountSwitchPresented {

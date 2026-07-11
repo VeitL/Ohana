@@ -17,6 +17,7 @@ enum AutomaticBackupPolicy {
     static let directoryName = "Ohana Backups"
     static let fileName = "Ohana Automatic Backup.\(DataBackupManager.packageFileExtension)"
     static let legacyFileName = "Ohana Automatic Backup.json"
+    nonisolated static let resetExportCancellationWaitNanoseconds: UInt64 = 2_000_000_000
 }
 
 struct AutomaticBackupFileReference: Codable, Equatable, Sendable {
@@ -85,6 +86,7 @@ enum AutomaticBackupSkipReason: Equatable {
     case disabled
     case notDue
     case alreadyRunning
+    case cancelledByReset
 }
 
 enum AutomaticBackupRunResult: Equatable {
@@ -359,15 +361,6 @@ struct ICloudDriveAutomaticBackupFileStore: AutomaticBackupFileStoring {
         }.value
     }
 
-    func removeManagedAutomaticBackupsSynchronously() throws {
-        try Self.remove(
-            containerIdentifier: containerIdentifier,
-            directoryName: directoryName,
-            fileName: fileName,
-            legacyFileName: legacyFileName
-        )
-    }
-
     private nonisolated static func write(
         packageURL: URL,
         containerIdentifier: String,
@@ -446,15 +439,6 @@ struct ICloudDriveAutomaticBackupFileStore: AutomaticBackupFileStoring {
     }
 }
 
-/// Lets the synchronous privacy-reset boundary be tested without accessing a
-/// real iCloud account. The asynchronous service path continues to use
-/// `AutomaticBackupFileStoring`.
-protocol AutomaticBackupResetCleaning {
-    func removeManagedAutomaticBackupsSynchronously() throws
-}
-
-extension ICloudDriveAutomaticBackupFileStore: AutomaticBackupResetCleaning {}
-
 @MainActor
 protocol AutomaticBackupManaging {
     func snapshot(now: Date) -> AutomaticBackupStatus
@@ -462,25 +446,36 @@ protocol AutomaticBackupManaging {
     func markReminderShown(now: Date)
     func runIfDue(container: ModelContainer, trigger: AutomaticBackupTrigger) async -> AutomaticBackupRunResult
     func runNow(container: ModelContainer, trigger: AutomaticBackupTrigger) async -> AutomaticBackupRunResult
-    func removeManagedAutomaticBackupsForReset() async
+    func prepareForAppReset() async
+    func removeManagedAutomaticBackupsForReset() async -> AutomaticBackupResetCleanupResult
     func retryManagedAutomaticBackupCleanup() async -> AutomaticBackupResetCleanupResult
     func removeLegacyAutomaticBackupForHealthSafety() async -> AutomaticBackupResetCleanupResult
 }
 
 @MainActor
 final class AutomaticBackupService: AutomaticBackupManaging {
+    private enum RunPhase {
+        case exporting
+        case writing
+    }
+
     private let statusStore: AutomaticBackupStatusStore
     private let exporter: AutomaticBackupExporting
     private let fileStore: AutomaticBackupFileStoring
     private let now: () -> Date
-    private var isRunning = false
+    private let resetExportCancellationWaitNanoseconds: UInt64
+    private var generation: UInt64 = 0
+    private var activeRunID: UUID?
+    private var activeRunPhase: RunPhase?
+    private var activeRunTask: Task<AutomaticBackupRunResult, Never>?
 
     convenience init(now: @escaping () -> Date = Date.init) {
         self.init(
             statusStore: AutomaticBackupStatusStore(),
             exporter: LiveAutomaticBackupExporter(),
             fileStore: ICloudDriveAutomaticBackupFileStore(),
-            now: now
+            now: now,
+            resetExportCancellationWaitNanoseconds: AutomaticBackupPolicy.resetExportCancellationWaitNanoseconds
         )
     }
 
@@ -488,12 +483,14 @@ final class AutomaticBackupService: AutomaticBackupManaging {
         statusStore: AutomaticBackupStatusStore,
         exporter: AutomaticBackupExporting,
         fileStore: AutomaticBackupFileStoring,
-        now: @escaping () -> Date = Date.init
+        now: @escaping () -> Date = Date.init,
+        resetExportCancellationWaitNanoseconds: UInt64 = AutomaticBackupPolicy.resetExportCancellationWaitNanoseconds
     ) {
         self.statusStore = statusStore
         self.exporter = exporter
         self.fileStore = fileStore
         self.now = now
+        self.resetExportCancellationWaitNanoseconds = resetExportCancellationWaitNanoseconds
     }
 
     func snapshot(now: Date = Date()) -> AutomaticBackupStatus {
@@ -519,14 +516,85 @@ final class AutomaticBackupService: AutomaticBackupManaging {
     func runNow(container: ModelContainer, trigger _: AutomaticBackupTrigger) async -> AutomaticBackupRunResult {
         let currentDate = now()
         guard statusStore.snapshot(now: currentDate).isEnabled else { return .skipped(.disabled) }
-        guard !isRunning else { return .skipped(.alreadyRunning) }
-        isRunning = true
-        defer { isRunning = false }
+        guard activeRunTask == nil else { return .skipped(.alreadyRunning) }
+
+        let runID = UUID()
+        let runGeneration = generation
+        activeRunID = runID
+        activeRunPhase = .exporting
 
         statusStore.markAttempt(now: currentDate)
+        let task: Task<AutomaticBackupRunResult, Never> = Task { @MainActor [weak self] in
+            guard let self else {
+                return AutomaticBackupRunResult.skipped(.cancelledByReset)
+            }
+            return await performRun(
+                container: container,
+                currentDate: currentDate,
+                runID: runID,
+                runGeneration: runGeneration
+            )
+        }
+        activeRunTask = task
+        let result = await task.value
+        clearActiveRun(ifMatching: runID)
+        return result
+    }
+
+    func prepareForAppReset() async {
+        generation &+= 1
+        guard let task = activeRunTask else { return }
+
+        let runID = activeRunID
+        let phase = activeRunPhase
+        task.cancel()
+        switch phase {
+        case .writing:
+            // Once the final managed-file write has begun, Reset must wait for
+            // it to settle before cleanup. Returning sooner could let the old
+            // generation recreate the file after Reset reports completion.
+            _ = await task.value
+        case .exporting, .none:
+            // Export can be slow or fail to cooperate with cancellation. The
+            // generation checkpoint after export makes it safe to stop waiting:
+            // an invalidated export can never enter the managed-file write.
+            let finished = await waitForCompletion(
+                of: task,
+                timeoutNanoseconds: resetExportCancellationWaitNanoseconds
+            )
+            if !finished {
+                if let runID {
+                    clearActiveRun(ifMatching: runID)
+                }
+                OhanaLog.warning(
+                    "Automatic backup export did not stop within the Reset cancellation budget; generation fencing remains active.",
+                    category: "Privacy"
+                )
+            }
+        }
+    }
+
+    func removeManagedAutomaticBackupsForReset() async -> AutomaticBackupResetCleanupResult {
+        statusStore.resetAfterAppReset(now: now())
+        return await removeManagedAutomaticBackups(markFailureAsResetPending: true)
+    }
+
+    private func performRun(
+        container: ModelContainer,
+        currentDate: Date,
+        runID: UUID,
+        runGeneration: UInt64
+    ) async -> AutomaticBackupRunResult {
         do {
             let packageURL = try await exporter.exportBackupPackage(container: container)
+            guard checkpoint(runID: runID, generation: runGeneration) else {
+                return .skipped(.cancelledByReset)
+            }
+            activeRunPhase = .writing
             let reference = try await fileStore.writeAutomaticBackup(packageURL: packageURL, now: currentDate)
+            guard checkpoint(runID: runID, generation: runGeneration) else {
+                return .skipped(.cancelledByReset)
+            }
             statusStore.markSuccess(
                 reference: reference,
                 scope: .automaticICloudDriveRestricted,
@@ -534,30 +602,22 @@ final class AutomaticBackupService: AutomaticBackupManaging {
             )
             return .success(reference)
         } catch {
+            guard checkpoint(runID: runID, generation: runGeneration) else {
+                return .skipped(.cancelledByReset)
+            }
             let failure = classify(error)
             statusStore.markFailure(kind: failure.kind, message: failure.message, now: currentDate)
             return .failure(failure.kind, failure.message)
         }
     }
 
-    func removeManagedAutomaticBackupsForReset() async {
-        statusStore.resetAfterAppReset(now: now())
-        _ = await retryManagedAutomaticBackupCleanup()
-    }
-
     func retryManagedAutomaticBackupCleanup() async -> AutomaticBackupResetCleanupResult {
-        do {
-            try await fileStore.removeManagedAutomaticBackups()
-            statusStore.clearResetCleanupFailure()
-            return .removed
-        } catch {
-            let failure = classify(error)
-            statusStore.markResetCleanupFailure(message: failure.message, now: now())
-            return .pending(message: failure.message)
-        }
+        await prepareForAppReset()
+        return await removeManagedAutomaticBackups(markFailureAsResetPending: true)
     }
 
     func removeLegacyAutomaticBackupForHealthSafety() async -> AutomaticBackupResetCleanupResult {
+        await prepareForAppReset()
         do {
             try await fileStore.removeManagedAutomaticBackups()
             statusStore.markManagedBackupRemoved()
@@ -568,6 +628,55 @@ final class AutomaticBackupService: AutomaticBackupManaging {
             statusStore.markFailure(kind: .cleanupFailed, message: failure.message, now: now())
             return .pending(message: failure.message)
         }
+    }
+
+    private func removeManagedAutomaticBackups(
+        markFailureAsResetPending: Bool
+    ) async -> AutomaticBackupResetCleanupResult {
+        do {
+            try await fileStore.removeManagedAutomaticBackups()
+            statusStore.clearResetCleanupFailure()
+            return .removed
+        } catch {
+            let failure = classify(error)
+            if markFailureAsResetPending {
+                statusStore.markResetCleanupFailure(message: failure.message, now: now())
+            }
+            return .pending(message: failure.message)
+        }
+    }
+
+    private func checkpoint(runID: UUID, generation runGeneration: UInt64) -> Bool {
+        activeRunID == runID && generation == runGeneration && !Task.isCancelled
+    }
+
+    private func clearActiveRun(ifMatching runID: UUID) {
+        guard activeRunID == runID else { return }
+        activeRunID = nil
+        activeRunPhase = nil
+        activeRunTask = nil
+    }
+
+    private func waitForCompletion(
+        of task: Task<AutomaticBackupRunResult, Never>,
+        timeoutNanoseconds: UInt64
+    ) async -> Bool {
+        let events = AsyncStream<Bool> { continuation in
+            Task { @MainActor in
+                _ = await task.value
+                continuation.yield(true)
+                continuation.finish()
+            }
+            Task { @MainActor in
+                if timeoutNanoseconds > 0 {
+                    try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                }
+                continuation.yield(false)
+                continuation.finish()
+            }
+        }
+        var iterator = events.makeAsyncIterator()
+        return await iterator.next() ?? false
     }
 
     private func classify(_ error: Error) -> (kind: AutomaticBackupFailureKind, message: String) {

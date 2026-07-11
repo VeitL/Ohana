@@ -585,7 +585,7 @@ struct HumanBasicInfoDetailContentView: View {
         eAvatarImageData = human.avatarImageData
         eAvatarEmoji = human.avatarEmoji
         eRole = HumanProfileOptions.normalizedRole(human.role)
-        eGender = HumanProfileOptions.storedGenderIdentity(human.genderRaw) ?? "private"
+        eGender = HumanProfileOptions.storedGenderIdentity(human.genderRaw) ?? ""
         eBirthday = human.birthday ?? Date()
         eHasBirthday = human.birthday != nil
         eBloodType = human.bloodType
@@ -667,7 +667,8 @@ struct HumanBasicInfoDetailContentView: View {
     }
 
     private func localizedGenderTitle(for raw: String) -> String {
-        HumanProfileOptions.localizedGenderTitle(raw, l: l)
+        let title = HumanProfileOptions.localizedGenderTitle(raw, l: l)
+        return title.isEmpty ? localizedEmptyValue : title
     }
 
     private func localizedPrivateFieldTitle(_ field: HumanPrivateField) -> String {
@@ -706,6 +707,13 @@ struct HumanBasicInfoDetailContentView: View {
             guard result.didPersist else {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return
+            }
+            if case .pending = result.attachmentCleanup {
+                appServices.islandToasts.show(l.tr(
+                    zh: "成员已删除，但其本地备注附件未能完全清理。请联系支持。",
+                    en: "The member was deleted, but local note attachments could not be fully removed. Contact support.",
+                    de: "Das Mitglied wurde gelöscht, aber lokale Notizanhänge konnten nicht vollständig entfernt werden. Kontaktiere den Support."
+                ))
             }
             if result.clearsActiveHumanID {
                 activeHumanIdStr = ""

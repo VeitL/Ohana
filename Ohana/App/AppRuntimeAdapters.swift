@@ -72,45 +72,68 @@ final class SharedDataBackupManagerAdapter: DataBackupManaging {
 
 @MainActor
 protocol AppResetting {
-    func reset(context: ModelContext) throws -> AppResetService.ResetResult
-    func reset(context: ModelContext, options: AppResetService.Options) throws -> AppResetService.ResetResult
+    func reset(context: ModelContext) async throws -> AppResetService.ResetResult
+    func reset(context: ModelContext, options: AppResetService.Options) async throws -> AppResetService.ResetResult
     func resetForUITests(context: ModelContext) throws
 }
 
 @MainActor
 final class StaticAppResetter: AppResetting {
     private let questManager: QuestManager
+    private let automaticBackups: AutomaticBackupManaging
+    private let defaults: UserDefaults
 
-    init(questManager: QuestManager) {
+    init(
+        questManager: QuestManager,
+        automaticBackups: AutomaticBackupManaging,
+        defaults: UserDefaults = .standard
+    ) {
         self.questManager = questManager
+        self.automaticBackups = automaticBackups
+        self.defaults = defaults
     }
 
-    func reset(context: ModelContext) throws -> AppResetService.ResetResult {
-        try AppResetService.reset(
-            context: context,
-            options: AppResetService.Options(),
-            questManager: questManager
-        )
+    func reset(context: ModelContext) async throws -> AppResetService.ResetResult {
+        try await reset(context: context, options: AppResetService.Options())
     }
 
-    func reset(context: ModelContext, options: AppResetService.Options) throws -> AppResetService.ResetResult {
-        try AppResetService.reset(
+    func reset(context: ModelContext, options: AppResetService.Options) async throws -> AppResetService.ResetResult {
+        if options.cleanUpAutomaticBackups {
+            await automaticBackups.prepareForAppReset()
+        }
+
+        let humanNoteAttachmentCleanup = try AppResetService.reset(
             context: context,
+            defaults: defaults,
             options: options,
             questManager: questManager
+        )
+        guard options.cleanUpAutomaticBackups else {
+            return AppResetService.ResetResult(
+                automaticBackupCleanup: .notRequested,
+                humanNoteAttachmentCleanup: humanNoteAttachmentCleanup
+            )
+        }
+
+        let cleanup = await automaticBackups.removeManagedAutomaticBackupsForReset()
+        return AppResetService.ResetResult(
+            automaticBackupCleanup: cleanup,
+            humanNoteAttachmentCleanup: humanNoteAttachmentCleanup
         )
     }
 
     func resetForUITests(context: ModelContext) throws {
-        _ = try reset(
+        try AppResetService.reset(
             context: context,
+            defaults: defaults,
             options: AppResetService.Options(
                 preserveLocalePreferences: false,
                 cancelPendingNotifications: false,
                 deleteCustomBackground: true,
                 resetSharedRuntimeState: true,
                 cleanUpAutomaticBackups: false
-            )
+            ),
+            questManager: questManager
         )
     }
 }

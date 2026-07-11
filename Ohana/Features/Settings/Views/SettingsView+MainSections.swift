@@ -264,16 +264,17 @@ extension SettingsView {
                 settingsRow(
                     icon: "info.circle",
                     title: l.tr(zh: "版本", en: "Version", de: "Version"),
-                    subtitle: "v4.5.0"
+                    subtitle: OhanaReleaseIdentity.currentVersionDisplay
                 ) {}
-                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-                settingsRow(
-                    icon: "star.fill",
-                    title: l.tr(zh: "评价 App", en: "Rate App", de: "App bewerten"),
-                    subtitle: ""
-                ) {
-                    if let url = URL(string: "https://apps.apple.com/app/id6742117937?action=write-review") {
-                        UIApplication.shared.open(url)
+
+                if let reviewURL = OhanaPublicLinks.appStoreReview {
+                    OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                    settingsRow(
+                        icon: "star.fill",
+                        title: l.tr(zh: "评价 App", en: "Rate App", de: "App bewerten"),
+                        subtitle: ""
+                    ) {
+                        UIApplication.shared.open(reviewURL)
                     }
                 }
                 OhanaDashedDivider(color: dividerLine).padding(.leading, 44)

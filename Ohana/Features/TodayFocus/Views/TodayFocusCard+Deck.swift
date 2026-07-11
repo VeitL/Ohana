@@ -184,7 +184,7 @@ extension TodayFocusCard {
                 .frame(width: width, height: cardHeight)
                 .clipShape(RoundedRectangle(cornerRadius: TodayFocusCardLayout.carouselCornerRadius, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: TodayFocusCardLayout.carouselCornerRadius, style: .continuous))
-                .highPriorityGesture(focusSwipeGesture(count: cards.count))
+                .simultaneousGesture(focusSwipeGesture(count: cards.count))
                 .offset(y: topPeekInset)
                 .zIndex(20)
                 .animation(carouselSwitchAnimation, value: selectedFocusIndex)

@@ -824,29 +824,28 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                         )
                         : [:]
 
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.ohanaPrimaryText.opacity(0.001)) // ui-v4: allow invisible vertical home card hit zone
-                        .frame(width: frame.width, height: frame.height)
-                        .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    Button {
+                        if freezesInactiveCollapsedGeometryDuringHero {
+                            setInactiveHeroCollapsedGeometry(inactiveGeometry, selectionId: card.id)
+                        }
+                        onSelect(
+                            preparedHeroSnapshot(for: card, index: index)
+                                .freezingCollapsedGeometry(
+                                    frame: frame.offsetBy(dx: floating.x, dy: floating.y),
+                                    rotation: collapsedRotation(index: index) + floating.rotation,
+                                    inactiveCollapsedGeometry: inactiveGeometry
+                                )
+                        )
+                    } label: {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(Color.ohanaPrimaryText.opacity(0.001)) // ui-v4: allow invisible vertical home card hit zone
+                            .frame(width: frame.width, height: frame.height)
+                            .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    }
+                        .buttonStyle(.plain) // ui-v4: allow transparent hit proxy; the hero transition supplies visible feedback
                         .rotationEffect(.degrees(collapsedRotation(index: index) + floating.rotation))
                         .position(x: frame.midX + floating.x, y: frame.midY + floating.y)
                         .zIndex(100 + collapsedZIndex(index: index, count: cards.count))
-                        .highPriorityGesture(
-                            TapGesture()
-                                .onEnded {
-                                    if freezesInactiveCollapsedGeometryDuringHero {
-                                        setInactiveHeroCollapsedGeometry(inactiveGeometry, selectionId: card.id)
-                                    }
-                                    onSelect(
-                                        preparedHeroSnapshot(for: card, index: index)
-                                            .freezingCollapsedGeometry(
-                                                frame: frame.offsetBy(dx: floating.x, dy: floating.y),
-                                                rotation: collapsedRotation(index: index) + floating.rotation,
-                                                inactiveCollapsedGeometry: inactiveGeometry
-                                            )
-                                    )
-                                }
-                        )
                         .accessibilityLabel(card.name)
                         .accessibilityIdentifier(cardAccessibilityIdentifier(for: card))
                         .accessibilityHint(l.tr(
@@ -854,7 +853,6 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                             en: "Tap to expand card",
                             de: "Tippen, um die Karte zu vergrößern"
                         ))
-                        .accessibilityAddTraits(.isButton)
                 }
             }
         }

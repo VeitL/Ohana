@@ -116,6 +116,7 @@ ui_swift_files=()
 shell_files=()
 json_files=()
 status_doc_files=()
+ui_test_shard_files=()
 build_reasons=()
 test_reasons=()
 
@@ -158,6 +159,12 @@ for file in "${files[@]}"; do
   if [[ "$file" == "scripts/audit-doc-status-ledgers.sh" ]]; then
     status_doc_files+=("$file")
   fi
+
+  case "$file" in
+    OhanaUITests/*.swift|scripts/ui-test-shards.tsv|scripts/audit-ui-test-shards.sh|scripts/test-ui-shard.sh|scripts/test-ui-nightly.sh)
+      ui_test_shard_files+=("$file")
+      ;;
+  esac
 done
 
 echo "dev-check: validating ${#files[@]} changed file(s)."
@@ -179,6 +186,10 @@ fi
 
 if [[ ${#status_doc_files[@]} -gt 0 ]]; then
   run "status ledger audit" scripts/audit-doc-status-ledgers.sh
+fi
+
+if [[ ${#ui_test_shard_files[@]} -gt 0 ]]; then
+  run "UI test shard completeness" scripts/audit-ui-test-shards.sh
 fi
 
 if [[ ${#swift_files[@]} -gt 0 ]]; then

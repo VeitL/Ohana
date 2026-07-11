@@ -15,7 +15,7 @@ import UIKit
 extension MemberCardCreationContentView {
     var humanBasicInfoStep: some View {
         MemberCreationSection(
-            title: l.tr(zh: "必要信息", en: "Essentials", de: "Wichtiges"),
+            title: l.tr(zh: "称呼与可选资料", en: "Name and optional details", de: "Name und optionale Angaben"),
             icon: "person.crop.rectangle.fill",
             foreground: cardForeground
         ) {

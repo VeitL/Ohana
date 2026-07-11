@@ -48,9 +48,9 @@ extension SettingsView {
                             ShareLink(item: url,
                                       subject: Text(l.tr(zh: "Ohana 数据备份", en: "Ohana Data Backup", de: "Ohana Datensicherung")),
                                       message: Text(l.tr(
-                                          zh: "该受限备份不包含人类健康或 HealthKit 数据，但仍可能包含家庭、宠物、位置和账单等敏感资料，请只分享给可信对象。",
-                                          en: "This restricted backup does not contain human health or HealthKit data, but it may still contain sensitive household, pet, location, and expense data. Share it only with trusted people.",
-                                          de: "Dieses eingeschränkte Backup enthält keine menschlichen Gesundheits- oder HealthKit-Daten, kann aber weiterhin sensible Familien-, Haustier-, Standort- und Ausgabendaten enthalten. Teile es nur mit vertrauenswürdigen Personen."
+                                          zh: "该受限备份不包含人类健康、HealthKit、自由文本家庭任务或派生经济/账本侧车，但仍可能包含家庭、宠物、位置和账单等敏感资料，请只分享给可信对象。",
+                                          en: "This restricted backup excludes human health, HealthKit, free-text family tasks, and derived economy/ledger sidecars, but it may still contain sensitive household, pet, location, and expense data. Share it only with trusted people.",
+                                          de: "Dieses eingeschränkte Backup schließt menschliche Gesundheits- und HealthKit-Daten, Freitext-Familienaufgaben sowie abgeleitete Wirtschafts- und Buchungsdaten aus. Es kann weiterhin sensible Familien-, Haustier-, Standort- und Ausgabendaten enthalten. Teile es nur mit vertrauenswürdigen Personen."
                                       ))) {
                                 backupPill(l.tr(zh: "分享", en: "Share", de: "Teilen"), icon: "square.and.arrow.up", color: Color.goTeal)
                             }
@@ -106,9 +106,9 @@ extension SettingsView {
                         .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                         .foregroundStyle(Color.goYellow.opacity(0.8))
                     Text(l.tr(
-                        zh: "导出和自动备份均不包含人类健康、HealthKit、体重、运动、用药或健康报告；这样这些数据不会写入 iCloud 或其他文件服务。",
-                        en: "Neither export nor automatic backup includes human health, HealthKit, weight, workout, medication, or health-report data, so those records are not written to iCloud or another file provider.",
-                        de: "Weder Export noch automatisches Backup enthalten menschliche Gesundheits-, HealthKit-, Gewichts-, Trainings-, Medikations- oder Gesundheitsberichtsdaten. Diese Daten werden daher nicht in iCloud oder einen anderen Dateidienst geschrieben."
+                        zh: "导出和自动备份均不包含人类健康、HealthKit、体重、运动、用药、健康报告、自由文本家庭任务或派生经济/账本侧车；这些数据不会写入 iCloud 或其他文件服务。",
+                        en: "Neither export nor automatic backup includes human health, HealthKit, weight, workout, medication, health-report data, free-text family tasks, or derived economy/ledger sidecars, so those records are not written to iCloud or another file provider.",
+                        de: "Weder Export noch automatisches Backup enthalten menschliche Gesundheits-, HealthKit-, Gewichts-, Trainings-, Medikations- oder Gesundheitsberichtsdaten, Freitext-Familienaufgaben oder abgeleitete Wirtschafts- und Buchungsdaten. Diese Daten werden daher nicht in iCloud oder einen anderen Dateidienst geschrieben."
                     ))
                     .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(tertiaryText.opacity(0.85))
@@ -324,9 +324,9 @@ extension SettingsView {
             .frame(minHeight: 34)
 
             Text(l.tr(
-                zh: "自动备份不会写入人类健康、HealthKit、体重、运动、用药或健康报告；手动导出同样受此安全限制。",
-                en: "Automatic backup does not include human health, HealthKit, weight, workout, medication, or health-report data. Manual export has the same safety restriction.",
-                de: "Das automatische Backup enthält keine menschlichen Gesundheits-, HealthKit-, Gewichts-, Trainings-, Medikations- oder Gesundheitsberichtsdaten. Für den manuellen Export gilt dieselbe Sicherheitsbeschränkung."
+                zh: "自动备份不会写入人类健康、HealthKit、体重、运动、用药、健康报告、自由文本家庭任务或派生经济/账本侧车；手动导出同样受此安全限制。",
+                en: "Automatic backup excludes human health, HealthKit, weight, workout, medication, health-report data, free-text family tasks, and derived economy/ledger sidecars. Manual export has the same safety restriction.",
+                de: "Das automatische Backup schließt menschliche Gesundheits-, HealthKit-, Gewichts-, Trainings-, Medikations- und Gesundheitsberichtsdaten, Freitext-Familienaufgaben sowie abgeleitete Wirtschafts- und Buchungsdaten aus. Für den manuellen Export gilt dieselbe Sicherheitsbeschränkung."
             ))
             .font(OhanaFont.adaptive(size: 11, weight: .medium))
             .foregroundStyle(tertiaryText.opacity(0.9))
@@ -589,6 +589,8 @@ extension SettingsView {
                     en: "Already backed up today",
                     de: "Heute bereits gesichert"
                 ))
+            case .skipped(.cancelledByReset):
+                break
             }
             isRunningAutomaticBackup = false
         }

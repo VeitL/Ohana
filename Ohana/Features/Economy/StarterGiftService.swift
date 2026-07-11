@@ -22,13 +22,46 @@ nonisolated enum StarterGiftStorageKey {
 enum StarterGiftService {
     static let giftAmount = StarterGiftPolicy.giftAmount
 
+    enum Recipient: Equatable {
+        case human(UUID)
+        case pet(UUID)
+    }
+
     enum Result: Equatable {
         case alreadyHandled
         case markedExistingUser
-        case pendingHuman
-        case pendingFirstCare(humanID: UUID)
-        case claimed(humanID: UUID, amount: Int)
-        case missingHuman
+        case pendingFirstPet
+        case pendingFirstCare(recipient: Recipient)
+        case claimed(recipient: Recipient, amount: Int)
+        case persistenceFailed
+    }
+
+    private enum RecipientEntity {
+        case human(Human)
+        case pet(Pet)
+
+        var value: Recipient {
+            switch self {
+            case let .human(human): .human(human.id)
+            case let .pet(pet): .pet(pet.id)
+            }
+        }
+    }
+
+    @discardableResult
+    @MainActor
+    static func beginFreshJourney(
+        context: ModelContext,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        guard !defaults.bool(forKey: StarterGiftStorageKey.claimed),
+              !defaults.bool(forKey: StarterGiftStorageKey.pending),
+              dataCounts(context: context).isPristine else {
+            return false
+        }
+        defaults.set(true, forKey: StarterGiftStorageKey.pending)
+        AppPerformanceMonitor.shared.record("starter_gift_pending", valueMS: 0)
+        return true
     }
 
     @MainActor
@@ -46,37 +79,44 @@ enum StarterGiftService {
             return .alreadyHandled
         }
 
-        let hasPendingGift = defaults.bool(forKey: StarterGiftStorageKey.pending)
-        let counts = dataCounts(context: context)
-        // 礼包改为「创建首只宠物即发」:不再要求先录体重(添加宠物已去掉体重字段)。
-        let hasFirstPet = counts.pets >= 1
+        if hasPersistedStarterGift(context: context) {
+            // The SwiftData save contains both the gift event and wallet write.
+            // Recovering the defaults after a termination must reveal that
+            // committed transaction, never mint the gift a second time.
+            defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+            defaults.set(false, forKey: StarterGiftStorageKey.pending)
+            return .alreadyHandled
+        }
 
-        if let human = activeHuman(matching: activeHumanID ?? "", context: context) {
-            if hasPendingGift || counts.humans == 1 && counts.pets == 0 && counts.ledger == 0 && counts.petWeights == 0 {
-                defaults.set(true, forKey: StarterGiftStorageKey.pending)
-                guard hasFirstPet else {
-                    AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_pet", valueMS: 0)
-                    return .pendingFirstCare(humanID: human.id)
-                }
-                return claim(for: human, context: context, defaults: defaults, careLedger: careLedger, wallet: wallet, projectionManager: projectionManager)
-            }
-
+        var hasPendingGift = defaults.bool(forKey: StarterGiftStorageKey.pending)
+        if !hasPendingGift {
+            hasPendingGift = beginFreshJourney(context: context, defaults: defaults)
+        }
+        guard hasPendingGift else {
             markExistingUser(defaults: defaults)
             return .markedExistingUser
         }
 
-        if counts.humans == 0, counts.pets == 0, counts.ledger == 0, counts.petWeights == 0 {
-            defaults.set(true, forKey: StarterGiftStorageKey.pending)
-            AppPerformanceMonitor.shared.record("starter_gift_pending", valueMS: 0)
-            return .pendingHuman
+        guard let pet = firstActivePet(context: context) else {
+            AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_pet", valueMS: 0)
+            return .pendingFirstPet
         }
 
-        if hasPendingGift {
-            return .missingHuman
+        let recipient: RecipientEntity = activeHuman(matching: activeHumanID ?? "", context: context)
+            .map(RecipientEntity.human) ?? .pet(pet)
+        guard hasRecordedFirstCare(context: context) else {
+            AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_care", valueMS: 0)
+            return .pendingFirstCare(recipient: recipient.value)
         }
 
-        markExistingUser(defaults: defaults)
-        return .markedExistingUser
+        return claim(
+            for: recipient,
+            context: context,
+            defaults: defaults,
+            careLedger: careLedger,
+            wallet: wallet,
+            projectionManager: projectionManager
+        )
     }
 
     @MainActor
@@ -105,7 +145,7 @@ enum StarterGiftService {
 
     @MainActor
     private static func claim(
-        for human: Human,
+        for recipient: RecipientEntity,
         context: ModelContext,
         defaults: UserDefaults,
         careLedger: CareLedgerRecording,
@@ -113,12 +153,64 @@ enum StarterGiftService {
         projectionManager: QuestManager?
     ) -> Result {
         let title = localizedGiftTitle()
+        let occurredAt = Date()
+        let subjectKind: CareLedgerSubjectKind
+        let subjectID: String
+        let walletDelta: (CareLedgerEvent) -> CoconutWalletDelta
+        switch recipient {
+        case let .human(human):
+            subjectKind = .human
+            subjectID = human.id.uuidString
+            walletDelta = { ledger in
+                .human(
+                    human,
+                    delta: giftAmount,
+                    entryKind: .reward,
+                    source: .starterGift,
+                    title: title,
+                    emoji: "🎁",
+                    actorId: human.id.uuidString,
+                    actorName: human.name,
+                    subjectKind: .human,
+                    subjectId: human.id.uuidString,
+                    sourceModelName: "CareLedgerEvent",
+                    sourceModelId: ledger.id.uuidString,
+                    careLedgerEventId: ledger.id.uuidString,
+                    metadataJSON: "{\"starterGift\":true}",
+                    occurredAt: occurredAt,
+                    transactionKey: "starterGift:v2:\(CoconutAccountKey.human(human.id))"
+                )
+            }
+        case let .pet(pet):
+            subjectKind = .pet
+            subjectID = pet.id.uuidString
+            walletDelta = { ledger in
+                .pet(
+                    pet,
+                    delta: giftAmount,
+                    entryKind: .reward,
+                    source: .starterGift,
+                    title: title,
+                    emoji: "🎁",
+                    actorId: nil,
+                    actorName: nil,
+                    subjectKind: .pet,
+                    subjectId: pet.id.uuidString,
+                    sourceModelName: "CareLedgerEvent",
+                    sourceModelId: ledger.id.uuidString,
+                    careLedgerEventId: ledger.id.uuidString,
+                    metadataJSON: "{\"starterGift\":true}",
+                    occurredAt: occurredAt,
+                    transactionKey: "starterGift:v2:\(CoconutAccountKey.pet(pet.id))"
+                )
+            }
+        }
         let ledger = careLedger.record(
-            occurredAt: Date(),
+            occurredAt: occurredAt,
             actorKind: .system,
             actorId: nil,
-            subjectKind: .human,
-            subjectId: human.id.uuidString,
+            subjectKind: subjectKind,
+            subjectId: subjectID,
             eventKind: .coconut,
             actionType: "starterGift",
             amountValue: Double(giftAmount),
@@ -138,24 +230,7 @@ enum StarterGiftService {
         )
         do {
             try wallet.apply(
-                deltas: [
-                    .human(
-                        human,
-                        delta: giftAmount,
-                        entryKind: .reward,
-                        source: .starterGift,
-                        title: title,
-                        emoji: "🎁",
-                        actorId: human.id.uuidString,
-                        actorName: human.name,
-                        subjectKind: .human,
-                        subjectId: human.id.uuidString,
-                        sourceModelName: "CareLedgerEvent",
-                        sourceModelId: ledger.id.uuidString,
-                        careLedgerEventId: ledger.id.uuidString,
-                        metadataJSON: "{\"starterGift\":true}"
-                    )
-                ],
+                deltas: [walletDelta(ledger)],
                 context: context,
                 save: false,
                 postsRewardFeedback: false,
@@ -169,13 +244,13 @@ enum StarterGiftService {
             #if DEBUG
                 OhanaLog.error("[StarterGiftService] wallet write failed: \(error.localizedDescription)", category: "Economy")
             #endif
-            return .missingHuman
+            return .persistenceFailed
         }
 
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
         defaults.set(false, forKey: StarterGiftStorageKey.pending)
         AppPerformanceMonitor.shared.record("starter_gift_claimed", valueMS: 0, note: "amount=\(giftAmount)")
-        return .claimed(humanID: human.id, amount: giftAmount)
+        return .claimed(recipient: recipient.value, amount: giftAmount)
     }
 
     @MainActor
@@ -190,16 +265,58 @@ enum StarterGiftService {
     private static func markExistingUser(defaults: UserDefaults) {
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
+        defaults.set(false, forKey: StarterGiftStorageKey.pending)
         defaults.set(false, forKey: StarterGiftStorageKey.oasisTabPromptPending)
     }
 
     @MainActor
-    private static func dataCounts(context: ModelContext) -> (humans: Int, pets: Int, ledger: Int, petWeights: Int) {
+    private static func dataCounts(context: ModelContext) -> StarterGiftDataCounts {
         let humans = fetchCountOrLog(FetchDescriptor<Human>(), context: context, operation: "fetch human count")
         let pets = fetchCountOrLog(FetchDescriptor<Pet>(), context: context, operation: "fetch pet count")
         let ledger = fetchCountOrLog(FetchDescriptor<CareLedgerEvent>(), context: context, operation: "fetch care ledger count")
         let petWeights = fetchCountOrLog(FetchDescriptor<PetWeightLog>(), context: context, operation: "fetch pet weight count")
-        return (humans, pets, ledger, petWeights)
+        return StarterGiftDataCounts(humans: humans, pets: pets, ledger: ledger, petWeights: petWeights)
+    }
+
+    @MainActor
+    private static func firstActivePet(context: ModelContext) -> Pet? {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { pet in
+                pet.passedAwayDate == nil
+            },
+            sortBy: [SortDescriptor(\Pet.createdAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 1
+        return fetchModelsOrLog(descriptor, context: context, operation: "fetch starter gift pet").first
+    }
+
+    @MainActor
+    private static func hasRecordedFirstCare(context: ModelContext) -> Bool {
+        if fetchCountOrLog(
+            FetchDescriptor<PetWeightLog>(),
+            context: context,
+            operation: "fetch starter pet weight count"
+        ) > 0 {
+            return true
+        }
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.actionType != "starterGift" && event.eventKind != "coconut"
+            }
+        )
+        descriptor.fetchLimit = 1
+        return !fetchModelsOrLog(descriptor, context: context, operation: "fetch starter care facts").isEmpty
+    }
+
+    @MainActor
+    private static func hasPersistedStarterGift(context: ModelContext) -> Bool {
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.actionType == "starterGift"
+            }
+        )
+        descriptor.fetchLimit = 1
+        return !fetchModelsOrLog(descriptor, context: context, operation: "recover persisted starter gift").isEmpty
     }
 
     @MainActor
@@ -248,6 +365,17 @@ enum StarterGiftService {
             en: "Starter coconut gift",
             de: "Starter-Kokosgeschenk"
         )
+    }
+}
+
+private struct StarterGiftDataCounts {
+    let humans: Int
+    let pets: Int
+    let ledger: Int
+    let petWeights: Int
+
+    var isPristine: Bool {
+        humans == 0 && pets == 0 && ledger == 0 && petWeights == 0
     }
 }
 

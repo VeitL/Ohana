@@ -365,6 +365,7 @@ LayeredAvatarView(imageData: Data?, petName: String, species: String,
 @discardableResult
 func awardAction(type: OhanaActionType, pet: Pet?, context: ModelContext) -> (humanGot: Int, petGot: Int)
 // 自动从 UserDefaults["currentActiveHumanId"] 读取当前绑定人类
+```
 
 ### 5.6 PetDetailView — `Views/Details/PetDetailView.swift`
 

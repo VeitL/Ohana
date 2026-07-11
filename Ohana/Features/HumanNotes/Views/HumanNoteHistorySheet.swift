@@ -301,10 +301,17 @@ struct HumanNoteHistorySheet: View {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let command = DomainCommand.humanNote(humanID: human.id)
         commandQueue.enqueue(command) {
-            HumanCareCommandExecutor(context: modelContext, services: appServices).deleteNote(
+            let result = HumanCareCommandExecutor(context: modelContext, services: appServices).deleteNote(
                 human: human,
                 rawString: entry.rawString
             )
+            if case .pending = result.attachmentCleanup {
+                appServices.islandToasts.show(l.tr(
+                    zh: "备注已删除，但本地附件未能完全清理。请联系支持。",
+                    en: "The note was deleted, but its local attachment could not be fully removed. Contact support.",
+                    de: "Die Notiz wurde gelöscht, aber der lokale Anhang konnte nicht vollständig entfernt werden. Kontaktiere den Support."
+                ))
+            }
         }
     }
 }

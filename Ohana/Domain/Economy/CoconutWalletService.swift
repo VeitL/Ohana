@@ -946,13 +946,17 @@ enum CoconutEconomyBootstrapService {
     static func bootstrapIfNeeded(
         context: ModelContext,
         defaults: UserDefaults = .standard,
-        projectionManager: CoconutProjectionManaging? = nil
+        projectionManager: CoconutProjectionManaging? = nil,
+        saveChanges: Bool = true,
+        updatesProjection: Bool = true
     ) throws {
         try bootstrapIfNeeded(
             context: context,
             legacyIslandCount: defaults.integer(forKey: "quest_coconutCount"),
             legacyLogs: decodeLegacyLogs(defaults: defaults),
-            projectionManager: projectionManager
+            projectionManager: projectionManager,
+            saveChanges: saveChanges,
+            updatesProjection: updatesProjection
         )
     }
 
@@ -960,13 +964,17 @@ enum CoconutEconomyBootstrapService {
         context: ModelContext,
         legacyIslandCount: Int,
         legacyLogsJSON: String,
-        projectionManager: CoconutProjectionManaging? = nil
+        projectionManager: CoconutProjectionManaging? = nil,
+        saveChanges: Bool = true,
+        updatesProjection: Bool = true
     ) throws {
         try bootstrapIfNeeded(
             context: context,
             legacyIslandCount: legacyIslandCount,
             legacyLogs: decodeLegacyLogs(json: legacyLogsJSON),
-            projectionManager: projectionManager
+            projectionManager: projectionManager,
+            saveChanges: saveChanges,
+            updatesProjection: updatesProjection
         )
     }
 
@@ -974,7 +982,9 @@ enum CoconutEconomyBootstrapService {
         context: ModelContext,
         legacyIslandCount: Int,
         legacyLogs: [CoconutLogEntry],
-        projectionManager: CoconutProjectionManaging?
+        projectionManager: CoconutProjectionManaging?,
+        saveChanges: Bool,
+        updatesProjection: Bool
     ) throws {
         let legacyAccountKey = CoconutAccountKey.legacySystem
         var legacyDescriptor = FetchDescriptor<CoconutAccount>(
@@ -982,7 +992,9 @@ enum CoconutEconomyBootstrapService {
         )
         legacyDescriptor.fetchLimit = 1
         if try !context.fetch(legacyDescriptor).isEmpty {
-            CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
+            if updatesProjection {
+                CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
+            }
             return
         }
 
@@ -1051,10 +1063,16 @@ enum CoconutEconomyBootstrapService {
             updatesProjection: false
         )
 
-        try saveWalletChanges(context: context)
+        if saveChanges {
+            try saveWalletChanges(context: context)
+        }
         try importLegacyHistory(legacyLogs, humans: humans, pets: pets, context: context)
-        try saveWalletChanges(context: context)
-        CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
+        if saveChanges {
+            try saveWalletChanges(context: context)
+        }
+        if updatesProjection {
+            CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
+        }
     }
 
     private static func importLegacyHistory(

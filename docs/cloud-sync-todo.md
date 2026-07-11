@@ -1,17 +1,22 @@
 # Cloud Sync TODO
 
-This file tracks CloudKit and real-device follow-up work that is intentionally
-deferred until the required account, provisioning, CloudKit Dashboard, and
-multi-device evidence exist. As of 2026-06-24, the standard `Ohana` Debug app can
-be signed for a paired iPhone with team `567SK733UN`, Push development
-entitlement, and CloudKit/iCloud container `iCloud.com.guanchen.li.Ohana`; real
-CloudKit sync remains deferred because the first-release SwiftData containers
-still use `cloudKitDatabase: .none`.
+This file tracks future CloudKit work that is intentionally deferred until the
+product gate, capability profile, provisioning, CloudKit Dashboard, and
+multi-device evidence all exist. The current Solo target keeps CloudDocuments
+for restricted iCloud Drive backup, but declares no APNs entitlement, no
+`remote-notification` background mode, and no CloudKit service entitlement;
+its SwiftData containers use `cloudKitDatabase: .none`.
+
+The 2026-06-24 signed-development build below is historical provisioning
+evidence from an earlier capability profile. It is not evidence about the
+current Solo target and must not be used to re-enable Push or CloudKit without
+an explicit release decision.
 
 ## Deferred Until Developer Account
 
-- [x] Verify development-device iCloud CloudKit and Remote Notifications
-  provisioning for the standard Ohana app target. Evidence: 2026-06-24
+- [x] Historical: verify that a development profile could provision iCloud
+  CloudKit and Remote Notifications. Evidence from the superseded profile:
+  2026-06-24
   `xcodebuild -allowProvisioningUpdates -project Ohana.xcodeproj -scheme Ohana
   -configuration Debug -destination 'id=4CDF4314-5293-5DFE-AD4E-B510473B1367'
   -derivedDataPath /tmp/ohana-device-capability-debug build

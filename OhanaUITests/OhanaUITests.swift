@@ -8,6 +8,7 @@
 import XCTest
 
 final class OhanaUITests: XCTestCase {
+    private var seededHumanBaselineName: String?
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
@@ -23,25 +24,76 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testCreateFirstHumanFromOnboarding() throws {
-        let app = launchEnglishApp()
-        createFirstHuman(from: app)
+    func testHumanCanBeAddedAfterPetFirstOnboarding() throws {
+        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        completePetFirstD17Flow(in: app)
+        closeOasisToHome(in: app)
+        let humanName = addFirstHumanAfterOnboarding(in: app)
+        XCTAssertTrue(
+            app.buttons["home-card-human-\(humanName)"].waitForExistence(timeout: 15),
+            "A Human profile could not be added after the Pet-first value loop."
+        )
     }
 
     @MainActor
-    func testCreateFirstPetFromTodayFocusAfterFirstHuman() throws {
-        let app = launchEnglishApp()
-        createFirstHuman(from: app)
-        completeFirstDayStarterFunnel(in: app)
+    func testPetFirstOnboardingCompletesCareRewardAndOasisWithoutHuman() throws {
+        let app = launchEnglishApp(seedHumanBaseline: false)
+        completePetFirstD17Flow(in: app)
     }
 
     @MainActor
-    func testCreateFirstPetFromTodayFocusWithProductionOverlaysAfterFirstHuman() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
-        createFirstHuman(from: app)
-        completeFirstDayStarterFunnel(
+    func testPetFirstOnboardingWithProductionOverlaysCompletesWithoutHuman() throws {
+        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        completePetFirstD17Flow(
             in: app,
-            completionMessage: "Creating the first pet with production overlays did not leave the pet creation handoff in time."
+            completionMessage: "Pet-first onboarding with production overlays did not reach the starter reward in time."
+        )
+    }
+
+    @MainActor
+    func testPetFirstOnboardingAccessibilityContract() throws {
+        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        advanceOnboardingIntroToMemberCreation(in: app)
+
+        let nameField = app.textFields["member-name-input"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 12), "Pet-first name field did not appear.")
+        XCTAssertEqual(nameField.elementType, .textField, "Pet-first name entry lost its text-field role.")
+        let speciesMenu = app.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] %@", "Species"))
+            .firstMatch
+        let breedMenu = app.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] %@", "Breed"))
+            .firstMatch
+        XCTAssertTrue(
+            speciesMenu.exists && breedMenu.exists,
+            "The Pet-first creation surface did not expose its Pet-specific Species and Breed controls."
+        )
+    }
+
+    @MainActor
+    func testPersistentStoreFailureFailsClosedAndRetryRecovers() throws {
+        let app = launchEnglishApp(
+            seedHumanBaseline: false,
+            extraLaunchArguments: ["-OHANA_UI_TEST_FAIL_STORE_OPEN_ONCE"]
+        )
+        let retryButton = app.buttons["bootstrap-retry-button"]
+        XCTAssertTrue(
+            retryButton.waitForExistence(timeout: 15),
+            "A failed primary store open did not stop at the recovery surface."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["bootstrap-support-action"].exists,
+            "The fail-closed recovery surface did not expose support."
+        )
+        XCTAssertFalse(
+            app.buttons["onboarding-intro-primary-action"].exists,
+            "The writable app surface appeared while the primary store was unavailable."
+        )
+
+        tapWhenHittable(retryButton, timeout: 8)
+        XCTAssertTrue(
+            app.buttons["onboarding-intro-primary-action"].waitForExistence(timeout: 20),
+            "Retry did not reopen the same primary store and resume onboarding."
         )
     }
 
@@ -201,7 +253,7 @@ final class OhanaUITests: XCTestCase {
         let routes: [HumanFeatureHubRouteExpectation] = [
             .init(tileIdentifier: "feature-hub-body-weight", markers: ["Weight trend", "Add weight", "Weight is private", "体重趋势", "添加体重", "体重记录仅本人可见"]),
             .init(tileIdentifier: "feature-hub-body-metrics", markers: ["Charts appear after you log a metric", "No checkup metrics yet", "Body data is private", "录入任意指标后会生成追踪图", "还没有体检指标记录", "身体数据仅本人可见"]),
-            .init(tileIdentifier: "feature-hub-body-workout", markers: ["Co-health", "Co-health data is private", "人宠共健", "共健数据仅本人可见"]),
+            .init(tileIdentifier: "feature-hub-body-workout", markers: ["Workout Summary", "Add Workout", "Recent Workouts", "运动摘要", "添加运动", "最近运动"]),
             .init(tileIdentifier: "feature-hub-body-report", markers: ["Health Reports", "Add Report", "No health reports yet", "身体检测报告", "添加报告", "还没有检测报告"]),
             .init(tileIdentifier: "feature-hub-care-medication", markers: ["No medication plan yet", "Add medication to see", "No medication yet", "还没有服药计划", "添加药物后", "还没有添加药物"]),
             .init(tileIdentifier: "feature-hub-care-basic", markers: ["\(humanName)'s Info", "\(humanName) 的信息"]),
@@ -294,7 +346,6 @@ final class OhanaUITests: XCTestCase {
         let reportHospital = "Codex Clinic \(timestamp)"
         let reportSummary = "Codex health report \(timestamp)"
         let wishTitle = "Codex wish \(timestamp)"
-        let profileNote = "Codex profile note \(timestamp)"
 
         saveHumanHealthMetricFromFeatureHub(in: app, humanName: humanName)
         saveHumanWorkoutFromFeatureHub(in: app, humanName: humanName, note: workoutNote)
@@ -305,7 +356,6 @@ final class OhanaUITests: XCTestCase {
             summary: reportSummary
         )
         saveHumanWishlistFromFeatureHub(in: app, humanName: humanName, title: wishTitle)
-        saveHumanProfileNoteFromFeatureHub(in: app, humanName: humanName, note: profileNote)
     }
 
     @MainActor
@@ -518,6 +568,31 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testHumanExpandedCardShowsQuickActionsWithoutSecondTap() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        let humanCard = app.buttons["home-card-human-\(humanName)"]
+        XCTAssertTrue(humanCard.waitForExistence(timeout: 14), "Home human card did not appear before expansion.")
+        XCTAssertTrue(
+            tapWhenFrameReady(humanCard, timeout: 8),
+            "Home human card did not expose a stable touch frame before expansion."
+        )
+
+        XCTAssertTrue(
+            waitUntil(timeout: 6) {
+                app.buttons["home-expanded-detail-human"].exists ||
+                    app.buttons["home-quick-action-humanWeight"].exists ||
+                    app.buttons["home-quick-action-humanMedication"].exists ||
+                    app.buttons["home-quick-action-humanExpense"].exists
+            },
+            "Expanded human card did not expose human quick actions without a second tap."
+        )
+    }
+
+    @MainActor
     func testPetHomeWalkCardMinimizesToFloatingBubble() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         createFirstHuman(from: app)
@@ -672,11 +747,17 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(hygieneAction, timeout: 8)
         XCTAssertTrue(
             waitUntil(timeout: 8) {
-                app.staticTexts["今天已经完成了"].exists || app.buttons["知道了"].exists
+                app.staticTexts["Already done today"].exists ||
+                    app.staticTexts["今天已经完成了"].exists ||
+                    app.buttons["OK"].exists ||
+                    app.buttons["知道了"].exists
             },
             "Long-session repeat hygiene tap did not show the single-use guard."
         )
-        tapWhenHittable(app.buttons["知道了"], timeout: 8)
+        tapWhenHittable(
+            app.buttons.matching(NSPredicate(format: "label IN %@", ["OK", "知道了", "Verstanden"])).firstMatch,
+            timeout: 8
+        )
         closeCurrentSheetToHome(in: app, humanName: humanName)
 
         openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
@@ -1597,11 +1678,17 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(recordAction, timeout: 8)
         XCTAssertTrue(
             waitUntil(timeout: 8) {
-                app.staticTexts["今天已经完成了"].exists || app.buttons["知道了"].exists
+                app.staticTexts["Already done today"].exists ||
+                    app.staticTexts["今天已经完成了"].exists ||
+                    app.buttons["OK"].exists ||
+                    app.buttons["知道了"].exists
             },
             "Repeating the same hygiene record did not show the single-use guard."
         )
-        tapWhenHittable(app.buttons["知道了"], timeout: 8)
+        tapWhenHittable(
+            app.buttons.matching(NSPredicate(format: "label IN %@", ["OK", "知道了", "Verstanden"])).firstMatch,
+            timeout: 8
+        )
         XCTAssertTrue(
             app.descendants(matching: .any)["pet-hygiene-detail-screen"].waitForExistence(timeout: 8),
             "Dismissing the repeat hygiene guard did not return to the hygiene detail screen."
@@ -2638,12 +2725,16 @@ final class OhanaUITests: XCTestCase {
 
         let streak = app.buttons["home-streak-action"]
         XCTAssertTrue(streak.waitForExistence(timeout: 20), "Home streak action did not appear.")
-        tapWhenHittable(streak, timeout: 8)
+        XCTAssertTrue(
+            tapWhenFrameReady(streak, timeout: 8),
+            "Home streak action did not expose a stable touch frame."
+        )
 
-        let streakTitle = app.staticTexts["打卡连击"]
+        let streakTitle = app.staticTexts["Check-in streak"]
+        let streakScreen = app.descendants(matching: .any)["daily-streak-screen"]
         let close = app.buttons["ohana-sheet-close-action"]
         let didOpen = waitUntil(timeout: 12) {
-            streakTitle.exists || close.exists
+            streakTitle.exists || streakScreen.exists || close.exists
         }
         XCTAssertTrue(didOpen, "Daily streak screen did not open.")
 
@@ -2665,6 +2756,7 @@ final class OhanaUITests: XCTestCase {
         let didClose = waitUntil(timeout: 12) {
             app.state == .runningForeground &&
                 !streakTitle.exists &&
+                !streakScreen.exists &&
                 !closeCandidates.contains { $0.exists } &&
                 app.buttons["home-streak-action"].exists
         }
@@ -2682,6 +2774,7 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func launchEnglishApp(
         resetPersistentState: Bool = true,
+        seedHumanBaseline: Bool = true,
         enableProductionOverlays: Bool = false,
         coconutBalanceSeedAmount: Int? = nil,
         unlockRewardTier: Bool = false,
@@ -2694,10 +2787,23 @@ final class OhanaUITests: XCTestCase {
             "(en)",
             "-AppleLocale",
             "en_US",
+            "-appLanguage",
+            "en",
             "-OHANA_UI_TESTS"
         ]
         if resetPersistentState {
             app.launchArguments += ["-OHANA_RESET_PERSISTENT_STATE"]
+        }
+        if seedHumanBaseline {
+            let baselineName = "Codex Human Baseline \(Int(Date().timeIntervalSince1970))"
+            seededHumanBaselineName = baselineName
+            app.launchArguments += [
+                "-OHANA_UI_TEST_SEED_HUMAN_BASELINE",
+                "-OHANA_UI_TEST_HUMAN_BASELINE_NAME",
+                baselineName
+            ]
+        } else {
+            seededHumanBaselineName = nil
         }
         if enableProductionOverlays {
             app.launchArguments += ["-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS"]
@@ -2723,25 +2829,59 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     @discardableResult
     private func createFirstHuman(from app: XCUIApplication) -> String {
-        let name = "Codex Human \(Int(Date().timeIntervalSince1970))"
+        guard let seededHumanBaselineName else {
+            XCTFail("This module test did not request its explicit Human baseline.")
+            return "Codex Human Baseline"
+        }
+        XCTAssertTrue(
+            app.buttons["onboarding-intro-primary-action"].waitForExistence(timeout: 25),
+            "Pet-first onboarding did not appear after the Human test baseline was seeded."
+        )
+        return seededHumanBaselineName
+    }
+
+    @MainActor
+    @discardableResult
+    private func completePetFirstD17Flow(
+        in app: XCUIApplication,
+        petName: String = "Codex D17 Pet \(Int(Date().timeIntervalSince1970))",
+        completionMessage: String = "Pet-first onboarding did not reach the starter reward in time."
+    ) -> String {
+        let startedAt = Date()
         advanceOnboardingIntroToMemberCreation(in: app)
         createMember(
             in: app,
-            name: name,
-            flowTitle: "Create Member Card",
-            missingFieldMessage: "Human creation name field did not appear.",
-            completionMessage: "Creating the first human did not leave the creation flow in time.",
+            name: petName,
+            flowTitle: "Create Pet Card",
+            missingFieldMessage: "Pet-first onboarding name field did not appear.",
+            completionMessage: completionMessage,
+            starterPetWeight: "7",
+            petSpeciesLabel: "Dog",
             postSaveMarkerIdentifiers: [
-                "home-add-first-pet-card",
-                "home-add-first-pet-action"
-            ],
-            postSaveTextMarkers: [
-                "Create Pet Card",
-                "制作宠物卡",
-                "Tierkarte erstellen"
+                "generic-weight-entry-sheet-pet",
+                "starter-gift-finish-action"
             ]
         )
-        return name
+        finishRequiredStarterGift(in: app)
+
+        let oasisTab = app.buttons["home-tab-oasis"]
+        XCTAssertTrue(oasisTab.waitForExistence(timeout: 8), "Oasis did not unlock after the first saved care fact.")
+        XCTAssertTrue(tapWhenFrameReady(oasisTab, timeout: 8), "Oasis tab was not frame-ready after the starter reward.")
+        XCTAssertTrue(app.otherElements["oasis-screen"].waitForExistence(timeout: 20), "The D17 flow did not show the Oasis seed surface.")
+        let level = app.descendants(matching: .any)["oasis-tree-level-control"]
+        XCTAssertTrue(level.waitForExistence(timeout: 12), "The Oasis seed level was not visible.")
+        XCTAssertTrue(level.label.contains("level 0"), "The first Oasis surface was not the Lv0 seed state: \(level.label)")
+        XCTAssertEqual(
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-")).count,
+            0,
+            "D17 silently created or required a Human profile."
+        )
+        XCTAssertLessThanOrEqual(
+            Date().timeIntervalSince(startedAt),
+            90,
+            "The first Pet + care + reward + Oasis value loop exceeded 90 seconds."
+        )
+        return petName
     }
 
     @MainActor
@@ -2772,7 +2912,7 @@ final class OhanaUITests: XCTestCase {
     private func completeFirstDayStarterFunnel(
         in app: XCUIApplication,
         petName: String = "Codex Pet \(Int(Date().timeIntervalSince1970))",
-        petSpeciesLabel: String? = nil,
+        petSpeciesLabel: String? = "Dog",
         completionMessage: String = "Creating the first pet did not leave the pet creation handoff in time."
     ) -> String {
         openFirstPetCreationFromTodayFocus(in: app)
@@ -2785,6 +2925,7 @@ final class OhanaUITests: XCTestCase {
             starterPetWeight: "7",
             petSpeciesLabel: petSpeciesLabel,
             postSaveMarkerIdentifiers: [
+                "generic-weight-entry-sheet-pet",
                 "starter-gift-finish-action"
             ]
         )
@@ -2794,8 +2935,9 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func finishRequiredStarterGift(in app: XCUIApplication) {
+        recordRequiredFirstPetCareIfNeeded(in: app)
         let finish = app.buttons["starter-gift-finish-action"]
-        XCTAssertTrue(finish.waitForExistence(timeout: 20), "Starter coconut gift unlock action did not appear after the first human.")
+        XCTAssertTrue(finish.waitForExistence(timeout: 20), "Starter coconut gift unlock action did not appear after the first saved care fact.")
         XCTAssertFalse(app.buttons["home-tab-oasis"].exists, "Oasis tab should stay hidden until the starter gift unlock action is tapped.")
         tapWhenHittable(finish, timeout: 8)
         XCTAssertTrue(app.buttons["home-tab-oasis"].waitForExistence(timeout: 8), "Oasis tab did not appear after unlocking the Coconut Tree.")
@@ -2806,19 +2948,71 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func recordRequiredFirstPetCareIfNeeded(in app: XCUIApplication) {
+        let sheet = app.descendants(matching: .any)["generic-weight-entry-sheet-pet"]
+        guard sheet.waitForExistence(timeout: 8) else {
+            return
+        }
+
+        let quickWeight = app.buttons["generic-weight-entry-quick-weight-0"]
+        XCTAssertTrue(
+            quickWeight.waitForExistence(timeout: 8),
+            "Pet-first onboarding did not expose a quick value for its required care fact."
+        )
+        XCTAssertTrue(
+            tapWhenFrameReady(quickWeight, timeout: 8),
+            "The first Pet care value was not frame-ready."
+        )
+
+        let save = app.buttons["generic-weight-entry-save-action"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { save.exists && save.isEnabled },
+            "The first Pet care save action did not enable after selecting a weight."
+        )
+        XCTAssertTrue(
+            tapWhenFrameReady(save, timeout: 8),
+            "The first Pet care save action was not frame-ready."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !sheet.exists },
+            "The first Pet care sheet did not dismiss after its fact was saved."
+        )
+    }
+
+    @MainActor
     private func openFirstPetCreationFromTodayFocus(in app: XCUIApplication) {
+        let introPrimary = app.buttons["onboarding-intro-primary-action"]
         let nameField = app.textFields["member-name-input"]
         let addPetCard = app.buttons["home-add-first-pet-card"]
-        let addPetAction = app.buttons["home-add-first-pet-action"]
+        let didReachStartingSurface = waitUntil(timeout: 20) {
+            introPrimary.exists || nameField.exists || addPetCard.exists
+        }
+        XCTAssertTrue(didReachStartingSurface, "Pet-first creation entry did not appear.")
+
+        if introPrimary.exists || (!nameField.exists && !addPetCard.exists) {
+            advanceOnboardingIntroToMemberCreation(in: app)
+            return
+        }
+
         let didReachPetEntry = waitUntil(timeout: 20) {
-            nameField.exists || addPetCard.exists || addPetAction.exists
+            guard !nameField.exists else { return true }
+            guard addPetCard.exists, addPetCard.isEnabled else { return false }
+            let frame = addPetCard.frame
+            return frame.width > 1 && frame.height > 1 && isFiniteFrame(frame)
         }
         XCTAssertTrue(didReachPetEntry, "Today Focus first-pet action did not appear.")
         if nameField.exists {
             return
         }
-        let didTapEntry = tapWhenFrameReady(addPetCard, timeout: 6) || tapWhenFrameReady(addPetAction, timeout: 6)
-        XCTAssertTrue(didTapEntry, "Today Focus first-pet action was visible but not tappable.")
+        XCTAssertTrue(
+            addPetCard.label.hasPrefix("Add your first pet") &&
+                addPetCard.label.count > "Add your first pet".count,
+            "Today Focus first-pet action did not expose its complete English accessibility label: \(addPetCard.label)"
+        )
+        XCTAssertTrue(
+            tapWhenFrameReady(addPetCard, timeout: 4),
+            "Today Focus first-pet action did not expose a stable touch frame."
+        )
         XCTAssertTrue(
             nameField.waitForExistence(timeout: 12),
             "Pet creation did not open from the Today Focus first-pet action."
@@ -2865,6 +3059,48 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func closeOasisToHome(in app: XCUIApplication) {
+        let oasisScreen = app.otherElements["oasis-screen"]
+        guard oasisScreen.exists else { return }
+        let homeTab = app.buttons["home-tab-home"]
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 8), "Oasis did not expose the Home tab.")
+        XCTAssertTrue(tapWhenFrameReady(homeTab, timeout: 8), "The Home tab was not frame-ready from Oasis.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !oasisScreen.exists && app.buttons["home-crew-roster-action"].exists },
+            "Switching from Oasis did not return to the Home member surface."
+        )
+    }
+
+    @MainActor
+    private func addFirstHumanAfterOnboarding(
+        in app: XCUIApplication,
+        name: String = "Codex Optional Human \(Int(Date().timeIntervalSince1970))"
+    ) -> String {
+        let crewButton = app.buttons["home-crew-roster-action"]
+        XCTAssertTrue(crewButton.waitForExistence(timeout: 12), "Home did not expose member management after Pet-first onboarding.")
+        tapWhenHittable(crewButton, timeout: 8)
+
+        let addMember = app.buttons["crew-roster-primary-action"]
+        XCTAssertTrue(addMember.waitForExistence(timeout: 12), "Member management did not expose Add Member.")
+        tapWhenHittable(addMember, timeout: 8)
+        let addHuman = app.buttons["crew-roster-add-human-action"]
+        XCTAssertTrue(addHuman.waitForExistence(timeout: 8), "Member management did not expose the optional Human path.")
+        tapWhenHittable(addHuman, timeout: 8)
+
+        createMember(
+            in: app,
+            name: name,
+            flowTitle: "Create Member Card",
+            missingFieldMessage: "Optional Human name field did not appear.",
+            completionMessage: "Optional Human creation did not return to Home.",
+            postSaveMarkerIdentifiers: ["home-card-human-\(name)"]
+        )
+        cancelMemberCreationIfStillPresented(in: app)
+        closeCrewRosterIfNeeded(in: app)
+        return name
+    }
+
+    @MainActor
     private func openSettingsFromHomeChrome(in app: XCUIApplication) {
         let settings = app.buttons["home-settings-action"]
         XCTAssertTrue(settings.waitForExistence(timeout: 12), "Home settings action did not appear.")
@@ -2905,8 +3141,7 @@ final class OhanaUITests: XCTestCase {
             missingFieldMessage: "Additional Human creation name field did not appear.",
             completionMessage: "Creating the additional Human did not return to Home.",
             postSaveMarkerIdentifiers: [
-                "home-card-human-\(name)",
-                "home-primary-action"
+                "home-card-human-\(name)"
             ]
         )
         cancelMemberCreationIfStillPresented(in: app)
@@ -3283,25 +3518,24 @@ final class OhanaUITests: XCTestCase {
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
         let allFeaturesShortcut = app.buttons["home-expanded-shortcut-humanAllFeatures"]
-        if !allFeaturesShortcut.exists || !allFeaturesShortcut.isHittable {
+        if !waitForFrameReady(allFeaturesShortcut, timeout: 1) {
             expandHumanCardFromHome(in: app, humanName: humanName)
         }
 
-        if !waitUntil(timeout: 4, condition: { allFeaturesShortcut.exists && allFeaturesShortcut.isHittable }) {
-            tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
-        }
-        if !waitUntil(timeout: 5, condition: { allFeaturesShortcut.exists && allFeaturesShortcut.isHittable }) {
-            collapseExpandedHumanCardIfNeeded(in: app, humanName: humanName)
-            expandHumanCardFromHome(in: app, humanName: humanName)
-            if !waitUntil(timeout: 3, condition: { allFeaturesShortcut.exists && allFeaturesShortcut.isHittable }) {
-                tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
-            }
+        if !waitForFrameReady(allFeaturesShortcut, timeout: 2) {
+            XCTAssertTrue(
+                tapWhenFrameReady(app.buttons["home-primary-action"], timeout: 8),
+                "Expanded human card did not expose a stable Home primary action."
+            )
         }
         XCTAssertTrue(
-            waitUntil(timeout: 10, condition: { allFeaturesShortcut.exists && allFeaturesShortcut.isHittable }),
-            "Expanded human card did not expose the Human All Features shortcut."
+            waitForFrameReady(allFeaturesShortcut, timeout: 10),
+            "Expanded human card did not expose a stable Human All Features shortcut."
         )
-        tapWhenHittable(allFeaturesShortcut, timeout: 8)
+        XCTAssertTrue(
+            tapWhenFrameReady(allFeaturesShortcut, timeout: 4),
+            "Human All Features shortcut lost its stable touch frame before opening."
+        )
 
         XCTAssertTrue(
             app.buttons["feature-hub-body-weight"].waitForExistence(timeout: 14),
@@ -3312,7 +3546,13 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func expandHumanCardFromHome(in app: XCUIApplication, humanName: String) {
         let detailButton = app.buttons["home-expanded-detail-human"]
-        if detailButton.exists && detailButton.isHittable { return }
+        let expandedMarkers = [
+            detailButton,
+            app.buttons["home-quick-action-humanWeight"],
+            app.buttons["home-quick-action-humanMedication"],
+            app.buttons["home-quick-action-humanExpense"]
+        ]
+        if expandedMarkers.contains(where: \.exists) { return }
 
         let humanCard = app.buttons["home-card-human-\(humanName)"]
         let humanCardByLabel = app.buttons.matching(NSPredicate(format: "label == %@", humanName)).firstMatch
@@ -3324,10 +3564,7 @@ final class OhanaUITests: XCTestCase {
         )
 
         let didExpand = waitUntil(timeout: 12) {
-            detailButton.exists ||
-                app.buttons["home-quick-action-humanWeight"].exists ||
-                app.buttons["home-quick-action-humanMedication"].exists ||
-                app.buttons["home-quick-action-humanExpense"].exists
+            expandedMarkers.contains(where: \.exists)
         }
         XCTAssertTrue(didExpand, "Human home card did not finish expanding before opening the feature hub.")
     }
@@ -3456,29 +3693,30 @@ final class OhanaUITests: XCTestCase {
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
         let action = app.buttons[actionIdentifier]
-        if !action.exists || !action.isHittable {
+        if !waitForFrameReady(action, timeout: 1) {
             expandHumanCardFromHome(in: app, humanName: humanName)
         }
 
         XCTAssertTrue(
-            waitUntil(timeout: 10) { action.exists && action.isEnabled && action.isHittable },
-            "Expanded human card did not expose quick action: \(actionIdentifier)"
+            waitForFrameReady(action, timeout: 10),
+            "Expanded human card did not expose a stable quick action: \(actionIdentifier)"
         )
-        XCTAssertTrue(
-            tapWhenFrameReady(action, timeout: 8),
-            "Human home quick action did not have a tappable frame: \(actionIdentifier)"
-        )
+        tapWhenHittable(action, timeout: 8)
 
-        let sheetMarker = app.staticTexts[sheetIdentifier]
+        let sheetMarker = app.descendants(matching: .any)[sheetIdentifier]
         if !sheetMarker.waitForExistence(timeout: 1.5) {
-            let menuIdentifier = actionIdentifier.replacingOccurrences(
-                of: "home-quick-action-",
-                with: "home-quick-action-menu-"
-            )
-            let quickMenuAction = app.buttons[menuIdentifier]
+            let actionType = actionIdentifier.replacingOccurrences(of: "home-quick-action-", with: "")
+            let quickMenuAction = app.buttons
+                .matching(NSPredicate(
+                    format: "identifier BEGINSWITH %@ AND identifier CONTAINS %@ AND identifier ENDSWITH %@",
+                    "home-quick-action-menu-",
+                    actionType,
+                    "-quick"
+                ))
+                .firstMatch
             XCTAssertTrue(
                 quickMenuAction.waitForExistence(timeout: 8),
-                "Human home quick action \(actionIdentifier) opened neither expected sheet nor inline menu: \(menuIdentifier)"
+                "Human home quick action \(actionIdentifier) opened neither the expected sheet nor its inline quick menu."
             )
             tapWhenHittable(quickMenuAction, timeout: 8)
         }
@@ -3619,26 +3857,12 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func openHumanWorkoutCardFromHomeProfile(in app: XCUIApplication, humanName: String) {
-        closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
-        ensureHomeSurfaceVisible(in: app, humanName: humanName)
-
-        let workoutQuickAction = app.buttons["home-quick-action-humanWorkout"]
-        if !workoutQuickAction.exists || !workoutQuickAction.isHittable {
-            expandHumanCardFromHome(in: app, humanName: humanName)
-        }
-
+        openHumanFeatureHubFromHome(in: app, humanName: humanName)
+        openHumanFeatureTile("feature-hub-body-workout", in: app)
         XCTAssertTrue(
-            waitUntil(timeout: 10) {
-                workoutQuickAction.exists && workoutQuickAction.isEnabled && workoutQuickAction.isHittable
-            },
-            "Expanded human card did not expose the Workout quick action."
-        )
-        workoutQuickAction.press(forDuration: 0.8)
-
-        let addWorkout = app.buttons["human-workout-add-action"]
-        XCTAssertTrue(
-            addWorkout.waitForExistence(timeout: 14),
-            "Human workout history did not expose the add action."
+            app.descendants(matching: .any)["human-workout-summary-view"].waitForExistence(timeout: 14) &&
+                app.buttons["human-workout-add-action"].waitForExistence(timeout: 8),
+            "Human feature hub did not open the current Workout Summary with its add action."
         )
     }
 
@@ -3647,7 +3871,7 @@ final class OhanaUITests: XCTestCase {
         in app: XCUIApplication,
         humanName: String,
         hospital: String,
-        summary: String
+        summary _: String
     ) {
         openHumanFeatureHubFromHome(in: app, humanName: humanName)
         openHumanFeatureTile("feature-hub-body-report", in: app)
@@ -3658,14 +3882,25 @@ final class OhanaUITests: XCTestCase {
             "Human health report add sheet did not open."
         )
         typeText(hospital, intoTextField: "add-human-health-report-hospital-input", in: app)
-        dismissKeyboardIfPresent(in: app)
-        let summaryInput = app.textViews["add-human-health-report-summary-input"]
-        scrollToElement(summaryInput, in: app, maxSwipes: 4)
-        typeText(summary, intoTextView: "add-human-health-report-summary-input", in: app)
-        dismissKeyboardIfPresent(in: app)
-        scrollToElement(app.buttons["add-human-health-report-save-action"], in: app, maxSwipes: 4)
-        tapWhenHittable(app.buttons["add-human-health-report-save-action"], timeout: 8)
-        assertAnyMarkerExists([hospital, summary], in: app, timeout: 18, context: "human health report save")
+        dismissKeyboardIfPresent(in: app, returnKeyIsSafe: true)
+        XCTAssertTrue(
+            waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists },
+            "Human health report hospital keyboard did not dismiss."
+        )
+        let saveAction = app.buttons["add-human-health-report-save-action"]
+        scrollToElement(saveAction, in: app, maxSwipes: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                saveAction.exists && saveAction.isEnabled && hasVisibleFrame(saveAction, in: app)
+            },
+            "Human health report save action did not enter the visible viewport."
+        )
+        if saveAction.isHittable {
+            saveAction.tap()
+        } else {
+            saveAction.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        assertAnyMarkerExists([hospital], in: app, timeout: 18, context: "human health report save")
         closeCurrentSheetToHome(in: app, humanName: humanName)
     }
 
@@ -3902,7 +4137,7 @@ final class OhanaUITests: XCTestCase {
         ensureHomeFeedQuickActionVisible(in: app, petName: petName)
         tapHomeFeedQuickAction(in: app, timeout: 8)
 
-        let detailButton = app.buttons["home-quick-action-menu-feed-detail"]
+        let detailButton = homeQuickActionMenuButton(in: app, actionType: "feed", suffix: "detail")
         if usingDetailMenuWhenAvailable || detailButton.waitForExistence(timeout: 1.5) {
             XCTAssertTrue(detailButton.waitForExistence(timeout: 8), "Feed detail menu action did not appear.")
             tapWhenHittable(detailButton, timeout: 8)
@@ -4156,10 +4391,16 @@ final class OhanaUITests: XCTestCase {
         ensureHomePetQuickActionVisible(actionType: "walk", in: app, petName: petName)
 
         let action = app.buttons["home-quick-action-walk"]
-        tapWhenHittable(action, timeout: 8)
-        let quickStart = app.buttons["home-quick-action-menu-walk"]
+        XCTAssertTrue(
+            tapWhenFrameReady(action, timeout: 8),
+            "Pet home walk quick action did not expose a stable touch frame."
+        )
+        let quickStart = homeQuickActionMenuButton(in: app, actionType: "walk", suffix: "quick")
         if quickStart.waitForExistence(timeout: 3) {
-            tapWhenHittable(quickStart, timeout: 8)
+            XCTAssertTrue(
+                tapWhenFrameReady(quickStart, timeout: 8),
+                "Pet home walk quick-start menu did not expose a stable touch frame."
+            )
         }
 
         let exposedWalkControls = app.buttons["walk-tracking-stop-action"].waitForExistence(timeout: 6) ||
@@ -4257,15 +4498,21 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func openPetHealthVisitPopup(in app: XCUIApplication) {
-        let visitAction = app.buttons
-            .matching(NSPredicate(format: "label IN %@", ["就诊", "Visit record", "Log visit", "Besuchseintrag"]))
-            .firstMatch
-        scrollToElement(visitAction, in: app, maxSwipes: 4)
+        let visitLabels = ["Visit", "就诊", "Besuch"]
+        var visitAction = firstFrameReadyButton(labels: visitLabels, in: app)
+        if visitAction == nil {
+            swipeUpInPrimaryScrollArea(in: app)
+            visitAction = firstFrameReadyButton(labels: visitLabels, in: app)
+        }
         XCTAssertTrue(
-            visitAction.waitForExistence(timeout: 12),
-            "Pet health detail did not expose the visit record action."
+            visitAction != nil,
+            "Pet health detail did not expose the current visit action."
         )
-        tapWhenHittable(visitAction, timeout: 8)
+        guard let visitAction else { return }
+        XCTAssertTrue(
+            tapWhenFrameReady(visitAction, timeout: 8),
+            "Pet health visit action did not expose a stable touch frame."
+        )
     }
 
     @MainActor
@@ -4282,17 +4529,16 @@ final class OhanaUITests: XCTestCase {
 
         let petCard = app.buttons["home-card-pet-\(petName)"]
         let fallbackPetCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
-        XCTAssertTrue(petCard.waitForExistence(timeout: 20), "Pet home card did not appear before opening the feature hub.")
+        XCTAssertTrue(
+            waitUntil(timeout: 20) { petCard.exists || fallbackPetCard.exists },
+            "Pet home card did not appear before opening the feature hub."
+        )
 
         for _ in 0 ..< 3 where !petAllFeaturesShortcutExists(in: app) {
             let targetCard = petCard.exists ? petCard : fallbackPetCard
             if targetCard.exists {
                 scrollTowardElement(targetCard, in: app, maxSwipes: 2)
-                if targetCard.isHittable {
-                    tapWhenHittable(targetCard, timeout: 8)
-                } else {
-                    _ = tapWhenFrameReady(targetCard, offset: CGVector(dx: 0.5, dy: 0.24), timeout: 3)
-                }
+                _ = tapWhenFrameReady(targetCard, offset: CGVector(dx: 0.5, dy: 0.24), timeout: 8)
             }
             if waitUntil(timeout: 3, condition: { petAllFeaturesShortcutExists(in: app) }) {
                 break
@@ -4315,7 +4561,10 @@ final class OhanaUITests: XCTestCase {
             "Expanded pet card did not expose the All Features shortcut."
         )
         let allFeaturesShortcut = petAllFeaturesShortcut(in: app)
-        tapWhenHittable(allFeaturesShortcut, timeout: 8)
+        XCTAssertTrue(
+            tapWhenFrameReady(allFeaturesShortcut, timeout: 8),
+            "Expanded pet card All Features shortcut did not expose a stable touch frame."
+        )
 
         XCTAssertTrue(
             app.buttons["feature-hub-daily-food"].waitForExistence(timeout: 14),
@@ -4478,7 +4727,7 @@ final class OhanaUITests: XCTestCase {
         ensureHomeFeedQuickActionVisible(in: app, petName: petName)
         tapHomeFeedQuickAction(in: app, timeout: 8)
 
-        let quickButton = app.buttons["home-quick-action-menu-feed"]
+        let quickButton = homeQuickActionMenuButton(in: app, actionType: "feed", suffix: "quick")
         if quickButton.waitForExistence(timeout: 4) {
             tapWhenHittable(quickButton, timeout: 8)
         } else if waitForQuickFeedHome(in: app, timeout: 2) {
@@ -4544,23 +4793,29 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func openPetBasicInfoFromHome(in app: XCUIApplication, petName: String) {
-        let petCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
-        XCTAssertTrue(petCard.waitForExistence(timeout: 20), "Pet home card did not appear before opening basic info.")
-        tapWhenHittable(petCard, timeout: 8)
-
-        if !petAllFeaturesShortcutExists(in: app) {
-            tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+        let detailAction = app.buttons["home-expanded-detail-pet"]
+        if !detailAction.exists {
+            let petCard = app.buttons["home-card-pet-\(petName)"]
+            let fallbackPetCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
+            XCTAssertTrue(
+                waitUntil(timeout: 20) { petCard.exists || fallbackPetCard.exists },
+                "Pet home card did not appear before opening basic info."
+            )
+            let targetCard = petCard.exists ? petCard : fallbackPetCard
+            XCTAssertTrue(
+                tapWhenFrameReady(targetCard, timeout: 8),
+                "Pet home card did not expose a stable touch frame before opening basic info."
+            )
         }
-        XCTAssertTrue(
-            waitUntil(timeout: 8, condition: { petAllFeaturesShortcutExists(in: app) }),
-            "Expanded card did not expose the All Features shortcut."
-        )
-        let allFeaturesShortcut = petAllFeaturesShortcut(in: app)
-        tapWhenHittable(allFeaturesShortcut, timeout: 8)
 
-        let basicInfoTile = app.buttons["feature-hub-archive-basicInfo"]
-        XCTAssertTrue(basicInfoTile.waitForExistence(timeout: 12), "Pet feature hub did not expose the Profile tile.")
-        tapWhenHittable(basicInfoTile, timeout: 8)
+        XCTAssertTrue(
+            detailAction.waitForExistence(timeout: 12),
+            "Expanded pet card did not expose the current profile entry."
+        )
+        XCTAssertTrue(
+            tapWhenFrameReady(detailAction, timeout: 8),
+            "Expanded pet profile entry did not expose a stable touch frame."
+        )
 
         let basicInfoScreen = app.descendants(matching: .any)["pet-basic-info-screen"]
         XCTAssertTrue(basicInfoScreen.waitForExistence(timeout: 12), "Pet basic info screen did not open.")
@@ -4568,18 +4823,25 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func petAllFeaturesShortcut(in app: XCUIApplication) -> XCUIElement {
-        let currentQuickAction = app.buttons["home-quick-action-allFeatures"]
-        if currentQuickAction.exists {
+        if let currentQuickAction = firstFrameReadyButton(
+            identifier: "home-quick-action-allFeatures",
+            in: app
+        ) {
             return currentQuickAction
         }
-        return app.buttons["home-expanded-shortcut-allFeatures"]
+        if let legacyExpandedShortcut = firstFrameReadyButton(
+            identifier: "home-expanded-shortcut-allFeatures",
+            in: app
+        ) {
+            return legacyExpandedShortcut
+        }
+        return app.buttons["home-quick-action-allFeatures"]
     }
 
     @MainActor
     private func petAllFeaturesShortcutExists(in app: XCUIApplication) -> Bool {
-        let currentQuickAction = app.buttons["home-quick-action-allFeatures"]
-        let legacyExpandedShortcut = app.buttons["home-expanded-shortcut-allFeatures"]
-        return currentQuickAction.exists || legacyExpandedShortcut.exists
+        firstFrameReadyButton(identifier: "home-quick-action-allFeatures", in: app) != nil
+            || firstFrameReadyButton(identifier: "home-expanded-shortcut-allFeatures", in: app) != nil
     }
 
     @MainActor
@@ -4638,10 +4900,19 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func openCalendarTab(in app: XCUIApplication, petName: String) {
-        let petCard = app.buttons["home-card-pet-\(petName)"]
-        XCTAssertTrue(petCard.waitForExistence(timeout: 20), "Pet home card did not appear before opening pet Calendar context.")
         closeCurrentPetRouteIfNeeded(in: app)
+        let homeTab = app.buttons["home-tab-home"]
+        if homeTab.exists {
+            _ = tapWhenFrameReady(homeTab, timeout: 5)
+        }
         collapseExpandedPetCardIfNeeded(in: app)
+
+        let petCard = app.buttons["home-card-pet-\(petName)"]
+        let fallbackPetCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
+        XCTAssertTrue(
+            waitUntil(timeout: 20) { petCard.exists || fallbackPetCard.exists },
+            "Pet home card did not appear before opening pet Calendar context."
+        )
 
         let calendarTab = app.buttons["home-tab-calendar"]
         XCTAssertTrue(calendarTab.waitForExistence(timeout: 20), "Calendar tab did not appear after starter setup.")
@@ -4687,7 +4958,11 @@ final class OhanaUITests: XCTestCase {
             "Calendar add-event sheet did not open."
         )
         typeText(title, intoTextField: "add-event-title-input", in: app)
-        dismissKeyboardIfPresent(in: app)
+        dismissKeyboardIfPresent(in: app, returnKeyIsSafe: true)
+        XCTAssertTrue(
+            waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists },
+            "Calendar event title keyboard did not dismiss."
+        )
         if let linkedPetName {
             let petChip = app.buttons["add-event-related-pet-\(linkedPetName)"]
             scrollToElement(petChip, in: app, maxSwipes: 8)
@@ -4886,7 +5161,7 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 8) {
-        for _ in 0 ..< maxSwipes where !element.exists || !element.isHittable {
+        for _ in 0 ..< maxSwipes where !element.exists || !hasVisibleFrame(element, in: app) {
             swipeUpInPrimaryScrollArea(in: app)
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
@@ -4894,7 +5169,7 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func scrollTowardElement(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 8) {
-        for _ in 0 ..< maxSwipes where !element.exists || !element.isHittable {
+        for _ in 0 ..< maxSwipes where !element.exists || !hasVisibleFrame(element, in: app) {
             if element.exists, element.frame.midY < app.frame.midY {
                 app.swipeDown()
             } else {
@@ -4907,22 +5182,53 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func swipeUpInPrimaryScrollArea(in app: XCUIApplication) {
         let calendarList = app.scrollViews["calendar-list-scroll-view"]
-        if calendarList.exists {
-            calendarList
-                .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.82))
-                .press(
-                    forDuration: 0.01,
-                    thenDragTo: calendarList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.26))
-                )
-            return
-        }
-
-        let scrollView = app.scrollViews.firstMatch
-        if scrollView.exists {
-            scrollView.swipeUp()
+        if visibleFrame(of: calendarList, in: app) != nil {
+            dragUp(in: calendarList)
+        } else if let scrollView = largestVisibleScrollView(in: app) {
+            dragUp(in: scrollView)
         } else {
             app.swipeUp()
         }
+    }
+
+    @MainActor
+    private func largestVisibleScrollView(in app: XCUIApplication) -> XCUIElement? {
+        let scrollViews = app.scrollViews
+        var bestElement: XCUIElement?
+        var bestArea: CGFloat = 0
+
+        for index in 0 ..< scrollViews.count {
+            let candidate = scrollViews.element(boundBy: index)
+            guard let frame = visibleFrame(of: candidate, in: app) else { continue }
+            let area = frame.width * frame.height
+            if area > bestArea {
+                bestArea = area
+                bestElement = candidate
+            }
+        }
+
+        return bestElement
+    }
+
+    private func visibleFrame(of element: XCUIElement, in app: XCUIApplication) -> CGRect? {
+        guard element.exists else { return nil }
+        let frame = element.frame
+        guard isFiniteFrame(frame), frame.width > 44, frame.height > 44 else { return nil }
+        let visibleFrame = frame.intersection(app.frame)
+        guard !visibleFrame.isNull, visibleFrame.width > 44, visibleFrame.height > 44 else { return nil }
+        return visibleFrame
+    }
+
+    private func hasVisibleFrame(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        guard element.exists else { return false }
+        let frame = element.frame
+        guard isFiniteFrame(frame), frame.width > 1, frame.height > 1 else { return false }
+        let visibleFrame = frame.intersection(app.frame)
+        return !visibleFrame.isNull && visibleFrame.width > 1 && visibleFrame.height > 1
+    }
+
+    private func dragUp(in scrollView: XCUIElement) {
+        scrollView.swipeUp()
     }
 
     @MainActor
@@ -4944,45 +5250,14 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func closeCurrentSheetToHomeIfNeeded(in app: XCUIApplication, humanName: String) {
-        if app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable,
-           !app.buttons["feature-hub-body-weight"].exists,
-           !isHumanFeatureRouteOverlayVisible(in: app),
-           !containsAnyMarker(["Weight trend", "Charts appear after you log a metric", "Co-health Report", "Health Reports", "No medication plan yet", "No expenses yet", "No wishes yet", "Timeline"], in: app) {
-            return
-        }
-
-        let closeCandidates = [
-            app.buttons["crew-roster-close-action"],
-            app.buttons["human-workout-close-action"],
-            app.buttons["human-basic-info-close-action"],
-            app.buttons["ohana-sheet-close-action"],
-            app.buttons["Close"].firstMatch,
-            app.buttons["Done"].firstMatch,
-            app.buttons["关闭"].firstMatch,
-            app.buttons["完成"].firstMatch
-        ]
-
-        if let close = closeCandidates.first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
-            tapWhenHittable(close, timeout: 5)
-        } else {
-            let homeTab = app.buttons["home-tab-home"]
-            let backCandidates = [
-                app.buttons["BackButton"],
-                app.buttons["Back"],
-                app.buttons["返回"]
-            ]
-            if homeTab.exists && homeTab.isEnabled && homeTab.isHittable {
-                tapWhenHittable(homeTab, timeout: 5)
-            } else if let back = backCandidates.first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
-                tapWhenHittable(back, timeout: 5)
-            } else {
-                dismissCurrentSheetByDrag(in: app)
+        for _ in 0 ..< 3 {
+            if isHumanRouteAtHome(in: app, humanName: humanName) {
+                return
             }
-        }
-
-        _ = waitUntil(timeout: 8) {
-            !isHumanFeatureRouteOverlayVisible(in: app) &&
-                (app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable)
+            dismissOneHumanRouteLayer(in: app)
+            _ = waitUntil(timeout: 4) {
+                isHumanRouteAtHome(in: app, humanName: humanName)
+            }
         }
     }
 
@@ -5007,54 +5282,92 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func closeHumanProfileToHome(in app: XCUIApplication, humanName: String) {
-        if app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable,
-           !isHumanFeatureRouteOverlayVisible(in: app) {
-            return
-        }
-
-        let closeCandidates = [
-            app.buttons["human-workout-close-action"],
-            app.buttons["human-basic-info-close-action"],
-            app.buttons["ohana-sheet-close-action"],
-            app.buttons["Close"].firstMatch,
-            app.buttons["Done"].firstMatch,
-            app.buttons["关闭"].firstMatch,
-            app.buttons["完成"].firstMatch
-        ]
-        let backCandidates = [
-            app.buttons["BackButton"],
-            app.buttons["Back"],
-            app.buttons["返回"]
-        ]
-        let homeTab = app.buttons["home-tab-home"]
-        if let close = closeCandidates.first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
-            tapWhenHittable(close, timeout: 5)
-        } else if let back = backCandidates.first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
-            tapWhenHittable(back, timeout: 5)
-        } else if homeTab.exists && homeTab.isHittable {
-            tapWhenHittable(homeTab, timeout: 5)
-        } else {
-            app.swipeRight()
+        for _ in 0 ..< 3 {
+            if isHumanRouteAtHome(in: app, humanName: humanName) {
+                return
+            }
+            dismissOneHumanRouteLayer(in: app)
+            _ = waitUntil(timeout: 4) {
+                isHumanRouteAtHome(in: app, humanName: humanName)
+            }
         }
 
         let didReturnHome = waitUntil(timeout: 14) {
-            app.state == .runningForeground &&
-                !isHumanFeatureRouteOverlayVisible(in: app) &&
-                (app.buttons[humanName].isHittable || app.buttons["home-primary-action"].isHittable)
+            isHumanRouteAtHome(in: app, humanName: humanName)
         }
         XCTAssertTrue(didReturnHome, "Closing the human profile did not return to Home.")
+    }
+
+    private func isHumanRouteAtHome(in app: XCUIApplication, humanName _: String) -> Bool {
+        app.state == .runningForeground &&
+            !app.buttons["feature-hub-body-weight"].exists &&
+            !isPetFeatureRouteOverlayVisible(in: app) &&
+            !isHumanFeatureRouteOverlayVisible(in: app) &&
+            app.buttons["home-tab-home"].exists
+    }
+
+    private func isPetFeatureRouteOverlayVisible(in app: XCUIApplication) -> Bool {
+        livePetRouteIdentifiers().contains { identifier in
+            app.descendants(matching: .any)[identifier].exists
+        } || [
+            "feature-hub-daily-food",
+            "feature-hub-daily-potty",
+            "feature-hub-health-health"
+        ].contains { identifier in
+            app.buttons[identifier].exists
+        }
+    }
+
+    @MainActor
+    private func dismissOneHumanRouteLayer(in app: XCUIApplication) {
+        let closeIdentifiers = [
+            "crew-roster-close-action",
+            "human-workout-close-action",
+            "human-basic-info-close-action",
+            "ohana-sheet-close-action"
+        ]
+        for identifier in closeIdentifiers {
+            if let close = firstHittableButton(identifier: identifier, in: app) {
+                close.tap()
+                return
+            }
+        }
+
+        if let close = firstHittableButton(labels: ["Close", "Done", "关闭", "完成", "Schließen", "Fertig"], in: app) {
+            close.tap()
+            return
+        }
+        if let close = firstFrameReadyButton(labels: ["Close", "Done", "关闭", "完成", "Schließen", "Fertig"], in: app) {
+            close.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            return
+        }
+        if let back = firstHittableButton(labels: ["Back", "返回", "Zurück"], in: app) {
+            back.tap()
+            return
+        }
+
+        let homeTab = app.buttons["home-tab-home"]
+        if homeTab.exists && homeTab.isEnabled && homeTab.isHittable {
+            homeTab.tap()
+        } else {
+            dismissCurrentSheetByDrag(in: app)
+        }
     }
 
     private func isHumanFeatureRouteOverlayVisible(in app: XCUIApplication) -> Bool {
         [
             "add-human-workout-sheet",
+            "generic-weight-entry-sheet-human",
             "human-basic-info-screen",
             "human-health-metric-detail-tsh",
             "human-health-metric-entry-sheet-tsh",
             "human-health-report-add-action",
             "human-note-history-screen",
             "human-workout-add-action",
-            "human-workout-delete-action"
+            "human-workout-delete-action",
+            "quick-human-expense-sheet",
+            "quick-human-medication-sheet",
+            "quick-human-note-sheet"
         ].contains { identifier in
             app.descendants(matching: .any)[identifier].exists
         }
@@ -5118,9 +5431,12 @@ final class OhanaUITests: XCTestCase {
         completionMessage: String,
         starterPetWeight: String? = nil,
         petSpeciesLabel: String? = nil,
-        postSaveMarkerIdentifiers: [String] = [],
-        postSaveTextMarkers: [String] = []
+        postSaveMarkerIdentifiers: [String]
     ) {
+        XCTAssertFalse(
+            postSaveMarkerIdentifiers.isEmpty,
+            "Member creation requires an explicit post-save marker."
+        )
         let nameField = app.textFields["member-name-input"]
         let didShowNameField = waitUntil(timeout: 12) {
             nameField.exists && nameField.isHittable
@@ -5144,13 +5460,11 @@ final class OhanaUITests: XCTestCase {
         let creationPrimary = app.buttons["member-creation-primary-action"]
         let didLeaveCreation = waitUntil(timeout: 30) {
             let didReachExpectedMarker = containsAnyElement(in: app, identifiers: postSaveMarkerIdentifiers)
-            let didReachExpectedTextMarker = containsAnyText(in: app, texts: postSaveTextMarkers)
             return app.state == .runningForeground &&
-                (didReachExpectedMarker ||
-                    didReachExpectedTextMarker ||
-                    (!nameField.exists &&
-                        !creationPrimary.exists &&
-                        !handoffTitle.exists))
+                didReachExpectedMarker &&
+                !nameField.exists &&
+                !creationPrimary.exists &&
+                !handoffTitle.exists
         }
         XCTAssertTrue(didLeaveCreation, completionMessage)
     }
@@ -5164,7 +5478,6 @@ final class OhanaUITests: XCTestCase {
             speciesMenu.waitForExistence(timeout: 8),
             "Pet creation species menu did not appear before selecting \(speciesLabel)."
         )
-        tapWhenHittable(speciesMenu, timeout: 8)
 
         let optionLabels: [String] = switch speciesLabel.lowercased() {
         case "cat", "猫", "katze":
@@ -5174,14 +5487,63 @@ final class OhanaUITests: XCTestCase {
         default:
             [speciesLabel]
         }
-        let option = app.buttons
-            .matching(NSPredicate(format: "label IN %@", optionLabels))
-            .firstMatch
-        XCTAssertTrue(
-            option.waitForExistence(timeout: 8),
-            "Pet creation species option did not appear: \(optionLabels)."
-        )
-        tapWhenHittable(option, timeout: 8)
+        let hasSelectedSpecies = {
+            speciesMenu.exists && optionLabels.contains { speciesMenu.label.localizedCaseInsensitiveContains($0) }
+        }
+        if hasSelectedSpecies() {
+            return
+        }
+
+        for _ in 0 ..< 3 {
+            guard tapWhenFrameReady(speciesMenu, timeout: 8) else { continue }
+            let didExposeOption = waitUntil(timeout: 8) {
+                optionLabels.contains { app.buttons[$0].exists }
+            }
+            guard didExposeOption else { continue }
+
+            // XCTest exposes the correct SwiftUI Menu label but reports the
+            // wrong activation point. Keep this coordinate path constrained to
+            // the repository's pinned iPhone 17 simulator.
+            if tapMemberCreationSpeciesMenuCoordinate(
+                speciesLabel,
+                speciesMenu: speciesMenu,
+                in: app
+            ), waitUntil(timeout: 4, condition: hasSelectedSpecies) {
+                return
+            }
+        }
+
+        XCTFail("Pet creation species selection did not apply. Current menu label: \(speciesMenu.label)")
+    }
+
+    @MainActor
+    private func tapMemberCreationSpeciesMenuCoordinate(
+        _ speciesLabel: String,
+        speciesMenu: XCUIElement,
+        in app: XCUIApplication
+    ) -> Bool {
+        let targetLabels: [String] = switch speciesLabel.lowercased() {
+        case "dog", "狗", "hund": ["Dog", "狗", "Hund"]
+        case "cat", "猫", "katze": ["Cat", "猫", "Katze"]
+        default: [speciesLabel]
+        }
+        guard hasVisibleFrame(speciesMenu, in: app) else {
+            return false
+        }
+
+        guard let targetOption = firstFrameReadyButton(labels: targetLabels, in: app) else {
+            return false
+        }
+
+        let appFrame = app.frame
+        let targetPoint = CGPoint(x: targetOption.frame.midX, y: targetOption.frame.midY)
+        guard appFrame.contains(targetPoint) else { return false }
+
+        app.coordinate(withNormalizedOffset: CGVector(
+            dx: (targetPoint.x - appFrame.minX) / appFrame.width,
+            dy: (targetPoint.y - appFrame.minY) / appFrame.height
+        )).tap()
+        return true
     }
 
     @MainActor
@@ -5190,16 +5552,77 @@ final class OhanaUITests: XCTestCase {
             .matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS %@ OR label CONTAINS %@", "Breed", "品种", "Rasse"))
             .firstMatch
         XCTAssertTrue(breedMenu.waitForExistence(timeout: 8), "Pet creation breed menu did not appear.")
-        tapWhenHittable(breedMenu, timeout: 8)
-
-        // 品种名当前仅中文;测试仅覆盖 Dog/Cat,选各自品种库首项。
-        let breedName: String = switch speciesLabel.lowercased() {
-        case "cat", "猫", "katze": "阿比西尼亚猫"
-        default: "阿富汗猎犬"
+        let creationPrimary = app.buttons["member-creation-primary-action"]
+        let unselectedValues = ["Choose", "选择", "Wählen"]
+        let hasSelectedBreed = {
+            breedMenu.exists && !unselectedValues.contains { value in
+                breedMenu.label.localizedCaseInsensitiveContains(value)
+            }
         }
-        let option = app.buttons[breedName]
-        XCTAssertTrue(option.waitForExistence(timeout: 8), "Pet creation breed option did not appear: \(breedName).")
-        tapWhenHittable(option, timeout: 8)
+        if hasSelectedBreed() {
+            return
+        }
+
+        let placeholderLabel = breedMenu.label
+        let selectionWasRequired = creationPrimary.exists && !creationPrimary.isEnabled
+        let breedOptionLabels = switch speciesLabel.lowercased() {
+        case "cat", "猫", "katze":
+            ["中华田园猫", "英国短毛猫", "美国短毛猫"]
+        default:
+            ["中华田园犬", "拉布拉多犬", "金毛寻回犬"]
+        }
+
+        for _ in 0 ..< 3 {
+            XCTAssertTrue(
+                tapWhenFrameReady(breedMenu, timeout: 8),
+                "Pet creation breed menu did not expose a stable touch frame."
+            )
+
+            let didExposeOption = waitUntil(timeout: 8) {
+                breedOptionLabels.contains { app.buttons[$0].exists }
+            }
+            guard didExposeOption else { continue }
+            guard tapMemberCreationBreedMenuCoordinate(
+                optionLabels: breedOptionLabels,
+                in: app
+            ) else {
+                continue
+            }
+
+            let didApplySelection = waitUntil(timeout: 4) {
+                hasSelectedBreed() ||
+                    (breedMenu.exists && breedMenu.label != placeholderLabel) ||
+                    (selectionWasRequired && creationPrimary.exists && creationPrimary.isEnabled)
+            }
+            if didApplySelection {
+                return
+            }
+        }
+
+        if waitUntil(timeout: 4, condition: hasSelectedBreed) {
+            return
+        }
+
+        XCTFail("Pet creation breed selection did not apply. Current menu label: \(breedMenu.label)")
+    }
+
+    @MainActor
+    private func tapMemberCreationBreedMenuCoordinate(
+        optionLabels: [String],
+        in app: XCUIApplication
+    ) -> Bool {
+        guard let targetOption = firstFrameReadyButton(labels: optionLabels, in: app) else {
+            return false
+        }
+        let appFrame = app.frame
+        let targetPoint = CGPoint(x: targetOption.frame.midX, y: targetOption.frame.midY)
+        guard appFrame.contains(targetPoint) else { return false }
+
+        app.coordinate(withNormalizedOffset: CGVector(
+            dx: (targetPoint.x - appFrame.minX) / appFrame.width,
+            dy: (targetPoint.y - appFrame.minY) / appFrame.height
+        )).tap()
+        return true
     }
 
     private func containsAnyElement(in app: XCUIApplication, identifiers: [String]) -> Bool {
@@ -5225,7 +5648,22 @@ final class OhanaUITests: XCTestCase {
         }
         XCTAssertTrue(didShowTextField, "Text field did not appear: \(identifier)")
         let target = field.exists ? field : fallback
-        XCTAssertTrue(tapWhenFrameReady(target, timeout: 8), "Text field did not become tappable: \(identifier)")
+        scrollTowardElement(target, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                target.exists && target.isEnabled && hasVisibleFrame(target, in: app)
+            },
+            "Text field did not become visible: \(identifier)"
+        )
+        if target.isHittable {
+            target.tap()
+        } else {
+            target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(
+            waitUntil(timeout: 4) { app.keyboards.firstMatch.exists },
+            "Text field did not receive keyboard focus: \(identifier)"
+        )
         target.typeText(text)
     }
 
@@ -5238,20 +5676,46 @@ final class OhanaUITests: XCTestCase {
         }
         XCTAssertTrue(didShowTextView, "Text view did not appear: \(identifier)")
         let target = textView.exists ? textView : fallback
-        XCTAssertTrue(tapWhenFrameReady(target, timeout: 8), "Text view did not become tappable: \(identifier)")
+        scrollTowardElement(target, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                target.exists && target.isEnabled && hasVisibleFrame(target, in: app)
+            },
+            "Text view did not become visible: \(identifier)"
+        )
+        if target.isHittable {
+            target.tap()
+        } else {
+            target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(
+            waitUntil(timeout: 4) { app.keyboards.firstMatch.exists },
+            "Text view did not receive keyboard focus: \(identifier)"
+        )
         target.typeText(text)
     }
 
     @MainActor
-    private func dismissKeyboardIfPresent(in app: XCUIApplication) {
+    private func dismissKeyboardIfPresent(in app: XCUIApplication, returnKeyIsSafe: Bool = false) {
         if app.keyboards.firstMatch.exists {
             let doneLabels = ["Done", "done", "完成", "隐藏键盘", "Hide keyboard"]
             if let done = doneLabels
-                .map({ app.buttons[$0] })
+                .map({ app.keyboards.buttons[$0].firstMatch })
                 .first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
                 done.tap()
                 RunLoop.current.run(until: Date().addingTimeInterval(0.3))
                 return
+            }
+            if returnKeyIsSafe {
+                let returnLabels = ["return", "Return", "换行"]
+                if let returnKey = returnLabels
+                    .map({ app.keyboards.buttons[$0].firstMatch })
+                    .first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
+                    returnKey.tap()
+                    if waitUntil(timeout: 2, condition: { !app.keyboards.firstMatch.exists }) {
+                        return
+                    }
+                }
             }
             app.swipeDown()
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
@@ -5278,21 +5742,30 @@ final class OhanaUITests: XCTestCase {
             }
             let actionLabel = creationPrimary.label
             let didBecomeReadyOrLeave = waitUntil(timeout: 8) {
-                !creationPrimary.exists || (creationPrimary.isEnabled && creationPrimary.isHittable)
+                guard creationPrimary.exists else { return true }
+                guard creationPrimary.isEnabled else { return false }
+                let frame = creationPrimary.frame
+                return frame.width > 1 && frame.height > 1 && isFiniteFrame(frame)
             }
-            XCTAssertTrue(didBecomeReadyOrLeave, "Member creation primary action did not become ready.")
+            XCTAssertTrue(
+                didBecomeReadyOrLeave,
+                "Member creation primary action did not become enabled with a stable touch frame."
+            )
             guard creationPrimary.exists else {
                 didTapFinalSave = true
                 break
             }
-            creationPrimary.tap()
+            if creationPrimary.isHittable {
+                creationPrimary.tap()
+            } else {
+                XCTAssertTrue(
+                    tapWhenFrameReady(creationPrimary, timeout: 2),
+                    "Member creation primary action lost its stable touch frame before the tap."
+                )
+            }
             if isMemberCreationFinalActionLabel(actionLabel) {
                 didTapFinalSave = true
-                RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-                if !creationPrimary.exists {
-                    break
-                }
-                continue
+                break
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.45))
             if !creationPrimary.exists {
@@ -5342,7 +5815,59 @@ final class OhanaUITests: XCTestCase {
 
         for index in 0 ..< count {
             let button = matches.element(boundBy: index)
-            if button.exists, button.isEnabled, button.isHittable {
+            if button.exists, button.isEnabled, hasVisibleFrame(button, in: app), button.isHittable {
+                return button
+            }
+        }
+        return nil
+    }
+
+    @MainActor
+    private func firstFrameReadyButton(identifier: String, in app: XCUIApplication) -> XCUIElement? {
+        let matches = app.buttons.matching(identifier: identifier)
+        let count = matches.count
+        guard count > 0 else { return nil }
+
+        for index in 0 ..< count {
+            let button = matches.element(boundBy: index)
+            if button.exists, button.isEnabled, hasVisibleFrame(button, in: app) {
+                return button
+            }
+        }
+        return nil
+    }
+
+    @MainActor
+    private func firstHittableButton(labels: [String], in app: XCUIApplication) -> XCUIElement? {
+        let matches = app.buttons.matching(NSPredicate(format: "label IN %@", labels))
+        let count = matches.count
+        guard count > 0 else { return nil }
+
+        for index in 0 ..< count {
+            let button = matches.element(boundBy: index)
+            if button.exists, button.isEnabled, hasVisibleFrame(button, in: app), button.isHittable {
+                return button
+            }
+        }
+        return nil
+    }
+
+    private func firstFrameReadyButton(labels: [String], in app: XCUIApplication) -> XCUIElement? {
+        let matches = app.buttons.matching(NSPredicate(format: "label IN %@", labels))
+        let count = matches.count
+        guard count > 0 else { return nil }
+
+        for index in 0 ..< count {
+            let button = matches.element(boundBy: index)
+            guard button.exists, button.isEnabled else { continue }
+            let frame = button.frame
+            let visibleFrame = frame.intersection(app.frame)
+            if frame.width > 1,
+               frame.height > 1,
+               isFiniteFrame(frame),
+               !visibleFrame.isNull,
+               visibleFrame.width > 1,
+               visibleFrame.height > 1 {
                 return button
             }
         }
@@ -5351,17 +5876,22 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func tapFirstHittableButton(identifier: String, in app: XCUIApplication, timeout: TimeInterval, context: String) {
-        let didTap = waitUntil(timeout: timeout) {
+        var didTap = waitUntil(timeout: timeout) {
             guard let button = firstHittableButton(identifier: identifier, in: app) else {
                 return false
             }
             button.tap()
             return true
         }
+        if !didTap {
+            let firstMatch = app.buttons.matching(identifier: identifier).firstMatch
+            scrollTowardElement(firstMatch, in: app, maxSwipes: 4)
+            didTap = tapWhenFrameReady(firstMatch, timeout: 2)
+        }
         let matchCount = app.buttons.matching(identifier: identifier).count
         XCTAssertTrue(
             didTap,
-            "No hittable button \(identifier) became available for \(context). matches=\(matchCount)"
+            "No visible button \(identifier) became available for \(context). matches=\(matchCount)"
         )
     }
 

@@ -80,7 +80,6 @@ private struct OhanaIconView: View {
 
 struct OnboardingView: View {
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
-    @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @AppStorage("ohana_show_first_success_card") private var showFirstSuccessCard: Bool = false
     @AppStorage("ohana_first_quick_checkin_completed") private var firstQuickCheckInCompleted: Bool = false
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
@@ -92,17 +91,17 @@ struct OnboardingView: View {
     @Environment(AppServices.self) private var appServices
     var isReplay: Bool = false
     var onReplayFinished: (() -> Void)?
-    var onPrimaryHumanSaved: ((Human) -> Void)?
+    var onFirstPetSaved: ((Pet) -> Void)?
     var onHomeJoinHandoffPreflight: (() -> Void)?
 
     private enum FlowStep: Equatable {
         case intro
-        case profile
+        case pet
     }
 
     @State private var step: FlowStep = .intro
-    /// 每次进入「添加人类」步骤刷新，避免从欢迎页返回后残留半填状态
-    @State private var humanWizardSessionId = UUID()
+    /// 每次进入「添加首宠」步骤刷新，避免从欢迎页返回后残留半填状态。
+    @State private var petWizardSessionId = UUID()
 
     @State private var iconPulse = false
     @State private var introPageIndex = 0
@@ -168,6 +167,9 @@ struct OnboardingView: View {
         .preferredColorScheme(isHomeJoinHandoffPreflightActive ? nil : .dark)
         .environment(\.colorScheme, .dark)
         .onAppear {
+            if !isReplay {
+                appServices.onboardingJourney.beginFreshJourney(context: modelContext)
+            }
             preferenceCoordinator.syncLocationAuthorizationStatus(appServices.location.authorizationStatus)
             if shouldReduceWork {
                 iconPulse = false
@@ -194,33 +196,34 @@ struct OnboardingView: View {
                     .transition(.identity)
             }
 
-            if step == .profile || isProfilePrepared {
-                humanOnboardingWizard
+            if step == .pet || isProfilePrepared {
+                petOnboardingWizard
                     .opacity(profileSideOpacity)
-                    .allowsHitTesting(step == .profile && !isFlippingToProfile)
+                    .allowsHitTesting(step == .pet && !isFlippingToProfile)
                     .transition(.identity)
             }
         }
     }
 
-    /// 与「添加家人 → 家庭成员」相同的完整人类向导，完成后绑定为当前设备主人
-    private var humanOnboardingWizard: some View {
-        AddHumanWizardView(
+    /// D17: first run creates the first Pet. A Human profile remains available
+    /// from the member flow later, but it is not a prerequisite for local care.
+    private var petOnboardingWizard: some View {
+        AddPetWizardView(
             onComplete: {
                 finishOnboarding(playsFeedback: false)
             },
             onCancel: {
                 returnToIntro()
             },
-            onHumanSaved: { human in
-                recordOnboardingHumanSaved(human)
+            onPetSaved: { pet in
+                recordOnboardingPetSaved(pet)
             },
             presentationStyle: .onboarding,
             onHomeJoinHandoffPreflight: beginHomeJoinHandoffPreflight,
             onHomeJoinHandoffStarted: beginHomeJoinHandoffPresentation,
             onHomeJoinHandoffEnded: endHomeJoinHandoffPresentation
         )
-        .id(humanWizardSessionId)
+        .id(petWizardSessionId)
         .environment(\.colorScheme, .dark)
         .environment(\.memberCreationCardFlipProgress, profileCardFlipProgress)
         .preferredColorScheme(isHomeJoinHandoffPreflightActive ? nil : .dark)
@@ -338,7 +341,7 @@ struct OnboardingView: View {
                     HStack(spacing: 8) {
                         Text(introPageIndex < introPageCount - 1
                             ? localized(zh: "下一页", en: "Next", de: "Weiter")
-                            : localized(zh: "建立本人档案", en: "Create profile", de: "Profil erstellen"))
+                            : localized(zh: "添加第一只宠物", en: "Add first pet", de: "Erstes Tier hinzufügen"))
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                         Image(systemName: introPageIndex < introPageCount - 1 ? "chevron.right" : "arrow.right")
@@ -1026,7 +1029,7 @@ struct OnboardingView: View {
     private func startProfileSetup() {
         guard !isFlippingToProfile else { return }
         flipTask?.cancel()
-        humanWizardSessionId = UUID()
+        petWizardSessionId = UUID()
         flipProgress = 0
         isProfilePrepared = true
         isFlippingToProfile = true
@@ -1036,7 +1039,7 @@ struct OnboardingView: View {
                 flipProgress = 1
             }
             flipTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: flipDurationMilliseconds) {
-                step = .profile
+                step = .pet
                 isFlippingToProfile = false
                 isProfilePrepared = false
                 introDragOffset = 0
@@ -1091,32 +1094,21 @@ struct OnboardingView: View {
         }
     }
 
-    private func recordOnboardingHumanSaved(_ human: Human) {
+    private func recordOnboardingPetSaved(_ pet: Pet) {
         guard !isReplay else { return }
-        persistActiveHumanId(human.id.uuidString)
         OnboardingHomeJoinHandoffGate.markCompleted()
-        onPrimaryHumanSaved?(human)
+        onFirstPetSaved?(pet)
     }
 
     private func recoverInterruptedOnboardingIfNeeded() {
         guard !isReplay, !hasOnboarded else { return }
-        if !currentActiveHumanId.isEmpty {
-            OnboardingHomeJoinHandoffGate.markCompleted()
-            finishOnboarding(playsFeedback: false)
-            return
-        }
-        guard let recoveredHumanID = appServices.onboardingJourney.interruptedOnboardingPrimaryHumanID(
+        guard appServices.onboardingJourney.interruptedOnboardingFirstPetID(
             context: modelContext
-        ) else {
+        ) != nil else {
             return
         }
-        persistActiveHumanId(recoveredHumanID)
         OnboardingHomeJoinHandoffGate.markCompleted()
         finishOnboarding(playsFeedback: false)
-    }
-
-    private func persistActiveHumanId(_ id: String) {
-        currentActiveHumanId = id
     }
 
     private func finishOnboarding(playsFeedback: Bool = true) {
@@ -1215,6 +1207,8 @@ private struct OnboardingNotificationOffRow: View {
 // MARK: - Preview
 
 #Preview {
-    OnboardingView()
-        .modelContainer(SharedModelContainer.make())
+    if let modelContainer = try? SharedModelContainer.makePreview() {
+        OnboardingView()
+            .modelContainer(modelContainer)
+    }
 }

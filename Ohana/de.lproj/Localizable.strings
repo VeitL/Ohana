@@ -3077,7 +3077,6 @@
 "过去 7 天几乎没有出门活动，请留意是否有关节不适或抑郁倾向。" = "You have been out of the house almost for the past seven days, so be on the lookout for joint discomfort or depression.";
 "\\(med.name) 还差 \\(need - taken) 次" = "\\\\(med.name) is still missing \\\\(need - taken) times";
 "\\(name) 首期保费\\(otherDouble > 0 ? " = "\\\\(name) Initial Premium \\\\(otherDouble > 0 ?";
-"⚠️ SwiftData: 备用磁盘库失败 — \\(error)" = "⚠️ SwiftData: Alternate disk library failed — \\\\(error)";
 "⚠️ 仅剩 \\(pet.remainingFoodDays) 天" = "⚠️ Only \\\\(pet.remainingFoodDays) days left";
 "❌ [batchAward] save 失败: \\(error)" = "❌ [batchAward] save failed: \\\\(error)";
 "已通知 \\(targetHuman.name) 快去完成任务！🐾" = "\\\\(targetHuman.name) has been notified to complete the task! 🐾";
@@ -3174,7 +3173,6 @@
 "\\(pet.name) 疫苗记录 +\\(got.petGot + got.humanGot)🥥" = "\\\\(pet.name) vaccine record +\\\\(got.petGot + got.humanGot)🥥";
 "\\(pet.name) 驱虫记录 +\\(got.petGot + got.humanGot)🥥" = "\\\\(pet.name) deworming record +\\\\(got.petGot + got.humanGot)🥥";
 "噗噗 · \\(p.pottyType.emoji)\\(p.pottyType.rawValue)" = "Häufchen · \\\\(p.pottyType.emoji)\\\\(p.pottyType.rawValue)";
-"备份含全部宠物、家庭成员、日志、健康档案及应用状态。恢复时以 UUID 去重，不会清除现有数据。" = "The backup includes all pets, family members, logs, health files and application status. UUID deduplication is used during recovery and existing data will not be cleared.";
 "将清除该宠物所有日志记录（体重、花费、健康、护理、遛狗、噗噗等），基础信息保留。此操作不可撤销。" = "All log records of the pet (weight, expenses, health, care, dog walking, puff, etc.) will be cleared, and the basic information will be retained. This action cannot be undone.";
 "最多 3 个 · 已选 \\(selectedPersonalityTagIds.count)/3" = "Up to 3 · Selected \\\\(selectedPersonalityTagIds.count)/3";
 "每日总喂食量约 \\(Int(plannedSchedulesDailyTotalGrams))g" = "The total daily feeding amount is approximately \\\\(Int(plannedSchedulesDailyTotalGrams))g";
@@ -3188,7 +3186,6 @@
 "本月铲屎战况 \\(winner.1):\\(loser.1)，\\(loser.0.name) 加油！🧹" = "This month's shit shoveling battle \\\\(winner.1):\\\\(loser.1), \\\\(loser.0.name) Come on! 🧹";
 "离世于 \\(d.formatted(.dateTime.year().month().day()))" = "Died at \\\\(d.formatted(.dateTime.year().month().day()))";
 "保额 \\(insurance.coverageAmount > 0 ? String(format: " = "Insurance amount \\\\(insurance.coverageAmount > 0 ? String(format:";
-"数据库加载失败，当前为临时模式。本次会话的数据不会被保存。请尝试重启 App，如问题持续请联系开发者。" = "The database failed to load and is currently in temporary mode. Data from this session will not be saved. Please try restarting the app. If the problem persists, please contact the developer.";
 "离世日期：\\(d.formatted(.dateTime.year().month().day()))" = "Date of death: \\\\(d.formatted(.dateTime.year().month().day()))";
 "覆盖主题色、字体层级、按钮、组件、图表、动效和交互反馈。用于快速验证宠物场景下的产品视觉与体验一致性。" = "Covers theme colors, font levels, buttons, components, charts, animations and interactive feedback. Used to quickly verify product visual and experience consistency in pet scenarios.";
 "删除「\\(doc.title.isEmpty ? doc.category : doc.title)」？" = "Delete \"\\\\(doc.title.isEmpty ? doc.category : doc.title)\"?";
@@ -3214,7 +3211,6 @@
 "参数：CTA 使用实色填充（如 goLime）；危险操作使用 goRed.opacity(0.12) + 0.3 描边。" = "Parameters: Use solid color fill for CTA (such as goLime); use goRed.opacity(0.12) + 0.3 stroke for dangerous operations.";
 "\\(debtor.name) 需向 \\(top.name) 支付 ¥\\(Int(abs(debtor.balance)))" = "\\\\(debtor.name) needs to pay \\\\(top.name) ¥\\\\(Int(abs(debtor.balance)))";
 "\\(pet.name) \\(type.rawValue)打卡 +\\(got.petGot + got.humanGot)🥥" = "\\\\(pet.name) \\\\(type.rawValue) check in +\\\\(got.petGot + got.humanGot)🥥";
-"⚠️ SwiftData: 已使用备用磁盘库 `ohana_disk_fallback`（主 default 无法打开时）" = "⚠️ SwiftData: Alternate disk library `ohana_disk_fallback` is used (when the main default cannot be opened)";
 "参数：glassEffect(.regular, RoundedRectangle(cornerRadius: 24))。" = "Parameters: glassEffect(.regular, RoundedRectangle(cornerRadius: 24)).";
 "本月你带 \\(petName) 走了 \\(km)km\n\\(petName)\\(dir) \\(String(format: " = "This month you took \\\\(petName) away \\\\(km)km\\n\\\\(petName)\\\\(dir) \\\\(String(format:";
 "本月你带 \\(petName) 走了 \\(km)km，\\(petName)\\(dir) \\(String(format: " = "This month you took \\\\(petName) away \\\\(km)km, \\\\(petName)\\\\(dir) \\\\(String(format:";

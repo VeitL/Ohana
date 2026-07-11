@@ -6,12 +6,20 @@ struct AddPetWizardView: View {
     let onComplete: () -> Void
     var onCancel: (() -> Void)?
     var onPetSaved: ((Pet) -> Void)?
+    var presentationStyle: MemberCreationPresentationStyle = .standard
+    var onHomeJoinHandoffPreflight: (() -> Void)?
+    var onHomeJoinHandoffStarted: (() -> Void)?
+    var onHomeJoinHandoffEnded: (() -> Void)?
 
     var body: some View {
         AddPetWizardContentView(
             onComplete: onComplete,
             onCancel: onCancel,
-            onPetSaved: onPetSaved
+            onPetSaved: onPetSaved,
+            presentationStyle: presentationStyle,
+            onHomeJoinHandoffPreflight: onHomeJoinHandoffPreflight,
+            onHomeJoinHandoffStarted: onHomeJoinHandoffStarted,
+            onHomeJoinHandoffEnded: onHomeJoinHandoffEnded
         )
     }
 

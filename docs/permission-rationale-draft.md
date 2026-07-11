@@ -3,7 +3,7 @@
 Status: Draft for App Store review notes, in-app rationale copy, and
 `Info.plist` usage-description review.
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Current Permission Inventory
 
@@ -17,13 +17,16 @@ Last updated: 2026-07-09
 | Face ID / Biometrics | `NSFaceIDUsageDescription`, `LAContext.evaluatePolicy` | User enables or uses member-gate biometrics | Let the device verify the current user as a shortcut to a local member PIN. Ohana receives only success/failure. |
 | Apple Health / HealthKit | `NSHealthShareUsageDescription`, `HKHealthStore.requestAuthorization` | User taps the Apple Health setup action in Human Workout | Read steps, walking/running distance, active energy, Activity Summary, and workouts for the selected Human's local workout summary/import. |
 | iCloud Drive backup | iCloud ubiquity entitlement and `ICloudDriveAutomaticBackupFileStore` | Automatic backup is enabled or user taps Back Up Now | Save a backup file to the user's own iCloud Drive container. Developer does not receive it. |
-| Remote notifications / CloudKit | `UIBackgroundModes` includes `remote-notification`; CloudKit code exists | Current release: online collaboration gate is false | Reserved for future CloudKit family sync. Keep gated off or update policy/App Store answers before enabling. |
+| Remote notifications / CloudKit | Not declared by the Solo capability profile; dormant CloudKit code remains | Not reachable in the Solo release | Future-only. Adding APNs, `remote-notification`, CloudKit sharing, or remote sync requires an explicit capability change, policy update, and release validation. |
 
 ## Recommended System Purpose Strings
 
-The current `Info.plist` default language is Chinese, with English and German
-overrides in `InfoPlist.strings`. There is no separate
-`zh-Hans.lproj/InfoPlist.strings` at the time of this draft.
+The current `Info.plist` default language is Chinese. English and German have
+reviewed localized `InfoPlist.strings`; Spanish, Portuguese, French, Japanese,
+Korean, and Italian currently carry explicit English fallback files so a
+registered app language never falls through to an unrelated Chinese system
+prompt. There is no separate `zh-Hans.lproj/InfoPlist.strings`; the default
+Chinese strings remain the Simplified Chinese source.
 
 ### Camera
 
@@ -182,11 +185,11 @@ Recommended Settings support text:
 
 Chinese:
 
-> 自动备份会把一份受限的 Ohana 备份文件保存到你的 iCloud Drive。它可包含家庭、宠物、照片、文件、路线和账单数据，但不包含人类健康、HealthKit、体重、运动、用药或健康报告。手动导出同样受此限制，因为它也可能保存到 iCloud 或其他文件服务。不会发送给开发者。你可以关闭自动备份或删除 iCloud Drive 中的备份文件。
+> 自动备份会把一份受限的 Ohana 备份文件保存到你的 iCloud Drive。它可包含家庭、宠物、照片、文件、路线和账单数据，但不包含人类健康、HealthKit、体重、运动、用药、健康报告、自由文本家庭任务或派生经济/账本侧车。手动导出同样受此限制，因为它也可能保存到 iCloud 或其他文件服务。不会发送给开发者。你可以关闭自动备份或删除 iCloud Drive 中的备份文件。
 
 English:
 
-> Automatic backup saves a restricted Ohana backup file to your iCloud Drive. It may include household, pet, photo, document, route, and expense data, but it does not include human health, HealthKit, weight, workout, medication, or health-report data. Manual export uses the same restriction because it can also be saved to iCloud or another file provider. The file is not sent to the developer. You can turn automatic backup off or delete the file from iCloud Drive.
+> Automatic backup saves a restricted Ohana backup file to your iCloud Drive. It may include household, pet, photo, document, route, and expense data, but it excludes human health, HealthKit, weight, workout, medication, health-report data, free-text family tasks, and derived economy/ledger sidecars. Manual export uses the same restriction because it can also be saved to iCloud or another file provider. The file is not sent to the developer. You can turn automatic backup off or delete the file from iCloud Drive.
 
 Review rationale:
 
@@ -200,19 +203,22 @@ Review rationale:
 Suggested short review note for the current release:
 
 > Ohana is local-first and does not send user data to the developer. Camera,
-> photo, location, notification, Face ID, Apple Health read access, and iCloud
+> photo, location, local notification, Face ID, Apple Health read access, and iCloud
 > Drive backup features are user initiated. Apple Health access is read-only and
 > used for the selected Human's local workout summary/import. Location Always is
 > used only during an active walk to continue recording the route in the
 > background. Family CloudKit collaboration code is gated off in the current
-> release by `OnlineFeatureGate.allows(.onlineCollaboration) == false`.
+> release by `OnlineFeatureGate.allows(.onlineCollaboration) == false`. The Solo
+> target does not declare APNs, the `remote-notification` background mode, or a
+> CloudKit service entitlement.
 
 ## Must Not Claim Yet
 
 Do not claim the following until implemented and revalidated:
 
 - Production CloudKit family sync. The code exists, but the current gate is
-  false and real-device CloudKit validation is still deferred.
+  false, the Solo capability profile does not declare the required capabilities,
+  and real-device CloudKit validation is still deferred.
 - Developer-hosted account sync, analytics, support upload, or crash-report data
   collection.
 
@@ -221,6 +227,9 @@ Do not claim the following until implemented and revalidated:
 - `Ohana/Info.plist` purpose strings match this document.
 - `Ohana/en.lproj/InfoPlist.strings` and `Ohana/de.lproj/InfoPlist.strings`
   match the final approved wording.
+- The other registered language directories contain an explicit safe English
+  fallback until reviewed native-language permission copy is approved; do not
+  silently delete those files.
 - If a `zh-Hans.lproj/InfoPlist.strings` file is added later, keep it in sync
   with the default Chinese `Info.plist` wording.
 - `docs/privacy-policy.md` is published at the Settings privacy-policy URL

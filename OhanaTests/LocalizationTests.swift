@@ -249,6 +249,9 @@ struct LocalizationTests {
         #expect(BackupError.passwordMismatch.localizedMessage(l: de) == "Die beiden Backup-Passwörter stimmen nicht überein.")
         #expect(BackupError.unsupportedVersion(72).localizedMessage(l: en).contains("v72"))
         #expect(BackupError.invalidEncryptedBackup.localizedMessage(l: en).contains("encrypted backup"))
+        #expect(BackupError.invalidRestoreData(.identity).localizedMessage(l: zh).contains("未对现有数据进行任何更改"))
+        #expect(BackupError.invalidRestoreData(.relationship).localizedMessage(l: en).contains("broken required relationship"))
+        #expect(BackupError.invalidRestoreData(.pendingChanges).localizedMessage(l: de).contains("Änderungen stehen noch aus"))
     }
 
     @Test func automaticBackupErrorsResolveLocalizedCopy() {

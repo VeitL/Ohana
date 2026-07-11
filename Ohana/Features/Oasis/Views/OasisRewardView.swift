@@ -626,6 +626,8 @@ struct OasisRewardView: View {
 }
 
 #Preview {
-    OasisRewardView()
-        .modelContainer(SharedModelContainer.make())
+    if let modelContainer = try? SharedModelContainer.makePreview() {
+        OasisRewardView()
+            .modelContainer(modelContainer)
+    }
 }
