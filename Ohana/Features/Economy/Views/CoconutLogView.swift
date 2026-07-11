@@ -248,7 +248,7 @@ struct CoconutLogContentView: View {
         }
         if !walletAccounts.isEmpty {
             return walletAccounts.reduce(0) { total, account in
-                guard account.ownerKind != .system,
+                guard account.ownerKind != .system || account.accountKey == CoconutAccountKey.islandReserve,
                       !memberSnapshot.frozenActorIds.contains(account.ownerId) else {
                     return total
                 }

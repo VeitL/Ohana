@@ -219,7 +219,8 @@ nonisolated enum HomeInteractionSnapshotBuilder {
         }
         return HomeInteractionSnapshot(
             activeHuman: activeHuman,
-            islandCoconutBalance: source.humans.reduce(0) { $0 + $1.coconutBalance }
+            islandCoconutBalance: source.islandCoconutReserveBalance
+                + source.humans.reduce(0) { $0 + $1.coconutBalance }
                 + source.pets.reduce(0) { $0 + $1.coconutBalance },
             petsByID: petsByID,
             humansByID: humansByID,
@@ -266,11 +267,12 @@ nonisolated enum HomeInteractionSnapshotBuilder {
             entityID: pet.id,
             kind: .pet
         )
+        let renderContext = HomePetQuickActionRenderContext(petID: pet.id, source: source)
         let states = stateDictionary(for: visibleItems + candidateItems) { item in
             HomeQuickActionRenderStateLogic.petRenderState(
                 item: item,
                 pet: pet,
-                source: source,
+                context: renderContext,
                 localization: l,
                 now: now
             )
@@ -347,6 +349,7 @@ nonisolated enum HomeInteractionSnapshotBuilder {
         makeState: (QuickActionItem) -> HomeQuickActionRenderSnapshot
     ) -> [String: HomeQuickActionRenderSnapshot] {
         items.reduce(into: [:]) { result, item in
+            guard result[item.actionType] == nil else { return }
             result[item.actionType] = makeState(item)
         }
     }

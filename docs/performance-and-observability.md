@@ -57,6 +57,13 @@ These are starting targets, not fake guarantees:
 
 If a budget cannot be met, write the reason and fallback: placeholder, cached snapshot, progressive loading, reduced media quality, or deferred refresh.
 
+Runtime-policy semantics must stay orthogonal: Reduce Motion selects the
+`minimal` motion budget, which stops spatial/repeating motion while preserving
+essential success/error state feedback and interaction. It must not throttle
+data refresh or background maintenance. Low Power Mode, app power saving, scene
+visibility, and thermal state independently constrain work and compose with the
+motion budget.
+
 ## Instrumentation Rule
 
 Critical flows should emit privacy-safe signposts or diagnostics for:

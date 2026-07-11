@@ -251,14 +251,18 @@ enum HumanMedicationCommandService {
         let medication = DomainMemberFactWriter.createHumanMedicationPlan(
             plan: write,
             human: human,
-            name: cleanName,
-            dosage: dosage.trimmingCharacters(in: .whitespacesAndNewlines),
-            frequency: frequency,
-            firstDoseTime: firstDoseTime,
-            startDate: startDate,
-            colorHex: colorHex,
-            notes: notes,
-            isActive: true,
+            values: DomainHumanMedicationPlanValues(
+                name: cleanName,
+                dosage: dosage.trimmingCharacters(in: .whitespacesAndNewlines),
+                frequency: frequency,
+                customFrequencyNote: "",
+                firstDoseTime: firstDoseTime,
+                startDate: startDate,
+                endDate: nil,
+                colorHex: colorHex,
+                notes: notes,
+                isActive: true
+            ),
             context: context
         )
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
@@ -435,6 +439,18 @@ enum PetMedicationPlanCommandService {
 
         let medication: PetMedication
         let created: Bool
+        let values = DomainPetMedicationPlanValues(
+            name: input.cleanName,
+            dosage: input.cleanDosage,
+            frequency: input.frequency,
+            customFrequencyNote: input.savedCustomFrequencyNote,
+            startDate: input.startDate,
+            endDate: input.endDate,
+            colorHex: input.colorHex,
+            notes: input.cleanNotes,
+            isActive: input.isActive,
+            remainingAmount: max(0, input.remainingAmount ?? existingMedication?.remainingAmount ?? 0)
+        )
         if let existing = existingMedication {
             medication = existing
             created = false
@@ -442,32 +458,14 @@ enum PetMedicationPlanCommandService {
                 plan: write,
                 medication: medication,
                 pet: pet,
-                name: input.cleanName,
-                dosage: input.cleanDosage,
-                frequency: input.frequency,
-                customFrequencyNote: input.savedCustomFrequencyNote,
-                startDate: input.startDate,
-                endDate: input.endDate,
-                colorHex: input.colorHex,
-                notes: input.cleanNotes,
-                isActive: input.isActive,
-                remainingAmount: max(0, input.remainingAmount ?? medication.remainingAmount),
+                values: values,
                 context: context
             )
         } else {
             medication = DomainMemberFactWriter.createPetMedicationPlan(
                 plan: write,
                 pet: pet,
-                name: input.cleanName,
-                dosage: input.cleanDosage,
-                frequency: input.frequency,
-                customFrequencyNote: input.savedCustomFrequencyNote,
-                startDate: input.startDate,
-                endDate: input.endDate,
-                colorHex: input.colorHex,
-                notes: input.cleanNotes,
-                isActive: input.isActive,
-                remainingAmount: max(0, input.remainingAmount ?? 0),
+                values: values,
                 context: context
             )
             created = true

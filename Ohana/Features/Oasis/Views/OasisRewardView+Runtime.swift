@@ -50,7 +50,7 @@ extension OasisRewardView {
                         plantsCount: plants.count,
                         electronicPetsCount: electronicPets.count,
                         critterFragmentsCount: critterFragments.count,
-                        activeHumanCoconutBalance: activeHumanCoconutBalance,
+                        availableOasisCoconutBalance: availableOasisCoconutBalance,
                         rulesTrigger: rulesTrigger,
                         inventoryTrigger: inventoryTrigger,
                         injectEnergyTrigger: injectEnergyTrigger,
@@ -437,7 +437,7 @@ extension OasisRewardView {
         bentoSnapshot = commandExecutor.makeBentoSnapshot(
             pets: pets,
             electronicPets: electronicPets,
-            activeCoconutBalance: nextActionSnapshot.activeCoconutBalance,
+            activeCoconutBalance: nextActionSnapshot.injectionCoconutBalance,
             careLedgerEvents: liveData.careLedgerEvents,
             petActivitySummaries: liveData.petActivitySummaries
         )

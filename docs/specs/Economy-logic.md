@@ -1,7 +1,7 @@
 # Economy 规则书
 
 确认日期：2026-06-12  
-最近更新：2026-06-14
+最近更新：2026-07-11
 适用范围：Phase 6 Economy 模块；覆盖椰子钱包、正式岛屿总资产、奖励预算 / 冷却、商店消费、宠物成长椰子、成就奖励、财富页与椰子历史。
 
 本规则书覆盖宪法 D2/D3/D7/D8/D12/D13/D14/G2/G4/G5/G8 在 Economy 模块中的首发语义，并保留 GAP-4 总账恒等、GAP-5 触顶感知、GAP-7 补记结算的已验证规则。
@@ -9,6 +9,7 @@
 ## 已确认产品决定
 
 - `system:legacy` 只作迁移兼容账户，不计入正式“岛屿总资产”，不出现在排行榜中。
+- `system:island` 是正式岛屿储备账户，只承接明确不属于任何成员的系统赠礼；它计入正式岛屿总资产但不进入成员排行榜。
 - 当账户余额与账本事实重放结果不一致时，以账本为准，自动修正账户余额与 `QuestManager.coconutCount` 投影。
 - 排行榜只显示正式成员钱包（人类成员 / 宠物）余额与贡献，不显示系统账户。
 - `legacyHistory` 只用于历史展示，不影响余额；旧余额由 `openingBalance` 承接。
@@ -16,7 +17,7 @@
 - 补记历史照护记录照常进入照护事实历史日期；但椰子奖励的预算、冷却与钱包流水按用户执行补记的操作日结算。
 - 首发版本隐藏“家庭线下兑现 / cash exchange”所有用户可达入口；`CoconutExchangeRequest` model、服务、备份兼容代码保留给 1.x 合资 / 转账事实，不作为首发用户经济面。
 - 隐私锁住的人类钱包仍计入正式“岛屿总资产”；财富页与椰子历史隐藏该成员的个人行、流水与明细，但总资产数字继续满足 D3/G2。
-- 特殊奖励必须归属到正式成员钱包：优先使用明确 actor；没有 actor 时归到当前 active human；若没有可用当前主人则不写钱包奖励，只保留业务事实。首发新奖励不得落入 `system` / `system:legacy`。
+- 有成员归属的特殊奖励必须进入正式成员钱包：优先使用明确 actor；没有 actor 时归到当前 active human；若没有可用当前主人则不写成员奖励，只保留业务事实。只有产品规则明确声明为岛屿级、无成员归属的系统赠礼（当前仅 D17 一次性启动赠礼）才可进入 `system:island`；任何新奖励不得落入 `system:legacy`。
 - 旧兼容钱包 API 也必须遵守相同归属规则：能解析到可写人类 / 宠物时才写钱包；无 actor 时只能归到当前 active human；解析不到可写正式成员时 no-op，不得创建或补写 `system` 正式余额流水。
 - 照护、花费、喂药、遛狗、时刻等可重复用户动作奖励必须先按明确执行人 `executorId` 归属；只有没有明确执行人时，才允许回退到当前 active human。
 - 体重、宠物花费、宠物健康、补签结算等由命令层已知执行人的奖励入口必须把 `executorId` 传进统一奖励管线；手动宠物里程碑没有独立 executor picker，奖励与照护账本 actor 均归属当前 active human；seed / 系统里程碑不产生人类 actor。
@@ -30,20 +31,20 @@
 
 ## 业务不变量
 
-- ECO-001：正式岛屿总资产在任何时候都等于所有正式成员钱包余额之和。正式成员钱包只包括 `ownerKind == human` 与 `ownerKind == pet` 的 `CoconutAccount`，不包括 `ownerKind == system` / `system:legacy`。
-- ECO-002：每个正式成员钱包余额必须能由该账户下 `affectsBalance == true` 的 `CoconutLedgerEntry.delta` 重放得到。
+- ECO-001：正式岛屿总资产在任何时候都等于 `system:island` 岛屿储备加所有活跃正式成员钱包余额之和。正式成员钱包包括 `ownerKind == human` 与 `ownerKind == pet`；`system:legacy` 永远排除。
+- ECO-002：每个正式成员钱包与 `system:island` 岛屿储备余额必须能由该账户下 `affectsBalance == true` 的 `CoconutLedgerEntry.delta` 重放得到。
 - ECO-003：`QuestManager.coconutCount` 是 UI 投影缓存，不是经济事实源；刷新投影时必须使用 ECO-001 的正式岛屿总资产。
 - ECO-004：启动后的钱包 bootstrap / 对账必须在首帧后执行，不阻塞启动首帧；发现账户余额与账本重放不一致时，自动以账本重放结果修正账户余额、成员缓存余额与投影。
 - ECO-005：`legacyHistory` 流水永不影响余额，它只作为历史展示资料存在；迁移期的旧余额由 `openingBalance` 事实承接。
-- ECO-006：排行榜与财富页正式资产展示不得显示 `system:legacy`，也不得把系统兼容余额伪装成成员贡献。
+- ECO-006：排行榜不得显示任何系统账户；财富页正式总资产必须计入 `system:island`、排除 `system:legacy`，且不得把岛屿储备或系统兼容余额伪装成成员贡献。
 - ECO-007：开发 / 设置余额测试工具属于非正式测试工具。它不得作为首发用户经济语义的依据；正式发布前该入口必须不可达，由 release hardening / 开发者工具隐藏检查覆盖。
 - ECO-008：当每日椰子预算进入 `recordOnly` 触顶状态时，照护记录必须照常完成；奖励反馈位置显示温和文案“今日椰子已装满，明天继续～”的九语言版本，不展示剩余额度、预算数字或说教式解释。
 - ECO-009：补记历史照护记录时，`PetCareLog` / `CareLedgerEvent` 的照护事实时间必须保持用户选择的历史日期；不得为了经济防刷改写事实时间。
 - ECO-010：补记历史照护记录获得的椰子奖励必须按操作日进入 `EconomyBudgetUsageEvent` 与冷却判断。历史日期已经触顶不得阻止今天的诚实补记获得今天预算内的奖励；今天已经触顶或处于冷却时，历史补记只记录事实，不额外产出椰子。
 - ECO-011：补记产生的钱包奖励流水应按操作日显示在椰子历史中；照护历史仍按照护事实日期显示。两条时间轴不得互相污染。
 - ECO-012：首发版 `CoconutExchangeFeatureGate` 恒为关闭；Shop 分类、兑换表单、Today Focus 兑换卡、Home 待读模型中的待确认兑换入口均不可达。直接调用 UI 命令或 `CoconutExchangeService` 创建 / 确认 / 取消也必须 no-op / 抛 feature-disabled，不产生兑换请求或钱包写入。
-- ECO-013：财富页活跃总资产 = 所有未冻结正式成员钱包余额之和，包含隐私锁住的人类成员；排行榜、筛选器、流水列表和个人余额不得泄漏隐私锁住成员的明细，也不得把离世成员当作活跃财富 owner 展示。
-- ECO-014：特殊奖励与旧兼容钱包 API 不得创建新的 `system` 正式影响余额流水。`system:legacy` 仅可由迁移兼容和明确非余额历史承接使用。
+- ECO-013：财富页活跃总资产 = `system:island` + 所有未冻结正式成员钱包余额之和，包含隐私锁住的人类成员；排行榜、筛选器、流水列表和个人余额不得泄漏隐私锁住成员的明细，也不得把离世成员或岛屿储备当作成员贡献展示。
+- ECO-014：特殊奖励与旧兼容钱包 API 不得任意创建新的系统余额流水。`system:legacy` 仅可由迁移兼容和明确非余额历史承接使用；`system:island` 仅可承接规则书明确批准的岛屿级系统赠礼及其支出/迁移事实。
 - ECO-015：`Human.hasPassedAway` / `Pet.hasPassedAway` 的成员钱包为冻结状态；成就领奖、宠物金库消费、特殊奖励、商店消费、兑换创建 / 确认 / 取消等 Economy 命令不得写入冻结钱包。用户可见删除不再产生可恢复冻结钱包态；被删除成员从 active 经济集合物理移除，必要的 CloudSync sync tombstone 不参与钱包展示或写入。
 - ECO-016：宠物成长椰子只能用于该宠物自己的成长 / 外观 / 纪念历史。宠物离世时金库展示历史和预览，但购买 / 投喂按钮必须不可执行；宠物被删除后不再有用户可达金库恢复路径。
 - ECO-017：财富页 screen model 只吃不可变快照值。图表、榜单、总资产、筛选和颜色计算不得在 SwiftUI body 中直接依赖 SwiftData 模型对象。
@@ -61,6 +62,7 @@
 - ECO-025（历史 farm-risk）：花费记录可产出椰子奖励曾被登记为"记假账→刷椰子"风险；TFU-20260613-010 已归档为 Done。当前规则是：Expense 属于家族 2 非照护奖励，必须经共享奖励原语、明确 executor、预算/冷却和钱包写入纪律；若未来改变花费发奖/限额/凭证策略，重新开新的 active TFU，不复用已归档编号。
 - ECO-026（冻结成员照护行为，2026-06-14 产品主人拍板二态模型，实现 G4.1）：① active 照护对象正常写事实，所有 reward / ledger / reminder / stock / Oasis / revision 派生必须统一经照护派生执行器裁决；② 离世成员（`hasPassedAway`）作为照护对象时完全只读，任何照护写入、编辑、历史补记和派生都必须 no-op；③ 用户可见回收站 / 可恢复删除 / 删除中转态取消，旧软删字段仅允许作为 legacy store compatibility 存在，不再作为照护写入或钱包写入边界；④ 非空显式 executor id 若不可解析、已被物理删除或不可写（含离世），**不得丢失 active 照护对象的事实**：事实仍写入，奖励归属走明确 fallback（可写 active human；没有可用 owner 则 fact-only 无奖励），且不得把奖励伪装成原 executor；⑤ 共享照护 target 解析必须只接受 active target，离世 target 被过滤或整体 no-op，不允许半笔账。
 - ECO-027（补记奖励按操作日，强化 ECO-010 至所有完成入口）：Calendar / 通知 / Today Focus / QuickCare 补完成历史 occurrence 时，active 照护对象的照护事实保留历史日期，但奖励的预算/冷却结算必须按**操作当日 dayKey**，不得写入历史 dayKey 绕过今日预算触顶。离世照护对象不补写历史事实。所有"完成照护任务"的入口一致适用。
+- ECO-028（岛屿启动赠礼与 Oasis 注入）：D17 的一次性 50 椰子由系统发放到 `system:island`，不得绑定 Human/Pet。旧 v2 赠礼若已落入成员钱包，以一次性成对转账事实把当前仍可用的赠礼余额重分类到岛屿储备，并写幂等 marker；不得改写或删除旧流水。生命树注入可使用全部正式岛屿资产，固定按岛屿储备优先、当前 active Human 次优先、其余活跃成员稳定顺序出资；所有出资、注入 ledger 与能量事实必须同一事务提交，任何余额不足或保存失败都整体不生效。
 
 ## 当前代码来源
 
@@ -71,6 +73,7 @@
 - 启动路径在首帧后调度钱包 bootstrap：`Ohana/App/ContentView.swift:250`。
 - 迁移导入会创建 `system:legacy` 兼容账户承接旧全岛总数差额：`Ohana/Domain/Economy/CoconutWalletService.swift:842`。
 - `legacyHistory` 迁移流水以 `affectsBalance == false` 写入：`Ohana/Domain/Economy/CoconutWalletService.swift:888`。
+- D17 启动赠礼与旧赠礼归属迁移由 `StarterGiftService` 写入 `system:island`；Oasis 注入的全岛资金计划与原子扣款由 `OasisCritterEconomyService.spendAvailableCoconuts` 执行。
 - 每日预算裁决与 `recordOnly` 反馈文案定义在 `CoconutEconomyPolicyV2`：`Ohana/Features/Economy/CoconutEconomyPolicyV2.swift:55`、`Ohana/Features/Economy/CoconutEconomyPolicyV2.swift:120`。
 - 奖励反馈 UI 通过 `CoconutRewardFeedbackOverlay` 展示事件标题：`Ohana/Features/TodayFocus/Views/CheckInRewardFeedback.swift:89`。
 - 普通照护记录先用用户选择的 `date` 写照护事实，再调用经济奖励入口；奖励入口默认以当前操作时间做预算 / 冷却裁决：`Ohana/Domain/Services/CareEventService.swift:82`、`Ohana/Domain/Services/CareEventRecording.swift:567`、`Ohana/Features/Economy/QuestManager+Awards.swift:17`。

@@ -157,14 +157,16 @@ enum HumanHealthReportCommandService {
         let report = DomainMemberFactWriter.createHumanHealthReport(
             plan: write,
             human: human,
-            reportType: input.reportType,
-            conclusion: input.conclusion,
-            hospitalName: input.hospitalName.trimmingCharacters(in: .whitespacesAndNewlines),
-            doctorName: input.doctorName.trimmingCharacters(in: .whitespacesAndNewlines),
-            reportDate: input.reportDate,
-            nextCheckDate: input.nextCheckDate,
-            summary: input.summary.trimmingCharacters(in: .whitespacesAndNewlines),
-            notes: input.notes.trimmingCharacters(in: .whitespacesAndNewlines),
+            values: DomainHumanHealthReportValues(
+                reportType: input.reportType,
+                conclusion: input.conclusion,
+                hospitalName: input.hospitalName.trimmingCharacters(in: .whitespacesAndNewlines),
+                doctorName: input.doctorName.trimmingCharacters(in: .whitespacesAndNewlines),
+                reportDate: input.reportDate,
+                nextCheckDate: input.nextCheckDate,
+                summary: input.summary.trimmingCharacters(in: .whitespacesAndNewlines),
+                notes: input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            ),
             context: context
         )
         let saveResult = context.safeSaveResult(publishFailureEvent: true)

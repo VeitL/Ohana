@@ -164,35 +164,7 @@ enum InsurancePolicyCommandService {
                 didChange: false
             )
         }
-        if let insurance {
-            DomainMemberFactWriter.updatePetInsurancePolicy(
-                plan: write,
-                insurance: insurance,
-                companyName: input.companyName,
-                policyNumber: input.policyNumber,
-                productName: input.productName,
-                annualPremium: input.annualPremium,
-                coverageAmount: input.coverageAmount,
-                startDate: input.startDate,
-                renewalDate: input.renewalDate,
-                notes: input.notes,
-                paymentFrequency: input.paymentFrequency,
-                paymentDayOfMonth: input.paymentDayOfMonth,
-                showInCalendar: input.showInCalendar,
-                otherFeeAmount: input.otherFeeAmount,
-                otherFeeNote: input.otherFeeNote,
-                context: context
-            )
-            try saveInsuranceChanges(context: context)
-            return InsurancePolicyCommandResult(
-                policyID: insurance.id,
-                petID: pet.id,
-                didChange: true
-            )
-        }
-
-        let insurance = DomainMemberFactWriter.createPetInsurancePolicy(
-            plan: write,
+        let policyValues = DomainPetInsurancePolicyValues(
             companyName: input.companyName,
             policyNumber: input.policyNumber,
             productName: input.productName,
@@ -205,14 +177,40 @@ enum InsurancePolicyCommandService {
             paymentDayOfMonth: input.paymentDayOfMonth,
             showInCalendar: input.showInCalendar,
             otherFeeAmount: input.otherFeeAmount,
-            otherFeeNote: input.otherFeeNote,
+            otherFeeNote: input.otherFeeNote
+        )
+        if let insurance {
+            DomainMemberFactWriter.updatePetInsurancePolicy(
+                plan: write,
+                insurance: insurance,
+                values: policyValues,
+                context: context
+            )
+            try saveInsuranceChanges(context: context)
+            return InsurancePolicyCommandResult(
+                policyID: insurance.id,
+                petID: pet.id,
+                didChange: true
+            )
+        }
+
+        let insurance = DomainMemberFactWriter.createPetInsurancePolicy(
+            plan: write,
+            values: policyValues,
             pet: pet,
             context: context
         )
 
-        let schedule = input.autoGeneratesPayments && input.annualPremium > 0
-            ? generatePaymentSchedule(for: insurance, pet: pet, executorId: input.executorId, context: context)
-            : (expenseIDs: [], events: [])
+        let schedule: (expenseIDs: [UUID], events: [Event]) = if input.autoGeneratesPayments, input.annualPremium > 0 {
+            try generatePaymentSchedule(
+                for: insurance,
+                pet: pet,
+                executorId: input.executorId,
+                context: context
+            )
+        } else {
+            (expenseIDs: [], events: [])
+        }
         try saveInsuranceChanges(context: context)
         return InsurancePolicyCommandResult(
             policyID: insurance.id,
@@ -312,20 +310,22 @@ enum InsurancePolicyCommandService {
         let approvedAt = input.status == .approved ? (input.approvedAt ?? input.claimDate) : nil
         let claim = DomainMemberFactWriter.createInsuranceClaim(
             plan: write,
-            claimDate: input.claimDate,
-            incidentDate: input.incidentDate,
-            totalExpense: input.totalExpense,
-            claimedAmount: input.claimedAmount,
-            approvedAmount: approvedAmount,
-            status: input.status,
-            note: input.note,
-            relatedExpenseLogId: input.relatedExpenseLogId,
-            approvedAt: approvedAt,
+            values: DomainInsuranceClaimValues(
+                claimDate: input.claimDate,
+                incidentDate: input.incidentDate,
+                totalExpense: input.totalExpense,
+                claimedAmount: input.claimedAmount,
+                approvedAmount: approvedAmount,
+                status: input.status,
+                note: input.note,
+                relatedExpenseLogID: input.relatedExpenseLogId,
+                approvedAt: approvedAt
+            ),
             insurance: insurance,
             context: context
         )
 
-        let expenseID = makeReimbursementExpenseIfNeeded(
+        let expenseID = try makeReimbursementExpenseIfNeeded(
             insurance: insurance,
             pet: pet,
             amount: approvedAmount,
@@ -381,7 +381,7 @@ enum InsurancePolicyCommandService {
         if status == .approved, claim.approvedAmount == 0 {
             nextApprovedAmount = claim.claimedAmount
             nextApprovedAt = approvedAt
-            expenseID = makeReimbursementExpenseIfNeeded(
+            expenseID = try makeReimbursementExpenseIfNeeded(
                 insurance: insurance,
                 pet: pet,
                 amount: nextApprovedAmount,
@@ -466,8 +466,9 @@ enum InsurancePolicyCommandService {
         approvedDate: Date,
         executorId: String?,
         context: ModelContext
-    ) -> UUID? {
-        guard amount > 0 else { return nil }
+    ) throws -> UUID? {
+        guard amount != 0 else { return nil }
+        _ = try ExpenseAmountPolicy.storedInsuranceReimbursementAmount(from: amount)
         let productName = insurance.productName.isEmpty ? insurance.companyName : insurance.productName
         let note = InsuranceReimbursementExpenseWriter.reimbursementNote(productName: productName)
         guard InsuranceReimbursementExpenseWriter.shouldInsertReimbursementLog(
@@ -477,16 +478,14 @@ enum InsurancePolicyCommandService {
             note: note
         ) else { return nil }
 
-        let result = ExpenseCommandService.recordPetExpense(
+        let result = try ExpenseCommandService.recordInsuranceReimbursement(
             pet: pet,
-            amount: -amount,
+            amount: amount,
             date: approvedDate,
-            category: .insurancePremium,
             note: note,
             context: context,
             executorId: executorId,
-            source: .detail,
-            awardsReward: false
+            source: .detail
         )
         return result.logID
     }
@@ -498,7 +497,7 @@ enum InsurancePolicyCommandService {
         pet: Pet,
         executorId: String?,
         context: ModelContext
-    ) -> (expenseIDs: [UUID], events: [Event]) {
+    ) throws -> (expenseIDs: [UUID], events: [Event]) {
         let dates = InsurancePaymentSchedule.dates(for: insurance, calendar: .current)
         let name = insurance.productName.isEmpty ? insurance.companyName : insurance.productName
         let perPeriodBase = insurance.paymentFrequency.periodAmount(fromAnnual: insurance.annualPremium)
@@ -511,7 +510,7 @@ enum InsurancePolicyCommandService {
             let expNote = index == 0
                 ? "\(name) 首期保费\(insurance.otherFeeAmount > 0 ? "（含\(otherNote)）" : "")"
                 : "\(name) 保费\(insurance.otherFeeAmount > 0 ? "（含\(otherNote)）" : "")"
-            let expense = ExpenseCommandService.recordPetExpense(
+            let expense = try ExpenseCommandService.recordPetExpense(
                 pet: pet,
                 amount: perPeriod,
                 date: payDate,

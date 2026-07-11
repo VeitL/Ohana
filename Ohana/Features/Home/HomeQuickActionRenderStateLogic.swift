@@ -7,11 +7,35 @@
 
 import Foundation
 
+nonisolated struct HomePetQuickActionRenderContext {
+    let events: [Event]
+    let feedingEntries: [HomeFeedQuickActionEntry]
+    let careEntries: [HomeCareQuickActionEntry]
+    let hygieneEntries: [HomeHygieneQuickActionEntry]
+    let walkEntries: [HomeWalkQuickActionEntry]
+    let pottyEntries: [HomePottyQuickActionEntry]
+    let expenseEntries: [HomePetExpenseQuickActionEntry]
+    let weightEntries: [HomePetWeightQuickActionEntry]
+    let momentEntries: [HomePetMomentQuickActionEntry]
+
+    init(petID: UUID, source: VerticalSolidHomeSourceState) {
+        events = source.events
+        feedingEntries = source.feedingLedgerEntries.filter { $0.petId == petID }
+        careEntries = source.careLedgerEntries.filter { $0.petId == petID }
+        hygieneEntries = source.hygieneLedgerEntries.filter { $0.petId == petID }
+        walkEntries = source.walkLedgerEntries.filter { $0.petId == petID }
+        pottyEntries = source.pottyLedgerEntries.filter { $0.petId == petID }
+        expenseEntries = source.petExpenseLedgerEntries.filter { $0.petId == petID }
+        weightEntries = source.petWeightLedgerEntries.filter { $0.petId == petID }
+        momentEntries = source.petMomentEntries.filter { $0.petId == petID }
+    }
+}
+
 nonisolated enum HomeQuickActionRenderStateLogic {
     static func petRenderState(
         item: QuickActionItem,
         pet: Pet,
-        source: VerticalSolidHomeSourceState,
+        context: HomePetQuickActionRenderContext,
         localization l: L10n,
         now: Date
     ) -> HomeQuickActionRenderSnapshot {
@@ -19,8 +43,8 @@ nonisolated enum HomeQuickActionRenderStateLogic {
         let basePolicy = ExpandedQuickActionLogic.petMenuPolicy(
             for: item,
             pet: pet,
-            allEvents: source.events,
-            feedingLedgerEntries: source.feedingLedgerEntries,
+            allEvents: context.events,
+            feedingLedgerEntries: context.feedingEntries,
             now: now
         )
         let menuPolicy = optionsArePresent
@@ -30,39 +54,39 @@ nonisolated enum HomeQuickActionRenderStateLogic {
             status: ExpandedQuickActionLogic.countText(
                 item: item,
                 pet: pet,
-                allEvents: source.events,
-                feedingLedgerEntries: source.feedingLedgerEntries,
-                careLedgerEntries: source.careLedgerEntries,
-                hygieneLedgerEntries: source.hygieneLedgerEntries,
-                walkLedgerEntries: source.walkLedgerEntries,
-                pottyLedgerEntries: source.pottyLedgerEntries,
-                petExpenseLedgerEntries: source.petExpenseLedgerEntries,
-                petWeightLedgerEntries: source.petWeightLedgerEntries,
-                petMomentEntries: source.petMomentEntries,
+                allEvents: context.events,
+                feedingLedgerEntries: context.feedingEntries,
+                careLedgerEntries: context.careEntries,
+                hygieneLedgerEntries: context.hygieneEntries,
+                walkLedgerEntries: context.walkEntries,
+                pottyLedgerEntries: context.pottyEntries,
+                petExpenseLedgerEntries: context.expenseEntries,
+                petWeightLedgerEntries: context.weightEntries,
+                petMomentEntries: context.momentEntries,
                 now: now,
                 l: l
             ),
             isCompleted: ExpandedQuickActionLogic.isCompleted(
                 item: item,
                 pet: pet,
-                allEvents: source.events,
-                feedingLedgerEntries: source.feedingLedgerEntries,
-                careLedgerEntries: source.careLedgerEntries,
-                hygieneLedgerEntries: source.hygieneLedgerEntries,
-                walkLedgerEntries: source.walkLedgerEntries,
-                pottyLedgerEntries: source.pottyLedgerEntries,
-                petWeightLedgerEntries: source.petWeightLedgerEntries,
+                allEvents: context.events,
+                feedingLedgerEntries: context.feedingEntries,
+                careLedgerEntries: context.careEntries,
+                hygieneLedgerEntries: context.hygieneEntries,
+                walkLedgerEntries: context.walkEntries,
+                pottyLedgerEntries: context.pottyEntries,
+                petWeightLedgerEntries: context.weightEntries,
                 now: now
             ),
             attentionLevel: ExpandedQuickActionLogic.attentionLevel(
                 item: item,
                 pet: pet,
-                allEvents: source.events,
-                feedingLedgerEntries: source.feedingLedgerEntries,
-                careLedgerEntries: source.careLedgerEntries,
-                hygieneLedgerEntries: source.hygieneLedgerEntries,
-                walkLedgerEntries: source.walkLedgerEntries,
-                pottyLedgerEntries: source.pottyLedgerEntries,
+                allEvents: context.events,
+                feedingLedgerEntries: context.feedingEntries,
+                careLedgerEntries: context.careEntries,
+                hygieneLedgerEntries: context.hygieneEntries,
+                walkLedgerEntries: context.walkEntries,
+                pottyLedgerEntries: context.pottyEntries,
                 now: now
             ),
             isLocked: false,

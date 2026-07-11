@@ -16,7 +16,7 @@ struct OasisRewardRuntimeModifier: ViewModifier {
     let plantsCount: Int
     let electronicPetsCount: Int
     let critterFragmentsCount: Int
-    let activeHumanCoconutBalance: Int
+    let availableOasisCoconutBalance: Int
     let rulesTrigger: Bool
     let inventoryTrigger: Bool
     let injectEnergyTrigger: Int
@@ -87,7 +87,7 @@ struct OasisRewardRuntimeModifier: ViewModifier {
             plantsCount: plantsCount,
             electronicPetsCount: electronicPetsCount,
             critterFragmentsCount: critterFragmentsCount,
-            activeHumanCoconutBalance: activeHumanCoconutBalance,
+            availableOasisCoconutBalance: availableOasisCoconutBalance,
             onRefreshOasisEnergy: onRefreshOasisEnergy,
             onRefreshFeaturedCritterLifecycle: onRefreshFeaturedCritterLifecycle,
             onRefreshRenderSnapshots: onRefreshRenderSnapshots
@@ -170,7 +170,7 @@ private struct OasisRewardDataRefreshModifier: ViewModifier {
     let plantsCount: Int
     let electronicPetsCount: Int
     let critterFragmentsCount: Int
-    let activeHumanCoconutBalance: Int
+    let availableOasisCoconutBalance: Int
     let onRefreshOasisEnergy: () -> Void
     let onRefreshFeaturedCritterLifecycle: () -> Void
     let onRefreshRenderSnapshots: () -> Void
@@ -182,7 +182,7 @@ private struct OasisRewardDataRefreshModifier: ViewModifier {
             .onChange(of: plantsCount) { _, _ in onRefreshOasisEnergy() }
             .onChange(of: electronicPetsCount) { _, _ in onRefreshFeaturedCritterLifecycle() }
             .onChange(of: critterFragmentsCount) { _, _ in onRefreshRenderSnapshots() }
-            .onChange(of: activeHumanCoconutBalance) { _, _ in onRefreshRenderSnapshots() }
+            .onChange(of: availableOasisCoconutBalance) { _, _ in onRefreshRenderSnapshots() }
     }
 }
 
@@ -522,15 +522,8 @@ struct OasisRewardView: View {
         humans.first { $0.id.uuidString == currentActiveHumanId && !$0.hasPassedAway }
     }
 
-    var activeHumanCoconutBalance: Int {
-        if let coconutBalanceVisualOverride {
-            return coconutBalanceVisualOverride
-        }
-        guard let activeHuman else { return 0 }
-        if actionSnapshot.activeCoconutBalance > 0 || actionSnapshot.canInjectCoconuts != nil {
-            return actionSnapshot.activeCoconutBalance
-        }
-        return activeHuman.coconutBalance
+    var availableOasisCoconutBalance: Int {
+        coconutBalanceVisualOverride ?? actionSnapshot.injectionCoconutBalance
     }
 
     var canInjectTreeEnergy: Bool {
@@ -544,7 +537,7 @@ struct OasisRewardView: View {
 
     var hasEnoughCoconutsForTreeInjection: Bool {
         actionSnapshot.canInjectCoconuts ??
-            (activeHumanCoconutBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost)
+            (availableOasisCoconutBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost)
     }
 
     var treeInjectionUnavailableReason: String? {

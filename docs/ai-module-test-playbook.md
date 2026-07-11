@@ -136,14 +136,18 @@ scripts/module-exit-gate.sh
 scripts/module-exit-gate.sh --test OhanaTests/<RelevantTests>
 scripts/module-exit-gate.sh --unit
 scripts/module-exit-gate.sh --full
+scripts/release-hardening-check.sh --static-only
+scripts/release-hardening-check.sh --with-ui
 ```
 
 `scripts/module-exit-gate.sh` without arguments is the low-risk changed/static
-lane and does not start Xcode. `--test` may be repeated for targeted
+lane and does not start Xcode or rewrite source. Formatting changes require an
+explicit `scripts/dev-check-changed.sh --fix-format <files...>`. `--test` may be repeated for targeted
 Unit/Integration selectors and, only when the changed user flow needs it, one
-high-value UI selector. `--unit` runs all `OhanaTests`; `--full` adds whole-repo
-audits. Full UI shards run through `scripts/test-ui-nightly.sh` at nightly or RC
-frequency.
+high-value UI selector. `--unit` runs all `OhanaTests`; `--full` delegates to the
+release static baseline and then runs all unit tests. Full UI shards run through
+`scripts/test-ui-nightly.sh` or the explicit release `--with-ui` lane at nightly
+or RC frequency.
 
 Use the UI, accessibility, runtime, privacy, localization, persistence, and
 release audits required by `AGENTS.md`. Local SwiftLint, SwiftFormat, and audit

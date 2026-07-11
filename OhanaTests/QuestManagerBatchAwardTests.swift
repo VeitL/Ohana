@@ -235,15 +235,21 @@ struct QuestManagerBatchAwardTests {
             executorId: executor.id.uuidString,
             date: Date(timeIntervalSince1970: 2002)
         )
-        let play = CareEventService.recordSharedCareFact(
+        let playRequest = SharedCareRecordRequest(
             sourcePet: deceasedPlaySource,
             targets: [activeTarget],
-            type: .play,
+            careType: .play,
             actionKind: .play,
-            context: context,
-            executorId: executor.id.uuidString,
+            executorID: executor.id.uuidString,
             reward: .general(humanReward: 3, petReward: 2, emoji: CareType.play.emoji, title: "Shared play"),
-            date: Date(timeIntervalSince1970: 2003)
+            rewardTitle: nil,
+            quality: .none,
+            date: Date(timeIntervalSince1970: 2003),
+            source: .quickAction
+        )
+        let play = CareEventService.recordSharedCareFact(
+            playRequest,
+            context: context
         )
         let walk = CareEventService.recordSharedWalk(
             sourcePet: deceasedWalkSource,

@@ -199,6 +199,7 @@ struct EconomyBackdateSettlementTests {
         let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
         let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
         let oldBoostDouble = defaults.object(forKey: "shop_boostDoubleActive")
+        let dependencies = makeDependencies().dependencies
         defer {
             restoreDefaults(
                 activeHumanID: oldActiveHumanID,
@@ -228,7 +229,8 @@ struct EconomyBackdateSettlementTests {
             pets: [pet],
             context: context,
             executorId: human.id.uuidString,
-            now: operationDate
+            now: operationDate,
+            options: CalendarEventCompletionOptions(economy: dependencies.economy)
         )
 
         let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)

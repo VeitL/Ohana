@@ -29,6 +29,18 @@ enum HumanMedicationPlanCommandService {
 
         let medication: HumanMedication
         let created: Bool
+        let values = DomainHumanMedicationPlanValues(
+            name: input.cleanName,
+            dosage: input.cleanDosage,
+            frequency: input.frequency,
+            customFrequencyNote: input.cleanCustomFrequencyNote,
+            firstDoseTime: input.firstDoseTime(),
+            startDate: input.startDate,
+            endDate: input.endDate,
+            colorHex: input.colorHex,
+            notes: input.savedNotes,
+            isActive: input.isActive
+        )
         if let existing = existingMedication {
             medication = existing
             created = false
@@ -36,32 +48,14 @@ enum HumanMedicationPlanCommandService {
                 plan: write,
                 medication: medication,
                 human: human,
-                name: input.cleanName,
-                dosage: input.cleanDosage,
-                frequency: input.frequency,
-                customFrequencyNote: input.cleanCustomFrequencyNote,
-                firstDoseTime: input.firstDoseTime(),
-                startDate: input.startDate,
-                endDate: input.endDate,
-                colorHex: input.colorHex,
-                notes: input.savedNotes,
-                isActive: input.isActive,
+                values: values,
                 context: context
             )
         } else {
             medication = DomainMemberFactWriter.createHumanMedicationPlan(
                 plan: write,
                 human: human,
-                name: input.cleanName,
-                dosage: input.cleanDosage,
-                frequency: input.frequency,
-                customFrequencyNote: input.cleanCustomFrequencyNote,
-                firstDoseTime: input.firstDoseTime(),
-                startDate: input.startDate,
-                endDate: input.endDate,
-                colorHex: input.colorHex,
-                notes: input.savedNotes,
-                isActive: input.isActive,
+                values: values,
                 context: context
             )
             created = true

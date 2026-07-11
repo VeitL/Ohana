@@ -4,16 +4,17 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/dev-check-changed.sh [--soft] [--dry-run] [--build] [files...]
+  scripts/dev-check-changed.sh [--soft] [--dry-run] [--fix-format] [--build] [files...]
 
 Purpose:
   Run the cheapest useful validation for the current change set. This script is
-  a fast local dispatcher: it formats touched Swift files, runs changed-file
-  audits only where they apply, validates shell/json syntax, and reports when a
-  full app build or test run should be used as an escalation.
+  a read-only local dispatcher by default: it lints touched Swift files, runs
+  changed-file audits only where they apply, validates shell/json syntax, and
+  reports when a full app build or test run should be used as an escalation.
 
 Defaults:
   - Uses changed and untracked files when no file arguments are provided.
+  - Never rewrites source unless --fix-format is explicitly passed.
   - Does not run xcodebuild. Pass --build only when a full build is intentional.
   - Runs audits in strict mode. Pass --soft to print audit warnings without
     failing the command.
@@ -21,6 +22,7 @@ Defaults:
 Examples:
   scripts/dev-check-changed.sh
   scripts/dev-check-changed.sh --soft
+  scripts/dev-check-changed.sh --fix-format Ohana/Features/Home/Views/MyView.swift
   scripts/dev-check-changed.sh Ohana/Features/Home/Views/MyView.swift
   scripts/dev-check-changed.sh --build
 USAGE
@@ -32,6 +34,7 @@ cd "$repo_root"
 soft=0
 dry_run=0
 run_build=0
+fix_format=0
 targets=()
 
 while [[ $# -gt 0 ]]; do
@@ -48,6 +51,10 @@ while [[ $# -gt 0 ]]; do
       run_build=1
       shift
       ;;
+    --fix-format)
+      fix_format=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -58,6 +65,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "$fix_format" == "1" && ${#targets[@]} -eq 0 ]]; then
+  echo "--fix-format requires explicit file or directory targets; refusing to rewrite the whole dirty tree." >&2
+  exit 2
+fi
 
 run() {
   local label="$1"
@@ -117,6 +129,9 @@ shell_files=()
 json_files=()
 status_doc_files=()
 ui_test_shard_files=()
+release_data_safety_reasons=()
+agent_skill_governance_reasons=()
+governance_manifest_reasons=()
 build_reasons=()
 test_reasons=()
 
@@ -156,6 +171,24 @@ for file in "${files[@]}"; do
       ;;
   esac
 
+  case "$file" in
+    Ohana/Models/*|Ohana/Domain/Services/*|Ohana/App/AppResetService.swift|Ohana/App/AppRuntimeAdapters.swift|Ohana/App/AppServices.swift|Ohana/App/StartupMaintenanceCoordinator.swift|Ohana/Shared/Media/*|Ohana/Shared/Utilities/LocalBackupExclusionPolicy.swift|Ohana/Features/HumanNotes/*|Ohana/Features/Members/MemberDeletionCommands.swift|Ohana/Features/Settings/Views/SettingsView+Backup.swift|Ohana/Features/Settings/Views/SettingsView+Chrome.swift|Ohana/Features/Documents/*|Ohana/Features/Expenses/ExpenseReceiptSupport.swift|OhanaTests/*Backup*.swift|OhanaTests/*Restore*.swift|OhanaTests/*Deletion*.swift|OhanaTests/*Privacy*.swift|OhanaTests/*Migration*.swift|OhanaTests/*Recovery*.swift|OhanaTests/*Attachment*.swift|OhanaTests/AppResetServiceTests.swift|OhanaTests/AutomaticBackupServiceTests.swift|OhanaTests/LocalBackupExclusionPolicyTests.swift|OhanaTests/SharedModelContainerRecoveryTests.swift|Ohana/*.lproj/Localizable.strings|docs/governance/manifests/swiftdata-save-failure-baseline.json|scripts/audit-release-data-safety.sh|scripts/audit-swiftdata-save-failures.sh)
+      release_data_safety_reasons+=("$file")
+      ;;
+  esac
+
+  case "$file" in
+    AGENTS.md|.codex/skills/*|scripts/audit-agent-skill-governance.sh)
+      agent_skill_governance_reasons+=("$file")
+      ;;
+  esac
+
+  case "$file" in
+    AGENTS.md|docs/README.md|docs/status-ledger-map.md|docs/*-governance.md|docs/*-policy.md|docs/release-quality-gates.md|docs/governance/manifests/*.json|ui规范.selection.json|Ohana.xcodeproj/project.pbxproj|scripts/audit-governance-manifests.sh)
+      governance_manifest_reasons+=("$file")
+      ;;
+  esac
+
   if [[ "$file" == "scripts/audit-doc-status-ledgers.sh" ]]; then
     status_doc_files+=("$file")
   fi
@@ -171,6 +204,8 @@ echo "dev-check: validating ${#files[@]} changed file(s)."
 if [[ "$dry_run" == "1" ]]; then
   echo "dev-check: dry run; commands will be printed but not executed."
 fi
+
+run "diff whitespace for tracked targets" git diff --check -- "${files[@]}"
 
 if [[ ${#shell_files[@]} -gt 0 ]]; then
   for file in "${shell_files[@]}"; do
@@ -194,10 +229,22 @@ fi
 
 if [[ ${#swift_files[@]} -gt 0 ]]; then
   if command -v swiftformat >/dev/null 2>&1; then
-    run "swiftformat touched Swift files" swiftformat "${swift_files[@]}"
+    if [[ "$fix_format" == "1" ]]; then
+      run "swiftformat fix for explicitly selected Swift files" swiftformat "${swift_files[@]}"
+    else
+      run "swiftformat lint for touched Swift files" swiftformat --lint "${swift_files[@]}"
+    fi
   else
-    echo "dev-check: swiftformat not found; skipping formatting."
+    echo "dev-check: swiftformat not found; skipping format lint."
   fi
+fi
+
+if [[ ${#agent_skill_governance_reasons[@]} -gt 0 ]]; then
+  run "agent skill governance" scripts/audit-agent-skill-governance.sh
+fi
+
+if [[ ${#governance_manifest_reasons[@]} -gt 0 ]]; then
+  run "governance manifests" scripts/audit-governance-manifests.sh
 fi
 
 audit_mode=()
@@ -211,8 +258,12 @@ if [[ ${#ui_swift_files[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#app_swift_files[@]} -gt 0 ]]; then
+  if command -v swiftlint >/dev/null 2>&1; then
+    run "Production complexity ratchet for changed app Swift" scripts/audit-code-complexity.sh --changed
+  else
+    echo "dev-check: swiftlint not found; CI will run the production complexity ratchet."
+  fi
   run "Localization hardcoded UI audit for touched app Swift" scripts/audit-localization-coverage.sh --changed "${app_swift_files[@]}"
-  run "Release data safety audit for touched app Swift" scripts/audit-release-data-safety.sh
   run "Smoothness audit for touched app Swift" scripts/audit-smoothness-risk.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Route first-frame audit for touched app Swift" scripts/audit-route-first-frame.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Runtime guardrails for touched app Swift" scripts/audit-runtime-guardrails.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
@@ -220,6 +271,12 @@ if [[ ${#app_swift_files[@]} -gt 0 ]]; then
   run "Economy boundaries audit for touched app Swift" scripts/audit-economy-boundaries.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Member lifecycle gate audit for touched app Swift" scripts/audit-member-lifecycle-gate.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
   run "Derived-state lifecycle audit for touched app Swift" scripts/audit-derived-state-lifecycle.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
+fi
+if [[ ${#release_data_safety_reasons[@]} -gt 0 ]]; then
+  run "Release data safety contract audit for affected persistence/privacy files" scripts/audit-release-data-safety.sh
+elif [[ ${#app_swift_files[@]} -gt 0 ]]; then
+  run "SwiftData save-failure audit for touched app Swift" \
+    scripts/audit-swiftdata-save-failures.sh --changed "${app_swift_files[@]}"
 fi
 
 if [[ ${#build_reasons[@]} -gt 0 ]]; then

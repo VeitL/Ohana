@@ -61,15 +61,17 @@ extension SettingsView {
             }
             .accessibilityIdentifier("settings-debug-reminder-observability")
 
-            settingsRow(
-                icon: "paintpalette.fill",
-                title: l.tr(zh: "UI 规范展示", en: "UI Specification Showcase"),
-                subtitle: l.tr(zh: "查看 token、组件和页面契约", en: "Review tokens, components, and page contracts"),
-                iconColor: Color.goTeal
-            ) {
-                showingUISpecShowcase = true
-            }
-            .accessibilityIdentifier("settings-debug-ui-spec-showcase")
+            #if DEBUG
+                settingsRow(
+                    icon: "paintpalette.fill",
+                    title: l.tr(zh: "UI 规范展示", en: "UI Specification Showcase"),
+                    subtitle: l.tr(zh: "查看 token、组件和页面契约", en: "Review tokens, components, and page contracts"),
+                    iconColor: Color.goTeal
+                ) {
+                    showingUISpecShowcase = true
+                }
+                .accessibilityIdentifier("settings-debug-ui-spec-showcase")
+            #endif
 
             if SettingsDebugTools.isRunningUITests {
                 settingsRow(

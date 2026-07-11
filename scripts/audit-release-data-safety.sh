@@ -41,6 +41,7 @@ if ! command -v rg >/dev/null 2>&1; then
 fi
 
 data_backup="Ohana/Domain/Services/DataBackupManager.swift"
+data_backup_app_state="Ohana/Domain/Services/DataBackupManager+AppState.swift"
 data_backup_dtos="Ohana/Domain/Services/DataBackupDTOs.swift"
 data_backup_preflight="Ohana/Domain/Services/DataBackupPreflightValidator.swift"
 automatic_backup="Ohana/Domain/Services/AutomaticBackupService.swift"
@@ -50,6 +51,7 @@ app_runtime_adapters="Ohana/App/AppRuntimeAdapters.swift"
 app_services="Ohana/App/AppServices.swift"
 data_backup_files=(
   "Ohana/Domain/Services/DataBackupManager.swift"
+  "Ohana/Domain/Services/DataBackupManager+AppState.swift"
   "Ohana/Domain/Services/DataBackupManager+Encode.swift"
   "Ohana/Domain/Services/DataBackupManager+Decode.swift"
   "Ohana/Domain/Services/DataBackupMediaPackage.swift"
@@ -66,7 +68,6 @@ human_note_attachment_tests="OhanaTests/HumanNoteAttachmentLifecycleTests.swift"
 data_backup_atomic_tests="OhanaTests/DataBackupAtomicRestoreTests.swift"
 settings_backup="Ohana/Features/Settings/Views/SettingsView+Backup.swift"
 settings_chrome="Ohana/Features/Settings/Views/SettingsView+Chrome.swift"
-save_failure_baseline="docs/governance/manifests/swiftdata-save-failure-baseline.json"
 
 failures=()
 
@@ -388,15 +389,15 @@ reject_pattern "$data_backup" 'UserDefaults\(suiteName: .*restore-staging' \
 require_pattern "$data_backup" 'context\.transaction\(block: changes\)' \
   "Restore must use one SwiftData transaction as its live-store commit boundary."
 
-reject_section_pattern "$data_backup" 'private func prepareBackupChanges' 'private func applyAppStateDefaults' \
+reject_section_pattern "$data_backup" 'private func prepareBackupChanges' 'private func insertLegacyShopPurchaseRecords' \
   'safeSave(Result)?|context\.save\(|saveRestoreCheckpoint' \
   "Restore preparation must not save intermediate SwiftData checkpoints."
 
-require_section_pattern "$data_backup" 'private func prepareBackupChanges' 'private func applyAppStateDefaults' \
+require_section_pattern "$data_backup" 'private func prepareBackupChanges' 'private func insertLegacyShopPurchaseRecords' \
   'persistChanges: false' \
   "Restore must keep shared-care legacy cleanup inside the outer transaction."
 
-require_section_pattern "$data_backup" 'private func prepareBackupChanges' 'private func applyAppStateDefaults' \
+require_section_pattern "$data_backup" 'private func prepareBackupChanges' 'private func insertLegacyShopPurchaseRecords' \
   'saveChanges: false' \
   "Restore must keep legacy economy and plant reconciliation inside the outer transaction."
 
@@ -421,7 +422,7 @@ require_pattern "$physical_deletion" 'retireWalletAccounts\(ownerKind:' \
 require_pattern "$data_backup_dtos" 'struct PlantReminderPreferencesBackup' \
   "Plant reminder preferences should be represented in backup app state."
 
-require_pattern "$data_backup" 'applyPlantReminderPreferences' \
+require_pattern "$data_backup_app_state" 'applyPlantReminderPreferences' \
   "DataBackupManager should restore plant reminder preferences."
 
 require_pattern "$data_backup" 'PlantBackupRestoreReconcileService\.rebuildPlantCarePlans' \
@@ -577,129 +578,11 @@ require_pattern "Ohana/Features/Expenses/ExpenseReceiptSupport.swift" 'sanitized
 require_pattern "OhanaTests/PrivacyHardeningTests.swift" 'imageAttachmentSanitizerNormalizesFilenameOnlyAfterJPEGRewrite' \
   "Privacy hardening tests should prove JPEG rewrite filename normalization and decode-failure preservation."
 
-if rg -n --pcre2 '^[[:space:]]*try\?[[:space:]]+(?:modelContext|context)\.save\(\)' Ohana --glob '*.swift' >/tmp/ohana-release-data-safety-silent-save.txt; then
-  failures+=("App code must not silently discard SwiftData save failures with try? context.save(); use safeSave/safeSaveResult or explicit do/catch.")
+save_failure_arguments=(--all)
+if [[ "$update_save_baseline" == "1" ]]; then
+  save_failure_arguments=(--update-baseline)
 fi
-
-if ! python3 - "$save_failure_baseline" "$update_save_baseline" <<'PY'; then
-from __future__ import annotations
-
-import collections
-import datetime as dt
-import json
-import pathlib
-import re
-import sys
-
-ROOT = pathlib.Path.cwd()
-BASELINE = ROOT / sys.argv[1]
-UPDATE_BASELINE = sys.argv[2] == "1"
-ALLOW_MARKER = "save-failure-audit: allow"
-RULE_ID = "swiftdata-ambiguous-safe-save"
-SAFE_SAVE_RE = re.compile(r"\b(?:[A-Za-z0-9_]+Context|context|modelContext)\.(?:safeSave|safeSaveResult)\(\)")
-
-
-def relative(path: pathlib.Path) -> str:
-    return path.relative_to(ROOT).as_posix()
-
-
-def scan_file(path: pathlib.Path) -> list[dict[str, object]]:
-    matches: list[dict[str, object]] = []
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except UnicodeDecodeError:
-        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
-    for line_number, line in enumerate(lines, start=1):
-        if ALLOW_MARKER in line:
-            continue
-        if SAFE_SAVE_RE.search(line):
-            matches.append({"line": line_number, "source": line.strip()})
-    return matches
-
-
-def load_baseline(path: pathlib.Path) -> dict[str, list[str]]:
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        print(f"SwiftData save failure audit: invalid baseline JSON: {exc}", file=sys.stderr)
-        sys.exit(1)
-    raw = data.get("allowedMatches", {})
-    if not isinstance(raw, dict):
-        print("SwiftData save failure audit: baseline missing allowedMatches.", file=sys.stderr)
-        sys.exit(1)
-    allowed: dict[str, list[str]] = {}
-    for file_path, lines in raw.items():
-        if isinstance(file_path, str) and isinstance(lines, list):
-            allowed[file_path] = [line for line in lines if isinstance(line, str)]
-    return allowed
-
-
-matches_by_file: dict[str, list[dict[str, object]]] = {}
-for path in sorted((ROOT / "Ohana").rglob("*.swift")):
-    matches = scan_file(path)
-    if matches:
-        matches_by_file[relative(path)] = matches
-
-if UPDATE_BASELINE:
-    allowed = {
-        file_path: sorted(str(match["source"]) for match in matches)
-        for file_path, matches in sorted(matches_by_file.items())
-        if matches
-    }
-    payload = {
-        "schema": "ohana.governance.swiftdata-save-failure-baseline.v1",
-        "updated": dt.date.today().isoformat(),
-        "policyDocuments": [
-            "AGENTS.md",
-            "docs/release-quality-gates.md",
-            "docs/data-cache-sync-policy.md",
-        ],
-        "purpose": (
-            "Ratcheted baseline for existing bare safeSave() or no-argument "
-            "safeSaveResult() calls that leave save-failure handling ambiguous. "
-            "New writes should pass publishFailureEvent explicitly, throw, or use "
-            "an explicit user-visible failure contract."
-        ),
-        "command": "scripts/audit-release-data-safety.sh",
-        "allowedMatches": allowed,
-    }
-    BASELINE.parent.mkdir(parents=True, exist_ok=True)
-    BASELINE.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"SwiftData save failure baseline updated at {relative(BASELINE)} ({sum(len(v) for v in allowed.values())} match(es), {len(allowed)} file(s)).")
-    sys.exit(0)
-
-allowed = load_baseline(BASELINE)
-violations: list[tuple[str, int, str]] = []
-for file_path, matches in matches_by_file.items():
-    allowed_counts = collections.Counter(allowed.get(file_path, []))
-    seen_counts: collections.Counter[str] = collections.Counter()
-    for match in matches:
-        source = str(match["source"])
-        seen_counts[source] += 1
-        if seen_counts[source] > allowed_counts[source]:
-            violations.append((file_path, int(match["line"]), source))
-
-if violations:
-    for file_path, line_number, source in violations:
-        print(
-            f"[{RULE_ID}] {file_path}:{line_number} "
-            "bare safeSave()/safeSaveResult() leaves persistence failure handling ambiguous; pass publishFailureEvent explicitly, throw, or add an explicit allow marker.",
-            file=sys.stderr,
-        )
-        print(f"  {source}", file=sys.stderr)
-    print(
-        f"SwiftData save failure audit: {len(violations)} new match(es) "
-        f"across {len({item[0] for item in violations})} file(s).",
-        file=sys.stderr,
-    )
-    sys.exit(1)
-
-current_debt = sum(len(matches) for matches in matches_by_file.values())
-baseline_debt = sum(len(lines) for lines in allowed.values())
-print(f"SwiftData save failure audit: passed ({current_debt} current baseline match(es), {baseline_debt} allowed).")
-PY
+if ! scripts/audit-swiftdata-save-failures.sh "${save_failure_arguments[@]}"; then
   failures+=("New bare safeSave()/safeSaveResult() sites must not leave SwiftData save failure handling ambiguous; pass publishFailureEvent explicitly, throw, or use an explicit allow marker.")
 fi
 
@@ -710,7 +593,4 @@ fi
 
 echo "Release data safety audit: failed." >&2
 printf ' - %s\n' "${failures[@]}" >&2
-if [[ -s /tmp/ohana-release-data-safety-silent-save.txt ]]; then
-  cat /tmp/ohana-release-data-safety-silent-save.txt >&2
-fi
 exit 1

@@ -1,0 +1,683 @@
+{
+  "version": 1,
+  "thresholds": {
+    "function_body_length": 120,
+    "type_body_length": 800,
+    "cyclomatic_complexity": 25,
+    "function_parameter_count": 10
+  },
+  "entries": [
+    {
+      "file": "Ohana/App/AppServices.swift",
+      "rule": "function_body_length",
+      "signature": "convenience init(modelContainer: ModelContainer? = nil) {",
+      "count": 1,
+      "maximum": 123
+    },
+    {
+      "file": "Ohana/Domain/Economy/CoconutWalletManaging.swift",
+      "rule": "function_parameter_count",
+      "signature": "func applyActorDelta(",
+      "count": 2,
+      "maximum": 11
+    },
+    {
+      "file": "Ohana/Domain/Services/CareLedgerBackfillService.swift",
+      "rule": "function_body_length",
+      "signature": "static func backfillBatch(",
+      "count": 1,
+      "maximum": 310
+    },
+    {
+      "file": "Ohana/Domain/Services/CarePlanCalendarSync.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "private nonisolated static func localizedPlanTitle(_ token: CarePlanTitleToken, l: L10n = .current) -> String {",
+      "count": 1,
+      "maximum": 35
+    },
+    {
+      "file": "Ohana/Domain/Services/CarePlanCalendarSync.swift",
+      "rule": "type_body_length",
+      "signature": "enum CarePlanCalendarSync {",
+      "count": 1,
+      "maximum": 971
+    },
+    {
+      "file": "Ohana/Domain/Services/CarePlanOverdueStatus.swift",
+      "rule": "type_body_length",
+      "signature": "nonisolated enum CarePlanOverdueStatusCalculator {",
+      "count": 1,
+      "maximum": 883
+    },
+    {
+      "file": "Ohana/Domain/Services/CloudSyncInitialMergeRuntime.swift",
+      "rule": "function_body_length",
+      "signature": "private static func stageLocalSnapshot(",
+      "count": 1,
+      "maximum": 126
+    },
+    {
+      "file": "Ohana/Domain/Services/CloudSyncMutationRecorder.swift",
+      "rule": "type_body_length",
+      "signature": "nonisolated enum CloudSyncMutationRecorder {",
+      "count": 1,
+      "maximum": 1210
+    },
+    {
+      "file": "Ohana/Domain/Services/CloudSyncRecordApplier+Deletion.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "nonisolated static func deleteLocalModel(",
+      "count": 1,
+      "maximum": 31
+    },
+    {
+      "file": "Ohana/Domain/Services/CloudSyncRecordApplier+Deletion.swift",
+      "rule": "function_body_length",
+      "signature": "nonisolated static func deleteLocalModel(",
+      "count": 1,
+      "maximum": 132
+    },
+    {
+      "file": "Ohana/Domain/Services/DataBackupManager.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "private func prepareBackupChanges(",
+      "count": 1,
+      "maximum": 52
+    },
+    {
+      "file": "Ohana/Domain/Services/DataBackupManager.swift",
+      "rule": "function_body_length",
+      "signature": "func buildBackup(",
+      "count": 1,
+      "maximum": 192
+    },
+    {
+      "file": "Ohana/Domain/Services/DataBackupManager.swift",
+      "rule": "function_body_length",
+      "signature": "private func prepareBackupChanges(",
+      "count": 1,
+      "maximum": 384
+    },
+    {
+      "file": "Ohana/Domain/Services/DataBackupManager.swift",
+      "rule": "type_body_length",
+      "signature": "final nonisolated class DataBackupManager: @unchecked Sendable {",
+      "count": 1,
+      "maximum": 916
+    },
+    {
+      "file": "Ohana/Domain/Services/DomainCareLedgerRecording.swift",
+      "rule": "function_parameter_count",
+      "signature": "func record(",
+      "count": 1,
+      "maximum": 21
+    },
+    {
+      "file": "Ohana/Domain/Services/PetMedicationDoseLogging.swift",
+      "rule": "function_body_length",
+      "signature": "static func recordDoseResult(",
+      "count": 1,
+      "maximum": 130
+    },
+    {
+      "file": "Ohana/Domain/Services/PhysicalDeletionService.swift",
+      "rule": "type_body_length",
+      "signature": "nonisolated enum PhysicalDeletionService {",
+      "count": 1,
+      "maximum": 882
+    },
+    {
+      "file": "Ohana/Domain/Services/PlantCareScheduleSyncService.swift",
+      "rule": "function_body_length",
+      "signature": "static func syncCompletedEvent(",
+      "count": 1,
+      "maximum": 122
+    },
+    {
+      "file": "Ohana/Domain/Services/SharedCareLegacyNoteBatchWorker.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "static func runBatch(",
+      "count": 1,
+      "maximum": 39
+    },
+    {
+      "file": "Ohana/Domain/Services/SharedCareLegacyNoteBatchWorker.swift",
+      "rule": "function_body_length",
+      "signature": "static func runBatch(",
+      "count": 1,
+      "maximum": 213
+    },
+    {
+      "file": "Ohana/Domain/Services/SharedCareSessionMaintenance.swift",
+      "rule": "function_body_length",
+      "signature": "static func cleanLegacyNoteMetadata(",
+      "count": 2,
+      "maximum": 142
+    },
+    {
+      "file": "Ohana/Domain/Services/SharedPetActionRecorder.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "static func record(",
+      "count": 1,
+      "maximum": 31
+    },
+    {
+      "file": "Ohana/Domain/Services/SharedPetActionRecorder.swift",
+      "rule": "function_body_length",
+      "signature": "private static func recordLedger(",
+      "count": 1,
+      "maximum": 155
+    },
+    {
+      "file": "Ohana/Domain/Services/SharedPetActionRecorder.swift",
+      "rule": "function_body_length",
+      "signature": "static func record(",
+      "count": 1,
+      "maximum": 328
+    },
+    {
+      "file": "Ohana/Domain/Services/SharedPetActionRecorder.swift",
+      "rule": "function_parameter_count",
+      "signature": "private static func deriveRevision(",
+      "count": 1,
+      "maximum": 11
+    },
+    {
+      "file": "Ohana/Domain/Services/SharedPetActionRecorder.swift",
+      "rule": "function_parameter_count",
+      "signature": "private static func recordLedger(",
+      "count": 1,
+      "maximum": 12
+    },
+    {
+      "file": "Ohana/Features/Achievements/Views/AchievementWallContentView+CompletionDates.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "func achievementCompletionDate(for badge: Achievement) -> Date? {",
+      "count": 1,
+      "maximum": 42
+    },
+    {
+      "file": "Ohana/Features/Achievements/Views/AchievementWallContentView+Layout.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "func achievementMomentLine(for badge: Achievement) -> String {",
+      "count": 1,
+      "maximum": 57
+    },
+    {
+      "file": "Ohana/Features/Achievements/Views/AchievementWallContentView+Progress.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "func progress(for badge: Achievement) -> ProgressInfo {",
+      "count": 1,
+      "maximum": 44
+    },
+    {
+      "file": "Ohana/Features/Achievements/Views/AchievementWallContentView+Progress.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "private func progressAction(_ action: AchievementProgressAction) -> String {",
+      "count": 1,
+      "maximum": 50
+    },
+    {
+      "file": "Ohana/Features/Achievements/Views/AchievementWallContentView+Progress.swift",
+      "rule": "function_body_length",
+      "signature": "func humanAchievements(for human: Human) -> [Achievement] {",
+      "count": 1,
+      "maximum": 176
+    },
+    {
+      "file": "Ohana/Features/Calendar/Views/AddEventView.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "private func eventTypeTitle(_ type: EventType) -> String {",
+      "count": 1,
+      "maximum": 27
+    },
+    {
+      "file": "Ohana/Features/Calendar/Views/AddEventView.swift",
+      "rule": "type_body_length",
+      "signature": "struct AddEventContentView: View {",
+      "count": 1,
+      "maximum": 957
+    },
+    {
+      "file": "Ohana/Features/CareLedger/CareLedgerRecording.swift",
+      "rule": "function_parameter_count",
+      "signature": "func record(",
+      "count": 1,
+      "maximum": 21
+    },
+    {
+      "file": "Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift",
+      "rule": "type_body_length",
+      "signature": "struct CrewRosterOverlay: View {",
+      "count": 1,
+      "maximum": 808
+    },
+    {
+      "file": "Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift",
+      "rule": "type_body_length",
+      "signature": "struct CrewRosterProfilePanel: View {",
+      "count": 1,
+      "maximum": 956
+    },
+    {
+      "file": "Ohana/Features/DailyStreak/Views/DailyStreakDetailView.swift",
+      "rule": "type_body_length",
+      "signature": "struct DailyStreakDetailView: View {",
+      "count": 1,
+      "maximum": 835
+    },
+    {
+      "file": "Ohana/Features/DashboardRecords/Views/IslandWeightDashboard.swift",
+      "rule": "type_body_length",
+      "signature": "struct IslandWeightDashboardContentView: View {",
+      "count": 1,
+      "maximum": 845
+    },
+    {
+      "file": "Ohana/Features/Economy/AchievementManager.swift",
+      "rule": "function_body_length",
+      "signature": "static func compute(for pet: Pet, context: AchievementComputationContext = .empty) -> [Achievement] {",
+      "count": 1,
+      "maximum": 373
+    },
+    {
+      "file": "Ohana/Features/Economy/CoconutEconomyPolicyV2.swift",
+      "rule": "function_parameter_count",
+      "signature": "private static func reward(",
+      "count": 1,
+      "maximum": 12
+    },
+    {
+      "file": "Ohana/Features/Economy/DomainCareReward+Economy.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "private static func localizedLegacyTitle(_ title: String, l: L10n) -> String? {",
+      "count": 1,
+      "maximum": 28
+    },
+    {
+      "file": "Ohana/Features/Economy/DomainCareReward+Economy.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "static func localized(_ title: String, fallbackActorName: String? = nil, l: L10n) -> String? {",
+      "count": 1,
+      "maximum": 34
+    },
+    {
+      "file": "Ohana/Features/Economy/QuestManager+Awards.swift",
+      "rule": "function_body_length",
+      "signature": "func awardAction(",
+      "count": 1,
+      "maximum": 126
+    },
+    {
+      "file": "Ohana/Features/Economy/QuestManager+Awards.swift",
+      "rule": "function_body_length",
+      "signature": "func awardSharedCareAction(",
+      "count": 1,
+      "maximum": 124
+    },
+    {
+      "file": "Ohana/Features/Economy/QuestManager+LegacyWallet.swift",
+      "rule": "function_parameter_count",
+      "signature": "private func specialCoconutDelta(",
+      "count": 1,
+      "maximum": 12
+    },
+    {
+      "file": "Ohana/Features/Economy/RewardEconomyCommands.swift",
+      "rule": "function_body_length",
+      "signature": "static func purchase(",
+      "count": 1,
+      "maximum": 188
+    },
+    {
+      "file": "Ohana/Features/Economy/RewardEconomyCommands.swift",
+      "rule": "function_body_length",
+      "signature": "static func unlock(",
+      "count": 1,
+      "maximum": 121
+    },
+    {
+      "file": "Ohana/Features/Expenses/ExpenseCommands.swift",
+      "rule": "function_parameter_count",
+      "signature": "private static func recordPetExpenseFact(",
+      "count": 1,
+      "maximum": 15
+    },
+    {
+      "file": "Ohana/Features/FamilyTasks/FamilyTaskService.swift",
+      "rule": "function_body_length",
+      "signature": "private static func transferRewardIfNeeded(",
+      "count": 1,
+      "maximum": 126
+    },
+    {
+      "file": "Ohana/Features/FamilyTasks/FamilyTaskService.swift",
+      "rule": "type_body_length",
+      "signature": "enum FamilyTaskService {",
+      "count": 1,
+      "maximum": 1060
+    },
+    {
+      "file": "Ohana/Features/FamilyTasks/Views/BountyBoardView.swift",
+      "rule": "function_body_length",
+      "signature": "private func taskCard(_ task: BountyTask, isActive: Bool) -> some View {",
+      "count": 1,
+      "maximum": 144
+    },
+    {
+      "file": "Ohana/Features/Feeding/FeedPlanAndStockCommands.swift",
+      "rule": "function_parameter_count",
+      "signature": "static func run(",
+      "count": 1,
+      "maximum": 18
+    },
+    {
+      "file": "Ohana/Features/Feeding/QuickFeedCommandExecutor.swift",
+      "rule": "function_parameter_count",
+      "signature": "func saveStock(",
+      "count": 1,
+      "maximum": 17
+    },
+    {
+      "file": "Ohana/Features/FunctionMenu/Views/FunctionMenuDestinationRouter.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "private func destinationView(_ dest: FMDest) -> some View {",
+      "count": 1,
+      "maximum": 69
+    },
+    {
+      "file": "Ohana/Features/FunctionMenu/Views/FunctionMenuDestinationRouter.swift",
+      "rule": "function_body_length",
+      "signature": "private func destinationView(_ dest: FMDest) -> some View {",
+      "count": 1,
+      "maximum": 190
+    },
+    {
+      "file": "Ohana/Features/FunctionMenu/Views/PetFeatureCollectionView.swift",
+      "rule": "function_body_length",
+      "signature": "private func cardSummary(for feature: PetFeature) -> PetFeatureCardSummary {",
+      "count": 1,
+      "maximum": 153
+    },
+    {
+      "file": "Ohana/Features/Gacha/GachaModels.swift",
+      "rule": "function_body_length",
+      "signature": "static func draw(",
+      "count": 1,
+      "maximum": 190
+    },
+    {
+      "file": "Ohana/Features/Gacha/Views/GachaView.swift",
+      "rule": "type_body_length",
+      "signature": "struct GachaView: View {",
+      "count": 1,
+      "maximum": 977
+    },
+    {
+      "file": "Ohana/Features/Health/PetHealthCommands.swift",
+      "rule": "function_body_length",
+      "signature": "static func recordHealth(",
+      "count": 1,
+      "maximum": 176
+    },
+    {
+      "file": "Ohana/Features/Home/ExpandedQuickActionExecutor.swift",
+      "rule": "function_parameter_count",
+      "signature": "static func performFeedCheckIn(",
+      "count": 1,
+      "maximum": 14
+    },
+    {
+      "file": "Ohana/Features/Home/FocusHomeRouteSheetModifier.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "private func homeSheetDestination(for route: HomeSheetRoute) -> some View {",
+      "count": 1,
+      "maximum": 38
+    },
+    {
+      "file": "Ohana/Features/Home/FocusHomeRouteSheetModifier.swift",
+      "rule": "function_body_length",
+      "signature": "private func homeSheetDestination(for route: HomeSheetRoute) -> some View {",
+      "count": 1,
+      "maximum": 136
+    },
+    {
+      "file": "Ohana/Features/Home/HomeCommandExecutor.swift",
+      "rule": "type_body_length",
+      "signature": "struct HomeCommandExecutor {",
+      "count": 1,
+      "maximum": 819
+    },
+    {
+      "file": "Ohana/Features/Home/HomeReadModelStore.swift",
+      "rule": "function_parameter_count",
+      "signature": "private func refresh(",
+      "count": 1,
+      "maximum": 11
+    },
+    {
+      "file": "Ohana/Features/Home/OverviewQuickActionSupport.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "static func resolve(actionType: String, fallbackSystemName: String) -> OhanaQuickActionGlyphKind? {",
+      "count": 1,
+      "maximum": 49
+    },
+    {
+      "file": "Ohana/Features/Home/Views/FocusHomeAuxiliaryViews.swift",
+      "rule": "function_parameter_count",
+      "signature": "static func make(",
+      "count": 2,
+      "maximum": 12
+    },
+    {
+      "file": "Ohana/Features/Home/Views/FocusHomeVerticalSolidScene.swift",
+      "rule": "function_body_length",
+      "signature": "private func cardLayer(for card: FocusCard, index: Int, in size: CGSize, visibleCenterX: CGFloat) -> some View {",
+      "count": 1,
+      "maximum": 129
+    },
+    {
+      "file": "Ohana/Features/Home/Views/FocusHomeVerticalSolidScene.swift",
+      "rule": "type_body_length",
+      "signature": "struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>: View {",
+      "count": 1,
+      "maximum": 993
+    },
+    {
+      "file": "Ohana/Features/Home/Views/OverviewQuickActionIcon.swift",
+      "rule": "function_body_length",
+      "signature": "private func draw(_ kind: OhanaQuickActionGlyphKind, in context: inout GraphicsContext) {",
+      "count": 1,
+      "maximum": 149
+    },
+    {
+      "file": "Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift",
+      "rule": "type_body_length",
+      "signature": "struct VerticalSolidHomePlantsPage: View {",
+      "count": 1,
+      "maximum": 1056
+    },
+    {
+      "file": "Ohana/Features/Hygiene/PetHygieneCommands.swift",
+      "rule": "function_body_length",
+      "signature": "static func createPlan(",
+      "count": 1,
+      "maximum": 131
+    },
+    {
+      "file": "Ohana/Features/Hygiene/Views/PetHygieneDetailView.swift",
+      "rule": "function_body_length",
+      "signature": "private func hygieneTypeCard(_ type: HygieneType) -> some View {",
+      "count": 1,
+      "maximum": 146
+    },
+    {
+      "file": "Ohana/Features/Medication/Views/HumanMedicationView.swift",
+      "rule": "type_body_length",
+      "signature": "struct HumanMedicationContentView: View {",
+      "count": 1,
+      "maximum": 919
+    },
+    {
+      "file": "Ohana/Features/Members/MemberProfileCommands.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "static func updatePet(",
+      "count": 1,
+      "maximum": 35
+    },
+    {
+      "file": "Ohana/Features/Members/PetPersonalityTag.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "private static func lines(for tagId: String, name: String, hour _: Int, l: L10n) -> [String] {",
+      "count": 1,
+      "maximum": 28
+    },
+    {
+      "file": "Ohana/Features/Members/Views/PetAllFeaturesSheet.swift",
+      "rule": "function_body_length",
+      "signature": "static func load(petID: UUID, context: ModelContext, now: Date = Date()) -> PetAllFeaturesActivitySummary {",
+      "count": 1,
+      "maximum": 173
+    },
+    {
+      "file": "Ohana/Features/Oasis/OasisUpgradeRewardService+Interaction.swift",
+      "rule": "function_body_length",
+      "signature": "static func interactWithOutcome(",
+      "count": 1,
+      "maximum": 151
+    },
+    {
+      "file": "Ohana/Features/Onboarding/Views/OnboardingView.swift",
+      "rule": "type_body_length",
+      "signature": "struct OnboardingView: View {",
+      "count": 1,
+      "maximum": 969
+    },
+    {
+      "file": "Ohana/Features/Plants/PlantCarePlanService.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "private static func explanationFactors(for type: PlantCareType, plant: Plant) -> [String] {",
+      "count": 1,
+      "maximum": 26
+    },
+    {
+      "file": "Ohana/Features/Plants/Views/AddPlantView.swift",
+      "rule": "type_body_length",
+      "signature": "struct AddPlantView: View {",
+      "count": 1,
+      "maximum": 1112
+    },
+    {
+      "file": "Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift",
+      "rule": "type_body_length",
+      "signature": "struct PlantCareFeatureDetailView: View {",
+      "count": 1,
+      "maximum": 1276
+    },
+    {
+      "file": "Ohana/Features/Plants/Views/PlantDashboardView.swift",
+      "rule": "type_body_length",
+      "signature": "struct PlantDashboardView: View {",
+      "count": 1,
+      "maximum": 1170
+    },
+    {
+      "file": "Ohana/Features/Plants/Views/PlantDetailEditSheet.swift",
+      "rule": "type_body_length",
+      "signature": "struct EditPlantSheet: View {",
+      "count": 1,
+      "maximum": 1051
+    },
+    {
+      "file": "Ohana/Features/Plants/Views/PlantDetailView.swift",
+      "rule": "type_body_length",
+      "signature": "struct PlantDetailContentView: View {",
+      "count": 1,
+      "maximum": 1014
+    },
+    {
+      "file": "Ohana/Features/QuickCare/Views/QuickPottyDetailSheet+Sheets.swift",
+      "rule": "function_body_length",
+      "signature": "func sheetContent(_ sheet: ActiveSheet) -> some View {",
+      "count": 1,
+      "maximum": 195
+    },
+    {
+      "file": "Ohana/Features/QuickCare/Views/QuickPottyDetailSheet.swift",
+      "rule": "type_body_length",
+      "signature": "struct QuickPottyDetailSheet: View {",
+      "count": 1,
+      "maximum": 827
+    },
+    {
+      "file": "Ohana/Features/QuickCare/Views/QuickWaterDetailSheet+Sheets.swift",
+      "rule": "function_body_length",
+      "signature": "func sheetContent(_ sheet: ActiveSheet) -> some View {",
+      "count": 1,
+      "maximum": 132
+    },
+    {
+      "file": "Ohana/Features/QuickCare/Views/QuickWaterDetailSheet.swift",
+      "rule": "type_body_length",
+      "signature": "struct QuickWaterDetailSheet: View {",
+      "count": 1,
+      "maximum": 964
+    },
+    {
+      "file": "Ohana/Features/Settings/Views/SettingsPlantReminderDataContainer.swift",
+      "rule": "type_body_length",
+      "signature": "private struct SettingsPlantReminderPanelContent: View {",
+      "count": 1,
+      "maximum": 814
+    },
+    {
+      "file": "Ohana/Features/TodayFocus/IslandQuestEngine.swift",
+      "rule": "function_body_length",
+      "signature": "static func todayQuests(",
+      "count": 1,
+      "maximum": 164
+    },
+    {
+      "file": "Ohana/Features/TodayFocus/IslandQuestEngine.swift",
+      "rule": "type_body_length",
+      "signature": "nonisolated enum IslandQuestEngine {",
+      "count": 1,
+      "maximum": 1007
+    },
+    {
+      "file": "Ohana/Features/TodayFocus/TodayFocusService.swift",
+      "rule": "function_body_length",
+      "signature": "private static func isQuestCompletedToday(",
+      "count": 1,
+      "maximum": 137
+    },
+    {
+      "file": "Ohana/Features/Walks/PetWalkingManager.swift",
+      "rule": "function_body_length",
+      "signature": "func stop(modelContext: ModelContext, sharedTargets: [Pet] = [], executorIds sharedExecutorIds: [String] = []) -> WalkStopRewardSummary {",
+      "count": 1,
+      "maximum": 243
+    },
+    {
+      "file": "Ohana/Features/Workouts/WorkoutCommands.swift",
+      "rule": "function_body_length",
+      "signature": "static func recordHumanWorkout(",
+      "count": 1,
+      "maximum": 169
+    },
+    {
+      "file": "Ohana/Models/Event.swift",
+      "rule": "cyclomatic_complexity",
+      "signature": "func localizedLabel(_ l: L10n) -> String {",
+      "count": 1,
+      "maximum": 27
+    },
+    {
+      "file": "Ohana/Shared/Components/IslandNegativeFeedback.swift",
+      "rule": "function_body_length",
+      "signature": "static func signals(",
+      "count": 1,
+      "maximum": 129
+    }
+  ]
+}

@@ -25,7 +25,7 @@
 | GAP-9 离世退场 | 🟢 | `e6a45e72c` | 纪念模式规则书、未来计划可逆退场、离世成员活跃入口过滤、奖励冻结定向测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 真机通知抽查 |
 | GAP-12 植物功能门 | 🟢 | `a1e0e0376` / `8f6c792dc` recheck | `PlantFeatureGate` 不变量、添加/路由/FunctionMenu、quest 引擎、心情信号、Oasis 植物历史隔离、`scripts/module-exit-gate.sh --full` 与 CI 均通过 | 待真实 UI 抽查 |
 | Phase 6 Members | 🟢 | `ead1e5fe4` / `8f6c792dc` recheck | 创建派生日历事实 sync metadata；成员删除进入不可恢复物理删除 + sync tombstone；RequiredHumanProfileView a11y；全仓 gate / CI 复验通过 | 待真实 UI 抽查 |
-| Phase 6 Oasis | 🟢 | `87423afd8` | Oasis 当前主人钱包门、预算 / 冷却、休眠态救援、UI/a11y/smoothness/runtime 审计、Oasis 窄测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
+| Phase 6 Oasis | 🟢 | `87423afd8` + 2026-07-11 repair | 生命树使用正式岛屿总额且支持无 Human；其他成员型 Oasis 消费保留当前主人钱包门；预算 / 冷却、休眠态救援、UI/a11y/smoothness/runtime 审计与窄测试通过 | 新签名 Release 覆盖安装后的旧 59🥥 样本注入待真机确认 |
 | Phase 6 Settings + Health | 🟢 | `5d4e71928` / `8f6c792dc` recheck | Debug-only 设置开发工具、真实通知开关策略、Health 物理删除 + tombstone/read-only 不变量、目标测试与全仓 gate / CI 复验通过 | 待 Release 真机 / 真实 UI 抽查 |
 | Phase 6 Economy | 🏁 | `92133da2a` / `8f6c792dc` recheck | 兑换入口首发门禁、冻结钱包写入拒绝、特殊奖励 active human 归属、隐私 / 冻结财富口径；最终纯复审 P0/P1/P2=0；全仓 gate / CI 复验通过 | 待真实 UI 抽查 |
 | Phase 7 Walks | 🟢* | `e0c1d69d3` / `8f6c792dc` recheck | `WalkFeaturePolicy` active dog 硬门、删除/离世过滤、遛狗中便便事实+ledger、共享遛狗服务适配器、全仓 gate / CI 复验通过 | 待真机定位 / 真实 UI 抽查 |
@@ -213,6 +213,10 @@ Xcode preflight 停在 `Unlock Guanchen's iPhone to Continue`，等待后取消�
   - 预期：仍能进入正确提醒处理路径。
   - 记录：2026-06-30 simulator/source preflight 已通过 `OhanaNotificationsSchedulingTests.notificationDelegateHandoffKeepsDefaultTapAndActionsSeparate()` 证明普通点击进入 reminder route、COMPLETE/SKIP/SNOOZE 进入 action payload，并通过 `ReminderActionCoordinatorTests.notificationSnoozeActionRoutesToOneDaySnooze()` 证明“明天再说”会进入一天 snooze 且请求重排；真机仍需证明用户从系统通知 UI 点击这些动作时 iOS 会真实交付给 app。
 
+- [ ] 如有配对 Apple Watch，验证 iPhone 通知转发和 action 交付。
+  - 预期：未安装原生 Ohana Watch app 时，手表仍可收到由 iPhone 转发的提醒；完成 / 跳过 / 明天再说各执行一次，iPhone 端不重复写事实或重排。此项只证明系统通知兼容性，不得宣传为原生 watchOS app 支持。
+  - 记录：
+
 - [ ] 真机等待或临时触发周报通知。
   - 预期：标题/正文只表达照护周报，不出现悬赏榜、指派、多人竞争或“谁更勤快”的语义。
   - 记录：2026-06-30 unit preflight 已通过 `OhanaNotificationsSchedulingTests.weeklyReportNotificationIsAmbientCareCopy()` 证明周报通知为 ambient / weeklyReport 分类，标题/正文保持照护周报语义，并在中英德文案中阻止悬赏榜、指派、竞争、“谁更勤快”等语义回退；真机仍需证明真实周报通知展示。
@@ -399,20 +403,21 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
 
 ## Phase 6 Oasis
 
-人工验收目标：Oasis 是当前主人钱包驱动的单机成长面；无主人不读写历史 / system 账户，重复产出受预算 / 冷却约束，电子宠物休眠可唤回。
+人工验收目标：Oasis 生命树是全岛共同消费出口，可使用 `system:island` 与所有活跃正式成员钱包；成员型互动仍由当前主人钱包承担。重复产出受预算 / 冷却约束，电子宠物休眠可唤回，`system:legacy` 永远不可用。
 
 - [ ] 无当前主人或当前主人已进入纪念模式时打开 Oasis。
-  - 预期：椰子余额显示为 0 或引导选择当前主人；注入生命树、开启升级椰子、电子宠物消费 / 奖励不会写入 `system` / `system:legacy`；页面不崩溃。
-  - 记录：
+  - 预期：生命树显示正式岛屿总额并可使用岛屿储备与活跃 Pet 钱包注入；需要当前主人的电子宠物消费 / 奖励保持禁用或提示选择主人；任何路径不读写 `system:legacy`，页面不崩溃。
+  - 记录：2026-07-11 iPhone 17 Pro Max 的 clean-run 样本只有 Pet、没有 Human，总额显示 59🥥，点击生命树注入只震动不写能量。根因是 D17 的旧 50🥥 赠礼被写入 Pet，而 Oasis 注入及 action snapshot 硬依赖 current Human。当前工作区已把新赠礼改写入 `system:island`，旧 v2 成员赠礼以幂等成对转账重分类；生命树按岛屿储备、current Human、其余活跃成员的稳定顺序聚合扣款。无 Human 的 Unit/Integration 路径与 Pet-first 五次注入 Lv0 -> Lv1 UI 路径已通过。新签名 Release 已在不卸载的前提下覆盖安装；只读设备 store 证明旧样本已迁移为岛屿储备 50 + Pet 奖励 9、legacy 0 且总额仍为 59。最终点击后的 59→49 与能量 +10 仍待用户真机确认。
 
-- [ ] 当前主人余额足够时连续注入生命树能量。
-  - 预期：注入可重复执行，只受当前主人余额限制；生命树 XP 增加；钱包历史记录归属当前主人，不出现系统账户行。
+- [ ] 正式岛屿总额足够时连续注入生命树能量。
+  - 预期：注入可重复执行，只受正式岛屿总额限制；生命树 XP 增加；每个实际出资账户各有可重放流水，岛屿储备流水不得伪装成成员贡献。
   - 记录：2026-06-17 真机 fresh install 发现 Oasis 右下角 FAB 注入能量无反应；产品期望是新装树应为 Lv0，用户手动注入后才升为 Lv1。根因：旧生命树模型没有真实 Lv0，`0` 能量会显示为 Lv1；注入成本 / XP 分散在 manager、executor、Oasis UI、Shop 和规则说明中，仍混用旧 `80🥥 -> 20XP`，而 starter gift 只给 50 椰子，所以 fresh 用户看起来“有启动礼但注入不可用”。同时 starter gift ceremony 文案仍暗示自动 Lv0 -> Lv1，和手动注入规则冲突；树视觉组件也会把 `level == 0` 夹到 Lv1 配置。处理：新增统一 `OasisTreeEnergyInjectionPolicy`，生命树等级加入 `lv0`，阈值改为 0/50/150...；Home/Oasis 快照、`BeautifulCoconutTree` 视觉配置、FAB 可用性、命令执行、Shop 加速、规则说明和 starter gift ceremony 全部消费同一策略；starter gift 只发 50 椰子，不再展示自动升级。2026-06-17 用户复核后继续改产品节奏：首包改为 `10🥥 -> 10XP`，因此新手礼包可完成 5 次注入，5 次后从 Lv0 到 Lv1；Lv5 每日椰子收益说明移入椰子树等级介绍，能量进度条不再显示 `Lv.5 🥥`。关闭条件：真机 fresh install 后 Oasis 树显示 Lv0；领取 starter gift 后有 50 椰子；点击礼包 CTA 后底栏才出现 Oasis tab 和点击提示；连续 5 次点击 Home/Oasis FAB 后升级为 Lv1，且不出现卡死或无响应。
   - 记录：2026-06-17 本轮补强 Home 内嵌 Oasis 的注入路径：为避免切 tab 首帧挂完整 `OasisRewardView`，Home Oasis tab 只呈现 frozen tree snapshot；右下 FAB 不再依赖 live Oasis view，而由 Home 延后一帧执行 `OasisTreeManager.injectEnergy(cost: OasisTreeEnergyInjectionPolicy.starterPackageCost, modelContext:)`，随后刷新 Home snapshot 并触发升级反馈。自动验证已更新为首发 UI smoke 中 fresh 用户领取 starter gift 后，Oasis tab 在礼包 CTA 后才出现，`home-primary-action` 连续 5 次注入后从 Lv0 到 Lv1；`VerticalHomeTabMountPolicyTests` 锁住 Home 内嵌 Oasis 不运行 active work，并新增 starter tab guard / 五次注入策略断言。
   - 记录：2026-06-17 真机发现结束一次遛狗后椰子树意外升级到 Lv2。根因：遛狗停止会按经济管线写 `CareLedgerEvent`，metadata 中的 care reward `growthXP` 被 `OasisTreeManager` 聚合进 `islandEnergy`，且 `CareLedgerRecording.syncLedgerEnergyIfNeeded` 对任意 `growthXP > 0` 都触发树能量刷新；这把普通照护成长奖励误当成“用户手动注入生命树能量”。处理：Oasis 树等级改为只读取显式手动注入产生的 `treeInjection` / `treeInjectionLarge` ledger `injectedXP`；`totalEnergy` 不再包含 care / walk / legacy activity baseline；generic care ledger sync 不再刷新树能量；升级椰子打开时即使旧记录带 `treeEnergyAmount` 也不再改 `injectedEnergy`，新升级椰子 catalog 不再产出树能量奖励。自动验证：`scripts/test-simulator.sh -only-testing:OhanaTests/OhanaTests` PASS（134 tests），新增/更新用例覆盖 walk/care `growthXP` 不能恢复树能量、非 `treeInjection` 的 `injectedXP` metadata 不能恢复树能量、旧升级椰子不能注入树能量、脏 `oasis_injectedEnergy` preference 无注入 ledger 时不能推进树等级、starter gift 五次 `10XP` 手动注入后才从 Lv0 升到 Lv1。关闭条件：真机完整遛狗停止后椰子树等级不变化；仍只有 Home/Oasis 显式注入能量会推进树等级。
+  - 记录：2026-07-11 聚合资金修复的 targeted Unit/Integration 共 32 条通过；Pet-first、无 Human 的 UI 路径连续点击 `home-primary-action` 五次并从 Lv0 到 Lv1，1 条测试通过（41.138 秒）。覆盖岛屿赠礼归属、旧 Pet 赠礼迁移、岛屿储备计入总额、`system:legacy` 排除、聚合扣款、总额不足原子失败和重复注入。
 
-- [ ] 当前主人余额不足时尝试生命树注入、电子宠物互动、升星或碎片唤醒。
-  - 预期：对应动作被禁用或得体失败；余额不变、不产生负数、不写 system 兜底流水。
+- [ ] 正式岛屿总额不足时尝试生命树注入；当前主人余额不足时尝试电子宠物互动、升星或碎片唤醒。
+  - 预期：对应动作被禁用或得体失败；余额不变、不产生负数、不写 `system:legacy` 兜底流水；生命树不得因某个单独成员不足而忽略其他正式可用余额。
   - 记录：
 
 - [ ] 在同一操作日重复触发 Oasis 椰子产出。

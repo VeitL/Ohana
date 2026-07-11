@@ -38,6 +38,7 @@ struct ExpenseHistoryContentView: View {
     @State private var newNote = ""
     @State private var newDate = Date()
     @State private var selectedPayerId: String? = nil
+    @State private var saveErrorMessage: String? = nil
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
@@ -170,6 +171,19 @@ struct ExpenseHistoryContentView: View {
             if sanitized != value {
                 newAmount = sanitized
             }
+        }
+        .alert(
+            l.tr(zh: "无法保存费用", en: "Could not save expense", de: "Ausgabe konnte nicht gespeichert werden"),
+            isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { if !$0 { saveErrorMessage = nil } }
+            )
+        ) {
+            Button(l.tr(zh: "知道了", en: "OK", de: "OK"), role: .cancel) {
+                saveErrorMessage = nil
+            }
+        } message: {
+            Text(saveErrorMessage ?? "")
         }
     }
 
@@ -640,18 +654,29 @@ struct ExpenseHistoryContentView: View {
             isInlineExpenseComposerVisible = false
         }
         commandQueue.enqueue(command) {
-            DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordPetExpense(
-                pet: pet,
-                amount: amount,
-                date: savedDate,
-                category: savedCategory,
-                note: note,
-                executorId: savedPayerId,
-                source: .detail,
-                command: command,
-                revisionNote: "dashboard.expense.entry"
-            )
-            onDataChanged?()
+            do {
+                try DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordPetExpense(
+                    pet: pet,
+                    amount: amount,
+                    date: savedDate,
+                    category: savedCategory,
+                    note: note,
+                    executorId: savedPayerId,
+                    source: .detail,
+                    command: command,
+                    revisionNote: "dashboard.expense.entry"
+                )
+                onDataChanged?()
+            } catch {
+                isInlineExpenseComposerVisible = true
+                saveErrorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? l.tr(
+                        zh: "费用保存失败，请检查金额后重试。",
+                        en: "Could not save the expense. Check the amount and try again.",
+                        de: "Die Ausgabe konnte nicht gespeichert werden. Prüfe den Betrag und versuche es erneut."
+                    )
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
         }
     }
 }

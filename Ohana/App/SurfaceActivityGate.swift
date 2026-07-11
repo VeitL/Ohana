@@ -38,7 +38,7 @@ extension AppWorkloadPolicy {
             isVisible: isVisible,
             isCovered: isCovered,
             isLive: isLive,
-            allowsInteraction: active && interactionMotionBudget(isVisible: active).allowsMotion,
+            allowsInteraction: active,
             allowsAmbientMotion: active
                 && allowsAmbientOptIn
                 && ambientMotionBudget(

@@ -121,7 +121,7 @@ struct IslandWealthSnapshot {
         }
         let allHumanBalances = Dictionary(uniqueKeysWithValues: activeAllHumans.map { ($0.id.uuidString, $0.coconutBalance) })
         let formalAccounts = walletAccounts.compactMap { account -> WealthAccountSnapshot? in
-            guard account.ownerKind != .system else { return nil }
+            guard account.ownerKind != .system || account.accountKey == CoconutAccountKey.islandReserve else { return nil }
             guard !frozenOwnerIds.contains(account.ownerId) else { return nil }
             return WealthAccountSnapshot(
                 ownerKind: account.ownerKind,
@@ -131,7 +131,10 @@ struct IslandWealthSnapshot {
         }
         let formalOwnerIds = Set(formalAccounts.map(\.ownerId))
         let visibleLogs = walletLedgerEntries
-            .filter { $0.delta != 0 && $0.ownerKind != .system }
+            .filter {
+                $0.delta != 0 &&
+                    ($0.ownerKind != .system || $0.accountKey == CoconutAccountKey.islandReserve)
+            }
             .filter { formalOwnerIds.contains($0.ownerId) }
             .map { $0.asCoconutLogEntry() }
             .filter { !hiddenHumanIds.contains($0.actorId ?? "") }
@@ -194,7 +197,7 @@ final class IslandWealthScreenModel {
         self.selectedActorId = selectedActorId
     }
 
-    // 正式岛屿总资产包含所有正式成员钱包；隐私只隐藏明细，不改变总数。
+    // 正式岛屿总资产包含岛屿储备与所有正式成员钱包；隐私只隐藏明细，不改变总数。
     var totalAssets: Int {
         if !snapshot.formalAccounts.isEmpty {
             return snapshot.formalAccounts.reduce(0) { $0 + $1.balance }

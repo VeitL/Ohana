@@ -44,7 +44,7 @@ struct OnboardingJourneyCoordinatorTests {
             context: context,
             defaults: defaults
         )
-        #expect(needsFirstCare.starterGiftResult == .pendingFirstCare(recipient: .pet(pet.id)))
+        #expect(needsFirstCare.starterGiftResult == .pendingFirstCare(recipient: .island))
         #expect(needsFirstCare.phase == .firstCarePending)
         #expect(pet.coconutBalance == 0)
 
@@ -57,10 +57,14 @@ struct OnboardingJourneyCoordinatorTests {
             context: context,
             defaults: defaults
         )
-        #expect(claimed.starterGiftResult == .claimed(recipient: .pet(pet.id), amount: StarterGiftService.giftAmount))
+        #expect(claimed.starterGiftResult == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
         #expect(claimed.phase == .starterGiftReadyForCeremony(amount: StarterGiftService.giftAmount))
         #expect(defaults.bool(forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted))
-        #expect(pet.coconutBalance == StarterGiftService.giftAmount)
+        #expect(pet.coconutBalance == 0)
+        #expect(CoconutWalletService.balance(
+            accountKey: CoconutAccountKey.islandReserve,
+            context: context
+        ) == StarterGiftService.giftAmount)
 
         let completedAt = Date(timeIntervalSince1970: 1089)
         #expect(OnboardingJourneyCoordinator.journeyElapsedMilliseconds(
@@ -109,7 +113,7 @@ struct OnboardingJourneyCoordinatorTests {
 
         #expect(recoveredID == first.id.uuidString)
         #expect(evaluation.phase == .firstCarePending)
-        #expect(evaluation.starterGiftResult == .pendingFirstCare(recipient: .pet(first.id)))
+        #expect(evaluation.starterGiftResult == .pendingFirstCare(recipient: .island))
         #expect(try context.fetch(FetchDescriptor<Human>()).isEmpty)
     }
 

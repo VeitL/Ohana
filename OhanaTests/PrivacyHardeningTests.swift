@@ -189,16 +189,22 @@ struct PrivacyHardeningTests {
         context.insert(plant)
         try context.save()
 
-        let result = PlantCareCommandService.recordCare(
-            .photo,
+        let request = PlantCareCommandRequest(
+            careType: .photo,
             plant: plant,
-            executorId: nil,
-            context: context,
+            executorID: nil,
             now: Date(timeIntervalSince1970: 1_800_000_000),
-            photoData: largeJPEG,
+            photoData: largeJPEG
+        )
+        let options = PlantCareCommandOptions(
             syncCarePlan: false,
             scheduleNotifications: false,
             awardRewards: false
+        )
+        let result = PlantCareCommandService.recordCare(
+            request,
+            context: context,
+            options: options
         )
 
         let log = try #require(try context.fetch(FetchDescriptor<PlantCareLog>()).first)

@@ -10,13 +10,16 @@
 ## Current Read
 
 - Last compacted: 2026-07-11.
-- Open follow-ups: 12 total: P1 = 8, P2 = 4, P3 = 0.
+- Open follow-ups: 9 total: P1 = 5, P2 = 4, P3 = 0.
 - Open P0: 0.
-- First-release repository blocker: none.
-- First-release proof/product/correctness gaps: TFU-20260710-007 through
-  TFU-20260710-009.
-- Current decision: continue hardening; do not claim RC/App Store readiness
-  until the first-release P1 items are explicitly dispositioned.
+- First-release repository blocker: none. TFU-20260711-002 is closed; the
+  wallet, full architecture, production-complexity, and release-static gates
+  pass on the current worktree.
+- First-release product/configuration gap: none. D24 approves iPhone-only,
+  iOS 26.2+, with native iPad/watchOS deferred.
+- Current decision: finish the four physical-device P1 items. The remaining
+  CloudKit P1 is explicitly deferred and unreachable in Solo. Do not claim
+  RC/App Store readiness until all release-reachable P1 items are dispositioned.
 
 ## Priority Meaning
 
@@ -28,39 +31,6 @@
 | P3 | Future improvement with no current release impact. |
 
 ## Open Items
-
-### TFU-20260710-007 - Enforce Valid Expense Values At Domain And Restore Boundaries
-
-- Priority / bucket: P1, first-release-reachable business/data correctness.
-- Blocker: UI validation does not prevent command or restore paths from writing
-  non-positive or non-finite expense values.
-- Next action: define one domain invariant and reject invalid values in command,
-  import/preflight, and rehydrate paths with localized recovery errors.
-- Close when: zero, negative, NaN, and infinity tests fail before persistence;
-  existing valid expense and backup round trips remain green.
-
-### TFU-20260710-008 - Separate Reduce Motion From Efficient Motion
-
-- Priority / bucket: P1, first-release accessibility/runtime behavior.
-- Blocker: Reduce Motion maps to the same `.efficient` policy used for energy
-  degradation, while some callers only test `allowsMotion`; motion semantics can
-  remain active when the user requested reduction.
-- Next action: define full/efficient/minimal behavior at `AppWorkloadPolicy`,
-  audit callers, and add route/animation policy tests before device acceptance.
-- Close when: Reduce Motion produces the documented minimal behavior across the
-  core onboarding/Home/quick-care/modal paths without removing essential state
-  feedback.
-
-### TFU-20260710-009 - Decide And Verify The Supported Device Matrix
-
-- Priority / bucket: P1, product/release configuration decision.
-- Blocker: minimum iOS 26.2 and iPad support are current build facts, but the
-  product has no approved launch-device policy or oldest-device proof.
-- Next action: the product owner confirms minimum iOS, iPhone/iPad scope, and
-  Storefront availability; then align project settings, docs, screenshots, and
-  the physical-device test matrix in one release-config change.
-- Close when: the signed Archive, App Store Connect device support, OS matrix,
-  and recorded oldest-supported-device smoke run agree.
 
 ### TFU-20260614-014 - Validate CloudSync Live-Apply Policy When Family Enables
 
@@ -95,23 +65,62 @@
 ### TFU-20260706-001 - Validate Human Workout HealthKit On A Real Device
 
 - Priority / bucket: P1, external/manual validation.
-- Blocker: simulator/build proof cannot validate real Health authorization,
-  Activity Summary values, or workout sample reads.
-- Next action: run the signed Human Workout checklist with real Health data.
+- Progress: on 2026-07-11, the user confirmed that HealthKit authorization and
+  the other displayed Health values matched on the physical-device signed
+  build. Exercise, Stand, and the concentric activity rings did not populate.
+  A selected workout did persist—the import control changed to its delete
+  state—but the UI gave no visible success message. The local repair now reads
+  Exercise Time and Stand Hour directly when Activity Summary is absent or
+  partial, keeps ring goals unavailable instead of inventing them, and exposes
+  localized import success/failure feedback. Targeted Unit/Integration passed
+  7/7; this repair is not yet signed-device verified.
+- Blocker: the repaired Exercise/Stand reads, real activity-goal rings, visible
+  import feedback, relaunch persistence, denial, and revocation recovery remain
+  unverified on a newly signed build with real Health data.
+- Next action: install a newly signed build without clearing app data, grant the
+  newly requested Exercise Time and Stand Hour reads if prompted, then repeat
+  summary refresh, one selected-workout import, relaunch, denial, and revocation.
 - Close when: permission, read-only summaries, selected workout import, relaunch
   persistence, denial, and revocation behavior are recorded.
 
 ### TFU-20260709-001 - Validate Solo Release Privacy And Runtime Paths On iPhone
 
 - Priority / bucket: P1, external/manual validation.
-- Blocker: local proof cannot establish OS backup contents, signed capability
-  profile, public URLs, the final App Store Connect Apple ID/storefront record,
-  hardware performance/energy, locked-screen location, or iCloud Drive failure
-  recovery. The app hides Rate App until that Apple ID is verified.
-- Next action: execute R1-R6 in `docs/release-true-device-test-plan.md`, including
-  encrypted device backup/restore inspection for the new Application Support
-  backup-exclusion policy.
-- Close when: all R1-R6 results identify the signed Release build and device;
+- Progress: on 2026-07-11 a development-signed Release 1.0 (1) Archive succeeded
+  from commit `eece7d642` plus the current dirty worktree. Strict code-sign
+  verification passed; the product is arm64, iPhone-only, iOS 26.2+, contains
+  no extension/watchOS content, and exposes HealthKit plus CloudDocuments but
+  no CloudKit, APNs, or App Group entitlement. The profile includes the current
+  iPhone 17 Pro Max, and the same archived app installed and launched on iOS
+  26.5.2 (23F84). After explicit approval, the local app container was cleared
+  by uninstalling the app; the same Archive was reinstalled and launched for a
+  clean first-run smoke without deleting iCloud Drive/external backups. The
+  public privacy-policy URL is anonymously reachable. The on-screen core smoke
+  then reproduced a release blocker in the preserved one-Pet/no-Human sample:
+  Oasis showed 59🥥 but tree injection only vibrated. The current worktree now
+  assigns the 50🥥 D17 grant to `system:island`, migrates an old member-owned
+  gift once without changing the total, and lets tree injection atomically use
+  the formal island total. Targeted Unit/Integration passed 32/32 and the
+  no-Human Pet-first five-injection UI path passed 1/1 on the iPhone 17 simulator.
+  A new incremental `-O` Release device build passed strict signing, overlaid
+  without uninstalling, and launched on the same iPhone. A read-only device
+  store copy proves the migration committed exactly once: `system:island=50`,
+  Pet=9, `system:legacy=0`, with paired -50/+50 transfer facts and a marker.
+  On 2026-07-11, the user physically tapped tree injection on the already
+  overlaid Release and confirmed the expected coconut deduction and energy
+  increase. The preserved 59🥥 Oasis regression is therefore device-verified.
+- Blocker: the current machine has only an Apple Development identity, so this
+  does not establish App Store distribution, the final App Store Connect Apple
+  ID/storefront, or Store validation of screenshots. The smallest physical
+  iPhone, OS backup contents, hardware performance/energy, locked-screen
+  location, notification dialogs, HealthKit data/revocation, and iCloud Drive
+  failure recovery remain unverified. The app hides Rate App until the Store
+  identity is verified.
+- Next action: finish R1-R6 and run the same R0 smoke on the smallest supported
+  physical iPhone; obtain App Store distribution/App Store Connect evidence
+  and inspect an encrypted device backup for the Application Support exclusion
+  policy.
+- Close when: all R0-R6 results identify the signed Release build and device;
   any defect is fixed or split into a scoped follow-up.
 
 ### TFU-20260629-004 - Finish Pet Simulator GUI Depth

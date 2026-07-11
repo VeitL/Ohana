@@ -257,18 +257,13 @@ enum PlantBatchCareCommandService {
             let existingRestorePoint = restorePointsByPlantID[plant.id]
             let restorePointBeforeCommand = existingRestorePoint ?? restorePoint(for: plant)
 
-            let result = PlantCareCommandService.recordCare(
-                selection.careType,
+            let result = recordCare(
+                selection: selection,
                 plant: plant,
                 executorId: executorId,
-                context: context,
                 now: now,
-                careLedger: CareLedgerService(),
                 economy: deferredEconomy,
-                syncCarePlan: false,
-                scheduleNotifications: false,
-                saveChanges: false,
-                awardRewards: false
+                context: context
             )
             guard result.didPersist else {
                 skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .commandRejected))
@@ -347,6 +342,35 @@ enum PlantBatchCareCommandService {
             estimatedCoconutDelta: estimatedCoconutDelta,
             didPersist: true,
             persistenceErrorDescription: nil
+        )
+    }
+
+    private static func recordCare(
+        selection: PlantBatchCareSelection,
+        plant: Plant,
+        executorId: String?,
+        now: Date,
+        economy: CareEventEconomyAwarding,
+        context: ModelContext
+    ) -> PlantCareCommandResult {
+        let request = PlantCareCommandRequest(
+            careType: selection.careType,
+            plant: plant,
+            executorID: executorId,
+            now: now
+        )
+        let options = PlantCareCommandOptions(
+            careLedger: CareLedgerService(),
+            economy: economy,
+            syncCarePlan: false,
+            scheduleNotifications: false,
+            saveChanges: false,
+            awardRewards: false
+        )
+        return PlantCareCommandService.recordCare(
+            request,
+            context: context,
+            options: options
         )
     }
 

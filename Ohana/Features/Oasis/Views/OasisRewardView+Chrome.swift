@@ -80,16 +80,16 @@ extension OasisRewardView {
 
     var headerCoconutBalanceButton: some View {
         CoconutBalanceCapsule(
-            balance: activeHumanCoconutBalance,
+            balance: availableOasisCoconutBalance,
             showsDeltaAnimation: true,
             deltaAnimationContext: "oasis-\(currentActiveHumanId.isEmpty ? "global" : currentActiveHumanId)"
         ) {
             presentCoconutLog()
         }
         .accessibilityLabel(l.tr(
-            zh: "椰子资产 \(activeHumanCoconutBalance)",
-            en: "Coconut balance \(activeHumanCoconutBalance)",
-            de: "Kokosnuss-Guthaben \(activeHumanCoconutBalance)"
+            zh: "椰子资产 \(availableOasisCoconutBalance)",
+            en: "Coconut balance \(availableOasisCoconutBalance)",
+            de: "Kokosnuss-Guthaben \(availableOasisCoconutBalance)"
         ))
         .accessibilityHint(l.tr(zh: "打开椰子历史", en: "Open coconut history", de: "Kokosnuss-Verlauf öffnen"))
     }

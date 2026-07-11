@@ -16,8 +16,9 @@ Ohana changes must be safe to ship, diagnose, and recover.
 
 ## Change Risk Levels
 
-Start with `scripts/dev-check-changed.sh` for changed files. Escalate only when
-the changed surface needs broader proof. A build is evidence for compiler
+Start with the read-only `scripts/dev-check-changed.sh` for changed files.
+Formatting changes require `--fix-format` plus explicit targets. Escalate only when the
+changed surface needs broader proof. A build is evidence for compiler
 surface, not for behavior, smoothness, privacy, persistence, leaks, or product
 acceptance.
 
@@ -82,12 +83,17 @@ full UI suite as a default response to a local code edit.
 
 | Lane | Command | Use when |
 |---|---|---|
-| Changed-file preflight | `scripts/dev-check-changed.sh` | Every local change; it dispatches syntax and applicable repository audits without starting Xcode by default. |
+| Changed-file preflight | `scripts/dev-check-changed.sh` | Every local change; read-only by default, it dispatches syntax, format lint, and applicable repository audits without starting Xcode. |
+| Feature/module gate | `scripts/module-exit-gate.sh --test OhanaTests/<RelevantTests>` | Changed checks plus targeted Unit/Integration proof and, only when necessary, one high-value UI selector. |
+| Release static gate | `scripts/release-hardening-check.sh --static-only` | Fixture self-tests and the complete strict static audit set without CoreSimulator. |
+| Release unit gate | `scripts/release-hardening-check.sh` | Full static release gate plus the complete unit suite; use `--with-ui` only for RC full UI regression. |
+| Fast optimized Release build | `scripts/build-release-fast.sh` | Repeated optimized compiler/artifact checks. It keeps `-O`, uses incremental compilation, and does not prove runtime behavior, signing, or App Store readiness. |
 | Targeted unit/integration | `scripts/test-simulator.sh -only-testing:OhanaTests/<RelevantTests>` | One service, command, read model, persistence boundary, or regression test changed. |
 | Full unit suite | `scripts/test-unit.sh` or `scripts/module-exit-gate.sh --unit` | Broad module handoff or phase boundary; it does not pull in the UI target. |
 | Release UI smoke | `scripts/test-ui-release-smoke.sh smoke` | First-release onboarding and first-pet path changed. |
 | Domain UI shard | `scripts/test-ui-shard.sh <shard>` | One user-facing domain changed; use `--list` to see the available shards. |
 | Full UI regression | `scripts/test-ui-nightly.sh` | Nightly, release candidate, or an explicitly requested whole-app UI pass. It builds once, then runs sequential shards with one xcresult per shard. |
+| Signed WMO Archive | `scripts/archive-release-local.sh` | RC/signing/device-matrix gates only. It keeps whole-module optimization, writes outside the File Provider-managed repository, verifies code signing/xattrs, and does not upload. |
 | Real-device acceptance | `docs/release-true-device-test-plan.md` | Permissions, HealthKit, background delivery, location, energy, iCloud, biometrics, camera, keyboard, and device-only behavior. |
 
 ## Frequency Matrix
@@ -104,8 +110,10 @@ full UI suite as a default response to a local code edit.
 `scripts/module-exit-gate.sh` defaults to the fast changed/static lane. Repeat
 `--test <target/test>` for targeted Unit/Integration selectors and, only when
 needed, one UI selector. Use `--unit` for the full unit lane and `--full` for
-whole-repository audits plus full unit tests. The complete UI suite remains
-`scripts/test-ui-nightly.sh`.
+the canonical release static baseline plus full unit tests. It does not rerun
+the changed audits after `dev-check-changed.sh`. The complete UI suite remains
+`scripts/test-ui-nightly.sh`, or `scripts/release-hardening-check.sh --with-ui`
+for an explicit RC lane.
 
 UI shards intentionally run sequentially with parallel testing disabled. The UI
 tests launch, reset, seed, and sometimes preserve state in the same simulator;

@@ -6,26 +6,35 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${REPO_ROOT}"
 
-SKIP_BUILD=0
+STATIC_ONLY=0
+RUN_UI=0
 
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/release-hardening-check.sh [--skip-build] [--ui-all-soft]
+  scripts/release-hardening-check.sh [--static-only|--skip-build] [--with-ui]
 
 Purpose:
-  Run the release-hardening baseline checks in the expected order.
+  Run the canonical local release-hardening lane. The default runs full static
+  audits and the complete unit suite. --with-ui appends sequential UI shards.
+  Signing, Archive validation, and physical-device acceptance remain separate.
 
 Options:
-  --skip-build   Run checks that do not require CoreSimulator.
-  --ui-all-soft  Deprecated compatibility no-op; UI/accessibility/smoothness run as strict --all gates.
+  --static-only  Run only checks that do not require CoreSimulator.
+  --skip-build   Deprecated compatibility alias for --static-only.
+  --with-ui      After the unit suite, run the complete sequential UI shard lane.
+  --ui-all-soft  Deprecated compatibility no-op; static UI audits remain strict.
 USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --skip-build)
-      SKIP_BUILD=1
+    --static-only|--skip-build)
+      STATIC_ONLY=1
+      shift
+      ;;
+    --with-ui)
+      RUN_UI=1
       shift
       ;;
     --ui-all-soft)
@@ -42,6 +51,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "${STATIC_ONLY}" == "1" && "${RUN_UI}" == "1" ]]; then
+  echo "--with-ui requires simulator validation; remove --static-only/--skip-build." >&2
+  exit 2
+fi
 
 section() {
   printf '\n== %s ==\n' "$1"
@@ -61,11 +75,27 @@ git diff --check
 section "Audit self-tests (fixtures + scope floor)"
 scripts/tests/run-audit-fixture-tests.sh
 
+section "UI test shard completeness"
+scripts/audit-ui-test-shards.sh
+
 section "Runtime guardrails"
 scripts/audit-runtime-guardrails.sh --all
 
 section "Architecture boundaries"
 scripts/audit-architecture-boundaries.sh --all
+
+section "Production complexity ratchet"
+scripts/tests/run-code-complexity-fixture-tests.sh
+scripts/audit-code-complexity.sh --all
+
+section "Economy boundaries"
+scripts/audit-economy-boundaries.sh --all
+
+section "Member lifecycle"
+scripts/audit-member-lifecycle-gate.sh --all
+
+section "Derived-state lifecycle"
+scripts/audit-derived-state-lifecycle.sh --all
 
 section "Shared-care note metadata"
 scripts/audit-shared-care-note-metadata.sh --all
@@ -78,6 +108,9 @@ scripts/audit-localization-coverage.sh
 
 section "Governance manifests"
 scripts/audit-governance-manifests.sh
+
+section "Agent skill governance"
+scripts/audit-agent-skill-governance.sh
 
 section "Resource integrity"
 scripts/audit-resource-integrity.sh
@@ -98,12 +131,19 @@ fi
 section "Git size"
 scripts/audit-git-size.sh
 
-if [[ "${SKIP_BUILD}" == "1" ]]; then
-  section "Fixed simulator build"
-  echo "Skipped by --skip-build. Run scripts/build-debug-fast.sh before release."
+if [[ "${STATIC_ONLY}" == "1" ]]; then
+  section "Simulator validation"
+  echo "Skipped by --static-only. Full unit and optional UI lanes were not run."
 else
-  section "Fixed simulator build"
-  scripts/build-debug-fast.sh
+  section "Full unit suite (includes app compilation)"
+  scripts/test-unit.sh
+
+  section "Full sequential UI shards"
+  if [[ "${RUN_UI}" == "1" ]]; then
+    scripts/test-ui-nightly.sh
+  else
+    echo "Not selected. Use --with-ui for RC UI regression."
+  fi
 fi
 
-section "Release hardening baseline complete"
+section "Release hardening lane complete"

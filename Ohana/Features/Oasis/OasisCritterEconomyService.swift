@@ -24,6 +24,89 @@ enum OasisRewardWriteError: LocalizedError {
 
 @MainActor
 enum OasisCritterEconomyService {
+    private enum InjectionFundingSource {
+        case island(CoconutAccount)
+        case human(Human, CoconutAccount)
+        case pet(Pet, CoconutAccount)
+
+        var availableBalance: Int {
+            switch self {
+            case let .island(account), let .human(_, account), let .pet(_, account):
+                max(0, account.balance)
+            }
+        }
+
+        var accountKey: String {
+            switch self {
+            case let .island(account), let .human(_, account), let .pet(_, account):
+                account.accountKey
+            }
+        }
+
+        func debitDelta(
+            amount: Int,
+            emoji: String,
+            title: String,
+            sourceModelId: String,
+            transactionKey: String,
+            occurredAt: Date
+        ) -> CoconutWalletDelta {
+            let metadataJSON = "{\"walletScope\":\"islandTotal\",\"oasisInjection\":true}"
+            switch self {
+            case .island:
+                return CoconutWalletDelta.island(
+                    delta: -amount,
+                    entryKind: .spend,
+                    source: .oasis,
+                    title: title,
+                    emoji: emoji,
+                    sourceModelName: "OasisTreeInjection",
+                    sourceModelId: sourceModelId,
+                    metadataJSON: metadataJSON,
+                    occurredAt: occurredAt,
+                    transactionKey: transactionKey
+                )
+            case let .human(human, _):
+                return CoconutWalletDelta.human(
+                    human,
+                    delta: -amount,
+                    entryKind: .spend,
+                    source: .oasis,
+                    title: title,
+                    emoji: emoji,
+                    subjectKind: .household,
+                    subjectId: "island",
+                    sourceModelName: "OasisTreeInjection",
+                    sourceModelId: sourceModelId,
+                    metadataJSON: metadataJSON,
+                    occurredAt: occurredAt,
+                    transactionKey: transactionKey
+                )
+            case let .pet(pet, _):
+                return CoconutWalletDelta.pet(
+                    pet,
+                    delta: -amount,
+                    entryKind: .spend,
+                    source: .oasis,
+                    title: title,
+                    emoji: emoji,
+                    subjectKind: .household,
+                    subjectId: "island",
+                    sourceModelName: "OasisTreeInjection",
+                    sourceModelId: sourceModelId,
+                    metadataJSON: metadataJSON,
+                    occurredAt: occurredAt,
+                    transactionKey: transactionKey
+                )
+            }
+        }
+    }
+
+    private struct InjectionFundingContribution {
+        let source: InjectionFundingSource
+        let amount: Int
+    }
+
     static func currentHuman(
         context: ModelContext,
         activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
@@ -103,6 +186,144 @@ enum OasisCritterEconomyService {
         }
         guard amount > 0 else { return true }
         return CoconutWalletService.balance(for: human, context: context) >= amount
+    }
+
+    static func availableCoconutBalance(context: ModelContext) -> Int {
+        CoconutWalletService.totalBalance(context: context)
+    }
+
+    static func canSpendAvailableCoconuts(_ amount: Int, context: ModelContext) -> Bool {
+        amount <= 0 || availableCoconutBalance(context: context) >= amount
+    }
+
+    @discardableResult
+    static func spendAvailableCoconuts(
+        _ amount: Int,
+        emoji: String,
+        title: String,
+        context: ModelContext,
+        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        wallet providedWallet: CoconutWalletManaging? = nil,
+        questManager providedQuestManager: QuestManager? = nil,
+        updatesProjection: Bool = true
+    ) -> Bool {
+        guard amount > 0 else { return true }
+        let wallet = providedWallet ?? SwiftDataCoconutWalletManager()
+        let questManager = providedQuestManager ?? QuestManager()
+        let fundingSources = injectionFundingSources(
+            context: context,
+            activeHumanSelection: activeHumanSelection
+        )
+        var remaining = amount
+        var contributions: [InjectionFundingContribution] = []
+        for source in fundingSources where remaining > 0 {
+            let contribution = min(remaining, source.availableBalance)
+            guard contribution > 0 else { continue }
+            contributions.append(InjectionFundingContribution(source: source, amount: contribution))
+            remaining -= contribution
+        }
+        guard remaining == 0 else { return false }
+
+        let transactionID = UUID().uuidString
+        let occurredAt = Date()
+        let deltas = contributions.map { contribution in
+            contribution.source.debitDelta(
+                amount: contribution.amount,
+                emoji: emoji,
+                title: title,
+                sourceModelId: transactionID,
+                transactionKey: "oasis:treeInjection:\(transactionID):\(contribution.source.accountKey)",
+                occurredAt: occurredAt
+            )
+        }
+        do {
+            try wallet.apply(
+                deltas: deltas,
+                context: context,
+                save: false,
+                postsRewardFeedback: true,
+                updatesProjection: updatesProjection,
+                projectionManager: questManager
+            )
+            return true
+        } catch {
+            #if DEBUG
+                OhanaLog.error(
+                    "[OasisCritterEconomyService] aggregate spend failed: \(error.localizedDescription)",
+                    category: "Oasis"
+                )
+            #endif
+            return false
+        }
+    }
+
+    private static func injectionFundingSources(
+        context: ModelContext,
+        activeHumanSelection: ActiveHumanSelecting
+    ) -> [InjectionFundingSource] {
+        let selectedHumanID = activeHumanSelection.currentHumanId ?? ""
+        let accounts: [CoconutAccount]
+        do {
+            accounts = try context.fetch(
+                FetchDescriptor<CoconutAccount>(
+                    predicate: #Predicate<CoconutAccount> { $0.balance > 0 },
+                    sortBy: [SortDescriptor(\CoconutAccount.createdAt, order: .forward)]
+                )
+            )
+        } catch {
+            OhanaLog.warning(
+                "[OasisCritterEconomyService] failed to fetch injection funding accounts: \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return []
+        }
+
+        let orderedAccounts = accounts.sorted { lhs, rhs in
+            let lhsPriority = injectionFundingPriority(account: lhs, selectedHumanID: selectedHumanID)
+            let rhsPriority = injectionFundingPriority(account: rhs, selectedHumanID: selectedHumanID)
+            if lhsPriority != rhsPriority { return lhsPriority < rhsPriority }
+            if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+            return lhs.accountKey < rhs.accountKey
+        }
+        return orderedAccounts.compactMap { account in
+            injectionFundingSource(account: account, context: context)
+        }
+    }
+
+    private static func injectionFundingPriority(account: CoconutAccount, selectedHumanID: String) -> Int {
+        if account.accountKey == CoconutAccountKey.islandReserve { return 0 }
+        if account.ownerKind == .human, account.ownerId == selectedHumanID { return 1 }
+        return 2
+    }
+
+    private static func injectionFundingSource(
+        account: CoconutAccount,
+        context: ModelContext
+    ) -> InjectionFundingSource? {
+        if account.ownerKind == .system {
+            return account.accountKey == CoconutAccountKey.islandReserve ? .island(account) : nil
+        }
+        guard let ownerID = UUID(uuidString: account.ownerId) else {
+            return nil
+        }
+        switch account.ownerKind {
+        case .human:
+            var descriptor = FetchDescriptor<Human>(predicate: #Predicate<Human> { $0.id == ownerID })
+            descriptor.fetchLimit = 1
+            guard let humans = try? context.fetch(descriptor),
+                  let human = humans.first,
+                  EconomyWalletWritePolicy.canWrite(human) else { return nil }
+            return .human(human, account)
+        case .pet:
+            var descriptor = FetchDescriptor<Pet>(predicate: #Predicate<Pet> { $0.id == ownerID })
+            descriptor.fetchLimit = 1
+            guard let pets = try? context.fetch(descriptor),
+                  let pet = pets.first,
+                  EconomyWalletWritePolicy.canWrite(pet) else { return nil }
+            return .pet(pet, account)
+        case .system:
+            return nil
+        }
     }
 
     @discardableResult

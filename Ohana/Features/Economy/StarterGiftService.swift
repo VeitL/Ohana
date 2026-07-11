@@ -23,6 +23,7 @@ enum StarterGiftService {
     static let giftAmount = StarterGiftPolicy.giftAmount
 
     enum Recipient: Equatable {
+        case island
         case human(UUID)
         case pet(UUID)
     }
@@ -36,14 +37,57 @@ enum StarterGiftService {
         case persistenceFailed
     }
 
-    private enum RecipientEntity {
-        case human(Human)
-        case pet(Pet)
+    private enum LegacyGiftTransferSource {
+        case human(Human, balance: Int)
+        case pet(Pet, balance: Int)
 
-        var value: Recipient {
+        var balance: Int {
             switch self {
-            case let .human(human): .human(human.id)
-            case let .pet(pet): .pet(pet.id)
+            case let .human(_, balance), let .pet(_, balance):
+                balance
+            }
+        }
+
+        func debitDelta(
+            amount: Int,
+            title: String,
+            emoji: String,
+            sourceModelName: String,
+            sourceModelId: String,
+            metadataJSON: String,
+            transactionKey: String
+        ) -> CoconutWalletDelta {
+            switch self {
+            case let .human(human, _):
+                .human(
+                    human,
+                    delta: -amount,
+                    entryKind: .transferOut,
+                    source: .starterGift,
+                    title: title,
+                    emoji: emoji,
+                    subjectKind: .household,
+                    subjectId: "island",
+                    sourceModelName: sourceModelName,
+                    sourceModelId: sourceModelId,
+                    metadataJSON: metadataJSON,
+                    transactionKey: transactionKey
+                )
+            case let .pet(pet, _):
+                .pet(
+                    pet,
+                    delta: -amount,
+                    entryKind: .transferOut,
+                    source: .starterGift,
+                    title: title,
+                    emoji: emoji,
+                    subjectKind: .household,
+                    subjectId: "island",
+                    sourceModelName: sourceModelName,
+                    sourceModelId: sourceModelId,
+                    metadataJSON: metadataJSON,
+                    transactionKey: transactionKey
+                )
             }
         }
     }
@@ -73,8 +117,24 @@ enum StarterGiftService {
         wallet providedWallet: CoconutWalletManaging? = nil,
         projectionManager: QuestManager? = nil
     ) -> Result {
+        _ = activeHumanID
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
+        do {
+            try migrateLegacyRecipientGiftIfNeeded(
+                context: context,
+                wallet: wallet,
+                projectionManager: projectionManager
+            )
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: projectionManager)
+            OhanaLog.error(
+                "[StarterGiftService] legacy gift ownership migration failed: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return .persistenceFailed
+        }
         if defaults.bool(forKey: StarterGiftStorageKey.claimed) {
             return .alreadyHandled
         }
@@ -97,20 +157,17 @@ enum StarterGiftService {
             return .markedExistingUser
         }
 
-        guard let pet = firstActivePet(context: context) else {
+        guard firstActivePet(context: context) != nil else {
             AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_pet", valueMS: 0)
             return .pendingFirstPet
         }
 
-        let recipient: RecipientEntity = activeHuman(matching: activeHumanID ?? "", context: context)
-            .map(RecipientEntity.human) ?? .pet(pet)
         guard hasRecordedFirstCare(context: context) else {
             AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_care", valueMS: 0)
-            return .pendingFirstCare(recipient: recipient.value)
+            return .pendingFirstCare(recipient: .island)
         }
 
         return claim(
-            for: recipient,
             context: context,
             defaults: defaults,
             careLedger: careLedger,
@@ -145,7 +202,6 @@ enum StarterGiftService {
 
     @MainActor
     private static func claim(
-        for recipient: RecipientEntity,
         context: ModelContext,
         defaults: UserDefaults,
         careLedger: CareLedgerRecording,
@@ -154,63 +210,12 @@ enum StarterGiftService {
     ) -> Result {
         let title = localizedGiftTitle()
         let occurredAt = Date()
-        let subjectKind: CareLedgerSubjectKind
-        let subjectID: String
-        let walletDelta: (CareLedgerEvent) -> CoconutWalletDelta
-        switch recipient {
-        case let .human(human):
-            subjectKind = .human
-            subjectID = human.id.uuidString
-            walletDelta = { ledger in
-                .human(
-                    human,
-                    delta: giftAmount,
-                    entryKind: .reward,
-                    source: .starterGift,
-                    title: title,
-                    emoji: "🎁",
-                    actorId: human.id.uuidString,
-                    actorName: human.name,
-                    subjectKind: .human,
-                    subjectId: human.id.uuidString,
-                    sourceModelName: "CareLedgerEvent",
-                    sourceModelId: ledger.id.uuidString,
-                    careLedgerEventId: ledger.id.uuidString,
-                    metadataJSON: "{\"starterGift\":true}",
-                    occurredAt: occurredAt,
-                    transactionKey: "starterGift:v2:\(CoconutAccountKey.human(human.id))"
-                )
-            }
-        case let .pet(pet):
-            subjectKind = .pet
-            subjectID = pet.id.uuidString
-            walletDelta = { ledger in
-                .pet(
-                    pet,
-                    delta: giftAmount,
-                    entryKind: .reward,
-                    source: .starterGift,
-                    title: title,
-                    emoji: "🎁",
-                    actorId: nil,
-                    actorName: nil,
-                    subjectKind: .pet,
-                    subjectId: pet.id.uuidString,
-                    sourceModelName: "CareLedgerEvent",
-                    sourceModelId: ledger.id.uuidString,
-                    careLedgerEventId: ledger.id.uuidString,
-                    metadataJSON: "{\"starterGift\":true}",
-                    occurredAt: occurredAt,
-                    transactionKey: "starterGift:v2:\(CoconutAccountKey.pet(pet.id))"
-                )
-            }
-        }
         let ledger = careLedger.record(
             occurredAt: occurredAt,
             actorKind: .system,
             actorId: nil,
-            subjectKind: subjectKind,
-            subjectId: subjectID,
+            subjectKind: .household,
+            subjectId: nil,
             eventKind: .coconut,
             actionType: "starterGift",
             amountValue: Double(giftAmount),
@@ -224,13 +229,27 @@ enum StarterGiftService {
             coconutDelta: giftAmount,
             rewardLogId: nil,
             privacyFieldRaw: nil,
-            metadataJSON: "{\"economyVersion\":2,\"starterGift\":true,\"growthXP\":0,\"coconutBase\":\(giftAmount),\"coconutBonus\":0}",
+            metadataJSON: "{\"economyVersion\":3,\"starterGift\":true,\"walletScope\":\"island\",\"growthXP\":0,\"coconutBase\":\(giftAmount),\"coconutBonus\":0}",
             context: context,
             save: false
         )
         do {
             try wallet.apply(
-                deltas: [walletDelta(ledger)],
+                deltas: [
+                    .island(
+                        delta: giftAmount,
+                        entryKind: .reward,
+                        source: .starterGift,
+                        title: title,
+                        emoji: "🎁",
+                        sourceModelName: "CareLedgerEvent",
+                        sourceModelId: ledger.id.uuidString,
+                        careLedgerEventId: ledger.id.uuidString,
+                        metadataJSON: "{\"starterGift\":true,\"walletScope\":\"island\"}",
+                        occurredAt: occurredAt,
+                        transactionKey: "starterGift:v3:\(CoconutAccountKey.islandReserve)"
+                    )
+                ],
                 context: context,
                 save: false,
                 postsRewardFeedback: false,
@@ -250,7 +269,117 @@ enum StarterGiftService {
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
         defaults.set(false, forKey: StarterGiftStorageKey.pending)
         AppPerformanceMonitor.shared.record("starter_gift_claimed", valueMS: 0, note: "amount=\(giftAmount)")
-        return .claimed(recipient: recipient.value, amount: giftAmount)
+        return .claimed(recipient: .island, amount: giftAmount)
+    }
+
+    @MainActor
+    private static func migrateLegacyRecipientGiftIfNeeded(
+        context: ModelContext,
+        wallet: CoconutWalletManaging,
+        projectionManager: QuestManager?
+    ) throws {
+        let starterGiftSource = CoconutWalletSource.starterGift.rawValue
+        var legacyDescriptor = FetchDescriptor<CoconutLedgerEntry>(
+            predicate: #Predicate<CoconutLedgerEntry> { entry in
+                entry.sourceRaw == starterGiftSource && entry.delta > 0
+            },
+            sortBy: [SortDescriptor(\CoconutLedgerEntry.occurredAt, order: .forward)]
+        )
+        legacyDescriptor.fetchLimit = 8
+        guard let legacyGift = try context.fetch(legacyDescriptor).first(where: {
+            $0.ownerKind != .system && $0.transactionKey.hasPrefix("starterGift:v2:")
+        }) else {
+            return
+        }
+
+        let migrationModelName = "StarterGiftOwnershipMigration"
+        let migrationModelID = legacyGift.id.uuidString
+        var migrationDescriptor = FetchDescriptor<CoconutLedgerEntry>(
+            predicate: #Predicate<CoconutLedgerEntry> { entry in
+                entry.sourceModelName == migrationModelName && entry.sourceModelId == migrationModelID
+            }
+        )
+        migrationDescriptor.fetchLimit = 1
+        guard try context.fetch(migrationDescriptor).isEmpty else { return }
+
+        let migrationKey = "starterGift:v3:reclassify:\(migrationModelID)"
+        let metadataJSON = "{\"starterGiftOwnershipMigration\":true,\"fromAccountKey\":\"\(legacyGift.accountKey)\",\"toAccountKey\":\"\(CoconutAccountKey.islandReserve)\"}"
+        var deltas: [CoconutWalletDelta] = []
+        if let source = legacyGiftTransferSource(for: legacyGift, context: context) {
+            let transferAmount = min(max(0, legacyGift.delta), source.balance)
+            if transferAmount > 0 {
+                deltas.append(source.debitDelta(
+                    amount: transferAmount,
+                    title: legacyGift.title,
+                    emoji: legacyGift.emoji,
+                    sourceModelName: migrationModelName,
+                    sourceModelId: migrationModelID,
+                    metadataJSON: metadataJSON,
+                    transactionKey: "\(migrationKey):out"
+                ))
+                deltas.append(.island(
+                    delta: transferAmount,
+                    entryKind: .transferIn,
+                    source: .starterGift,
+                    title: legacyGift.title,
+                    emoji: legacyGift.emoji,
+                    sourceModelName: migrationModelName,
+                    sourceModelId: migrationModelID,
+                    metadataJSON: metadataJSON,
+                    occurredAt: legacyGift.occurredAt,
+                    transactionKey: "\(migrationKey):in"
+                ))
+            }
+        }
+        deltas.append(.island(
+            delta: 0,
+            entryKind: .legacyHistory,
+            source: .starterGift,
+            title: legacyGift.title,
+            emoji: legacyGift.emoji,
+            sourceModelName: migrationModelName,
+            sourceModelId: migrationModelID,
+            metadataJSON: metadataJSON,
+            occurredAt: legacyGift.occurredAt,
+            transactionKey: "\(migrationKey):marker",
+            affectsBalance: false
+        ))
+
+        try wallet.apply(
+            deltas: deltas,
+            context: context,
+            save: false,
+            postsRewardFeedback: false,
+            updatesProjection: true,
+            projectionManager: projectionManager
+        )
+        try saveStarterGiftChanges(context: context)
+    }
+
+    @MainActor
+    private static func legacyGiftTransferSource(
+        for entry: CoconutLedgerEntry,
+        context: ModelContext
+    ) -> LegacyGiftTransferSource? {
+        guard let ownerID = UUID(uuidString: entry.ownerId) else { return nil }
+        switch entry.ownerKind {
+        case .human:
+            var descriptor = FetchDescriptor<Human>(predicate: #Predicate<Human> { $0.id == ownerID })
+            descriptor.fetchLimit = 1
+            guard let humans = try? context.fetch(descriptor),
+                  let human = humans.first,
+                  EconomyWalletWritePolicy.canWrite(human) else { return nil }
+            return .human(human, balance: CoconutWalletService.balance(for: human, context: context))
+        case .pet:
+            var descriptor = FetchDescriptor<Pet>(predicate: #Predicate<Pet> { $0.id == ownerID })
+            descriptor.fetchLimit = 1
+            guard let pets = try? context.fetch(descriptor),
+                  let pet = pets.first,
+                  EconomyWalletWritePolicy.canWrite(pet) else { return nil }
+            return .pet(pet, balance: CoconutWalletService.balance(for: pet, context: context))
+        case .system:
+            return nil
+        }
     }
 
     @MainActor
@@ -317,12 +446,6 @@ enum StarterGiftService {
         )
         descriptor.fetchLimit = 1
         return !fetchModelsOrLog(descriptor, context: context, operation: "recover persisted starter gift").isEmpty
-    }
-
-    @MainActor
-    private static func activeHuman(matching id: String, context: ModelContext) -> Human? {
-        let humans = fetchModelsOrLog(FetchDescriptor<Human>(), context: context, operation: "fetch starter gift humans")
-        return humans.first { $0.id.uuidString == id } ?? humans.first
     }
 
     @MainActor

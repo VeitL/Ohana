@@ -90,6 +90,41 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertEqual(projection.coconutCount, 15)
     }
 
+    func testSpendableIslandTotalIncludesIslandReserveButStillExcludesLegacySystemBalance() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let projection = retainUntilProcessExit(QuestManager())
+
+        try CoconutWalletService.apply(
+            deltas: [
+                .island(
+                    delta: 50,
+                    entryKind: .reward,
+                    source: .starterGift,
+                    title: "Starter gift",
+                    transactionKey: "test:island-reserve:starter-gift"
+                ),
+                .system(
+                    delta: 99,
+                    entryKind: .openingBalance,
+                    source: .legacyUserDefaults,
+                    title: "Legacy compatibility balance",
+                    transactionKey: "test:island-reserve:legacy"
+                )
+            ],
+            context: context,
+            save: true,
+            postsRewardFeedback: false,
+            updatesProjection: false
+        )
+
+        CoconutWalletService.refreshQuestProjection(context: context, manager: projection)
+
+        XCTAssertEqual(CoconutWalletService.totalBalance(context: context), 50)
+        XCTAssertEqual(projection.coconutCount, 50)
+        XCTAssertEqual(CoconutWalletService.legacySystemBalance(context: context), 99)
+    }
+
     func testWalletProjectionPublishesWalletRevisionWithoutCommandMutation() {
         let revisionCenter = ReadModelRevisionCenter()
         let questManager = retainUntilProcessExit(

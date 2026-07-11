@@ -109,6 +109,45 @@ struct InsuranceExpenseLedgerTests {
         #expect(human.coconutBalance == 0)
     }
 
+    @Test func invalidReimbursementFailsBeforeMutationAndValidRetryRecovers() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "狗")
+        context.insert(pet)
+        try context.save()
+
+        for _ in 0 ..< 2 {
+            do {
+                _ = try ExpenseCommandService.recordInsuranceReimbursement(
+                    pet: pet,
+                    amount: .nan,
+                    date: makeDate(year: 2026, month: 6, day: 9),
+                    note: "\(ExpenseAmountPolicy.insuranceReimbursementNotePrefix)invalid",
+                    context: context,
+                    executorId: nil
+                )
+                Issue.record("Expected invalid reimbursement rejection")
+            } catch let error as ExpenseAmountValidationError {
+                #expect(error == .invalidInsuranceReimbursement)
+            }
+            #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).isEmpty)
+            #expect(!context.hasChanges)
+        }
+
+        let recovered = try ExpenseCommandService.recordInsuranceReimbursement(
+            pet: pet,
+            amount: 80,
+            date: makeDate(year: 2026, month: 6, day: 9),
+            note: "\(ExpenseAmountPolicy.insuranceReimbursementNotePrefix)valid retry",
+            context: context,
+            executorId: nil
+        )
+        let recoveredExpenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
+        #expect(recoveredExpenses.count == 1)
+        #expect(recoveredExpenses.first?.id == recovered.logID)
+        #expect(recoveredExpenses.first?.amount == -80)
+    }
+
     @Test func updateClaimStatusApprovedWritesReimbursementExpenseLedgerEventOnce() throws {
         let container = try makeContainer()
         let context = container.mainContext

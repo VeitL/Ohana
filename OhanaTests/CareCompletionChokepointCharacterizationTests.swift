@@ -282,7 +282,7 @@ struct CareCompletionChokepointCharacterizationTests {
         resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [pet])
         let questManager = makeQuestManager()
 
-        _ = ExpenseCommandService.recordPetExpense(
+        _ = try ExpenseCommandService.recordPetExpense(
             pet: pet,
             amount: 42,
             date: Date(timeIntervalSince1970: 2100),
@@ -293,7 +293,7 @@ struct CareCompletionChokepointCharacterizationTests {
             questManager: questManager
         )
         UserDefaults.standard.removeObject(forKey: QuestManager.Keys.cooldownLogs)
-        _ = ExpenseCommandService.recordHumanExpense(
+        _ = try ExpenseCommandService.recordHumanExpense(
             human: human,
             amount: 12,
             date: Date(timeIntervalSince1970: 2200),
@@ -371,7 +371,7 @@ struct CareCompletionChokepointCharacterizationTests {
         defer { state.restore() }
         resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [pet])
 
-        let result = ExpenseCommandService.recordPetExpense(
+        let result = try ExpenseCommandService.recordPetExpense(
             pet: pet,
             amount: 18,
             date: Date(timeIntervalSince1970: 2400),

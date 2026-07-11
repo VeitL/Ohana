@@ -53,6 +53,7 @@ nonisolated enum DataBackupPreflightValidator {
             counters: &counters
         )
         try validateTopLevelIdentities(backup, counters: &counters)
+        try validateBusinessValues(backup)
 
         guard counters.recordCount <= DataBackupRestoreLimits.maximumRecordCount,
               counters.mediaBytes <= DataBackupRestoreLimits.maximumMediaBytes else {
@@ -212,6 +213,28 @@ nonisolated enum DataBackupPreflightValidator {
             !components[1].isEmpty &&
             components[1] != "." &&
             components[1] != ".."
+    }
+
+    // MARK: - Business value validation
+
+    private static func validateBusinessValues(_ backup: OhanaBackup) throws {
+        for expense in backup.petExpenseLogs {
+            guard ExpenseAmountPolicy.isValidPersistedExpense(
+                amount: expense.amount,
+                categoryRaw: expense.category,
+                note: expense.note
+            ) else {
+                throw BackupError.invalidRestoreData(.businessValue)
+            }
+        }
+
+        for session in backup.sharedCareSessions ?? [] {
+            guard session.actionKindRaw == SharedCareActionKind.expense.rawValue else { continue }
+            guard let amount = session.totalExpenseAmount,
+                  ExpenseAmountPolicy.isValidUserExpense(amount) else {
+                throw BackupError.invalidRestoreData(.businessValue)
+            }
+        }
     }
 
     // MARK: - Required relationship validation

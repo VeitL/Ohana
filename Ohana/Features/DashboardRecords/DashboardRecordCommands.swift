@@ -359,8 +359,8 @@ struct DashboardRecordCommandExecutor {
         receiptAttachments: [ExpenseReceiptAttachmentDraft] = [],
         command: DomainCommand,
         revisionNote: String
-    ) -> ExpenseCommandResult {
-        let result = ExpenseCommandService.recordPetExpense(
+    ) throws -> ExpenseCommandResult {
+        let result = try ExpenseCommandService.recordPetExpense(
             pet: pet,
             amount: amount,
             date: date,
@@ -392,8 +392,8 @@ struct DashboardRecordCommandExecutor {
         source: CareLedgerSource = .detail,
         command: DomainCommand,
         revisionNote: String
-    ) -> SharedPetActionResult {
-        let result = ExpenseCommandService.recordSharedPetExpense(
+    ) throws -> SharedPetActionResult {
+        let result = try ExpenseCommandService.recordSharedPetExpense(
             sourcePet: sourcePet,
             targets: targets,
             amount: amount,
@@ -453,8 +453,8 @@ struct DashboardRecordCommandExecutor {
         source: CareLedgerSource = .quickAction,
         command: DomainCommand,
         revisionNote: String
-    ) -> ExpenseCommandResult {
-        let result = ExpenseCommandService.recordHumanExpense(
+    ) throws -> ExpenseCommandResult {
+        let result = try ExpenseCommandService.recordHumanExpense(
             human: human,
             amount: amount,
             date: date,

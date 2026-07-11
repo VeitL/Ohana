@@ -162,7 +162,7 @@ enum DocumentExpenseSyncPlanner {
 
 enum InsuranceReimbursementExpenseWriter {
     static func reimbursementNote(productName: String) -> String {
-        "保险报销到账：\(productName)"
+        "\(ExpenseAmountPolicy.insuranceReimbursementNotePrefix)\(productName)"
     }
 
     static func shouldInsertReimbursementLog(

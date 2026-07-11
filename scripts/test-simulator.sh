@@ -8,7 +8,12 @@ cd "${REPO_ROOT}"
 
 export COPYFILE_DISABLE="${COPYFILE_DISABLE:-1}"
 
-SCHEME="${SCHEME:-Ohana}"
+if [[ -n "${SCHEME:-}" ]]; then
+  SCHEME_SOURCE="explicit"
+else
+  SCHEME="$("${REPO_ROOT}/scripts/resolve-test-scheme.sh" "$@")"
+  SCHEME_SOURCE="automatic"
+fi
 SDK="${SDK:-iphonesimulator}"
 CODE_SIGNING_ALLOWED_VALUE="${CODE_SIGNING_ALLOWED:-NO}"
 REQUIRED_SIMULATOR_NAME="${OHANA_SIMULATOR_NAME:-iPhone 17}"
@@ -155,6 +160,9 @@ LOCK_ACQUIRED=1
 printf '%s\n' "$$" > "${LOCK_DIR}/pid"
 
 echo "Xcode action: ${TEST_ACTION} (${SCHEME})"
+if [[ "${SCHEME_SOURCE}" == "automatic" ]]; then
+  echo "Scheme routing: selected ${SCHEME} from the requested test selectors."
+fi
 echo "SDK: ${SDK}"
 echo "Destination: ${DESTINATION}"
 echo "DerivedData: ${DERIVED_DATA_PATH}"

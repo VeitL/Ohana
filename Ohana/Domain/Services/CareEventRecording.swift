@@ -2,6 +2,21 @@ import Foundation
 import SwiftData
 
 typealias CareRecordResult = CareEventService.CareRecordResult
+
+@MainActor
+struct SharedCareRecordRequest {
+    let sourcePet: Pet
+    let targets: [Pet]
+    let careType: CareType
+    let actionKind: SharedCareActionKind
+    let executorID: String?
+    let reward: DomainCareRewardAction
+    let rewardTitle: String?
+    let quality: DomainCareRewardQuality
+    let date: Date
+    let source: CareLedgerSource
+}
+
 @MainActor
 protocol CareEventRecording {
     @discardableResult
@@ -161,32 +176,14 @@ protocol CareEventRecording {
 
     @discardableResult
     func recordSharedCare(
-        sourcePet: Pet,
-        targets: [Pet],
-        type: CareType,
-        actionKind: SharedCareActionKind,
-        context: ModelContext,
-        executorId: String?,
-        reward: DomainCareRewardAction,
-        rewardTitle: String?,
-        quality: DomainCareRewardQuality,
-        date: Date,
-        source: CareLedgerSource
+        _ request: SharedCareRecordRequest,
+        context: ModelContext
     ) -> (humanGot: Int, petGot: Int)
 
     @discardableResult
     func recordSharedCareFact(
-        sourcePet: Pet,
-        targets: [Pet],
-        type: CareType,
-        actionKind: SharedCareActionKind,
-        context: ModelContext,
-        executorId: String?,
-        reward: DomainCareRewardAction,
-        rewardTitle: String?,
-        quality: DomainCareRewardQuality,
-        date: Date,
-        source: CareLedgerSource
+        _ request: SharedCareRecordRequest,
+        context: ModelContext
     ) -> SharedPetActionResult
 
     @discardableResult

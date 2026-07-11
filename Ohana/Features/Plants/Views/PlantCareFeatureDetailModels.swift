@@ -14,15 +14,8 @@ struct PlantCareFeatureLogDraft: Identifiable {
     let careType: PlantCareType
 }
 
-struct PlantWateringChartPoint: Identifiable, Equatable, Sendable {
-    let id: String
-    let date: Date
-    let intervalDays: Int
-}
-
 struct PlantWateringSignal: Identifiable {
     let id: String
-    let icon: String
     let title: String
     let value: String
     let tint: Color
@@ -35,6 +28,37 @@ struct PlantCareAggregateInsight: Identifiable {
     let value: String
     let detail: String
     let tint: Color
+}
+
+struct PlantWaterPrimaryCardModel {
+    let title: String
+    let habitSummary: String
+    let metricValue: String
+    let signals: [PlantWateringSignal]
+    let advice: String?
+}
+
+struct PlantWaterChartCardModel {
+    let plantName: String
+    let plannedIntervalDays: Int
+    let points: [OhanaMinimalChartPoint]
+    let wateringLogCount: Int
+    let isLoading: Bool
+}
+
+enum PlantWaterDiscoveryAction: String {
+    case plan
+    case history
+    case detail
+}
+
+struct PlantWaterDiscoveryItem: Identifiable {
+    let id: String
+    let icon: String
+    let title: String
+    let value: String
+    let tint: Color
+    let action: PlantWaterDiscoveryAction?
 }
 
 enum PlantWaterGuidedMode: String, CaseIterable, Identifiable {

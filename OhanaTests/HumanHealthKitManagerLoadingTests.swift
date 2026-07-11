@@ -19,6 +19,12 @@ struct HumanHealthKitManagerLoadingTests {
         #expect(source.contains("fallback: HumanWorkoutHealthSnapshot.empty.hourlySteps"))
         #expect(source.contains("fallback: HumanWorkoutHealthSnapshot.empty.hourlyDistanceKm"))
         #expect(source.contains("let activeEnergy = resolvedHealthValue"))
+        #expect(source.contains("async let exerciseResult"))
+        #expect(source.contains("async let standHoursResult"))
+        #expect(source.contains(".appleExerciseTime"))
+        #expect(source.contains(".appleStandHour"))
+        #expect(source.contains("try await appleStandHours("))
+        #expect(source.contains("HumanHealthActivityResolver.resolve("))
         #expect(source.contains("let activity = resolvedHealthValue"))
         #expect(source.contains("errorMessage = firstError.localizedDescription"))
         #expect(source.contains("var components = calendar.dateComponents([.era, .year, .month, .day], from: date)"))
@@ -27,6 +33,19 @@ struct HumanHealthKitManagerLoadingTests {
 
         let rawContinuationCount = source.components(separatedBy: "withCheckedThrowingContinuation").count - 1
         #expect(rawContinuationCount == 1)
+    }
+
+    @Test func workoutImportAndUnavailableGoalsHaveVisibleStatus() throws {
+        let source = try source("Ohana/Features/Workouts/Views/HumanWorkoutSummaryView.swift")
+
+        #expect(source.contains("presentWorkoutImportResult(result)"))
+        #expect(source.contains("运动已导入"))
+        #expect(source.contains("Import failed. Try again."))
+        #expect(source.contains("appServices.islandToasts.show(message)"))
+        #expect(source.contains("UIAccessibility.post(notification: .announcement"))
+        #expect(source.contains(".islandToastOverlay()"))
+        #expect(source.contains("snapshot.hasCompleteActivityGoals"))
+        #expect(source.contains("human-workout-activity-goals-unavailable"))
     }
 
     private func source(_ path: String) throws -> String {

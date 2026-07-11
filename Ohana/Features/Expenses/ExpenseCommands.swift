@@ -48,6 +48,76 @@ enum ExpenseCommandService {
         awardsReward: Bool = true,
         questManager providedQuestManager: QuestManager? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
+    ) throws -> ExpenseCommandResult {
+        try ExpenseAmountPolicy.validateUserExpense(amount)
+        return recordPetExpenseFact(
+            pet: pet,
+            amount: amount,
+            date: date,
+            category: category,
+            note: note,
+            context: context,
+            executorId: executorId,
+            source: source,
+            receiptTitle: receiptTitle,
+            receiptCategory: receiptCategory,
+            receiptAttachments: receiptAttachments,
+            awardsReward: awardsReward,
+            mutationSource: .userCommand,
+            questManager: providedQuestManager,
+            careLedger: providedCareLedger
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordInsuranceReimbursement(
+        pet: Pet,
+        amount: Double,
+        date: Date,
+        note: String,
+        context: ModelContext,
+        executorId: String? = nil,
+        source: CareLedgerSource = .detail,
+        careLedger providedCareLedger: CareLedgerRecording? = nil
+    ) throws -> ExpenseCommandResult {
+        let storedAmount = try ExpenseAmountPolicy.storedInsuranceReimbursementAmount(from: amount)
+        return recordPetExpenseFact(
+            pet: pet,
+            amount: storedAmount,
+            date: date,
+            category: .insurancePremium,
+            note: note,
+            context: context,
+            executorId: executorId,
+            source: source,
+            receiptTitle: nil,
+            receiptCategory: nil,
+            receiptAttachments: [],
+            awardsReward: false,
+            mutationSource: .domainService,
+            questManager: nil,
+            careLedger: providedCareLedger
+        )
+    }
+
+    @MainActor
+    private static func recordPetExpenseFact(
+        pet: Pet,
+        amount: Double,
+        date: Date,
+        category: ExpenseCategory,
+        note: String,
+        context: ModelContext,
+        executorId: String?,
+        source: CareLedgerSource,
+        receiptTitle: String?,
+        receiptCategory: DocumentCategory?,
+        receiptAttachments: [ExpenseReceiptAttachmentDraft],
+        awardsReward: Bool,
+        mutationSource: DomainMutationSourceKind,
+        questManager providedQuestManager: QuestManager?,
+        careLedger providedCareLedger: CareLedgerRecording?
     ) -> ExpenseCommandResult {
         let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let intent = DomainCareFactCreateIntent(
@@ -59,7 +129,7 @@ enum ExpenseCommandService {
             ),
             occurredAt: date,
             executorId: executorId,
-            source: .userCommand
+            source: mutationSource
         )
         guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
             pet: pet,
@@ -186,7 +256,8 @@ enum ExpenseCommandService {
         executorId: String? = nil,
         source: CareLedgerSource = .detail,
         careEvents providedCareEvents: CareEventRecording? = nil
-    ) -> SharedPetActionResult {
+    ) throws -> SharedPetActionResult {
+        try ExpenseAmountPolicy.validateUserExpense(amount)
         let careEvents = providedCareEvents ?? CareEventService()
         let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         return careEvents.recordSharedExpense(
@@ -215,7 +286,8 @@ enum ExpenseCommandService {
         source: CareLedgerSource = .quickAction,
         questManager providedQuestManager: QuestManager? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
-    ) -> ExpenseCommandResult {
+    ) throws -> ExpenseCommandResult {
+        try ExpenseAmountPolicy.validateUserExpense(amount)
         let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let intent = DomainCareFactCreateIntent(
             kind: .expense(

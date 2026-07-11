@@ -33,7 +33,6 @@ struct PlantCareFeatureDetailView: View {
     @State private var routeSnapshot = PlantCareFeatureRouteSnapshot.empty
     @State private var routeSnapshotRefreshTask: Task<Void, Never>?
     @State private var routeSnapshotRefreshGeneration = 0
-    @Namespace private var waterModeSelectionNamespace
 
     private var l: L10n { L10n(appLanguage) }
     private var isAggregate: Bool { focusedPlantID == nil }
@@ -85,6 +84,9 @@ struct PlantCareFeatureDetailView: View {
     }
     private var primaryCareType: PlantCareType {
         focusedCareType ?? feature.primaryCareType
+    }
+    private var scheduleCommands: PlantCareFeatureScheduleCommandExecutor {
+        PlantCareFeatureScheduleCommandExecutor(context: modelContext, services: appServices)
     }
 
     private func matchesFocusedFeature(_ careType: PlantCareType) -> Bool {
@@ -243,14 +245,6 @@ struct PlantCareFeatureDetailView: View {
 
     private var plantCareFeatureInsightColumns: [GridItem] {
         [GridItem(.adaptive(minimum: 156), spacing: 10)]
-    }
-
-    private var plantCareFeatureWaterSignalColumns: [GridItem] {
-        [GridItem(.adaptive(minimum: 118), spacing: 10)]
-    }
-
-    private var plantCareFeatureDiscoveryColumns: [GridItem] {
-        [GridItem(.adaptive(minimum: 150), spacing: 10)]
     }
 
     private var duePlantCount: Int {
@@ -487,17 +481,26 @@ struct PlantCareFeatureDetailView: View {
 
     private func waterGuidedHome(for plant: Plant) -> some View {
         VStack(spacing: 14) {
-            waterModeStrip(for: plant)
-            waterPrimaryTaskCard(for: plant)
+            PlantWaterModeStrip(l: l, selectedMode: $selectedWaterMode)
+            PlantWaterPrimaryTaskCard(
+                l: l,
+                model: waterPrimaryCardModel(for: plant),
+                onOpenPlan: { selectWaterMode(.plan) },
+                onQuickRecord: { quickRecordWater(for: plant) }
+            )
 
             switch selectedWaterMode {
             case .overview:
-                waterGuidedMiniChartCard(for: plant)
-                waterCompactDiscoveryDock(for: plant)
+                PlantWaterGuidedMiniChartCard(l: l, model: waterChartCardModel(for: plant))
+                PlantWaterCompactDiscoveryDock(
+                    items: waterDiscoveryItems(for: plant),
+                    adviceItems: waterAdviceItems(for: plant, task: wateringTask(for: plant)),
+                    onSelect: { handleWaterDiscoveryAction($0, plant: plant) }
+                )
             case .plan:
                 waterScheduleControlSection(plant)
             case .history:
-                waterGuidedMiniChartCard(for: plant)
+                PlantWaterGuidedMiniChartCard(l: l, model: waterChartCardModel(for: plant))
                 recordSection
             }
         }
@@ -505,153 +508,15 @@ struct PlantCareFeatureDetailView: View {
         .accessibilityIdentifier("plant-care-feature-water-guided-home")
     }
 
-    private func waterModeStrip(for _: Plant) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 7) {
-                Label(l.tr(zh: "浇水模式", en: "Watering mode", de: "Gießmodus"), systemImage: "switch.2")
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .labelStyle(.titleAndIcon)
-                Spacer(minLength: 8)
-                Text(selectedWaterMode.title(l: l))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goTeal)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-
-            HStack(spacing: 8) {
-                ForEach(PlantWaterGuidedMode.allCases) { mode in
-                    let isSelected = selectedWaterMode == mode
-                    Button {
-                        OhanaFeedback.light()
-                        withAnimation(GoMotion.selection) {
-                            selectedWaterMode = mode
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: mode.icon)
-                                .font(OhanaFont.adaptive(size: 12, weight: .black))
-                                .accessibilityHidden(true)
-                            Text(mode.title(l: l))
-                                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
-                        }
-                        .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaSecondaryText)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 42)
-                        .background {
-                            if isSelected {
-                                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
-                                    .fill(Color.goTeal)
-                                    .matchedGeometryEffect(id: "plant-water-mode-selection", in: waterModeSelectionNamespace)
-                            } else {
-                                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
-                                    .fill(Color.goTeal.opacity(0.12))
-                            }
-                        }
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityIdentifier("plant-care-feature-water-mode-\(mode.rawValue)")
-                }
-            }
-        }
-        .padding(13)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardSoft)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-care-feature-water-mode-strip")
-    }
-
-    private func waterPrimaryTaskCard(for plant: Plant) -> some View {
+    private func waterPrimaryCardModel(for plant: Plant) -> PlantWaterPrimaryCardModel {
         let task = wateringTask(for: plant)
-        let signals = Array(waterSignals(for: plant, task: task).prefix(3))
-        let advice = waterAdviceItems(for: plant, task: task).first
-        return VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                Label(l.tr(zh: "浇水", en: "Watering", de: "Gießen"), systemImage: "drop.fill")
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .labelStyle(.titleAndIcon)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 7)
-                    .background(Color.goTeal, in: Capsule())
-
-                Spacer()
-
-                Button {
-                    OhanaFeedback.light()
-                    withAnimation(GoMotion.selection) {
-                        selectedWaterMode = .plan
-                    }
-                } label: {
-                    Image(systemName: "gearshape.fill") // a11y: allow decorative plan glyph; accessibilityLabel names the button.
-                        .font(OhanaFont.adaptive(size: 14, weight: .black))
-                        .foregroundStyle(Color.goTeal)
-                        .frame(width: 44, height: 44)
-                        .background(Color.ohanaControlFill, in: Circle())
-                        .contentShape(Circle())
-                        .accessibilityHidden(true)
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "管理浇水计划", en: "Manage watering plan", de: "Gießplan verwalten"))
-                .accessibilityIdentifier("plant-care-feature-water-card-plan")
-            }
-
-            HStack(alignment: .bottom, spacing: 14) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(waterPrimaryTitle(for: plant, task: task))
-                        .font(OhanaFont.adaptive(size: 23, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
-
-                    Text(waterHabitSummary(for: plant, task: task))
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
-                }
-
-                Spacer(minLength: 8)
-
-                Text(waterPrimaryMetricValue(for: plant, task: task))
-                    .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goTeal)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.52)
-                    .contentTransition(.numericText())
-            }
-
-            HStack(spacing: 8) {
-                ForEach(signals) { signal in
-                    waterGuidedMetricPill(signal)
-                }
-            }
-
-            if let advice {
-                waterGuidedNotice(text: advice, tint: Color.goTeal)
-            }
-
-            Button {
-                OhanaFeedback.medium()
-                quickRecordWater(for: plant)
-            } label: {
-                Label(l.tr(zh: "快速记录已浇水", en: "Log watered now", de: "Jetzt Gießen erfassen"), systemImage: "checkmark.circle.fill")
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .labelStyle(.titleAndIcon)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color.goTeal, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityIdentifier("plant-care-feature-water-quick-log")
-        }
-        .padding(16)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardLarge)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-care-feature-water-primary-card")
+        return PlantWaterPrimaryCardModel(
+            title: waterPrimaryTitle(for: plant, task: task),
+            habitSummary: waterHabitSummary(for: plant, task: task),
+            metricValue: waterPrimaryMetricValue(for: plant, task: task),
+            signals: Array(waterSignals(for: plant, task: task).prefix(3)),
+            advice: waterAdviceItems(for: plant, task: task).first
+        )
     }
 
     private func waterPrimaryTitle(for plant: Plant, task: PlantCareTaskSnapshot?) -> String {
@@ -676,515 +541,117 @@ struct PlantCareFeatureDetailView: View {
         )
     }
 
-    private func waterGuidedMetricPill(_ signal: PlantWateringSignal) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(signal.title)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(signal.value)
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(signal.tint)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .contentTransition(.numericText())
+    private func selectWaterMode(_ mode: PlantWaterGuidedMode) {
+        withAnimation(GoMotion.selection) {
+            selectedWaterMode = mode
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(signal.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-        .accessibilityElement(children: .combine)
-    }
-
-    private func waterGuidedNotice(text: String, tint: Color) -> some View {
-        HStack(alignment: .top, spacing: 9) {
-            Image(systemName: "checkmark.circle.fill") // a11y: allow decorative advice marker; text carries the content.
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
-                .foregroundStyle(tint)
-                .accessibilityHidden(true)
-            Text(text)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-    }
-
-    private func waterHabitSection(_ plant: Plant) -> some View {
-        let task = wateringTask(for: plant)
-        let signals = waterSignals(for: plant, task: task)
-        return VStack(alignment: .leading, spacing: 14) {
-            sectionHeader(
-                icon: "drop.degreesign.fill",
-                title: l.tr(zh: "浇水习性与建议", en: "Watering habit and guidance", de: "Gießverhalten und Empfehlung"),
-                subtitle: waterHabitSummary(for: plant, task: task),
-                tint: Color.goTeal
-            )
-
-            waterQuickActionRail(for: plant)
-
-            LazyVGrid(columns: plantCareFeatureWaterSignalColumns, spacing: 10) {
-                ForEach(signals) { signal in
-                    waterSignalPill(signal)
-                }
-            }
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], spacing: 8) {
-                ForEach(waterAdviceItems(for: plant, task: task), id: \.self) { advice in
-                    waterAdviceChip(advice)
-                }
-            }
-        }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-care-feature-water-habit")
-    }
-
-    private func waterQuickActionRail(for plant: Plant) -> some View {
-        HStack(spacing: 10) {
-            Button {
-                quickRecordWater(for: plant)
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "drop.fill") // a11y: allow decorative quick-log glyph; button text names the action.
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
-                        .accessibilityHidden(true)
-                    Text(l.tr(zh: "快速记录已浇水", en: "Log watered now", de: "Jetzt Gießen erfassen"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.74)
-                }
-                .foregroundStyle(Color.arkInk)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .background(Color.goTeal, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityIdentifier("plant-care-feature-water-quick-log")
-
-            Button {
-                openLog(for: plant)
-            } label: {
-                Image(systemName: "square.and.pencil") // a11y: allow decorative detailed-log glyph; accessibilityLabel names the action.
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 48, height: 48)
-                    .background(Color.ohanaControlFill.opacity(0.72), in: Circle())
-                    .contentShape(Circle())
-                    .accessibilityHidden(true)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "添加详细浇水记录", en: "Add detailed water log", de: "Detailliertes Gießprotokoll hinzufügen"))
-            .accessibilityIdentifier("plant-care-feature-water-detailed-log")
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-care-feature-water-quick-actions")
     }
 
     private func waterScheduleControlSection(_ plant: Plant) -> some View {
-        let task = wateringTask(for: plant)
-        return VStack(alignment: .leading, spacing: 14) {
-            sectionHeader(
-                icon: "calendar.badge.clock",
-                title: l.tr(zh: "浇水计划与提醒", en: "Watering plan and reminders", de: "Gießplan und Erinnerungen"),
-                subtitle: waterReminderSummary(for: plant, task: task),
-                tint: Color.goYellow
-            )
+        PlantWaterScheduleControlSection(
+            l: l,
+            summary: waterReminderSummary(for: plant, task: wateringTask(for: plant)),
+            persistenceError: waterSchedulePersistenceError,
+            bindings: waterScheduleBindings(for: plant),
+            onResync: { resyncWaterReminder(for: plant) }
+        )
+    }
 
-            Stepper(
-                value: Binding(
-                    get: { max(1, plant.wateringIntervalDays) },
-                    set: { updateWateringInterval($0, for: plant) }
-                ),
-                in: 1 ... 60
-            ) {
-                scheduleControlText(
-                    title: l.tr(zh: "浇水间隔", en: "Watering interval", de: "Gießintervall"),
-                    value: l.tr(zh: "每 \(max(1, plant.wateringIntervalDays)) 天", en: "Every \(max(1, plant.wateringIntervalDays))d", de: "Alle \(max(1, plant.wateringIntervalDays)) T."),
-                    footnote: l.tr(zh: "用于计算下一次浇水和循环日历计划。", en: "Used for the next due date and recurring calendar plan.", de: "Wird für Fälligkeit und wiederkehrenden Kalenderplan genutzt.")
-                )
-            }
-            .tint(Color.goTeal)
-            .frame(minHeight: 58)
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            .accessibilityIdentifier("plant-care-feature-water-interval-stepper")
-
-            DatePicker(
-                selection: Binding(
-                    get: { waterScheduleStartDate(for: plant) },
-                    set: { updateWateringStartDate($0, for: plant) }
-                ),
-                displayedComponents: [.date]
-            ) {
-                scheduleControlText(
-                    title: l.tr(zh: "起始日期", en: "Start date", de: "Startdatum"),
-                    value: fullDateText(waterScheduleStartDate(for: plant)),
-                    footnote: l.tr(zh: "按最近一次浇水作为计划起点。", en: "Uses the last watering date as the plan start.", de: "Nutzt das letzte Gießen als Planstart.")
-                )
-            }
-            .tint(Color.goTeal)
-            .frame(minHeight: 58)
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            .accessibilityIdentifier("plant-care-feature-water-start-date")
-
-            Toggle(isOn: Binding(
+    private func waterScheduleBindings(for plant: Plant) -> PlantWaterScheduleControlBindings {
+        PlantWaterScheduleControlBindings(
+            intervalDays: Binding(
+                get: { max(1, plant.wateringIntervalDays) },
+                set: { updateWateringInterval($0, for: plant) }
+            ),
+            startDate: Binding(
+                get: { waterScheduleStartDate(for: plant) },
+                set: { updateWateringStartDate($0, for: plant) }
+            ),
+            endEnabled: Binding(
                 get: { waterScheduleEndEnabled },
                 set: { setWaterScheduleEndEnabled($0, for: plant) }
-            )) {
-                scheduleControlText(
-                    title: l.tr(zh: "设置结束日期", en: "Set end date", de: "Enddatum setzen"),
-                    value: waterScheduleEndEnabled ? fullDateText(waterScheduleEndDate) : l.tr(zh: "长期循环", en: "No end date", de: "Ohne Enddatum"),
-                    footnote: l.tr(zh: "开启后，循环计划会在结束日期停止。", en: "When enabled, the recurring plan stops at this date.", de: "Wenn aktiv, endet der wiederkehrende Plan an diesem Datum.")
-                )
-            }
-            .tint(Color.goTeal)
-            .frame(minHeight: 58)
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            .accessibilityIdentifier("plant-care-feature-water-end-enabled")
-
-            if waterScheduleEndEnabled {
-                DatePicker(
-                    selection: Binding(
-                        get: { waterScheduleEndDate },
-                        set: { setWaterScheduleEndDate($0, for: plant) }
-                    ),
-                    displayedComponents: [.date]
-                ) {
-                    scheduleControlText(
-                        title: l.tr(zh: "结束日期", en: "End date", de: "Enddatum"),
-                        value: fullDateText(waterScheduleEndDate),
-                        footnote: l.tr(zh: "计划到这天后停止循环。", en: "The recurring plan stops after this date.", de: "Der Plan endet nach diesem Datum.")
-                    )
-                }
-                .tint(Color.goTeal)
-                .frame(minHeight: 58)
-                .padding(12)
-                .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-                .accessibilityIdentifier("plant-care-feature-water-end-date")
-            }
-
-            Toggle(isOn: Binding(
+            ),
+            endDate: Binding(
+                get: { waterScheduleEndDate },
+                set: { setWaterScheduleEndDate($0, for: plant) }
+            ),
+            planCalendarEnabled: Binding(
                 get: { waterPlanCalendarEnabled },
                 set: { setWaterPlanCalendarEnabled($0, for: plant) }
-            )) {
-                scheduleControlText(
-                    title: l.tr(zh: "显示计划到日历", en: "Show plan in calendar", de: "Plan im Kalender zeigen"),
-                    value: waterPlanCalendarEnabled ? l.tr(zh: "已显示", en: "Shown", de: "Angezeigt") : l.tr(zh: "不显示", en: "Hidden", de: "Ausgeblendet"),
-                    footnote: l.tr(zh: "只控制未来循环计划；不会删除已经完成的护理记录。", en: "Controls only the future recurring plan; completed care logs stay intact.", de: "Steuert nur den zukünftigen Plan; erledigte Einträge bleiben erhalten.")
-                )
-            }
-            .tint(Color.goTeal)
-            .frame(minHeight: 58)
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            .accessibilityIdentifier("plant-care-feature-water-calendar-toggle")
-
-            Toggle(isOn: Binding(
+            ),
+            systemReminderEnabled: Binding(
                 get: { waterSystemReminderEnabled },
                 set: { setWaterSystemReminderEnabled($0, for: plant) }
-            )) {
-                scheduleControlText(
-                    title: l.tr(zh: "系统提醒", en: "System alerts", de: "Systemhinweise"),
-                    value: waterSystemReminderEnabled ? l.tr(zh: "开启", en: "On", de: "Ein") : l.tr(zh: "关闭", en: "Off", de: "Aus"),
-                    footnote: l.tr(zh: "关闭后日历计划仍保留，但不会生成提醒或推送。", en: "When off, the calendar plan remains without reminders or push alerts.", de: "Bei Aus bleibt der Kalenderplan ohne Erinnerungen oder Push.")
-                )
-            }
-            .tint(Color.goTeal)
-            .frame(minHeight: 58)
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            .accessibilityIdentifier("plant-care-feature-water-system-reminder-toggle")
-
-            VStack(alignment: .leading, spacing: 10) {
-                scheduleControlText(
-                    title: l.tr(zh: "提前提醒时间", en: "Reminder lead time", de: "Vorlaufzeit"),
-                    value: waterReminderLeadTitle,
-                    footnote: l.tr(zh: "按当前提醒时间窗口发送。", en: "Delivered in the current reminder time window.", de: "Wird im aktuellen Erinnerungsfenster gesendet.")
-                )
-
-                Picker(
-                    selection: Binding(
-                        get: { waterReminderLeadDays },
-                        set: { setWaterReminderLeadDays($0, for: plant) }
-                    )
-                ) {
-                    ForEach(WaterReminderLeadOption.allCases) { option in
-                        Text(option.title(l: l)).tag(option.rawValue)
-                    }
-                } label: {
-                    Text(l.tr(zh: "提前提醒时间", en: "Reminder lead time", de: "Vorlaufzeit"))
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
-            .tint(Color.goTeal)
-            .opacity(waterSystemReminderEnabled ? 1 : 0.52)
-            .disabled(!waterSystemReminderEnabled)
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            .accessibilityIdentifier("plant-care-feature-water-lead-picker")
-
-            Toggle(isOn: Binding(
+            ),
+            reminderLeadDays: Binding(
+                get: { waterReminderLeadDays },
+                set: { setWaterReminderLeadDays($0, for: plant) }
+            ),
+            completionCalendarEnabled: Binding(
                 get: { waterCompletionCalendarEnabled },
                 set: { setWaterCompletionCalendarEnabled($0, for: plant) }
-            )) {
-                scheduleControlText(
-                    title: l.tr(zh: "护理记录显示在日历", en: "Show completed logs in calendar", de: "Erledigte Einträge im Kalender"),
-                    value: waterCompletionCalendarEnabled ? l.tr(zh: "显示", en: "Shown", de: "Angezeigt") : l.tr(zh: "隐藏", en: "Hidden", de: "Ausgeblendet"),
-                    footnote: l.tr(zh: "只影响浇水完成记录是否出现在日历；不会删除护理日志。", en: "Controls whether completed watering logs appear in Calendar; care logs are not deleted.", de: "Steuert nur Kalenderanzeige erledigter Einträge; Pflegeprotokolle bleiben erhalten.")
-                )
-            }
-            .tint(Color.goTeal)
-            .frame(minHeight: 58)
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            .accessibilityIdentifier("plant-care-feature-water-completion-calendar-toggle")
-
-            if let waterSchedulePersistenceError {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative error glyph; adjacent text announces the failure.
-                        .font(OhanaFont.adaptive(size: 12, weight: .black))
-                        .foregroundStyle(Color.goRed)
-                        .accessibilityHidden(true)
-                    Text(waterSchedulePersistenceError)
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.goRed)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-                .accessibilityIdentifier("plant-care-feature-water-schedule-error")
-            }
-
-            Button {
-                resyncWaterReminder(for: plant)
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.triangle.2.circlepath") // a11y: allow decorative sync glyph; button text names the action.
-                        .font(OhanaFont.adaptive(size: 12, weight: .black))
-                        .accessibilityHidden(true)
-                    Text(l.tr(zh: "同步浇水日历计划", en: "Sync watering calendar plan", de: "Gießkalender synchronisieren"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                }
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityIdentifier("plant-care-feature-water-reminder-sync")
-        }
-        .padding(14)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardSoft)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-care-feature-water-schedule")
+            )
+        )
     }
 
-    private func scheduleControlText(title: String, value: String, footnote: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Spacer(minLength: 8)
-                Text(value)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goTeal)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-
-            Text(footnote)
-                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaTertiaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+    private func waterChartCardModel(for plant: Plant) -> PlantWaterChartCardModel {
+        PlantWaterChartCardModel(
+            plantName: plant.name,
+            plannedIntervalDays: plannedIntervalDays(for: plant),
+            points: wateringBarChartPoints(for: plant),
+            wateringLogCount: wateringLogCount(for: plant),
+            isLoading: isRouteSnapshotLoading
+        )
     }
 
-    private func waterHistoryChartSection(_ plant: Plant) -> some View {
-        waterGuidedMiniChartCard(for: plant)
-    }
-
-    private func waterGuidedMiniChartCard(for plant: Plant) -> some View {
-        let points = wateringChartPoints(for: plant)
-        let chartPoints = wateringBarChartPoints(for: plant)
-
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(l.tr(zh: "浇水趋势", en: "Watering trend", de: "Gießtrend"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "只看节奏，详情在历史。", en: "A quiet rhythm. Details in history.", de: "Ruhiger Rhythmus. Details im Verlauf."))
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                }
-                Spacer(minLength: 8)
-                Text(l.tr(zh: "目标 \(plannedIntervalDays(for: plant)) 天", en: "Target \(plannedIntervalDays(for: plant))d", de: "Ziel \(plannedIntervalDays(for: plant)) T."))
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.goTeal)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-            }
-
-            if isRouteSnapshotLoading {
-                loadingWaterChartState
-            } else if points.isEmpty {
-                emptyWaterChartState(for: plant)
-            } else {
-                OhanaMinimalBarChart(
-                    points: chartPoints,
-                    tint: Color.goTeal,
-                    progress: 1,
-                    showsLabels: true,
-                    maxBarHeight: 58
-                )
-                .frame(height: 88)
-                .accessibilityLabel(l.tr(zh: "\(plant.name) 的浇水间隔 mini 图表", en: "\(plant.name) watering interval mini chart", de: "Mini-Gießintervall-Diagramm für \(plant.name)"))
-            }
-        }
-        .padding(13)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardSoft)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-care-feature-water-chart")
-    }
-
-    private func waterCompactDiscoveryDock(for plant: Plant) -> some View {
+    private func waterDiscoveryItems(for plant: Plant) -> [PlantWaterDiscoveryItem] {
         let task = wateringTask(for: plant)
         let adviceItems = waterAdviceItems(for: plant, task: task)
-        return VStack(spacing: 10) {
-            LazyVGrid(columns: plantCareFeatureDiscoveryColumns, spacing: 10) {
-                waterCompactDiscoveryCard(
-                    id: "habit",
-                    icon: "humidity.fill",
-                    title: l.tr(zh: "习性", en: "Habit", de: "Vorliebe"),
-                    value: adviceItems.first ?? plant.humidityPreference.displayName,
-                    tint: Color.goTeal,
-                    action: nil
-                )
-                waterCompactDiscoveryCard(
-                    id: "plan",
-                    icon: "calendar.badge.clock",
-                    title: l.tr(zh: "计划", en: "Plan", de: "Plan"),
-                    value: waterPlanSummaryText(for: plant, task: task),
-                    tint: Color.goYellow
-                ) {
-                    withAnimation(GoMotion.selection) {
-                        selectedWaterMode = .plan
-                    }
-                }
-                waterCompactDiscoveryCard(
-                    id: "history",
-                    icon: "clock.arrow.circlepath",
-                    title: l.tr(zh: "历史", en: "History", de: "Verlauf"),
-                    value: waterHistorySummaryText(for: plant),
-                    tint: feature.tint
-                ) {
-                    withAnimation(GoMotion.selection) {
-                        selectedWaterMode = .history
-                    }
-                }
-                waterCompactDiscoveryCard(
-                    id: "detail",
-                    icon: "square.and.pencil",
-                    title: l.tr(zh: "详细记录", en: "Detail log", de: "Detailprotokoll"),
-                    value: l.tr(zh: "照片/备注", en: "Photo + note", de: "Foto + Notiz"),
-                    tint: feature.tint
-                ) {
-                    openLog(for: plant)
-                }
-            }
-
-            if adviceItems.count > 1 {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], spacing: 8) {
-                    ForEach(Array(adviceItems.dropFirst().prefix(2)), id: \.self) { advice in
-                        waterAdviceChip(advice)
-                    }
-                }
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-care-feature-water-discovery-dock")
+        return [
+            PlantWaterDiscoveryItem(
+                id: "habit",
+                icon: "humidity.fill",
+                title: l.tr(zh: "习性", en: "Habit", de: "Vorliebe"),
+                value: adviceItems.first ?? plant.humidityPreference.displayName,
+                tint: Color.goTeal,
+                action: nil
+            ),
+            PlantWaterDiscoveryItem(
+                id: "plan",
+                icon: "calendar.badge.clock",
+                title: l.tr(zh: "计划", en: "Plan", de: "Plan"),
+                value: waterPlanSummaryText(for: plant, task: task),
+                tint: Color.goYellow,
+                action: .plan
+            ),
+            PlantWaterDiscoveryItem(
+                id: "history",
+                icon: "clock.arrow.circlepath",
+                title: l.tr(zh: "历史", en: "History", de: "Verlauf"),
+                value: waterHistorySummaryText(),
+                tint: feature.tint,
+                action: .history
+            ),
+            PlantWaterDiscoveryItem(
+                id: "detail",
+                icon: "square.and.pencil",
+                title: l.tr(zh: "详细记录", en: "Detail log", de: "Detailprotokoll"),
+                value: l.tr(zh: "照片/备注", en: "Photo + note", de: "Foto + Notiz"),
+                tint: feature.tint,
+                action: .detail
+            )
+        ]
     }
 
-    private func waterCompactDiscoveryCard(
-        id: String,
-        icon: String,
-        title: String,
-        value: String,
-        tint: Color,
-        action: (() -> Void)?
-    ) -> some View {
-        Group {
-            if let action {
-                Button {
-                    OhanaFeedback.light()
-                    action()
-                } label: {
-                    waterCompactDiscoveryCardContent(icon: icon, title: title, value: value, tint: tint, isInteractive: true)
-                }
-                .buttonStyle(ScaleButtonStyle())
-            } else {
-                waterCompactDiscoveryCardContent(icon: icon, title: title, value: value, tint: tint, isInteractive: false)
-            }
+    private func handleWaterDiscoveryAction(_ action: PlantWaterDiscoveryAction, plant: Plant) {
+        switch action {
+        case .plan:
+            selectWaterMode(.plan)
+        case .history:
+            selectWaterMode(.history)
+        case .detail:
+            openLog(for: plant)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("plant-care-feature-water-dock-\(id)")
-    }
-
-    private func waterCompactDiscoveryCardContent(
-        icon: String,
-        title: String,
-        value: String,
-        tint: Color,
-        isInteractive: Bool
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 8) {
-                Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(tint)
-                    .frame(width: 34, height: 34) // a11y: allow visual glyph frame; card text carries the accessible content.
-                    .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-                    .accessibilityHidden(true)
-                Text(title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                if isInteractive {
-                    Image(systemName: "chevron.right") // a11y: allow decorative affordance; card label names the action.
-                        .font(OhanaFont.adaptive(size: 9, weight: .black))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                        .accessibilityHidden(true)
-                }
-            }
-
-            Text(value)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(tint)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
-        .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private func waterPlanSummaryText(for plant: Plant, task: PlantCareTaskSnapshot?) -> String {
@@ -1210,7 +677,7 @@ struct PlantCareFeatureDetailView: View {
         )
     }
 
-    private func waterHistorySummaryText(for _: Plant) -> String {
+    private func waterHistorySummaryText() -> String {
         if let latestRecordDate {
             return l.tr(
                 zh: "\(records.count) 条 · \(relativeDateText(latestRecordDate))",
@@ -1447,118 +914,6 @@ struct PlantCareFeatureDetailView: View {
             .textCase(.uppercase)
     }
 
-    private func sectionHeader(icon: String, title: String, subtitle: String, tint: Color) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
-                .foregroundStyle(tint)
-                .frame(width: 36, height: 36) // a11y: allow non-interactive header glyph; text carries the accessible content.
-                .background(tint.opacity(0.14), in: Circle())
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.74)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func waterSignalPill(_ signal: PlantWateringSignal) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: signal.icon)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
-                .foregroundStyle(signal.tint)
-                .frame(width: 30, height: 30) // a11y: allow non-interactive metric glyph; label and value carry the accessible content.
-                .background(signal.tint.opacity(0.13), in: Circle())
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(signal.title)
-                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                Text(signal.value)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.66)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(Color.ohanaControlFill.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("plant-care-feature-water-signal-\(signal.id)")
-    }
-
-    private func waterAdviceChip(_ text: String) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: "checkmark.circle.fill") // a11y: allow decorative advice marker; chip text carries the content.
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
-                .foregroundStyle(Color.goTeal)
-                .accessibilityHidden(true)
-            Text(text)
-                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
-        .background(Color.ohanaControlFill.opacity(0.46), in: Capsule())
-        .accessibilityElement(children: .combine)
-    }
-
-    private func emptyWaterChartState(for plant: Plant) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(l.tr(zh: "还没有足够的浇水间隔", en: "Not enough watering intervals yet", de: "Noch nicht genug Gießintervalle"))
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text(wateringLogCount(for: plant) == 0
-                ? l.tr(zh: "记录第一次浇水后会开始累积趋势。", en: "The trend starts after the first watering log.", de: "Der Trend beginnt nach dem ersten Gießprotokoll.")
-                : l.tr(zh: "再记录一次浇水后会显示实际间隔。", en: "Log one more watering to show the real interval.", de: "Noch einmal gießen erfassen, dann erscheint das echte Intervall."))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
-        .padding(14)
-        .background(Color.ohanaControlFill.opacity(0.48), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-        .accessibilityElement(children: .combine)
-    }
-
-    private var loadingWaterChartState: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(l.tr(zh: "正在整理浇水节奏", en: "Preparing watering rhythm", de: "Gießrhythmus wird vorbereitet"))
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(zh: "先显示页面，历史趋势稍后补上。", en: "The page stays ready while history loads.", de: "Die Seite bleibt bereit, während der Verlauf lädt."))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
-        .padding(14)
-        .background(Color.ohanaControlFill.opacity(0.48), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("plant-care-feature-water-chart-loading")
-    }
-
     private func wateringTask(for plant: Plant) -> PlantCareTaskSnapshot? {
         routeSnapshot.wateringTasksByPlantID[plant.id]
     }
@@ -1567,7 +922,6 @@ struct PlantCareFeatureDetailView: View {
         [
             PlantWateringSignal(
                 id: "interval",
-                icon: "calendar.badge.clock",
                 title: l.tr(zh: "周期", en: "Cadence", de: "Rhythmus"),
                 value: l.tr(
                     zh: "每 \(task?.effectiveIntervalDays ?? appServices.plantCarePlans.intervalDays(for: .watering, plant: plant)) 天",
@@ -1578,14 +932,12 @@ struct PlantCareFeatureDetailView: View {
             ),
             PlantWateringSignal(
                 id: "due",
-                icon: "clock.fill",
                 title: l.tr(zh: "下次", en: "Next", de: "Nächstes"),
                 value: task.map(waterDueText) ?? l.tr(zh: "无计划", en: "No plan", de: "Kein Plan"),
                 tint: task?.daysUntilDue ?? 1 <= 0 ? Color.goYellow : Color.goPrimary
             ),
             PlantWateringSignal(
                 id: "last",
-                icon: "drop.circle.fill",
                 title: l.tr(zh: "上次", en: "Last", de: "Zuletzt"),
                 value: plant.daysSinceWatered.map {
                     l.tr(zh: "\($0) 天前", en: "\($0)d ago", de: "vor \($0) T.")
@@ -1594,7 +946,6 @@ struct PlantCareFeatureDetailView: View {
             ),
             PlantWateringSignal(
                 id: "humidity",
-                icon: "humidity.fill",
                 title: l.tr(zh: "偏好", en: "Preference", de: "Vorliebe"),
                 value: plant.humidityPreference.displayName,
                 tint: plant.humidityPreference == .humid ? Color.goTeal : Color.goPrimary
@@ -1644,35 +995,25 @@ struct PlantCareFeatureDetailView: View {
         return Array(uniqueStrings(items).prefix(4))
     }
 
-    private func wateringChartPoints(for plant: Plant) -> [PlantWateringChartPoint] {
+    private func wateringBarChartPoints(for plant: Plant) -> [OhanaMinimalChartPoint] {
         let wateringRecords = records
             .filter { $0.plantID == plant.id && $0.careType == .watering }
             .sorted { $0.date < $1.date }
         guard wateringRecords.count >= 2 else { return [] }
 
-        var points: [PlantWateringChartPoint] = []
+        var points: [OhanaMinimalChartPoint] = []
         for index in wateringRecords.indices.dropFirst() {
             let previous = Calendar.current.startOfDay(for: wateringRecords[index - 1].date)
             let current = Calendar.current.startOfDay(for: wateringRecords[index].date)
             let days = max(0, Calendar.current.dateComponents([.day], from: previous, to: current).day ?? 0)
-            points.append(PlantWateringChartPoint(
-                id: wateringRecords[index].id.uuidString,
+            points.append(OhanaMinimalChartPoint(
                 date: wateringRecords[index].date,
-                intervalDays: days
+                value: Double(days),
+                label: wateringRecords[index].date.formatted(.dateTime.month(.abbreviated).day()),
+                id: wateringRecords[index].id.uuidString
             ))
         }
         return Array(points.suffix(10))
-    }
-
-    private func wateringBarChartPoints(for plant: Plant) -> [OhanaMinimalChartPoint] {
-        wateringChartPoints(for: plant).map { point in
-            OhanaMinimalChartPoint(
-                date: point.date,
-                value: Double(point.intervalDays),
-                label: point.date.formatted(.dateTime.month(.abbreviated).day()),
-                id: point.id
-            )
-        }
     }
 
     private func wateringLogCount(for plant: Plant) -> Int {
@@ -1701,36 +1042,14 @@ struct PlantCareFeatureDetailView: View {
 
     private func refreshWaterScheduleControls() {
         guard feature == .water, let focusedPlant else { return }
-        waterPlanCalendarEnabled = PlantReminderPreferenceStore.isPlanCalendarEnabled(
-            forPlantID: focusedPlant.id,
-            careType: .watering,
-            fallback: PlantReminderPreferenceStore.planCalendarFallback(
-                for: .watering,
-                plantRemindersEnabled: focusedPlant.remindersEnabled
-            )
-        )
-        waterSystemReminderEnabled = PlantReminderPreferenceStore.isSystemReminderEnabled(
-            forPlantID: focusedPlant.id,
-            careType: .watering
-        )
-        waterCompletionCalendarEnabled = PlantReminderPreferenceStore.isCompletionCalendarEnabled(
-            forPlantID: focusedPlant.id,
-            careType: .watering
-        )
-        waterReminderLeadDays = PlantReminderPreferenceStore.reminderLeadDays(
-            forPlantID: focusedPlant.id,
-            careType: .watering
-        )
-        if let endDate = PlantReminderPreferenceStore.recurrenceEndDate(
-            forPlantID: focusedPlant.id,
-            careType: .watering
-        ) {
-            waterScheduleEndEnabled = true
-            waterScheduleEndDate = endDate
-        } else {
-            waterScheduleEndEnabled = false
-            waterScheduleEndDate = Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date()
-        }
+        let now = Date()
+        let snapshot = scheduleCommands.controlSnapshot(for: focusedPlant, now: now)
+        waterPlanCalendarEnabled = snapshot.planCalendarEnabled
+        waterSystemReminderEnabled = snapshot.systemReminderEnabled
+        waterCompletionCalendarEnabled = snapshot.completionCalendarEnabled
+        waterReminderLeadDays = snapshot.reminderLeadDays
+        waterScheduleEndEnabled = snapshot.hasRecurrenceEndDate
+        waterScheduleEndDate = snapshot.resolvedRecurrenceEndDate(now: now, calendar: .current)
     }
 
     private func waterScheduleStartDate(for plant: Plant) -> Date {
@@ -1738,52 +1057,38 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func updateWateringInterval(_ days: Int, for plant: Plant) {
-        let clampedDays = min(max(days, 1), 60)
-        guard plant.wateringIntervalDays != clampedDays else { return }
-        plant.wateringIntervalDays = clampedDays
-        persistWateringScheduleFacts(for: plant)
+        applyWaterScheduleFact(.intervalDays(days), for: plant)
     }
 
     private func updateWateringStartDate(_ date: Date, for plant: Plant) {
-        let startDate = Calendar.current.startOfDay(for: date)
-        guard plant.lastWateredDate.map({ Calendar.current.isDate($0, inSameDayAs: startDate) }) != true else { return }
-        plant.lastWateredDate = startDate
-        persistWateringScheduleFacts(for: plant)
+        applyWaterScheduleFact(.startDate(date), for: plant)
     }
 
     private func setWaterScheduleEndEnabled(_ enabled: Bool, for plant: Plant) {
         waterScheduleEndEnabled = enabled
         let endDate = enabled ? Calendar.current.startOfDay(for: waterScheduleEndDate) : nil
-        PlantReminderPreferenceStore.setRecurrenceEndDate(endDate, forPlantID: plant.id, careType: .watering)
-        resyncWaterSchedule(for: plant)
+        scheduleCommands.setPreference(.recurrenceEndDate(endDate), for: plant)
     }
 
     private func setWaterScheduleEndDate(_ date: Date, for plant: Plant) {
         let normalizedDate = Calendar.current.startOfDay(for: date)
         waterScheduleEndDate = normalizedDate
-        PlantReminderPreferenceStore.setRecurrenceEndDate(normalizedDate, forPlantID: plant.id, careType: .watering)
-        resyncWaterSchedule(for: plant)
+        scheduleCommands.setPreference(.recurrenceEndDate(normalizedDate), for: plant)
     }
 
     private func setWaterReminderLeadDays(_ days: Int, for plant: Plant) {
         waterReminderLeadDays = days
-        PlantReminderPreferenceStore.setReminderLeadDays(days, forPlantID: plant.id, careType: .watering)
-        resyncWaterSchedule(for: plant)
+        scheduleCommands.setPreference(.reminderLeadDays(days), for: plant)
     }
 
-    @discardableResult
-    private func persistWateringScheduleFacts(for plant: Plant) -> Bool {
-        CloudSyncMutationRecorder.markModified(plant, context: modelContext)
-        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
-        guard saveResult.didSave else {
-            modelContext.rollback()
-            waterSchedulePersistenceError = waterScheduleSaveFailureMessage(saveResult.errorDescription)
+    private func applyWaterScheduleFact(_ mutation: PlantWaterScheduleFactMutation, for plant: Plant) {
+        let result = scheduleCommands.updateScheduleFact(mutation, for: plant)
+        guard result.didPersist else {
+            waterSchedulePersistenceError = waterScheduleSaveFailureMessage(result.persistenceErrorDescription)
             UINotificationFeedbackGenerator().notificationOccurred(.error)
-            return false
+            return
         }
         waterSchedulePersistenceError = nil
-        resyncWaterSchedule(for: plant)
-        return true
     }
 
     private func waterScheduleSaveFailureMessage(_ errorDescription: String?) -> String {
@@ -1801,10 +1106,6 @@ struct PlantCareFeatureDetailView: View {
         )
     }
 
-    private func resyncWaterSchedule(for plant: Plant) {
-        appServices.plantReminderControls.resyncPlans(plants: [plant], context: modelContext)
-    }
-
     private func waterDueText(_ task: PlantCareTaskSnapshot) -> String {
         if task.daysUntilDue < 0 {
             return l.tr(zh: "超期 \(abs(task.daysUntilDue)) 天", en: "\(abs(task.daysUntilDue))d overdue", de: "\(abs(task.daysUntilDue)) T. überfällig")
@@ -1817,41 +1118,25 @@ struct PlantCareFeatureDetailView: View {
 
     private func setWaterPlanCalendarEnabled(_ enabled: Bool, for plant: Plant) {
         waterPlanCalendarEnabled = enabled
-        PlantReminderPreferenceStore.setPlanCalendarEnabled(enabled, forPlantID: plant.id, careType: .watering)
-        resyncWaterSchedule(for: plant)
-        publishWaterPreferenceRefresh(for: plant, action: "waterPlanCalendar")
+        scheduleCommands.setPreference(.planCalendarEnabled(enabled), for: plant)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func setWaterSystemReminderEnabled(_ enabled: Bool, for plant: Plant) {
         waterSystemReminderEnabled = enabled
-        PlantReminderPreferenceStore.setSystemReminderEnabled(enabled, forPlantID: plant.id, careType: .watering)
-        resyncWaterSchedule(for: plant)
-        publishWaterPreferenceRefresh(for: plant, action: "waterSystemReminder")
+        scheduleCommands.setPreference(.systemReminderEnabled(enabled), for: plant)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func setWaterCompletionCalendarEnabled(_ enabled: Bool, for plant: Plant) {
         waterCompletionCalendarEnabled = enabled
-        PlantReminderPreferenceStore.setCompletionCalendarEnabled(enabled, forPlantID: plant.id, careType: .watering)
-        publishWaterPreferenceRefresh(for: plant, action: "waterCompletionCalendar")
+        scheduleCommands.setPreference(.completionCalendarEnabled(enabled), for: plant)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func resyncWaterReminder(for plant: Plant) {
-        appServices.plantReminderControls.resyncPlans(plants: [plant], context: modelContext)
+        scheduleCommands.resyncPlan(for: plant)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-    }
-
-    private func publishWaterPreferenceRefresh(for plant: Plant, action: String) {
-        appServices.domainRevisions.publish(
-            DomainMutationResult(
-                command: .plantCare(plantID: plant.id, action: action),
-                affectedEntityIDs: [plant.id],
-                wroteBusinessFact: false,
-                note: "plant.water.preference"
-            )
-        )
     }
 
     private func quickRecordWater(for plant: Plant) {
@@ -1968,13 +1253,18 @@ struct PlantCareFeatureDetailView: View {
         healthStatus: PlantHealthStatus,
         photoData: Data?
     ) {
-        let result = HomeCommandExecutor(modelContext: modelContext, services: appServices).recordPlantCare(
-            careType,
+        let request = PlantCareCommandRequest(
+            careType: careType,
             plant: plant,
-            executorId: activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw,
+            executorID: activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw,
             careNote: careNote,
             photoData: photoData,
             healthStatus: healthStatus
+        )
+        let result = PlantCareCommandExecutor(context: modelContext, services: appServices).recordCare(
+            request,
+            note: "plant.feature.care",
+            options: PlantCareCommandOptions()
         )
         UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         if result.didPersist {

@@ -1385,13 +1385,14 @@ struct PlantLaunchTests {
         }
 
         PlantCareCommandService.recordCare(
-            .watering,
-            plant: plant,
-            executorId: nil,
+            PlantCareCommandRequest(
+                careType: .watering,
+                plant: plant,
+                executorID: nil,
+                now: now
+            ),
             context: context,
-            now: now,
-            syncCarePlan: false,
-            awardRewards: false
+            options: PlantCareCommandOptions(syncCarePlan: false, awardRewards: false)
         )
         let events = try context.fetch(FetchDescriptor<Event>())
         let dayID = CalendarSnapshotBuilder.timelineDateID(now)
@@ -1731,12 +1732,14 @@ struct PlantLaunchTests {
             scheduleNotifications: false
         )
         PlantCareCommandService.recordCare(
-            .watering,
-            plant: plant,
-            executorId: nil,
+            PlantCareCommandRequest(
+                careType: .watering,
+                plant: plant,
+                executorID: nil,
+                now: now
+            ),
             context: context,
-            now: now,
-            scheduleNotifications: false
+            options: PlantCareCommandOptions(scheduleNotifications: false)
         )
 
         let events = try context.fetch(FetchDescriptor<Event>())
@@ -1774,7 +1777,7 @@ struct PlantLaunchTests {
             context: context,
             executorId: nil,
             now: now,
-            schedulePlantCareNotifications: false
+            options: CalendarEventCompletionOptions(schedulePlantCareNotifications: false)
         )
 
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
@@ -1815,7 +1818,7 @@ struct PlantLaunchTests {
             context: context,
             executorId: nil,
             now: now,
-            schedulePlantCareNotifications: false
+            options: CalendarEventCompletionOptions(schedulePlantCareNotifications: false)
         )
 
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
@@ -2118,7 +2121,7 @@ struct PlantLaunchTests {
             context: context,
             executorId: userKey,
             now: now,
-            schedulePlantCareNotifications: false
+            options: CalendarEventCompletionOptions(schedulePlantCareNotifications: false)
         )
         let reward = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
             context: context,
@@ -2340,13 +2343,17 @@ struct PlantLaunchTests {
         defer { restore() }
 
         let result = PlantCareCommandService.recordCare(
-            .watering,
-            plant: plant,
-            executorId: human.id.uuidString,
+            PlantCareCommandRequest(
+                careType: .watering,
+                plant: plant,
+                executorID: human.id.uuidString,
+                now: now
+            ),
             context: context,
-            now: now,
-            economy: StaticCareEventEconomyAwarder(questManager: QuestManager()),
-            syncCarePlan: false
+            options: PlantCareCommandOptions(
+                economy: StaticCareEventEconomyAwarder(questManager: QuestManager()),
+                syncCarePlan: false
+            )
         )
 
         let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first(where: {
@@ -2374,13 +2381,14 @@ struct PlantLaunchTests {
         let economy = PlantCareEconomyAwarderSpy(reward: (humanGot: 9, petGot: 0))
 
         let result = PlantCareCommandService.recordCare(
-            .watering,
-            plant: plant,
-            executorId: nil,
+            PlantCareCommandRequest(
+                careType: .watering,
+                plant: plant,
+                executorID: nil,
+                now: now
+            ),
             context: context,
-            now: now,
-            economy: economy,
-            syncCarePlan: false
+            options: PlantCareCommandOptions(economy: economy, syncCarePlan: false)
         )
 
         let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first(where: {
@@ -2402,12 +2410,14 @@ struct PlantLaunchTests {
         try context.save()
 
         let result = PlantCareCommandService.recordCare(
-            .watering,
-            plant: plant,
-            executorId: "human-1",
+            PlantCareCommandRequest(
+                careType: .watering,
+                plant: plant,
+                executorID: "human-1",
+                now: now
+            ),
             context: context,
-            now: now,
-            syncCarePlan: false
+            options: PlantCareCommandOptions(syncCarePlan: false)
         )
 
         #expect(!result.didPersist)
@@ -2442,22 +2452,24 @@ struct PlantLaunchTests {
         let questManager = QuestManager()
         let economy = StaticCareEventEconomyAwarder(questManager: questManager)
         let firstResult = PlantCareCommandService.recordCare(
-            .watering,
-            plant: first,
-            executorId: human.id.uuidString,
+            PlantCareCommandRequest(
+                careType: .watering,
+                plant: first,
+                executorID: human.id.uuidString,
+                now: now
+            ),
             context: context,
-            now: now,
-            economy: economy,
-            syncCarePlan: false
+            options: PlantCareCommandOptions(economy: economy, syncCarePlan: false)
         )
         let secondResult = PlantCareCommandService.recordCare(
-            .watering,
-            plant: second,
-            executorId: human.id.uuidString,
+            PlantCareCommandRequest(
+                careType: .watering,
+                plant: second,
+                executorID: human.id.uuidString,
+                now: now
+            ),
             context: context,
-            now: now,
-            economy: economy,
-            syncCarePlan: false
+            options: PlantCareCommandOptions(economy: economy, syncCarePlan: false)
         )
 
         #expect(firstResult.coconutDelta >= 2)
@@ -2595,13 +2607,17 @@ struct PlantLaunchTests {
         defer { restore() }
 
         PlantCareCommandService.recordCare(
-            .watering,
-            plant: plant,
-            executorId: human.id.uuidString,
+            PlantCareCommandRequest(
+                careType: .watering,
+                plant: plant,
+                executorID: human.id.uuidString,
+                now: now
+            ),
             context: context,
-            now: now,
-            economy: StaticCareEventEconomyAwarder(questManager: QuestManager()),
-            syncCarePlan: false
+            options: PlantCareCommandOptions(
+                economy: StaticCareEventEconomyAwarder(questManager: QuestManager()),
+                syncCarePlan: false
+            )
         )
         let oasisLogs = try context.fetch(FetchDescriptor<OasisCritterActionLog>())
         let treeBoost = try #require(ShopCatalog.item(id: "boost_tree"))

@@ -23,13 +23,25 @@ as current status sources. Their role and precedence are listed in
 ```bash
 open Ohana.xcodeproj
 scripts/dev-check-changed.sh
+scripts/module-exit-gate.sh --test OhanaTests/RelevantTests
+scripts/release-hardening-check.sh --static-only
 scripts/build-debug-fast.sh
+scripts/build-release-fast.sh
 scripts/test-simulator.sh
+scripts/archive-release-local.sh
 ```
 
 Local command-line validation uses the `iPhone 17` simulator by name with the
-`iphonesimulator` SDK. Commit, push, remote CI, signing, entitlement changes,
-and App Store actions require an explicit user request.
+`iphonesimulator` SDK. `build-release-fast.sh` keeps `-O` but uses incremental
+Swift compilation and an external stable cache for repeated optimized checks.
+`archive-release-local.sh` is the slower signed WMO lane for RC/signing gates;
+it writes outside the File Provider-managed repository and never uploads.
+`dev-check-changed.sh` is read-only unless `--fix-format` and explicit targets
+are supplied;
+`module-exit-gate.sh` owns feature proof; `release-hardening-check.sh` owns the
+full static/unit release lane and accepts `--with-ui` for RC UI regression.
+Commit, push, remote CI, signing, entitlement changes, and App Store actions
+require an explicit user request.
 
 ## Repository Layout
 

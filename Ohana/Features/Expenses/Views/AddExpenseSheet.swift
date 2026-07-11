@@ -131,6 +131,7 @@ struct AddExpenseSheetContent: View {
     @State var popupVisible = false
     @State var isClosing = false
     @State var popupDragOffset: CGFloat = 0
+    @State var saveErrorMessage: String? = nil
     @StateObject var commandQueue = DeferredDomainCommandQueue()
 
     // 报销申请快捷入口
@@ -358,6 +359,19 @@ struct AddExpenseSheetContent: View {
             Button(l.done, role: .cancel) {}
         } message: {
             Text(l.quickExpenseCameraPermissionMessage)
+        }
+        .alert(
+            l.tr(zh: "无法保存费用", en: "Could not save expense", de: "Ausgabe konnte nicht gespeichert werden"),
+            isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { if !$0 { saveErrorMessage = nil } }
+            )
+        ) {
+            Button(l.tr(zh: "知道了", en: "OK", de: "OK"), role: .cancel) {
+                saveErrorMessage = nil
+            }
+        } message: {
+            Text(saveErrorMessage ?? "")
         }
         .onAppear {
             configureInitialPayer()

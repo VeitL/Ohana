@@ -16,7 +16,7 @@ enum AppPerformanceMode {
     static let reducedVisualEffectsKey = "appReducedVisualEffectsExperiment"
 
     static var systemPrefersReducedWork: Bool {
-        ProcessInfo.processInfo.isLowPowerModeEnabled || UIAccessibility.isReduceMotionEnabled
+        ProcessInfo.processInfo.isLowPowerModeEnabled
     }
 
     static var userPrefersReducedVisualEffects: Bool {
@@ -31,14 +31,24 @@ enum AppPerformanceMode {
             false
         #endif
     }
+
+    static var uiTestsForceReduceMotion: Bool {
+        #if DEBUG
+            OhanaUITestLaunchOptions.forcesReduceMotion
+        #else
+            false
+        #endif
+    }
 }
 
 enum OhanaMotionBudget: Equatable {
     case full
     case efficient
+    case minimal
     case `static`
 
-    var allowsMotion: Bool { self != .static }
+    var allowsMotion: Bool { self == .full || self == .efficient }
+    var allowsEssentialFeedback: Bool { self != .static }
     var usesFullMotion: Bool { self == .full }
 }
 
@@ -214,7 +224,9 @@ final class AppWorkloadPolicy: ObservableObject {
         thermalStateProvider: (@MainActor () -> ProcessInfo.ThermalState)? = nil
     ) {
         let lowPowerModeProvider = lowPowerModeProvider ?? { ProcessInfo.processInfo.isLowPowerModeEnabled }
-        let reduceMotionProvider = reduceMotionProvider ?? { UIAccessibility.isReduceMotionEnabled }
+        let reduceMotionProvider = reduceMotionProvider ?? {
+            UIAccessibility.isReduceMotionEnabled || AppPerformanceMode.uiTestsForceReduceMotion
+        }
         let userPowerSavingProvider = userPowerSavingProvider ?? {
             UserDefaults.standard.bool(forKey: AppPerformanceMode.powerSavingKey)
         }
@@ -309,16 +321,22 @@ final class AppWorkloadPolicy: ObservableObject {
     }
 
     func shouldPlayFeedback(isVisible: Bool = true) -> Bool {
-        guard isVisible, isForeground else { return false }
         guard !isLowPowerModeEnabled else { return false }
-        return thermalState != .critical
+        guard thermalState != .critical else { return false }
+        return interactionMotionBudget(isVisible: isVisible).allowsEssentialFeedback
     }
 
     func interactionMotionBudget(isVisible: Bool = true) -> OhanaMotionBudget {
         guard isVisible else { return .static }
         guard isForeground else { return .static }
         guard !AppPerformanceMode.uiTestsDisableAnimations else { return .static }
-        let base: OhanaMotionBudget = isReduceMotionEnabled ? .efficient : .full
+        let base: OhanaMotionBudget = if isReduceMotionEnabled {
+            .minimal
+        } else if isLowPowerModeEnabled || userPowerSavingMode {
+            .efficient
+        } else {
+            .full
+        }
         return stricterMotionBudget(base, thermalInteractionMotionBudget)
     }
 
@@ -326,8 +344,10 @@ final class AppWorkloadPolicy: ObservableObject {
         guard isVisible else { return .static }
         guard isForeground || (allowDuringActiveWalk && hasRunningWalk) else { return .static }
         guard !AppPerformanceMode.uiTestsDisableAnimations else { return .static }
-        let base: OhanaMotionBudget = if isLowPowerModeEnabled || isReduceMotionEnabled || userPowerSavingMode {
+        let base: OhanaMotionBudget = if isLowPowerModeEnabled || userPowerSavingMode {
             .static
+        } else if isReduceMotionEnabled {
+            .minimal
         } else {
             .full
         }
@@ -338,7 +358,7 @@ final class AppWorkloadPolicy: ObservableObject {
         guard isVisible else { return .paused }
         let base: OhanaRefreshBudget = if !isForeground {
             allowDuringActiveWalk && hasRunningWalk ? .throttled : .paused
-        } else if isLowPowerModeEnabled || isReduceMotionEnabled || userPowerSavingMode {
+        } else if isLowPowerModeEnabled || userPowerSavingMode {
             .throttled
         } else {
             .live
@@ -349,7 +369,6 @@ final class AppWorkloadPolicy: ObservableObject {
     func visualEffectsBudget(isVisible: Bool = true) -> OhanaVisualEffectsBudget {
         guard isVisible, isForeground else { return .efficient }
         if isLowPowerModeEnabled ||
-            isReduceMotionEnabled ||
             userPowerSavingMode ||
             isUserReducedVisualEffectsMode {
             return .efficient
@@ -401,8 +420,7 @@ final class AppWorkloadPolicy: ObservableObject {
 
         let constrained = isLowPowerModeEnabled ||
             isUserPowerSavingMode ||
-            thermalState == .serious ||
-            isReduceMotionEnabled
+            thermalState == .serious
         if constrained {
             return OhanaBackgroundWorkBudget(
                 operation: operation,
@@ -428,7 +446,6 @@ final class AppWorkloadPolicy: ObservableObject {
         if thermalState == .critical { return "thermalCritical" }
         if thermalState == .serious { return "thermalSerious" }
         if isLowPowerModeEnabled { return "lowPowerMode" }
-        if isReduceMotionEnabled { return "reduceMotion" }
         if userPowerSavingMode { return "appPowerSaving" }
         return nil
     }
@@ -482,7 +499,8 @@ final class AppWorkloadPolicy: ObservableObject {
         switch budget {
         case .full: 0
         case .efficient: 1
-        case .static: 2
+        case .minimal: 2
+        case .static: 3
         }
     }
 

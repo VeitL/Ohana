@@ -271,7 +271,7 @@ struct SharedPetActionRecorderTests {
             executorId: human.id.uuidString,
             date: Date(timeIntervalSince1970: 2230)
         )
-        _ = ExpenseCommandService.recordSharedPetExpense(
+        _ = try ExpenseCommandService.recordSharedPetExpense(
             sourcePet: first,
             targets: [first, second],
             amount: 40,
@@ -1047,7 +1047,7 @@ struct SharedPetActionRecorderTests {
         let cleanup = isolateEconomy(activeHumanID: nil)
         defer { cleanup() }
 
-        _ = ExpenseCommandService.recordSharedPetExpense(
+        _ = try ExpenseCommandService.recordSharedPetExpense(
             sourcePet: first,
             targets: [first, second, third],
             amount: 100,
@@ -1174,18 +1174,23 @@ struct SharedPetActionRecorderTests {
         let cleanup = isolateEconomy(activeHumanID: human.id.uuidString)
         defer { cleanup() }
 
-        _ = CareEventService.recordSharedCare(
+        let careRequest = SharedCareRecordRequest(
             sourcePet: first,
             targets: [first, second],
-            type: .filterClean,
+            careType: .filterClean,
             actionKind: .filterClean,
-            context: context,
-            executorId: human.id.uuidString,
+            executorID: human.id.uuidString,
             reward: .general(humanReward: 25, petReward: 2, emoji: CareType.filterClean.emoji, title: "共同清理滤材"),
             rewardTitle: "共同清理滤材 · 2只",
-            date: Date(timeIntervalSince1970: 4000)
+            quality: .none,
+            date: Date(timeIntervalSince1970: 4000),
+            source: .quickAction
         )
-        _ = ExpenseCommandService.recordSharedPetExpense(
+        _ = CareEventService.recordSharedCare(
+            careRequest,
+            context: context
+        )
+        _ = try ExpenseCommandService.recordSharedPetExpense(
             sourcePet: first,
             targets: [first, second],
             amount: 40,
@@ -1349,7 +1354,7 @@ struct SharedPetActionRecorderTests {
         let cleanup = isolateEconomy(activeHumanID: primary.id.uuidString)
         defer { cleanup() }
 
-        _ = ExpenseCommandService.recordSharedPetExpense(
+        _ = try ExpenseCommandService.recordSharedPetExpense(
             sourcePet: first,
             targets: [first, second],
             amount: 30,

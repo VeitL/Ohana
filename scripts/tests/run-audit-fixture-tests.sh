@@ -27,6 +27,14 @@ fail() {
   failures=$((failures + 1))
 }
 
+if ! scripts/tests/run-test-scheme-routing-tests.sh; then
+  fail "scripts/tests/run-test-scheme-routing-tests.sh: scheme routing regression"
+fi
+
+if ! scripts/tests/run-validation-routing-tests.sh; then
+  fail "scripts/tests/run-validation-routing-tests.sh: validation lane regression"
+fi
+
 run_audit() {
   local script="$1"
   shift
@@ -96,8 +104,11 @@ member_view_revision_fixture_path="Ohana/Features/Members/Views/__MemberProfileR
 save_failure_fixture_path="Ohana/Features/Settings/__SaveFailureBoundaryFixture.swift"
 governance_manifest_path="docs/governance/manifests/feature-ownership.json"
 governance_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-feature-ownership.XXXXXX")"
+release_device_manifest_path="docs/governance/manifests/release-device-matrix.json"
+release_device_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-release-device-matrix.XXXXXX")"
 ui_shard_manifest_fixture=""
 cp "$governance_manifest_path" "$governance_manifest_backup"
+cp "$release_device_manifest_path" "$release_device_manifest_backup"
 
 cleanup_architecture_fixture() {
   rm -f "$architecture_fixture_path"
@@ -111,6 +122,10 @@ cleanup_governance_fixture() {
   if [[ -f "$governance_manifest_backup" ]]; then
     cp "$governance_manifest_backup" "$governance_manifest_path"
     rm -f "$governance_manifest_backup"
+  fi
+  if [[ -f "$release_device_manifest_backup" ]]; then
+    cp "$release_device_manifest_backup" "$release_device_manifest_path"
+    rm -f "$release_device_manifest_backup"
   fi
   if [[ -n "$ui_shard_manifest_fixture" ]]; then
     rm -f "$ui_shard_manifest_fixture"
@@ -181,7 +196,7 @@ assert_bad scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeBad.swift" \
 assert_good scripts/audit-runtime-guardrails.sh "$fixtures/RuntimeGood.swift"
 
 cp "$fixtures/ArchitectureBoundariesBad.swift" "$architecture_fixture_path"
-run_audit scripts/audit-architecture-boundaries.sh --changed
+run_audit scripts/audit-architecture-boundaries.sh "$architecture_fixture_path"
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesBad.swift: expected strict exit 1, got $status"
 else
@@ -193,7 +208,7 @@ else
   echo "ok  scripts/audit-architecture-boundaries.sh catches Domain dependency rules"
 fi
 cp "$fixtures/ArchitectureBoundariesGood.swift" "$architecture_fixture_path"
-run_audit scripts/audit-architecture-boundaries.sh --changed
+run_audit scripts/audit-architecture-boundaries.sh "$architecture_fixture_path"
 if [[ "$status" -ne 0 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesGood.swift: expected clean exit 0, got $status: $output"
 else
@@ -202,7 +217,7 @@ fi
 cleanup_architecture_fixture
 
 cp "$fixtures/ArchitectureModelBoundariesBad.swift" "$architecture_model_fixture_path"
-run_audit scripts/audit-architecture-boundaries.sh --changed
+run_audit scripts/audit-architecture-boundaries.sh "$architecture_model_fixture_path"
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesBad.swift: expected strict exit 1, got $status"
 else
@@ -214,7 +229,7 @@ else
   echo "ok  scripts/audit-architecture-boundaries.sh catches Models boundary rules"
 fi
 cp "$fixtures/ArchitectureModelBoundariesGood.swift" "$architecture_model_fixture_path"
-run_audit scripts/audit-architecture-boundaries.sh --changed
+run_audit scripts/audit-architecture-boundaries.sh "$architecture_model_fixture_path"
 if [[ "$status" -ne 0 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureModelBoundariesGood.swift: expected clean exit 0, got $status: $output"
 else
@@ -223,7 +238,7 @@ fi
 cleanup_architecture_fixture
 
 cp "$fixtures/MemberProfileRevisionBoundaryBad.swift" "$member_view_revision_fixture_path"
-run_audit scripts/audit-architecture-boundaries.sh --changed
+run_audit scripts/audit-architecture-boundaries.sh "$member_view_revision_fixture_path"
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-architecture-boundaries.sh MemberProfileRevisionBoundaryBad.swift: expected strict exit 1, got $status"
 elif ! grep -qF "[member-view-direct-profile-revision]" <<<"$output"; then
@@ -232,7 +247,7 @@ else
   echo "ok  scripts/audit-architecture-boundaries.sh catches direct Members view profile revision publishes"
 fi
 cp "$fixtures/MemberProfileRevisionBoundaryGood.swift" "$member_view_revision_fixture_path"
-run_audit scripts/audit-architecture-boundaries.sh --changed
+run_audit scripts/audit-architecture-boundaries.sh "$member_view_revision_fixture_path"
 if [[ "$status" -ne 0 ]]; then
   fail "scripts/audit-architecture-boundaries.sh MemberProfileRevisionBoundaryGood.swift: expected clean exit 0, got $status: $output"
 else
@@ -283,6 +298,10 @@ assert_good scripts/audit-agent-skill-governance.sh "$agent_skill_fixtures/SelfI
 assert_bad scripts/audit-agent-skill-governance.sh "$agent_skill_fixtures/GenericGovernanceBad/SKILL.md" \
   skill-source-of-truth-claim skill-repo-relative-command
 assert_good scripts/audit-agent-skill-governance.sh "$agent_skill_fixtures/GenericGovernanceGood/SKILL.md"
+
+assert_bad scripts/audit-swiftdata-save-failures.sh "$fixtures/SaveFailureBoundaryBad.swift" \
+  swiftdata-silent-save-discard swiftdata-ambiguous-safe-save
+assert_good scripts/audit-swiftdata-save-failures.sh "$fixtures/SaveFailureBoundaryGood.swift"
 
 run_audit scripts/audit-governance-manifests.sh
 if [[ "$status" -ne 0 ]]; then
@@ -338,6 +357,25 @@ else
   echo "ok  scripts/audit-governance-manifests.sh catches manifest service ghost symbols"
 fi
 
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path("docs/governance/manifests/release-device-matrix.json")
+data = json.loads(path.read_text(encoding="utf-8"))
+data["targetedDeviceFamilies"] = [1, 2]
+path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PY
+run_audit scripts/audit-governance-manifests.sh
+cp "$release_device_manifest_backup" "$release_device_manifest_path"
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-governance-manifests.sh device matrix fixture: expected strict exit 1, got $status"
+elif ! grep -qF "targetedDeviceFamilies must be exactly [1]" <<<"$output"; then
+  fail "scripts/audit-governance-manifests.sh device matrix fixture: iPhone-only guard no longer fires"
+else
+  echo "ok  scripts/audit-governance-manifests.sh catches iPad device-family drift"
+fi
+
 assert_bad scripts/audit-derived-state-lifecycle.sh "$fixtures/DerivedStateLifecycleBad.swift" \
   derived-state-lifecycle-checklist physical-delete-without-tombstone \
   cloudsync-upload-builder-coverage physical-deletion-cascade-coverage
@@ -348,6 +386,7 @@ assert_scope_floor scripts/audit-accessibility.sh
 assert_scope_floor scripts/audit-smoothness-risk.sh
 assert_scope_floor scripts/audit-route-first-frame.sh
 assert_scope_floor scripts/audit-runtime-guardrails.sh
+assert_scope_floor scripts/audit-swiftdata-save-failures.sh
 assert_scope_floor scripts/audit-economy-boundaries.sh
 assert_scope_floor scripts/audit-member-lifecycle-gate.sh
 assert_scope_floor scripts/audit-derived-state-lifecycle.sh

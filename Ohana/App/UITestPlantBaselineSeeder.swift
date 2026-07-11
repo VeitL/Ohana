@@ -25,7 +25,28 @@ enum OhanaUITestLaunchOptions {
     }
 
     static var disablesAnimations: Bool {
-        isRunningUITests && !ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_ENABLE_ANIMATIONS")
+        shouldDisableAnimations(arguments: ProcessInfo.processInfo.arguments)
+    }
+
+    static var forcesReduceMotion: Bool {
+        shouldForceReduceMotion(
+            arguments: ProcessInfo.processInfo.arguments,
+            isRunningUITests: isRunningUITests
+        )
+    }
+
+    static func shouldDisableAnimations(arguments: [String]) -> Bool {
+        // Unit-test hosts also expose XCTest environment keys. Requiring the
+        // explicit app launch marker keeps unit tests on production budgets.
+        arguments.contains("-OHANA_UI_TESTS")
+            && !arguments.contains("-OHANA_UI_TEST_ENABLE_ANIMATIONS")
+    }
+
+    static func shouldForceReduceMotion(
+        arguments: [String],
+        isRunningUITests: Bool
+    ) -> Bool {
+        isRunningUITests && arguments.contains("-OHANA_UI_TEST_REDUCE_MOTION")
     }
 
     static var requestsSingleStoreOpenFailure: Bool {

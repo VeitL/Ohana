@@ -20,20 +20,29 @@
 
 ## 本轮结论
 
-当前首发仓库代码层 P0 为 0，首发可达的 repo-code P1 为 0。状态总账里还剩 15 个手动 / 外部 gate：其中 14 项需要你做真机或真实 UI 验收；第 15 项 CloudKit live apply 是 1.x 延后项，首发如果继续关闭 CloudKit，本轮只需要勾选“确认不测”。
+当前首发仓库代码层 P0 为 0，首发可达的 repo-code P1 为 0。状态总账还剩
+9 个 follow-up：1 个 CloudKit 1.x 延后项、4 个真机 P1 和 4 个非阻塞 P2。
+设备范围已经批准为 iPhone-only / iOS 26.2+；签名
+Archive、App Store Connect 和最小实体 iPhone 证明并入下方 R0。下方 15 项
+是给人执行的合并验收清单，不等于 15 个独立 open follow-up；第 15 项
+CloudKit live apply 在首发继续关闭 CloudKit 时只需确认本轮不测。
 
 建议分两轮完成：
 
-1. 第一轮：只跑首发硬门和系统权限。覆盖首启、覆盖安装、Settings、PIN/隐私、通知、纪念模式通知、相册/文件选择器。
+1. 第一轮：只跑首发硬门和系统权限。先验证 R0 设备矩阵与签名包，再覆盖首启、覆盖安装、Settings、PIN/隐私、通知、纪念模式通知、相册/文件选择器。
 2. 第二轮：跑模块视觉和手感签收。覆盖宠物、人类、日历账本、费用文档、成就心愿、照片周报、植物/纪念历史、RC。
 
 ## 校对状态
 
-本清单已按 2026-07-01 当前源头校对：
+本清单已按 2026-07-11 当前源头校对：
 
-- 15 项来自 `docs/testing-progress.md` 的 Active Manual / External Gates。
+- 15 项把当前真机/人工债按用户路径合并，状态数量以
+  `docs/task-follow-ups.md` 为准。
 - GAP-6、GAP-7、GAP-9 的详细要求来自 `docs/planning/gap-acceptance-track-list.md`。
 - CloudKit live apply 来自 TFU-20260614-014 和 `docs/cloud-sync-todo.md`，首发关闭 CloudKit 时不进入真机测试轮。
+- D24、`docs/os-support-matrix.md` 和机器清单已经固定 iPhone-only / iOS
+  26.2+；R0 只负责核实最终签名产物、App Store Connect 与实体设备，没有重新
+  打开 iPad 或原生 Watch 产品范围。
 - 本清单只用于你执行和打勾；最终通过 / 失败状态仍要同步回对应总账。
 
 ## 2026-07-11 模拟器预检补充
@@ -49,6 +58,11 @@
 - 上述证据只关闭仓库内 UI smoke gate，不勾选本文件任何真机项目。请在真机
   RC 轮继续检查首宠卡片的朗读顺序、主动作与右上角收起动作是否各出现一次，
   并保留 Reduce Motion、Dynamic Type 和真实触摸手感证据。
+- TFU-20260710-007/008 的仓库内预检已关闭：费用命令和恢复路径对无效金额的
+  失败/恢复/重复用例通过 14/14，运行时策略用例通过 6/6；开启中央 Reduce
+  Motion 策略的 Pet-first 照护 → 奖励 → Oasis 路径在 iPhone 17 模拟器通过
+  1/1。该结果不替代真机 VoiceOver、Voice Control、Switch Control、触感和
+  能耗验收。
 
 ## 完成打卡板
 
@@ -62,7 +76,7 @@
 ### 第一轮：首发硬门和系统能力
 
 - [x] 1. GAP-7 补记喂食
-- [x] 2. GAP-6 通知交付
+- [ ] 2. GAP-6 通知交付
 - [ ] 3. GAP-9 离世退场
 - [ ] 9. Medication / Notifications
 - [ ] 11. Expenses / Insurance / Documents
@@ -89,12 +103,54 @@
 包和真实 iPhone 执行；模拟器、Debug、静态审计或 Instruments 截图都只能当
 预检，不能勾选下面任何一项。
 
+- [ ] R0. 首发设备矩阵与签名包
 - [ ] R1. 公开政策与支持入口
 - [ ] R2. 首页十次快速照护
 - [ ] R3. 两分钟 sheet 覆盖首页
 - [ ] R4. 500 图长滚
 - [ ] R5. 30–60 分钟锁屏遛狗
 - [ ] R6. 自动备份与删除失败恢复
+
+### R0. 首发设备矩阵与签名包
+
+步骤：生成已签名 Release Archive；在 App Store Connect 核对设备与 storefront；
+分别在 iPhone SE（第二代）或实际首发最小 iPhone，以及一台当前 iPhone 上安装
+同一 build 并完成首启 → 建第一只宠物 → 第一笔照护 → Oasis 的最短 smoke。
+
+通过标准：
+
+- Archive 的 `UIDeviceFamily` 仅包含 `1`，App Store Connect 不要求 iPad 截图，
+  不包含 watchOS app 或 complication。
+- 最低系统为 iOS 26.2；最小与当前 iPhone 都能完成核心 smoke，关键操作不截断、
+  不被安全区遮挡、没有启动或持久化失败。
+- 记录实际开放的 storefront。原生 iPad、原生 Watch 与更低 iOS 不得写入首发宣传。
+
+记录（2026-07-11，部分完成）：Archive / build：开发签名 Release 1.0 (1)，
+`/tmp/OhanaArchives-20260711/Ohana-R0-eece7d642-dirty.xcarchive`；
+`xcodebuild archive`、Xcode store validation 和严格 `codesign` 校验通过。
+归档产物为 arm64、`UIDeviceFamily = [1]`、`MinimumOSVersion = 26.2`，不含
+app extension / watchOS 内容；签名 Entitlements 只有 HealthKit 与
+`CloudDocuments` iCloud container，没有 CloudKit、APNs 或 App Group。
+Provisioning profile 包含当前设备，当前 iPhone 17 Pro Max / iOS 26.5.2
+(23F84) 已安装并启动，进程未立即退出。用户授权后已于 2026-07-11 卸载 App
+以清除本地容器，再重新安装并启动同一 Archive；未删除 iCloud Drive 或用户
+自行导出的备份。最小设备 / iOS：未执行；当前设备内“首启 → 建第一只宠物 →
+第一笔照护 → Oasis” smoke 已走到 Oasis，但在只有 Pet、没有 Human、总额显示
+59🥥 的样本上，点击右下角生命树注入只震动、不增加能量。根因已定位为旧 D17
+50🥥 赠礼错误绑定 Pet，而注入命令硬依赖 current Human。当前工作区已把赠礼改为
+`system:island` 岛屿储备，加入旧 v2 赠礼幂等重分类，并让生命树原子使用全部正式
+岛屿总额；32 条 targeted Unit/Integration 与 1 条 Pet-first 五次注入 UI 路径通过。
+随后增量 `-O` Release 设备包通过严格签名校验，并在不卸载、不清空容器的前提下
+覆盖安装和启动。只读复制设备 SwiftData store 后确认迁移已提交：`system:island=50`、
+Pet 奖励余额 `9`、`system:legacy=0`，同时存在 Pet `-50`、岛屿 `+50` 和幂等 marker，
+总额仍为 59。还需用户在该设备点击一次注入，确认总额 59→49、树能量 +10，故当前
+设备核心 smoke 尚未最终签收；Storefront：未验证。当前机器
+只有 Apple Development identity，因此本次证明的是可安装的
+开发签名 Release，不是 App Store distribution / App Store Connect 通过证据。
+项目目录受 File Provider 管理时，`.build` 内归档会在签名前重新附加
+`com.apple.FinderInfo`；将 DerivedData 与 Archive 移到 `/tmp` 后成功，归档内
+未残留 FinderInfo / ResourceFork。R0 保持未勾选，直至最小设备、当前设备完整
+smoke 与 App Store Connect / storefront 均有记录。
 
 ### R1. 公开政策与支持入口
 
@@ -106,7 +162,10 @@
   同步关闭，自动 iCloud Drive 包不含人类健康/HealthKit/体重/运动/用药/健康报告。
 - 支持入口打开邮件撰写，收件人正确，且不会自动附带任何记录、日志、截图或诊断数据。
 
-记录：设备 / iOS：_____；Release build：_____；结果：_____；问题：_____.
+记录（2026-07-11，外部 URL 预检）：公开隐私政策 HTTPS 页面可匿名访问，页面
+内容声明 Solo 关闭 CloudKit sharing、APNs、远程同步，并声明自动 iCloud Drive
+备份排除人类健康 / HealthKit 数据。真机 Settings 内点按、系统浏览器跳转、邮件
+撰写页收件人与“不会自动附带诊断数据”尚未执行；R1 保持未勾选。
 
 ### R2. 首页十次快速照护
 
@@ -180,7 +239,7 @@
 | 编号 | 模块 / Gate | 已测过 | 真机还要测 | 本轮状态 |
 | --- | --- | --- | --- | --- |
 | 1 | GAP-7 补记喂食 | 模拟器 UI 已覆盖 History “+” 手动补记、1 天 / 2 天历史日期保存和回读；2026-07-01 batch F 再次复测通过。 | 手动选择历史日期补记一次，确认历史行日期和操作日奖励口径正确。 | 待真机 |
-| 2 | GAP-6 通知交付 | 调度策略、合并、夜间延后、关键用药豁免、通知 action 协调、Observability 面板已测；2026-07-03 已补测关联植物的普通 Calendar 事项会按用户选择时间通知，不被植物护理提醒窗口挪到早晨；普通植物关联 Reminder 完成 / 跳过不会误写植物护理事实。 | 真机权限弹窗、banner、锁屏、Focus/DND、前台展示、通知点击和完成 / 跳过 / 稍后提醒；真机创建一个关联植物的普通 Calendar 事项，确认按选定时间通知。 | 待真机 |
+| 2 | GAP-6 通知交付 | 调度策略、合并、夜间延后、关键用药豁免、通知 action 协调、Observability 面板已测；2026-07-03 已补测关联植物的普通 Calendar 事项会按用户选择时间通知，不被植物护理提醒窗口挪到早晨；普通植物关联 Reminder 完成 / 跳过不会误写植物护理事实。 | 真机权限弹窗、banner、锁屏、Focus/DND、前台展示、通知点击和完成 / 跳过 / 稍后提醒；真机创建一个关联植物的普通 Calendar 事项，确认按选定时间通知；如有配对 Apple Watch，再确认 iPhone 通知转发及三个 action 恰好处理一次，但不得据此宣称原生 Watch app 支持。 | 待真机 |
 | 3 | GAP-9 离世退场 | 离世对象活跃入口过滤、冻结钱包、历史可读、未来计划清理、标记 / 撤销 UI 已测；2026-07-01 已复测 Human、Pet 和 Dog 纪念标记 / 撤销的取消 / 确认路径，并复测纪念宠物不再暴露 Home / Function Menu 活跃照护入口，旧 Calendar 宠物事项不会打开活跃照护页。 | 真机标记离世、撤销离世、通知取消 / 恢复、历史资料可读、无活跃照护入口。 | 待真机 |
 | 4 | PhotoAlbum / FamilyReports | 周报非竞赛语义、照片隐私清洗、相册命令边界、密集照片 fixture 已测；2026-07-01 已复测 Settings Debug -> Family Weekly Report GUI，batch L 再次复测周报入口和非竞赛文案。 | PhotosPicker 权限和选择器、真实批量照片、大图 viewer、隐私和性能目检。 | 待真机 |
 | 5 | Memorial / Plants | 植物门禁、历史植物数据、植物提醒 / 照护 / 账本边界、纪念历史可读已测；2026-07-01 已跑通植物解锁、创建、提醒、日历、护理和删除 GUI 长链路；最新复测确认新建植物生成的植物计划可在 Calendar 列表行中找到；2026-07-03 最新 executor 级单测确认添加植物命令会直接物化植物计划 Calendar Event 和 Reminder 行；植物提醒“全部延后一天”业务单测和 existing-plant Settings GUI 路径均已通过；batch K 又完整复跑植物解锁、创建、提醒、Calendar、详情护理、删除撤销和最终删除；batch L 再次复测 existing-plant Settings bulk defer 和 Plant Detail 编辑取消 / 保存；2026-07-03 已复测系统生成植物护理计划仍走植物提醒窗口，同时普通植物关联 Calendar / Reminder 完成或跳过都不污染植物护理日志、last-care 日期和植物护理账本；后续产品口径改为不再提供植物页 / Function Menu 的独立植物日历入口，植物事项只从首页日历 tab 的“植物”聚合筛选查看；植物 wallet 卡片展开 / 收起已做根因复测，当前实现使用共享 scene 的本地 inactive freeze 锁住非选中卡片 frame / rotation，且不恢复植物页外部 frozen 状态，非选中卡片不应再跳位；8 株植物长列表已 GUI 复测为首屏只有 6 张可点卡片，后续卡片需要向下滚动并仍可展开 / 收起。 | 用真实纪念对象和历史植物样本遍历 Home、Today Focus、Oasis、FunctionMenu；真机点击 Settings -> Plant care reminders -> Defer all by one day 并看反馈；新增植物品种库添加、植物 wallet 卡片展开 / 快捷操作、右侧房间 rail 手感验收；真机创建关联植物的普通 Calendar 事项并确认通知按时到达；从首页日历 tab 点“植物”聚合筛选确认可查看植物事项，同时确认植物详情和 Function Menu 植物分组不再出现日历入口。 | 待真机 |
@@ -189,7 +248,7 @@
 | 8 | HumanHealth / HumanNotes / Workouts | 添加 / 回读、删除后消失、首发本地查看者可见策略已由模拟器 UI 覆盖；2026-07-01 已复测 Human Feature Hub 多路由、Home 快捷 sheet、weight / expense / medication / note 持久化、note 保存后历史刷新、note 删除和扩展模块创建 / 删除；batch K 又复测 Human extended module 连续写入 body metric / workout / health report / wishlist / profile notes；batch L 再次复测 Human record persistence。 | 真机键盘、长文案、添加 / 删除、本地查看者文案和手感最终签收。 | 待真机 |
 | 9 | Medication / Notifications | 宠物 / 人类用药命令、剂量记录、Human medication 添加 / 回读 UI 已测；2026-07-01 已复测 Reminder Observability 入口和 Human medication 持久化，batch L 再次复测 Observability 面板。 | 真实通知系统行为同编号 2；再确认用药入口、长语言通知和手感。 | 待真机 |
 | 10 | Calendar / DashboardRecords / CareLedger | 日历命令、筛选、深链、水计划读回、密集快照、账本 backfill 已测；手动事项详情 / 编辑 / 删除、系统喂食事项跳 Quick Feed、Add Event 键盘保存、水计划日历保存 / 删除、宠物筛选，以及标题像 feed / water / potty / walk / play / weight / health / hygiene 的宠物关联用户事项打开可编辑详情已复测；最新 6 条策略单测还覆盖普通植物事项不会误跳系统页，生成的喂食 / 饮水 / 植物计划会进相关详情页 / 打卡页；batch E/F/G/H/I/J/K/L 复测系统计划、linked pet 用户事项、植物计划行、宠物筛选、Add Event 键盘保存和手动 Calendar CRUD；2026-07-03 已补测普通植物关联 Calendar 事项的通知时间不会被植物护理窗口改写，且普通植物关联事项 / 提醒完成或跳过不写植物护理账本；当前全局日历入口收敛为首页日历 tab，植物页不再提供独立植物日历路由。 | 真机长列表滚动、趋势图 / 账本筛选、已删除 / 已离世 / legacy 样本目检；创建普通植物关联 Calendar 事项并确认详情 / filter / 通知时间都正确；从首页日历 tab 进入，确认“植物”聚合筛选能显示植物事项，且没有从植物详情或 Function Menu 进入日历的替代入口。 | 待真机 |
-| 11 | Expenses / Insurance / Documents | 费用、保单、文档、附件隐私清洗、删除级联、人类费用 UI 已测；2026-07-01 已复测 Human expense 添加 / 回读。 | 真实相册 / 文件 picker、附件预览、删除后入口消失和手感。 | 待真机 |
+| 11 | Expenses / Insurance / Documents | 费用、保单、文档、附件隐私清洗、删除级联、人类费用 UI 已测；2026-07-01 已复测 Human expense 添加 / 回读。2026-07-11 补充：普通费用在 user/shared/Human command、备份 preflight 和 rehydrate 边界拒绝 0、负数、NaN、正负无穷；失败后重试、重复失败、合法恢复和保险报销负向事实兼容测试通过。 | 真实相册 / 文件 picker、附件预览、删除后入口消失和手感。 | 待真机 |
 | 12 | Privacy / Security | 未来 PIN / 隐私字段命令边界、备份排除和不可写保护已测；首发本地 UI 当前隐藏 Human 隐私 / PIN 控制并保持同设备成员资料可见；2026-07-01 已复测 account switcher 不暴露隐私 / PIN 控制、同设备成员资料仍可见，以及 Human 永久删除取消 / 错误名称保护；batch K 再次复测 account switcher 不暴露隐私 / PIN 控制。 | 真机确认当前首发 Settings / 成员切换不会露出误导性隐私 / PIN 入口，锁屏 / 键盘 / 系统权限相关页面不破版。 | 待真机 |
 | 13 | Onboarding / CrewRoster / FunctionMenu | 首启核心链路真机 smoke 已过；一人一宠 Function Menu 模拟器预检已过；Home FAB -> Function Menu -> Coconut Shop 购买路径已复测；2026-07-01 已在 broad GUI 中复测首启建档和 Function Menu 可达；batch K 复跑首启建档、Oasis、Settings、Function Menu；CrewRoster 成员页卡片缩回动画提前掉层的问题已修复并有策略单测覆盖。 | 覆盖安装、reset、第二人 / 第二宠、CrewRoster 卡片放大 / 缩小动画手感、全功能菜单、危险区视觉。 | 待真机 |
 | 14 | Phase 9 dogfooding / RC | 当前处于 9A；自动和模拟器证据已大幅收敛。 | 真机完成本表后，再跑一次 RC 级全路径冒烟。 | 待 RC |

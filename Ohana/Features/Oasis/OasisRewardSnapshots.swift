@@ -169,6 +169,7 @@ struct OasisBentoSnapshot: Equatable {
 
 struct OasisRewardActionSnapshot: Equatable {
     var canInjectCoconuts: Bool?
+    var injectionCoconutBalance: Int = 0
     var activeCoconutBalance: Int = 0
     var critterFragmentTotal: Int = 0
 }

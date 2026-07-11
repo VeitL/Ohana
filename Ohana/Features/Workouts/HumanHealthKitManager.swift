@@ -48,6 +48,59 @@ struct HumanWorkoutHealthSnapshot: Equatable, Sendable {
         hourlySteps: (0 ..< 24).map { HumanHealthHourlyPoint(hour: $0, value: 0) },
         hourlyDistanceKm: (0 ..< 24).map { HumanHealthHourlyPoint(hour: $0, value: 0) }
     )
+
+    var hasCompleteActivityGoals: Bool {
+        moveGoalKcal > 0 && exerciseGoalMinutes > 0 && standGoalHours > 0
+    }
+}
+
+nonisolated struct HumanHealthActivityValues: Equatable, Sendable {
+    let activeEnergyKcal: Double
+    let exerciseMinutes: Double
+    let standHours: Double
+    let moveGoalKcal: Double
+    let exerciseGoalMinutes: Double
+    let standGoalHours: Double
+}
+
+nonisolated struct HumanHealthResolvedActivity: Equatable, Sendable {
+    let activeEnergyKcal: Int
+    let exerciseMinutes: Int
+    let standHours: Int
+    let moveGoalKcal: Int
+    let exerciseGoalMinutes: Int
+    let standGoalHours: Int
+}
+
+nonisolated enum HumanHealthActivityResolver {
+    static func resolve(
+        summary: HumanHealthActivityValues?,
+        fallbackActiveEnergyKcal: Double,
+        fallbackExerciseMinutes: Double,
+        fallbackStandHours: Double
+    ) -> HumanHealthResolvedActivity {
+        HumanHealthResolvedActivity(
+            activeEnergyKcal: measured(summary?.activeEnergyKcal, fallback: fallbackActiveEnergyKcal),
+            exerciseMinutes: measured(summary?.exerciseMinutes, fallback: fallbackExerciseMinutes),
+            standHours: measured(summary?.standHours, fallback: fallbackStandHours),
+            moveGoalKcal: goal(summary?.moveGoalKcal),
+            exerciseGoalMinutes: goal(summary?.exerciseGoalMinutes),
+            standGoalHours: goal(summary?.standGoalHours)
+        )
+    }
+
+    private static func measured(_ value: Double?, fallback: Double) -> Int {
+        Int(max(finite(value), finite(fallback)).rounded())
+    }
+
+    private static func goal(_ value: Double?) -> Int {
+        Int(finite(value).rounded())
+    }
+
+    private static func finite(_ value: Double?) -> Double {
+        guard let value, value.isFinite else { return 0 }
+        return max(0, value)
+    }
 }
 
 struct HealthKitWorkoutImportCandidate: Equatable, Identifiable, Sendable {
@@ -247,11 +300,34 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
                 healthStore: healthStore
             )
         }
+        async let exerciseResult = loadHealthValue("Apple Health exercise time") {
+            try await totalQuantity(
+                .appleExerciseTime,
+                unit: .minute(),
+                start: startOfDay,
+                end: now,
+                healthStore: healthStore
+            )
+        }
+        async let standHoursResult = loadHealthValue("Apple Health stand hours") {
+            try await appleStandHours(
+                start: startOfDay,
+                end: now,
+                healthStore: healthStore
+            )
+        }
         async let activityResult = loadHealthValue("Apple Health activity summary") {
             try await activitySummary(for: now, healthStore: healthStore)
         }
 
-        let results = await (hourlyStepsResult, hourlyDistanceResult, activeEnergyResult, activityResult)
+        let results = await (
+            hourlyStepsResult,
+            hourlyDistanceResult,
+            activeEnergyResult,
+            exerciseResult,
+            standHoursResult,
+            activityResult
+        )
         var readErrors: [Error] = []
         let hourlySteps = resolvedHealthValue(
             results.0,
@@ -264,21 +340,29 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
             errors: &readErrors
         )
         let activeEnergy = resolvedHealthValue(results.2, fallback: 0, errors: &readErrors)
+        let exerciseMinutes = resolvedHealthValue(results.3, fallback: 0, errors: &readErrors)
+        let standHours = resolvedHealthValue(results.4, fallback: 0, errors: &readErrors)
         let activity = resolvedHealthValue(
-            results.3,
-            fallback: ActivitySummaryValues?.none,
+            results.5,
+            fallback: HumanHealthActivityValues?.none,
             errors: &readErrors
+        )
+        let resolvedActivity = HumanHealthActivityResolver.resolve(
+            summary: activity,
+            fallbackActiveEnergyKcal: activeEnergy,
+            fallbackExerciseMinutes: exerciseMinutes,
+            fallbackStandHours: standHours
         )
 
         snapshot = HumanWorkoutHealthSnapshot(
             steps: Int(hourlySteps.reduce(0) { $0 + $1.value }.rounded()),
-            activeEnergyKcal: Int((activity?.activeEnergyKcal ?? activeEnergy).rounded()),
+            activeEnergyKcal: resolvedActivity.activeEnergyKcal,
             distanceKm: hourlyDistance.reduce(0) { $0 + $1.value },
-            exerciseMinutes: Int((activity?.exerciseMinutes ?? 0).rounded()),
-            standHours: Int((activity?.standHours ?? 0).rounded()),
-            moveGoalKcal: Int((activity?.moveGoalKcal ?? 0).rounded()),
-            exerciseGoalMinutes: Int((activity?.exerciseGoalMinutes ?? 0).rounded()),
-            standGoalHours: Int((activity?.standGoalHours ?? 0).rounded()),
+            exerciseMinutes: resolvedActivity.exerciseMinutes,
+            standHours: resolvedActivity.standHours,
+            moveGoalKcal: resolvedActivity.moveGoalKcal,
+            exerciseGoalMinutes: resolvedActivity.exerciseGoalMinutes,
+            standGoalHours: resolvedActivity.standGoalHours,
             hourlySteps: hourlySteps,
             hourlyDistanceKm: hourlyDistance
         )
@@ -318,10 +402,13 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
             HKObjectType.workoutType(),
             HKObjectType.activitySummaryType()
         ]
-        for identifier in [HKQuantityTypeIdentifier.stepCount, .activeEnergyBurned, .distanceWalkingRunning] {
+        for identifier in [HKQuantityTypeIdentifier.stepCount, .activeEnergyBurned, .distanceWalkingRunning, .appleExerciseTime] {
             if let type = HKObjectType.quantityType(forIdentifier: identifier) {
                 types.insert(type)
             }
+        }
+        if let standHourType = HKObjectType.categoryType(forIdentifier: .appleStandHour) {
+            types.insert(standHourType)
         }
         return types
     }
@@ -441,16 +528,37 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
         }
     }
 
-    private struct ActivitySummaryValues: Sendable {
-        let activeEnergyKcal: Double
-        let exerciseMinutes: Double
-        let standHours: Double
-        let moveGoalKcal: Double
-        let exerciseGoalMinutes: Double
-        let standGoalHours: Double
+    private func appleStandHours(
+        start: Date,
+        end: Date,
+        healthStore: HKHealthStore
+    ) async throws -> Double {
+        guard let categoryType = HKObjectType.categoryType(forIdentifier: .appleStandHour) else { return 0 }
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [.strictStartDate])
+        let calendar = calendar
+
+        return try await executeHealthKitQuery(operationName: "Apple Health stand hours", healthStore: healthStore) { finish in
+            HKSampleQuery(
+                sampleType: categoryType,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, samples, error in
+                if let error {
+                    finish(.failure(error))
+                    return
+                }
+                let stoodValue = HKCategoryValueAppleStandHour.stood.rawValue
+                let stoodHours = Set((samples as? [HKCategorySample] ?? []).compactMap { sample -> Date? in
+                    guard sample.value == stoodValue else { return nil }
+                    return calendar.dateInterval(of: .hour, for: sample.startDate)?.start
+                })
+                finish(.success(Double(stoodHours.count)))
+            }
+        }
     }
 
-    private func activitySummary(for date: Date, healthStore: HKHealthStore) async throws -> ActivitySummaryValues? {
+    private func activitySummary(for date: Date, healthStore: HKHealthStore) async throws -> HumanHealthActivityValues? {
         var components = calendar.dateComponents([.era, .year, .month, .day], from: date)
         components.calendar = calendar
         components.timeZone = calendar.timeZone
@@ -466,7 +574,7 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
                     finish(.success(nil))
                     return
                 }
-                finish(.success(ActivitySummaryValues(
+                finish(.success(HumanHealthActivityValues(
                     activeEnergyKcal: summary.activeEnergyBurned.doubleValue(for: .kilocalorie()),
                     exerciseMinutes: summary.appleExerciseTime.doubleValue(for: .minute()),
                     standHours: summary.appleStandHours.doubleValue(for: .count()),

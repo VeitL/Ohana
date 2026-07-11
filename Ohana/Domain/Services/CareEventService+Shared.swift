@@ -259,31 +259,13 @@ extension CareEventService {
     @discardableResult
     @MainActor
     static func recordSharedCare(
-        sourcePet: Pet,
-        targets: [Pet],
-        type: CareType,
-        actionKind: SharedCareActionKind,
+        _ request: SharedCareRecordRequest,
         context: ModelContext,
-        executorId: String? = nil,
-        reward: DomainCareRewardAction,
-        rewardTitle: String? = nil,
-        quality: DomainCareRewardQuality = .none,
-        date: Date = Date(),
-        source: CareLedgerSource = .quickAction,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int) {
         recordSharedCareFact(
-            sourcePet: sourcePet,
-            targets: targets,
-            type: type,
-            actionKind: actionKind,
+            request,
             context: context,
-            executorId: executorId,
-            reward: reward,
-            rewardTitle: rewardTitle,
-            quality: quality,
-            date: date,
-            source: source,
             dependencies: providedDependencies
         ).reward
     }
@@ -291,32 +273,23 @@ extension CareEventService {
     @discardableResult
     @MainActor
     static func recordSharedCareFact(
-        sourcePet: Pet,
-        targets: [Pet],
-        type: CareType,
-        actionKind: SharedCareActionKind,
+        _ request: SharedCareRecordRequest,
         context: ModelContext,
-        executorId: String? = nil,
-        reward: DomainCareRewardAction,
-        rewardTitle: String? = nil,
-        quality: DomainCareRewardQuality = .none,
-        date: Date = Date(),
-        source: CareLedgerSource = .quickAction,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
         let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
-        let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
+        let liveTargets = SharedPetTargetResolver.normalizedTargets(request.targets, fallback: request.sourcePet)
         guard !liveTargets.isEmpty else { return .noOp() }
         guard liveTargets.count > 1 else {
             let target = liveTargets[0]
             let recorded = recordCareFact(
                 pet: target,
-                type: type,
+                type: request.careType,
                 context: context,
-                executorId: executorId,
-                reward: reward,
-                quality: quality,
-                date: date,
+                executorId: request.executorID,
+                reward: request.reward,
+                quality: request.quality,
+                date: request.date,
                 dependencies: dependencies
             )
             return sharedResult(
@@ -331,18 +304,18 @@ extension CareEventService {
 
         let result = SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
-                actionKind: actionKind,
-                sourcePet: sourcePet,
+                actionKind: request.actionKind,
+                sourcePet: request.sourcePet,
                 targets: liveTargets,
-                date: date,
-                executorId: executorId,
+                date: request.date,
+                executorId: request.executorID,
                 allocationMode: .equal,
-                childLogStrategy: .care(type: type),
-                reward: reward,
-                rewardQuality: quality,
-                rewardTitle: rewardTitle,
-                reminderCareType: type,
-                source: source
+                childLogStrategy: .care(type: request.careType),
+                reward: request.reward,
+                rewardQuality: request.quality,
+                rewardTitle: request.rewardTitle,
+                reminderCareType: request.careType,
+                source: request.source
             ),
             context: context,
             dependencies: dependencies

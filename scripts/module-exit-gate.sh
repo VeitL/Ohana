@@ -37,7 +37,7 @@ Lanes:
   --test        Targeted Unit/Integration proof and, only when needed, one
                 high-value UI path. The script adds -only-testing automatically.
   --unit        Changed checks plus the complete OhanaTests unit suite.
-  --full        Whole-repository audits plus the complete OhanaTests unit suite.
+  --full        Release static baseline plus the complete OhanaTests unit suite.
 USAGE
 }
 
@@ -98,29 +98,11 @@ echo "=== [gate] mode: ${MODE} ==="
 echo "=== [gate] working tree scope ==="
 git status --short
 
-run_step "changed-file checks (format + changed audits)" scripts/dev-check-changed.sh
-
 if [[ "${MODE}" == "all" ]]; then
-  run_step "ui-v4 audit (all)" scripts/audit-ui-v4.sh --all
-  run_step "accessibility audit (all)" scripts/audit-accessibility.sh --all
-  run_step "smoothness audit (all)" scripts/audit-smoothness-risk.sh --all
-  run_step "route first-frame audit (all)" scripts/audit-route-first-frame.sh --all
-  run_step "runtime guardrails (all)" scripts/audit-runtime-guardrails.sh --all
-  run_step "architecture boundaries" scripts/audit-architecture-boundaries.sh
-  run_step "economy boundaries (all)" scripts/audit-economy-boundaries.sh --all
-  run_step "member lifecycle gate (all)" scripts/audit-member-lifecycle-gate.sh --all
-  run_step "agent skill governance" scripts/audit-agent-skill-governance.sh
-  run_step "derived-state lifecycle (all)" scripts/audit-derived-state-lifecycle.sh --all
+  run_step "release static baseline" scripts/release-hardening-check.sh --static-only
 else
-  run_step "route first-frame audit (changed)" scripts/audit-route-first-frame.sh --changed
-  run_step "runtime guardrails (changed)" scripts/audit-runtime-guardrails.sh --changed
-  run_step "economy boundaries (changed)" scripts/audit-economy-boundaries.sh --changed
-  run_step "member lifecycle gate (changed)" scripts/audit-member-lifecycle-gate.sh --changed
-  run_step "agent skill governance" scripts/audit-agent-skill-governance.sh
-  run_step "derived-state lifecycle (changed)" scripts/audit-derived-state-lifecycle.sh --changed
+  run_step "read-only changed-file checks" scripts/dev-check-changed.sh
 fi
-
-run_step "localization coverage" scripts/audit-localization-coverage.sh
 
 if [[ "${RUN_FULL_UNIT}" == "1" ]]; then
   run_step "full unit test suite (iPhone 17 simulator)" scripts/test-unit.sh

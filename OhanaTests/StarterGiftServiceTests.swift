@@ -24,7 +24,7 @@ struct StarterGiftServiceTests {
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
     }
 
-    @Test func petFirstJourneyWaitsForCareThenClaimsIntoPetWallet() throws {
+    @Test func petFirstJourneyWaitsForCareThenClaimsIntoIslandReserve() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -41,7 +41,7 @@ struct StarterGiftServiceTests {
             defaults: defaults
         )
 
-        #expect(waitingForCare == .pendingFirstCare(recipient: .pet(pet.id)))
+        #expect(waitingForCare == .pendingFirstCare(recipient: .island))
         #expect(pet.coconutBalance == 0)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
@@ -55,21 +55,26 @@ struct StarterGiftServiceTests {
             defaults: defaults
         )
 
-        #expect(result == .claimed(recipient: .pet(pet.id), amount: StarterGiftService.giftAmount))
-        #expect(pet.coconutBalance == StarterGiftService.giftAmount)
+        #expect(result == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
+        #expect(pet.coconutBalance == 0)
+        #expect(CoconutWalletService.balance(
+            accountKey: CoconutAccountKey.islandReserve,
+            context: context
+        ) == StarterGiftService.giftAmount)
+        #expect(CoconutWalletService.totalBalance(context: context) == StarterGiftService.giftAmount)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.pending))
 
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledger.count == 1)
         #expect(ledger.first?.actionType == "starterGift")
-        #expect(ledger.first?.subjectKind == CareLedgerSubjectKind.pet.rawValue)
-        #expect(ledger.first?.subjectId == pet.id.uuidString)
+        #expect(ledger.first?.subjectKind == CareLedgerSubjectKind.household.rawValue)
+        #expect(ledger.first?.subjectId == nil)
         #expect(ledger.first?.coconutDelta == StarterGiftService.giftAmount)
         #expect(ledger.first?.metadataJSON.contains("\"growthXP\":0") == true)
     }
 
-    @Test func existingHumanRemainsTheRecipientWhenOneIsAvailable() throws {
+    @Test func existingHumanDoesNotOwnTheSystemStarterGift() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -90,9 +95,13 @@ struct StarterGiftServiceTests {
             defaults: defaults
         )
 
-        #expect(result == .claimed(recipient: .human(human.id), amount: StarterGiftService.giftAmount))
-        #expect(human.coconutBalance == StarterGiftService.giftAmount)
+        #expect(result == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
+        #expect(human.coconutBalance == 0)
         #expect(pet.coconutBalance == 0)
+        #expect(CoconutWalletService.balance(
+            accountKey: CoconutAccountKey.islandReserve,
+            context: context
+        ) == StarterGiftService.giftAmount)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
         #expect(StarterGiftService.shouldShowCeremony(defaults: defaults))
@@ -116,7 +125,7 @@ struct StarterGiftServiceTests {
             context: context,
             defaults: defaults
         )
-        #expect(first == .claimed(recipient: .pet(pet.id), amount: StarterGiftService.giftAmount))
+        #expect(first == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
 
         defaults.removeObject(forKey: StarterGiftStorageKey.claimed)
         defaults.set(true, forKey: StarterGiftStorageKey.pending)
@@ -127,11 +136,76 @@ struct StarterGiftServiceTests {
         )
 
         #expect(recovered == .alreadyHandled)
-        #expect(pet.coconutBalance == StarterGiftService.giftAmount)
+        #expect(pet.coconutBalance == 0)
+        #expect(CoconutWalletService.balance(
+            accountKey: CoconutAccountKey.islandReserve,
+            context: context
+        ) == StarterGiftService.giftAmount)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.pending))
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).count == 1)
+    }
+
+    @Test func legacyMemberStarterGiftMovesAvailableGiftBalanceToIslandOnce() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        try CoconutWalletService.apply(
+            deltas: [
+                .pet(
+                    pet,
+                    delta: StarterGiftService.giftAmount,
+                    entryKind: .reward,
+                    source: .starterGift,
+                    title: "Starter gift",
+                    transactionKey: "starterGift:v2:\(CoconutAccountKey.pet(pet.id))"
+                ),
+                .pet(
+                    pet,
+                    delta: 9,
+                    entryKind: .reward,
+                    source: .careEvent,
+                    title: "Care reward",
+                    transactionKey: "test:starter-gift:migration:care-reward"
+                )
+            ],
+            context: context,
+            save: true,
+            postsRewardFeedback: false,
+            updatesProjection: false
+        )
+        defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+
+        let first = StarterGiftService.prepareOrClaim(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+        let entryCountAfterFirst = try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>())
+        let second = StarterGiftService.prepareOrClaim(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+
+        #expect(first == .alreadyHandled)
+        #expect(second == .alreadyHandled)
+        #expect(CoconutWalletService.balance(for: pet, context: context) == 9)
+        #expect(CoconutWalletService.balance(
+            accountKey: CoconutAccountKey.islandReserve,
+            context: context
+        ) == StarterGiftService.giftAmount)
+        #expect(CoconutWalletService.totalBalance(context: context) == 59)
+        #expect(try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>()) == entryCountAfterFirst)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).contains {
+            $0.sourceModelName == "StarterGiftOwnershipMigration" && !$0.affectsBalance
+        })
     }
 
     @Test func existingUserIsMarkedHandledWithoutGift() throws {

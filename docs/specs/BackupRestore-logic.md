@@ -104,6 +104,13 @@ BR-012. Launch restore limits are a 32 MiB manifest, 100,000 model records,
 limit requires dense-data memory and disk evidence; a restore must not silently
 skip records or media to fit a budget.
 
+BR-013. Restore enforces product invariant G14 before mutation. Ordinary and
+shared expense facts require finite amounts greater than zero. A finite negative
+expense is accepted only when it is an explicitly marked insurance
+reimbursement in the insurance category. Zero, NaN, infinity, unmarked negative
+expenses, and expense sessions without a valid amount fail preflight; direct
+rehydrate writers enforce the same rule as defense in depth.
+
 ## Validation
 
 Required launch evidence:
@@ -121,6 +128,9 @@ Required launch evidence:
 - Backup coverage tests for any newly added SwiftData model or backup DTO field.
 - Invalid required UUID/date, duplicate identity, broken required relation,
   unsafe/oversized media, and oversized manifest rejection before live writes.
+- Invalid ordinary expense amounts (zero, negative, NaN, and positive/negative
+  infinity), repeated failure, valid retry, and marked insurance-reimbursement
+  compatibility before live writes.
 - Fault injection at every restore phase, transaction-save failure,
   cancellation, and repeated-restore idempotency with original-store,
   UserDefaults, and notification assertions.

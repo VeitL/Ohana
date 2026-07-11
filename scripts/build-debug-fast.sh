@@ -13,6 +13,39 @@ SCHEME="${SCHEME:-Ohana}"
 CONFIGURATION="${CONFIGURATION:-Debug}"
 SDK="${SDK:-iphonesimulator}"
 CODE_SIGNING_ALLOWED_VALUE="${CODE_SIGNING_ALLOWED:-NO}"
+SWIFT_COMPILATION_MODE_VALUE="${OHANA_SWIFT_COMPILATION_MODE:-}"
+SWIFT_OPTIMIZATION_LEVEL_VALUE="${OHANA_SWIFT_OPTIMIZATION_LEVEL:-}"
+COMPILER_INDEX_STORE_ENABLE_VALUE="${OHANA_COMPILER_INDEX_STORE_ENABLE:-}"
+
+case "${SWIFT_COMPILATION_MODE_VALUE}" in
+  ""|incremental|wholemodule)
+    ;;
+  *)
+    echo "Unsupported OHANA_SWIFT_COMPILATION_MODE=${SWIFT_COMPILATION_MODE_VALUE}." >&2
+    echo "Expected incremental, wholemodule, or an empty value." >&2
+    exit 2
+    ;;
+esac
+
+case "${SWIFT_OPTIMIZATION_LEVEL_VALUE}" in
+  ""|-Onone|-O|-Osize)
+    ;;
+  *)
+    echo "Unsupported OHANA_SWIFT_OPTIMIZATION_LEVEL=${SWIFT_OPTIMIZATION_LEVEL_VALUE}." >&2
+    echo "Expected -Onone, -O, -Osize, or an empty value." >&2
+    exit 2
+    ;;
+esac
+
+case "${COMPILER_INDEX_STORE_ENABLE_VALUE}" in
+  ""|YES|NO)
+    ;;
+  *)
+    echo "Unsupported OHANA_COMPILER_INDEX_STORE_ENABLE=${COMPILER_INDEX_STORE_ENABLE_VALUE}." >&2
+    echo "Expected YES, NO, or an empty value." >&2
+    exit 2
+    ;;
+esac
 
 # Simulator selection: resolve by NAME, not by hardcoded UDID. A pinned UDID is
 # machine-local state — it breaks on any new Mac, Xcode reinstall, or device
@@ -151,8 +184,30 @@ echo "SDK: ${SDK}"
 echo "Destination: ${DESTINATION}"
 echo "DerivedData: ${DERIVED_DATA_PATH}"
 echo "Code signing: CODE_SIGNING_ALLOWED=${CODE_SIGNING_ALLOWED_VALUE}"
+if [[ -n "${SWIFT_COMPILATION_MODE_VALUE}" ]]; then
+  echo "Swift compilation mode: ${SWIFT_COMPILATION_MODE_VALUE}"
+fi
+if [[ -n "${SWIFT_OPTIMIZATION_LEVEL_VALUE}" ]]; then
+  echo "Swift optimization: ${SWIFT_OPTIMIZATION_LEVEL_VALUE}"
+fi
+if [[ -n "${COMPILER_INDEX_STORE_ENABLE_VALUE}" ]]; then
+  echo "Index store: COMPILER_INDEX_STORE_ENABLE=${COMPILER_INDEX_STORE_ENABLE_VALUE}"
+fi
 
 sanitize_derived_data_products
+
+xcodebuild_settings=(
+  "CODE_SIGNING_ALLOWED=${CODE_SIGNING_ALLOWED_VALUE}"
+)
+if [[ -n "${SWIFT_COMPILATION_MODE_VALUE}" ]]; then
+  xcodebuild_settings+=("SWIFT_COMPILATION_MODE=${SWIFT_COMPILATION_MODE_VALUE}")
+fi
+if [[ -n "${SWIFT_OPTIMIZATION_LEVEL_VALUE}" ]]; then
+  xcodebuild_settings+=("SWIFT_OPTIMIZATION_LEVEL=${SWIFT_OPTIMIZATION_LEVEL_VALUE}")
+fi
+if [[ -n "${COMPILER_INDEX_STORE_ENABLE_VALUE}" ]]; then
+  xcodebuild_settings+=("COMPILER_INDEX_STORE_ENABLE=${COMPILER_INDEX_STORE_ENABLE_VALUE}")
+fi
 
 set +e
 xcodebuild \
@@ -165,7 +220,7 @@ xcodebuild \
   -disableAutomaticPackageResolution \
   -skipPackagePluginValidation \
   -showBuildTimingSummary \
-  CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED_VALUE}" \
+  "${xcodebuild_settings[@]}" \
   build
 build_status=$?
 set -e

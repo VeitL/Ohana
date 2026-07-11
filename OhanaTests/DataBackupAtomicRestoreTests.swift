@@ -143,6 +143,97 @@ struct DataBackupAtomicRestoreTests {
         )
     }
 
+    @Test func invalidExpenseAmountsFailAtomicallyAndValidReimbursementRestoresOnce() throws {
+        let source = try makeBackup()
+        let timestamp = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: 1_700_000_400))
+
+        let invalidAmounts: [Double] = [0, -1, .nan, .infinity, -Double.infinity]
+        for amount in invalidAmounts {
+            var invalid = source.backup
+            invalid.petExpenseLogs = [
+                PetExpenseLogBackup(
+                    id: UUID().uuidString,
+                    date: timestamp,
+                    amount: amount,
+                    category: ExpenseCategory.medical.rawValue,
+                    note: "invalid",
+                    petId: source.petID.uuidString,
+                    executorId: nil,
+                    sharedSessionId: nil
+                )
+            ]
+            for _ in 0 ..< 2 {
+                try assertPreflightFailure(
+                    invalid,
+                    expected: .businessValue,
+                    petID: source.petID
+                )
+            }
+        }
+
+        var invalidSharedExpense = source.backup
+        invalidSharedExpense.sharedCareSessions = [
+            SharedCareSessionBackup(
+                id: UUID().uuidString,
+                date: timestamp,
+                actionKindRaw: SharedCareActionKind.expense.rawValue,
+                executorId: nil,
+                executorIdsRaw: nil,
+                sourcePetId: source.petID.uuidString,
+                targetPetIdsRaw: source.petID.uuidString,
+                speciesRaw: "cat",
+                totalAmountGrams: 0,
+                totalAmountMl: 0,
+                totalExpenseAmount: nil,
+                expenseCategoryRaw: ExpenseCategory.other.rawValue,
+                currencyCode: AppCurrency.code,
+                allocationModeRaw: SharedCareAllocationMode.equal.rawValue,
+                foodKindRaw: FeedFoodKind.dry.rawValue,
+                stockOwnerPetId: "",
+                primaryLegacyModelName: nil,
+                primaryLegacyModelId: nil,
+                note: "invalid shared expense",
+                createdAt: timestamp
+            )
+        ]
+        for _ in 0 ..< 2 {
+            try assertPreflightFailure(
+                invalidSharedExpense,
+                expected: .businessValue,
+                petID: source.petID
+            )
+        }
+
+        var valid = source.backup
+        valid.petExpenseLogs = [
+            PetExpenseLogBackup(
+                id: UUID().uuidString,
+                date: timestamp,
+                amount: -80,
+                category: ExpenseCategory.insurancePremium.rawValue,
+                note: "\(ExpenseAmountPolicy.insuranceReimbursementNotePrefix)clinic",
+                petId: source.petID.uuidString,
+                executorId: nil,
+                sharedSessionId: nil
+            )
+        ]
+        let fixture = try makeTarget(petID: source.petID)
+        defer { fixture.removeDefaults() }
+
+        for _ in 0 ..< 2 {
+            try fixture.manager.applyBackup(
+                valid,
+                context: fixture.container.mainContext,
+                projectionManager: nil,
+                schedulePlantNotifications: false,
+                plantNotifications: fixture.notifications
+            )
+        }
+        let restoredExpenses = try fixture.container.mainContext.fetch(FetchDescriptor<PetExpenseLog>())
+        #expect(restoredExpenses.count == 1)
+        #expect(restoredExpenses.first?.amount == -80)
+    }
+
     @Test func restoreLimitsAndMediaReaderRejectOversizeOrTampering() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("DataBackupAtomicRestoreTests.\(UUID().uuidString)", isDirectory: true)

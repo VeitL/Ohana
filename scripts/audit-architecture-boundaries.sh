@@ -12,7 +12,7 @@ fi
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/audit-architecture-boundaries.sh [--changed|--all|--soft]
+  scripts/audit-architecture-boundaries.sh [--changed|--all|--soft] [Swift files or directories...]
 
 Purpose:
   Enforce the architecture boundaries established by the P0-P4 refactor:
@@ -42,11 +42,15 @@ Purpose:
     Color/View types.
   - Models do not import SwiftUI or expose SwiftUI Color/View/Image types.
   - Domain/Models do not import platform UI frameworks such as UIKit.
+
+Explicit file or directory targets select an isolated targeted scan even when
+the worktree contains unrelated changes.
 USAGE
 }
 
 mode="changed"
 strict=1
+targets=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -67,12 +71,15 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "unknown argument: $1" >&2
-      usage >&2
-      exit 2
+      targets+=("$1")
+      shift
       ;;
   esac
 done
+
+if [[ ${#targets[@]} -gt 0 ]]; then
+  mode="targeted"
+fi
 
 warnings_file="$(mktemp)"
 trap 'rm -f "$warnings_file"' EXIT
@@ -99,7 +106,15 @@ changed_swift_files() {
 }
 
 swift_scope() {
-  if [[ "$mode" == "all" ]]; then
+  if [[ ${#targets[@]} -gt 0 ]]; then
+    for target in "${targets[@]}"; do
+      if [[ -d "$target" ]]; then
+        rg --files "$target" -g '*.swift'
+      elif [[ -f "$target" && "$target" == *.swift ]]; then
+        printf '%s\n' "$target"
+      fi
+    done
+  elif [[ "$mode" == "all" ]]; then
     find Ohana -type f -name '*.swift' | sort
   else
     changed_swift_files
@@ -117,8 +132,13 @@ if [[ ${#files[@]} -eq 0 && "$mode" != "all" ]]; then
 fi
 
 model_pollution() {
-  find Ohana/Models -maxdepth 1 -name '*.swift' \
-    | rg '(Service|Manager|Executor|Command|Coordinator|Database|Catalog|Localization|Support|Engine)' || true
+  if [[ "$mode" == "all" ]]; then
+    find Ohana/Models -maxdepth 1 -name '*.swift' \
+      | rg '(Service|Manager|Executor|Command|Coordinator|Database|Catalog|Localization|Support|Engine)' || true
+    return
+  fi
+  printf '%s\n' "${files[@]}" \
+    | rg '^Ohana/Models/[^/]*(Service|Manager|Executor|Command|Coordinator|Database|Catalog|Localization|Support|Engine)[^/]*\.swift$' || true
 }
 
 query_outside_containers() {
@@ -310,7 +330,17 @@ coconut_balance_writes_outside_wallet() {
 }
 
 legacy_coconut_writes_in_quest_manager() {
-  rg -n 'quest_coconut(Count|Logs)|flushToDefaults' Ohana/Features/Economy/QuestManager*.swift Ohana/Models/QuestManager.swift 2>/dev/null || true
+  if [[ "$mode" == "all" ]]; then
+    rg -n 'quest_coconut(Count|Logs)|flushToDefaults' Ohana/Features/Economy/QuestManager*.swift Ohana/Models/QuestManager.swift 2>/dev/null || true
+    return
+  fi
+  for file in "${files[@]}"; do
+    case "$file" in
+      Ohana/Features/Economy/QuestManager*.swift|Ohana/Models/QuestManager.swift)
+        rg -n --with-filename 'quest_coconut(Count|Logs)|flushToDefaults' "$file" 2>/dev/null || true
+        ;;
+    esac
+  done
 }
 
 static_service_calls_outside_facades() {

@@ -17,9 +17,9 @@
 
 任何情况下，购买 2.5D 头像券会优先使用当前 active human；找不到 active human 时退回 `humans.first`，没人则抛 `missingActiveHuman`。余额不足抛 `insufficientCoconuts`；余额足够时写一条 care ledger coconut 事件，调用 wallet 扣款，保存成功后才给库存加 1 张券。来源：`Ohana/Features/Members/MemberCreationService.swift:71`、`Ohana/Features/Members/MemberCreationService.swift:79`、`Ohana/Features/Members/MemberCreationService.swift:85`、`Ohana/Features/Members/MemberCreationService.swift:88`、`Ohana/Features/Members/MemberCreationService.swift:95`、`Ohana/Features/Members/MemberCreationService.swift:119`、`Ohana/Features/Members/MemberCreationService.swift:145`、`Ohana/Features/Members/MemberCreationService.swift:151`。
 
-### MBR-004 新宠物创建会写 Pet、本地首页可见性、相关日历事实和首宠欢迎奖励
+### MBR-004 新宠物创建会写 Pet、本地首页可见性、相关日历事实和首宠完成标记
 
-任何情况下，新宠物会从草稿写入核心资料、头像数据、毛色/眼色和性格标签；如果首页可见卡片已满，会把该宠物写入隐藏首页列表。Pet 插入后会标记 CloudSync modified。保存成功后，生日会创建生日 Event + Reminder，到家日会创建周年 Event 和若干 PetMilestone，并确保默认 CarePlan 日历计划；生日 Event、生日 Reminder、到家周年 Event 都必须写入 CloudSync 本地 dirty state。首只宠物会设置 quest flag 并尝试发 50 椰子欢迎奖励；奖励失败只记录性能日志，不回滚宠物创建。来源：`Ohana/Features/Members/MemberCreationService.swift:227`、`Ohana/Features/Members/MemberCreationService.swift:228`、`Ohana/Features/Members/MemberCreationService.swift:249`、`Ohana/Features/Members/MemberCreationService.swift:395`、`Ohana/Features/Members/MemberCreationService.swift:407`、`Ohana/Features/Members/MemberCreationService.swift:410`、`Ohana/Features/Members/MemberCreationService.swift:423`。
+任何情况下，新宠物会从草稿写入核心资料、头像数据、毛色/眼色和性格标签；如果首页可见卡片已满，会把该宠物写入隐藏首页列表。Pet 插入后会标记 CloudSync modified。保存成功后，生日会创建生日 Event + Reminder，到家日会创建周年 Event 和若干 PetMilestone，并确保默认 CarePlan 日历计划；生日 Event、生日 Reminder、到家周年 Event 都必须写入 CloudSync 本地 dirty state。首只宠物只设置 pet wizard quest flag；D17 的 50 椰子启动赠礼由 `StarterGiftService` 在第一笔照护事实持久化后独立写入 `system:island`，不属于 Pet 创建事务，也不绑定 Pet/Human。来源：`Ohana/Features/Members/MemberCreationService.swift`、`Ohana/Features/Economy/StarterGiftService.swift`、`docs/specs/Onboarding-logic.md`。
 
 ### MBR-005 新人类创建会写 Human、可选初始体重、生日 Event 和隐私字段
 

@@ -1,0 +1,17 @@
+{
+  "schema": "ohana.release-device-matrix.v1",
+  "updated": "2026-07-11",
+  "policyDocuments": [
+    "docs/specs/product-foundation.md",
+    "docs/os-support-matrix.md",
+    "docs/release-true-device-test-plan.md"
+  ],
+  "minimumIOS": "26.2",
+  "targetedDeviceFamilies": [
+    1
+  ],
+  "nativeIPadApp": false,
+  "nativeWatchApp": false,
+  "latestSimulatorName": "iPhone 17",
+  "minimumHardwareAcceptance": "iPhone SE (2nd generation)"
+}

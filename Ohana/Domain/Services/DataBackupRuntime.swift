@@ -14,6 +14,7 @@ nonisolated enum BackupRestoreValidationCategory: String, Equatable, Sendable {
     case duplicateIdentity
     case date
     case relationship
+    case businessValue
     case media
     case sizeLimit
     case pendingChanges
@@ -109,6 +110,12 @@ enum BackupError: LocalizedError {
                     zh: "备份包含断开的必要关系，未对现有数据进行任何更改。",
                     en: "The backup contains a broken required relationship. Existing data was not changed.",
                     de: "Das Backup enthält eine unterbrochene erforderliche Beziehung. Vorhandene Daten wurden nicht geändert."
+                )
+            case .businessValue:
+                l.tr(
+                    zh: "备份包含无效的费用金额，未对现有数据进行任何更改。请检查备份来源后重试。",
+                    en: "The backup contains an invalid expense amount. Existing data was not changed. Check the backup source and try again.",
+                    de: "Das Backup enthält einen ungültigen Ausgabenbetrag. Vorhandene Daten wurden nicht geändert. Prüfe die Backup-Quelle und versuche es erneut."
                 )
             case .media:
                 l.tr(

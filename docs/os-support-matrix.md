@@ -1,49 +1,67 @@
 # OS Support Matrix
 
-Mature apps explicitly choose which OS versions they support, balancing reach
-against engineering cost. Ohana must make this an intentional, reviewed decision
-— not an accident of the default Xcode template.
+Status: Active release policy
 
-## Current State (action required)
+Owner: Product owner
 
-- `IPHONEOS_DEPLOYMENT_TARGET = 26.2` for all targets (see `Ohana.xcodeproj`).
-- Effect: only devices running iOS 26.2+ can install Ohana — a near-empty
-  installable base at launch. This is almost certainly unintentionally narrow.
-- Tension: `AGENTS.md` already tells agents to "preserve older-iOS fallbacks with
-  availability checks," which only makes sense with a lower deployment target.
+Last reviewed: 2026-07-11
 
-## Policy
+## Approved First-Release Policy
 
-1. **Pick an intentional minimum.** The product owner sets the minimum supported
-   iOS major version. The mature default for a consumer app is **N-1 to N-2**
-   major versions (i.e., support the two newest majors), unless a required API
-   forces a higher floor.
-2. **Justify any high floor.** If the floor stays at a very recent version, record
-   the specific APIs that require it (e.g., iOS 26 Liquid Glass, a SwiftData
-   feature, a Swift Charts API) in this file.
-3. **Guard newer APIs.** Features above the floor must use `if #available` /
-   `@available` with a graceful fallback, never an unconditional dependency.
-4. **CI must run on the floor.** Tests should run at least on the minimum
-   supported major and the latest major (see `.github/workflows/ci.yml`).
+- Distribution target: iPhone app only.
+- Minimum OS: iOS 26.2.
+- Native iPad app: not included in the first release.
+- Native watchOS app, complication, and WatchConnectivity data client: not
+  included in the first release.
+- A paired Apple Watch may receive and act on system notifications forwarded
+  from iPhone. That is a physical-device compatibility check, not a claim that
+  Ohana ships a native Apple Watch app.
+- App Store storefront selection remains part of the signed-release and App
+  Store Connect checklist owned by `TFU-20260709-001`; it does not change the
+  device-family policy.
 
-## Lowering the Deployment Target Is a Migration, Not a Setting
+This is an intentional narrow-launch decision. It keeps the current iOS 26-era
+API surface and avoids combining RC hardening with an older-OS compatibility
+migration or unverified iPad/watchOS product work.
 
-Dropping `IPHONEOS_DEPLOYMENT_TARGET` is **not** a one-line change here, because
-the codebase uses iOS 26-era APIs (Liquid Glass, recent SwiftUI/SwiftData/Charts)
-in many places. Doing it safely requires:
+Apple's current compatibility list includes iPhone SE (2nd generation) and
+iPhone 11 through the current iPhone generation:
+<https://support.apple.com/guide/iphone/iphone-models-compatible-with-ios-26-iphe3fa5df43/26>.
 
-1. Decide the target floor (e.g., iOS 18).
-2. Audit usages of APIs introduced after the floor; wrap each in availability
-   checks with fallbacks, or gate the feature.
-3. Lower `IPHONEOS_DEPLOYMENT_TARGET` in all targets.
-4. Build + test on a simulator at the floor version, not just the latest.
-5. Re-run the runtime/UI audits and a full smoke pass.
+## Enforced Repository Configuration
 
-Until that migration is scheduled, this file records the gap. Do not silently
-lower the target in an unrelated change — it will break the build.
+- Every `Ohana`, `OhanaTests`, and `OhanaUITests` build configuration uses
+  `TARGETED_DEVICE_FAMILY = 1`.
+- Every explicit iOS deployment setting remains `26.2`.
+- App build configurations do not generate iPad-specific orientation keys.
+- The project contains no watchOS target.
+- `docs/governance/manifests/release-device-matrix.json` is the machine-readable
+  policy, and `scripts/audit-governance-manifests.sh` rejects configuration
+  drift.
 
-## Device Matrix for Testing
+## Release Acceptance Matrix
 
-Per `docs/performance-and-observability.md`, performance-sensitive changes must be
-checked on the **smallest supported iPhone** as well as a current device, at the
-minimum and maximum supported OS where feasible.
+| Lane | Required evidence |
+| --- | --- |
+| Latest simulator | Debug and Release simulator builds on the repository-pinned `iPhone 17`. |
+| Hardware floor | Signed Release smoke on iPhone SE (2nd generation), or the smallest supported iPhone actually used for launch, running iOS 26.2 or later. |
+| Current hardware | Signed Release smoke on a current iPhone and current supported iOS. |
+| Archive / App Store Connect | The shipped app reports iPhone-only device family, requires no iPad screenshots, exposes no watchOS app, and records the selected storefronts. |
+| Paired Apple Watch | Notification forwarding and Complete / Skip / Snooze actions are checked once; no native Watch support is advertised. |
+
+Simulator evidence cannot close the hardware-floor, signed Archive, App Store
+Connect, notification-delivery, energy, or physical accessibility rows. Those
+remain in `TFU-20260709-001` and the true-device release plan.
+
+## Deferred Platform Migrations
+
+Each of the following requires its own product decision, code audit, fallback
+plan, target, and test matrix:
+
+1. Lowering the deployment target below iOS 26.2.
+2. Shipping a native iPad experience.
+3. Shipping a dependent or independent watchOS app.
+4. Adding Watch complications, WatchConnectivity persistence, HealthKit workout
+   sessions, or background location on Apple Watch.
+
+Do not change deployment target or device family as incidental work.

@@ -179,13 +179,17 @@ extension VerticalSolidHomeView {
             startWalkFromQuickAction(petID: petID)
             return
         }
+        guard let action = HomePetQuickActionKind(rawValue: actionType) else { return }
 
         enqueueHomeCommand(.quickCare(entityID: petID, action: actionType)) {
-            commandExecutor.performActionType(
-                actionType,
-                petID: petID,
-                executorId: currentExecutorId(),
-                now: Date(),
+            commandExecutor.performQuickAction(
+                HomePetQuickActionRequest(
+                    action: action,
+                    petID: petID,
+                    executorID: currentExecutorId(),
+                    now: Date()
+                ),
+                actions: HomePetQuickActionActions(
                 antiRepeatTitle: l.tr(zh: "刚刚已经记录过", en: "Already logged", de: "Bereits erfasst"),
                 antiRepeatMessage: { warning in
                     l.tr(
@@ -209,6 +213,7 @@ extension VerticalSolidHomeView {
                 openWaterManagement: { routeCoordinator.openSheet(.petWater($0)) },
                 openMedication: { routeCoordinator.openSheet(.petMedication($0)) },
                 feedback: applyQuickActionExecutorFeedback
+                )
             )
         }
     }

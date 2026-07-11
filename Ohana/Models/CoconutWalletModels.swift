@@ -45,8 +45,9 @@ enum EconomyBudgetUsageScope: String, Codable, CaseIterable {
     case careObject
 }
 
-enum CoconutAccountKey {
+nonisolated enum CoconutAccountKey {
     static let legacySystem = "system:legacy"
+    static let islandReserve = "system:island"
 
     static func human(_ id: UUID) -> String {
         human(id.uuidString)

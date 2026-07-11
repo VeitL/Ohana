@@ -658,7 +658,7 @@ final class OasisTreeManager {
         let package = Self.injectionPackage(forRequestedCost: cost, currentLevel: treeLevel)
         guard package.isAvailable else { return false }
         guard Self.canUseInjectionPackage(package) else { return false }
-        guard OasisCritterEconomyService.spendCurrentHumanCoconuts(
+        guard OasisCritterEconomyService.spendAvailableCoconuts(
             package.cost,
             emoji: "✨",
             title: package.title,
@@ -692,6 +692,7 @@ final class OasisTreeManager {
     @MainActor
     private func applyEnergyPackage(_ package: InjectionPackage, recordsCost: Bool, modelContext: ModelContext) -> Bool {
         let previousInjectedEnergy = injectedEnergy
+        let activeHumanID = UserDefaultsActiveHumanSelection().currentHumanId
         let previousUsedPeriod = package.enforcesPeriodLimit
             ? OasisTreePreferenceStore.injectionUsedPeriod(for: package.limitKey)
             : nil
@@ -699,8 +700,8 @@ final class OasisTreeManager {
         Self.markInjectionPackageUsed(package)
         careLedger.record(
             occurredAt: Date(),
-            actorKind: .human,
-            actorId: UserDefaultsActiveHumanSelection().currentHumanId,
+            actorKind: activeHumanID == nil ? .system : .human,
+            actorId: activeHumanID,
             subjectKind: .system,
             subjectId: nil,
             eventKind: .coconut,
@@ -716,7 +717,7 @@ final class OasisTreeManager {
             coconutDelta: recordsCost ? -package.cost : 0,
             rewardLogId: nil,
             privacyFieldRaw: nil,
-            metadataJSON: "{\"economyVersion\":2,\"injectedXP\":\(package.xp),\"coconutCost\":\(package.cost),\"budgetMultiplier\":1.0,\"reason\":\"treeInjection\"}",
+            metadataJSON: "{\"economyVersion\":3,\"walletScope\":\"islandTotal\",\"injectedXP\":\(package.xp),\"coconutCost\":\(package.cost),\"budgetMultiplier\":1.0,\"reason\":\"treeInjection\"}",
             context: modelContext,
             save: false
         )

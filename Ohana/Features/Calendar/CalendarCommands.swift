@@ -419,6 +419,22 @@ struct CalendarEventCompletionResult: Equatable {
     }
 }
 
+nonisolated struct CalendarEventCompletionOptions {
+    let reminderCompletion: ReminderCompleting?
+    let economy: CareEventEconomyAwarding?
+    let schedulePlantCareNotifications: Bool
+
+    init(
+        reminderCompletion: ReminderCompleting? = nil,
+        economy: CareEventEconomyAwarding? = nil,
+        schedulePlantCareNotifications: Bool = true
+    ) {
+        self.reminderCompletion = reminderCompletion
+        self.economy = economy
+        self.schedulePlantCareNotifications = schedulePlantCareNotifications
+    }
+}
+
 enum CalendarEventDeletionScope: Equatable {
     case wholeEvent
     case singleOccurrence
@@ -471,10 +487,9 @@ enum CalendarEventCommandService {
         context: ModelContext,
         executorId: String?,
         now: Date = Date(),
-        reminderCompletion providedReminderCompletion: ReminderCompleting? = nil,
-        schedulePlantCareNotifications: Bool = true
+        options: CalendarEventCompletionOptions = CalendarEventCompletionOptions()
     ) throws -> CalendarEventCompletionResult {
-        let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
+        let reminderCompletion = options.reminderCompletion ?? ReminderCompletionService()
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         let affectedSubjectIDs = affectedSubjectIDs(for: event, context: context)
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
@@ -483,16 +498,11 @@ enum CalendarEventCommandService {
             source: .userCommand,
             context: context
         ) else {
-            return CalendarEventCompletionResult(
-                eventID: event.id,
-                isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
-                syncedReminderCount: 0,
+            return unchangedCompletionResult(
+                event: event,
+                occurrenceDate: occurrenceDate,
                 affectedSubjectIDs: affectedSubjectIDs,
-                didChange: false,
-                didWriteFact: false,
-                allowsDerivedEffects: false,
-                factDate: nil,
-                operationDate: now
+                now: now
             )
         }
         var petTaskSyncResult: CalendarTaskCompletionSyncService.PetTaskSyncResult?
@@ -504,46 +514,35 @@ enum CalendarEventCommandService {
                 pets: pets,
                 context: context,
                 executorId: executorId,
-                operationDate: now
+                operationDate: now,
+                economy: options.economy
             )
             petTaskSyncResult = syncResult
             guard syncResult.didPersist else {
-                return CalendarEventCompletionResult(
-                    eventID: event.id,
-                    isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
-                    syncedReminderCount: 0,
+                return unchangedCompletionResult(
+                    event: event,
+                    occurrenceDate: occurrenceDate,
                     affectedSubjectIDs: affectedSubjectIDs,
-                    didChange: false,
-                    didWriteFact: false,
-                    allowsDerivedEffects: false,
-                    factDate: nil,
-                    operationDate: now
+                    now: now
                 )
             }
             if !shouldComplete && syncResult == .noOp {
-                return CalendarEventCompletionResult(
-                    eventID: event.id,
-                    isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
-                    syncedReminderCount: 0,
+                return unchangedCompletionResult(
+                    event: event,
+                    occurrenceDate: occurrenceDate,
                     affectedSubjectIDs: affectedSubjectIDs,
-                    didChange: false,
-                    didWriteFact: false,
-                    allowsDerivedEffects: false,
-                    factDate: nil,
-                    operationDate: now
+                    now: now
                 )
             }
             if shouldComplete && !syncResult.shouldCompleteOccurrence {
-                return CalendarEventCompletionResult(
-                    eventID: event.id,
-                    isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
-                    syncedReminderCount: 0,
+                return unchangedCompletionResult(
+                    event: event,
+                    occurrenceDate: occurrenceDate,
                     affectedSubjectIDs: affectedSubjectIDs,
-                    didChange: false,
+                    now: now,
                     didWriteFact: syncResult.didWriteFact,
                     allowsDerivedEffects: syncResult.allowsDerivedEffects,
-                    factDate: occurrenceDate,
-                    operationDate: now
+                    factDate: occurrenceDate
                 )
             }
         }
@@ -555,16 +554,11 @@ enum CalendarEventCommandService {
             context: context,
             modifiedAt: now
         ) else {
-            return CalendarEventCompletionResult(
-                eventID: event.id,
-                isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
-                syncedReminderCount: 0,
+            return unchangedCompletionResult(
+                event: event,
+                occurrenceDate: occurrenceDate,
                 affectedSubjectIDs: affectedSubjectIDs,
-                didChange: false,
-                didWriteFact: false,
-                allowsDerivedEffects: false,
-                factDate: nil,
-                operationDate: now
+                now: now
             )
         }
 
@@ -584,19 +578,14 @@ enum CalendarEventCommandService {
                 context: context,
                 source: .calendar,
                 now: now,
-                scheduleNotifications: schedulePlantCareNotifications
+                scheduleNotifications: options.schedulePlantCareNotifications
             )
             guard plantCareSyncResult.didPersist else {
-                return CalendarEventCompletionResult(
-                    eventID: event.id,
-                    isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
-                    syncedReminderCount: 0,
+                return unchangedCompletionResult(
+                    event: event,
+                    occurrenceDate: occurrenceDate,
                     affectedSubjectIDs: affectedSubjectIDs,
-                    didChange: false,
-                    didWriteFact: false,
-                    allowsDerivedEffects: false,
-                    factDate: nil,
-                    operationDate: now
+                    now: now
                 )
             }
         }
@@ -613,6 +602,28 @@ enum CalendarEventCommandService {
             didWriteFact: petTaskSyncResult?.didWriteFact ?? true,
             allowsDerivedEffects: petTaskSyncResult?.allowsDerivedEffects ?? true,
             factDate: occurrenceDate,
+            operationDate: now
+        )
+    }
+
+    private static func unchangedCompletionResult(
+        event: Event,
+        occurrenceDate: Date,
+        affectedSubjectIDs: Set<UUID>,
+        now: Date,
+        didWriteFact: Bool = false,
+        allowsDerivedEffects: Bool = false,
+        factDate: Date? = nil
+    ) -> CalendarEventCompletionResult {
+        CalendarEventCompletionResult(
+            eventID: event.id,
+            isCompleted: event.recurrenceDays <= 0 ? event.isCompleted : event.isOccurrenceMarkedComplete(on: occurrenceDate),
+            syncedReminderCount: 0,
+            affectedSubjectIDs: affectedSubjectIDs,
+            didChange: false,
+            didWriteFact: didWriteFact,
+            allowsDerivedEffects: allowsDerivedEffects,
+            factDate: factDate,
             operationDate: now
         )
     }
@@ -859,7 +870,7 @@ struct CalendarCommandExecutor {
             pets: pets,
             context: context,
             executorId: executorId,
-            reminderCompletion: reminderCompletion
+            options: CalendarEventCompletionOptions(reminderCompletion: reminderCompletion)
         )
         deriveCalendarCompletion(result, occurrenceDate: occurrenceDate, note: note)
         return result

@@ -197,41 +197,94 @@ enum DomainMemberFactWriteAuthorizer {
     }
 }
 
+nonisolated struct DomainPetInsurancePolicyValues {
+    let companyName: String
+    let policyNumber: String
+    let productName: String
+    let annualPremium: Double
+    let coverageAmount: Double
+    let startDate: Date
+    let renewalDate: Date
+    let notes: String
+    let paymentFrequency: InsurancePaymentFrequency
+    let paymentDayOfMonth: Int
+    let showInCalendar: Bool
+    let otherFeeAmount: Double
+    let otherFeeNote: String
+}
+
+nonisolated struct DomainInsuranceClaimValues {
+    let claimDate: Date
+    let incidentDate: Date
+    let totalExpense: Double
+    let claimedAmount: Double
+    let approvedAmount: Double
+    let status: ClaimStatus
+    let note: String
+    let relatedExpenseLogID: String?
+    let approvedAt: Date?
+}
+
+nonisolated struct DomainHumanHealthReportValues {
+    let reportType: HealthReportType
+    let conclusion: ReportConclusion
+    let hospitalName: String
+    let doctorName: String
+    let reportDate: Date
+    let nextCheckDate: Date?
+    let summary: String
+    let notes: String
+}
+
+nonisolated struct DomainHumanMedicationPlanValues {
+    let name: String
+    let dosage: String
+    let frequency: MedicationFrequency
+    let customFrequencyNote: String
+    let firstDoseTime: Date
+    let startDate: Date
+    let endDate: Date?
+    let colorHex: String
+    let notes: String
+    let isActive: Bool
+}
+
+nonisolated struct DomainPetMedicationPlanValues {
+    let name: String
+    let dosage: String
+    let frequency: PetMedicationFrequency
+    let customFrequencyNote: String
+    let startDate: Date
+    let endDate: Date?
+    let colorHex: String
+    let notes: String
+    let isActive: Bool
+    let remainingAmount: Double
+}
+
 nonisolated enum DomainMemberFactWriter {
     @discardableResult
     static func createPetInsurancePolicy(
         plan: AuthorizedDomainMemberFactWrite,
-        companyName: String,
-        policyNumber: String,
-        productName: String,
-        annualPremium: Double,
-        coverageAmount: Double,
-        startDate: Date,
-        renewalDate: Date,
-        notes: String,
-        paymentFrequency: InsurancePaymentFrequency,
-        paymentDayOfMonth: Int,
-        showInCalendar: Bool,
-        otherFeeAmount: Double,
-        otherFeeNote: String,
+        values: DomainPetInsurancePolicyValues,
         pet: Pet,
         context: ModelContext
     ) -> PetInsurance {
         plan.consume()
         let insurance = PetInsurance(
-            companyName: companyName,
-            policyNumber: policyNumber,
-            productName: productName,
-            annualPremium: annualPremium,
-            coverageAmount: coverageAmount,
-            startDate: startDate,
-            renewalDate: renewalDate,
-            notes: notes,
-            paymentFrequency: paymentFrequency,
-            paymentDayOfMonth: paymentDayOfMonth,
-            showInCalendar: showInCalendar,
-            otherFeeAmount: otherFeeAmount,
-            otherFeeNote: otherFeeNote,
+            companyName: values.companyName,
+            policyNumber: values.policyNumber,
+            productName: values.productName,
+            annualPremium: values.annualPremium,
+            coverageAmount: values.coverageAmount,
+            startDate: values.startDate,
+            renewalDate: values.renewalDate,
+            notes: values.notes,
+            paymentFrequency: values.paymentFrequency,
+            paymentDayOfMonth: values.paymentDayOfMonth,
+            showInCalendar: values.showInCalendar,
+            otherFeeAmount: values.otherFeeAmount,
+            otherFeeNote: values.otherFeeNote,
             pet: pet
         )
         context.insert(insurance)
@@ -242,35 +295,23 @@ nonisolated enum DomainMemberFactWriter {
     static func updatePetInsurancePolicy(
         plan: AuthorizedDomainMemberFactWrite,
         insurance: PetInsurance,
-        companyName: String,
-        policyNumber: String,
-        productName: String,
-        annualPremium: Double,
-        coverageAmount: Double,
-        startDate: Date,
-        renewalDate: Date,
-        notes: String,
-        paymentFrequency: InsurancePaymentFrequency,
-        paymentDayOfMonth: Int,
-        showInCalendar: Bool,
-        otherFeeAmount: Double,
-        otherFeeNote: String,
+        values: DomainPetInsurancePolicyValues,
         context: ModelContext
     ) {
         plan.consume()
-        insurance.companyName = companyName
-        insurance.policyNumber = policyNumber
-        insurance.productName = productName
-        insurance.annualPremium = annualPremium
-        insurance.coverageAmount = coverageAmount
-        insurance.startDate = startDate
-        insurance.renewalDate = renewalDate
-        insurance.notes = notes
-        insurance.paymentFrequencyRaw = paymentFrequency.rawValue
-        insurance.paymentDayOfMonth = max(1, min(28, paymentDayOfMonth))
-        insurance.showInCalendar = showInCalendar
-        insurance.otherFeeAmount = otherFeeAmount
-        insurance.otherFeeNote = otherFeeNote
+        insurance.companyName = values.companyName
+        insurance.policyNumber = values.policyNumber
+        insurance.productName = values.productName
+        insurance.annualPremium = values.annualPremium
+        insurance.coverageAmount = values.coverageAmount
+        insurance.startDate = values.startDate
+        insurance.renewalDate = values.renewalDate
+        insurance.notes = values.notes
+        insurance.paymentFrequencyRaw = values.paymentFrequency.rawValue
+        insurance.paymentDayOfMonth = max(1, min(28, values.paymentDayOfMonth))
+        insurance.showInCalendar = values.showInCalendar
+        insurance.otherFeeAmount = values.otherFeeAmount
+        insurance.otherFeeNote = values.otherFeeNote
         CloudSyncMutationRecorder.markModified(insurance, context: context, modifiedAt: plan.modifiedAt)
     }
 
@@ -302,31 +343,23 @@ nonisolated enum DomainMemberFactWriter {
     @discardableResult
     static func createInsuranceClaim(
         plan: AuthorizedDomainMemberFactWrite,
-        claimDate: Date,
-        incidentDate: Date,
-        totalExpense: Double,
-        claimedAmount: Double,
-        approvedAmount: Double,
-        status: ClaimStatus,
-        note: String,
-        relatedExpenseLogId: String?,
-        approvedAt: Date?,
+        values: DomainInsuranceClaimValues,
         insurance: PetInsurance,
         context: ModelContext
     ) -> InsuranceClaim {
         plan.consume()
         let claim = InsuranceClaim(
-            claimDate: claimDate,
-            incidentDate: incidentDate,
-            totalExpense: totalExpense,
-            claimedAmount: claimedAmount,
-            approvedAmount: approvedAmount,
-            status: status,
-            note: note,
-            relatedExpenseLogId: relatedExpenseLogId,
+            claimDate: values.claimDate,
+            incidentDate: values.incidentDate,
+            totalExpense: values.totalExpense,
+            claimedAmount: values.claimedAmount,
+            approvedAmount: values.approvedAmount,
+            status: values.status,
+            note: values.note,
+            relatedExpenseLogId: values.relatedExpenseLogID,
             insurance: insurance
         )
-        claim.approvedAt = approvedAt
+        claim.approvedAt = values.approvedAt
         context.insert(claim)
         CloudSyncMutationRecorder.markModified(claim, context: context, modifiedAt: plan.modifiedAt)
         return claim
@@ -607,27 +640,20 @@ nonisolated enum DomainMemberFactWriter {
     static func createHumanHealthReport(
         plan: AuthorizedDomainMemberFactWrite,
         human: Human,
-        reportType: HealthReportType,
-        conclusion: ReportConclusion,
-        hospitalName: String,
-        doctorName: String,
-        reportDate: Date,
-        nextCheckDate: Date?,
-        summary: String,
-        notes: String,
+        values: DomainHumanHealthReportValues,
         context: ModelContext
     ) -> HumanHealthReport {
         plan.consume()
         let report = HumanHealthReport(
             humanId: human.id.uuidString,
-            reportType: reportType,
-            conclusion: conclusion,
-            hospitalName: hospitalName,
-            doctorName: doctorName,
-            reportDate: reportDate,
-            nextCheckDate: nextCheckDate,
-            summary: summary,
-            notes: notes
+            reportType: values.reportType,
+            conclusion: values.conclusion,
+            hospitalName: values.hospitalName,
+            doctorName: values.doctorName,
+            reportDate: values.reportDate,
+            nextCheckDate: values.nextCheckDate,
+            summary: values.summary,
+            notes: values.notes
         )
         context.insert(report)
         CloudSyncMutationRecorder.markModified(report, context: context, modifiedAt: plan.modifiedAt)
@@ -676,32 +702,23 @@ nonisolated enum DomainMemberFactWriter {
     static func createHumanMedicationPlan(
         plan: AuthorizedDomainMemberFactWrite,
         human: Human,
-        name: String,
-        dosage: String,
-        frequency: MedicationFrequency,
-        customFrequencyNote: String = "",
-        firstDoseTime: Date,
-        startDate: Date,
-        endDate: Date? = nil,
-        colorHex: String,
-        notes: String,
-        isActive: Bool = true,
+        values: DomainHumanMedicationPlanValues,
         context: ModelContext
     ) -> HumanMedication {
         plan.consume()
         let medication = HumanMedication(
             humanId: human.id.uuidString,
-            name: name,
-            dosage: dosage,
-            frequency: frequency,
-            firstDoseTime: firstDoseTime,
-            startDate: startDate,
-            endDate: endDate,
-            colorHex: colorHex,
-            notes: notes
+            name: values.name,
+            dosage: values.dosage,
+            frequency: values.frequency,
+            firstDoseTime: values.firstDoseTime,
+            startDate: values.startDate,
+            endDate: values.endDate,
+            colorHex: values.colorHex,
+            notes: values.notes
         )
-        medication.customFrequencyNote = customFrequencyNote
-        medication.isActive = isActive
+        medication.customFrequencyNote = values.customFrequencyNote
+        medication.isActive = values.isActive
         context.insert(medication)
         CloudSyncMutationRecorder.markModified(medication, context: context, modifiedAt: plan.modifiedAt)
         return medication
@@ -711,30 +728,21 @@ nonisolated enum DomainMemberFactWriter {
         plan: AuthorizedDomainMemberFactWrite,
         medication: HumanMedication,
         human: Human,
-        name: String,
-        dosage: String,
-        frequency: MedicationFrequency,
-        customFrequencyNote: String,
-        firstDoseTime: Date,
-        startDate: Date,
-        endDate: Date?,
-        colorHex: String,
-        notes: String,
-        isActive: Bool,
+        values: DomainHumanMedicationPlanValues,
         context: ModelContext
     ) {
         plan.consume()
         medication.humanId = human.id.uuidString
-        medication.name = name
-        medication.dosage = dosage
-        medication.frequency = frequency
-        medication.customFrequencyNote = customFrequencyNote
-        medication.firstDoseTime = firstDoseTime
-        medication.startDate = startDate
-        medication.endDate = endDate
-        medication.colorHex = colorHex
-        medication.notes = notes
-        medication.isActive = isActive
+        medication.name = values.name
+        medication.dosage = values.dosage
+        medication.frequency = values.frequency
+        medication.customFrequencyNote = values.customFrequencyNote
+        medication.firstDoseTime = values.firstDoseTime
+        medication.startDate = values.startDate
+        medication.endDate = values.endDate
+        medication.colorHex = values.colorHex
+        medication.notes = values.notes
+        medication.isActive = values.isActive
         CloudSyncMutationRecorder.markModified(medication, context: context, modifiedAt: plan.modifiedAt)
     }
 
@@ -763,32 +771,23 @@ nonisolated enum DomainMemberFactWriter {
     static func createPetMedicationPlan(
         plan: AuthorizedDomainMemberFactWrite,
         pet: Pet,
-        name: String,
-        dosage: String,
-        frequency: PetMedicationFrequency,
-        customFrequencyNote: String,
-        startDate: Date,
-        endDate: Date? = nil,
-        colorHex: String,
-        notes: String,
-        isActive: Bool = true,
-        remainingAmount: Double = 0,
+        values: DomainPetMedicationPlanValues,
         context: ModelContext
     ) -> PetMedication {
         plan.consume()
         let medication = PetMedication(
-            name: name,
-            dosage: dosage,
-            frequency: frequency,
-            startDate: startDate,
-            endDate: endDate,
-            colorHex: colorHex,
-            notes: notes,
+            name: values.name,
+            dosage: values.dosage,
+            frequency: values.frequency,
+            startDate: values.startDate,
+            endDate: values.endDate,
+            colorHex: values.colorHex,
+            notes: values.notes,
             pet: pet
         )
-        medication.customFrequencyNote = customFrequencyNote
-        medication.isActive = isActive
-        medication.remainingAmount = max(0, remainingAmount)
+        medication.customFrequencyNote = values.customFrequencyNote
+        medication.isActive = values.isActive
+        medication.remainingAmount = max(0, values.remainingAmount)
         context.insert(medication)
         CloudSyncMutationRecorder.markModified(medication, context: context, modifiedAt: plan.modifiedAt)
         return medication
@@ -798,29 +797,20 @@ nonisolated enum DomainMemberFactWriter {
         plan: AuthorizedDomainMemberFactWrite,
         medication: PetMedication,
         pet: Pet,
-        name: String,
-        dosage: String,
-        frequency: PetMedicationFrequency,
-        customFrequencyNote: String,
-        startDate: Date,
-        endDate: Date?,
-        colorHex: String,
-        notes: String,
-        isActive: Bool,
-        remainingAmount: Double,
+        values: DomainPetMedicationPlanValues,
         context: ModelContext
     ) {
         plan.consume()
-        medication.name = name
-        medication.dosage = dosage
-        medication.frequency = frequency
-        medication.customFrequencyNote = customFrequencyNote
-        medication.startDate = startDate
-        medication.endDate = endDate
-        medication.colorHex = colorHex
-        medication.notes = notes
-        medication.isActive = isActive
-        medication.remainingAmount = max(0, remainingAmount)
+        medication.name = values.name
+        medication.dosage = values.dosage
+        medication.frequency = values.frequency
+        medication.customFrequencyNote = values.customFrequencyNote
+        medication.startDate = values.startDate
+        medication.endDate = values.endDate
+        medication.colorHex = values.colorHex
+        medication.notes = values.notes
+        medication.isActive = values.isActive
+        medication.remainingAmount = max(0, values.remainingAmount)
         medication.pet = pet
         CloudSyncMutationRecorder.markModified(medication, context: context, modifiedAt: plan.modifiedAt)
     }

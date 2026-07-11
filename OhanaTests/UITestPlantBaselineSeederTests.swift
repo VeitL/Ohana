@@ -6,6 +6,33 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct UITestPlantBaselineSeederTests {
+    @Test func animationDisablingRequiresExplicitUITestLaunchMarker() {
+        #expect(!OhanaUITestLaunchOptions.shouldDisableAnimations(arguments: []))
+        #expect(!OhanaUITestLaunchOptions.shouldDisableAnimations(arguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]))
+        #expect(OhanaUITestLaunchOptions.shouldDisableAnimations(arguments: ["-OHANA_UI_TESTS"]))
+        #expect(!OhanaUITestLaunchOptions.shouldDisableAnimations(arguments: [
+            "-OHANA_UI_TESTS",
+            "-OHANA_UI_TEST_ENABLE_ANIMATIONS"
+        ]))
+    }
+
+    @Test func reduceMotionOverrideRequiresUITestSessionAndExplicitFlag() {
+        let arguments = ["-OHANA_UI_TEST_REDUCE_MOTION"]
+
+        #expect(!OhanaUITestLaunchOptions.shouldForceReduceMotion(
+            arguments: [],
+            isRunningUITests: true
+        ))
+        #expect(!OhanaUITestLaunchOptions.shouldForceReduceMotion(
+            arguments: arguments,
+            isRunningUITests: false
+        ))
+        #expect(OhanaUITestLaunchOptions.shouldForceReduceMotion(
+            arguments: arguments,
+            isRunningUITests: true
+        ))
+    }
+
     @Test func seedAddsMissingPlantsWithoutDuplicatingExistingBaseline() throws {
         let container = try makeInMemoryContainer()
         let services = AppServices(modelContainer: container)

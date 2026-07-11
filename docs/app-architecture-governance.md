@@ -83,9 +83,11 @@ Apple 的审核和能耗边界很清楚：后台能力必须服务于用户明�
 
 - 全局能耗判断统一走 `AppWorkloadPolicy`，不要在单个页面里随手写一套低功耗判断。
 - 动效/能耗分成三类预算：核心交互走 `interactionMotionBudget`，装饰循环走 `ambientMotionBudget`，计时/地图/UI 刷新走 `refreshBudget`。
+- `OhanaMotionBudget` 的语义是 `full`（完整空间动效）、`efficient`（节能短动效）、`minimal`（停止空间/重复动效但保留必要状态反馈）和 `static`（无动效/反馈）。Reduce Motion 选择 `minimal`；Low Power、省电模式和 thermal 约束独立组合。
 - 正常前台、当前可见页面的点击、FAB、弹窗、卡片展开、奖励反馈保持完整动效。
 - App 内省电模式默认关闭；开启后也不能牺牲当前可见核心交互的顺滑度，只能静态化装饰动效、降低刷新频率、停止离屏工作。
-- 后台、锁屏、低电量、Reduce Motion、省电模式、离屏页面，只允许保留必要业务；常驻动画、`repeatForever`、粒子、Canvas、TimelineView、Timer 应暂停或降频。
+- 后台、锁屏、低电量、省电模式、离屏页面，只允许保留必要业务；常驻动画、`repeatForever`、粒子、Canvas、TimelineView、Timer 应暂停或降频。
+- Reduce Motion 只替换或停止空间/重复动效，不得禁用交互、节流数据刷新、缩减后台维护预算或移除成功/错误等必要状态反馈。
 - 时长、倒计时、计划状态优先用“当前时间 - 开始时间”计算，不依赖后台每秒 timer。
 - Map UI 使用降采样路线点；数据记录不能被降采样影响。
 - 关键空间动效统一使用稳定 `ZStack` motion scene：动画开始前冻结 UI snapshot，动画期间保持视觉层挂载，只用单一 progress 驱动 transform、mask、opacity、zIndex 和 hit-testing；动画完成后再解冻真实业务状态。

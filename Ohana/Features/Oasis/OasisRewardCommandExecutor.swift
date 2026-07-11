@@ -39,8 +39,10 @@ struct OasisRewardCommandExecutor {
             humans: humans,
             currentActiveHumanId: currentActiveHumanId
         )
+        let injectionBalance = OasisCritterEconomyService.availableCoconutBalance(context: context)
         return OasisRewardActionSnapshot(
-            canInjectCoconuts: activeBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost,
+            canInjectCoconuts: injectionBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost,
+            injectionCoconutBalance: injectionBalance,
             activeCoconutBalance: activeBalance,
             critterFragmentTotal: critterFragments.reduce(0) { $0 + $1.amount }
         )

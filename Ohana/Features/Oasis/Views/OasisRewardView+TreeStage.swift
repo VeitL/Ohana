@@ -876,10 +876,10 @@ extension OasisRewardView {
 
     func applyCoconutBalanceVisualDelta(_ amount: Int) {
         guard amount != 0 else { return }
-        let targetBalance = max(0, activeHumanCoconutBalance + amount)
+        let targetBalance = max(0, availableOasisCoconutBalance + amount)
         withAnimation(GoMotion.feedback) {
             coconutBalanceVisualOverride = targetBalance
-            actionSnapshot.activeCoconutBalance = targetBalance
+            actionSnapshot.injectionCoconutBalance = targetBalance
             actionSnapshot.canInjectCoconuts = targetBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost
             bentoSnapshot.shopMetric = "\(targetBalance)"
         }
@@ -926,7 +926,7 @@ extension OasisRewardView {
         let resetDelay: UInt64 = motionBudget.usesFullMotion ? 230 : 120
         let thawDelay: UInt64 = motionBudget.usesFullMotion ? 120 : 48
         let beforeLevel = treeVisualLevel
-        let beforeBalance = activeHumanCoconutBalance
+        let beforeBalance = availableOasisCoconutBalance
         let targetBalance = max(0, beforeBalance - OasisTreeEnergyInjectionPolicy.starterPackageCost)
         let targetEnergy = treeMgr.totalEnergy + OasisTreeEnergyInjectionPolicy.starterPackageXP
         let targetLevel = treeMgr.treeLevel(forTotalEnergy: targetEnergy)
@@ -938,7 +938,7 @@ extension OasisRewardView {
         treeInjectionLocked = true
         withAnimation(visualAnimation) {
             coconutBalanceVisualOverride = targetBalance
-            actionSnapshot.activeCoconutBalance = targetBalance
+            actionSnapshot.injectionCoconutBalance = targetBalance
             actionSnapshot.canInjectCoconuts = targetBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost
             bentoSnapshot.shopMetric = "\(targetBalance)"
             treeVisualEnergyOverride = targetEnergy

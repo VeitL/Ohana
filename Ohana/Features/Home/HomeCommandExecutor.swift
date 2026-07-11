@@ -120,25 +120,16 @@ struct HomeCommandExecutor {
     }
 
     @discardableResult
-    func performActionType(
-        _ actionType: String,
-        petID: UUID,
-        executorId: String?,
-        now: Date,
-        antiRepeatTitle: String,
-        antiRepeatMessage: @escaping ((executorName: String, minutesAgo: Int)) -> String,
-        openFeedDetail: @escaping (_ petID: UUID, _ opensManualSheet: Bool) -> Void,
-        showAntiRepeat: @escaping (_ title: String, _ message: String, _ pendingAction: @escaping () -> Void) -> Void,
-        startWalk: (UUID) -> Void,
-        openWaterManagement: (UUID) -> Void,
-        openMedication: (UUID) -> Void,
-        feedback: @escaping (ExpandedQuickActionExecutor.Feedback) -> Void
+    func performQuickAction(
+        _ request: HomePetQuickActionRequest,
+        actions: HomePetQuickActionActions
     ) -> Bool {
+        let actionType = request.action.rawValue
         let flowStartedAt = AppFlowPerformance.start(
             AppPerformanceFlows.quickCareCommand,
             note: ["action": actionType, "entry": "id"]
         )
-        guard let pet = fetchPet(id: petID),
+        guard let pet = fetchPet(id: request.petID),
               MemberLifecycleGate.disposition(pet: pet, writeKind: .care).allowsCareFactWrite else {
             AppFlowPerformance.mark(
                 AppPerformanceFlows.quickCareCommand,
@@ -146,13 +137,13 @@ struct HomeCommandExecutor {
                 startedAt: flowStartedAt,
                 note: ["action": actionType, "reason": "missing_pet"]
             )
-            publishNoop(QuickCareCommand.action(petID: petID, action: actionType), note: "home.quickCare.missingPet")
+            publishNoop(QuickCareCommand.action(petID: request.petID, action: actionType), note: "home.quickCare.missingPet")
             return false
         }
 
-        let events = fetchQuickCareEvents(pet: pet, now: now)
-        let foodRecords = fetchFoodRecords(petID: petID)
-        let humans = fetchHumans()
+        let events = request.action.needsEvents ? fetchQuickCareEvents(pet: pet, now: request.now) : []
+        let foodRecords = request.action.needsFoodRecords ? fetchFoodRecords(petID: request.petID) : []
+        let humans = request.action.needsHumans ? fetchHumans() : []
         AppFlowPerformance.mark(
             AppPerformanceFlows.quickCareCommand,
             AppPerformancePhases.dataReady,
@@ -165,141 +156,84 @@ struct HomeCommandExecutor {
             ]
         )
 
-        let didRecord = performActionType(
-            actionType,
+        let executionRequest = ExpandedQuickActionExecutor.Request(
+            action: request.action,
             pet: pet,
-            executorId: executorId,
-            allEvents: events,
-            allFoodRecords: foodRecords,
+            executorID: request.executorID,
+            events: events,
+            foodRecords: foodRecords,
             humans: humans,
-            now: now,
-            antiRepeatTitle: antiRepeatTitle,
-            antiRepeatMessage: antiRepeatMessage,
-            openFeedDetail: { opensManualSheet in
-                openFeedDetail(petID, opensManualSheet)
-            },
+            modelContext: modelContext,
+            now: request.now,
+            careEvents: careEvents,
+            questManager: questManager,
+            medicationReminders: medicationReminders
+        )
+        let executionActions = ExpandedQuickActionExecutor.Actions(
+            antiRepeatTitle: actions.antiRepeatTitle,
+            antiRepeatMessage: actions.antiRepeatMessage,
+            openFeedDetail: { actions.openFeedDetail(request.petID, $0) },
             completePlannedFeed: { plannedPet in
                 completePlannedFeedFromFetchedState(
                     pet: plannedPet,
                     events: events,
                     foodRecords: foodRecords,
-                    executorId: executorId,
-                    now: now,
-                    feedback: feedback
+                    executorId: request.executorID,
+                    now: request.now,
+                    feedback: actions.feedback
                 )
             },
-            showAntiRepeat: showAntiRepeat,
-            startWalk: { startWalk($0.id) },
-            openWaterManagement: { openWaterManagement($0.id) },
-            openMedication: { openMedication($0.id) },
-            feedback: feedback,
-            recordPerformance: false
+            showAntiRepeat: { title, message, pendingAction in
+                actions.showAntiRepeat(title, message) {
+                    let confirmedDidRecord = pendingAction()
+                    guard confirmedDidRecord,
+                          shouldPublishConfirmedAntiRepeatMutation(
+                              action: request.action,
+                              pet: pet,
+                              allEvents: events,
+                              now: request.now
+                          )
+                    else { return }
+                    publishMutation(QuickCareCommand.action(petID: pet.id, action: actionType), pet: pet)
+                }
+            },
+            startWalk: { actions.startWalk($0.id) },
+            openWaterManagement: { actions.openWaterManagement($0.id) },
+            openMedication: { actions.openMedication($0.id) },
+            feedback: actions.feedback
         )
+        let didRecord = ExpandedQuickActionExecutor.perform(executionRequest, actions: executionActions)
+        guard didRecord else {
+            publishNoop(QuickCareCommand.action(petID: pet.id, action: actionType), note: "home.quickCare.factNoop")
+            AppFlowPerformance.mark(
+                AppPerformanceFlows.quickCareCommand,
+                AppPerformancePhases.noop,
+                startedAt: flowStartedAt,
+                note: ["action": actionType]
+            )
+            return false
+        }
+        publishMutation(QuickCareCommand.action(petID: pet.id, action: actionType), pet: pet)
         AppFlowPerformance.mark(
             AppPerformanceFlows.quickCareCommand,
-            didRecord ? AppPerformancePhases.writeSuccess : AppPerformancePhases.noop,
+            AppPerformancePhases.writeSuccess,
             startedAt: flowStartedAt,
             note: ["action": actionType]
         )
-        return didRecord
+        return true
     }
 
     func scheduleMedicationReminders(for pet: Pet) {
         medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
     }
 
-    @discardableResult
-    func performActionType(
-        _ actionType: String,
-        pet: Pet,
-        executorId: String?,
-        allEvents: [Event],
-        allFoodRecords: [PetFoodRecord],
-        humans: [Human],
-        now: Date,
-        antiRepeatTitle: String,
-        antiRepeatMessage: @escaping ((executorName: String, minutesAgo: Int)) -> String,
-        openFeedDetail: @escaping (_ opensManualSheet: Bool) -> Void,
-        completePlannedFeed: @escaping (Pet) -> Bool,
-        showAntiRepeat: @escaping (_ title: String, _ message: String, _ pendingAction: @escaping () -> Void) -> Void,
-        startWalk: (Pet) -> Void,
-        openWaterManagement: (Pet) -> Void,
-        openMedication: (Pet) -> Void,
-        feedback: @escaping (ExpandedQuickActionExecutor.Feedback) -> Void,
-        recordPerformance: Bool = true
-    ) -> Bool {
-        let flowStartedAt = recordPerformance
-            ? AppFlowPerformance.start(
-                AppPerformanceFlows.quickCareCommand,
-                note: ["action": actionType, "entry": "snapshot"]
-            )
-            : nil
-        let didRecord = ExpandedQuickActionExecutor.performActionType(
-            actionType,
-            pet: pet,
-            executorId: executorId,
-            allEvents: allEvents,
-            allFoodRecords: allFoodRecords,
-            humans: humans,
-            modelContext: modelContext,
-            now: now,
-            antiRepeatTitle: antiRepeatTitle,
-            antiRepeatMessage: antiRepeatMessage,
-            openFeedDetail: openFeedDetail,
-            completePlannedFeed: completePlannedFeed,
-            showAntiRepeat: { title, message, pendingAction in
-                showAntiRepeat(title, message) {
-                    let confirmedDidRecord = pendingAction()
-                    guard confirmedDidRecord,
-                          shouldPublishConfirmedAntiRepeatMutation(
-                              actionType: actionType,
-                              pet: pet,
-                              allEvents: allEvents,
-                              now: now
-                          )
-                    else { return }
-                    publishMutation(QuickCareCommand.action(petID: pet.id, action: actionType), pet: pet)
-                }
-            },
-            startWalk: startWalk,
-            openWaterManagement: openWaterManagement,
-            openMedication: openMedication,
-            feedback: feedback,
-            careEvents: careEvents,
-            questManager: questManager,
-            medicationReminders: medicationReminders
-        )
-        guard didRecord else {
-            publishNoop(QuickCareCommand.action(petID: pet.id, action: actionType), note: "home.quickCare.factNoop")
-            if let flowStartedAt {
-                AppFlowPerformance.mark(
-                    AppPerformanceFlows.quickCareCommand,
-                    AppPerformancePhases.noop,
-                    startedAt: flowStartedAt,
-                    note: ["action": actionType]
-                )
-            }
-            return false
-        }
-        publishMutation(QuickCareCommand.action(petID: pet.id, action: actionType), pet: pet)
-        if let flowStartedAt {
-            AppFlowPerformance.mark(
-                AppPerformanceFlows.quickCareCommand,
-                AppPerformancePhases.writeSuccess,
-                startedAt: flowStartedAt,
-                note: ["action": actionType]
-            )
-        }
-        return true
-    }
-
     private func shouldPublishConfirmedAntiRepeatMutation(
-        actionType: String,
+        action: HomePetQuickActionKind,
         pet: Pet,
         allEvents: [Event],
         now: Date
     ) -> Bool {
-        guard actionType == "feed" else { return true }
+        guard action == .feed else { return true }
         return ExpandedQuickActionLogic.feedDashboard(
             for: pet,
             allEvents: allEvents,
@@ -531,14 +465,18 @@ struct HomeCommandExecutor {
         photoData: Data? = nil,
         healthStatus: PlantHealthStatus? = nil
     ) -> PlantCareCommandResult {
-        PlantCareCommandExecutor(context: modelContext, revisions: revisions).recordCare(
-            type,
+        let request = PlantCareCommandRequest(
+            careType: type,
             plant: plant,
-            executorId: executorId,
-            note: "home.plantCare",
+            executorID: executorId,
             careNote: careNote,
             photoData: photoData,
             healthStatus: healthStatus
+        )
+        return PlantCareCommandExecutor(context: modelContext, revisions: revisions).recordCare(
+            request,
+            note: "home.plantCare",
+            options: PlantCareCommandOptions()
         )
     }
 

@@ -39,6 +39,7 @@ final class OhanaUITests: XCTestCase {
     func testPetFirstOnboardingCompletesCareRewardAndOasisWithoutHuman() throws {
         let app = launchEnglishApp(seedHumanBaseline: false)
         completePetFirstD17Flow(in: app)
+        injectStarterEnergyToLevelOne(in: app)
     }
 
     @MainActor
@@ -47,6 +48,22 @@ final class OhanaUITests: XCTestCase {
         completePetFirstD17Flow(
             in: app,
             completionMessage: "Pet-first onboarding with production overlays did not reach the starter reward in time."
+        )
+    }
+
+    @MainActor
+    func testReduceMotionKeepsPetFirstValueLoopInteractive() throws {
+        let app = launchEnglishApp(
+            seedHumanBaseline: false,
+            enableProductionOverlays: true,
+            extraLaunchArguments: [
+                "-OHANA_UI_TEST_REDUCE_MOTION",
+                "-OHANA_UI_TEST_ENABLE_ANIMATIONS"
+            ]
+        )
+        completePetFirstD17Flow(
+            in: app,
+            completionMessage: "Reduce Motion prevented the Pet-first care, reward, or Oasis value loop from completing."
         )
     }
 
@@ -3030,6 +3047,14 @@ final class OhanaUITests: XCTestCase {
 
         let oasisScreen = app.otherElements["oasis-screen"]
         XCTAssertTrue(oasisScreen.waitForExistence(timeout: 20), "Oasis did not become visible from the home tab.")
+
+        injectStarterEnergyToLevelOne(in: app)
+    }
+
+    @MainActor
+    private func injectStarterEnergyToLevelOne(in app: XCUIApplication) {
+        let oasisScreen = app.otherElements["oasis-screen"]
+        XCTAssertTrue(oasisScreen.waitForExistence(timeout: 20), "Oasis was not visible before starter energy injection.")
 
         let treeLevel = app.descendants(matching: .any)["oasis-tree-level-control"]
         XCTAssertTrue(treeLevel.waitForExistence(timeout: 12), "Oasis tree level control did not become visible.")

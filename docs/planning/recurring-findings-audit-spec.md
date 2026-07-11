@@ -17,10 +17,10 @@
 - **必须排除误报**：`coconutBalance ==` / `>=` / `<=`（比较）、`let x = pet.coconutBalance`（读取）。正则要精确匹配赋值，不匹配比较与读取。
 - **违规处置**：`// economy-boundary: allow <reason>` 需人工批准（同其他豁免）。
 
-### R2 奖励归属按 executor，不写 system（D3/G2）
-- **要抓**：调用奖励发放 API（`awardAction` / `addCoconuts` / `batchAward` / `award` 等，符号见 `QuestManager+Awards`、`QuestManager+LegacyWallet`、`RewardEconomyCommands`、`StreakRewardManager`）时，actor 归属硬编码为 `system` / `system:legacy` / nil-fallback-to-system 的路径。
-- **依据**：Economy 复审已确立「特殊奖励无 actor 时归属 active human，不写 system」。`system:legacy` 仅允许迁移兼容代码（`QuestManager+LegacyWallet` 内）。
-- **范围**：app 业务代码中任何**新增**对 system 钱包的写入都要显式理由。
+### R2 奖励归属按 executor，岛屿赠礼须显式批准（D3/G2）
+- **要抓**：调用奖励发放 API（`awardAction` / `addCoconuts` / `batchAward` / `award` 等，符号见 `QuestManager+Awards`、`QuestManager+LegacyWallet`、`RewardEconomyCommands`、`StreakRewardManager`）时，actor 归属硬编码为 `system` / `system:legacy` / nil-fallback-to-system，或未由产品规则批准却写入 `system:island` 的路径。
+- **依据**：有成员归属的奖励按明确 executor，缺失 actor 时归属可写 active Human；`system:legacy` 仅用于迁移兼容。只有 `product-foundation.md` / `Economy-logic.md` 明确批准的无成员岛屿赠礼（当前为 D17 启动赠礼）可写 `system:island`。
+- **范围**：app 业务代码中任何**新增**对 system 钱包的写入都要有可追踪的产品规则与测试。
 
 ### R3 派生状态生命周期完整（D8/G5）
 - **要抓**：删除/恢复路径是否成对——有删除写 tombstone 的地方，是否有对应的恢复重建（提醒重排、级联子记录 tombstone）。这条难纯静态抓全，**降级为 checklist 审计**：扫描含 `tombstone` / `isDeleted` / `recycl` 的文件，若同文件/同服务缺少 `reschedule` / `restore` / 级联处理的对称符号，标 warning 供人工确认。

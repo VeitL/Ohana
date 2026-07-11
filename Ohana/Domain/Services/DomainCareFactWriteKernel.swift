@@ -35,6 +35,105 @@ nonisolated enum DomainCareFactKind: Equatable {
     )
 }
 
+nonisolated enum ExpenseAmountValidationError: LocalizedError, Equatable, Sendable {
+    case invalidUserExpense
+    case invalidInsuranceReimbursement
+    case invalidPersistedExpense
+
+    var errorDescription: String? {
+        let l = L10n.current
+        return switch self {
+        case .invalidUserExpense:
+            l.tr(
+                zh: "费用金额必须是大于 0 的有效数字。请修改金额后重试。",
+                en: "Expense amount must be a finite number greater than zero. Update the amount and try again.",
+                de: "Der Ausgabenbetrag muss eine endliche Zahl größer als null sein. Ändere den Betrag und versuche es erneut."
+            )
+        case .invalidInsuranceReimbursement:
+            l.tr(
+                zh: "保险报销金额必须是大于 0 的有效数字。请修改金额后重试。",
+                en: "Insurance reimbursement must be a finite number greater than zero. Update the amount and try again.",
+                de: "Die Versicherungserstattung muss eine endliche Zahl größer als null sein. Ändere den Betrag und versuche es erneut."
+            )
+        case .invalidPersistedExpense:
+            l.tr(
+                zh: "费用记录包含无效金额，未写入数据。请检查来源后重试。",
+                en: "The expense record contains an invalid amount and was not saved. Check the source and try again.",
+                de: "Der Ausgabeneintrag enthält einen ungültigen Betrag und wurde nicht gespeichert. Prüfe die Quelle und versuche es erneut."
+            )
+        }
+    }
+}
+
+nonisolated enum ExpenseAmountPolicy {
+    static let insuranceReimbursementNotePrefix = "保险报销到账："
+
+    static func isValidUserExpense(_ amount: Double) -> Bool {
+        amount.isFinite && amount > 0
+    }
+
+    static func validateUserExpense(_ amount: Double) throws {
+        guard isValidUserExpense(amount) else {
+            throw ExpenseAmountValidationError.invalidUserExpense
+        }
+    }
+
+    static func storedInsuranceReimbursementAmount(from amount: Double) throws -> Double {
+        guard isValidUserExpense(amount) else {
+            throw ExpenseAmountValidationError.invalidInsuranceReimbursement
+        }
+        return -amount
+    }
+
+    static func isValidPersistedExpense(
+        amount: Double,
+        categoryRaw: String,
+        note: String
+    ) -> Bool {
+        if isValidUserExpense(amount) {
+            return true
+        }
+        return isRecognizedInsuranceReimbursement(
+            amount: amount,
+            categoryRaw: categoryRaw,
+            note: note
+        )
+    }
+
+    static func validatePersistedExpense(
+        amount: Double,
+        categoryRaw: String,
+        note: String
+    ) throws {
+        guard isValidPersistedExpense(amount: amount, categoryRaw: categoryRaw, note: note) else {
+            throw ExpenseAmountValidationError.invalidPersistedExpense
+        }
+    }
+
+    static func isValid(intent: DomainCareFactCreateIntent) -> Bool {
+        guard case let .expense(amount, category, note, _) = intent.kind else { return true }
+        if intent.source == .domainService {
+            return isValidPersistedExpense(
+                amount: amount,
+                categoryRaw: category.rawValue,
+                note: note
+            )
+        }
+        return isValidUserExpense(amount)
+    }
+
+    private static func isRecognizedInsuranceReimbursement(
+        amount: Double,
+        categoryRaw: String,
+        note: String
+    ) -> Bool {
+        amount.isFinite &&
+            amount < 0 &&
+            categoryRaw == ExpenseCategory.insurancePremium.rawValue &&
+            note.hasPrefix(insuranceReimbursementNotePrefix)
+    }
+}
+
 nonisolated struct DomainCareFactCreateIntent: Equatable {
     let kind: DomainCareFactKind
     let occurredAt: Date
@@ -142,7 +241,8 @@ enum DomainCareFactWriteAuthorizer {
         logPrefix: String,
         actorOverride: EconomyRewardOwnerResolution? = nil
     ) -> AuthorizedDomainCareFactWrite? {
-        guard let mutationPlan = DomainPolicyAuthorizer.authorize(
+        guard ExpenseAmountPolicy.isValid(intent: intent),
+              let mutationPlan = DomainPolicyAuthorizer.authorize(
             DomainMutationAuthorizationRequest(
                 scope: .careFact,
                 source: intent.source,
@@ -183,7 +283,8 @@ enum DomainCareFactWriteAuthorizer {
         intent: DomainCareFactCreateIntent,
         context: ModelContext
     ) -> AuthorizedDomainCareFactWrite? {
-        guard let mutationPlan = DomainPolicyAuthorizer.authorize(
+        guard ExpenseAmountPolicy.isValid(intent: intent),
+              let mutationPlan = DomainPolicyAuthorizer.authorize(
             DomainMutationAuthorizationRequest(
                 scope: .careFact,
                 source: intent.source,
@@ -221,6 +322,7 @@ enum DomainCareFactWriteAuthorizer {
         logPrefix _: String
     ) -> AuthorizedDomainHumanExpenseWrite? {
         guard case .expense = intent.kind,
+              ExpenseAmountPolicy.isValid(intent: intent),
               let mutationPlan = DomainPolicyAuthorizer.authorize(
                   DomainMutationAuthorizationRequest(
                       scope: .careFact,

@@ -63,6 +63,28 @@ enum CalendarTaskCompletionSyncService {
         }
     }
 
+    private struct CalendarFactInsertionContext {
+        let pet: Pet
+        let event: Event
+        let occurredAt: Date
+        let occurrenceDate: Date
+        let rewardDate: Date
+        let sourceReminderID: String?
+        let modelContext: ModelContext
+        let careLedger: CareLedgerRecording
+        let economy: CareEventEconomyAwarding
+    }
+
+    private struct CalendarLedgerRecord {
+        let eventKind: CareLedgerEventKind
+        let actionType: String
+        var amountValue: Double = 0
+        var amountUnit = ""
+        let legacyModelName: String
+        let legacyModelID: String
+        let reward: GeneratedRewardTrace
+    }
+
     private struct CalendarRewardCooldownClear {
         let petId: UUID?
         let action: DomainCareRewardAction
@@ -133,6 +155,17 @@ enum CalendarTaskCompletionSyncService {
               let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return .noOp }
 
         let occurredAt = occurrenceTimestamp(for: event, occurrenceDate: occurrenceDate)
+        let insertion = CalendarFactInsertionContext(
+            pet: pet,
+            event: event,
+            occurredAt: occurredAt,
+            occurrenceDate: occurrenceDate,
+            rewardDate: operationDate,
+            sourceReminderID: sourceReminderId,
+            modelContext: context,
+            careLedger: careLedger,
+            economy: economy
+        )
         if let careType = careType(for: event) {
             let intent = careIntent(
                 pet: pet,
@@ -154,16 +187,8 @@ enum CalendarTaskCompletionSyncService {
             ).result { return result }
             let insertDecision = insertCareLog(
                 write: write,
-                pet: pet,
-                event: event,
                 careType: careType,
-                occurredAt: occurredAt,
-                occurrenceDate: occurrenceDate,
-                rewardDate: operationDate,
-                sourceReminderId: sourceReminderId,
-                context: context,
-                careLedger: careLedger,
-                economy: economy
+                insertion: insertion
             )
             if let result = insertDecision.result {
                 return result
@@ -192,16 +217,8 @@ enum CalendarTaskCompletionSyncService {
             ).result { return result }
             let insertDecision = insertPottyLog(
                 write: write,
-                pet: pet,
-                event: event,
                 pottyType: pottyType,
-                occurredAt: occurredAt,
-                occurrenceDate: occurrenceDate,
-                rewardDate: operationDate,
-                sourceReminderId: sourceReminderId,
-                context: context,
-                careLedger: careLedger,
-                economy: economy
+                insertion: insertion
             )
             if let result = insertDecision.result {
                 return result
@@ -227,16 +244,8 @@ enum CalendarTaskCompletionSyncService {
             ).result { return result }
             let insertDecision = insertHygieneLog(
                 write: write,
-                pet: pet,
-                event: event,
                 hygieneType: hygieneType,
-                occurredAt: occurredAt,
-                occurrenceDate: occurrenceDate,
-                rewardDate: operationDate,
-                sourceReminderId: sourceReminderId,
-                context: context,
-                careLedger: careLedger,
-                economy: economy
+                insertion: insertion
             )
             if let result = insertDecision.result {
                 return result
@@ -409,51 +418,38 @@ enum CalendarTaskCompletionSyncService {
     @MainActor
     private static func insertCareLog(
         write: AuthorizedDomainCareFactWrite,
-        pet: Pet,
-        event: Event,
         careType: CareType,
-        occurredAt: Date,
-        occurrenceDate: Date,
-        rewardDate: Date,
-        sourceReminderId: String?,
-        context: ModelContext,
-        careLedger: CareLedgerRecording,
-        economy: CareEventEconomyAwarding
+        insertion: CalendarFactInsertionContext
     ) -> CalendarFactInsertDecision {
-        let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        let log = DomainCareFactWriter.createCareLog(plan: write, context: insertion.modelContext).log
+        let saveResult = insertion.modelContext.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
-            context.rollback()
-            economy.refreshProjectionAfterRollback(context: context)
+            insertion.modelContext.rollback()
+            insertion.economy.refreshProjectionAfterRollback(context: insertion.modelContext)
             return .persistenceFailed
         }
         let rewardTrace = awardGeneratedCare(
             plan: write,
-            action: rewardAction(for: careType, pet: pet),
-            pet: pet,
-            occurrenceDate: occurrenceDate,
-            rewardDate: rewardDate,
-            context: context,
-            economy: economy
+            action: rewardAction(for: careType, pet: insertion.pet),
+            pet: insertion.pet,
+            occurrenceDate: insertion.occurrenceDate,
+            rewardDate: insertion.rewardDate,
+            context: insertion.modelContext,
+            economy: insertion.economy
         )
         DomainCareFactEffectsDispatcher.run(plan: write) { actor in
             recordCalendarLedger(
-                occurredAt: occurredAt,
-                executorId: actor.effectiveExecutorId,
-                pet: pet,
-                event: event,
-                occurrenceDate: occurrenceDate,
-                sourceReminderId: sourceReminderId,
-                eventKind: .care,
-                actionType: careType.rawValue,
-                amountValue: log.careType == .feeding ? log.amountGrams : log.amountMl,
-                amountUnit: log.careType == .feeding ? "g" : (log.careType == .watering ? "ml" : ""),
-                legacyModelName: "PetCareLog",
-                legacyModelId: log.id.uuidString,
-                coconutDelta: rewardTrace.coconutDelta,
-                metadataJSON: rewardTrace.metadataJSON,
-                context: context,
-                careLedger: careLedger
+                executorID: actor.effectiveExecutorId,
+                insertion: insertion,
+                record: CalendarLedgerRecord(
+                    eventKind: .care,
+                    actionType: careType.rawValue,
+                    amountValue: log.careType == .feeding ? log.amountGrams : log.amountMl,
+                    amountUnit: log.careType == .feeding ? "g" : (log.careType == .watering ? "ml" : ""),
+                    legacyModelName: "PetCareLog",
+                    legacyModelID: log.id.uuidString,
+                    reward: rewardTrace
+                )
             )
         }
         return .insert
@@ -462,49 +458,36 @@ enum CalendarTaskCompletionSyncService {
     @MainActor
     private static func insertPottyLog(
         write: AuthorizedDomainCareFactWrite,
-        pet: Pet,
-        event: Event,
         pottyType: PottyType,
-        occurredAt: Date,
-        occurrenceDate: Date,
-        rewardDate: Date,
-        sourceReminderId: String?,
-        context: ModelContext,
-        careLedger: CareLedgerRecording,
-        economy: CareEventEconomyAwarding
+        insertion: CalendarFactInsertionContext
     ) -> CalendarFactInsertDecision {
-        let log = DomainCareFactWriter.createPottyLog(plan: write, context: context)
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        let log = DomainCareFactWriter.createPottyLog(plan: write, context: insertion.modelContext)
+        let saveResult = insertion.modelContext.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
-            context.rollback()
-            economy.refreshProjectionAfterRollback(context: context)
+            insertion.modelContext.rollback()
+            insertion.economy.refreshProjectionAfterRollback(context: insertion.modelContext)
             return .persistenceFailed
         }
         let rewardTrace = awardGeneratedCare(
             plan: write,
             action: .potty(isLitter: false),
-            pet: pet,
-            occurrenceDate: occurrenceDate,
-            rewardDate: rewardDate,
-            context: context,
-            economy: economy
+            pet: insertion.pet,
+            occurrenceDate: insertion.occurrenceDate,
+            rewardDate: insertion.rewardDate,
+            context: insertion.modelContext,
+            economy: insertion.economy
         )
         DomainCareFactEffectsDispatcher.run(plan: write) { actor in
             recordCalendarLedger(
-                occurredAt: occurredAt,
-                executorId: actor.effectiveExecutorId,
-                pet: pet,
-                event: event,
-                occurrenceDate: occurrenceDate,
-                sourceReminderId: sourceReminderId,
-                eventKind: .potty,
-                actionType: pottyType.rawValue,
-                legacyModelName: "PetPottyLog",
-                legacyModelId: log.id.uuidString,
-                coconutDelta: rewardTrace.coconutDelta,
-                metadataJSON: rewardTrace.metadataJSON,
-                context: context,
-                careLedger: careLedger
+                executorID: actor.effectiveExecutorId,
+                insertion: insertion,
+                record: CalendarLedgerRecord(
+                    eventKind: .potty,
+                    actionType: pottyType.rawValue,
+                    legacyModelName: "PetPottyLog",
+                    legacyModelID: log.id.uuidString,
+                    reward: rewardTrace
+                )
             )
         }
         return .insert
@@ -513,49 +496,36 @@ enum CalendarTaskCompletionSyncService {
     @MainActor
     private static func insertHygieneLog(
         write: AuthorizedDomainCareFactWrite,
-        pet: Pet,
-        event: Event,
         hygieneType: HygieneType,
-        occurredAt: Date,
-        occurrenceDate: Date,
-        rewardDate: Date,
-        sourceReminderId: String?,
-        context: ModelContext,
-        careLedger: CareLedgerRecording,
-        economy: CareEventEconomyAwarding
+        insertion: CalendarFactInsertionContext
     ) -> CalendarFactInsertDecision {
-        let log = DomainCareFactWriter.createHygieneLog(plan: write, context: context)
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        let log = DomainCareFactWriter.createHygieneLog(plan: write, context: insertion.modelContext)
+        let saveResult = insertion.modelContext.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
-            context.rollback()
-            economy.refreshProjectionAfterRollback(context: context)
+            insertion.modelContext.rollback()
+            insertion.economy.refreshProjectionAfterRollback(context: insertion.modelContext)
             return .persistenceFailed
         }
         let rewardTrace = awardGeneratedCare(
             plan: write,
             action: .care(type: hygieneType),
-            pet: pet,
-            occurrenceDate: occurrenceDate,
-            rewardDate: rewardDate,
-            context: context,
-            economy: economy
+            pet: insertion.pet,
+            occurrenceDate: insertion.occurrenceDate,
+            rewardDate: insertion.rewardDate,
+            context: insertion.modelContext,
+            economy: insertion.economy
         )
         DomainCareFactEffectsDispatcher.run(plan: write) { actor in
             recordCalendarLedger(
-                occurredAt: occurredAt,
-                executorId: actor.effectiveExecutorId,
-                pet: pet,
-                event: event,
-                occurrenceDate: occurrenceDate,
-                sourceReminderId: sourceReminderId,
-                eventKind: .hygiene,
-                actionType: hygieneType.rawValue,
-                legacyModelName: "PetHygieneLog",
-                legacyModelId: log.id.uuidString,
-                coconutDelta: rewardTrace.coconutDelta,
-                metadataJSON: rewardTrace.metadataJSON,
-                context: context,
-                careLedger: careLedger
+                executorID: actor.effectiveExecutorId,
+                insertion: insertion,
+                record: CalendarLedgerRecord(
+                    eventKind: .hygiene,
+                    actionType: hygieneType.rawValue,
+                    legacyModelName: "PetHygieneLog",
+                    legacyModelID: log.id.uuidString,
+                    reward: rewardTrace
+                )
             )
         }
         return .insert
@@ -563,44 +533,31 @@ enum CalendarTaskCompletionSyncService {
 
     @MainActor
     private static func recordCalendarLedger(
-        occurredAt: Date,
-        executorId: String?,
-        pet: Pet,
-        event: Event,
-        occurrenceDate: Date,
-        sourceReminderId: String?,
-        eventKind: CareLedgerEventKind,
-        actionType: String,
-        amountValue: Double = 0,
-        amountUnit: String = "",
-        legacyModelName: String,
-        legacyModelId: String,
-        coconutDelta: Int,
-        metadataJSON: String,
-        context: ModelContext,
-        careLedger: CareLedgerRecording
+        executorID: String?,
+        insertion: CalendarFactInsertionContext,
+        record: CalendarLedgerRecord
     ) {
-        careLedger.record(
-            occurredAt: occurredAt,
-            actorKind: executorId == nil ? .unknown : .human,
-            actorId: executorId,
+        insertion.careLedger.record(
+            occurredAt: insertion.occurredAt,
+            actorKind: executorID == nil ? .unknown : .human,
+            actorId: executorID,
             subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: eventKind,
-            actionType: actionType,
-            amountValue: amountValue,
-            amountUnit: amountUnit,
-            note: event.title,
+            subjectId: insertion.pet.id.uuidString,
+            eventKind: record.eventKind,
+            actionType: record.actionType,
+            amountValue: record.amountValue,
+            amountUnit: record.amountUnit,
+            note: insertion.event.title,
             source: .calendar,
-            sourceEventId: event.id.uuidString,
-            sourceReminderId: sourceReminderId,
-            legacyModelName: legacyModelName,
-            legacyModelId: legacyModelId,
-            coconutDelta: coconutDelta,
+            sourceEventId: insertion.event.id.uuidString,
+            sourceReminderId: insertion.sourceReminderID,
+            legacyModelName: record.legacyModelName,
+            legacyModelId: record.legacyModelID,
+            coconutDelta: record.reward.coconutDelta,
             rewardLogId: nil,
             privacyFieldRaw: nil,
-            metadataJSON: metadataJSON,
-            context: context,
+            metadataJSON: record.reward.metadataJSON,
+            context: insertion.modelContext,
             save: true
         )
     }

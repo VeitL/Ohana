@@ -39,6 +39,7 @@ REQUIRED_FILES = [
     "privacy-ownership.json",
     "runtime-energy-ownership.json",
     "release-resource-ownership.json",
+    "release-device-matrix.json",
     "full-scope-audit-baseline.json",
     "recurring-findings-audit-baseline.json",
     "localization-hardcoded-ui-baseline.json",
@@ -199,6 +200,56 @@ for entry in release_resource.get("preSignChecks", []):
     for key in ("id", "owner", "check", "releaseGate"):
         require_text(entry, key, where)
     require_paths(entry, "paths", where)
+
+release_device = manifests.get("release-device-matrix.json", {})
+if release_device:
+    where = "release device matrix"
+    require_text(release_device, "minimumIOS", where)
+    require_text(release_device, "latestSimulatorName", where)
+    require_text(release_device, "minimumHardwareAcceptance", where)
+
+    expected_families = release_device.get("targetedDeviceFamilies")
+    if expected_families != [1]:
+        fail(f"{where} targetedDeviceFamilies must be exactly [1] for the approved iPhone-only release.")
+    if release_device.get("nativeIPadApp") is not False:
+        fail(f"{where} nativeIPadApp must be false for the approved first release.")
+    if release_device.get("nativeWatchApp") is not False:
+        fail(f"{where} nativeWatchApp must be false for the approved first release.")
+
+    project_path = ROOT / "Ohana.xcodeproj" / "project.pbxproj"
+    if not project_path.is_file():
+        fail(f"{where} cannot find Ohana.xcodeproj/project.pbxproj.")
+    else:
+        project_text = project_path.read_text(encoding="utf-8")
+        family_values = [
+            value.strip().strip('"')
+            for value in re.findall(r"TARGETED_DEVICE_FAMILY\s*=\s*([^;]+);", project_text)
+        ]
+        if not family_values:
+            fail(f"{where} found no TARGETED_DEVICE_FAMILY settings.")
+        elif any(value != "1" for value in family_values):
+            fail(
+                f"{where} requires every target configuration to use iPhone family 1; "
+                f"found {sorted(set(family_values))}."
+            )
+
+        minimum_ios = release_device.get("minimumIOS")
+        deployment_values = [
+            value.strip().strip('"')
+            for value in re.findall(r"IPHONEOS_DEPLOYMENT_TARGET\s*=\s*([^;]+);", project_text)
+        ]
+        if not deployment_values:
+            fail(f"{where} found no IPHONEOS_DEPLOYMENT_TARGET settings.")
+        elif isinstance(minimum_ios, str) and any(value != minimum_ios for value in deployment_values):
+            fail(
+                f"{where} requires every explicit iOS deployment target to be {minimum_ios}; "
+                f"found {sorted(set(deployment_values))}."
+            )
+
+        if "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad" in project_text:
+            fail(f"{where} found an iPad orientation build setting in the iPhone-only project.")
+        if "WATCHOS_DEPLOYMENT_TARGET" in project_text or "com.apple.product-type.application.watchapp" in project_text:
+            fail(f"{where} found a native watchOS target while nativeWatchApp is false.")
 
 full_scope = manifests.get("full-scope-audit-baseline.json", {})
 if full_scope:

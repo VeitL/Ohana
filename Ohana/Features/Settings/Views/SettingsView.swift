@@ -266,12 +266,14 @@ struct SettingsView: View {
             }
             .ohanaSheetPagePresentation() // ui-v4: allow developer reminder observability console as long sheet
         }
-        .sheet(isPresented: $showingUISpecShowcase) {
-            NavigationStack {
-                OhanaUISpecShowcaseView()
+        #if DEBUG
+            .sheet(isPresented: $showingUISpecShowcase) {
+                NavigationStack {
+                    OhanaUISpecShowcaseView()
+                }
+                .ohanaSheetPagePresentation() // ui-v4: allow developer UI specification console as long sheet
             }
-            .ohanaSheetPagePresentation() // ui-v4: allow developer UI specification console as long sheet
-        }
+        #endif
         .sheet(isPresented: $showingFamilyWeeklyReportDebug) {
             NavigationStack {
                 FamilyWeeklyReportDashboardView()

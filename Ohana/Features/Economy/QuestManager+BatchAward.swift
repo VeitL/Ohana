@@ -133,34 +133,40 @@ extension QuestManager {
                 rewardTitle: batchRewardTitle(type: .care(type: type), targets: targets)
             )
         case let .general(_, _, _, title) where DomainCareRewardGeneralTitle.isLitterRewardTitle(title):
-            let result = careEvents.recordSharedCareFact(
+            let request = SharedCareRecordRequest(
                 sourcePet: sourcePet,
                 targets: targets,
-                type: .litter,
+                careType: .litter,
                 actionKind: .litterScoop,
-                context: context,
-                executorId: executorId,
+                executorID: executorId,
                 reward: type,
                 rewardTitle: batchRewardTitle(type: type, targets: targets),
                 quality: .none,
                 date: date,
                 source: .quickAction
             )
+            let result = careEvents.recordSharedCareFact(
+                request,
+                context: context
+            )
             guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
             return result.reward
         case let .general(_, _, _, title) where DomainCareRewardGeneralTitle.isPlayRewardTitle(title):
-            let result = careEvents.recordSharedCareFact(
+            let request = SharedCareRecordRequest(
                 sourcePet: sourcePet,
                 targets: targets,
-                type: .play,
+                careType: .play,
                 actionKind: .play,
-                context: context,
-                executorId: executorId,
+                executorID: executorId,
                 reward: type,
                 rewardTitle: DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.sharedPlay, count: targets.count),
                 quality: .none,
                 date: date,
                 source: .quickAction
+            )
+            let result = careEvents.recordSharedCareFact(
+                request,
+                context: context
             )
             guard result.didWriteFact, result.allowsDerivedEffects else { return (0, 0) }
             return result.reward

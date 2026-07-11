@@ -37,6 +37,7 @@ struct QuickHumanExpenseSheet: View {
     @State private var isClosing = false
     @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @State private var saveErrorMessage: String? = nil
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
@@ -152,6 +153,19 @@ struct QuickHumanExpenseSheet: View {
         }
         .onDisappear {
             commandQueue.cancelAll()
+        }
+        .alert(
+            l.tr(zh: "无法保存费用", en: "Could not save expense", de: "Ausgabe konnte nicht gespeichert werden"),
+            isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { if !$0 { saveErrorMessage = nil } }
+            )
+        ) {
+            Button(l.tr(zh: "知道了", en: "OK", de: "OK"), role: .cancel) {
+                saveErrorMessage = nil
+            }
+        } message: {
+            Text(saveErrorMessage ?? "")
         }
     }
 
@@ -418,17 +432,28 @@ struct QuickHumanExpenseSheet: View {
         let savedCategory = selectedCategory
         let command = DomainCommand.quickHumanExpense(humanID: human.id)
         commandQueue.enqueue(command) {
-            DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordHumanExpense(
-                human: human,
-                amount: amount,
-                date: savedDate,
-                note: savedNote,
-                category: savedCategory,
-                command: command,
-                revisionNote: "quick.human.expense"
-            )
-            onSaved?()
-            close()
+            do {
+                try DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordHumanExpense(
+                    human: human,
+                    amount: amount,
+                    date: savedDate,
+                    note: savedNote,
+                    category: savedCategory,
+                    command: command,
+                    revisionNote: "quick.human.expense"
+                )
+                onSaved?()
+                close()
+            } catch {
+                saveErrorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? l.tr(
+                        zh: "费用保存失败，请检查金额后重试。",
+                        en: "Could not save the expense. Check the amount and try again.",
+                        de: "Die Ausgabe konnte nicht gespeichert werden. Prüfe den Betrag und versuche es erneut."
+                    )
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
         }
     }
 }

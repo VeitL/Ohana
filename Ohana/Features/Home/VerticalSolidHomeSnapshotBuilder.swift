@@ -12,6 +12,7 @@ import SwiftData
 nonisolated struct VerticalSolidHomeSourceState {
     let pets: [Pet]
     let humans: [Human]
+    let islandCoconutReserveBalance: Int
     let plants: [Plant]
     let electronicPets: [OasisElectronicPet]
     let events: [Event]
@@ -42,6 +43,7 @@ nonisolated struct VerticalSolidHomeSourceState {
     init(
         pets: [Pet],
         humans: [Human],
+        islandCoconutReserveBalance: Int = 0,
         plants: [Plant],
         electronicPets: [OasisElectronicPet],
         events: [Event],
@@ -71,6 +73,7 @@ nonisolated struct VerticalSolidHomeSourceState {
     ) {
         self.pets = pets
         self.humans = humans
+        self.islandCoconutReserveBalance = max(0, islandCoconutReserveBalance)
         self.plants = plants
         self.electronicPets = electronicPets
         self.events = events
@@ -238,7 +241,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             isReady: true,
             greeting: greetingText(l, now: now),
             activeName: source.activeHuman?.name ?? l.tr(zh: "家人", en: "Family", de: "Familie"),
-            coconutText: "\(EconomyWalletWritePolicy.familyCoconutTotal(pets: source.pets, humans: source.humans))",
+            coconutText: "\(source.islandCoconutReserveBalance + EconomyWalletWritePolicy.familyCoconutTotal(pets: source.pets, humans: source.humans))",
             todayFocus: todayFocus,
             cards: cards,
             firstPetEmptyState: nil,
@@ -298,6 +301,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             "day:\(dayToken(for: now))",
             petSignature(source.pets),
             humanSignature(source.humans),
+            "islandReserve:\(source.islandCoconutReserveBalance)",
             plantSignature(visiblePlants, now: now),
             electronicPetSignature(source.electronicPets),
             eventSignature(source.events),

@@ -51,7 +51,10 @@ final class QuestManager: CoconutProjectionManaging {
     func recordWalletProjection(entries: [CoconutLedgerEntry], postsRewardFeedback: Bool) {
         guard !entries.isEmpty else { return }
         let totalDelta = entries
-            .filter { $0.affectsBalance && $0.ownerKind != .system }
+            .filter {
+                $0.affectsBalance &&
+                    ($0.ownerKind != .system || $0.accountKey == CoconutAccountKey.islandReserve)
+            }
             .reduce(0) { $0 + $1.delta }
         coconutCount = max(0, coconutCount + totalDelta)
 

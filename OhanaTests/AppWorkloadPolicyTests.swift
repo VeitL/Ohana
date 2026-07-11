@@ -62,6 +62,79 @@ struct AppWorkloadPolicyTests {
         #expect(policy.refreshBudget() == .throttled)
     }
 
+    @Test func reduceMotionMinimizesMotionWithoutThrottlingWorkOrInteraction() {
+        let policy = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { true },
+            userPowerSavingProvider: { false },
+            userReducedVisualEffectsProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+
+        #expect(policy.interactionMotionBudget() == .minimal)
+        #expect(policy.ambientMotionBudget() == .minimal)
+        #expect(!policy.interactionMotionBudget().allowsMotion)
+        #expect(policy.interactionMotionBudget().allowsEssentialFeedback)
+        #expect(policy.refreshBudget() == .live)
+        #expect(policy.visualEffectsBudget() == .full)
+        #expect(!policy.shouldReduceWork())
+        #expect(policy.shouldRunTimer())
+        #expect(!policy.shouldRunRepeatingAnimation())
+        #expect(!policy.shouldRunInteractionAnimation())
+        #expect(policy.shouldPlayFeedback())
+
+        let backgroundBudget = policy.backgroundWorkBudget(
+            operation: "reduce-motion-test",
+            requestedItemCount: 200
+        )
+        #expect(backgroundBudget.maximumItemCount == 64)
+        #expect(backgroundBudget.allowsExpensiveWork)
+
+        let surfaceGate = policy.surfaceGate(isVisible: true)
+        #expect(surfaceGate.allowsInteraction)
+        #expect(!surfaceGate.allowsAmbientMotion)
+        #expect(surfaceGate.allowsRefresh)
+    }
+
+    @Test func lowPowerStillConstrainsWorkSeparatelyFromReduceMotion() {
+        let policy = AppWorkloadPolicy(
+            lowPowerModeProvider: { true },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            userReducedVisualEffectsProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+
+        #expect(policy.interactionMotionBudget() == .efficient)
+        #expect(policy.ambientMotionBudget() == .static)
+        #expect(policy.refreshBudget() == .throttled)
+        #expect(policy.visualEffectsBudget() == .efficient)
+        #expect(policy.shouldReduceWork())
+        #expect(!policy.shouldPlayFeedback())
+
+        let backgroundBudget = policy.backgroundWorkBudget(
+            operation: "low-power-test",
+            requestedItemCount: 200
+        )
+        #expect(backgroundBudget.maximumItemCount == 12)
+        #expect(!backgroundBudget.allowsExpensiveWork)
+    }
+
+    @Test func reduceMotionComposesWithCriticalThermalState() {
+        let policy = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { true },
+            userPowerSavingProvider: { false },
+            userReducedVisualEffectsProvider: { false },
+            thermalStateProvider: { .critical }
+        )
+
+        #expect(policy.interactionMotionBudget() == .minimal)
+        #expect(policy.ambientMotionBudget() == .static)
+        #expect(policy.refreshBudget() == .paused)
+        #expect(!policy.shouldPlayFeedback())
+    }
+
     @Test func backgroundWorkBudgetBoundsAndDefersMaintenanceByRuntimeState() {
         let normal = AppWorkloadPolicy(
             lowPowerModeProvider: { false },

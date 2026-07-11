@@ -50,11 +50,17 @@ a Pet, care record, or reward transaction.
 ## Starter Gift Invariants
 
 - The gift is claimed only after an active Pet and a persisted care fact exist.
-- If an active Human exists, the legacy Human wallet remains the recipient. If
-  no Human exists, the first active Pet wallet is the recipient.
+- The one-time 50-coconut gift is a system-created island grant. It is credited
+  to the `system:island` reserve and is never owned by a Human or Pet.
+- The formal island total is the island reserve plus all active member wallets.
+  Oasis tree injection may atomically spend that whole pool, using the island
+  reserve first and then active member wallets. `system:legacy` is excluded.
 - The gift ledger event and wallet mutation save in one SwiftData transaction.
 - The wallet transaction key is deterministic. A persisted `starterGift` event
   recovers presentation defaults after interruption and prevents a second mint.
+- A legacy v2 gift already credited to a Human or Pet is reclassified once with
+  paired wallet transfer facts plus an idempotent marker. The migration preserves
+  the total balance and never mints a second gift.
 - Existing users without a pending first-run journey are marked handled and do
   not receive a retroactive gift.
 
@@ -85,11 +91,11 @@ must remain separate from the Human domain model:
 
 ## Required Proof
 
-- Unit: clean state transitions, Pet-only wallet claim, Human-recipient
-  compatibility, interruption recovery, and idempotent reward recovery.
+- Unit: clean state transitions, island-reserve claim, legacy member-gift
+  reclassification, interruption recovery, and idempotent reward recovery.
 - Unit: Human draft defaults and last-Human deletion remain non-blocking.
 - UI smoke: a clean install reaches first Pet, first care, reward ceremony, and
-  Oasis Lv0 without creating a Human.
+  Oasis Lv0 without creating a Human, then five 10-coconut injections reach Lv1.
 - Stability: repeat the clean-install UI path ten times with relaunch isolation;
   record duration and require median <= 90 seconds.
 - Physical device remains required for final touch latency, Reduce Motion,

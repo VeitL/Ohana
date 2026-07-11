@@ -84,6 +84,8 @@ jobs:
         run: scripts/audit-release-data-safety.sh
       - name: Governance manifests audit
         run: scripts/audit-governance-manifests.sh
+      - name: Agent skill governance audit
+        run: scripts/audit-agent-skill-governance.sh
       - name: Resource integrity / xattr pre-sign audit
         run: scripts/audit-resource-integrity.sh
       - name: Git size audit
@@ -106,6 +108,10 @@ jobs:
           brew upgrade swiftlint swiftformat
       - name: Tool version pins
         run: scripts/check-tool-versions.sh swiftlint swiftformat
+      - name: Complexity audit self-tests
+        run: scripts/tests/run-code-complexity-fixture-tests.sh
+      - name: Production complexity ratchet
+        run: scripts/audit-code-complexity.sh --all
       # SwiftLint runs as a strict gate after the P1 warning baseline cleanup.
       - name: SwiftLint
         run: swiftlint lint --strict --reporter github-actions-logging

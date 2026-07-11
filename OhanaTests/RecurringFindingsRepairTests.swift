@@ -37,7 +37,7 @@ struct RecurringFindingsRepairTests {
             ledgerSource: .detail,
             questManager: questManager
         )
-        _ = ExpenseCommandService.recordPetExpense(
+        _ = try ExpenseCommandService.recordPetExpense(
             pet: pet,
             amount: 12,
             date: Date(timeIntervalSince1970: 1_800_000_002),

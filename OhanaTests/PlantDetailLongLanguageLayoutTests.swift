@@ -72,18 +72,20 @@ struct PlantDetailLongLanguageLayoutTests {
     }
 
     @Test func plantCareFeatureDetailUsesAdaptiveSummaryAndDiscoveryGrids() throws {
-        let source = try source(
+        let detailSource = try source(
             "Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift",
             rootURL: repositoryRootURL()
         )
+        let waterSource = try source(
+            "Ohana/Features/Plants/Views/PlantCareFeatureWaterComponents.swift",
+            rootURL: repositoryRootURL()
+        )
+        let source = [detailSource, waterSource].joined(separator: "\n")
 
         #expect(source.contains("plantCareFeatureMetricColumns"))
         #expect(source.contains("plantCareFeatureInsightColumns"))
-        #expect(source.contains("plantCareFeatureWaterSignalColumns"))
-        #expect(source.contains("plantCareFeatureDiscoveryColumns"))
         #expect(source.contains("GridItem(.adaptive(minimum: 132)"))
         #expect(source.contains("GridItem(.adaptive(minimum: 156)"))
-        #expect(source.contains("GridItem(.adaptive(minimum: 118)"))
         #expect(source.contains("GridItem(.adaptive(minimum: 150)"))
         #expect(!source.contains("LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10)"))
     }

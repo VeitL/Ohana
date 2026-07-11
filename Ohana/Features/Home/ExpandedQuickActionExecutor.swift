@@ -18,6 +18,32 @@ enum ExpandedQuickActionExecutor {
         let label: String?
     }
 
+    struct Request {
+        let action: HomePetQuickActionKind
+        let pet: Pet
+        let executorID: String?
+        let events: [Event]
+        let foodRecords: [PetFoodRecord]
+        let humans: [Human]
+        let modelContext: ModelContext
+        let now: Date
+        let careEvents: CareEventRecording
+        let questManager: QuestManager
+        let medicationReminders: MedicationReminderManaging
+    }
+
+    struct Actions {
+        let antiRepeatTitle: String
+        let antiRepeatMessage: ((executorName: String, minutesAgo: Int)) -> String
+        let openFeedDetail: (_ opensManualSheet: Bool) -> Void
+        let completePlannedFeed: (Pet) -> Bool
+        let showAntiRepeat: (_ title: String, _ message: String, _ pendingAction: @escaping () -> Bool) -> Void
+        let startWalk: (Pet) -> Void
+        let openWaterManagement: (Pet) -> Void
+        let openMedication: (Pet) -> Void
+        let feedback: (Feedback) -> Void
+    }
+
     @discardableResult
     static func performFeedCheckIn(
         pet: Pet,
@@ -209,31 +235,21 @@ enum ExpandedQuickActionExecutor {
     }
 
     @discardableResult
-    static func performActionType(
-        _ actionType: String,
-        pet: Pet,
-        executorId: String?,
-        allEvents: [Event],
-        allFoodRecords: [PetFoodRecord],
-        humans: [Human],
-        modelContext: ModelContext,
-        now: Date,
-        antiRepeatTitle: String,
-        antiRepeatMessage: @escaping ((executorName: String, minutesAgo: Int)) -> String,
-        openFeedDetail: @escaping (_ opensManualSheet: Bool) -> Void,
-        completePlannedFeed: @escaping (Pet) -> Bool,
-        showAntiRepeat: @escaping (_ title: String, _ message: String, _ pendingAction: @escaping () -> Bool) -> Void,
-        startWalk: (Pet) -> Void,
-        openWaterManagement: (Pet) -> Void,
-        openMedication: (Pet) -> Void,
-        feedback: @escaping (Feedback) -> Void,
-        careEvents: CareEventRecording,
-        questManager: QuestManager,
-        medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
-    ) -> Bool {
-        let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
-        switch actionType {
-        case "feed":
+    static func perform(_ request: Request, actions: Actions) -> Bool {
+        let pet = request.pet
+        let executorId = request.executorID
+        let allEvents = request.events
+        let allFoodRecords = request.foodRecords
+        let humans = request.humans
+        let modelContext = request.modelContext
+        let now = request.now
+        let careEvents = request.careEvents
+        let questManager = request.questManager
+        let medicationReminders = request.medicationReminders
+        let feedback = actions.feedback
+
+        switch request.action {
+        case .feed:
             return performFeedCheckIn(
                 pet: pet,
                 executorId: executorId,
@@ -242,29 +258,29 @@ enum ExpandedQuickActionExecutor {
                 humans: humans,
                 modelContext: modelContext,
                 now: now,
-                antiRepeatTitle: antiRepeatTitle,
-                antiRepeatMessage: antiRepeatMessage,
-                openFeedDetail: openFeedDetail,
-                completePlannedFeed: completePlannedFeed,
-                showAntiRepeat: showAntiRepeat,
+                antiRepeatTitle: actions.antiRepeatTitle,
+                antiRepeatMessage: actions.antiRepeatMessage,
+                openFeedDetail: actions.openFeedDetail,
+                completePlannedFeed: actions.completePlannedFeed,
+                showAntiRepeat: actions.showAntiRepeat,
                 feedback: feedback,
                 careEvents: careEvents
             )
-        case "water":
+        case .water:
             return performWaterCheckIn(
                 pet: pet,
                 executorId: executorId,
                 allEvents: allEvents,
                 modelContext: modelContext,
                 now: now,
-                openWaterManagement: openWaterManagement,
+                openWaterManagement: actions.openWaterManagement,
                 feedback: feedback,
                 careEvents: careEvents
             )
-        case "walk":
-            startWalk(pet)
+        case .walk:
+            actions.startWalk(pet)
             return false
-        case "litter":
+        case .litter:
             let recorded = careEvents.recordCareFact(
                 pet: pet,
                 type: .litter,
@@ -282,41 +298,39 @@ enum ExpandedQuickActionExecutor {
             feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "litter", delta: delta)))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
-        case "play":
+        case .play:
             let didRecord = performSpecialCare(.play, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
             if didRecord { UINotificationFeedbackGenerator().notificationOccurred(.success) }
             return didRecord
-        case "medication":
+        case .medication:
             return performMedicationCheckIn(
                 pet: pet,
                 allEvents: allEvents,
                 modelContext: modelContext,
-                openMedication: openMedication,
+                openMedication: actions.openMedication,
                 feedback: feedback,
                 questManager: questManager,
                 medicationReminders: medicationReminders
             )
-        case "waterChange", "filterClean":
-            openWaterManagement(pet)
+        case .waterChange, .filterClean:
+            actions.openWaterManagement(pet)
             return false
-        case "cageCleaning":
+        case .cageCleaning:
             let didRecord = performSpecialCare(.cageCleaning, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
             if didRecord { UINotificationFeedbackGenerator().notificationOccurred(.success) }
             return didRecord
-        case "freeFlight":
+        case .freeFlight:
             let didRecord = performSpecialCare(.freeFlight, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
             if didRecord { UINotificationFeedbackGenerator().notificationOccurred(.success) }
             return didRecord
-        case "misting":
+        case .misting:
             let didRecord = performSpecialCare(.misting, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
             if didRecord { UINotificationFeedbackGenerator().notificationOccurred(.success) }
             return didRecord
-        case "substrateChange":
+        case .substrateChange:
             let didRecord = performSpecialCare(.substrateChange, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
             if didRecord { UINotificationFeedbackGenerator().notificationOccurred(.success) }
             return didRecord
-        default:
-            return false
         }
     }
 

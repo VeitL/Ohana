@@ -594,7 +594,7 @@ struct OhanaTests {
     }
 
     @MainActor
-    @Test func starterGiftBalanceFundsFiveTreeInjectionsToLevelOne() throws {
+    @Test func islandStarterGiftAndPetRewardsFundFiveTreeInjectionsWithoutHuman() throws {
         let defaults = UserDefaults.standard
         let oldActiveHumanId = defaults.object(forKey: "currentActiveHumanId")
         let oldInjectedEnergy = OasisTreePreferenceStore.injectedEnergy
@@ -612,12 +612,33 @@ struct OhanaTests {
 
         let container = try makeInMemoryContainer()
         let context = container.mainContext
-        let human = Human(name: "Starter")
-        human.coconutBalance = StarterGiftPolicy.giftAmount
-        context.insert(human)
-        try context.save()
+        let pet = Pet(name: "Starter", species: "cat")
+        context.insert(pet)
+        try CoconutWalletService.apply(
+            deltas: [
+                .island(
+                    delta: StarterGiftPolicy.giftAmount,
+                    entryKind: .reward,
+                    source: .starterGift,
+                    title: "Starter gift",
+                    transactionKey: "test:oasis:island-starter-gift"
+                ),
+                .pet(
+                    pet,
+                    delta: 9,
+                    entryKind: .reward,
+                    source: .careEvent,
+                    title: "First care",
+                    transactionKey: "test:oasis:first-care-reward"
+                )
+            ],
+            context: context,
+            save: true,
+            postsRewardFeedback: false,
+            updatesProjection: false
+        )
 
-        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: "currentActiveHumanId")
         OasisTreePreferenceStore.injectedEnergy = 0
         OasisTreePreferenceStore.lastRewardedLevel = 0
         OasisTreePreferenceStore.clearLedgerEnergyCache()
@@ -634,7 +655,112 @@ struct OhanaTests {
 
         #expect(manager.totalEnergy == 5 * OasisTreeEnergyInjectionPolicy.starterPackageXP)
         #expect(manager.treeLevel == .lv1)
-        #expect(CoconutWalletService.balance(for: human, context: context) == 0)
+        #expect(CoconutWalletService.balance(
+            accountKey: CoconutAccountKey.islandReserve,
+            context: context
+        ) == 0)
+        #expect(CoconutWalletService.balance(for: pet, context: context) == 9)
+        #expect(CoconutWalletService.totalBalance(context: context) == 9)
+    }
+
+    @MainActor
+    @Test func legacyPetStarterGiftCanInjectEnergyWithoutHuman() throws {
+        let defaults = UserDefaults.standard
+        let oldActiveHumanId = defaults.object(forKey: "currentActiveHumanId")
+        let oldInjectedEnergy = OasisTreePreferenceStore.injectedEnergy
+        let oldRewardedLevel = OasisTreePreferenceStore.lastRewardedLevel
+        defer {
+            if let oldActiveHumanId {
+                defaults.set(oldActiveHumanId, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            OasisTreePreferenceStore.injectedEnergy = oldInjectedEnergy
+            OasisTreePreferenceStore.lastRewardedLevel = oldRewardedLevel
+            OasisTreePreferenceStore.clearLedgerEnergyCache()
+        }
+
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Legacy Starter", species: "cat")
+        context.insert(pet)
+        try CoconutWalletService.apply(
+            deltas: [
+                .pet(
+                    pet,
+                    delta: 59,
+                    entryKind: .reward,
+                    source: .starterGift,
+                    title: "Legacy starter balance",
+                    transactionKey: "test:oasis:legacy-pet-starter-balance"
+                )
+            ],
+            context: context,
+            save: true,
+            postsRewardFeedback: false,
+            updatesProjection: false
+        )
+
+        defaults.removeObject(forKey: "currentActiveHumanId")
+        OasisTreePreferenceStore.injectedEnergy = 0
+        OasisTreePreferenceStore.lastRewardedLevel = 0
+        OasisTreePreferenceStore.clearLedgerEnergyCache()
+
+        let manager = OasisTreeManager()
+        manager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 0)
+
+        #expect(manager.injectEnergy(modelContext: context))
+        #expect(manager.injectedEnergy == OasisTreeEnergyInjectionPolicy.starterPackageXP)
+        #expect(CoconutWalletService.balance(for: pet, context: context) == 49)
+    }
+
+    @MainActor
+    @Test func failedAggregateTreeInjectionLeavesEnergyAndWalletUnchanged() throws {
+        let defaults = UserDefaults.standard
+        let oldActiveHumanId = defaults.object(forKey: "currentActiveHumanId")
+        let oldInjectedEnergy = OasisTreePreferenceStore.injectedEnergy
+        defer {
+            if let oldActiveHumanId {
+                defaults.set(oldActiveHumanId, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            OasisTreePreferenceStore.injectedEnergy = oldInjectedEnergy
+            OasisTreePreferenceStore.clearLedgerEnergyCache()
+        }
+
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Low Balance", species: "cat")
+        context.insert(pet)
+        try CoconutWalletService.apply(
+            deltas: [
+                .pet(
+                    pet,
+                    delta: 9,
+                    entryKind: .reward,
+                    source: .careEvent,
+                    title: "Small reward",
+                    transactionKey: "test:oasis:insufficient-balance"
+                )
+            ],
+            context: context,
+            save: true,
+            postsRewardFeedback: false,
+            updatesProjection: false
+        )
+
+        defaults.removeObject(forKey: "currentActiveHumanId")
+        OasisTreePreferenceStore.injectedEnergy = 0
+        OasisTreePreferenceStore.clearLedgerEnergyCache()
+        let manager = OasisTreeManager()
+        manager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 0)
+        let ledgerCountBefore = try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>())
+
+        #expect(!manager.injectEnergy(modelContext: context))
+        #expect(manager.injectedEnergy == 0)
+        #expect(CoconutWalletService.balance(for: pet, context: context) == 9)
+        #expect(try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>()) == ledgerCountBefore)
     }
 
     @MainActor

@@ -332,6 +332,11 @@ nonisolated enum DomainCareFactRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) throws -> DomainCareFactRehydrateResult {
+        try ExpenseAmountPolicy.validatePersistedExpense(
+            amount: snapshot.amount,
+            categoryRaw: snapshot.categoryRaw,
+            note: snapshot.note
+        )
         let plan = authorize(petId: snapshot.petId, source: source, context: context)
         guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         guard try fetchPetExpenseLog(id: snapshot.id, context: context) == nil else {

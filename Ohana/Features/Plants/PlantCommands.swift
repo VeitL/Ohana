@@ -44,45 +44,117 @@ enum PlantCareCommandService {
     @discardableResult
     @MainActor
     static func recordCare(
-        _ type: PlantCareType,
-        plant: Plant,
-        executorId: String?,
+        _ request: PlantCareCommandRequest,
         context: ModelContext,
-        now: Date = Date(),
-        careNote: String = "",
-        photoData: Data? = nil,
-        healthStatus: PlantHealthStatus? = nil,
-        careLedger providedCareLedger: CareLedgerRecording? = nil,
-        economy providedEconomy: CareEventEconomyAwarding? = nil,
-        syncCarePlan: Bool = true,
-        scheduleNotifications: Bool = true,
-        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
-        saveChanges: Bool = true,
-        awardRewards: Bool = true
+        options: PlantCareCommandOptions
     ) -> PlantCareCommandResult {
+        let plant = request.plant
         guard !plant.isArchived else {
             return .failed(
                 plantID: plant.id,
-                careType: type,
+                careType: request.careType,
                 error: "plantArchived"
             )
         }
+        guard let plan = authorizedScheduleWrite(for: request, context: context) else {
+            return .failed(
+                plantID: plant.id,
+                careType: request.careType,
+                error: "plantCareAuthorizationDenied"
+            )
+        }
 
-        let careLedger = providedCareLedger ?? CareLedgerService()
+        let authorizedExecutorID = plan.intent.assigneeId
+        let wasRewardEligible = isRewardEligible(request.careType, for: plant, now: request.now)
+        applyCareFact(request)
+        let persistedPhotoData = sanitizedPhotoData(for: request)
+        let log = makeCareLog(
+            request,
+            authorizedExecutorID: authorizedExecutorID,
+            photoData: persistedPhotoData
+        )
+        log.plant = plant
+        context.insert(log)
+        CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: request.now)
+
+        let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
+        let reward = rewardOutcome(
+            for: request,
+            authorizedExecutorID: authorizedExecutorID,
+            persistedPhotoData: persistedPhotoData,
+            wasEligible: wasRewardEligible,
+            context: context,
+            options: options
+        )
+        let ledgerEvent = recordLedgerEvent(
+            for: request,
+            log: log,
+            event: event,
+            authorizedExecutorID: authorizedExecutorID,
+            reward: reward,
+            context: context,
+            options: options
+        )
+        if options.saveChanges {
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            guard saveResult.didSave else {
+                context.rollback()
+                return persistenceFailureResult(
+                    for: request,
+                    log: log,
+                    event: event,
+                    ledgerEvent: ledgerEvent,
+                    errorDescription: saveResult.errorDescription
+                )
+            }
+        }
+        if options.syncCarePlan {
+            PlantCarePlanScheduleService.sync(
+                plant: plant,
+                context: context,
+                now: request.now,
+                scheduleNotifications: options.scheduleNotifications,
+                reminderScheduling: options.reminderScheduling,
+                saveChanges: options.saveChanges
+            )
+        }
+
+        return PlantCareCommandResult(
+            plantID: plant.id,
+            logID: log.id,
+            eventID: event.id,
+            ledgerEventID: ledgerEvent.id,
+            careType: request.careType,
+            coconutDelta: reward.coconutDelta,
+            didPersist: true,
+            persistenceError: nil
+        )
+    }
+
+    private struct RewardOutcome {
+        let coconutDelta: Int
+        let metadata: String
+    }
+
+    @MainActor
+    private static func authorizedScheduleWrite(
+        for request: PlantCareCommandRequest,
+        context: ModelContext
+    ) -> AuthorizedDomainScheduleWrite? {
         let l = L10n.current
-        let careTypeName = type.displayName(l: l)
+        let careTypeName = request.careType.displayName(l: l)
         let eventIntent = DomainScheduleCreateIntent(
-            title: "\(type.emoji) \(l.tr(zh: "给 \(plant.name)\(careTypeName)", en: "\(careTypeName) for \(plant.name)", de: "\(careTypeName) für \(plant.name)"))\(safetyReminderSuffix(for: plant))",
-            startDate: now,
+            title: "\(request.careType.emoji) \(l.tr(zh: "给 \(request.plant.name)\(careTypeName)", en: "\(careTypeName) for \(request.plant.name)", de: "\(careTypeName) für \(request.plant.name)"))\(safetyReminderSuffix(for: request.plant))",
+            startDate: request.now,
             isAllDay: false,
-            eventType: type.eventType.rawValue,
+            eventType: request.careType.eventType.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString,
-            assigneeId: executorId,
+            relatedEntityId: request.plant.id.uuidString,
+            assigneeId: request.executorID,
             writeKind: .care,
             source: .userCommand
         )
-        let plan = DomainScheduleWriteAuthorizer.authorizeCreate(intent: eventIntent, context: context)
+        return DomainScheduleWriteAuthorizer.authorizeCreate(intent: eventIntent, context: context)
             ?? DomainScheduleWriteAuthorizer.authorizeCreate(
                 intent: DomainScheduleCreateIntent(
                     title: eventIntent.title,
@@ -96,87 +168,105 @@ enum PlantCareCommandService {
                 ),
                 context: context
             )
-        guard let plan else {
-            return PlantCareCommandResult(
-                plantID: plant.id,
-                logID: UUID(),
-                eventID: UUID(),
-                ledgerEventID: UUID(),
-                careType: type,
-                coconutDelta: 0,
-                didPersist: false,
-                persistenceError: "plantCareAuthorizationDenied"
-            )
-        }
-        let authorizedExecutorId = plan.intent.assigneeId
-        let wasRewardEligible = isRewardEligible(type, for: plant, now: now)
-        switch type {
+    }
+
+    @MainActor
+    private static func applyCareFact(_ request: PlantCareCommandRequest) {
+        switch request.careType {
         case .watering:
-            plant.lastWateredDate = now
+            request.plant.lastWateredDate = request.now
         case .fertilizing:
-            plant.lastFertilizedDate = now
+            request.plant.lastFertilizedDate = request.now
         case .pestCheck, .pestFound, .yellowLeaf, .newLeaf, .photo, .customNote:
-            plant.lastHealthCheckDate = now
+            request.plant.lastHealthCheckDate = request.now
         case .repotting, .pruning, .misting, .rotating, .leafCleaning:
             break
         }
-        if let healthStatus {
-            plant.healthStatus = healthStatus
+        if let healthStatus = request.healthStatus {
+            request.plant.healthStatus = healthStatus
         }
-        let persistedPhotoData = photoData.map {
+    }
+
+    @MainActor
+    private static func sanitizedPhotoData(for request: PlantCareCommandRequest) -> Data? {
+        request.photoData.map {
             AttachmentPrivacySanitizer.sanitizedData(
                 $0,
-                filename: "plant-care-\(type.rawValue).jpg",
+                filename: "plant-care-\(request.careType.rawValue).jpg",
                 isImage: true
             )
         }
+    }
 
-        let log = PlantCareLog(
-            date: now,
-            careType: type,
-            note: careNote,
-            executorId: authorizedExecutorId,
-            photoData: persistedPhotoData,
-            healthStatus: healthStatus
+    @MainActor
+    private static func makeCareLog(
+        _ request: PlantCareCommandRequest,
+        authorizedExecutorID: String?,
+        photoData: Data?
+    ) -> PlantCareLog {
+        PlantCareLog(
+            date: request.now,
+            careType: request.careType,
+            note: request.careNote,
+            executorId: authorizedExecutorID,
+            photoData: photoData,
+            healthStatus: request.healthStatus
         )
-        log.plant = plant
-        context.insert(log)
-        CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
+    }
 
-        let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
-        let rewardAction = rewardAction(for: type)
-        let reward: (humanGot: Int, petGot: Int)
-        let rewardMetadata: String
-        if awardRewards, wasRewardEligible, let rewardAction {
-            let economy = providedEconomy ?? DomainServiceDependencyRegistry.careEventEconomy()
-            reward = economy.awardCareAction(
-                type: rewardAction,
-                pet: nil,
-                context: context,
-                quality: DomainCareRewardQuality.compose(
-                    precise: false,
-                    hasNote: !careNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                    hasPhoto: persistedPhotoData != nil
-                ),
-                date: now,
-                executorId: authorizedExecutorId,
-                careObjectKey: plant.id
-            )
-            rewardMetadata = economy.rewardMetadata(for: reward)
-        } else {
-            reward = (0, 0)
-            rewardMetadata = ""
+    @MainActor
+    private static func rewardOutcome(
+        for request: PlantCareCommandRequest,
+        authorizedExecutorID: String?,
+        persistedPhotoData: Data?,
+        wasEligible: Bool,
+        context: ModelContext,
+        options: PlantCareCommandOptions
+    ) -> RewardOutcome {
+        guard options.awardRewards,
+              wasEligible,
+              let action = rewardAction(for: request.careType) else {
+            return RewardOutcome(coconutDelta: 0, metadata: "")
         }
-        let coconutDelta = max(0, reward.humanGot) + max(0, reward.petGot)
+        let economy = options.economy ?? DomainServiceDependencyRegistry.careEventEconomy()
+        let reward = economy.awardCareAction(
+            type: action,
+            pet: nil,
+            context: context,
+            quality: DomainCareRewardQuality.compose(
+                precise: false,
+                hasNote: !request.careNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                hasPhoto: persistedPhotoData != nil
+            ),
+            date: request.now,
+            executorId: authorizedExecutorID,
+            careObjectKey: request.plant.id
+        )
+        return RewardOutcome(
+            coconutDelta: max(0, reward.humanGot) + max(0, reward.petGot),
+            metadata: economy.rewardMetadata(for: reward)
+        )
+    }
 
-        let ledgerEvent = careLedger.record(
+    @MainActor
+    private static func recordLedgerEvent(
+        for request: PlantCareCommandRequest,
+        log: PlantCareLog,
+        event: Event,
+        authorizedExecutorID: String?,
+        reward: RewardOutcome,
+        context: ModelContext,
+        options: PlantCareCommandOptions
+    ) -> CareLedgerEvent {
+        let careLedger = options.careLedger ?? CareLedgerService()
+        return careLedger.record(
             occurredAt: log.date,
-            actorKind: authorizedExecutorId == nil ? .unknown : .human,
-            actorId: authorizedExecutorId,
+            actorKind: authorizedExecutorID == nil ? .unknown : .human,
+            actorId: authorizedExecutorID,
             subjectKind: .plant,
-            subjectId: plant.id.uuidString,
+            subjectId: request.plant.id.uuidString,
             eventKind: .plantCare,
-            actionType: type.rawValue,
+            actionType: request.careType.rawValue,
             amountValue: 0,
             amountUnit: "",
             note: log.note,
@@ -185,49 +275,31 @@ enum PlantCareCommandService {
             sourceReminderId: nil,
             legacyModelName: "PlantCareLog",
             legacyModelId: log.id.uuidString,
-            coconutDelta: coconutDelta,
+            coconutDelta: reward.coconutDelta,
             rewardLogId: nil,
             privacyFieldRaw: nil,
-            metadataJSON: rewardMetadata,
+            metadataJSON: reward.metadata,
             context: context,
             save: false
         )
-        if saveChanges {
-            let saveResult = context.safeSaveResult(publishFailureEvent: true)
-            guard saveResult.didSave else {
-                context.rollback()
-                return PlantCareCommandResult(
-                    plantID: plant.id,
-                    logID: log.id,
-                    eventID: event.id,
-                    ledgerEventID: ledgerEvent.id,
-                    careType: type,
-                    coconutDelta: 0,
-                    didPersist: false,
-                    persistenceError: saveResult.errorDescription
-                )
-            }
-        }
-        if syncCarePlan {
-            PlantCarePlanScheduleService.sync(
-                plant: plant,
-                context: context,
-                now: now,
-                scheduleNotifications: scheduleNotifications,
-                reminderScheduling: providedReminderScheduling,
-                saveChanges: saveChanges
-            )
-        }
+    }
 
-        return PlantCareCommandResult(
-            plantID: plant.id,
+    private static func persistenceFailureResult(
+        for request: PlantCareCommandRequest,
+        log: PlantCareLog,
+        event: Event,
+        ledgerEvent: CareLedgerEvent,
+        errorDescription: String?
+    ) -> PlantCareCommandResult {
+        PlantCareCommandResult(
+            plantID: request.plant.id,
             logID: log.id,
             eventID: event.id,
             ledgerEventID: ledgerEvent.id,
-            careType: type,
-            coconutDelta: coconutDelta,
-            didPersist: true,
-            persistenceError: nil
+            careType: request.careType,
+            coconutDelta: 0,
+            didPersist: false,
+            persistenceError: errorDescription
         )
     }
 

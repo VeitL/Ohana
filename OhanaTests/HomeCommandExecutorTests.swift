@@ -19,11 +19,14 @@ struct HomeCommandExecutorTests {
         var feedbacks: [ExpandedQuickActionExecutor.Feedback] = []
         var openedWaterRoute = false
 
-        executor.performActionType(
-            "water",
-            petID: pet.id,
-            executorId: executorHuman.id.uuidString,
-            now: Date(timeIntervalSince1970: 1_800_000_000),
+        executor.performQuickAction(
+            HomePetQuickActionRequest(
+                action: .water,
+                petID: pet.id,
+                executorID: executorHuman.id.uuidString,
+                now: Date(timeIntervalSince1970: 1_800_000_000)
+            ),
+            actions: HomePetQuickActionActions(
             antiRepeatTitle: "Already logged",
             antiRepeatMessage: { "\($0.executorName) \($0.minutesAgo)" },
             openFeedDetail: { _, _ in },
@@ -32,6 +35,7 @@ struct HomeCommandExecutorTests {
             openWaterManagement: { _ in openedWaterRoute = true },
             openMedication: { _ in },
             feedback: { feedbacks.append($0) }
+            )
         )
 
         let logs = try context.fetch(FetchDescriptor<PetCareLog>())
@@ -96,11 +100,14 @@ struct HomeCommandExecutorTests {
         var openedFeedDetail: Bool?
         var feedbacks: [ExpandedQuickActionExecutor.Feedback] = []
 
-        let didRecord = executor.performActionType(
-            "feed",
-            petID: pet.id,
-            executorId: executorHuman.id.uuidString,
-            now: now,
+        let didRecord = executor.performQuickAction(
+            HomePetQuickActionRequest(
+                action: .feed,
+                petID: pet.id,
+                executorID: executorHuman.id.uuidString,
+                now: now
+            ),
+            actions: HomePetQuickActionActions(
             antiRepeatTitle: "Already logged",
             antiRepeatMessage: { "\($0.executorName) \($0.minutesAgo)" },
             openFeedDetail: { _, opensManualSheet in openedFeedDetail = opensManualSheet },
@@ -109,6 +116,7 @@ struct HomeCommandExecutorTests {
             openWaterManagement: { _ in },
             openMedication: { _ in },
             feedback: { feedbacks.append($0) }
+            )
         )
 
         let logs = try context.fetch(FetchDescriptor<PetCareLog>())
@@ -383,11 +391,14 @@ struct HomeCommandExecutorTests {
         let beforeRevision = revisionCenter.homeRevision.value
 
         func performQuickFeed(at date: Date) {
-            executor.performActionType(
-                "feed",
-                petID: pet.id,
-                executorId: executorHuman.id.uuidString,
-                now: date,
+            executor.performQuickAction(
+                HomePetQuickActionRequest(
+                    action: .feed,
+                    petID: pet.id,
+                    executorID: executorHuman.id.uuidString,
+                    now: date
+                ),
+                actions: HomePetQuickActionActions(
                 antiRepeatTitle: "Already logged",
                 antiRepeatMessage: { "\($0.executorName) \($0.minutesAgo)" },
                 openFeedDetail: { _, _ in },
@@ -398,6 +409,7 @@ struct HomeCommandExecutorTests {
                 openWaterManagement: { _ in },
                 openMedication: { _ in },
                 feedback: { feedbacks.append($0) }
+                )
             )
         }
 
@@ -443,11 +455,14 @@ struct HomeCommandExecutorTests {
         var antiRepeatAlerts: [(String, String)] = []
         var feedbacks: [ExpandedQuickActionExecutor.Feedback] = []
 
-        executor.performActionType(
-            "feed",
-            petID: pet.id,
-            executorId: "human-2",
-            now: now,
+        executor.performQuickAction(
+            HomePetQuickActionRequest(
+                action: .feed,
+                petID: pet.id,
+                executorID: "human-2",
+                now: now
+            ),
+            actions: HomePetQuickActionActions(
             antiRepeatTitle: "Already logged",
             antiRepeatMessage: { "\($0.executorName) \($0.minutesAgo)" },
             openFeedDetail: { _, _ in },
@@ -458,6 +473,7 @@ struct HomeCommandExecutorTests {
             openWaterManagement: { _ in },
             openMedication: { _ in },
             feedback: { feedbacks.append($0) }
+            )
         )
 
         let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
@@ -865,11 +881,14 @@ struct HomeCommandExecutorTests {
         var feedbacks: [ExpandedQuickActionExecutor.Feedback] = []
         let beforeRevision = revisionCenter.homeRevision.value
 
-        executor.performActionType(
-            "play",
-            petID: pet.id,
-            executorId: executorHuman.id.uuidString,
-            now: makeDate(year: 2026, month: 6, day: 8, hour: 18, minute: 0),
+        executor.performQuickAction(
+            HomePetQuickActionRequest(
+                action: .play,
+                petID: pet.id,
+                executorID: executorHuman.id.uuidString,
+                now: makeDate(year: 2026, month: 6, day: 8, hour: 18, minute: 0)
+            ),
+            actions: HomePetQuickActionActions(
             antiRepeatTitle: "Already logged",
             antiRepeatMessage: { "\($0.executorName) \($0.minutesAgo)" },
             openFeedDetail: { _, _ in },
@@ -878,6 +897,7 @@ struct HomeCommandExecutorTests {
             openWaterManagement: { _ in },
             openMedication: { _ in },
             feedback: { feedbacks.append($0) }
+            )
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
@@ -2593,12 +2613,14 @@ struct HomeCommandExecutorTests {
         try context.save()
 
         let result = PlantCareCommandService.recordCare(
-            .watering,
-            plant: plant,
-            executorId: "human-1",
+            PlantCareCommandRequest(
+                careType: .watering,
+                plant: plant,
+                executorID: "human-1",
+                now: now
+            ),
             context: context,
-            now: now,
-            syncCarePlan: false
+            options: PlantCareCommandOptions(syncCarePlan: false)
         )
 
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
@@ -2636,11 +2658,13 @@ struct HomeCommandExecutorTests {
 
         let beforeRevision = revisionCenter.homeRevision.value
         let result = PlantCareCommandExecutor(context: context, revisionCenter: revisionCenter).recordCare(
-            .fertilizing,
-            plant: plant,
-            executorId: "human-1",
+            PlantCareCommandRequest(
+                careType: .fertilizing,
+                plant: plant,
+                executorID: "human-1"
+            ),
             note: "test.plant.executor",
-            syncCarePlan: false
+            options: PlantCareCommandOptions(syncCarePlan: false)
         )
         let mutation = try #require(revisionCenter.lastMutation)
 
@@ -3014,14 +3038,16 @@ struct HomeCommandExecutorTests {
 
         for (index, type) in PlantCareType.allCases.enumerated() {
             PlantCareCommandService.recordCare(
-                type,
-                plant: plant,
-                executorId: nil,
+                PlantCareCommandRequest(
+                    careType: type,
+                    plant: plant,
+                    executorID: nil,
+                    now: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: index),
+                    careNote: "type.\(type.rawValue)",
+                    healthStatus: type == .yellowLeaf ? .watching : nil
+                ),
                 context: context,
-                now: makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: index),
-                careNote: "type.\(type.rawValue)",
-                healthStatus: type == .yellowLeaf ? .watching : nil,
-                syncCarePlan: false
+                options: PlantCareCommandOptions(syncCarePlan: false)
             )
         }
 
@@ -4916,7 +4942,7 @@ struct HomeCommandExecutorTests {
         }
 
         let date = Date(timeIntervalSince1970: 1_800_000_000)
-        let result = ExpenseCommandService.recordHumanExpense(
+        let result = try ExpenseCommandService.recordHumanExpense(
             human: human,
             amount: 12.5,
             date: date,
@@ -4976,7 +5002,7 @@ struct HomeCommandExecutorTests {
         }
 
         let date = Date(timeIntervalSince1970: 1_800_000_000)
-        let result = ExpenseCommandService.recordPetExpense(
+        let result = try ExpenseCommandService.recordPetExpense(
             pet: pet,
             amount: 36.8,
             date: date,
@@ -5038,7 +5064,7 @@ struct HomeCommandExecutorTests {
         }
 
         let date = Date(timeIntervalSince1970: 1_800_000_000)
-        let result = ExpenseCommandService.recordPetExpense(
+        let result = try ExpenseCommandService.recordPetExpense(
             pet: pet,
             amount: 88.8,
             date: date,
@@ -7354,7 +7380,7 @@ struct HomeCommandExecutorTests {
         #expect(weightDeleteMutation.note == "test.dashboard.weight.delete")
 
         let expenseCommand = DomainCommand.quickHumanExpense(humanID: human.id)
-        let expense = executor.recordHumanExpense(
+        let expense = try executor.recordHumanExpense(
             human: human,
             amount: 12.5,
             date: makeDate(year: 2026, month: 6, day: 11, hour: 9, minute: 0),
@@ -7398,7 +7424,7 @@ struct HomeCommandExecutorTests {
         let executor = DashboardRecordCommandExecutor(context: context, revisionCenter: revisionCenter)
         let beforeRevision = revisionCenter.homeRevision.value
         let missingExecutorID = UUID().uuidString
-        let result = executor.recordSharedPetExpense(
+        let result = try executor.recordSharedPetExpense(
             sourcePet: first,
             targets: [first, second],
             amount: 24,

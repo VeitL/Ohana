@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct HumanWorkoutSummaryView: View {
     let human: Human
@@ -135,6 +136,7 @@ struct HumanWorkoutSummaryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .islandToastOverlay()
     }
 
     private var healthConnectionCard: some View {
@@ -205,7 +207,7 @@ struct HumanWorkoutSummaryView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             HStack(spacing: 18) {
-                HumanWorkoutActivityRings(snapshot: healthManager.snapshot)
+                HumanWorkoutActivityRings(snapshot: healthManager.snapshot, l: l)
                     .frame(width: 136, height: 136)
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -517,7 +519,7 @@ struct HumanWorkoutSummaryView: View {
         let command = DomainCommand.humanWorkoutEntry(humanID: human.id)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            HumanCareCommandExecutor(context: modelContext, services: appServices).recordWorkout(
+            let result = HumanCareCommandExecutor(context: modelContext, services: appServices).recordWorkout(
                 human: human,
                 type: candidate.type,
                 durationMinutes: candidate.durationMinutes,
@@ -534,6 +536,7 @@ struct HumanWorkoutSummaryView: View {
                 command: command,
                 note: "human.workout.healthkit.import"
             )
+            presentWorkoutImportResult(result)
         }
     }
 
@@ -541,7 +544,7 @@ struct HumanWorkoutSummaryView: View {
         let command = DomainCommand.humanWorkoutEntry(humanID: human.id)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            HumanCareCommandExecutor(context: modelContext, services: appServices).recordWorkout(
+            let result = HumanCareCommandExecutor(context: modelContext, services: appServices).recordWorkout(
                 human: human,
                 type: matchedCandidate?.type ?? .walking,
                 durationMinutes: petWalk.durationMinutes,
@@ -559,7 +562,17 @@ struct HumanWorkoutSummaryView: View {
                 command: command,
                 note: "human.workout.petwalk.import"
             )
+            presentWorkoutImportResult(result)
         }
+    }
+
+    private func presentWorkoutImportResult(_ result: WorkoutCommandResult) {
+        let message = result.didPersist
+            ? l.tr(zh: "运动已导入", en: "Workout imported", de: "Training importiert")
+            : l.tr(zh: "导入失败，请重试", en: "Import failed. Try again.", de: "Import fehlgeschlagen. Erneut versuchen.")
+        UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
+        appServices.islandToasts.show(message)
+        UIAccessibility.post(notification: .announcement, argument: message)
     }
 
     private func deleteLog(_ log: HumanWorkoutLog) {
@@ -761,30 +774,55 @@ struct HumanWorkoutSummaryView: View {
 
 private struct HumanWorkoutActivityRings: View {
     let snapshot: HumanWorkoutHealthSnapshot
+    let l: L10n
 
+    @ViewBuilder
     var body: some View {
-        ZStack {
-            ActivityRing(
-                progress: progress(value: snapshot.activeEnergyKcal, goal: snapshot.moveGoalKcal),
-                color: .goRed,
-                lineWidth: 18,
-                inset: 0
-            )
-            ActivityRing(
-                progress: progress(value: snapshot.exerciseMinutes, goal: snapshot.exerciseGoalMinutes),
-                color: .goPrimary,
-                lineWidth: 18,
-                inset: 25
-            )
-            ActivityRing(
-                progress: progress(value: snapshot.standHours, goal: snapshot.standGoalHours),
-                color: .goCardCyan,
-                lineWidth: 18,
-                inset: 50
-            )
+        if snapshot.hasCompleteActivityGoals {
+            ZStack {
+                ActivityRing(
+                    progress: progress(value: snapshot.activeEnergyKcal, goal: snapshot.moveGoalKcal),
+                    color: .goRed,
+                    lineWidth: 18,
+                    inset: 0
+                )
+                ActivityRing(
+                    progress: progress(value: snapshot.exerciseMinutes, goal: snapshot.exerciseGoalMinutes),
+                    color: .goPrimary,
+                    lineWidth: 18,
+                    inset: 25
+                )
+                ActivityRing(
+                    progress: progress(value: snapshot.standHours, goal: snapshot.standGoalHours),
+                    color: .goCardCyan,
+                    lineWidth: 18,
+                    inset: 50
+                )
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(l.tr(zh: "活动环", en: "Activity rings", de: "Aktivitätsringe"))
+        } else {
+            VStack(spacing: 7) {
+                Image(systemName: "circle.dotted") // a11y: allow decorative unavailable-state glyph; adjacent text carries the status.
+                    .font(OhanaFont.metric(size: 30))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+                    .accessibilityHidden(true)
+                Text(l.tr(zh: "活动目标暂不可读取", en: "Activity goals unavailable", de: "Aktivitätsziele nicht verfügbar"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.78)
+                Text(l.tr(zh: "数值仍从 Apple Health 同步", en: "Values still sync from Apple Health", de: "Werte werden weiter synchronisiert"))
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.74)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("human-workout-activity-goals-unavailable")
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Activity rings")
     }
 
     private func progress(value: Int, goal: Int) -> Double {

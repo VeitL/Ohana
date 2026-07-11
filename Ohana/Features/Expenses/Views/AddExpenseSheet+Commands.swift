@@ -33,43 +33,55 @@ extension AddExpenseSheetContent {
             let executor = DashboardRecordCommandExecutor(context: modelContext, services: appServices)
             let coconutDelta: Int
             let savedLogID: UUID?
-            if savedTargets.count > 1 {
-                let result = executor.recordSharedPetExpense(
-                    sourcePet: pet,
-                    targets: savedTargets,
-                    amount: amount,
-                    date: savedDate,
-                    category: savedCategory,
-                    note: cleanNote,
-                    executorId: payerId,
-                    source: .detail,
-                    command: command,
-                    revisionNote: "dashboard.expense.sharedEntry"
-                )
-                guard result.didWriteFact else {
-                    isSaving = false
-                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                    return
+            do {
+                if savedTargets.count > 1 {
+                    let result = try executor.recordSharedPetExpense(
+                        sourcePet: pet,
+                        targets: savedTargets,
+                        amount: amount,
+                        date: savedDate,
+                        category: savedCategory,
+                        note: cleanNote,
+                        executorId: payerId,
+                        source: .detail,
+                        command: command,
+                        revisionNote: "dashboard.expense.sharedEntry"
+                    )
+                    guard result.didWriteFact else {
+                        isSaving = false
+                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                        return
+                    }
+                    coconutDelta = result.coconutDelta
+                    savedLogID = result.expenseLogIDs.first
+                } else {
+                    let result = try executor.recordPetExpense(
+                        pet: pet,
+                        amount: amount,
+                        date: savedDate,
+                        category: savedCategory,
+                        note: cleanNote,
+                        executorId: payerId,
+                        source: .detail,
+                        receiptTitle: savedReceiptTitle,
+                        receiptCategory: savedReceiptCategory,
+                        receiptAttachments: savedReceiptDrafts,
+                        command: command,
+                        revisionNote: "dashboard.expense.entry"
+                    )
+                    coconutDelta = result.coconutDelta
+                    savedLogID = result.logID
                 }
-                coconutDelta = result.coconutDelta
-                savedLogID = result.expenseLogIDs.first
-            } else {
-                let result = executor.recordPetExpense(
-                    pet: pet,
-                    amount: amount,
-                    date: savedDate,
-                    category: savedCategory,
-                    note: cleanNote,
-                    executorId: payerId,
-                    source: .detail,
-                    receiptTitle: savedReceiptTitle,
-                    receiptCategory: savedReceiptCategory,
-                    receiptAttachments: savedReceiptDrafts,
-                    command: command,
-                    revisionNote: "dashboard.expense.entry"
-                )
-                coconutDelta = result.coconutDelta
-                savedLogID = result.logID
+            } catch {
+                saveErrorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? l.tr(
+                        zh: "费用保存失败，请检查金额后重试。",
+                        en: "Could not save the expense. Check the amount and try again.",
+                        de: "Die Ausgabe konnte nicht gespeichert werden. Prüfe den Betrag und versuche es erneut."
+                    )
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
             }
             SharedPetSelectionMemory.saveSelection(
                 Set(savedTargets.map(\.id)),

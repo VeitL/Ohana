@@ -304,59 +304,23 @@ extension CareEventService {
     }
 
     func recordSharedCare(
-        sourcePet: Pet,
-        targets: [Pet],
-        type: CareType,
-        actionKind: SharedCareActionKind,
-        context: ModelContext,
-        executorId: String?,
-        reward: DomainCareRewardAction,
-        rewardTitle: String?,
-        quality: DomainCareRewardQuality,
-        date: Date,
-        source: CareLedgerSource
+        _ request: SharedCareRecordRequest,
+        context: ModelContext
     ) -> (humanGot: Int, petGot: Int) {
         CareEventService.recordSharedCare(
-            sourcePet: sourcePet,
-            targets: targets,
-            type: type,
-            actionKind: actionKind,
+            request,
             context: context,
-            executorId: executorId,
-            reward: reward,
-            rewardTitle: rewardTitle,
-            quality: quality,
-            date: date,
-            source: source,
             dependencies: dependencies
         )
     }
 
     func recordSharedCareFact(
-        sourcePet: Pet,
-        targets: [Pet],
-        type: CareType,
-        actionKind: SharedCareActionKind,
-        context: ModelContext,
-        executorId: String?,
-        reward: DomainCareRewardAction,
-        rewardTitle: String?,
-        quality: DomainCareRewardQuality,
-        date: Date,
-        source: CareLedgerSource
+        _ request: SharedCareRecordRequest,
+        context: ModelContext
     ) -> SharedPetActionResult {
         CareEventService.recordSharedCareFact(
-            sourcePet: sourcePet,
-            targets: targets,
-            type: type,
-            actionKind: actionKind,
+            request,
             context: context,
-            executorId: executorId,
-            reward: reward,
-            rewardTitle: rewardTitle,
-            quality: quality,
-            date: date,
-            source: source,
             dependencies: dependencies
         )
     }

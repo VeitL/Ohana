@@ -59,11 +59,14 @@ struct FocusHomeCardContextMenu: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let petID = pet.id
         commandQueue.enqueue(.quickCare(entityID: petID, action: "feed")) {
-            commandExecutor.performActionType(
-                "feed",
-                petID: petID,
-                executorId: currentUserId,
-                now: Date(),
+            commandExecutor.performQuickAction(
+                HomePetQuickActionRequest(
+                    action: .feed,
+                    petID: petID,
+                    executorID: currentUserId,
+                    now: Date()
+                ),
+                actions: HomePetQuickActionActions(
                 antiRepeatTitle: l.tr(zh: "近期已喂食", en: "Recently fed", de: "Kuerzlich gefuettert"),
                 antiRepeatMessage: { warning in
                     l.tr(
@@ -82,6 +85,7 @@ struct FocusHomeCardContextMenu: View {
                 },
                 openMedication: { _ in },
                 feedback: { _ in }
+                )
             )
         }
     }

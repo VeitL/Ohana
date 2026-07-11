@@ -330,6 +330,7 @@ actor HomeReadModelActor {
         let fetches = HomeReadModelFetches(context: modelContext, now: now)
         let pets = fetches.pets()
         let humans = fetches.humans()
+        let islandCoconutReserveBalance = fetches.islandCoconutReserveBalance()
         try Task.checkCancellation()
 
         let plants = input.loadPlants ? fetches.plants() : []
@@ -365,6 +366,7 @@ actor HomeReadModelActor {
         let source = VerticalSolidHomeSourceState(
             pets: pets,
             humans: humans,
+            islandCoconutReserveBalance: islandCoconutReserveBalance,
             plants: plants,
             electronicPets: electronicPets,
             events: events,
@@ -448,6 +450,15 @@ private nonisolated struct HomeReadModelFetches {
         )
         descriptor.fetchLimit = 40
         return fetchOrLog(descriptor, operation: "fetch home humans")
+    }
+
+    func islandCoconutReserveBalance() -> Int {
+        let accountKey = CoconutAccountKey.islandReserve
+        var descriptor = FetchDescriptor<CoconutAccount>(
+            predicate: #Predicate<CoconutAccount> { $0.accountKey == accountKey }
+        )
+        descriptor.fetchLimit = 1
+        return max(0, fetchOrLog(descriptor, operation: "fetch home island coconut reserve").first?.balance ?? 0)
     }
 
     func plants() -> [Plant] {

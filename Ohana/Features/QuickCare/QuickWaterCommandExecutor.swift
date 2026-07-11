@@ -468,18 +468,21 @@ struct QuickWaterCommandExecutor {
             emoji: CareType.waterChange.emoji,
             title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCareWaterChange, petName: pet.name)
         )
-        let recorded = careEvents.recordSharedCareFact(
+        let request = SharedCareRecordRequest(
             sourcePet: pet,
             targets: liveTargets,
-            type: .waterChange,
+            careType: .waterChange,
             actionKind: .waterChange,
-            context: context,
-            executorId: executorId,
+            executorID: executorId,
             reward: reward,
             rewardTitle: liveTargets.count > 1 ? DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.sharedWaterChange, count: liveTargets.count) : nil,
             quality: .none,
             date: Date(),
             source: .quickAction
+        )
+        let recorded = careEvents.recordSharedCareFact(
+            request,
+            context: context
         )
         guard recorded.didWriteFact, recorded.allowsDerivedEffects else {
             deriveWaterMutation(
@@ -541,18 +544,21 @@ struct QuickWaterCommandExecutor {
             emoji: CareType.filterClean.emoji,
             title: DomainCareRewardGeneralTitle.scoped(DomainCareRewardGeneralTitle.petCareFilterClean, petName: pet.name)
         )
-        let recorded = careEvents.recordSharedCareFact(
+        let request = SharedCareRecordRequest(
             sourcePet: pet,
             targets: liveTargets,
-            type: .filterClean,
+            careType: .filterClean,
             actionKind: .filterClean,
-            context: context,
-            executorId: executorId,
+            executorID: executorId,
             reward: reward,
             rewardTitle: liveTargets.count > 1 ? DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.sharedFilterClean, count: liveTargets.count) : nil,
             quality: .none,
             date: Date(),
             source: .quickAction
+        )
+        let recorded = careEvents.recordSharedCareFact(
+            request,
+            context: context
         )
         guard recorded.didWriteFact, recorded.allowsDerivedEffects else {
             deriveWaterMutation(
