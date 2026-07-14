@@ -37,6 +37,7 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
     let endDate: Date?
     let isAllDay: Bool
     let eventType: String
+    let taskCareKindRaw: String
     let relatedLink: DomainEntityLink
     let recurrenceDays: Int
     let recurrenceEndDate: Date?
@@ -59,6 +60,7 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
         reminderLeadMinutes: Int? = nil,
         reminderDates: [Date] = [],
         assigneeId: String? = nil,
+        taskCareKindRaw: String = "",
         writeKind: MemberWriteKind,
         source: DomainScheduleSourceKind = .userCommand
     ) {
@@ -67,6 +69,7 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
         self.endDate = endDate
         self.isAllDay = isAllDay
         self.eventType = eventType
+        self.taskCareKindRaw = taskCareKindRaw
         self.relatedLink = DomainEntityLink(rawType: relatedEntityType, rawId: relatedEntityId)
         self.recurrenceDays = recurrenceDays
         self.recurrenceEndDate = recurrenceDays > 0 ? recurrenceEndDate : nil
@@ -96,6 +99,7 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
             recurrenceDays: event.recurrenceDays,
             recurrenceEndDate: recurrenceEndDate ?? event.recurrenceEndDate,
             assigneeId: assigneeOverride.resolved(existing: event.assigneeId),
+            taskCareKindRaw: event.taskCareKindRaw,
             writeKind: writeKind,
             source: source
         )
@@ -115,6 +119,7 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
             reminderLeadMinutes: reminderLeadMinutes,
             reminderDates: explicitReminderDates,
             assigneeId: assigneeId,
+            taskCareKindRaw: taskCareKindRaw,
             writeKind: writeKind,
             source: source
         )
@@ -415,7 +420,8 @@ nonisolated enum DomainScheduleWriter {
             isAllDay: intent.isAllDay,
             eventType: intent.eventType,
             relatedEntityType: intent.relatedLink.rawType,
-            relatedEntityId: intent.relatedLink.rawId
+            relatedEntityId: intent.relatedLink.rawId,
+            taskCareKindRaw: intent.taskCareKindRaw
         )
         event.recurrenceDays = intent.recurrenceDays
         event.recurrenceEndDate = intent.recurrenceEndDate
@@ -441,6 +447,7 @@ nonisolated enum DomainScheduleWriter {
         event.relatedEntityType = authorizedIntent.relatedLink.rawType
         event.relatedEntityId = authorizedIntent.relatedLink.rawId
         event.eventType = authorizedIntent.eventType
+        event.taskCareKindRaw = authorizedIntent.taskCareKindRaw
         event.isAllDay = authorizedIntent.isAllDay
         event.assigneeId = authorizedIntent.assigneeId
         return true
@@ -584,6 +591,7 @@ nonisolated enum DomainScheduleWriter {
         mutation: AuthorizedDomainScheduleMutation,
         completedBy humanId: String?,
         completedAt: Date,
+        occurrenceDate: Date? = nil,
         context: ModelContext
     ) -> Bool {
         _ = mutation.token
@@ -593,7 +601,10 @@ nonisolated enum DomainScheduleWriter {
         reminder.completedAt = completedAt
         reminder.completedBy = humanId ?? ""
         if let event = reminder.event {
-            event.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
+            event.setOccurrenceMarkedComplete(
+                true,
+                on: occurrenceDate ?? reminder.resolvedOccurrenceAt
+            )
             CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: completedAt)
         }
         CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: completedAt)
@@ -650,7 +661,7 @@ nonisolated enum DomainScheduleWriter {
         reminder.completedAt = nil
         reminder.completedBy = humanId ?? ""
         if let event = reminder.event {
-            event.setOccurrenceMarkedComplete(false, on: reminder.scheduledAt)
+            event.setOccurrenceMarkedComplete(false, on: reminder.resolvedOccurrenceAt)
             CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: reopenedAt)
         }
         CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: reopenedAt)
@@ -669,12 +680,13 @@ nonisolated enum DomainScheduleWriter {
         _ = mutation.token
         mutation.mutationPlan.consumeAuthorization()
         guard mutation.writesContent else { return false }
-        let occurrenceDate = reminder.scheduledAt
+        let occurrenceDate = reminder.resolvedOccurrenceAt
         reminder.statusEnum = .pending
         reminder.completedAt = nil
         reminder.completedBy = humanId ?? ""
         if let newScheduledAt {
             reminder.scheduledAt = newScheduledAt
+            reminder.occurrenceAt = newScheduledAt
         }
         if let event = reminder.event {
             event.setOccurrenceMarkedComplete(false, on: occurrenceDate)
@@ -714,7 +726,11 @@ nonisolated enum DomainScheduleWriter {
     ) -> [Reminder] {
         if !intent.explicitReminderDates.isEmpty {
             return intent.explicitReminderDates.prefix(maxReminderOccurrences).map { scheduled in
-                let reminder = Reminder(event: event, scheduledAt: scheduled)
+                let reminder = Reminder(
+                    event: event,
+                    scheduledAt: scheduled,
+                    occurrenceAt: scheduled
+                )
                 context.insert(reminder)
                 return reminder
             }
@@ -726,7 +742,11 @@ nonisolated enum DomainScheduleWriter {
             var safetyCount = 0
             while cursor <= recurrenceEndDate, safetyCount < maxReminderOccurrences {
                 let scheduled = calendar.date(byAdding: .minute, value: -leadMinutes, to: cursor) ?? cursor
-                let reminder = Reminder(event: event, scheduledAt: scheduled)
+                let reminder = Reminder(
+                    event: event,
+                    scheduledAt: scheduled,
+                    occurrenceAt: cursor
+                )
                 context.insert(reminder)
                 reminders.append(reminder)
 
@@ -741,7 +761,11 @@ nonisolated enum DomainScheduleWriter {
         }
 
         let scheduled = calendar.date(byAdding: .minute, value: -leadMinutes, to: intent.startDate) ?? intent.startDate
-        let reminder = Reminder(event: event, scheduledAt: scheduled)
+        let reminder = Reminder(
+            event: event,
+            scheduledAt: scheduled,
+            occurrenceAt: intent.startDate
+        )
         context.insert(reminder)
         return [reminder]
     }

@@ -44,6 +44,7 @@ struct TodayFocusCard: View {
     var onTapNegativeSignal: (IslandNegativeSignal) -> Void = { _ in }
     var onTapOasis: () -> Void = {}
     var onTapFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void = { _ in }
+    var onPerformFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void = { _ in }
     var onOpenExchange: (TodayFocusExchangeRequestSnapshot) -> Void = { _ in }
     var onConfirmExchange: (TodayFocusExchangeRequestSnapshot) -> Void = { _ in }
     var freezesToFrontCard: Bool = false
@@ -76,6 +77,7 @@ struct TodayFocusCard: View {
         onTapNegativeSignal: @escaping (IslandNegativeSignal) -> Void = { _ in },
         onTapOasis: @escaping () -> Void = {},
         onTapFamilyTask: @escaping (TodayFocusFamilyTaskSnapshot) -> Void = { _ in },
+        onPerformFamilyTask: @escaping (TodayFocusFamilyTaskSnapshot) -> Void = { _ in },
         onOpenExchange: @escaping (TodayFocusExchangeRequestSnapshot) -> Void = { _ in },
         onConfirmExchange: @escaping (TodayFocusExchangeRequestSnapshot) -> Void = { _ in },
         freezesToFrontCard: Bool = false,
@@ -91,6 +93,7 @@ struct TodayFocusCard: View {
         self.onTapNegativeSignal = onTapNegativeSignal
         self.onTapOasis = onTapOasis
         self.onTapFamilyTask = onTapFamilyTask
+        self.onPerformFamilyTask = onPerformFamilyTask
         self.onOpenExchange = onOpenExchange
         self.onConfirmExchange = onConfirmExchange
         self.freezesToFrontCard = freezesToFrontCard
@@ -158,17 +161,17 @@ struct TodayFocusCard: View {
             indexedStatus(
                 current: pendingQuests.firstIndex { questSkipKey($0) == questSkipKey(quest) },
                 total: pendingQuests.count,
-                zh: "个任务",
-                en: "tasks",
-                de: "Aufgaben"
+                zh: "个成长引导",
+                en: "growth guides",
+                de: "Wachstum"
             )
         case let .familyTask(task):
             indexedStatus(
                 current: assignedFamilyTasks.firstIndex { familyTaskSkipKey($0) == familyTaskSkipKey(task) },
                 total: assignedFamilyTasks.count,
-                zh: "协作",
-                en: "collab",
-                de: "Team"
+                zh: "个待办",
+                en: "tasks",
+                de: "Aufgaben"
             )
         case let .coconutExchange(request):
             indexedStatus(

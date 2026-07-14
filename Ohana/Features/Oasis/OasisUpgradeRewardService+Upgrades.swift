@@ -177,7 +177,18 @@ extension OasisUpgradeRewardService {
         try saveRewardChanges(context: context)
     }
 
-    static func rewardFeaturedCritterFromCare(type: QuestManager.OhanaActionType, context: ModelContext) {
+    static func rewardFeaturedCritterFromCare(
+        type: QuestManager.OhanaActionType,
+        context: ModelContext,
+        idempotencyID: UUID? = nil
+    ) -> Bool {
+        if let idempotencyID {
+            var descriptor = FetchDescriptor<OasisCritterActionLog>(
+                predicate: #Predicate<OasisCritterActionLog> { $0.id == idempotencyID }
+            )
+            descriptor.fetchLimit = 1
+            if (try? context.fetch(descriptor).first) != nil { return true }
+        }
         let candidates = activeCritters(context: context)
             .sorted(by: {
                 if $0.isFeaturedOnOasis != $1.isFeaturedOnOasis { return $0.isFeaturedOnOasis && !$1.isFeaturedOnOasis }
@@ -187,7 +198,7 @@ extension OasisUpgradeRewardService {
         guard let critter = candidates.first(where: {
             normalizeLifecycle(for: $0, context: context)
             return $0.lifeState != .dead
-        }) else { return }
+        }) else { return true }
 
         let gain = careEchoGain(for: type)
         let xpDelta = addXP(gain.xp, to: critter)
@@ -204,12 +215,14 @@ extension OasisUpgradeRewardService {
         critter.appearanceStage = appearanceStage(forLevel: critter.level)
         critter.lastStateRefreshAt = Date()
         refreshLifecycleState(for: critter, now: Date())
-        context.insert(actionLog(
+        let log = actionLog(
             for: critter,
             action: .careEcho,
             xpDelta: xpDelta
-        ))
-        _ = saveRewardChangesIfNeeded(context: context)
+        )
+        if let idempotencyID { log.id = idempotencyID }
+        context.insert(log)
+        return saveRewardChangesIfNeeded(context: context)
     }
 
     static func careEchoGain(for type: QuestManager.OhanaActionType) -> (xp: Int, bond: Int, mood: Int, health: Int) {

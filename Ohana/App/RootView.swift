@@ -21,6 +21,7 @@ struct RootView: View {
     @State private var onboardingFirstPetID: String?
     @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
+    @StateObject private var sharedCareUndo = SharedCareUndoCoordinator.shared
     @State private var plantBatchCareRewardSettlementTask: Task<Void, Never>?
     @State private var plantBatchCareRewardRetryAfterFailure: Date?
     @State private var automaticBackupReminderTask: Task<Void, Never>?
@@ -48,6 +49,20 @@ struct RootView: View {
                 .zIndex(100)
             }
 
+            if let snapshot = sharedCareUndo.banner {
+                VStack {
+                    Spacer()
+                    SharedCareUndoBannerView(
+                        snapshot: snapshot,
+                        undo: sharedCareUndo.undoCurrent
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 18)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(900)
+            }
+
             if shouldShowPrivacySnapshotCover {
                 AppPrivacySnapshotCover()
                     .zIndex(1000)
@@ -57,11 +72,13 @@ struct RootView: View {
         .toggleStyle(OhanaPillToggleStyle())
         .islandToastOverlay()
         .onAppear {
+            sharedCareUndo.configure(context: modelContext, appServices: appServices)
             startupMaintenance.startAfterFirstRender(context: modelContext)
             schedulePlantBatchCareRewardSettlement()
             scheduleAutomaticBackupFailureReminder()
         }
         .onDisappear {
+            sharedCareUndo.pauseDeadlineTimer()
             startupMaintenance.cancel()
             plantBatchCareRewardSettlementTask?.cancel()
             plantBatchCareRewardSettlementTask = nil
@@ -86,9 +103,11 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             appSwitcherSnapshotCoverRequested = true
+            sharedCareUndo.pauseDeadlineTimer()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             appSwitcherSnapshotCoverRequested = false
+            sharedCareUndo.recover()
             schedulePlantBatchCareRewardSettlement()
             scheduleAutomaticBackupFailureReminder()
         }

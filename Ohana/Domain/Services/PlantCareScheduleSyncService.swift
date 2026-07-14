@@ -47,6 +47,22 @@ struct PlantCareScheduleSyncResult: Equatable {
         action != .persistenceFailed
     }
 
+    /// Schedule state may advance only after a generated care plan has either
+    /// produced its durable fact or found the same care fact already present.
+    /// Non-generated events remain ordinary calendar/reminder items.
+    var allowsScheduleCompletion: Bool {
+        switch action {
+        case .wroteCareFact, .skippedExistingCare, .notGeneratedPlantPlan:
+            true
+        case .wroteSkipFeedback, .noPlantTarget, .unsupportedCareType, .unauthorized, .persistenceFailed:
+            false
+        }
+    }
+
+    var didWriteCareFact: Bool {
+        action == .wroteCareFact
+    }
+
     static func persistenceFailed(
         plantID: UUID?,
         careType: PlantCareType?,
@@ -65,8 +81,26 @@ struct PlantCareScheduleSyncResult: Equatable {
 
 @MainActor
 enum PlantCareScheduleSyncService {
+    private struct CompletedCarePersistenceContext {
+        let event: Event
+        let plant: Plant
+        let careType: PlantCareType
+        let careDate: Date
+        let executorID: String?
+        let source: CareLedgerSource
+        let sourceReminderID: UUID?
+        let now: Date
+        let modelContext: ModelContext
+        let careLedger: CareLedgerRecording
+        let scheduleNotifications: Bool
+        let syncPlanSchedule: Bool
+    }
+
     static func careType(for event: Event) -> PlantCareType? {
-        switch EventType(rawValue: event.eventType) {
+        if !event.taskCareKindRaw.isEmpty {
+            return TaskCareKind(rawValue: event.taskCareKindRaw)?.plantCareType
+        }
+        return switch EventType(rawValue: event.eventType) {
         case .watering:
             .watering
         case .fertilizing:
@@ -94,7 +128,36 @@ enum PlantCareScheduleSyncService {
     }
 
     static func isPlantCareEvent(_ event: Event) -> Bool {
-        PlantReminderPreferenceStore.isGeneratedPlantCareEvent(event)
+        if !event.taskCareKindRaw.isEmpty {
+            return TaskCareKind(rawValue: event.taskCareKindRaw)?.plantCareType != nil
+        }
+        return PlantReminderPreferenceStore.isGeneratedPlantCareEvent(event)
+    }
+
+    static func hasCompletedCareFact(
+        for event: Event,
+        occurrenceDate: Date,
+        context: ModelContext
+    ) -> Bool {
+        guard isPlantCareEvent(event),
+              let type = careType(for: event),
+              let plantID = DomainEntityLinkRegistry.plantId(for: event) else { return false }
+        let eventID = event.id.uuidString
+        let eventKind = CareLedgerEventKind.plantCare.rawValue
+        let actionType = type.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { ledger in
+                ledger.sourceEventId == eventID &&
+                    ledger.eventKind == eventKind &&
+                    ledger.actionType == actionType
+            }
+        )
+        descriptor.fetchLimit = 20
+        let calendar = Calendar.current
+        return ((try? context.fetch(descriptor)) ?? []).contains { ledger in
+            ledger.subjectId == plantID.uuidString &&
+                calendar.isDate(ledger.occurredAt, inSameDayAs: occurrenceDate)
+        }
     }
 
     @discardableResult
@@ -107,7 +170,8 @@ enum PlantCareScheduleSyncService {
         sourceReminderId: UUID? = nil,
         now: Date = Date(),
         careLedger providedCareLedger: CareLedgerRecording? = nil,
-        scheduleNotifications: Bool = true
+        scheduleNotifications: Bool = true,
+        syncPlanSchedule: Bool = true
     ) -> PlantCareScheduleSyncResult {
         guard isPlantCareEvent(event) else {
             return PlantCareScheduleSyncResult(
@@ -138,7 +202,8 @@ enum PlantCareScheduleSyncService {
             )
         }
         let careDate = Event.dateMergingTime(from: event.startDate, ontoOccurrenceDay: occurrenceDate)
-        if hasExistingCare(type, plantID: plant.id, on: careDate, context: context) {
+        if hasCompletedCareFact(for: event, occurrenceDate: occurrenceDate, context: context) ||
+            hasExistingCare(type, plantID: plant.id, on: careDate, context: context) {
             return PlantCareScheduleSyncResult(
                 action: .skippedExistingCare,
                 plantID: plant.id,
@@ -174,74 +239,100 @@ enum PlantCareScheduleSyncService {
             careType: type
         )
         DomainEffectDispatcher.run(plan: plan) { actor in
-            applyCareDate(careDate, type: type, to: plant)
-            let log = PlantCareLog(
-                date: careDate,
-                careType: type,
-                note: scheduleCompletionNote(for: event),
-                executorId: actor.effectiveExecutorId
-            )
-            log.plant = plant
-            context.insert(log)
-            CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
-            let ledger = (providedCareLedger ?? CareLedgerService()).record(
-                occurredAt: careDate,
-                actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
-                actorId: actor.effectiveExecutorId,
-                subjectKind: .plant,
-                subjectId: plant.id.uuidString,
-                eventKind: .plantCare,
-                actionType: type.rawValue,
-                amountValue: 0,
-                amountUnit: "",
-                note: log.note,
-                source: source,
-                sourceEventId: event.id.uuidString,
-                sourceReminderId: sourceReminderId?.uuidString,
-                legacyModelName: "PlantCareLog",
-                legacyModelId: log.id.uuidString,
-                coconutDelta: 0,
-                rewardLogId: nil,
-                privacyFieldRaw: nil,
-                metadataJSON: "{\"scheduleCompletion\":true}",
-                context: context,
-                save: false
-            )
-            let saveResult = context.safeSaveResult(publishFailureEvent: true)
-            guard saveResult.didSave else {
-                context.rollback()
-                result = .persistenceFailed(
-                    plantID: plant.id,
+            result = persistCompletedCare(
+                CompletedCarePersistenceContext(
+                    event: event,
+                    plant: plant,
                     careType: type,
-                    errorDescription: saveResult.errorDescription
+                    careDate: careDate,
+                    executorID: actor.effectiveExecutorId,
+                    source: source,
+                    sourceReminderID: sourceReminderId,
+                    now: now,
+                    modelContext: context,
+                    careLedger: providedCareLedger ?? CareLedgerService(),
+                    scheduleNotifications: scheduleNotifications,
+                    syncPlanSchedule: syncPlanSchedule
                 )
-                return
-            }
-            PlantCarePlanScheduleService.sync(
-                plant: plant,
-                context: context,
-                now: now,
-                scheduleNotifications: scheduleNotifications
-            )
-            result = PlantCareScheduleSyncResult(
-                action: .wroteCareFact,
-                plantID: plant.id,
-                logID: log.id,
-                ledgerEventID: ledger.id,
-                careType: type
             )
         }
         return result
     }
 
+    private static func persistCompletedCare(
+        _ persistence: CompletedCarePersistenceContext
+    ) -> PlantCareScheduleSyncResult {
+        let plant = persistence.plant
+        let context = persistence.modelContext
+        applyCareDate(persistence.careDate, type: persistence.careType, to: plant)
+        let log = PlantCareLog(
+            date: persistence.careDate,
+            careType: persistence.careType,
+            note: scheduleCompletionNote(for: persistence.event),
+            executorId: persistence.executorID
+        )
+        log.plant = plant
+        context.insert(log)
+        CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: persistence.now)
+        let ledger = persistence.careLedger.record(
+            occurredAt: persistence.careDate,
+            actorKind: persistence.executorID == nil ? .unknown : .human,
+            actorId: persistence.executorID,
+            subjectKind: .plant,
+            subjectId: plant.id.uuidString,
+            eventKind: .plantCare,
+            actionType: persistence.careType.rawValue,
+            amountValue: 0,
+            amountUnit: "",
+            note: log.note,
+            source: persistence.source,
+            sourceEventId: persistence.event.id.uuidString,
+            sourceReminderId: persistence.sourceReminderID?.uuidString,
+            legacyModelName: "PlantCareLog",
+            legacyModelId: log.id.uuidString,
+            coconutDelta: 0,
+            rewardLogId: nil,
+            privacyFieldRaw: nil,
+            metadataJSON: "{\"scheduleCompletion\":true}",
+            context: context,
+            save: false
+        )
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return .persistenceFailed(
+                plantID: plant.id,
+                careType: persistence.careType,
+                errorDescription: saveResult.errorDescription
+            )
+        }
+        if persistence.syncPlanSchedule {
+            PlantCarePlanScheduleService.sync(
+                plant: plant,
+                context: context,
+                now: persistence.now,
+                scheduleNotifications: persistence.scheduleNotifications
+            )
+        }
+        return PlantCareScheduleSyncResult(
+            action: .wroteCareFact,
+            plantID: plant.id,
+            logID: log.id,
+            ledgerEventID: ledger.id,
+            careType: persistence.careType
+        )
+    }
+
     @discardableResult
     static func syncCompletedReminder(
         _ reminder: Reminder,
+        occurrenceDate: Date? = nil,
         executorId: String?,
         context: ModelContext,
         now: Date = Date(),
         careLedger providedCareLedger: CareLedgerRecording? = nil,
-        scheduleNotifications: Bool = true
+        scheduleNotifications: Bool = true,
+        syncPlanSchedule: Bool = true
     ) -> PlantCareScheduleSyncResult {
         guard let event = reminder.event else {
             return PlantCareScheduleSyncResult(
@@ -254,13 +345,31 @@ enum PlantCareScheduleSyncService {
         }
         return syncCompletedEvent(
             event,
-            occurrenceDate: reminder.scheduledAt,
+            occurrenceDate: occurrenceDate ?? reminder.scheduledAt,
             executorId: executorId,
             context: context,
             source: .reminder,
             sourceReminderId: reminder.id,
             now: now,
             careLedger: providedCareLedger,
+            scheduleNotifications: scheduleNotifications,
+            syncPlanSchedule: syncPlanSchedule
+        )
+    }
+
+    static func syncPlanAfterCompletion(
+        _ result: PlantCareScheduleSyncResult,
+        context: ModelContext,
+        now: Date,
+        scheduleNotifications: Bool
+    ) {
+        guard result.allowsScheduleCompletion,
+              let plantID = result.plantID,
+              let plant = fetchPlant(id: plantID, context: context) else { return }
+        PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
             scheduleNotifications: scheduleNotifications
         )
     }

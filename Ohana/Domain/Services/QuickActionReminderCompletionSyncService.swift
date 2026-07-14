@@ -133,6 +133,28 @@ final class QuickActionReminderCompletionSyncService: QuickActionReminderComplet
         }
     }
 
+    /// Freezes the exact occurrence selected at fact-record time without mutating it.
+    /// Deferred shared-care finalization must use this identity instead of searching again.
+    @MainActor
+    static func nearestPetCareReminderOccurrence(
+        pet: Pet,
+        type: CareType,
+        context: ModelContext,
+        now: Date = Date()
+    ) -> SharedCareUndoReminderOccurrence? {
+        guard let reminder = nearestPetReminder(
+            pet: pet,
+            context: context,
+            now: now,
+            matches: { matchesCare($0, type: type) }
+        ) else { return nil }
+        return SharedCareUndoReminderOccurrence(
+            targetPetId: pet.id,
+            reminderId: reminder.id,
+            occurrenceAt: reminder.resolvedOccurrenceAt
+        )
+    }
+
     @discardableResult
     @MainActor
     static func completeNearestPetPottyReminder(
@@ -186,6 +208,24 @@ final class QuickActionReminderCompletionSyncService: QuickActionReminderComplet
         reminderCompletion providedReminderCompletion: ReminderCompleting?,
         matches: (Event) -> Bool
     ) -> Reminder? {
+        guard let selected = nearestPetReminder(
+            pet: pet,
+            context: context,
+            now: now,
+            matches: matches
+        ) else { return nil }
+        let reminderCompletion = providedReminderCompletion ?? DomainServiceDependencyRegistry.reminderCompletion(careLedger: CareLedgerService())
+        reminderCompletion.complete(selected, by: executorId, context: context)
+        return selected
+    }
+
+    @MainActor
+    private static func nearestPetReminder(
+        pet: Pet,
+        context: ModelContext,
+        now: Date,
+        matches: (Event) -> Bool
+    ) -> Reminder? {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: now)
         let end = calendar.date(byAdding: .day, value: 1, to: start) ?? now
@@ -218,9 +258,6 @@ final class QuickActionReminderCompletionSyncService: QuickActionReminderComplet
         let due = matched.filter { $0.scheduledAt <= now }
         let selected = due.max { $0.scheduledAt < $1.scheduledAt }
             ?? matched.min { $0.scheduledAt < $1.scheduledAt }
-        guard let selected else { return nil }
-        let reminderCompletion = providedReminderCompletion ?? DomainServiceDependencyRegistry.reminderCompletion(careLedger: CareLedgerService())
-        reminderCompletion.complete(selected, by: executorId, context: context)
         return selected
     }
 

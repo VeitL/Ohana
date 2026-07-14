@@ -16,10 +16,16 @@ struct AppPetRouteContainer: View {
 
     let id: UUID
     let initialTab: PetDetailTab
+    let onCreateCareTask: (TaskCreationPreset) -> Void
 
-    init(id: UUID, initialTab: PetDetailTab) {
+    init(
+        id: UUID,
+        initialTab: PetDetailTab,
+        onCreateCareTask: @escaping (TaskCreationPreset) -> Void = { _ in }
+    ) {
         self.id = id
         self.initialTab = initialTab
+        self.onCreateCareTask = onCreateCareTask
     }
 
     var body: some View {
@@ -28,7 +34,7 @@ struct AppPetRouteContainer: View {
                 if initialTab == .health {
                     PetHealthDetailView(pet: pet)
                 } else {
-                    PetBasicInfoDetailView(pet: pet)
+                    PetBasicInfoDetailView(pet: pet, onCreateCareTask: onCreateCareTask)
                 }
             } else if routeData.hasLoaded {
                 MemberProfileMissingEntityView(kind: "pet")
@@ -66,13 +72,16 @@ struct AppHumanRouteContainer: View {
 
     let id: UUID
     let onPresentCoconutLog: (CoconutLogSubject?) -> Void
+    let onOpenTasks: () -> Void
 
     init(
         id: UUID,
-        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in }
+        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in },
+        onOpenTasks: @escaping () -> Void = {}
     ) {
         self.id = id
         self.onPresentCoconutLog = onPresentCoconutLog
+        self.onOpenTasks = onOpenTasks
     }
 
     var body: some View {
@@ -85,7 +94,8 @@ struct AppHumanRouteContainer: View {
                     allPendingReminders: routeData.allPendingReminders,
                     allMeds: routeData.allMeds,
                     allReports: routeData.allReports,
-                    onPresentCoconutLog: onPresentCoconutLog
+                    onPresentCoconutLog: onPresentCoconutLog,
+                    onOpenTasks: onOpenTasks
                 )
             } else if routeData.hasLoaded {
                 MemberProfileMissingEntityView(kind: "human")

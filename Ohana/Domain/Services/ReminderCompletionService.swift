@@ -11,11 +11,30 @@ protocol ReminderCompleting {
     @discardableResult
     func complete(_ reminder: Reminder, by humanId: String?, context: ModelContext) -> Bool
     @discardableResult
+    func complete(
+        _ reminder: Reminder,
+        by humanId: String?,
+        occurrenceDate: Date,
+        context: ModelContext
+    ) -> Bool
+    @discardableResult
     func skip(_ reminder: Reminder, by humanId: String?, context: ModelContext) -> Bool
     @discardableResult
     func reopen(_ reminder: Reminder, by humanId: String?, context: ModelContext, reschedule: Bool) -> Bool
     @discardableResult
     func snoozeOneDay(_ reminder: Reminder, by humanId: String?, context: ModelContext, reschedule: Bool) -> Bool
+}
+
+extension ReminderCompleting {
+    @discardableResult
+    func complete(
+        _ reminder: Reminder,
+        by humanId: String?,
+        occurrenceDate _: Date,
+        context: ModelContext
+    ) -> Bool {
+        complete(reminder, by: humanId, context: context)
+    }
 }
 
 @MainActor
@@ -42,6 +61,24 @@ final class ReminderCompletionService: ReminderCompleting {
         Self.complete(
             reminder,
             by: humanId,
+            context: context,
+            careLedger: careLedger,
+            familyTasks: familyTasks,
+            notifications: notifications
+        )
+    }
+
+    @discardableResult
+    func complete(
+        _ reminder: Reminder,
+        by humanId: String?,
+        occurrenceDate: Date,
+        context: ModelContext
+    ) -> Bool {
+        Self.complete(
+            reminder,
+            by: humanId,
+            occurrenceDate: occurrenceDate,
             context: context,
             careLedger: careLedger,
             familyTasks: familyTasks,
@@ -84,6 +121,7 @@ final class ReminderCompletionService: ReminderCompleting {
     static func complete(
         _ reminder: Reminder,
         by humanId: String?,
+        occurrenceDate: Date? = nil,
         context: ModelContext,
         careLedger: CareLedgerRecording = CareLedgerService(),
         familyTasks providedFamilyTasks: FamilyTaskManaging? = nil,
@@ -92,45 +130,88 @@ final class ReminderCompletionService: ReminderCompleting {
     ) -> Bool {
         let familyTasks = providedFamilyTasks ?? DomainServiceDependencyRegistry.familyTasks()
         let now = Date()
+        if let occurrenceDate,
+           reminder.statusEnum == .completed,
+           reminder.event?.isOccurrenceMarkedComplete(on: occurrenceDate) == true {
+            // Deferred shared-care recovery may replay after the Reminder,
+            // linked FamilyTask and audit row committed together. Treat that
+            // exact occurrence as an idempotent success.
+            return true
+        }
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
             reminder: reminder,
             writeKind: .care,
             source: .domainService,
             context: context
-        ),
-            DomainScheduleWriter.completeReminder(
-                reminder,
-                mutation: mutation,
-                completedBy: humanId,
-                completedAt: now,
-                context: context
-            )
-        else {
+        ) else {
             return false
         }
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
-        guard saveResult.didSave else {
+        let plantCareSyncResult: PlantCareScheduleSyncResult?
+        if let event = reminder.event,
+           PlantCareScheduleSyncService.isPlantCareEvent(event) {
+            let result = PlantCareScheduleSyncService.syncCompletedReminder(
+                reminder,
+                occurrenceDate: occurrenceDate,
+                executorId: humanId,
+                context: context,
+                now: now,
+                careLedger: careLedger,
+                scheduleNotifications: schedulePlantCareNotifications,
+                syncPlanSchedule: false
+            )
+            guard result.allowsScheduleCompletion else { return false }
+            plantCareSyncResult = result
+        } else {
+            plantCareSyncResult = nil
+        }
+        guard DomainScheduleWriter.completeReminder(
+            reminder,
+            mutation: mutation,
+            completedBy: humanId,
+            completedAt: now,
+            occurrenceDate: occurrenceDate,
+            context: context
+        ) else {
+            return false
+        }
+        let familyTaskPreparation = FamilyTaskService.prepareCompletedReminder(
+            reminder,
+            completedBy: humanId,
+            context: context
+        )
+        guard familyTaskPreparation != .rejected else {
             context.rollback()
             return false
         }
-        PlantCareScheduleSyncService.syncCompletedReminder(
-            reminder,
-            executorId: humanId,
-            context: context,
-            now: now,
-            careLedger: careLedger,
-            scheduleNotifications: schedulePlantCareNotifications
-        )
-        cancelNotification(for: reminder, notifications: notifications)
-        runReminderEffects(
+        let didStageReminderEffects = stageReminderEffects(
             reminder,
             actionType: "complete",
             actorId: humanId,
             occurredAt: now,
             context: context,
             careLedger: careLedger
-        ) {
-            familyTasks.syncCompletedReminder(reminder, completedBy: humanId, context: context)
+        )
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            context.rollback()
+            return false
+        }
+        cancelNotification(for: reminder, notifications: notifications)
+        if didStageReminderEffects {
+            // A linked live task was staged and committed with the Reminder.
+            // Keep the injected callback only for adapters/spies when no
+            // canonical SwiftData task was linked.
+            if familyTaskPreparation == .notLinked {
+                familyTasks.syncCompletedReminder(reminder, completedBy: humanId, context: context)
+            }
+        }
+        if let plantCareSyncResult {
+            PlantCareScheduleSyncService.syncPlanAfterCompletion(
+                plantCareSyncResult,
+                context: context,
+                now: now,
+                scheduleNotifications: schedulePlantCareNotifications
+            )
         }
         return true
     }
@@ -333,6 +414,42 @@ final class ReminderCompletionService: ReminderCompleting {
                 source: .service,
                 context: context,
                 save: true
+            )
+        }
+    }
+
+    /// Stages the audit projection in the same save boundary as Reminder,
+    /// Event occurrence and linked FamilyTask. This makes deferred replay
+    /// crash-safe: recovery observes either the whole completion or none of it.
+    private static func stageReminderEffects(
+        _ reminder: Reminder,
+        actionType: String,
+        actorId: String?,
+        occurredAt: Date,
+        context: ModelContext,
+        careLedger: CareLedgerRecording
+    ) -> Bool {
+        guard let event = reminder.event,
+              let plan = DomainEffectWriteAuthorizer.authorizeSubjectEffect(
+                  subjectRequest: DomainSubjectResolutionRequest(event: event),
+                  occurredAt: occurredAt,
+                  writeKind: .care,
+                  source: .domainService,
+                  executorId: actorId,
+                  unresolvedAssigneePolicy: .drop,
+                  context: context,
+                  logPrefix: "ReminderCompletion:\(actionType)"
+              ) else {
+            return false
+        }
+        return DomainEffectDispatcher.run(plan: plan) { _ in
+            careLedger.recordReminderState(
+                reminder: reminder,
+                actionType: actionType,
+                actorId: actorId,
+                source: .service,
+                context: context,
+                save: false
             )
         }
     }

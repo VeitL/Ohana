@@ -31,6 +31,18 @@ protocol CareEventEconomyAwarding {
         executorId: String?
     ) -> (humanGot: Int, petGot: Int)
 
+    @discardableResult
+    func awardDeferredSharedCareAction(
+        type: DomainCareRewardAction,
+        pets: [Pet],
+        context: ModelContext,
+        quality: DomainCareRewardQuality,
+        title: String?,
+        executorId: String?,
+        date: Date,
+        idempotencyKey: String
+    ) -> (humanGot: Int, petGot: Int)
+
     func rewardMetadata(for reward: (humanGot: Int, petGot: Int)?) -> String
     func recordFirstMeal(actorId: String?, context: ModelContext)
     func clearCooldown(petId: UUID?, type: DomainCareRewardAction)
@@ -55,6 +67,27 @@ extension CareEventEconomyAwarding {
             date: date,
             executorId: executorId,
             careObjectKey: nil
+        )
+    }
+
+    @discardableResult
+    func awardDeferredSharedCareAction(
+        type: DomainCareRewardAction,
+        pets: [Pet],
+        context: ModelContext,
+        quality: DomainCareRewardQuality,
+        title: String?,
+        executorId: String?,
+        date _: Date,
+        idempotencyKey _: String
+    ) -> (humanGot: Int, petGot: Int) {
+        awardSharedCareAction(
+            type: type,
+            pets: pets,
+            context: context,
+            quality: quality,
+            title: title,
+            executorId: executorId
         )
     }
 }

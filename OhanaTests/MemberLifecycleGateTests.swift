@@ -1360,6 +1360,7 @@ struct MemberLifecycleGateTests {
         let assignee = Human(name: "Ava")
         let humanOwner = Human(name: "Mira")
         let pet = Pet(name: "Momo", species: "cat")
+        let plant = Plant(name: "Fern")
         let petMedication = PetMedication(name: "Drops", pet: pet)
         let humanMedication = HumanMedication(humanId: humanOwner.id.uuidString, name: "Vitamin")
         let scheduledAt = Date(timeIntervalSince1970: 1_800_004_600)
@@ -1377,18 +1378,29 @@ struct MemberLifecycleGateTests {
             relatedEntityType: DomainEntityLinkRegistry.humanMedicationPlan,
             relatedEntityId: humanMedication.id.uuidString
         )
+        let plantEvent = Event(
+            title: "Water Fern",
+            startDate: scheduledAt,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
         let petReminder = Reminder(event: petMedicationEvent, scheduledAt: scheduledAt)
         let humanReminder = Reminder(event: humanMedicationEvent, scheduledAt: scheduledAt)
+        let plantReminder = Reminder(event: plantEvent, scheduledAt: scheduledAt)
         context.insert(creator)
         context.insert(assignee)
         context.insert(humanOwner)
         context.insert(pet)
+        context.insert(plant)
         context.insert(petMedication)
         context.insert(humanMedication)
         context.insert(petMedicationEvent)
         context.insert(humanMedicationEvent)
+        context.insert(plantEvent)
         context.insert(petReminder)
         context.insert(humanReminder)
+        context.insert(plantReminder)
         try context.save()
 
         let petTask = try #require(FamilyTaskService.assignReminder(
@@ -1405,11 +1417,25 @@ struct MemberLifecycleGateTests {
             rewardCoconuts: 5,
             context: context
         ))
+        let plantTask = try #require(FamilyTaskService.assignReminder(
+            plantReminder,
+            to: assignee,
+            by: creator,
+            rewardCoconuts: 5,
+            context: context
+        ))
 
         #expect(petTask.relatedPetId == pet.id.uuidString)
+        #expect(petTask.subjectKind == .pet)
+        #expect(petTask.resolvedSubjectId == pet.id.uuidString)
         #expect(humanTask.relatedPetId == nil)
+        #expect(humanTask.subjectKind == .human)
+        #expect(humanTask.resolvedSubjectId == humanOwner.id.uuidString)
+        #expect(plantTask.subjectKind == .plant)
+        #expect(plantTask.resolvedSubjectId == plant.id.uuidString)
         #expect(petMedicationEvent.assigneeId == assignee.id.uuidString)
         #expect(humanMedicationEvent.assigneeId == assignee.id.uuidString)
+        #expect(plantEvent.assigneeId == assignee.id.uuidString)
 
         FamilyTaskService.submitForReview(humanTask, by: assignee, context: context)
 
@@ -1419,7 +1445,7 @@ struct MemberLifecycleGateTests {
         #expect(reviewLedger.subjectId == humanOwner.id.uuidString)
     }
 
-    @Test func familyTaskCreationRequiresFundedPositiveRewardAndDifferentAssignee() throws {
+    @Test func familyTaskCreationAllowsOptionalRewardAndRequiresDifferentAssignee() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let creator = Human(name: "Guan")
@@ -1492,7 +1518,8 @@ struct MemberLifecycleGateTests {
 
         #expect(missingCreator == nil)
         #expect(selfAssigned == nil)
-        #expect(zeroReward == nil)
+        #expect(zeroReward?.kind == .householdTask)
+        #expect(zeroReward?.rewardCoconuts == 0)
         #expect(underfunded == nil)
         #expect(emptyTitle == nil)
         #expect(created?.kind == .bounty)
@@ -1500,10 +1527,10 @@ struct MemberLifecycleGateTests {
         #expect(created?.createdById == creator.id.uuidString)
         #expect(created?.assignedToId == assignee.id.uuidString)
         #expect(CoconutWalletService.balance(for: creator, context: context) == 60)
-        #expect(try context.fetch(FetchDescriptor<FamilyCollaborationTask>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<FamilyCollaborationTask>()).count == 2)
     }
 
-    @Test func reminderAssignmentRequiresFundedPositiveRewardAndCreator() throws {
+    @Test func reminderAssignmentAllowsOptionalRewardAndRequiresCreator() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let creator = Human(name: "Guan")
@@ -1538,13 +1565,15 @@ struct MemberLifecycleGateTests {
             rewardCoconuts: 20,
             context: context
         ) == nil)
-        #expect(FamilyTaskService.assignReminder(
+        let unrewardedTask = FamilyTaskService.assignReminder(
             reminder,
             to: assignee,
             by: creator,
             rewardCoconuts: 0,
             context: context
-        ) == nil)
+        )
+        #expect(unrewardedTask?.kind == .careReminder)
+        #expect(unrewardedTask?.rewardCoconuts == 0)
         #expect(FamilyTaskService.assignReminder(
             reminder,
             to: assignee,
@@ -1575,12 +1604,13 @@ struct MemberLifecycleGateTests {
             )
         }
 
-        #expect(task?.rewardCoconuts == 40)
+        #expect(task?.id == unrewardedTask?.id)
+        #expect(task?.rewardCoconuts == 0)
         #expect(task?.createdById == creator.id.uuidString)
         #expect(task?.assignedToId == assignee.id.uuidString)
         #expect(event.assigneeId == assignee.id.uuidString)
         #expect(CoconutWalletService.balance(for: creator, context: context) == 40)
-        #expect(removedReward == false)
+        #expect(removedReward == true)
 
         let reassigned = FamilyTaskService.assignReminder(
             reminder,
@@ -1597,7 +1627,7 @@ struct MemberLifecycleGateTests {
         #expect(CoconutWalletService.balance(for: replacementCreator, context: context) == 30)
     }
 
-    @Test func householdTaskUpdateRejectsZeroOrUnderfundedReward() throws {
+    @Test func householdTaskUpdateAllowsRemovingRewardButRejectsUnderfundedReward() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let creator = Human(name: "Guan")
@@ -1662,7 +1692,7 @@ struct MemberLifecycleGateTests {
             context: context
         )
 
-        #expect(!removedReward)
+        #expect(removedReward)
         #expect(!underfunded)
         #expect(!reassignedToCreator)
         #expect(updated)
@@ -1804,6 +1834,131 @@ struct MemberLifecycleGateTests {
         #expect(!FamilyTaskService.submitForReview(claimedTask, by: outsider, context: context))
         #expect(FamilyTaskService.submitForReview(claimedTask, by: assignee, context: context))
         #expect(claimedTask.status == .pendingReview)
+    }
+
+    @Test func familyTaskSubjectLifecycleGateAndCompletionPreflightAreFailClosedAndReadOnly() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let creator = Human(name: "Publisher")
+        creator.coconutBalance = 100
+        let assignee = Human(name: "Assignee")
+        let activeHumanSubject = Human(name: "Ava")
+        let deceasedHumanSubject = Human(name: "Mira")
+        deceasedHumanSubject.passedAwayDate = Date(timeIntervalSince1970: 1_900_000_001)
+        let activePet = Pet(name: "Momo", species: "cat")
+        let deceasedPet = Pet(name: "Luna", species: "cat")
+        deceasedPet.passedAwayDate = Date(timeIntervalSince1970: 1_900_000_002)
+        let activePlant = Plant(name: "Fern")
+        let archivedPlant = Plant(name: "Palm")
+        archivedPlant.archivedAt = Date(timeIntervalSince1970: 1_900_000_003)
+
+        func task(
+            title: String,
+            subjectKind: FamilyCollaborationTaskSubjectKind,
+            subjectId: String?,
+            status: FamilyCollaborationTaskStatus = .active,
+            reward: Int = 0,
+            assigned: Bool = true
+        ) -> FamilyCollaborationTask {
+            FamilyCollaborationTask(
+                title: title,
+                kind: reward > 0 ? .bounty : .householdTask,
+                status: status,
+                subjectKind: subjectKind,
+                subjectId: subjectId,
+                createdById: creator.id.uuidString,
+                createdByName: creator.name,
+                assignedToId: assigned ? assignee.id.uuidString : nil,
+                assignedToName: assigned ? assignee.name : nil,
+                rewardCoconuts: reward
+            )
+        }
+
+        let householdTask = task(title: "Household", subjectKind: .household, subjectId: nil)
+        let humanTask = task(
+            title: "Human",
+            subjectKind: .human,
+            subjectId: activeHumanSubject.id.uuidString
+        )
+        let petTask = task(title: "Pet", subjectKind: .pet, subjectId: activePet.id.uuidString)
+        let plantTask = task(
+            title: "Plant",
+            subjectKind: .plant,
+            subjectId: activePlant.id.uuidString,
+            reward: 5
+        )
+        let invalidHumanTask = task(title: "Invalid", subjectKind: .human, subjectId: "not-a-uuid")
+        let claimableTask = task(
+            title: "Claimable",
+            subjectKind: .household,
+            subjectId: nil,
+            assigned: false
+        )
+        let deceasedHumanTask = task(
+            title: "Deceased human",
+            subjectKind: .human,
+            subjectId: deceasedHumanSubject.id.uuidString,
+            reward: 10,
+            assigned: false
+        )
+        let deceasedPetTask = task(
+            title: "Deceased pet",
+            subjectKind: .pet,
+            subjectId: deceasedPet.id.uuidString
+        )
+        let archivedPlantTask = task(
+            title: "Archived plant",
+            subjectKind: .plant,
+            subjectId: archivedPlant.id.uuidString,
+            status: .pendingReview,
+            reward: 5
+        )
+        [creator, assignee, activeHumanSubject, deceasedHumanSubject].forEach { context.insert($0) }
+        [activePet, deceasedPet].forEach { context.insert($0) }
+        [activePlant, archivedPlant].forEach { context.insert($0) }
+        [
+            householdTask, humanTask, petTask, plantTask, invalidHumanTask, claimableTask,
+            deceasedHumanTask, deceasedPetTask, archivedPlantTask
+        ].forEach { context.insert($0) }
+        try context.save()
+
+        #expect(FamilyTaskService.canComplete(householdTask, by: assignee, context: context))
+        #expect(FamilyTaskService.canComplete(humanTask, by: assignee, context: context))
+        #expect(FamilyTaskService.canComplete(petTask, by: assignee, context: context))
+        #expect(FamilyTaskService.canSubmitForReview(plantTask, by: assignee, context: context))
+        #expect(!FamilyTaskService.canComplete(invalidHumanTask, by: assignee, context: context))
+        #expect(!FamilyTaskService.canComplete(deceasedPetTask, by: assignee, context: context))
+        #expect(!FamilyTaskService.canSubmitForReview(archivedPlantTask, by: assignee, context: context))
+        #expect(FamilyTaskService.canClaim(claimableTask, by: assignee, context: context))
+        #expect(!FamilyTaskService.canClaim(deceasedHumanTask, by: assignee, context: context))
+
+        #expect(!FamilyTaskService.claim(deceasedHumanTask, by: assignee, context: context))
+        #expect(!FamilyTaskService.updateTask(
+            deceasedHumanTask,
+            title: "Still blocked",
+            note: "",
+            assignedTo: assignee,
+            rewardCoconuts: 10,
+            dueAt: nil,
+            emoji: "checkmark",
+            by: creator,
+            context: context
+        ))
+        #expect(!FamilyTaskService.complete(deceasedPetTask, by: assignee, context: context))
+        #expect(!FamilyTaskService.confirmCompletion(archivedPlantTask, by: creator, context: context))
+        #expect(!FamilyTaskService.rejectCompletion(archivedPlantTask, by: creator, context: context))
+
+        #expect(householdTask.status == .active)
+        #expect(humanTask.status == .active)
+        #expect(petTask.status == .active)
+        #expect(plantTask.status == .active)
+        #expect(claimableTask.status == .active)
+        #expect(claimableTask.claimedById == nil)
+        #expect(deceasedHumanTask.claimedById == nil)
+        #expect(deceasedPetTask.status == .active)
+        #expect(archivedPlantTask.status == .pendingReview)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(!context.hasChanges)
     }
 
     @Test func memberDeletionResultsUseDomainResolverForIndirectScheduleLinks() throws {
@@ -2722,9 +2877,39 @@ struct MemberLifecycleGateTests {
         }
         #expect(bountySource.contains("careLedgerEntries: [FamilyCareLedgerEntry]"))
         #expect(bountyRouteSource.contains("FamilyCareLedgerEntry.fetchPetEntries"))
-        #expect(crewRouteSource.contains("careLedgerEntries: FamilyCareLedgerEntry.fetchPetEntries"))
+        #expect(!crewRouteSource.contains("FamilyCareLedgerEntry.fetchPetEntries"))
+        #expect(!crewRouteSource.contains("FamilyCollaborationTask"))
+        #expect(!crewRouteSource.contains("FetchDescriptor<Reminder>"))
         #expect(collaborationSource.contains("careLedgerEntries.compactMap"))
         #expect(collaborationActivitySource.contains("careLedgerEntries.contains"))
+    }
+
+    @Test func crewRosterUsesOneMemberSurfaceAndHandsTasksToTheGlobalCenter() throws {
+        let rootURL = repositoryRootURL()
+        let routeSource = try source("Ohana/Features/CrewRoster/CrewRosterRouteContainer.swift", rootURL: rootURL)
+        let routesSource = try source("Ohana/Features/CrewRoster/CrewRosterRoutes.swift", rootURL: rootURL)
+        let overlaySource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift", rootURL: rootURL)
+        let presentationSource = try source("Ohana/Features/CrewRoster/Views/CrewRosterPresentationModifier.swift", rootURL: rootURL)
+
+        #expect(routesSource.contains("case collaboration"))
+        #expect(routesSource.contains("case members"))
+        #expect(overlaySource.contains("switch initialMode"))
+        #expect(overlaySource.contains("case .collaboration, .members:"))
+        #expect(overlaySource.contains("private var resolvedInitialMode: CrewRosterMode"))
+        #expect(!overlaySource.contains("crew-roster-mode-picker"))
+        #expect(!overlaySource.contains("FamilyCollaborationDashboardHost"))
+        #expect(!overlaySource.contains("collaborationEditorPresented"))
+        #expect(!overlaySource.contains("canPublishFamilyTask"))
+        #expect(!overlaySource.contains("pendingReminders"))
+        #expect(!overlaySource.contains("familyTasks"))
+        #expect(!overlaySource.contains("careLedgerEntries"))
+        #expect(routeSource.contains("var onOpenTaskCenter: (() -> Void)?"))
+        #expect(routeSource.contains("onOpenTaskCenter: onOpenTaskCenter"))
+        #expect(overlaySource.contains("l.tr(zh: \"查看待办\", en: \"View tasks\""))
+        #expect(overlaySource.contains(".accessibilityIdentifier(\"crew-roster-open-task-center\")"))
+        #expect(!routeSource.contains("FetchDescriptor<FamilyCollaborationTask>"))
+        #expect(!routeSource.contains("FetchDescriptor<Reminder>"))
+        #expect(!presentationSource.contains("CrewRosterSheetRoute"))
     }
 
     @Test func crewRosterUsesRouteScopedPetSummariesInsteadOfPetArchiveRelationships() throws {

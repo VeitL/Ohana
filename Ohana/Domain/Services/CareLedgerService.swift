@@ -13,6 +13,8 @@ nonisolated enum CareLedgerMetadata {
     static let feedFoodKind = "feedFoodKind"
     static let feedTreatKind = "feedTreatKind"
     static let sharedSessionId = "sharedSessionId"
+    static let careTransactionId = "careTransactionId"
+    static let batchID = "batchID"
     private static let legacyMetadataKey = "legacyMetadata"
 
     static func stringValue(named name: String, in metadataJSON: String) -> String? {

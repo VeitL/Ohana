@@ -4,6 +4,9 @@ import SwiftUI
 struct AddEventView: View {
     var onClose: (() -> Void)?
     var plants: [Plant] = []
+    var preselectedEntityType: String?
+    var preselectedEntityId: String?
+    var taskCreationPreset: TaskCreationPreset?
 
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
@@ -13,7 +16,10 @@ struct AddEventView: View {
             onClose: onClose,
             pets: pets,
             humans: humans,
-            plants: plants
+            plants: plants,
+            preselectedEntityType: preselectedEntityType,
+            preselectedEntityId: preselectedEntityId,
+            taskCreationPreset: taskCreationPreset
         )
     }
 }

@@ -48,6 +48,7 @@ extension TodayFocusCard {
                     Spacer(minLength: 0)
 
                     carouselPageIndicator(count: count, selected: selected)
+                        .padding(.leading, carouselTaskPrimaryAction(for: content) == nil ? 0 : 104)
                         .padding(.bottom, 2)
                 }
                 .padding(.leading, 18)
@@ -109,6 +110,23 @@ extension TodayFocusCard {
                 .padding(.trailing, 10)
                 .zIndex(2)
             }
+
+            if case let .familyTask(task) = content,
+               let action = task.primaryAction {
+                focusActionButton(
+                    icon: taskActionIcon(for: action),
+                    title: taskActionTitle(for: action),
+                    accent: task.hasReward ? Color.goTeal : Color.goPurple
+                ) {
+                    OhanaFeedback.medium()
+                    onPerformFamilyTask(task)
+                }
+                .accessibilityIdentifier("today-focus-task-action-\(task.id)")
+                .padding(.leading, 18)
+                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .zIndex(3)
+            }
         }
     }
 
@@ -136,7 +154,7 @@ extension TodayFocusCard {
             quest.title
         case let .familyTask(task):
             task.status == .pendingReview
-                ? l.tr(zh: "确认协作任务", en: "Review shared task", de: "Aufgabe prüfen")
+                ? l.tr(zh: "审核待办", en: "Review task", de: "Aufgabe prüfen")
                 : task.title
         case .coconutExchange:
             l.tr(zh: "确认线下收款", en: "Confirm cash received", de: "Zahlung bestätigen")
@@ -262,9 +280,6 @@ extension TodayFocusCard {
         let accent = task.hasReward ? Color.goTeal : Color.goPurple
         let rewardText = task.rewardCoconuts > 0 ? " · +\(task.rewardCoconuts)🥥" : ""
         let performer = task.completedByName ?? l.tr(zh: "对方", en: "Someone", de: "Jemand")
-        let actionTitle = task.status == .pendingReview
-            ? l.tr(zh: "去确认", en: "Review", de: "Prüfen")
-            : l.tr(zh: "去处理", en: "Open", de: "Öffnen")
         return HStack(spacing: 8) {
             Button {
                 OhanaFeedback.light()
@@ -291,13 +306,16 @@ extension TodayFocusCard {
             .buttonStyle(ScaleButtonStyle())
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            focusActionButton(
-                icon: task.status == .pendingReview ? "checkmark.seal.fill" : "arrow.right",
-                title: actionTitle,
-                accent: accent
-            ) {
-                OhanaFeedback.medium()
-                onTapFamilyTask(task)
+            if let action = task.primaryAction {
+                focusActionButton(
+                    icon: taskActionIcon(for: action),
+                    title: taskActionTitle(for: action),
+                    accent: accent
+                ) {
+                    OhanaFeedback.medium()
+                    onPerformFamilyTask(task)
+                }
+                .accessibilityIdentifier("today-focus-task-action-\(task.id)")
             }
         }
         .padding(.horizontal, TodayFocusCardLayout.contentHorizontalPadding)
@@ -410,8 +428,46 @@ extension TodayFocusCard {
                 de: "\(performer) · prüfen\(rewardText)"
             )
         }
+        if task.taskCenterItem.source == .event {
+            let subject = task.taskCenterItem.subjectName ?? l.tr(zh: "家庭", en: "Household", de: "Haushalt")
+            return l.tr(
+                zh: "\(subject) · 待完成",
+                en: "\(subject) · pending",
+                de: "\(subject) · offen"
+            )
+        }
         let target = task.assignedToName ?? task.claimedByName ?? l.tr(zh: "全家", en: "Open", de: "Offen")
         return "\(task.createdByName) → \(target)\(rewardText)"
+    }
+
+    func carouselTaskPrimaryAction(for content: TodayFocusContent) -> TaskCenterAvailableAction? {
+        guard case let .familyTask(task) = content else { return nil }
+        return task.primaryAction
+    }
+
+    func taskActionIcon(for action: TaskCenterAvailableAction) -> String {
+        switch action {
+        case .complete: "checkmark"
+        case .claim: "hand.raised.fill"
+        case .submitForReview: "paperplane.fill"
+        case .approve: "checkmark.seal.fill"
+        case .reject: "arrow.uturn.backward"
+        }
+    }
+
+    func taskActionTitle(for action: TaskCenterAvailableAction) -> String {
+        switch action {
+        case .complete:
+            l.tr(zh: "完成", en: "Done", de: "Fertig")
+        case .claim:
+            l.tr(zh: "领取", en: "Claim", de: "Annehmen")
+        case .submitForReview:
+            l.tr(zh: "提交", en: "Submit", de: "Senden")
+        case .approve:
+            l.tr(zh: "通过", en: "Approve", de: "Bestätigen")
+        case .reject:
+            l.tr(zh: "驳回", en: "Reject", de: "Ablehnen")
+        }
     }
 
     // MARK: - Negative signal card

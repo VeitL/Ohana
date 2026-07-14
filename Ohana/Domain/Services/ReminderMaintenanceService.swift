@@ -159,8 +159,15 @@ actor ReminderMaintenancePlanActor {
                 SortDescriptor(\Reminder.id, order: .forward)
             ]
         )
-        descriptor.fetchLimit = max(1, limit)
-        return try modelContext.fetch(descriptor)
+        // `scheduledAt` is the notification time. V89 reminders can notify
+        // before their task occurrence, so fetch a bounded superset and only
+        // compensate rows whose actual occurrence is overdue.
+        descriptor.fetchLimit = min(512, max(32, limit * 16))
+        return Array(
+            try modelContext.fetch(descriptor)
+                .filter { $0.resolvedOccurrenceAt <= now }
+                .prefix(max(1, limit))
+        )
     }
 
     private func fetchFuture(

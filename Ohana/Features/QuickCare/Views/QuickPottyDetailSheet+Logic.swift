@@ -249,19 +249,31 @@ extension QuickPottyDetailSheet {
                 targetIDs: targetIDs,
                 executorId: executorId,
                 date: Date(),
-                isFullChange: false
+                isFullChange: false,
+                scoopPlan: SharedLitterScoopPlanSnapshot(
+                    intervalDays: scoopIntervalDays,
+                    anchorDate: scoopAnchorDate,
+                    reminderOn: scoopReminderOn
+                )
             ) else {
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
                 showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
                 return
             }
-            SharedPetSelectionMemory.saveSelection(
-                targetIDs,
-                sourcePet: pet,
-                scope: "quickCare.potty",
-                candidates: sameSpeciesPottyPets
-            )
-            syncScoopPlan(for: targets, showToast: false)
+            if let undoToken = result.undoToken {
+                SharedCareUndoCoordinator.shared.register(
+                    undoToken,
+                    targetCount: result.targetCount
+                )
+            } else {
+                SharedPetSelectionMemory.saveSelection(
+                    targetIDs,
+                    sourcePet: pet,
+                    scope: "quickCare.potty",
+                    candidates: sameSpeciesPottyPets
+                )
+                syncScoopPlan(for: targets, showToast: false)
+            }
             let delta = result.coconutDelta
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             scoopFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: scoopTint)
@@ -269,7 +281,9 @@ extension QuickPottyDetailSheet {
             let actionText = result.targetCount > 1
                 ? l.tr(zh: "\(result.targetCount)只猫 已铲", en: "\(result.targetCount) cats scooped", de: "\(result.targetCount) Katzenklos sauber")
                 : l.tr(zh: "铲砂已记录", en: "Scoop logged", de: "Klo erfasst")
-            showSaveConfirmation(delta > 0 ? "\(actionText) +\(delta)🥥" : actionText)
+            if result.undoToken == nil {
+                showSaveConfirmation(delta > 0 ? "\(actionText) +\(delta)🥥" : actionText)
+            }
             onRecordChanged()
         }
     }

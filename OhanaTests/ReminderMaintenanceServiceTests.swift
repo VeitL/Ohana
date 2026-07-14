@@ -48,6 +48,35 @@ struct ReminderMaintenanceServiceTests {
         #expect(futurePending.statusEnum == .pending)
     }
 
+    @Test func earlyNotificationDoesNotExpireBeforeItsTaskOccurrence() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let reminder = Reminder(
+            scheduledAt: now.addingTimeInterval(-3600),
+            occurrenceAt: now.addingTimeInterval(3600)
+        )
+        context.insert(reminder)
+        try context.save()
+
+        _ = await ReminderMaintenanceService.runPendingReminderMaintenance(context: context)
+        #expect(reminder.statusEnum == .pending)
+
+        let budget = OhanaBackgroundWorkBudget(
+            operation: "test_reminder_occurrence",
+            maximumItemCount: 1,
+            maximumWallClockSeconds: 5,
+            allowsExpensiveWork: false,
+            isDeferred: false
+        )
+        let plan = try await ReminderMaintenanceService.makeBackgroundPlan(
+            context: context,
+            budget: budget,
+            cursor: .initial
+        )
+        #expect(!plan.reminderModelIDs.contains(reminder.persistentModelID))
+    }
+
     @Test func backgroundPlanCapsWorkAndRecordsContinuationCursor() async throws {
         let container = try makeContainer()
         let context = container.mainContext

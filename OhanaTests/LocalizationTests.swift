@@ -125,7 +125,9 @@ struct LocalizationTests {
         #expect(FeatureGroup.plants.title(l: zh) == "植物")
         #expect(FeatureGroup.plants.title(l: en) == "Plants")
         #expect(FeatureGroup.plants.title(l: de) == "Pflanzen")
-        #expect(FeatureGroup.householdHub.title(l: en) == "Household")
+        #expect(FeatureGroup.householdHub.title(l: zh) == "家庭洞察")
+        #expect(FeatureGroup.householdHub.title(l: en) == "Household Insights")
+        #expect(FeatureGroup.householdHub.title(l: de) == "Haushaltseinblicke")
         #expect(PetFeature.food.title(l: en) == "Food")
         #expect(PetFeature.potty.title(l: de) == "Häufchen-Radio")
     }

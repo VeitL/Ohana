@@ -99,13 +99,15 @@ nonisolated extension DataBackupManager {
             feedRuleKindRaw: e.feedRuleKindRaw.isEmpty ? nil : e.feedRuleKindRaw,
             foodKindRaw: e.foodKindRaw,
             feedAmountGrams: e.feedAmountGrams,
-            feedPlanGroupId: e.feedPlanGroupId.isEmpty ? nil : e.feedPlanGroupId
+            feedPlanGroupId: e.feedPlanGroupId.isEmpty ? nil : e.feedPlanGroupId,
+            taskCareKindRaw: e.taskCareKindRaw.isEmpty ? nil : e.taskCareKindRaw
         )
     }
 
     func encodeReminder(_ r: Reminder) -> ReminderBackup {
         ReminderBackup(
             id: r.id.uuidString, scheduledAt: d(r.scheduledAt),
+            occurrenceAt: d(r.occurrenceAt),
             status: r.status, notificationId: r.notificationId,
             eventId: r.event?.id.uuidString,
             completedAt: d(r.completedAt),
@@ -178,6 +180,7 @@ nonisolated extension DataBackupManager {
             executorId: l.executorId,
             plantId: l.plant?.id.uuidString,
             healthStatusRaw: l.healthStatusRaw.isEmpty ? nil : l.healthStatusRaw,
+            careTransactionId: l.careTransactionId.isEmpty ? nil : l.careTransactionId,
             photoBase64: photoRef == nil ? l.photoData?.base64EncodedString() : nil,
             photoRef: photoRef
         )
@@ -642,6 +645,8 @@ nonisolated extension DataBackupManager {
             note: task.note,
             kindRaw: task.kindRaw,
             statusRaw: task.statusRaw,
+            subjectKindRaw: task.subjectKindRaw.isEmpty ? nil : task.subjectKindRaw,
+            subjectId: task.subjectId,
             relatedPetId: task.relatedPetId,
             relatedEventId: task.relatedEventId,
             relatedReminderId: task.relatedReminderId,

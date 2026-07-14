@@ -1267,6 +1267,8 @@ struct PlantDashboardView: View {
         guard !selections.isEmpty else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let executorId = currentExecutorId()
+        let retryCareType = batchCareInitialType
+        let retryRoomID = batchCareRoomFilter
         Task { @MainActor in
             await OhanaFrameScheduler.waitAfterNextFrame()
             let result = commandExecutor.completePlantBatchCare(
@@ -1275,6 +1277,12 @@ struct PlantDashboardView: View {
             )
             guard result.didPersist else {
                 showBatchCarePersistenceFailure(result.persistenceErrorDescription)
+                return
+            }
+            if !result.didWrite, !result.skipped.isEmpty {
+                showBatchCareSelectionChanged()
+                await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 220)
+                openBatchCareSheet(careType: retryCareType, roomID: retryRoomID)
                 return
             }
             guard let token = result.undoToken else { return }
@@ -1286,27 +1294,31 @@ struct PlantDashboardView: View {
         }
     }
 
-    func recordBatchQuickCare(_ selections: [PlantBatchCareSelection]) {
-        guard !selections.isEmpty else { return }
+    func recordBatchQuickCare(_ selections: [PlantBatchCareSelection]) async -> Bool {
+        guard !selections.isEmpty else { return false }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let executorId = currentExecutorId()
-        Task { @MainActor in
-            await OhanaFrameScheduler.waitAfterNextFrame()
-            let result = commandExecutor.recordPlantBatchQuickCare(
-                selections: selections,
-                executorId: executorId
-            )
-            guard result.didPersist else {
-                showBatchCarePersistenceFailure(result.persistenceErrorDescription)
-                return
-            }
-            guard let token = result.undoToken else { return }
-            PlantBatchCarePendingRewardStore.upsert(token)
-            publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchQuickRecordPendingRewardsChanged")
-            pendingBatchCareUndoToken = token
-            publishBatchCareVisualReward(result)
-            scheduleBatchCareRewardCommit(for: token)
+        await OhanaFrameScheduler.waitAfterNextFrame()
+        let result = commandExecutor.recordPlantBatchQuickCare(
+            selections: selections,
+            executorId: executorId
+        )
+        guard result.didPersist else {
+            showBatchCarePersistenceFailure(result.persistenceErrorDescription)
+            return false
         }
+        guard result.skipped.isEmpty else {
+            showBatchCareSelectionChanged()
+            return false
+        }
+        guard result.didWrite else { return true }
+        guard let token = result.undoToken else { return false }
+        PlantBatchCarePendingRewardStore.upsert(token)
+        publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchQuickRecordPendingRewardsChanged")
+        pendingBatchCareUndoToken = token
+        publishBatchCareVisualReward(result)
+        scheduleBatchCareRewardCommit(for: token)
+        return true
     }
 
     func undoPendingBatchCare() {
@@ -1374,15 +1386,6 @@ struct PlantDashboardView: View {
             pendingCount: PlantBatchCarePendingRewardStore.load().count,
             note: "plant.batchCare.pendingRewardsChanged"
         )
-    }
-
-    func showBatchCarePersistenceFailure(_ error: String?) {
-        UINotificationFeedbackGenerator().notificationOccurred(.error)
-        appServices.islandToasts.show(l.tr(
-            zh: "保存失败，批量照护未完成",
-            en: "Save failed. Batch care was not completed.",
-            de: "Speichern fehlgeschlagen. Die Batch-Pflege wurde nicht abgeschlossen."
-        ))
     }
 
     func deferTaskFromBatchCare(_ task: PlantBatchCareSheetTask) {

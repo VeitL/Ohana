@@ -1,7 +1,7 @@
 # Members 业务规则书
 
-> 状态：已按 2026-07-14 成员管理与本机家庭分工重设计更新；S-MEM-006 仍为余留项。
-> 范围：`Ohana/Features/Members`、`Ohana/Features/CrewRoster` 与成员页承载的本机 `FamilyTasks` 入口。
+> 状态：已按 2026-07-14 成员名册与统一待办架构更新；S-MEM-006 仍为余留项。
+> 范围：`Ohana/Features/Members`、`Ohana/Features/CrewRoster`，以及它们到统一 Task Center 的成员筛选入口。
 
 ## 1. 业务不变量
 
@@ -73,9 +73,11 @@
 
 任何情况下，人类创建步骤为 basicInfo -> avatar -> theme；宠物创建步骤为 basicInfo -> petProfile -> avatar -> theme。来源：`Ohana/Features/Members/MemberCardCreationSupport.swift:309`、`Ohana/Features/Members/MemberCardCreationSupport.swift:317`。
 
-### MBR-018 成员页统一管理档案、钱包与本机家庭分工
+### MBR-018 成员页只管理名册，家庭分工进入统一 Task Center
 
-成员页只保留“成员”和“协作”两个一级面。成员面以首页同源的 `FocusHomeVerticalSolidCardSurface` 整齐网格排列 Human / Pet，支持搜索、类型筛选、添加成员和进入详情；每张卡必须可读出该成员椰子余额，头像媒体只随 LazyVGrid 可见单元按需加载。成员页不提供“是否显示在首页”开关。协作面要求至少两位在世 Human，当前 Human 作为发布者，可把正奖励任务指派给另一位 Human；发布时验证余额但不扣款或托管，执行者提交后只有发布者能确认转账、编辑或删除任务。来源：`Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift`、`Ohana/Features/CrewRoster/Views/CrewRosterWalletScene.swift`、`Ohana/Features/FamilyTasks/FamilyTaskService.swift`、`docs/specs/product-foundation.md` D5。
+成员页是单一名册面：`CrewRosterOverlay` 以首页同源的 `FocusHomeVerticalSolidCardSurface` 排列 Human / Pet，支持搜索、类型筛选、添加成员、查看成员钱包和进入详情；头像媒体只随 LazyVGrid 可见单元按需加载。旧 `.collaboration` 路由由 `resolvedInitialMode` 收敛到 `.members`，成员页不再挂载独立协作面、任务 dashboard 或 FamilyTask 查询，也不提供“是否显示在首页”开关。
+
+成员页的“查看待办”通过 `onOpenTaskCenter` 打开统一 Task Center；Human 详情页的“查看全部”通过 `TaskCenterRouteContext.human` 打开带该成员筛选的同一入口。家庭分工的创建、领取、提交与审核由 Task Center 和 `FamilyTaskService` 承载，而不是在成员页复制一套任务中心。来源：`CrewRosterOverlay`、`CrewRosterOverlayRouteContainer`、`AppHumanRouteContainer`、`HumanDetailView`、`TaskCenterRouteContext`、`TaskCenterRouteContainer`、`FamilyTaskService`。
 
 ## 2. 状态机
 
@@ -140,7 +142,7 @@ stateDiagram-v2
 
 ### 多成员
 
-- 当前 active Human 决定头像券购买付款人、初始 HumanWeightLog executorId、隐私查看者、删除 Human 后是否需要 account switch，也决定本机家庭任务中的当前发布者、执行者/确认者与对应成员钱包归属。来源：`Ohana/Features/Members/MemberCreationService.swift`、`Ohana/Models/Human.swift`、`Ohana/Features/Members/MemberDeletionCommands.swift`、`Ohana/Features/FamilyTasks/Views/FamilyCollaborationDashboardView.swift`、`Ohana/Features/FamilyTasks/FamilyTaskService.swift`。
+- 当前 active Human 决定头像券购买付款人、初始 HumanWeightLog executorId、隐私查看者、删除 Human 后是否需要 account switch，也决定本机家庭任务中的当前发布者、执行者/确认者与对应成员钱包归属。统一待办通过 `TaskCenterSnapshotBuilder` 计算该成员可用动作，并由 `TaskActionCommandExecutor` 委托 `FamilyTaskService` 执行。来源：`MemberCreationService`、`Human`、`MemberDeletionCommands`、`TaskCenterSnapshotBuilder`、`TaskActionCommandExecutor`、`FamilyTaskService`。
 - 删除非 active human 时不会清空 `currentActiveHumanId`；删除 active human 时由 UI 清空 active id 并发布 route event。来源：`Ohana/Features/Members/MemberDeletionCommands.swift:111`、`Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift:673`。
 
 ### 多成员卡片

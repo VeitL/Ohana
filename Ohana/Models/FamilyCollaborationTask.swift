@@ -26,6 +26,15 @@ enum FamilyCollaborationTaskStatus: String, Codable, CaseIterable, Identifiable 
     var id: String { rawValue }
 }
 
+nonisolated enum FamilyCollaborationTaskSubjectKind: String, Codable, CaseIterable, Identifiable, Sendable {
+    case household
+    case human
+    case pet
+    case plant
+
+    var id: String { rawValue }
+}
+
 @Model
 final class FamilyCollaborationTask {
     #Index<FamilyCollaborationTask>([\.statusRaw], [\.assignedToId], [\.relatedReminderId], [\.dueAt])
@@ -36,6 +45,9 @@ final class FamilyCollaborationTask {
     var kindRaw: String
     var statusRaw: String
 
+    /// V87 canonical subject link. `relatedPetId` remains for V86 compatibility.
+    var subjectKindRaw: String = ""
+    var subjectId: String?
     var relatedPetId: String?
     var relatedEventId: String?
     var relatedReminderId: String?
@@ -62,6 +74,8 @@ final class FamilyCollaborationTask {
         note: String = "",
         kind: FamilyCollaborationTaskKind,
         status: FamilyCollaborationTaskStatus = .active,
+        subjectKind: FamilyCollaborationTaskSubjectKind? = nil,
+        subjectId: String? = nil,
         relatedPetId: String? = nil,
         relatedEventId: String? = nil,
         relatedReminderId: String? = nil,
@@ -79,7 +93,16 @@ final class FamilyCollaborationTask {
         self.note = note
         self.kindRaw = kind.rawValue
         self.statusRaw = status.rawValue
-        self.relatedPetId = relatedPetId
+        let inferredSubjectKind = subjectKind
+            ?? (Self.nonempty(relatedPetId) == nil ? .household : .pet)
+        self.subjectKindRaw = inferredSubjectKind.rawValue
+        let inferredSubjectId = Self.canonicalSubjectId(
+            subjectId ?? (inferredSubjectKind == .pet ? relatedPetId : nil)
+        )
+        self.subjectId = inferredSubjectKind == .household ? nil : inferredSubjectId
+        self.relatedPetId = inferredSubjectKind == .pet
+            ? (inferredSubjectId ?? Self.nonempty(relatedPetId))
+            : nil
         self.relatedEventId = relatedEventId
         self.relatedReminderId = relatedReminderId
         self.createdById = createdById
@@ -108,6 +131,41 @@ final class FamilyCollaborationTask {
         set { statusRaw = newValue.rawValue }
     }
 
+    /// Legacy V86 rows have an empty `subjectKindRaw`; their pet link remains authoritative.
+    var subjectKind: FamilyCollaborationTaskSubjectKind {
+        if let explicitKind = FamilyCollaborationTaskSubjectKind(rawValue: subjectKindRaw) {
+            return explicitKind
+        }
+        return Self.nonempty(relatedPetId) == nil ? .household : .pet
+    }
+
+    var resolvedSubjectId: String? {
+        switch subjectKind {
+        case .household:
+            nil
+        case .human, .plant:
+            Self.canonicalSubjectId(subjectId)
+        case .pet:
+            Self.canonicalSubjectId(subjectId) ?? Self.canonicalSubjectId(relatedPetId)
+        }
+    }
+
+    func setSubject(kind: FamilyCollaborationTaskSubjectKind, id: String?) {
+        subjectKindRaw = kind.rawValue
+        switch kind {
+        case .household:
+            subjectId = nil
+            relatedPetId = nil
+        case .human, .plant:
+            subjectId = Self.canonicalSubjectId(id)
+            relatedPetId = nil
+        case .pet:
+            let normalizedId = Self.canonicalSubjectId(id)
+            subjectId = normalizedId
+            relatedPetId = normalizedId
+        }
+    }
+
     var isOpen: Bool {
         status == .active && assignedToId == nil && claimedById == nil
     }
@@ -126,5 +184,17 @@ final class FamilyCollaborationTask {
 
     func touch() {
         updatedAt = Date()
+    }
+
+    private static func canonicalSubjectId(_ raw: String?) -> String? {
+        guard let raw = nonempty(raw) else { return nil }
+        let firstComponent = raw.split(separator: ":", maxSplits: 1).first.map(String.init) ?? raw
+        return UUID(uuidString: firstComponent)?.uuidString
+    }
+
+    private static func nonempty(_ raw: String?) -> String? {
+        guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 }

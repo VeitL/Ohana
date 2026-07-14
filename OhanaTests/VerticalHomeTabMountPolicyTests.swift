@@ -233,13 +233,13 @@ struct VerticalHomeTabMountPolicyTests {
     @Test func frozenOasisShopEntryUsesGlobalShopRouteWithoutMountingLiveTree() throws {
         let frozenStage = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
         let host = try source("Ohana/Features/Oasis/Views/OasisHomeTabHost.swift")
-        let home = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift")
+        let homeUtilities = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Utilities.swift")
 
         #expect(frozenStage.contains("interactiveFeatures: [.shop]"))
         #expect(frozenStage.contains("onOpenShop(snapshot.shopInitialCategory)"))
         #expect(host.contains("VerticalSolidHomeOasisFrozenTreeStage("))
         #expect(host.contains("onOpenShop: onOpenShop"))
-        #expect(home.contains("routeCoordinator.openCoconutShop(category, currentLevel: treeLevel)"))
+        #expect(homeUtilities.contains("routeCoordinator.openCoconutShop(category, currentLevel: treeLevel)"))
         #expect(!OasisHomeTabContentPolicy.shouldRenderTreeContent(
             for: VerticalHomeTabMountPolicy.lifecycle(
                 for: .oasis,
@@ -585,7 +585,7 @@ struct VerticalHomeTabMountPolicyTests {
         let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
         let oasisHostSource = try source("Ohana/Features/Oasis/Views/OasisHomeTabHost.swift")
 
-        #expect(routingSource.contains("openFunctionMenu(destination: .petFeatureCollection)"))
+        #expect(routingSource.contains("openFunctionMenu(destination: .featureGroup(.householdHub))"))
         #expect(routingSource.contains("case .home:\n            \"chart.bar.xaxis\""))
         #expect(routingSource.contains("case .calendar:\n            \"plus\""))
         #expect(routingSource.contains("case .plants:\n            \"ellipsis.circle\""))
@@ -652,13 +652,14 @@ struct VerticalHomeTabMountPolicyTests {
         let plantSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift")
         let taskCenterSource = try source("Ohana/Features/Tasks/TaskCenterRouteContainer.swift")
         let taskCenterViewSource = try source("Ohana/Features/Tasks/TaskCenterView.swift")
+        let homeUtilitiesSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Utilities.swift")
 
         #expect(componentsSource.contains("TabView(selection: selection)"))
         #expect(componentsSource.contains(".tabItem"))
         #expect(componentsSource.contains(".tabBarMinimizeBehavior(.onScrollDown)"))
         #expect(componentsSource.contains(".badge(tab == .calendar ? taskCenterBadge.overdueCount : 0)"))
         #expect(componentsSource.contains(".accessibilityIdentifier(\"home-native-tab-view\")"))
-        #expect(!componentsSource.contains("Text(tab.title(localization))"))
+        #expect(componentsSource.contains("Label(tab.title(localization), systemImage: tab.icon)"))
         #expect(componentsSource.contains("viewportAlignedPageBackground(for: tab)"))
         #expect(componentsSource.contains("if lifecycle(for: tab).isVisible"))
         #expect(componentsSource.contains("OhanaStaticBackgroundCanvas()"))
@@ -685,13 +686,32 @@ struct VerticalHomeTabMountPolicyTests {
         }
         #expect(homeSource.contains("primaryActionIcon: homeToolbarPrimaryActionIcon"))
         #expect(homeSource.contains("onPrimaryAction: performHomeToolbarPrimaryAction"))
-        #expect(homeSource.contains("onInjectEnergy: injectEmbeddedOasisEnergy"))
+        #expect(homeUtilitiesSource.contains("onInjectEnergy: injectEmbeddedOasisEnergy"))
         #expect(homeSource.contains(".toolbarBackground(.hidden, for: .navigationBar)"))
         #expect(!homeSource.contains("VerticalSolidHomeQuickActionMenu("))
         #expect(!homeSource.contains("VerticalSolidHomeBottomBar("))
         #expect(!homeSource.contains("calendarBottomChromeHidden"))
         #expect(!routingSource.contains("VerticalSolidHomeBottomChromeScrollPolicy"))
         #expect(!plantSource.contains("updateBottomChromeVisibility"))
+    }
+
+    @Test func taskCenterAddAndEmbeddedCalendarCompletionUseUnifiedEntryPoints() throws {
+        let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Routing.swift")
+        let taskCenterSource = try source("Ohana/Features/Tasks/TaskCenterRouteContainer.swift")
+        let calendarRouteSource = try source("Ohana/Features/Calendar/CalendarRouteContainer.swift")
+        let calendarViewSource = try source("Ohana/Features/Calendar/Views/CalendarView.swift")
+        let calendarListSource = try source("Ohana/Features/Calendar/Views/CalendarView+List.swift")
+
+        #expect(routingSource.contains("case .calendar:\n            calendarAddEventTrigger += 1"))
+        #expect(taskCenterSource.contains("onAdd: requestAdd"))
+        #expect(taskCenterSource.contains(".onChange(of: addEventTrigger) { _, _ in\n            requestAdd()"))
+        #expect(taskCenterSource.contains("onCompleteEvent: completeEvent"))
+        #expect(taskCenterSource.contains("TaskActionCommandExecutor("))
+        #expect(calendarRouteSource.contains("var onCompleteEvent: ((Event, Date) -> Bool)?"))
+        #expect(calendarRouteSource.contains("onCompleteEvent: onCompleteEvent"))
+        #expect(calendarViewSource.contains("var onCompleteEvent: ((Event, Date) -> Bool)?"))
+        #expect(calendarListSource.contains("if shouldComplete, let onCompleteEvent"))
+        #expect(calendarListSource.contains("let executor = CalendarCommandExecutor"))
     }
 
     @Test func plantWalletQuickActionsUseSharedEditablePolicy() throws {
@@ -1264,10 +1284,14 @@ struct VerticalHomeTabMountPolicyTests {
         let homeSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift")
         let toolbarSource = try source("Ohana/Features/Home/Views/FocusHomeHeaderView.swift")
         let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Routing.swift")
+        let functionRootSource = try source("Ohana/Features/FunctionMenu/Views/FunctionMenuRootView.swift")
         let rosterSource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift")
 
-        #expect(routingSource.contains("openFunctionMenu(destination: .petFeatureCollection)"))
-        #expect(routingSource.contains("return l.tr(zh: \"查看家庭数据\""))
+        #expect(routingSource.contains("openFunctionMenu(destination: .featureGroup(.householdHub))"))
+        #expect(routingSource.contains("l.tr(zh: \"查看家庭洞察\""))
+        #expect(!functionRootSource.contains("id: \"insights\""))
+        #expect(!functionRootSource.contains("id: \"report\""))
+        #expect(functionRootSource.contains("from: [.dailyCare, .healthBody, .archiveMemory, .householdHub]"))
         #expect(toolbarSource.contains("systemImage: primaryActionIcon"))
         #expect(toolbarSource.contains(".accessibilityIdentifier(\"home-primary-action\")"))
         #expect(rosterSource.contains("Menu {"))
@@ -1368,11 +1392,10 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!functionRootSource.contains(".householdHub, .plants"))
     }
 
-    @Test func nativeTabsUseIconOnlySymbolsWithLocalizedAccessibilityLabels() throws {
+    @Test func nativeTabsUseLocalizedTitlesAndAccessibilityLabels() throws {
         let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
 
-        #expect(!componentsSource.contains("Text(tab.title(localization))"))
-        #expect(componentsSource.contains("Image(systemName: tab.icon)"))
+        #expect(componentsSource.contains("Label(tab.title(localization), systemImage: tab.icon)"))
         #expect(componentsSource.contains(".accessibilityLabel(tabAccessibilityLabel(for: tab))"))
         #expect(componentsSource.contains(".accessibilityIdentifier(\"home-tab-\\(tab.rawValue)\")"))
     }
@@ -1454,7 +1477,7 @@ struct VerticalHomeTabMountPolicyTests {
         let surfaceSource = try source("Ohana/Features/Home/Views/FocusHomeVerticalSolidCardSurface.swift")
 
         #expect(!surfaceSource.contains("radius: lerp(15, 24, p)"))
-        #expect(surfaceSource.contains("stable home card depth without animating shadow rasterization"))
+        #expect(surfaceSource.contains(".compositingGroup()"))
         #expect(surfaceSource.contains("collapse internal text/avatar shadows into one card surface before hero scaling"))
     }
 

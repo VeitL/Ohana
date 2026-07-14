@@ -52,7 +52,10 @@ nonisolated enum CloudSyncEntityRegistry {
     static let localOnlySchemaEntityNames: Set<String> = [
         // Legacy store compatibility for the retired user-visible recycle-bin model.
         // It must stay out of CloudSync descriptors and upload paths.
-        String(describing: RecycleBinBatch.self)
+        String(describing: RecycleBinBatch.self),
+        // Short-lived crash-recovery coordination state. The authoritative
+        // shared-care fact is SharedCareSession; receipts must never sync.
+        String(describing: SharedCareUndoReceipt.self)
     ]
 
     static let descriptors: [CloudSyncEntityDescriptor] = [
@@ -142,7 +145,7 @@ nonisolated enum CloudSyncEntityRegistry {
         deletionOwnership(Event.self, parent: .pet, reason: "relatedEntityId"),
         deletionOwnership(Reminder.self, parent: .pet, reason: "event.reminders"),
         deletionOwnership(PetRelationship.self, parent: .pet, reason: "fromPetId/toPetId"),
-        deletionOwnership(FamilyCollaborationTask.self, parent: .pet, reason: "relatedPetId"),
+        deletionOwnership(FamilyCollaborationTask.self, parent: .pet, reason: "pet subject/relatedPetId"),
         deletionOwnership(SharedCareSession.self, parent: .pet, reason: "source/target/stock owner pet ids"),
         deletionOwnership(PetCareLog.self, parent: .pet, reason: "pet relationship"),
         deletionOwnership(PetPottyLog.self, parent: .pet, reason: "pet relationship"),
@@ -181,10 +184,11 @@ nonisolated enum CloudSyncEntityRegistry {
         deletionOwnership(EconomyBudgetUsageEvent.self, parent: .human, reason: "memberKey/scopeKey"),
         deletionOwnership(SharedCareSession.self, parent: .human, reason: "executorIds"),
         deletionOwnership(CoconutExchangeRequest.self, parent: .human, reason: "sender/receiver"),
-        deletionOwnership(FamilyCollaborationTask.self, parent: .human, reason: "human actor fields"),
+        deletionOwnership(FamilyCollaborationTask.self, parent: .human, reason: "human subject/actor fields"),
 
         deletionOwnership(Event.self, parent: .plant, reason: "plant relatedEntityId"),
         deletionOwnership(Reminder.self, parent: .plant, reason: "event.reminders"),
+        deletionOwnership(FamilyCollaborationTask.self, parent: .plant, reason: "plant subject"),
         deletionOwnership(PlantCareLog.self, parent: .plant, reason: "plant relationship"),
         deletionOwnership(CareLedgerEvent.self, parent: .plant, reason: "subject/legacy source")
     ]

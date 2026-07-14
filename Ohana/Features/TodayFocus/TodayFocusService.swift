@@ -27,9 +27,9 @@ nonisolated enum TodayFocusContent {
     var statusText: String {
         switch self {
         case .quest:
-            AppLocalizedText(zh: "去打卡", en: "Check in").resolve()
+            AppLocalizedText(zh: "成长引导", en: "Growth guide").resolve()
         case .familyTask:
-            AppLocalizedText(zh: "发给你", en: "Assigned").resolve()
+            AppLocalizedText(zh: "待办", en: "Task").resolve()
         case .coconutExchange:
             AppLocalizedText(zh: "待确认", en: "Pending").resolve()
         case let .negative(signal):

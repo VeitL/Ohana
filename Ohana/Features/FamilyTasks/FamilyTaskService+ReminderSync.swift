@@ -9,16 +9,28 @@
 import Foundation
 import SwiftData
 
+enum FamilyTaskReminderCompletionPreparation: Equatable {
+    case notLinked
+    case prepared
+    case rejected
+}
+
 extension FamilyTaskService {
     @MainActor
     @discardableResult
-    static func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext) -> Bool {
+    static func syncCompletedReminder(
+        _ reminder: Reminder,
+        completedBy humanId: String?,
+        context: ModelContext,
+        saveChanges: Bool = true
+    ) -> Bool {
         syncCompletedReminder(
             reminder,
             completedBy: humanId,
             context: context,
             wallet: SwiftDataCoconutWalletManager(),
-            careLedger: CareLedgerService()
+            careLedger: CareLedgerService(),
+            saveChanges: saveChanges
         )
     }
 
@@ -30,15 +42,41 @@ extension FamilyTaskService {
         context: ModelContext,
         wallet _: CoconutWalletManaging,
         careLedger _: CareLedgerRecording,
-        projectionManager _: QuestManager? = nil
+        projectionManager _: QuestManager? = nil,
+        saveChanges: Bool = true
     ) -> Bool {
+        switch prepareCompletedReminder(
+            reminder,
+            completedBy: humanId,
+            context: context
+        ) {
+        case .notLinked, .rejected:
+            return false
+        case .prepared:
+            return saveChanges ? persistMutation(context: context) : true
+        }
+    }
+
+    /// Stages the linked FamilyTask in the caller's current SwiftData
+    /// transaction. Reminder completion uses this before its single save so an
+    /// Event/Reminder cannot commit while the assignment remains open.
+    @MainActor
+    static func prepareCompletedReminder(
+        _ reminder: Reminder,
+        completedBy humanId: String?,
+        context: ModelContext
+    ) -> FamilyTaskReminderCompletionPreparation {
         guard let task = activeTask(forReminderId: reminder.id.uuidString, context: context),
-              task.status != .completed else { return false }
+              task.status != .completed else {
+            return .notLinked
+        }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: reminder, assigneeId: humanId, context: context),
             actor: human(id: humanId, context: context),
             context: context
-        ) else { return false }
+        ) else {
+            return .rejected
+        }
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.completedAt = reminder.completedAt ?? Date()
             task.completedById = humanId
@@ -46,8 +84,7 @@ extension FamilyTaskService {
             task.status = task.hasReward ? .pendingReview : .completed
             task.touch()
         }
-
-        return persistMutation(context: context)
+        return .prepared
     }
 
     @MainActor

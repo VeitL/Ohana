@@ -19,6 +19,7 @@ struct CrewRosterOverlayRouteContainer: View {
     var safeTopInset: CGFloat = 0
     var safeBottomInset: CGFloat = 0
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+    var onOpenTaskCenter: (() -> Void)?
 
     var body: some View {
         CrewRosterOverlay(
@@ -26,9 +27,6 @@ struct CrewRosterOverlayRouteContainer: View {
             pets: routeData.pets,
             humans: routeData.humans,
             plants: [],
-            pendingReminders: routeData.pendingReminders,
-            familyTasks: routeData.familyTasks,
-            careLedgerEntries: routeData.careLedgerEntries,
             petSummaries: routeData.petSummaries,
             onSelectPet: onSelectPet,
             onSelectHuman: onSelectHuman,
@@ -40,7 +38,8 @@ struct CrewRosterOverlayRouteContainer: View {
             searchTrigger: searchTrigger,
             safeTopInset: safeTopInset,
             safeBottomInset: safeBottomInset,
-            onPresentCoconutLog: onPresentCoconutLog
+            onPresentCoconutLog: onPresentCoconutLog,
+            onOpenTaskCenter: onOpenTaskCenter
         )
         .onAppear {
             scheduleRouteDataLoad()
@@ -65,14 +64,8 @@ struct CrewRosterOverlayRouteContainer: View {
 }
 
 private struct CrewRosterRouteData {
-    private static let pendingReminderFetchLimit = 80
-    private static let activeFamilyTaskFetchLimit = 120
-
     var pets: [Pet] = []
     var humans: [Human] = []
-    var pendingReminders: [Reminder] = []
-    var familyTasks: [FamilyCollaborationTask] = []
-    var careLedgerEntries: [FamilyCareLedgerEntry] = []
     var petSummaries: [UUID: CrewRosterPetSummary] = [:]
     var hasLoaded = false
 
@@ -89,58 +82,9 @@ private struct CrewRosterRouteData {
                 context: context,
                 name: "Human"
             ),
-            // Same-device reward tasks are local Solo records, not online collaboration.
-            pendingReminders: fetch(
-                pendingReminderDescriptor(),
-                context: context,
-                name: "Reminder"
-            ),
-            familyTasks: fetch(
-                activeFamilyTaskDescriptor(),
-                context: context,
-                name: "FamilyCollaborationTask"
-            ),
-            careLedgerEntries: FamilyCareLedgerEntry.fetchPetEntries(
-                since: FamilyCareLedgerEntry.weekStart(),
-                context: context
-            ),
             petSummaries: CrewRosterPetSummary.load(pets: pets, context: context),
             hasLoaded: true
         )
-    }
-
-    private static func pendingReminderDescriptor() -> FetchDescriptor<Reminder> {
-        let pendingStatus = "pending"
-        var descriptor = FetchDescriptor<Reminder>(
-            predicate: #Predicate<Reminder> { reminder in
-                reminder.status == pendingStatus
-            },
-            sortBy: [
-                SortDescriptor(\.scheduledAt),
-                SortDescriptor(\.id)
-            ]
-        )
-        descriptor.fetchLimit = pendingReminderFetchLimit
-        return descriptor
-    }
-
-    private static func activeFamilyTaskDescriptor() -> FetchDescriptor<FamilyCollaborationTask> {
-        let activeStatus = FamilyCollaborationTaskStatus.active.rawValue
-        let claimedStatus = FamilyCollaborationTaskStatus.claimed.rawValue
-        let pendingReviewStatus = FamilyCollaborationTaskStatus.pendingReview.rawValue
-        var descriptor = FetchDescriptor<FamilyCollaborationTask>(
-            predicate: #Predicate<FamilyCollaborationTask> { task in
-                task.statusRaw == activeStatus ||
-                    task.statusRaw == claimedStatus ||
-                    task.statusRaw == pendingReviewStatus
-            },
-            sortBy: [
-                SortDescriptor(\.updatedAt, order: .reverse),
-                SortDescriptor(\.id)
-            ]
-        )
-        descriptor.fetchLimit = activeFamilyTaskFetchLimit
-        return descriptor
     }
 
     private static func fetch<T: PersistentModel>(

@@ -25,6 +25,33 @@ struct CalendarEventPlanCommandInput: Equatable {
     let recurrenceEndDate: Date?
     let reminderLeadMinutes: Int?
     let assigneeId: String?
+    let taskCareKindRaw: String
+
+    init(
+        title: String,
+        startDate: Date,
+        isAllDay: Bool,
+        eventType: EventType,
+        relatedEntityType: String,
+        relatedEntityId: String,
+        recurrenceDays: Int,
+        recurrenceEndDate: Date?,
+        reminderLeadMinutes: Int?,
+        assigneeId: String?,
+        taskCareKindRaw: String = ""
+    ) {
+        self.title = title
+        self.startDate = startDate
+        self.isAllDay = isAllDay
+        self.eventType = eventType
+        self.relatedEntityType = relatedEntityType
+        self.relatedEntityId = relatedEntityId
+        self.recurrenceDays = recurrenceDays
+        self.recurrenceEndDate = recurrenceEndDate
+        self.reminderLeadMinutes = reminderLeadMinutes
+        self.assigneeId = assigneeId
+        self.taskCareKindRaw = taskCareKindRaw
+    }
 
     var cleanTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -76,6 +103,7 @@ enum CalendarEventPlanCommandService {
             recurrenceEndDate: input.recurrenceEndDate,
             reminderLeadMinutes: input.reminderLeadMinutes,
             assigneeId: input.assigneeId,
+            taskCareKindRaw: input.taskCareKindRaw,
             writeKind: writeKind(for: input),
             source: .userCommand
         )
@@ -134,6 +162,7 @@ enum CalendarEventPlanCommandService {
             recurrenceEndDate: input.recurrenceEndDate,
             reminderLeadMinutes: input.reminderLeadMinutes,
             assigneeId: input.assigneeId,
+            taskCareKindRaw: input.taskCareKindRaw,
             writeKind: writeKind(for: input),
             source: .userCommand
         )
@@ -173,7 +202,11 @@ enum CalendarEventPlanCommandService {
                 mutation: reminderMutation,
                 context: context
             )
-            for reminder in createdReminders {
+            let reminderOccurrenceDates = occurrenceDates(for: input)
+            for (index, reminder) in createdReminders.enumerated() {
+                reminder.occurrenceAt = reminderOccurrenceDates.indices.contains(index)
+                    ? reminderOccurrenceDates[index]
+                    : nil
                 CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: now)
             }
         } else {
@@ -245,6 +278,29 @@ enum CalendarEventPlanCommandService {
             return dates
         }
         return [calendar.date(byAdding: .minute, value: -leadMinutes, to: input.startDate) ?? input.startDate]
+    }
+
+    private static func occurrenceDates(
+        for input: CalendarEventPlanCommandInput,
+        calendar: Calendar = .current
+    ) -> [Date] {
+        guard input.reminderLeadMinutes != nil else { return [] }
+        guard input.recurrenceDays >= 1,
+              let recurrenceEndDate = input.recurrenceEndDate else {
+            return [input.startDate]
+        }
+        var dates: [Date] = []
+        var cursor = input.startDate
+        while cursor <= recurrenceEndDate, dates.count < maxReminderOccurrences {
+            dates.append(cursor)
+            guard let next = calendar.date(
+                byAdding: .day,
+                value: input.recurrenceDays,
+                to: cursor
+            ), next > cursor else { break }
+            cursor = next
+        }
+        return dates
     }
 
     private static func writeKind(for input: CalendarEventPlanCommandInput) -> MemberWriteKind {
@@ -478,6 +534,16 @@ enum CalendarEventDeletionOutcome: Equatable {
 }
 
 enum CalendarEventCommandService {
+    private struct PetTaskCompletionPreparation {
+        let syncResult: CalendarTaskCompletionSyncService.PetTaskSyncResult?
+        let blockedResult: CalendarEventCompletionResult?
+    }
+
+    private struct PlantCareCompletionPreparation {
+        let syncResult: PlantCareScheduleSyncResult?
+        let blockedResult: CalendarEventCompletionResult?
+    }
+
     @discardableResult
     @MainActor
     static func toggleCompletion(
@@ -505,47 +571,36 @@ enum CalendarEventCommandService {
                 now: now
             )
         }
-        var petTaskSyncResult: CalendarTaskCompletionSyncService.PetTaskSyncResult?
-        if CalendarTaskCompletionSyncService.isPetTask(event: event) {
-            let syncResult = CalendarTaskCompletionSyncService.syncPetTask(
-                event: event,
-                occurrenceDate: occurrenceDate,
-                isCompleted: shouldComplete,
-                pets: pets,
-                context: context,
-                executorId: executorId,
-                operationDate: now,
-                economy: options.economy
-            )
-            petTaskSyncResult = syncResult
-            guard syncResult.didPersist else {
-                return unchangedCompletionResult(
-                    event: event,
-                    occurrenceDate: occurrenceDate,
-                    affectedSubjectIDs: affectedSubjectIDs,
-                    now: now
-                )
-            }
-            if !shouldComplete && syncResult == .noOp {
-                return unchangedCompletionResult(
-                    event: event,
-                    occurrenceDate: occurrenceDate,
-                    affectedSubjectIDs: affectedSubjectIDs,
-                    now: now
-                )
-            }
-            if shouldComplete && !syncResult.shouldCompleteOccurrence {
-                return unchangedCompletionResult(
-                    event: event,
-                    occurrenceDate: occurrenceDate,
-                    affectedSubjectIDs: affectedSubjectIDs,
-                    now: now,
-                    didWriteFact: syncResult.didWriteFact,
-                    allowsDerivedEffects: syncResult.allowsDerivedEffects,
-                    factDate: occurrenceDate
-                )
-            }
-        }
+        let petPreparation = preparePetTaskCompletion(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            shouldComplete: shouldComplete,
+            pets: pets,
+            context: context,
+            executorID: executorId,
+            now: now,
+            economy: options.economy,
+            affectedSubjectIDs: affectedSubjectIDs
+        )
+        if let blockedResult = petPreparation.blockedResult { return blockedResult }
+        let petTaskSyncResult = petPreparation.syncResult
+        let remindersToSync = remindersForCompletionSync(
+            event: event,
+            occurrenceDate: occurrenceDate
+        )
+        let plantPreparation = preparePlantCareCompletion(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            shouldComplete: shouldComplete,
+            reminders: remindersToSync,
+            context: context,
+            executorID: executorId,
+            now: now,
+            scheduleNotifications: options.schedulePlantCareNotifications,
+            affectedSubjectIDs: affectedSubjectIDs
+        )
+        if let blockedResult = plantPreparation.blockedResult { return blockedResult }
+        let plantCareSyncResult = plantPreparation.syncResult
         guard DomainScheduleWriter.setEventOccurrenceCompletion(
             event,
             occurrenceDate: occurrenceDate,
@@ -562,35 +617,35 @@ enum CalendarEventCommandService {
             )
         }
 
-        let remindersToSync = remindersForCompletionSync(event: event, now: now)
-        for reminder in remindersToSync {
-            if shouldComplete {
-                reminderCompletion.complete(reminder, by: executorId, context: context)
-            } else {
-                reminderCompletion.reopen(reminder, by: executorId, context: context, reschedule: true)
-            }
-        }
-        if shouldComplete, remindersToSync.isEmpty {
-            let plantCareSyncResult = PlantCareScheduleSyncService.syncCompletedEvent(
-                event,
+        guard syncReminders(
+            remindersToSync,
+            shouldComplete: shouldComplete,
+            occurrenceDate: occurrenceDate,
+            executorID: executorId,
+            context: context,
+            reminderCompletion: reminderCompletion
+        ) else {
+            context.rollback()
+            return unchangedCompletionResult(
+                event: event,
                 occurrenceDate: occurrenceDate,
-                executorId: executorId,
-                context: context,
-                source: .calendar,
+                affectedSubjectIDs: affectedSubjectIDs,
                 now: now,
-                scheduleNotifications: options.schedulePlantCareNotifications
+                didWriteFact: petTaskSyncResult?.didWriteFact ?? plantCareSyncResult?.didWriteCareFact ?? false,
+                allowsDerivedEffects: false,
+                factDate: occurrenceDate
             )
-            guard plantCareSyncResult.didPersist else {
-                return unchangedCompletionResult(
-                    event: event,
-                    occurrenceDate: occurrenceDate,
-                    affectedSubjectIDs: affectedSubjectIDs,
-                    now: now
-                )
-            }
         }
         if remindersToSync.isEmpty {
             try CalendarEventPlanCommandService.saveCalendarChanges(context: context)
+            if let plantCareSyncResult {
+                PlantCareScheduleSyncService.syncPlanAfterCompletion(
+                    plantCareSyncResult,
+                    context: context,
+                    now: now,
+                    scheduleNotifications: options.schedulePlantCareNotifications
+                )
+            }
         }
 
         return CalendarEventCompletionResult(
@@ -599,11 +654,125 @@ enum CalendarEventCommandService {
             syncedReminderCount: remindersToSync.count,
             affectedSubjectIDs: affectedSubjectIDs,
             didChange: true,
-            didWriteFact: petTaskSyncResult?.didWriteFact ?? true,
-            allowsDerivedEffects: petTaskSyncResult?.allowsDerivedEffects ?? true,
+            didWriteFact: petTaskSyncResult?.didWriteFact ?? plantCareSyncResult?.didWriteCareFact ?? true,
+            allowsDerivedEffects: petTaskSyncResult?.allowsDerivedEffects ?? plantCareSyncResult?.allowsScheduleCompletion ?? true,
             factDate: occurrenceDate,
             operationDate: now
         )
+    }
+
+    private static func preparePetTaskCompletion(
+        event: Event,
+        occurrenceDate: Date,
+        shouldComplete: Bool,
+        pets: [Pet],
+        context: ModelContext,
+        executorID: String?,
+        now: Date,
+        economy: CareEventEconomyAwarding?,
+        affectedSubjectIDs: Set<UUID>
+    ) -> PetTaskCompletionPreparation {
+        guard CalendarTaskCompletionSyncService.isPetTask(event: event) else {
+            return PetTaskCompletionPreparation(syncResult: nil, blockedResult: nil)
+        }
+        let syncResult = CalendarTaskCompletionSyncService.syncPetTask(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            isCompleted: shouldComplete,
+            pets: pets,
+            context: context,
+            executorId: executorID,
+            operationDate: now,
+            economy: economy
+        )
+        if !syncResult.didPersist || (!shouldComplete && syncResult == .noOp) {
+            return PetTaskCompletionPreparation(
+                syncResult: syncResult,
+                blockedResult: unchangedCompletionResult(
+                    event: event,
+                    occurrenceDate: occurrenceDate,
+                    affectedSubjectIDs: affectedSubjectIDs,
+                    now: now
+                )
+            )
+        }
+        if shouldComplete && !syncResult.shouldCompleteOccurrence {
+            return PetTaskCompletionPreparation(
+                syncResult: syncResult,
+                blockedResult: unchangedCompletionResult(
+                    event: event,
+                    occurrenceDate: occurrenceDate,
+                    affectedSubjectIDs: affectedSubjectIDs,
+                    now: now,
+                    didWriteFact: syncResult.didWriteFact,
+                    allowsDerivedEffects: syncResult.allowsDerivedEffects,
+                    factDate: occurrenceDate
+                )
+            )
+        }
+        return PetTaskCompletionPreparation(syncResult: syncResult, blockedResult: nil)
+    }
+
+    private static func preparePlantCareCompletion(
+        event: Event,
+        occurrenceDate: Date,
+        shouldComplete: Bool,
+        reminders: [Reminder],
+        context: ModelContext,
+        executorID: String?,
+        now: Date,
+        scheduleNotifications: Bool,
+        affectedSubjectIDs: Set<UUID>
+    ) -> PlantCareCompletionPreparation {
+        guard shouldComplete, PlantCareScheduleSyncService.isPlantCareEvent(event) else {
+            return PlantCareCompletionPreparation(syncResult: nil, blockedResult: nil)
+        }
+        let sourceReminder = reminders.first
+        let syncResult = PlantCareScheduleSyncService.syncCompletedEvent(
+            event,
+            occurrenceDate: occurrenceDate,
+            executorId: executorID,
+            context: context,
+            source: sourceReminder == nil ? .calendar : .reminder,
+            sourceReminderId: sourceReminder?.id,
+            now: now,
+            scheduleNotifications: scheduleNotifications,
+            syncPlanSchedule: false
+        )
+        let blockedResult = syncResult.allowsScheduleCompletion ? nil : unchangedCompletionResult(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            affectedSubjectIDs: affectedSubjectIDs,
+            now: now
+        )
+        return PlantCareCompletionPreparation(syncResult: syncResult, blockedResult: blockedResult)
+    }
+
+    private static func syncReminders(
+        _ reminders: [Reminder],
+        shouldComplete: Bool,
+        occurrenceDate: Date,
+        executorID: String?,
+        context: ModelContext,
+        reminderCompletion: ReminderCompleting
+    ) -> Bool {
+        for reminder in reminders {
+            let didSync = shouldComplete
+                ? reminderCompletion.complete(
+                    reminder,
+                    by: executorID,
+                    occurrenceDate: occurrenceDate,
+                    context: context
+                )
+                : reminderCompletion.reopen(
+                    reminder,
+                    by: executorID,
+                    context: context,
+                    reschedule: true
+                )
+            guard didSync else { return false }
+        }
+        return true
     }
 
     private static func unchangedCompletionResult(
@@ -628,14 +797,19 @@ enum CalendarEventCommandService {
         )
     }
 
-    private static func remindersForCompletionSync(event: Event, now: Date) -> [Reminder] {
-        guard event.recurrenceDays == 0 else { return [] }
+    private static func remindersForCompletionSync(event: Event, occurrenceDate: Date) -> [Reminder] {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: now)
-        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? now
-        return event.reminders.filter { reminder in
+        let today = calendar.startOfDay(for: occurrenceDate)
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? occurrenceDate
+        let sameDay = event.reminders.filter { reminder in
             reminder.scheduledAt >= today && reminder.scheduledAt < tomorrow
         }
+        if !sameDay.isEmpty { return sameDay }
+        return event.reminders
+            .filter { $0.isPending && $0.scheduledAt < tomorrow }
+            .sorted { $0.scheduledAt > $1.scheduledAt }
+            .prefix(1)
+            .map(\.self)
     }
 
     private static func affectedSubjectIDs(for event: Event, context: ModelContext) -> Set<UUID> {

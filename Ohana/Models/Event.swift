@@ -185,6 +185,7 @@ final class Event {
     var completedOccurrences: [String]
     var createdAt: Date
     var assigneeId: String? // 模块4：指派给谁 (Human.id.uuidString)
+    var taskCareKindRaw: String = ""
     var feedRuleKindRaw: String = ""
     var foodKindRaw: String = FeedFoodKind.dry.rawValue
     var feedAmountGrams: Double = 0
@@ -205,7 +206,8 @@ final class Event {
         isAllDay: Bool = false,
         eventType: String = EventType.daily.rawValue,
         relatedEntityType: String = "",
-        relatedEntityId: String = ""
+        relatedEntityId: String = "",
+        taskCareKindRaw: String = ""
     ) {
         self.id = UUID()
         self.title = title
@@ -215,6 +217,7 @@ final class Event {
         self.eventType = eventType
         self.relatedEntityType = relatedEntityType
         self.relatedEntityId = relatedEntityId
+        self.taskCareKindRaw = taskCareKindRaw
         self.recurrenceDays = 0
         self.recurrenceEndDate = nil
         self.isCompleted = false

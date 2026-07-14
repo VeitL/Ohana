@@ -308,6 +308,12 @@ final class AppWorkloadPolicy: ObservableObject {
         refreshBudget(isVisible: isVisible, allowDuringActiveWalk: allowDuringActiveWalk) == .live
     }
 
+    /// A one-shot correctness deadline is materially cheaper than a repeating UI timer.
+    /// It may run in any foreground power mode; background recovery settles it on resume.
+    func shouldRunEssentialDeadlineTimer(isVisible: Bool = true) -> Bool {
+        isVisible && isForeground
+    }
+
     func shouldRunRepeatingAnimation(isVisible: Bool = true) -> Bool {
         ambientMotionBudget(isVisible: isVisible).allowsMotion
     }

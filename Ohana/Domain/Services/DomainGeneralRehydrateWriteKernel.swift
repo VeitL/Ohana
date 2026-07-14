@@ -223,6 +223,8 @@ nonisolated struct DomainFamilyCollaborationTaskRehydrateSnapshot: Equatable {
     let note: String
     let kindRaw: String
     let statusRaw: String
+    let subjectKindRaw: String?
+    let subjectId: String?
     let relatedPetId: String?
     let relatedEventId: String?
     let relatedReminderId: String?
@@ -737,6 +739,8 @@ nonisolated enum DomainGeneralRehydrateWriter {
             note: snapshot.note,
             kind: FamilyCollaborationTaskKind(rawValue: snapshot.kindRaw) ?? .householdTask,
             status: FamilyCollaborationTaskStatus(rawValue: snapshot.statusRaw) ?? .active,
+            subjectKind: snapshot.subjectKindRaw.flatMap(FamilyCollaborationTaskSubjectKind.init(rawValue:)),
+            subjectId: snapshot.subjectId,
             relatedPetId: snapshot.relatedPetId,
             relatedEventId: snapshot.relatedEventId,
             relatedReminderId: snapshot.relatedReminderId,

@@ -10,6 +10,7 @@ import SwiftUI
 
 struct PetBasicInfoDetailView: View {
     let pet: Pet
+    var onCreateCareTask: ((TaskCreationPreset) -> Void)? = nil
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     @Environment(AppServices.self) var appServices
@@ -84,28 +85,46 @@ struct PetBasicInfoDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if isEditing, !pet.hasPassedAway {
-                    Button {
-                        saveChanges()
-                    } label: {
-                        Text(l.save)
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Pet.canonicalSex(eGender) == nil ? Color.ohanaSecondaryText : Color.goPrimary)
+                HStack(spacing: 8) {
+                    if !isEditing, !pet.hasPassedAway, let onCreateCareTask {
+                        Menu {
+                            petCareTaskButton(.petFeeding, action: onCreateCareTask)
+                            petCareTaskButton(.petWatering, action: onCreateCareTask)
+                            petCareTaskButton(.petLitter, action: onCreateCareTask)
+                            petCareTaskButton(.petPlay, action: onCreateCareTask)
+                        } label: {
+                            Image(systemName: "calendar.badge.plus") // a11y: allow decorative glyph; the Menu carries the localized action label.
+                                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                                .accessibilityHidden(true)
+                        }
+                        .accessibilityLabel(l.tr(zh: "安排宠物照顾", en: "Schedule pet care", de: "Tierpflege planen"))
+                        .accessibilityIdentifier("pet-basic-info-create-care-task")
                     }
-                    .accessibilityIdentifier("pet-basic-info-save-action")
-                    .disabled(Pet.canonicalSex(eGender) == nil)
-                } else if !pet.hasPassedAway {
-                    Button {
-                        loadEditState()
-                        withAnimation { isEditing = true }
-                    } label: {
-                        Image(systemName: "pencil.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(Color.goPrimary)
+
+                    if isEditing, !pet.hasPassedAway {
+                        Button {
+                            saveChanges()
+                        } label: {
+                            Text(l.save)
+                                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .foregroundStyle(Pet.canonicalSex(eGender) == nil ? Color.ohanaSecondaryText : Color.goPrimary)
+                        }
+                        .accessibilityIdentifier("pet-basic-info-save-action")
+                        .disabled(Pet.canonicalSex(eGender) == nil)
+                    } else if !pet.hasPassedAway {
+                        Button {
+                            loadEditState()
+                            withAnimation { isEditing = true }
+                        } label: {
+                            Image(systemName: "pencil.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(Color.goPrimary)
+                        }
+                        .accessibilityLabel(l.tr(zh: "编辑宠物资料", en: "Edit pet profile", de: "Haustierprofil bearbeiten"))
+                        .accessibilityIdentifier("pet-basic-info-edit-action")
                     }
-                    .accessibilityLabel(l.tr(zh: "编辑宠物资料", en: "Edit pet profile", de: "Haustierprofil bearbeiten"))
-                    .accessibilityIdentifier("pet-basic-info-edit-action")
                 }
             }
             if isEditing {
@@ -131,6 +150,18 @@ struct PetBasicInfoDetailView: View {
             healthSummaryLoadTask = nil
         }
         .accessibilityIdentifier("pet-basic-info-screen")
+    }
+
+    @ViewBuilder
+    private func petCareTaskButton(
+        _ careKind: TaskCareKind,
+        action: @escaping (TaskCreationPreset) -> Void
+    ) -> some View {
+        Button {
+            action(TaskCreationPreset(subjectID: pet.id, careKind: careKind))
+        } label: {
+            Label(careKind.localizedTitle(l: l), systemImage: careKind.defaultIcon)
+        }
     }
 
     // MARK: - Read View

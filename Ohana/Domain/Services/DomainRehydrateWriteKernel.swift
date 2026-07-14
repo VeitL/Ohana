@@ -78,6 +78,7 @@ nonisolated struct DomainScheduleRehydrateEventSnapshot: Equatable {
     let foodKindRaw: String
     let feedAmountGrams: Double
     let feedPlanGroupId: String
+    var taskCareKindRaw: String = ""
 
     var subjectRequest: DomainSubjectResolutionRequest {
         DomainSubjectResolutionRequest(
@@ -91,6 +92,7 @@ nonisolated struct DomainScheduleRehydrateEventSnapshot: Equatable {
 nonisolated struct DomainScheduleRehydrateReminderSnapshot: Equatable {
     let id: UUID
     let scheduledAt: Date
+    var occurrenceAt: Date? = nil
     let status: String
     let notificationId: String
     let eventId: UUID?
@@ -471,7 +473,11 @@ nonisolated enum DomainScheduleRehydrateWriter {
             reminder = existing
             inserted = false
         } else {
-            reminder = Reminder(event: linkedEvent, scheduledAt: snapshot.scheduledAt)
+            reminder = Reminder(
+                event: linkedEvent,
+                scheduledAt: snapshot.scheduledAt,
+                occurrenceAt: snapshot.occurrenceAt
+            )
             reminder.id = snapshot.id
             context.insert(reminder)
             inserted = true
@@ -515,6 +521,7 @@ nonisolated enum DomainScheduleRehydrateWriter {
         event.foodKindRaw = snapshot.foodKindRaw
         event.feedAmountGrams = snapshot.feedAmountGrams
         event.feedPlanGroupId = snapshot.feedPlanGroupId
+        event.taskCareKindRaw = snapshot.taskCareKindRaw
         return notificationIdsToCancel
     }
 
@@ -530,6 +537,7 @@ nonisolated enum DomainScheduleRehydrateWriter {
             : []
         reminder.event = event
         reminder.scheduledAt = snapshot.scheduledAt
+        reminder.occurrenceAt = snapshot.occurrenceAt
         reminder.status = rehydratedReminderStatus(snapshot.status, disposition: plan.disposition)
         reminder.notificationId = snapshot.notificationId
         reminder.completedAt = snapshot.completedAt

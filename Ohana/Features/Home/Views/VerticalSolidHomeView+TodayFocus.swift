@@ -245,8 +245,52 @@ extension VerticalSolidHomeView {
         }
     }
 
-    func openTodayFocusFamilyTask(_: TodayFocusFamilyTaskSnapshot) {
-        routeCoordinator.openCrewRoster(mode: .collaboration)
+    func openTodayFocusFamilyTask(_ task: TodayFocusFamilyTaskSnapshot) {
+        taskCenterFocusedItemID = task.id
+        taskCenterFocusedFamilyTaskID = task.taskCenterItem.familyTaskID
+        taskCenterFocusRequestID = UUID()
+        selectTab(.calendar, preservesTaskFocus: true)
+    }
+
+    func performTodayFocusTask(_ task: TodayFocusFamilyTaskSnapshot) {
+        guard let action = task.primaryAction else {
+            openTodayFocusFamilyTask(task)
+            return
+        }
+        let item = task.taskCenterItem
+        guard let entityID = item.familyTaskID ?? item.eventID ?? item.reminderID ?? item.subject.id else {
+            openTodayFocusFamilyTask(task)
+            return
+        }
+        let domainCommand = DomainCommand.todayFocus(
+            entityID: entityID,
+            action: "task.\(action.rawValue)"
+        )
+        enqueueHomeCommand(domainCommand) {
+            do {
+                let result = try TaskActionCommandExecutor(
+                    modelContext: modelContext,
+                    services: appServices
+                ).execute(TaskActionCommand(item: item, action: action))
+                guard result.didSucceed else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    appServices.islandToasts.show(l.tr(
+                        zh: "待办状态已变化，请打开待办后重试。",
+                        en: "This task changed. Open Tasks and try again.",
+                        de: "Diese Aufgabe wurde geändert. Öffne Aufgaben und versuche es erneut."
+                    ))
+                    return
+                }
+                applyTodayFocusMutationFeedback(
+                    entityId: item.subject.id ?? item.eventID ?? item.familyTaskID ?? entityID
+                )
+                requestHomeSnapshotRefresh()
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } catch {
+                appServices.domainRevisions.publishFailure(command: domainCommand, error: error)
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
     }
 
     func openTodayFocusExchange(_ request: TodayFocusExchangeRequestSnapshot) {

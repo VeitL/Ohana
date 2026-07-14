@@ -7,6 +7,36 @@ import SwiftData
 import SwiftUI
 
 extension VerticalSolidHomeView {
+    func embeddedTaskCenterPage(lifecycle: VerticalSolidHomePageLifecycle) -> some View {
+        TaskCenterRouteContainer(
+            presentation: .embeddedHome,
+            initialSurface: .tasks,
+            routeContext: TaskCenterRouteContext(
+                scope: .all,
+                focusedItemID: taskCenterFocusedItemID,
+                focusedFamilyTaskID: taskCenterFocusedFamilyTaskID,
+                focusRequestID: taskCenterFocusRequestID
+            ),
+            preselectedPetId: embeddedCalendarPreselectedPetId,
+            preselectedHumanId: embeddedCalendarPreselectedHumanId,
+            addEventTrigger: calendarAddEventTrigger,
+            isEmbeddedPrepared: lifecycle.isPrepared,
+            isEmbeddedVisible: lifecycle.isVisible,
+            isEmbeddedActive: lifecycle.isLive,
+            onRequestAddEvent: openCalendarAddEvent,
+            onPlantsLoaded: { plants in
+                embeddedCalendarPlants = plants
+            },
+            onOpenEventDestination: openCalendarEventDestination,
+            onPresentCoconutLog: onPresentCoconutLog,
+            onBadgeChange: { badge in
+                guard taskCenterBadge != badge else { return }
+                taskCenterBadge = badge
+            }
+        )
+        .padding(.top, 4)
+    }
+
     func bindHomeAppRouteSink() {
         routeCoordinator.bindAppRouteSink { route in
             switch route {
@@ -101,10 +131,18 @@ extension VerticalSolidHomeView {
         }
     }
 
-    func selectTab(_ tab: VerticalSolidHomeTab) {
+    func selectTab(
+        _ tab: VerticalSolidHomeTab,
+        preservesTaskFocus: Bool = false
+    ) {
         guard AppFeatureRouteGuard.allowsHomeTab(tab, currentLevel: appServices.oasisTree.treeLevel.rawValue) else {
             AppFeatureRouteGuard.recordIntercept("homeTab:\(tab.rawValue)")
             return
+        }
+        if tab == .calendar, !preservesTaskFocus {
+            taskCenterFocusedItemID = nil
+            taskCenterFocusedFamilyTaskID = nil
+            taskCenterFocusRequestID = nil
         }
         guard controller.selectedTab != tab else { return }
         OhanaFeedback.selection()
@@ -143,9 +181,9 @@ extension VerticalSolidHomeView {
     func performHomeToolbarPrimaryAction() {
         switch controller.selectedTab {
         case .home:
-            openFunctionMenu(destination: .petFeatureCollection)
+            openFunctionMenu(destination: .featureGroup(.householdHub))
         case .calendar:
-            openCalendarAddEvent(plants: embeddedCalendarPlants)
+            calendarAddEventTrigger += 1
         case .oasis:
             injectEmbeddedOasisEnergy()
         case .plants:
@@ -169,13 +207,13 @@ extension VerticalSolidHomeView {
     var homeToolbarPrimaryActionAccessibilityLabel: String {
         switch controller.selectedTab {
         case .home:
-            return l.tr(zh: "查看家庭数据", en: "View family data", de: "Familiendaten anzeigen")
+            l.tr(zh: "查看家庭洞察", en: "View household insights", de: "Haushaltseinblicke anzeigen")
         case .calendar:
-            return l.tr(zh: "添加待办", en: "Add task", de: "Aufgabe hinzufügen")
+            l.tr(zh: "添加待办", en: "Add task", de: "Aufgabe hinzufügen")
         case .oasis:
-            return l.tr(zh: "注入能量", en: "Inject energy", de: "Energie einspeisen")
+            l.tr(zh: "注入能量", en: "Inject energy", de: "Energie einspeisen")
         case .plants:
-            return l.tr(zh: "植物操作", en: "Plant actions", de: "Pflanzenaktionen")
+            l.tr(zh: "植物操作", en: "Plant actions", de: "Pflanzenaktionen")
         }
     }
 }

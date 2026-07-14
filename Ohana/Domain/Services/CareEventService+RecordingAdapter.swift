@@ -363,6 +363,29 @@ extension CareEventService {
         )
     }
 
+    func recordPendingSharedLitterScoopFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        context: ModelContext,
+        executorId: String?,
+        date: Date,
+        undoDeadline: Date,
+        corePayloadJSON: String,
+        externalEffectsPayloadJSON: String
+    ) -> SharedPetActionResult {
+        CareEventService.recordPendingSharedLitterScoopFact(
+            sourcePet: sourcePet,
+            targets: targets,
+            context: context,
+            executorId: executorId,
+            date: date,
+            undoDeadline: undoDeadline,
+            corePayloadJSON: corePayloadJSON,
+            externalEffectsPayloadJSON: externalEffectsPayloadJSON,
+            dependencies: dependencies
+        )
+    }
+
     func recordUnknownSharedPotty(
         sourcePet: Pet,
         targets: [Pet],

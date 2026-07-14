@@ -12,6 +12,8 @@ struct PlantDetailContentView: View {
     let plant: Plant
     let households: [Household]
     let initialFeatureDestination: PlantFeatureDestination?
+    let onCreateCareTask: ((TaskCreationPreset) -> Void)?
+    let batchQuickRecordTargetLoader: () async throws -> [PlantBatchQuickRecordTargetSnapshot]
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
@@ -31,6 +33,13 @@ struct PlantDetailContentView: View {
     @State var careFeatureDraft: PlantDetailCareFeatureDraft?
     @State var quickCareConfirmDraft: PlantQuickCareConfirmDraft?
     @State var quickCareToast: PlantQuickCareToast?
+    @State var showingBatchQuickRecordSheet = false
+    @State var batchQuickRecordCareType: PlantCareType?
+    @State var batchQuickRecordTargets: [PlantBatchQuickRecordTargetSnapshot] = []
+    @State var pendingBatchCareUndoToken: PlantBatchCareUndoToken?
+    @State var pendingBatchCareRewardTask: Task<Void, Never>?
+    @State var showingBatchCareFailure = false
+    @State var batchCareFailureDetail = ""
     @State var pendingDetailQuickCareTypes: Set<PlantCareType> = []
     @State var completedDetailQuickCareTypes: Set<PlantCareType> = []
     @State var failedDetailQuickCareTypes: Set<PlantCareType> = []
@@ -785,6 +794,26 @@ struct PlantDetailContentView: View {
                     .accessibilityIdentifier("plant-detail-delete-action")
                     #endif
 
+                    if !plant.isArchived, let onCreateCareTask {
+                        Menu {
+                            ForEach(PlantCareCategory.schedulableCareTypes, id: \.rawValue) { careType in
+                                if let careKind = TaskCareKind(plantCareType: careType) {
+                                    Button {
+                                        onCreateCareTask(TaskCreationPreset(subjectID: plant.id, careKind: careKind))
+                                    } label: {
+                                        Label(careType.displayName(l: l), systemImage: careKind.defaultIcon)
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "calendar.badge.plus") // a11y: allow decorative glyph; the Menu carries the localized action label.
+                                .accessibilityHidden(true)
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                        }
+                        .accessibilityLabel(l.tr(zh: "安排植物照顾", en: "Schedule plant care", de: "Pflanzenpflege planen"))
+                        .accessibilityIdentifier("plant-detail-create-care-task")
+                    }
+
                     Button { showingAllFeaturesHub = true } label: {
                         Image(systemName: "square.grid.2x2.fill") // a11y: allow decorative all-features glyph; button label names the action.
                             .accessibilityHidden(true)
@@ -843,6 +872,17 @@ struct PlantDetailContentView: View {
                 focusedCareType: draft.focusedCareType
             )
         }
+        .sheet(isPresented: $showingBatchQuickRecordSheet) {
+            PlantBatchQuickRecordSheet(
+                targets: batchQuickRecordTargets,
+                initialCareType: batchQuickRecordCareType,
+                initialSelectedPlantIDs: [plant.id],
+                imageDataProvider: { modelID in
+                    await batchQuickRecordImageData(for: modelID)
+                },
+                onRecord: recordBatchQuickCareFromDetail
+            )
+        }
         .safeAreaInset(edge: .bottom) {
             pendingDeleteBanner
         }
@@ -882,11 +922,23 @@ struct PlantDetailContentView: View {
                 de: "Nach der Wiederherstellung werden künftige Pflegepläne aus den aktuellen Einstellungen neu erstellt."
             ))
         }
+        .alert(
+            l.tr(zh: "未记录这次批量照护", en: "Batch care was not logged", de: "Sammelpflege wurde nicht erfasst"),
+            isPresented: $showingBatchCareFailure
+        ) {
+            Button(l.tr(zh: "重新选择", en: "Select again", de: "Erneut auswählen")) {
+                reloadBatchQuickRecordTargetsAndPresent()
+            }
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+        } message: {
+            Text(batchCareFailureDetail)
+        }
         .onDisappear {
             renderDataRefreshTask?.cancel()
             mediaAttachmentIndexRepairTask?.cancel()
             quickCareToastClearTask?.cancel()
             deleteUndoTask?.cancel()
+            pendingBatchCareRewardTask?.cancel()
             if !isDeleteCommitting {
                 commandQueue.cancelAll()
             }
@@ -898,7 +950,9 @@ struct PlantDetailContentView: View {
             )
         }
     }
+}
 
+extension PlantDetailContentView {
     var shouldRefreshPlantDetailRenderDataForLatestMutation: Bool {
         guard let mutation = appServices.domainRevisions.lastMutation else {
             return false

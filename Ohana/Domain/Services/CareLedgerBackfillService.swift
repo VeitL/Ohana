@@ -390,21 +390,7 @@ nonisolated enum CareLedgerBackfillService {
             control: control
         ) { log in
             guard try shouldBackfill("PlantCareLog", log.id.uuidString) else { return }
-            CareLedgerService.record(
-                occurredAt: log.date,
-                actorKind: log.executorId == nil ? .unknown : .human,
-                actorId: log.executorId,
-                subjectKind: .plant,
-                subjectId: log.plant?.id.uuidString,
-                eventKind: .plantCare,
-                actionType: log.careTypeRaw,
-                note: log.note,
-                source: .backfill,
-                legacyModelName: "PlantCareLog",
-                legacyModelId: log.id.uuidString,
-                context: context,
-                save: false
-            )
+            recordPlantCare(log, context: context)
         }
                 control.complete(.plantCare)
             }
@@ -446,6 +432,29 @@ nonisolated enum CareLedgerBackfillService {
         }
 
         return try persistBatch(context: context, control: control)
+    }
+
+    private static func recordPlantCare(_ log: PlantCareLog, context: ModelContext) {
+        CareLedgerService.record(
+            occurredAt: log.date,
+            actorKind: log.executorId == nil ? .unknown : .human,
+            actorId: log.executorId,
+            subjectKind: .plant,
+            subjectId: log.plant?.id.uuidString,
+            eventKind: .plantCare,
+            actionType: log.careTypeRaw,
+            note: log.note,
+            source: .backfill,
+            legacyModelName: "PlantCareLog",
+            legacyModelId: log.id.uuidString,
+            metadataJSON: CareLedgerMetadata.addingString(
+                CareLedgerMetadata.careTransactionId,
+                value: log.careTransactionId,
+                to: ""
+            ),
+            context: context,
+            save: false
+        )
     }
 
     private static func persistBatch(

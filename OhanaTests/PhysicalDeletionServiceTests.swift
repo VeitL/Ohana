@@ -145,6 +145,14 @@ struct PhysicalDeletionServiceTests {
             coconutDelta: 2,
             rewardLogId: "plant-reward-ledger"
         )
+        let plantTask = FamilyCollaborationTask(
+            title: "Fertilize Fern",
+            kind: .careReminder,
+            subjectKind: .plant,
+            subjectId: plantID.uuidString,
+            createdById: UUID().uuidString,
+            createdByName: "Creator"
+        )
 
         context.insert(plant)
         context.insert(log)
@@ -153,6 +161,7 @@ struct PhysicalDeletionServiceTests {
         context.insert(unrelatedEvent)
         context.insert(ledger)
         context.insert(rewardLedger)
+        context.insert(plantTask)
         try context.save()
 
         PhysicalDeletionService.deletePlant(plant, context: context, notifications: scheduler)
@@ -161,6 +170,7 @@ struct PhysicalDeletionServiceTests {
         #expect(try context.fetch(FetchDescriptor<Plant>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<FamilyCollaborationTask>()).isEmpty)
         let retainedLedgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(retainedLedgers.map(\.id) == [rewardLedger.id])
         #expect(retainedLedgers.first?.subjectKind == CareLedgerSubjectKind.unknown.rawValue)
@@ -175,6 +185,7 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(PlantCareLog.self, id: log.id, context: context) != nil)
         #expect(deletionTombstone(Event.self, id: event.id, context: context) != nil)
         #expect(deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
+        #expect(deletionTombstone(FamilyCollaborationTask.self, id: plantTask.id, context: context) != nil)
         #expect(deletionTombstone(CareLedgerEvent.self, id: ledger.id, context: context) != nil)
         #expect(deletionTombstone(CareLedgerEvent.self, id: rewardLedger.id, context: context) == nil)
     }
@@ -245,6 +256,14 @@ struct PhysicalDeletionServiceTests {
             totalAmountGrams: 120,
             stockOwnerPetId: deletedPet.id.uuidString
         )
+        let undoReceipt = SharedCareUndoReceipt(
+            sharedSessionId: session.id,
+            sourcePetId: deletedPet.id,
+            targetPetIds: [deletedPet.id, survivor.id],
+            actionKind: .litterScoop,
+            occurredAt: session.date,
+            undoDeadline: session.date.addingTimeInterval(6)
+        )
         let deletedLog = PetCareLog(
             date: session.date,
             type: .feeding,
@@ -307,6 +326,7 @@ struct PhysicalDeletionServiceTests {
         context.insert(deletedPet)
         context.insert(survivor)
         context.insert(session)
+        context.insert(undoReceipt)
         context.insert(deletedLog)
         context.insert(survivorLog)
         context.insert(account)
@@ -323,6 +343,7 @@ struct PhysicalDeletionServiceTests {
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         let careLedgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let undoReceipts = try context.fetch(FetchDescriptor<SharedCareUndoReceipt>())
 
         let retiredAccount = try #require(accounts.first { $0.ownerId == deletedPet.id.uuidString })
         #expect(retiredAccount.balance == 0)
@@ -345,6 +366,7 @@ struct PhysicalDeletionServiceTests {
         #expect(sessions.first?.targetPetIds == [survivor.id.uuidString])
         #expect(sessions.first?.sourcePetId.isEmpty == true)
         #expect(sessions.first?.stockOwnerPetId.isEmpty == true)
+        #expect(undoReceipts.isEmpty)
         #expect(sessions.first?.totalAmountGrams == survivorLog.amountGrams)
         #expect(CoconutWalletService.totalBalance(context: context) == 0)
         #expect(deletionTombstone(CoconutLedgerEntry.self, id: walletEntry.id, context: context) == nil)
@@ -713,6 +735,15 @@ struct PhysicalDeletionServiceTests {
             species: pet.species
         )
         session.setExecutorIds([humanId], primaryExecutorId: humanId)
+        let undoReceipt = SharedCareUndoReceipt(
+            sharedSessionId: session.id,
+            sourcePetId: pet.id,
+            targetPetIds: [pet.id],
+            executorId: humanId,
+            actionKind: .litterScoop,
+            occurredAt: session.date,
+            undoDeadline: session.date.addingTimeInterval(6)
+        )
         let exchange = CoconutExchangeRequest(
             senderId: humanId,
             senderName: human.name,
@@ -729,6 +760,16 @@ struct PhysicalDeletionServiceTests {
             createdByName: human.name,
             assignedToId: humanId,
             assignedToName: human.name
+        )
+        let humanSubjectTask = FamilyCollaborationTask(
+            title: "Human subject task",
+            kind: .householdTask,
+            subjectKind: .human,
+            subjectId: humanId,
+            createdById: survivor.id.uuidString,
+            createdByName: survivor.name,
+            assignedToId: survivor.id.uuidString,
+            assignedToName: survivor.name
         )
         context.insert(human)
         context.insert(survivor)
@@ -751,8 +792,10 @@ struct PhysicalDeletionServiceTests {
         context.insert(careLedger)
         context.insert(budgetUsage)
         context.insert(session)
+        context.insert(undoReceipt)
         context.insert(exchange)
         context.insert(task)
+        context.insert(humanSubjectTask)
         try context.save()
 
         let deletedCount = PhysicalDeletionService.deleteHuman(human, context: context, deletedByHumanId: survivor.id.uuidString)
@@ -781,6 +824,7 @@ struct PhysicalDeletionServiceTests {
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<SharedCareUndoReceipt>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutExchangeRequest>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<FamilyCollaborationTask>()).isEmpty)
         #expect(deletionTombstone(Human.self, id: human.id, context: context) != nil)
@@ -789,6 +833,7 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(EconomyBudgetUsageEvent.self, id: budgetUsage.id, context: context) != nil)
         #expect(deletionTombstone(CoconutExchangeRequest.self, id: exchange.id, context: context) != nil)
         #expect(deletionTombstone(FamilyCollaborationTask.self, id: task.id, context: context) != nil)
+        #expect(deletionTombstone(FamilyCollaborationTask.self, id: humanSubjectTask.id, context: context) != nil)
     }
 
     @Test func deleteHumanUsesUnifiedResolverForMedicationNotesAndAssignments() throws {
@@ -1187,7 +1232,7 @@ struct PhysicalDeletionServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV85.models)
+        let schema = Schema(ArkSchemaV90.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

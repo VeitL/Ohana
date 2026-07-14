@@ -8,6 +8,28 @@
 import Foundation
 import SwiftData
 
+nonisolated struct SharedLitterScoopPlanSnapshot: Codable, Equatable, Sendable {
+    static let currentVersion = 1
+
+    let version: Int
+    let intervalDays: Int
+    let anchorDate: Date
+    let reminderOn: Bool
+
+    init(intervalDays: Int, anchorDate: Date, reminderOn: Bool) {
+        version = Self.currentVersion
+        self.intervalDays = max(1, intervalDays)
+        self.anchorDate = anchorDate
+        self.reminderOn = reminderOn
+    }
+
+    var encodedJSON: String {
+        guard let data = try? JSONEncoder().encode(self),
+              let json = String(data: data, encoding: .utf8) else { return "{}" }
+        return json
+    }
+}
+
 struct QuickPottyCommandResult: Equatable {
     let petID: UUID
     let careLogID: UUID?
@@ -15,6 +37,7 @@ struct QuickPottyCommandResult: Equatable {
     let coconutDelta: Int
     let action: String
     let targetCount: Int
+    let undoToken: SharedCareUndoToken?
 }
 
 @MainActor
@@ -36,9 +59,12 @@ private func fetchQuickPottyModelsOrLog<T: PersistentModel>(
 
 @MainActor
 struct QuickPottyCommandExecutor {
+    static let sharedLitterUndoWindow: TimeInterval = 6
+
     private let context: ModelContext
     private let careEvents: CareEventRecording
     private let derivations: CareDerivationExecutor
+    private let revisions: DomainRevisionPublishing
 
     init(context: ModelContext) {
         self.init(
@@ -63,6 +89,7 @@ struct QuickPottyCommandExecutor {
     ) {
         self.context = context
         self.careEvents = careEvents
+        self.revisions = revisions
         derivations = CareDerivationExecutor(revisions: revisions)
     }
 
@@ -113,7 +140,8 @@ struct QuickPottyCommandExecutor {
                 pottyLogID: nil,
                 coconutDelta: recorded.result.coconutDelta,
                 action: action,
-                targetCount: 1
+                targetCount: 1,
+                undoToken: nil
             )
         }
 
@@ -150,7 +178,8 @@ struct QuickPottyCommandExecutor {
             pottyLogID: logID,
             coconutDelta: recorded.reward.humanGot + recorded.reward.petGot,
             action: action,
-            targetCount: 1
+            targetCount: 1,
+            undoToken: nil
         )
     }
 
@@ -165,7 +194,14 @@ struct QuickPottyCommandExecutor {
             deriveNoop(petID: sourcePetID, action: "unknownSharedPotty", note: "quickPotty.unknown.missingPet")
             return nil
         }
-        let targets = fetchTargets(sourcePet: sourcePet, targetIDs: targetIDs)
+        guard let targets = fetchTargets(sourcePet: sourcePet, targetIDs: targetIDs) else {
+            deriveNoop(
+                petID: sourcePet.id,
+                action: "unknownSharedPotty",
+                note: "quickPotty.unknown.invalidTargets"
+            )
+            return nil
+        }
         guard let log = careEvents.recordUnknownSharedPotty(
             sourcePet: sourcePet,
             targets: targets,
@@ -194,7 +230,8 @@ struct QuickPottyCommandExecutor {
             pottyLogID: log.id,
             coconutDelta: 0,
             action: "unknownSharedPotty",
-            targetCount: targets.count
+            targetCount: targets.count,
+            undoToken: nil
         )
     }
 
@@ -203,25 +240,47 @@ struct QuickPottyCommandExecutor {
         targetIDs: Set<UUID>,
         executorId: String?,
         date: Date,
-        isFullChange: Bool
+        isFullChange: Bool,
+        scoopPlan: SharedLitterScoopPlanSnapshot? = nil
     ) -> QuickPottyCommandResult? {
         guard let sourcePet = fetchPet(id: sourcePetID), EconomyWalletWritePolicy.canWrite(sourcePet) else {
             deriveNoop(petID: sourcePetID, action: isFullChange ? "litterFullChange" : "litterScoop", note: "quickPotty.litter.missingPet")
             return nil
         }
-        let targets = fetchTargets(sourcePet: sourcePet, targetIDs: targetIDs)
+        let action = isFullChange ? "litterFullChange" : "litterScoop"
+        guard let targets = fetchTargets(sourcePet: sourcePet, targetIDs: targetIDs) else {
+            deriveNoop(
+                petID: sourcePet.id,
+                action: action,
+                note: "quickPotty.litterCare.invalidTargets"
+            )
+            return nil
+        }
         let result: SharedPetActionResult?
         let reward: (humanGot: Int, petGot: Int)
         let careLogID: UUID?
         if targets.count > 1 {
-            let recorded = careEvents.recordSharedLitterCareFact(
-                sourcePet: sourcePet,
-                targets: targets,
-                context: context,
-                executorId: executorId,
-                date: date,
-                isFullChange: isFullChange
-            )
+            let recorded = if isFullChange {
+                careEvents.recordSharedLitterCareFact(
+                    sourcePet: sourcePet,
+                    targets: targets,
+                    context: context,
+                    executorId: executorId,
+                    date: date,
+                    isFullChange: true
+                )
+            } else {
+                careEvents.recordPendingSharedLitterScoopFact(
+                    sourcePet: sourcePet,
+                    targets: targets,
+                    context: context,
+                    executorId: executorId,
+                    date: date,
+                    undoDeadline: date.addingTimeInterval(Self.sharedLitterUndoWindow),
+                    corePayloadJSON: scoopPlan?.encodedJSON ?? "{}",
+                    externalEffectsPayloadJSON: "{}"
+                )
+            }
             result = recorded
             reward = recorded.reward
             careLogID = nil
@@ -242,13 +301,11 @@ struct QuickPottyCommandExecutor {
             reward = recorded.reward
             careLogID = recorded.result.logID
             guard recorded.result.didWriteFact else {
-                let action = isFullChange ? "litterFullChange" : "litterScoop"
                 deriveNoop(petID: sourcePet.id, action: action, note: "quickPotty.litterCare.factNoop")
                 return nil
             }
         }
 
-        let action = isFullChange ? "litterFullChange" : "litterScoop"
         if let result, !result.didWriteFact {
             deriveNoop(petID: sourcePet.id, action: action, note: "quickPotty.litterCare.factNoop")
             return nil
@@ -275,8 +332,66 @@ struct QuickPottyCommandExecutor {
             pottyLogID: nil,
             coconutDelta: reward.humanGot + reward.petGot,
             action: action,
-            targetCount: targets.count
+            targetCount: targets.count,
+            undoToken: (isFullChange ? nil : result).flatMap { recorded in
+                guard let receiptID = recorded.undoReceiptID,
+                      let undoDeadline = recorded.undoDeadline else { return nil }
+                return SharedCareUndoToken(
+                    sessionID: recorded.sessionID,
+                    sourcePetID: sourcePet.id,
+                    receiptID: receiptID,
+                    undoDeadline: undoDeadline
+                )
+            }
         )
+    }
+
+    func undoSharedCare(
+        _ token: SharedCareUndoToken,
+        executorId: String?,
+        date: Date = Date()
+    ) throws -> SharedCareUndoResult {
+        let command = DomainCommand.quickCare(entityID: token.sourcePetID, action: "undoSharedCare")
+        do {
+            let result = try SharedCareSessionUndoService.undo(
+                token,
+                context: context,
+                undoneByHumanId: executorId,
+                undoneAt: date
+            )
+            guard result.didUndo else { return result }
+
+            let deletedIDs = result.deletedCareLogIDs + result.deletedLedgerEventIDs
+            var affectedIDs = Set(result.targetPetIDs)
+            affectedIDs.formUnion(deletedIDs)
+            affectedIDs.formUnion(result.reversalWalletEntryIDs)
+            affectedIDs.insert(token.sessionID)
+            affectedIDs.insert(token.sourcePetID)
+            derivations.derive(
+                .active(
+                    disposition: .active,
+                    fact: CareWriteOutcome.FactPayload(
+                        subjectID: token.sourcePetID,
+                        logIDs: deletedIDs,
+                        factDate: date,
+                        operationDate: date
+                    ),
+                    revision: CareWriteOutcome.RevisionPayload(
+                        command: command,
+                        affectedEntityIDs: affectedIDs,
+                        note: "quickPotty.undoSharedCare"
+                    )
+                )
+            )
+            revisions.publishWalletProjection(
+                affectedEntityIDs: Set(result.targetPetIDs).union([token.sourcePetID]),
+                note: "quickPotty.undoSharedCare"
+            )
+            return result
+        } catch {
+            derivations.publishFailure(command: command, error: error)
+            throw error
+        }
     }
 
     private func fetchPet(id: UUID) -> Pet? {
@@ -293,11 +408,23 @@ struct QuickPottyCommandExecutor {
         ).first
     }
 
-    private func fetchTargets(sourcePet: Pet, targetIDs: Set<UUID>) -> [Pet] {
-        let ids = targetIDs.isEmpty ? [sourcePet.id] : Array(targetIDs)
-        let targets = ids.compactMap { fetchPet(id: $0) }
-            .filter(EconomyWalletWritePolicy.canWrite)
-        return targets.isEmpty ? [sourcePet] : targets
+    private func fetchTargets(sourcePet: Pet, targetIDs: Set<UUID>) -> [Pet]? {
+        let requestedIDs = targetIDs.isEmpty ? Set([sourcePet.id]) : targetIDs
+        let fetchedTargets = requestedIDs.compactMap { fetchPet(id: $0) }
+
+        // A multi-target selection is one user intent. Requiring the fetched
+        // identifiers to match before normalization prevents a missing target
+        // from being silently dropped and turning the request into a partial
+        // write (or a source-only fallback).
+        guard Set(fetchedTargets.map(\.id)) == requestedIDs else { return nil }
+
+        let normalizedTargets = SharedPetTargetResolver.normalizedTargets(
+            fetchedTargets,
+            fallback: sourcePet
+        )
+        let expectedIDs = requestedIDs.union([sourcePet.id])
+        guard Set(normalizedTargets.map(\.id)) == expectedIDs else { return nil }
+        return normalizedTargets
     }
 
     private func latestPottyLogID(petID: UUID, type: PottyType, date: Date) -> UUID? {

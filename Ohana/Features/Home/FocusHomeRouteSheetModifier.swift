@@ -214,6 +214,12 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                     onClose: { routes.dismissModal() },
                     onPresentCoconutLog: { subject in
                         routes.openCoconutLog(subject)
+                    },
+                    onOpenTaskCenter: {
+                        routes.dismissModal()
+                        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
+                            routes.openTaskCenter()
+                        }
                     }
                 )
                 .toolbar {

@@ -978,6 +978,38 @@ enum ArkSchemaV85: VersionedSchema {
     static var models: [any PersistentModel.Type] { ArkSchemaV84.models }
 }
 
+// MARK: - Schema V86（Plant 照顾事务识别子）
+enum ArkSchemaV86: VersionedSchema {
+    static var versionIdentifier = Schema.Version(86, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV85.models }
+}
+
+// MARK: - Schema V87（FamilyTask 通用对象关联）
+enum ArkSchemaV87: VersionedSchema {
+    static var versionIdentifier = Schema.Version(87, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV86.models }
+}
+
+// MARK: - Schema V88（Event 任务照顾语义）
+enum ArkSchemaV88: VersionedSchema {
+    static var versionIdentifier = Schema.Version(88, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV87.models }
+}
+
+// MARK: - Schema V89（Reminder 通知时间与任务发生时间分离）
+enum ArkSchemaV89: VersionedSchema {
+    static var versionIdentifier = Schema.Version(89, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV88.models }
+}
+
+// MARK: - Schema V90（共享照顾撤销窗口持久化恢复）
+enum ArkSchemaV90: VersionedSchema {
+    static var versionIdentifier = Schema.Version(90, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV89.models + [SharedCareUndoReceipt.self]
+    }
+}
+
 // MARK: - Migration Plan
 // 只保留有真实 custom logic 的 stage；轻量新增字段/模型不需要显式 stage。
 // 相邻 schema hash 相同时，显式 stage 会触发 iOS 26 "model reference cannot be equal"。
@@ -1001,7 +1033,8 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV70.self, ArkSchemaV71.self, ArkSchemaV72.self, ArkSchemaV73.self, ArkSchemaV74.self,
          ArkSchemaV75.self, ArkSchemaV76.self, ArkSchemaV77.self, ArkSchemaV78.self, ArkSchemaV79.self,
          ArkSchemaV80.self, ArkSchemaV81.self, ArkSchemaV82.self, ArkSchemaV83.self, ArkSchemaV84.self,
-         ArkSchemaV85.self]
+         ArkSchemaV85.self, ArkSchemaV86.self, ArkSchemaV87.self, ArkSchemaV88.self,
+         ArkSchemaV89.self, ArkSchemaV90.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -1065,7 +1098,7 @@ enum SharedModelContainer {
     }
 
     static func makePreview() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV85.models)
+        let schema = Schema(ArkSchemaV90.models)
         let configuration = ModelConfiguration(
             isStoredInMemoryOnly: true,
             cloudKitDatabase: .none
@@ -1075,7 +1108,7 @@ enum SharedModelContainer {
 
     private static func createPersistentContainer() throws -> ModelContainer {
         ensureApplicationSupportDirectory()
-        let schema = Schema(ArkSchemaV85.models)
+        let schema = Schema(ArkSchemaV90.models)
         let primaryConfiguration = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

@@ -256,6 +256,48 @@ extension CareEventService {
         return result
     }
 
+    /// Records only the authoritative real-world facts plus the durable undo receipt.
+    /// Rewards, ledger projection, reminder/task completion, and plan side effects are
+    /// deliberately deferred until the receipt is finalized.
+    @discardableResult
+    @MainActor
+    static func recordPendingSharedLitterScoopFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        context: ModelContext,
+        executorId: String? = nil,
+        date: Date = Date(),
+        undoDeadline: Date,
+        corePayloadJSON: String = "{}",
+        externalEffectsPayloadJSON: String = "{}",
+        dependencies providedDependencies: CareEventServiceDependencies? = nil
+    ) -> SharedPetActionResult {
+        let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
+        let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet)
+        guard liveTargets.count > 1 else { return .noOp() }
+        return SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: .litterScoop,
+                sourcePet: sourcePet,
+                targets: liveTargets,
+                date: date,
+                executorId: executorId,
+                allocationMode: .equal,
+                childLogStrategy: .care(type: .litter),
+                reward: .potty(isLitter: true),
+                rewardTitle: sharedCareRewardTitle(.litterScoop, targetCount: liveTargets.count, l: .current),
+                reminderCareType: .litter
+            ),
+            context: context,
+            dependencies: dependencies,
+            deferredFinalization: SharedCareDeferredFinalizationRequest(
+                undoDeadline: undoDeadline,
+                corePayloadJSON: corePayloadJSON,
+                externalEffectsPayloadJSON: externalEffectsPayloadJSON
+            )
+        )
+    }
+
     @discardableResult
     @MainActor
     static func recordSharedCare(

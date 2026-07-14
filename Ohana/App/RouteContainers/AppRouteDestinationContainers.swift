@@ -10,27 +10,42 @@ import SwiftUI
 struct AppRouteDestination: View {
     let route: AppRoute
     let onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+    let onPresentTaskCenter: ((TaskCenterRouteContext) -> Void)?
 
     init(
         route: AppRoute,
-        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil,
+        onPresentTaskCenter: ((TaskCenterRouteContext) -> Void)? = nil
     ) {
         self.route = route
         self.onPresentCoconutLog = onPresentCoconutLog
+        self.onPresentTaskCenter = onPresentTaskCenter
     }
 
     var body: some View {
         switch route {
         case let .petProfile(id, initialTab):
-            AppPetRouteContainer(id: id, initialTab: initialTab)
+            AppPetRouteContainer(
+                id: id,
+                initialTab: initialTab,
+                onCreateCareTask: { preset in
+                    onPresentTaskCenter?(.createCare(preset))
+                }
+            )
         case let .humanProfile(id):
             AppHumanRouteContainer(
                 id: id,
-                onPresentCoconutLog: onPresentCoconutLog ?? { _ in }
+                onPresentCoconutLog: onPresentCoconutLog ?? { _ in },
+                onOpenTasks: { onPresentTaskCenter?(.human(id)) }
             )
         case let .plantProfile(id):
             if AppFeatureRouteGuard.allowsAppRoute(route) {
-                AppPlantRouteContainer(id: id)
+                AppPlantRouteContainer(
+                    id: id,
+                    onCreateCareTask: { preset in
+                        onPresentTaskCenter?(.createCare(preset))
+                    }
+                )
             } else {
                 HiddenRouteInterceptView(note: route.id)
             }
@@ -323,10 +338,11 @@ private struct AppSheetRouteDestination: View {
                 }
             )
             .ohanaSheetPagePresentation()
-        case .taskCenter:
+        case let .taskCenter(context):
             TaskCenterRouteContainer(
                 presentation: .sheet,
                 initialSurface: .tasks,
+                routeContext: context,
                 onOpenEventDestination: onCalendarEventDestination,
                 onPresentCoconutLog: { subject in
                     coordinator.presentCoconutLog(subject)
@@ -374,6 +390,12 @@ private struct AppSheetRouteDestination: View {
                     onClose: onDismiss,
                     onPresentCoconutLog: { subject in
                         coordinator.presentCoconutLog(subject)
+                    },
+                    onOpenTaskCenter: {
+                        onDismiss()
+                        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
+                            coordinator.presentTaskCenter()
+                        }
                     }
                 )
                 .toolbar {

@@ -66,10 +66,17 @@ struct CareLedgerAnalysisContentView: View {
                 Spacer()
             }
             HStack(spacing: 10) {
-                metric(l.tr(zh: "事件", en: "Events", de: "Ereignisse"), "\(screenModel.filteredEvents.count)", .goPrimary)
+                metric(l.tr(zh: "现实操作", en: "Actions", de: "Aktionen"), "\(screenModel.realOperationCount)", .goPrimary)
+                metric(l.tr(zh: "对象覆盖", en: "Coverage", de: "Abdeckung"), "\(screenModel.objectCoverageCount)", .goTeal)
                 metric(l.tr(zh: "奖励", en: "Rewards", de: "Belohnungen"), "\(screenModel.positiveRewardTotal)🥥", .goYellow)
-                metric(l.tr(zh: "类型", en: "Types", de: "Typen"), "\(screenModel.kindStats.count)", .goTeal)
             }
+            Text(l.tr(
+                zh: "同一批量或共享照护只计一次现实操作；每个被照护对象各计一次覆盖。",
+                en: "A batch or shared-care session counts as one action; each cared-for subject counts once toward coverage.",
+                de: "Eine Sammel- oder gemeinsame Pflege zaehlt als eine Aktion; jedes versorgte Objekt als eine Abdeckung."
+            ))
+                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
@@ -107,7 +114,7 @@ struct CareLedgerAnalysisContentView: View {
                 emptyText(l.tr(zh: "暂无账本事件", en: "No ledger events yet", de: "Noch keine Buchereignisse"))
             } else {
                 ForEach(screenModel.kindStats, id: \.0) { kind, count in
-                    statBar(title: kind.displayName(l: l), count: count, total: max(screenModel.filteredEvents.count, 1), color: kind.color)
+                    statBar(title: kind.displayName(l: l), count: count, total: max(screenModel.realOperationCount, 1), color: kind.color)
                 }
             }
         }
@@ -167,7 +174,7 @@ struct CareLedgerAnalysisContentView: View {
                 emptyText(l.tr(zh: "暂无成员统计", en: "No member stats yet", de: "Noch keine Mitgliederstatistik"))
             } else {
                 ForEach(actorStats.prefix(6), id: \.0) { name, count in
-                    statBar(title: name, count: count, total: max(screenModel.filteredEvents.count, 1), color: .goPrimary)
+                    statBar(title: name, count: count, total: max(screenModel.realOperationCount, 1), color: .goPrimary)
                 }
             }
         }

@@ -9,20 +9,22 @@
 
 ## Current Read
 
-- Last compacted: 2026-07-12.
+- Last compacted: 2026-07-14.
 - Open follow-ups: 9 total: P1 = 5, P2 = 4, P3 = 0.
 - Open P0: 0.
-- First-release repository blocker: none. TFU-20260711-002 is closed; the
-  wallet, full architecture, production-complexity, and release-static gates
-  pass on the current worktree.
+- First-release repository blocker: none currently recorded. The unified Task
+  Center, Plant multi-object flow, and shared-litter one-shot undo contract are
+  implemented with repository-local compile, migration, recovery, and targeted
+  consistency evidence.
 - First-release product/configuration gap: none for accounts; the current Solo
   product deliberately has no Ohana account, login, or developer backend. D24
   still approves iPhone-only, iOS 26.2+, with native iPad/watchOS deferred.
-- Current decision: finish the four physical-device P1 items. The remaining
-  CloudKit P1 is explicitly deferred and unreachable in Solo. The future account
-  design is recorded in `docs/planning/account-backend-extension.md` and is not
-  active backlog until a documented trigger is approved. Do not claim RC/App
-  Store readiness until all release-reachable P1 items are dispositioned.
+- Current decision: complete the four physical-device P1 items. The remaining
+  CloudKit P1 is explicitly deferred and unreachable in Solo. The future
+  account design is recorded in
+  `docs/planning/account-backend-extension.md` and is not active backlog until a
+  documented trigger is approved. Do not claim RC/App Store readiness until all
+  release-reachable P1 items are dispositioned.
 
 ## Priority Meaning
 

@@ -35,15 +35,77 @@ struct CareLedgerAnalysisScreenModelTests {
         #expect(model.dailyTrendPoints.last?.value == 2)
     }
 
-    private func ledger(kind: CareLedgerEventKind, occurredAt: Date) -> CareLedgerEvent {
+    @Test func batchAndSharedCareDistinguishOperationsFromObjectCoverage() {
+        let now = Date()
+        let model = CareLedgerAnalysisScreenModel()
+        let plantTransaction = UUID().uuidString
+        let sharedPetSession = UUID().uuidString
+
+        model.applyQuerySnapshot(
+            ledgerEvents: [
+                ledger(
+                    kind: .plantCare,
+                    actionType: "watering",
+                    occurredAt: now,
+                    subjectId: "plant-1",
+                    metadataJSON: "{\"careTransactionId\":\"\(plantTransaction)\"}"
+                ),
+                ledger(
+                    kind: .plantCare,
+                    actionType: "watering",
+                    occurredAt: now,
+                    subjectId: "plant-2",
+                    metadataJSON: "{\"careTransactionId\":\"\(plantTransaction)\"}"
+                ),
+                ledger(
+                    kind: .hygiene,
+                    actionType: "litterBox",
+                    occurredAt: now,
+                    subjectId: "pet-1",
+                    metadataJSON: "{\"sharedSessionId\":\"\(sharedPetSession)\"}"
+                ),
+                ledger(
+                    kind: .hygiene,
+                    actionType: "litterBox",
+                    occurredAt: now,
+                    subjectId: "pet-2",
+                    metadataJSON: "{\"sharedSessionId\":\"\(sharedPetSession)\"}"
+                ),
+                ledger(
+                    kind: .hygiene,
+                    actionType: "litterBox",
+                    occurredAt: now,
+                    subjectId: "pet-2",
+                    metadataJSON: "{\"sharedSessionId\":\"\(sharedPetSession)\"}"
+                )
+            ],
+            pets: [],
+            humans: []
+        )
+        model.selectedRange = .all
+
+        #expect(model.realOperationCount == 2)
+        #expect(model.objectCoverageCount == 4)
+        #expect(model.dailyTrendTotal == 2)
+        #expect(model.kindStats.map(\.1).reduce(0, +) == 2)
+    }
+
+    private func ledger(
+        kind: CareLedgerEventKind,
+        actionType: String? = nil,
+        occurredAt: Date,
+        subjectId: String = "pet-1",
+        metadataJSON: String = ""
+    ) -> CareLedgerEvent {
         CareLedgerEvent(
             occurredAt: occurredAt,
             actorKind: .human,
             actorId: "human-1",
             subjectKind: .pet,
-            subjectId: "pet-1",
+            subjectId: subjectId,
             eventKind: kind,
-            actionType: kind.rawValue
+            actionType: actionType ?? kind.rawValue,
+            metadataJSON: metadataJSON
         )
     }
 }

@@ -6,7 +6,7 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct SharedPetActionRecorderTests {
-    @Test func resolverKeepsSourceFirstAndFiltersSameSpeciesLiveTargets() {
+    @Test func resolverKeepsSourceFirstAndRejectsAStaleMixedTargetSelection() {
         let source = Pet(name: "Milo", species: "cat")
         let sibling = Pet(name: "Luna", species: " 猫 ")
         let dog = Pet(name: "Biscuit", species: "狗")
@@ -20,11 +20,46 @@ struct SharedPetActionRecorderTests {
         let targets = SharedPetTargetResolver.sameSpeciesTargets(
             sourcePet: source,
             allPets: [sibling, owl, dog, memorial, source],
+            explicitTargetIds: [sibling.id]
+        )
+        let staleTargets = SharedPetTargetResolver.sameSpeciesTargets(
+            sourcePet: source,
+            allPets: [sibling, owl, dog, memorial, source],
             explicitTargetIds: [sibling.id, owl.id]
         )
 
         #expect(targets.map(\.id) == [source.id, sibling.id])
+        #expect(staleTargets.isEmpty)
         #expect(PetSpeciesKey.normalized("猫头鹰") == "bird")
+    }
+
+    @Test func sharedLitterRejectsAllTargetsWhenOneSelectedPetIsNoLongerActive() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let first = Pet(name: "Milo", species: "猫")
+        let second = Pet(name: "Luna", species: "猫")
+        second.passedAwayDate = Date(timeIntervalSince1970: 900)
+        context.insert(human)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: human.id.uuidString)
+        defer { cleanup() }
+
+        let result = CareEventService.recordSharedLitterCareFact(
+            sourcePet: first,
+            targets: [first, second],
+            context: context,
+            executorId: human.id.uuidString,
+            date: Date(timeIntervalSince1970: 1000)
+        )
+
+        #expect(!result.didWriteFact)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     @Test func sharedLitterWritesOneSessionTwoCareLogsAndNoPottyProjection() throws {

@@ -113,18 +113,21 @@ enum CarePlanCalendarSync {
         }
     }
 
-    static func removeCalendarPlan(kind: String, petKey: String, context: ModelContext) {
+    @discardableResult
+    static func removeCalendarPlan(kind: String, petKey: String, context: ModelContext) -> Bool {
         let key = eventStorageKey(kind: kind, petKey: petKey)
         guard let idStr = UserDefaults.standard.string(forKey: key),
               let uuid = UUID(uuidString: idStr),
               let ev = existingEvent(uuid: uuid, context: context) else {
             UserDefaults.standard.removeObject(forKey: key)
-            return
+            return true
         }
         tombstoneAndDelete(ev, context: context)
         if saveCalendarSyncChanges(context: context) {
             UserDefaults.standard.removeObject(forKey: key)
+            return true
         }
+        return false
     }
 
     static func suppressDefaultPlan(kind: String, pet: Pet, context: ModelContext) {
@@ -423,6 +426,7 @@ enum CarePlanCalendarSync {
         startDate: Date,
         recurrenceDays: Int,
         eventType: EventType = .daily,
+        preferredEventID: UUID? = nil,
         context: ModelContext
     ) -> Event? {
         let petKey = pet.id.uuidString
@@ -445,9 +449,11 @@ enum CarePlanCalendarSync {
             source: .domainService
         )
 
-        if let idStr = UserDefaults.standard.string(forKey: key),
-           let uuid = UUID(uuidString: idStr),
-           let ev = existingEvent(uuid: uuid, context: context) {
+        let storedEvent = UserDefaults.standard.string(forKey: key)
+            .flatMap(UUID.init(uuidString:))
+            .flatMap { existingEvent(uuid: $0, context: context) }
+        let recoveredEvent = preferredEventID.flatMap { existingEvent(uuid: $0, context: context) }
+        if let ev = storedEvent ?? recoveredEvent {
             guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventUpdate(
                 event: ev,
                 intent: createIntent,
@@ -475,7 +481,9 @@ enum CarePlanCalendarSync {
                     context: context
                 )
             }
-            return saveCalendarSyncChanges(context: context) ? ev : nil
+            guard saveCalendarSyncChanges(context: context) else { return nil }
+            UserDefaults.standard.set(ev.id.uuidString, forKey: key)
+            return ev
         }
 
         guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(
@@ -483,6 +491,7 @@ enum CarePlanCalendarSync {
             context: context
         ) else { return nil }
         let ev = DomainScheduleWriter.createEvent(plan: plan, context: context).event
+        if let preferredEventID { ev.id = preferredEventID }
         guard saveCalendarSyncChanges(context: context) else { return nil }
         UserDefaults.standard.set(ev.id.uuidString, forKey: key)
         return ev
@@ -991,36 +1000,20 @@ enum CarePlanCalendarSync {
         )
     }
 
-    @discardableResult
-    static func syncScoopPlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, anchor: Date) -> Event? {
-        let petKey = pet.id.uuidString
-        guard canWriteActiveCarePlan(for: pet) else {
-            removeActiveCalendarPlans(for: pet, context: context)
-            return nil
-        }
-        if intervalDays > 0 {
-            suppressDefaultPlan(kind: "litter", pet: pet, context: context)
-        }
-        guard enabled, intervalDays > 0 else {
-            removeCalendarPlan(kind: "scoop", petKey: petKey, context: context)
-            return nil
-        }
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        let anchorDay = cal.startOfDay(for: anchor)
-        let last = pet.careLogs.filter { $0.type == CareType.litter.rawValue }.map(\.date).max()
-        var base = anchorDay
-        if let last { base = max(base, cal.startOfDay(for: last)) }
-        var next = cal.date(byAdding: .day, value: intervalDays, to: base) ?? base
-        while next < today {
-            next = cal.date(byAdding: .day, value: intervalDays, to: next) ?? next
-        }
-        return upsertWithSingleReminder(
+    static func persistScoopPlanEvent(
+        pet: Pet,
+        context: ModelContext,
+        intervalDays: Int,
+        startDate: Date,
+        preferredEventID: UUID? = nil
+    ) -> Event? {
+        upsertWithSingleReminder(
             pet: pet,
             kind: "scoop",
             title: eventTitle(pet: pet, title: localizedPlanTitle(.scoopPlan)),
-            startDate: next,
+            startDate: startDate,
             recurrenceDays: intervalDays,
+            preferredEventID: preferredEventID,
             context: context
         )
     }

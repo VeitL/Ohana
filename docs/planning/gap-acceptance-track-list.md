@@ -34,14 +34,16 @@
 
 ## GAP-1 联机功能门
 
-人工验收目标：首发版本无任何可达联机协作面；收到分享邀请时被得体拦截。
+人工验收目标：首发版本无任何可达联机协作面；收到分享邀请时被得体拦截。本机
+FamilyTask / “家庭分工”属于同一设备上的记录与任务流，不属于联机协作。
 
 - [ ] 在真实设备或可用 iCloud 测试环境中打开 / 接收 CKShare 分享邀请链接。
   - 预期：App 不加入共享家庭，不启用云同步，本机数据保持不变，并显示“联机协作即将推出”提示。
   - 记录：
 
 - [ ] 在真实 UI 中遍历首页 FAB 与全功能菜单。
-  - 预期：不出现 FamilyTasks、家庭协作、悬赏榜、发布协作任务入口。
+  - 预期：允许从统一“待办”进入本机家庭分工；不出现邀请、共享家庭、远程成员、
+    跨设备任务推送、在线悬赏榜或任何暗示另一位用户已收到任务的文案。
   - 记录：
 
 - [ ] 在真实 UI 中打开设置页并扫描所有可见区块。
@@ -51,7 +53,8 @@
   - 记录：2026-06-17 同日真机复测发现上一条 loading shell 方案会停在 “Opening settings”。根因再修正：设置页可达性不应依赖 Household / Pet / Human / OasisElectronicPet 四张表 fetch 完成；这些数据只服务“设备身份 / 宠物管理 / 家庭同步”低频区块。把完整 `SettingsView` 挂在 `data.hasLoaded` 后面，是用一个 loading gate 替代了原始首帧问题，制造了新阻塞。最终处理：`AppSettingsSheetRouteContainer` 始终先呈现 `SettingsView`，数据数组初始为 nil；数据区在页面可用后异步补齐；`homeRevisionUpdates` 只 coalesce 加载，不再 cancel / restart 运行中的加载任务。自动验证：`scripts/test-simulator.sh -only-testing:OhanaTests/SettingsRouteContainerTests` 在 iPhone 17 simulator 通过，测试锁住“不出现 `SettingsRouteLoadingView` / `if data.hasLoaded` 阻断完整设置页”以及 `dataLoadTask` coalescing。关闭条件：真机点击设置按钮后应直接进入设置页；数据身份 / 宠物管理区可以稍后出现，但页面不能停在 opening shell。
 
 - [ ] 在真实 UI 中打开照护周报。
-  - 预期：周报正常显示，不出现悬赏榜内容、悬赏排行榜、家庭协作排行榜。
+  - 预期：周报可以汇总本机记录的成员贡献，但不出现远程悬赏榜、在线排行榜或
+    把本机 Human 档案描述为真实在线操作者的文案。
   - 记录：
 
 ## GAP-2 删除模型（原回收站退役）

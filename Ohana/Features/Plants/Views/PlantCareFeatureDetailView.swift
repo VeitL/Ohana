@@ -85,6 +85,9 @@ struct PlantCareFeatureDetailView: View {
     private var primaryCareType: PlantCareType {
         focusedCareType ?? feature.primaryCareType
     }
+    private var showsFertilizingCadence: Bool {
+        primaryCareType == .fertilizing
+    }
     private var scheduleCommands: PlantCareFeatureScheduleCommandExecutor {
         PlantCareFeatureScheduleCommandExecutor(context: modelContext, services: appServices)
     }
@@ -700,15 +703,25 @@ struct PlantCareFeatureDetailView: View {
                 Text(plant.name)
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.74)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text(plantStatusText(plant))
                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if showsFertilizingCadence {
+                    Text(fertilizingCadenceText(for: plant))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("plant-care-feature-fertilizing-status-\(plant.id.uuidString)")
+                }
             }
+            .accessibilityElement(children: .combine)
 
             Spacer(minLength: 8)
 
@@ -733,7 +746,7 @@ struct PlantCareFeatureDetailView: View {
             RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.ohanaGlassStroke.opacity(0.32), lineWidth: 1)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     private func plantAvatar(_ plant: Plant) -> some View {
@@ -1154,26 +1167,6 @@ struct PlantCareFeatureDetailView: View {
         return result
     }
 
-    private func plantStatusText(_ plant: Plant) -> String {
-        switch feature {
-        case .water:
-            if let days = plant.daysSinceWatered {
-                return l.tr(zh: "上次浇水 \(days) 天前", en: "Last watered \(days)d ago", de: "Zuletzt vor \(days) T. gegossen")
-            }
-            return l.tr(zh: "还没有浇水记录", en: "No water log yet", de: "Noch kein Gießprotokoll")
-        case .fertilize:
-            if let days = plant.daysSinceFertilized {
-                return l.tr(zh: "上次施肥 \(days) 天前", en: "Last fertilized \(days)d ago", de: "Zuletzt vor \(days) T. gedüngt")
-            }
-            return l.tr(zh: "还没有施肥记录", en: "No fertilizer log yet", de: "Noch kein Düngeprotokoll")
-        case .maintenance, .health, .growth, .log:
-            let count = featureRecords(for: plant).count
-            return count == 0
-                ? l.tr(zh: "还没有相关记录", en: "No matching logs yet", de: "Noch keine passenden Einträge")
-                : l.tr(zh: "\(count) 条相关记录", en: "\(count) matching logs", de: "\(count) passende Einträge")
-        }
-    }
-
     private func featureRecords(for plant: Plant) -> [PlantCareFeatureRecord] {
         records.filter { $0.plantID == plant.id && matchesFocusedFeature($0.careType) }
     }
@@ -1399,5 +1392,72 @@ struct PlantCareFeatureDetailView: View {
         case .customNote:
             "note.text"
         }
+    }
+}
+
+private extension PlantCareFeatureDetailView {
+    func plantStatusText(_ plant: Plant) -> String {
+        if showsFertilizingCadence {
+            guard let lastDate = plant.lastFertilizedDate else {
+                return l.tr(
+                    zh: "还没有施肥记录",
+                    en: "No fertilizer log yet",
+                    de: "Noch kein Düngeprotokoll"
+                )
+            }
+            return l.tr(
+                zh: "最近施肥：\(fullDateText(lastDate))",
+                en: "Last fertilized: \(fullDateText(lastDate))",
+                de: "Zuletzt gedüngt: \(fullDateText(lastDate))"
+            )
+        }
+
+        switch feature {
+        case .water:
+            if let days = plant.daysSinceWatered {
+                return l.tr(zh: "上次浇水 \(days) 天前", en: "Last watered \(days)d ago", de: "Zuletzt vor \(days) T. gegossen")
+            }
+            return l.tr(zh: "还没有浇水记录", en: "No water log yet", de: "Noch kein Gießprotokoll")
+        case .fertilize:
+            let count = featureRecords(for: plant).count
+            return count == 0
+                ? l.tr(zh: "还没有相关记录", en: "No matching logs yet", de: "Noch keine passenden Einträge")
+                : l.tr(zh: "\(count) 条相关记录", en: "\(count) matching logs", de: "\(count) passende Einträge")
+        case .maintenance, .health, .growth, .log:
+            let count = featureRecords(for: plant).count
+            return count == 0
+                ? l.tr(zh: "还没有相关记录", en: "No matching logs yet", de: "Noch keine passenden Einträge")
+                : l.tr(zh: "\(count) 条相关记录", en: "\(count) matching logs", de: "\(count) passende Einträge")
+        }
+    }
+
+    func fertilizingCadenceText(for plant: Plant) -> String {
+        let intervalDays = plannedIntervalDays(for: plant)
+        let statusText = if let status = CareCycleStatus.make(
+            lastDate: plant.lastFertilizedDate,
+            intervalDays: intervalDays
+        ) {
+            switch status.duePhase {
+            case .upcoming:
+                l.tr(
+                    zh: "距下次施肥 \(status.compactDueText(l: l))",
+                    en: "Next fertilizing in \(status.compactDueText(l: l))",
+                    de: "Nächste Düngung in \(status.compactDueText(l: l))"
+                )
+            case .dueToday, .overdue:
+                status.compactDueText(l: l)
+            }
+        } else {
+            l.tr(
+                zh: "待首次施肥",
+                en: "Awaiting first fertilizing",
+                de: "Erste Düngung ausstehend"
+            )
+        }
+        return l.tr(
+            zh: "计划每 \(intervalDays) 天 · \(statusText)",
+            en: "Every \(intervalDays)d · \(statusText)",
+            de: "Alle \(intervalDays) T. · \(statusText)"
+        )
     }
 }

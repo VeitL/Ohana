@@ -247,10 +247,10 @@ enum ReminderActionCoordinator {
             guard let pet = pet(for: event, context: context) else {
                 return .missingPet
             }
-            if !event.isOccurrenceMarkedComplete(on: reminder.scheduledAt) {
+            if !event.isOccurrenceMarkedComplete(on: reminder.resolvedOccurrenceAt) {
                 let syncResult = CalendarTaskCompletionSyncService.syncPetTask(
                     event: event,
-                    occurrenceDate: reminder.scheduledAt,
+                    occurrenceDate: reminder.resolvedOccurrenceAt,
                     isCompleted: true,
                     pets: [pet],
                     context: context,
@@ -261,7 +261,7 @@ enum ReminderActionCoordinator {
                 guard syncResult.shouldCompleteOccurrence else { return .skipped }
             } else if !CalendarTaskCompletionSyncService.canCompletePetTask(
                 event: event,
-                occurrenceDate: reminder.scheduledAt,
+                occurrenceDate: reminder.resolvedOccurrenceAt,
                 pets: [pet],
                 context: context,
                 executorId: executorId

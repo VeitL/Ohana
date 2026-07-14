@@ -25,6 +25,19 @@ extension HumanDetailView {
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.goOrange.opacity(0.15), in: Capsule())
                 }
+                Button(action: onOpenTasks) {
+                    Text(l.tr(zh: "查看全部", en: "View all", de: "Alle anzeigen"))
+                        .font(OhanaFont.caption(.bold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.goPrimary)
+                .frame(minHeight: 44)
+                .accessibilityLabel(l.tr(
+                    zh: "查看此成员的待办",
+                    en: "View this member's tasks",
+                    de: "Aufgaben dieses Mitglieds anzeigen"
+                ))
+                .accessibilityIdentifier("human-detail-open-tasks")
             }
 
             if humanReminders.isEmpty {
@@ -69,16 +82,6 @@ extension HumanDetailView {
                let assignee = MemberLifecycleActiveScheduleResolver.humanAssignee(for: event, humans: allHumans),
                assignee.id != human.id {
                 NudgeButton(targetHuman: assignee)
-            }
-            Button { completeReminder(reminder) } label: {
-                Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.title3(.bold))
-                    .foregroundStyle(Color.goPrimary)
-            }
-            Button { skipReminder(reminder) } label: {
-                Image(systemName: "forward.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.title3(.bold))
-                    .foregroundStyle(Color.goYellow)
             }
         }
     }
@@ -154,28 +157,6 @@ extension HumanDetailView {
     }
 
     // MARK: - Actions
-    func completeReminder(_ reminder: Reminder) {
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        commandQueue.enqueue(.reminderCompletion(reminderID: reminder.id)) {
-            ReminderCommandExecutor(context: modelContext, services: appServices).complete(
-                reminder,
-                by: human.id.uuidString,
-                note: "human.detail.reminder.complete"
-            )
-        }
-    }
-
-    func skipReminder(_ reminder: Reminder) {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        commandQueue.enqueue(.reminderCompletion(reminderID: reminder.id)) {
-            ReminderCommandExecutor(context: modelContext, services: appServices).skip(
-                reminder,
-                by: human.id.uuidString,
-                note: "human.detail.reminder.skip"
-            )
-        }
-    }
-
     func deleteHumanAndReturnHome() {
         let activeHumanID = activeHumanIdStr
         let command = DomainCommand.memberDeletion(entityID: human.id, kind: EntityKind.human.rawValue)

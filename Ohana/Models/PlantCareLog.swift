@@ -228,6 +228,7 @@ final class PlantCareLog {
     var careTypeRaw: String
     var note: String
     var executorId: String?
+    var careTransactionId: String = ""
     @Attribute(.externalStorage) var photoData: Data?
     var photoAttachmentStateRaw: String = PlantCarePhotoAttachmentState.unknown.rawValue
     var photoImageSignature: String = ""
@@ -240,6 +241,7 @@ final class PlantCareLog {
         careType: PlantCareType,
         note: String = "",
         executorId: String? = nil,
+        careTransactionId: String = UUID().uuidString,
         photoData: Data? = nil,
         healthStatus: PlantHealthStatus? = nil
     ) {
@@ -248,6 +250,7 @@ final class PlantCareLog {
         self.careTypeRaw = careType.rawValue
         self.note = note
         self.executorId = executorId
+        self.careTransactionId = careTransactionId
         self.photoData = photoData
         self.photoAttachmentStateRaw = photoData == nil ? PlantCarePhotoAttachmentState.absent.rawValue : PlantCarePhotoAttachmentState.present.rawValue
         self.photoImageSignature = photoData.map(MediaPayloadSignature.signature(for:)) ?? ""

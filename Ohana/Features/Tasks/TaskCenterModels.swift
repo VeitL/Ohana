@@ -20,38 +20,249 @@ nonisolated enum TaskCenterUrgency: String, Equatable, Sendable {
     case critical
 }
 
+nonisolated struct TaskSubjectSnapshot: Equatable, Sendable {
+    nonisolated enum Kind: String, Equatable, Sendable {
+        case household
+        case human
+        case pet
+        case plant
+    }
+
+    let kind: Kind
+    let id: UUID?
+    let name: String?
+    let themeColorHex: String?
+
+    static let household = TaskSubjectSnapshot(
+        kind: .household,
+        id: nil,
+        name: nil,
+        themeColorHex: nil
+    )
+}
+
+nonisolated struct TaskMemberSnapshot: Equatable, Sendable {
+    /// Legacy tasks can retain a trustworthy stored name even when their old ID is not a UUID.
+    let id: UUID?
+    let name: String
+}
+
+nonisolated enum TaskCenterItemSource: String, Equatable, Sendable {
+    case event
+    case familyTask
+    case linked
+}
+
+nonisolated enum TaskCenterWorkflowStatus: String, Equatable, Sendable {
+    case scheduled
+    case active
+    case claimed
+    case pendingReview
+    case completed
+    case cancelled
+}
+
+nonisolated enum TaskCenterAvailableAction: String, Hashable, Sendable {
+    case complete
+    case claim
+    case submitForReview
+    case approve
+    case reject
+}
+
+nonisolated enum TaskCenterMemberFilter: String, CaseIterable, Identifiable, Hashable, Sendable {
+    case all
+    case currentMember
+    case waitingForOthers
+    case pendingReview
+
+    var id: String { rawValue }
+}
+
+nonisolated struct TaskCenterMemberFilterContext: Equatable, Sendable {
+    let activeHumanName: String?
+    let showsFilters: Bool
+    let currentMemberItemIDs: Set<String>
+    let waitingForOthersItemIDs: Set<String>
+    let pendingReviewItemIDs: Set<String>
+
+    static let hidden = TaskCenterMemberFilterContext(
+        activeHumanName: nil,
+        showsFilters: false,
+        currentMemberItemIDs: [],
+        waitingForOthersItemIDs: [],
+        pendingReviewItemIDs: []
+    )
+
+    func itemIDs(for filter: TaskCenterMemberFilter) -> Set<String>? {
+        switch filter {
+        case .all:
+            nil
+        case .currentMember:
+            currentMemberItemIDs
+        case .waitingForOthers:
+            waitingForOthersItemIDs
+        case .pendingReview:
+            pendingReviewItemIDs
+        }
+    }
+}
+
 nonisolated struct TaskCenterItemSnapshot: Identifiable, Equatable, Sendable {
     let id: String
-    let eventID: UUID
+    let eventID: UUID?
+    let reminderID: UUID?
+    let familyTaskID: UUID?
+    let source: TaskCenterItemSource
     let title: String
-    let subjectName: String?
+    let subject: TaskSubjectSnapshot
     let eventType: EventType?
     let symbol: String
-    let themeColorHex: String?
     let occurrenceDate: Date
     let scheduledAt: Date
+    let dueAt: Date?
     let isAllDay: Bool
     let isRecurring: Bool
     let urgency: TaskCenterUrgency
+    let workflowStatus: TaskCenterWorkflowStatus
+    let availableActions: Set<TaskCenterAvailableAction>
+    let participantHumanIDs: Set<UUID>
+    let createdByMember: TaskMemberSnapshot?
+    let assignedToMember: TaskMemberSnapshot?
+    let claimedByMember: TaskMemberSnapshot?
+    let completedByMember: TaskMemberSnapshot?
+    let rewardCoconuts: Int
+
+    init(
+        id: String,
+        eventID: UUID?,
+        reminderID: UUID?,
+        familyTaskID: UUID?,
+        source: TaskCenterItemSource,
+        title: String,
+        subject: TaskSubjectSnapshot,
+        eventType: EventType?,
+        symbol: String,
+        occurrenceDate: Date,
+        scheduledAt: Date,
+        dueAt: Date?,
+        isAllDay: Bool,
+        isRecurring: Bool,
+        urgency: TaskCenterUrgency,
+        workflowStatus: TaskCenterWorkflowStatus,
+        availableActions: Set<TaskCenterAvailableAction>,
+        participantHumanIDs: Set<UUID>,
+        createdByMember: TaskMemberSnapshot? = nil,
+        assignedToMember: TaskMemberSnapshot? = nil,
+        claimedByMember: TaskMemberSnapshot? = nil,
+        completedByMember: TaskMemberSnapshot? = nil,
+        rewardCoconuts: Int = 0
+    ) {
+        self.id = id
+        self.eventID = eventID
+        self.reminderID = reminderID
+        self.familyTaskID = familyTaskID
+        self.source = source
+        self.title = title
+        self.subject = subject
+        self.eventType = eventType
+        self.symbol = symbol
+        self.occurrenceDate = occurrenceDate
+        self.scheduledAt = scheduledAt
+        self.dueAt = dueAt
+        self.isAllDay = isAllDay
+        self.isRecurring = isRecurring
+        self.urgency = urgency
+        self.workflowStatus = workflowStatus
+        self.availableActions = availableActions
+        self.participantHumanIDs = participantHumanIDs
+        self.createdByMember = createdByMember
+        self.assignedToMember = assignedToMember
+        self.claimedByMember = claimedByMember
+        self.completedByMember = completedByMember
+        self.rewardCoconuts = max(0, rewardCoconuts)
+    }
+
+    var subjectName: String? { subject.name }
+    var themeColorHex: String? { subject.themeColorHex }
 }
 
 nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
     let overdue: [TaskCenterItemSnapshot]
     let today: [TaskCenterItemSnapshot]
     let upcoming: [TaskCenterItemSnapshot]
+    let unscheduled: [TaskCenterItemSnapshot]
     let todayCompletedCount: Int
     let todayTotalCount: Int
+    let memberFilterContext: TaskCenterMemberFilterContext
 
     static let empty = TaskCenterSnapshot(
         overdue: [],
         today: [],
         upcoming: [],
+        unscheduled: [],
         todayCompletedCount: 0,
-        todayTotalCount: 0
+        todayTotalCount: 0,
+        memberFilterContext: .hidden
     )
 
     var pendingCount: Int {
-        overdue.count + today.count + upcoming.count
+        overdue.count + today.count + upcoming.count + unscheduled.count
+    }
+
+    var allItems: [TaskCenterItemSnapshot] {
+        overdue + today + upcoming + unscheduled
+    }
+
+    var showsMemberFilters: Bool {
+        memberFilterContext.showsFilters
+    }
+
+    func filtered(for scope: TaskCenterScope) -> TaskCenterSnapshot {
+        guard case .all = scope else {
+            let includes: (TaskCenterItemSnapshot) -> Bool = { item in
+                switch scope {
+                case .all:
+                    true
+                case let .human(id):
+                    (item.subject.kind == .human && item.subject.id == id)
+                        || item.participantHumanIDs.contains(id)
+                case let .pet(id):
+                    item.subject.kind == .pet && item.subject.id == id
+                case let .plant(id):
+                    item.subject.kind == .plant && item.subject.id == id
+                }
+            }
+            let scopedToday = today.filter(includes)
+            return TaskCenterSnapshot(
+                overdue: overdue.filter(includes),
+                today: scopedToday,
+                upcoming: upcoming.filter(includes),
+                unscheduled: unscheduled.filter(includes),
+                todayCompletedCount: 0,
+                todayTotalCount: scopedToday.count,
+                memberFilterContext: memberFilterContext
+            )
+        }
+        return self
+    }
+
+    func filtered(for memberFilter: TaskCenterMemberFilter) -> TaskCenterSnapshot {
+        guard showsMemberFilters,
+              let includedItemIDs = memberFilterContext.itemIDs(for: memberFilter) else {
+            return self
+        }
+        let includes: (TaskCenterItemSnapshot) -> Bool = { includedItemIDs.contains($0.id) }
+        let filteredToday = today.filter(includes)
+        return TaskCenterSnapshot(
+            overdue: overdue.filter(includes),
+            today: filteredToday,
+            upcoming: upcoming.filter(includes),
+            unscheduled: unscheduled.filter(includes),
+            todayCompletedCount: 0,
+            todayTotalCount: filteredToday.count,
+            memberFilterContext: memberFilterContext
+        )
     }
 
     var overdueCount: Int {
@@ -94,6 +305,61 @@ nonisolated enum TaskCenterSnapshotBuilder {
     /// task surface bounded while preserving the existing completion semantics.
     private static let recurringOverdueLookbackDays = 14
 
+    private struct ItemBuildContext {
+        let pets: [Pet]
+        let humans: [Human]
+        let plants: [Plant]
+        let insurances: [PetInsurance]
+        let petMedications: [PetMedication]
+        let humanMedications: [HumanMedication]
+        let reminders: [Reminder]
+        let remindersByID: [UUID: Reminder]
+        let eventsByID: [UUID: Event]
+        let activeHumanId: String?
+        let now: Date
+        let calendar: Calendar
+    }
+
+    private struct PendingEventState {
+        var occurrencesByEventID: [UUID: [CalendarEventOccurrence]] = [:]
+        var todayTaskKeys: Set<String> = []
+        var completedTodayTaskKeys: Set<String> = []
+    }
+
+    private struct ItemBuckets {
+        var overdue: [TaskCenterItemSnapshot] = []
+        var today: [TaskCenterItemSnapshot] = []
+        var upcoming: [TaskCenterItemSnapshot] = []
+        var unscheduled: [TaskCenterItemSnapshot] = []
+
+        mutating func append(
+            _ item: TaskCenterItemSnapshot,
+            dueAt: Date?,
+            today startOfToday: Date,
+            calendar: Calendar
+        ) {
+            guard let dueAt else {
+                unscheduled.append(item)
+                return
+            }
+            switch item.urgency {
+            case .critical, .overdue:
+                overdue.append(item)
+            case .standard:
+                if calendar.isDate(dueAt, inSameDayAs: startOfToday) {
+                    today.append(item)
+                } else {
+                    upcoming.append(item)
+                }
+            }
+        }
+    }
+
+    private struct EventItemProjection {
+        var buckets = ItemBuckets()
+        var representedFamilyTaskIDs: Set<UUID> = []
+    }
+
     static func make(
         events: [Event],
         allEvents: [Event],
@@ -103,6 +369,9 @@ nonisolated enum TaskCenterSnapshotBuilder {
         insurances: [PetInsurance] = [],
         petMedications: [PetMedication] = [],
         humanMedications: [HumanMedication] = [],
+        reminders: [Reminder] = [],
+        familyTasks: [FamilyCollaborationTask] = [],
+        activeHumanId: String? = nil,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> TaskCenterSnapshot {
@@ -119,19 +388,92 @@ nonisolated enum TaskCenterSnapshotBuilder {
             value: -recurringOverdueLookbackDays,
             to: today
         ) ?? today
-        var pendingByEventID: [UUID: [CalendarEventOccurrence]] = [:]
-        var todayEventIDs: Set<UUID> = []
-        var completedTodayEventIDs: Set<UUID> = []
+        let allKnownEvents = uniqueEvents(events + allEvents)
+        let allKnownReminders = uniqueReminders(reminders + allKnownEvents.flatMap(\.reminders))
+        let remindersByID = Dictionary(uniqueKeysWithValues: allKnownReminders.map { ($0.id, $0) })
+        let eventsByID = Dictionary(uniqueKeysWithValues: allKnownEvents.map { ($0.id, $0) })
+        let openFamilyTasks = familyTasks.filter { !$0.isFinished }
+        let familyTasksByEventID = Dictionary(grouping: openFamilyTasks.compactMap { task -> (UUID, FamilyCollaborationTask)? in
+            guard let eventID = linkedEventID(for: task, remindersByID: remindersByID) else { return nil }
+            return (eventID, task)
+        }, by: \.0).mapValues { $0.map(\.1) }
+        let context = ItemBuildContext(
+            pets: pets,
+            humans: humans,
+            plants: plants,
+            insurances: insurances,
+            petMedications: petMedications,
+            humanMedications: humanMedications,
+            reminders: allKnownReminders,
+            remindersByID: remindersByID,
+            eventsByID: eventsByID,
+            activeHumanId: activeHumanId,
+            now: now,
+            calendar: calendar
+        )
+        var pendingState = pendingEventState(
+            occurrences: timeline.expandedOccurrences,
+            today: today,
+            recurringCutoff: recurringCutoff,
+            calendar: calendar
+        )
+        var projection = eventItemProjection(
+            pendingState.occurrencesByEventID,
+            familyTasksByEventID: familyTasksByEventID,
+            context: context
+        )
+        appendStandaloneFamilyTasks(
+            openFamilyTasks,
+            excluding: projection.representedFamilyTaskIDs,
+            today: today,
+            context: context,
+            buckets: &projection.buckets
+        )
+        applyFamilyTaskMetrics(
+            familyTasks,
+            today: today,
+            context: context,
+            state: &pendingState
+        )
+        let memberFilterContext = makeMemberFilterContext(
+            items: projection.buckets.overdue
+                + projection.buckets.today
+                + projection.buckets.upcoming
+                + projection.buckets.unscheduled,
+            familyTasks: familyTasks,
+            eventsByID: eventsByID,
+            humans: humans,
+            activeHumanId: activeHumanId
+        )
 
-        for occurrence in timeline.expandedOccurrences {
+        return TaskCenterSnapshot(
+            overdue: projection.buckets.overdue.sorted(by: taskSort),
+            today: projection.buckets.today.sorted(by: taskSort),
+            upcoming: projection.buckets.upcoming.sorted(by: taskSort),
+            unscheduled: projection.buckets.unscheduled.sorted(by: taskSort),
+            todayCompletedCount: pendingState.completedTodayTaskKeys.count,
+            todayTotalCount: pendingState.todayTaskKeys.count,
+            memberFilterContext: memberFilterContext
+        )
+    }
+
+    private static func pendingEventState(
+        occurrences: [CalendarEventOccurrence],
+        today: Date,
+        recurringCutoff: Date,
+        calendar: Calendar
+    ) -> PendingEventState {
+        var state = PendingEventState()
+        for occurrence in occurrences {
             let event = occurrence.event
             guard event.isActionableTask else { continue }
             let occurrenceDay = calendar.startOfDay(for: occurrence.occurrenceDate)
 
             if occurrenceDay == today {
-                todayEventIDs.insert(event.id)
+                let metricKey = eventOccurrenceID(eventID: event.id, date: occurrence.occurrenceDate)
+                state.todayTaskKeys.insert(metricKey)
                 if event.isOccurrenceMarkedComplete(on: occurrence.occurrenceDate) {
-                    completedTodayEventIDs.insert(event.id)
+                    state.completedTodayTaskKeys.insert(metricKey)
                 }
             }
 
@@ -139,50 +481,95 @@ nonisolated enum TaskCenterSnapshotBuilder {
             if event.recurrenceDays > 0, occurrenceDay < recurringCutoff {
                 continue
             }
-            pendingByEventID[event.id, default: []].append(occurrence)
+            state.occurrencesByEventID[event.id, default: []].append(occurrence)
         }
+        return state
+    }
 
-        var overdueItems: [TaskCenterItemSnapshot] = []
-        var todayItems: [TaskCenterItemSnapshot] = []
-        var upcomingItems: [TaskCenterItemSnapshot] = []
-
-        for occurrences in pendingByEventID.values {
+    private static func eventItemProjection(
+        _ occurrencesByEventID: [UUID: [CalendarEventOccurrence]],
+        familyTasksByEventID: [UUID: [FamilyCollaborationTask]],
+        context: ItemBuildContext
+    ) -> EventItemProjection {
+        var projection = EventItemProjection()
+        for occurrences in occurrencesByEventID.values {
             guard let occurrence = currentOccurrence(
                 from: occurrences,
-                now: now,
-                calendar: calendar
+                now: context.now,
+                calendar: context.calendar
             ) else { continue }
+            let familyTask = matchingFamilyTask(
+                for: occurrence,
+                candidates: familyTasksByEventID[occurrence.event.id] ?? [],
+                calendar: context.calendar
+            )
             let item = makeItem(
                 occurrence: occurrence,
-                pets: pets,
-                humans: humans,
-                plants: plants,
-                insurances: insurances,
-                petMedications: petMedications,
-                humanMedications: humanMedications,
-                now: now,
-                calendar: calendar
+                familyTask: familyTask,
+                context: context
             )
+            if let familyTaskID = item.familyTaskID {
+                projection.representedFamilyTaskIDs.insert(familyTaskID)
+            }
+            projection.buckets.append(
+                item,
+                dueAt: item.dueAt,
+                today: context.calendar.startOfDay(for: context.now),
+                calendar: context.calendar
+            )
+        }
+        return projection
+    }
 
-            switch item.urgency {
-            case .critical, .overdue:
-                overdueItems.append(item)
-            case .standard:
-                if calendar.isDate(item.occurrenceDate, inSameDayAs: today) {
-                    todayItems.append(item)
-                } else {
-                    upcomingItems.append(item)
-                }
+    private static func appendStandaloneFamilyTasks(
+        _ tasks: [FamilyCollaborationTask],
+        excluding representedFamilyTaskIDs: Set<UUID>,
+        today: Date,
+        context: ItemBuildContext,
+        buckets: inout ItemBuckets
+    ) {
+        for task in tasks where !representedFamilyTaskIDs.contains(task.id) {
+            let reminder = linkedReminder(for: task, remindersByID: context.remindersByID)
+            let event = linkedEvent(
+                for: task,
+                eventsByID: context.eventsByID,
+                remindersByID: context.remindersByID
+            )
+            let dueAt = taskDueAt(task, event: event)
+            let item = makeFamilyTaskItem(
+                task: task,
+                event: event,
+                reminder: reminder,
+                dueAt: dueAt,
+                context: context
+            )
+            buckets.append(item, dueAt: dueAt, today: today, calendar: context.calendar)
+        }
+    }
+
+    private static func applyFamilyTaskMetrics(
+        _ tasks: [FamilyCollaborationTask],
+        today: Date,
+        context: ItemBuildContext,
+        state: inout PendingEventState
+    ) {
+        for task in tasks where task.status != .cancelled {
+            let event = linkedEvent(
+                for: task,
+                eventsByID: context.eventsByID,
+                remindersByID: context.remindersByID
+            )
+            guard let dueAt = taskDueAt(task, event: event),
+                  context.calendar.isDate(dueAt, inSameDayAs: today) else { continue }
+            let metricKey = event.map { eventOccurrenceID(eventID: $0.id, date: dueAt) }
+                ?? "family-\(task.id.uuidString)"
+            state.todayTaskKeys.insert(metricKey)
+            if task.status == .completed {
+                state.completedTodayTaskKeys.insert(metricKey)
+            } else if !task.isFinished {
+                state.completedTodayTaskKeys.remove(metricKey)
             }
         }
-
-        return TaskCenterSnapshot(
-            overdue: overdueItems.sorted(by: taskSort),
-            today: todayItems.sorted(by: taskSort),
-            upcoming: upcomingItems.sorted(by: taskSort),
-            todayCompletedCount: completedTodayEventIDs.count,
-            todayTotalCount: todayEventIDs.count
-        )
     }
 
     private static func currentOccurrence(
@@ -194,7 +581,9 @@ nonisolated enum TaskCenterSnapshotBuilder {
         if let overdue = sorted.first(where: { $0.event.isOverdue(on: $0.occurrenceDate, now: now) }) {
             return overdue
         }
-        if let today = sorted.first(where: { calendar.isDateInToday($0.occurrenceDate) }) {
+        if let today = sorted.first(where: {
+            calendar.isDate($0.occurrenceDate, inSameDayAs: now)
+        }) {
             return today
         }
         return sorted.first
@@ -202,26 +591,20 @@ nonisolated enum TaskCenterSnapshotBuilder {
 
     private static func makeItem(
         occurrence: CalendarEventOccurrence,
-        pets: [Pet],
-        humans: [Human],
-        plants: [Plant],
-        insurances: [PetInsurance],
-        petMedications: [PetMedication],
-        humanMedications: [HumanMedication],
-        now: Date,
-        calendar: Calendar
+        familyTask: FamilyCollaborationTask?,
+        context: ItemBuildContext
     ) -> TaskCenterItemSnapshot {
         let event = occurrence.event
         let subject = subjectPresentation(
             for: event,
-            pets: pets,
-            humans: humans,
-            plants: plants,
-            insurances: insurances,
-            petMedications: petMedications,
-            humanMedications: humanMedications
+            pets: context.pets,
+            humans: context.humans,
+            plants: context.plants,
+            insurances: context.insurances,
+            petMedications: context.petMedications,
+            humanMedications: context.humanMedications
         )
-        let isOverdue = event.isOverdue(on: occurrence.occurrenceDate, now: now)
+        let isOverdue = event.isOverdue(on: occurrence.occurrenceDate, now: context.now)
         let urgency: TaskCenterUrgency = if isOverdue, isHealthCritical(event) {
             .critical
         } else if isOverdue {
@@ -230,20 +613,135 @@ nonisolated enum TaskCenterSnapshotBuilder {
             .standard
         }
         let title = event.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let reminder = familyTask.flatMap { task in
+            task.relatedReminderId.flatMap(UUID.init(uuidString:)).flatMap { reminderID in
+                context.reminders.first(where: { $0.id == reminderID })
+            }
+        } ?? reminder(
+            for: event,
+            occurrenceDate: occurrence.occurrenceDate,
+            reminders: context.reminders,
+            calendar: context.calendar
+        )
+        let scheduledAt = occurrenceMoment(occurrence, calendar: context.calendar)
 
         return TaskCenterItemSnapshot(
-            id: "\(event.id.uuidString)-\(CalendarSnapshotBuilder.timelineDateID(occurrence.occurrenceDate))",
+            id: eventOccurrenceID(eventID: event.id, date: occurrence.occurrenceDate),
             eventID: event.id,
+            reminderID: reminder?.id,
+            familyTaskID: familyTask?.id,
+            source: familyTask == nil ? .event : .linked,
             title: title.isEmpty ? event.eventType : title,
-            subjectName: subject.name,
+            subject: subject,
             eventType: event.eventTypeEnum,
             symbol: event.silhouetteListSymbol,
-            themeColorHex: subject.themeColorHex,
             occurrenceDate: occurrence.occurrenceDate,
-            scheduledAt: occurrenceMoment(occurrence, calendar: calendar),
+            scheduledAt: scheduledAt,
+            dueAt: scheduledAt,
             isAllDay: event.isAllDay,
             isRecurring: event.recurrenceDays > 0,
-            urgency: urgency
+            urgency: urgency,
+            workflowStatus: familyTask.map(workflowStatus) ?? .scheduled,
+            availableActions: availableActions(
+                for: familyTask,
+                activeHumanId: context.activeHumanId,
+                humans: context.humans
+            ),
+            participantHumanIDs: participantHumanIDs(event: event, familyTask: familyTask),
+            createdByMember: familyTask.flatMap {
+                memberSnapshot(idRaw: $0.createdById, storedName: $0.createdByName, humans: context.humans)
+            },
+            assignedToMember: familyTask.flatMap {
+                memberSnapshot(idRaw: $0.assignedToId, storedName: $0.assignedToName, humans: context.humans)
+            } ?? memberSnapshot(idRaw: event.assigneeId, storedName: nil, humans: context.humans),
+            claimedByMember: familyTask.flatMap {
+                memberSnapshot(idRaw: $0.claimedById, storedName: $0.claimedByName, humans: context.humans)
+            },
+            completedByMember: familyTask.flatMap {
+                memberSnapshot(idRaw: $0.completedById, storedName: $0.completedByName, humans: context.humans)
+            },
+            rewardCoconuts: max(0, familyTask?.rewardCoconuts ?? 0)
+        )
+    }
+
+    private static func makeFamilyTaskItem(
+        task: FamilyCollaborationTask,
+        event: Event?,
+        reminder: Reminder?,
+        dueAt: Date?,
+        context: ItemBuildContext
+    ) -> TaskCenterItemSnapshot {
+        let subject = event.map {
+            subjectPresentation(
+                for: $0,
+                pets: context.pets,
+                humans: context.humans,
+                plants: context.plants,
+                insurances: context.insurances,
+                petMedications: context.petMedications,
+                humanMedications: context.humanMedications
+            )
+        } ?? standaloneSubject(
+            for: task,
+            pets: context.pets,
+            humans: context.humans,
+            plants: context.plants
+        )
+        let scheduledAt = dueAt ?? task.createdAt
+        let isOverdue = dueAt.map { $0 < context.now } ?? false
+        let urgency: TaskCenterUrgency = if isOverdue, event.map(isHealthCritical) == true {
+            .critical
+        } else if isOverdue {
+            .overdue
+        } else {
+            .standard
+        }
+        let normalizedTitle = task.title.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return TaskCenterItemSnapshot(
+            id: "family-\(task.id.uuidString)",
+            eventID: event?.id,
+            reminderID: reminder?.id ?? task.relatedReminderId.flatMap(UUID.init(uuidString:)),
+            familyTaskID: task.id,
+            source: event == nil ? .familyTask : .linked,
+            title: normalizedTitle.isEmpty ? event?.eventType ?? task.kindRaw : normalizedTitle,
+            subject: subject,
+            eventType: event?.eventTypeEnum,
+            symbol: event?.silhouetteListSymbol ?? (task.kind == .bounty ? "gift.fill" : "checkmark.circle.fill"),
+            occurrenceDate: scheduledAt,
+            scheduledAt: scheduledAt,
+            dueAt: dueAt,
+            isAllDay: event?.isAllDay ?? false,
+            isRecurring: event.map { $0.recurrenceDays > 0 } ?? false,
+            urgency: urgency,
+            workflowStatus: workflowStatus(task),
+            availableActions: availableActions(
+                for: task,
+                activeHumanId: context.activeHumanId,
+                humans: context.humans
+            ),
+            participantHumanIDs: participantHumanIDs(event: event, familyTask: task),
+            createdByMember: memberSnapshot(
+                idRaw: task.createdById,
+                storedName: task.createdByName,
+                humans: context.humans
+            ),
+            assignedToMember: memberSnapshot(
+                idRaw: task.assignedToId ?? event?.assigneeId,
+                storedName: task.assignedToName,
+                humans: context.humans
+            ),
+            claimedByMember: memberSnapshot(
+                idRaw: task.claimedById,
+                storedName: task.claimedByName,
+                humans: context.humans
+            ),
+            completedByMember: memberSnapshot(
+                idRaw: task.completedById,
+                storedName: task.completedByName,
+                humans: context.humans
+            ),
+            rewardCoconuts: max(0, task.rewardCoconuts)
         )
     }
 
@@ -255,7 +753,7 @@ nonisolated enum TaskCenterSnapshotBuilder {
         insurances: [PetInsurance],
         petMedications: [PetMedication],
         humanMedications: [HumanMedication]
-    ) -> (name: String?, themeColorHex: String?) {
+    ) -> TaskSubjectSnapshot {
         if let pet = MemberLifecycleActiveScheduleResolver.petTarget(
             for: event,
             pets: pets,
@@ -263,11 +761,11 @@ nonisolated enum TaskCenterSnapshotBuilder {
             insurances: insurances,
             includePassedAway: false
         ) {
-            return (pet.name, pet.themeColorHex)
+            return TaskSubjectSnapshot(kind: .pet, id: pet.id, name: pet.name, themeColorHex: pet.themeColorHex)
         }
         if let plantID = DomainEntityLinkRegistry.plantId(for: event),
            let plant = plants.first(where: { $0.id == plantID && !$0.isArchived }) {
-            return (plant.name, plant.themeColorHex)
+            return TaskSubjectSnapshot(kind: .plant, id: plant.id, name: plant.name, themeColorHex: plant.themeColorHex)
         }
         if let human = MemberLifecycleActiveScheduleResolver.humanOwner(
             for: event,
@@ -284,9 +782,68 @@ nonisolated enum TaskCenterSnapshotBuilder {
             humans: humans,
             includePassedAway: false
         ) {
-            return (human.name, human.themeColorHex)
+            return TaskSubjectSnapshot(kind: .human, id: human.id, name: human.name, themeColorHex: human.themeColorHex)
         }
-        return (nil, nil)
+        return .household
+    }
+
+    private static func standaloneSubject(
+        for task: FamilyCollaborationTask,
+        pets: [Pet],
+        humans: [Human],
+        plants: [Plant]
+    ) -> TaskSubjectSnapshot {
+        let subjectID = task.resolvedSubjectId.flatMap(UUID.init(uuidString:))
+        switch task.subjectKind {
+        case .household:
+            return .household
+        case .human:
+            let human = subjectID.flatMap { id in
+                humans.first { $0.id == id && !$0.hasPassedAway }
+            }
+            return TaskSubjectSnapshot(
+                kind: .human,
+                id: subjectID,
+                name: human?.name,
+                themeColorHex: human?.themeColorHex
+            )
+        case .pet:
+            let pet = subjectID.flatMap { id in
+                pets.first { $0.id == id && !$0.hasPassedAway }
+            }
+            return TaskSubjectSnapshot(
+                kind: .pet,
+                id: subjectID,
+                name: pet?.name,
+                themeColorHex: pet?.themeColorHex
+            )
+        case .plant:
+            let plant = subjectID.flatMap { id in
+                plants.first { $0.id == id && !$0.isArchived }
+            }
+            return TaskSubjectSnapshot(
+                kind: .plant,
+                id: subjectID,
+                name: plant?.name,
+                themeColorHex: plant?.themeColorHex
+            )
+        }
+    }
+
+    private static func memberSnapshot(
+        idRaw: String?,
+        storedName: String?,
+        humans: [Human]
+    ) -> TaskMemberSnapshot? {
+        let id = idRaw.flatMap(UUID.init(uuidString:))
+        let currentName = id.flatMap { memberID in
+            humans.first(where: { $0.id == memberID })?.name
+        }
+        let name = [currentName, storedName]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty }) ?? ""
+        guard id != nil || !name.isEmpty else { return nil }
+        return TaskMemberSnapshot(id: id, name: name)
     }
 
     private static func occurrenceMoment(
@@ -309,9 +866,255 @@ nonisolated enum TaskCenterSnapshotBuilder {
         }
     }
 
+    private static func workflowStatus(_ task: FamilyCollaborationTask) -> TaskCenterWorkflowStatus {
+        switch task.status {
+        case .active:
+            .active
+        case .claimed:
+            .claimed
+        case .pendingReview:
+            .pendingReview
+        case .completed:
+            .completed
+        case .cancelled:
+            .cancelled
+        }
+    }
+
+    private static func availableActions(
+        for task: FamilyCollaborationTask?,
+        activeHumanId: String?,
+        humans: [Human]
+    ) -> Set<TaskCenterAvailableAction> {
+        guard let task else { return [.complete] }
+        let activeHumans = humans.filter { !$0.hasPassedAway }
+        guard let activeHumanId,
+              activeHumans.contains(where: { $0.id.uuidString == activeHumanId }) else { return [] }
+        let supportsCollaboration = activeHumans.count > 1
+
+        if !supportsCollaboration {
+            switch task.status {
+            case .active, .claimed:
+                return task.hasReward ? [] : [.complete]
+            case .pendingReview, .completed, .cancelled:
+                return []
+            }
+        }
+
+        switch task.status {
+        case .active:
+            if task.assignedToId == activeHumanId {
+                if task.hasReward {
+                    return [.submitForReview]
+                }
+                return [.complete]
+            }
+            if task.isOpen {
+                return [.claim]
+            }
+            return []
+        case .claimed:
+            guard task.claimedById == activeHumanId else { return [] }
+            if task.hasReward {
+                return [.submitForReview]
+            }
+            return [.complete]
+        case .pendingReview:
+            guard task.createdById == activeHumanId else { return [] }
+            return [.approve, .reject]
+        case .completed, .cancelled:
+            return []
+        }
+    }
+
+    private static func makeMemberFilterContext(
+        items: [TaskCenterItemSnapshot],
+        familyTasks: [FamilyCollaborationTask],
+        eventsByID: [UUID: Event],
+        humans: [Human],
+        activeHumanId: String?
+    ) -> TaskCenterMemberFilterContext {
+        let activeHumans = humans.filter { !$0.hasPassedAway }
+        guard activeHumans.count > 1 else { return .hidden }
+        let selectedHuman = activeHumanId.flatMap { activeID in
+            activeHumans.first { $0.id.uuidString == activeID }
+        } ?? activeHumans.first
+        guard let selectedHuman else { return .hidden }
+
+        var familyTasksByID: [UUID: FamilyCollaborationTask] = [:]
+        for task in familyTasks {
+            familyTasksByID[task.id] = task
+        }
+        var currentMemberItemIDs: Set<String> = []
+        var waitingForOthersItemIDs: Set<String> = []
+        var pendingReviewItemIDs: Set<String> = []
+
+        for item in items {
+            if item.workflowStatus == .pendingReview {
+                pendingReviewItemIDs.insert(item.id)
+            }
+            guard let responsibleHumanID = responsibleHumanID(
+                for: item,
+                familyTasksByID: familyTasksByID,
+                eventsByID: eventsByID
+            ) else { continue }
+            if responsibleHumanID == selectedHuman.id {
+                currentMemberItemIDs.insert(item.id)
+            } else if item.workflowStatus != .pendingReview {
+                waitingForOthersItemIDs.insert(item.id)
+            }
+        }
+
+        return TaskCenterMemberFilterContext(
+            activeHumanName: selectedHuman.name,
+            showsFilters: true,
+            currentMemberItemIDs: currentMemberItemIDs,
+            waitingForOthersItemIDs: waitingForOthersItemIDs,
+            pendingReviewItemIDs: pendingReviewItemIDs
+        )
+    }
+
+    private static func responsibleHumanID(
+        for item: TaskCenterItemSnapshot,
+        familyTasksByID: [UUID: FamilyCollaborationTask],
+        eventsByID: [UUID: Event]
+    ) -> UUID? {
+        if let familyTaskID = item.familyTaskID,
+           let task = familyTasksByID[familyTaskID],
+           let rawID = task.claimedById ?? task.assignedToId,
+           let humanID = UUID(uuidString: rawID) {
+            return humanID
+        }
+        if let eventID = item.eventID,
+           let rawID = eventsByID[eventID]?.assigneeId,
+           let humanID = UUID(uuidString: rawID) {
+            return humanID
+        }
+        return item.subject.kind == .human ? item.subject.id : nil
+    }
+
+    private static func participantHumanIDs(
+        event: Event?,
+        familyTask: FamilyCollaborationTask?
+    ) -> Set<UUID> {
+        let rawIDs = [
+            event?.assigneeId,
+            familyTask?.createdById,
+            familyTask?.assignedToId,
+            familyTask?.claimedById,
+            familyTask?.completedById
+        ]
+        return Set(rawIDs.compactMap { rawID in
+            guard let rawID else { return nil }
+            return UUID(uuidString: rawID)
+        })
+    }
+
+    private static func uniqueEvents(_ events: [Event]) -> [Event] {
+        var result: [UUID: Event] = [:]
+        for event in events {
+            result[event.id] = event
+        }
+        return Array(result.values)
+    }
+
+    private static func uniqueReminders(_ reminders: [Reminder]) -> [Reminder] {
+        var result: [UUID: Reminder] = [:]
+        for reminder in reminders {
+            result[reminder.id] = reminder
+        }
+        return Array(result.values)
+    }
+
+    private static func linkedReminder(
+        for task: FamilyCollaborationTask,
+        remindersByID: [UUID: Reminder]
+    ) -> Reminder? {
+        guard let rawID = task.relatedReminderId,
+              let reminderID = UUID(uuidString: rawID) else { return nil }
+        return remindersByID[reminderID]
+    }
+
+    private static func linkedEventID(
+        for task: FamilyCollaborationTask,
+        remindersByID: [UUID: Reminder]
+    ) -> UUID? {
+        if let rawID = task.relatedEventId,
+           let eventID = UUID(uuidString: rawID) {
+            return eventID
+        }
+        return linkedReminder(for: task, remindersByID: remindersByID)?.event?.id
+    }
+
+    private static func linkedEvent(
+        for task: FamilyCollaborationTask,
+        eventsByID: [UUID: Event],
+        remindersByID: [UUID: Reminder]
+    ) -> Event? {
+        guard let eventID = linkedEventID(for: task, remindersByID: remindersByID) else { return nil }
+        return eventsByID[eventID] ?? linkedReminder(for: task, remindersByID: remindersByID)?.event
+    }
+
+    private static func taskDueAt(
+        _ task: FamilyCollaborationTask,
+        event: Event?
+    ) -> Date? {
+        task.dueAt ?? event?.startDate
+    }
+
+    private static func matchingFamilyTask(
+        for occurrence: CalendarEventOccurrence,
+        candidates: [FamilyCollaborationTask],
+        calendar: Calendar
+    ) -> FamilyCollaborationTask? {
+        let sorted = candidates.sorted {
+            let lhsDate = taskDueAt($0, event: occurrence.event)
+                ?? $0.createdAt
+            let rhsDate = taskDueAt($1, event: occurrence.event)
+                ?? $1.createdAt
+            if lhsDate != rhsDate {
+                return lhsDate < rhsDate
+            }
+            if $0.createdAt != $1.createdAt {
+                return $0.createdAt < $1.createdAt
+            }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+        if let exact = sorted.first(where: { task in
+            guard let dueAt = taskDueAt(
+                task,
+                event: occurrence.event
+            ) else { return false }
+            return calendar.isDate(dueAt, inSameDayAs: occurrence.occurrenceDate)
+        }) {
+            return exact
+        }
+        return sorted.count == 1 ? sorted[0] : nil
+    }
+
+    private static func reminder(
+        for event: Event,
+        occurrenceDate: Date,
+        reminders: [Reminder],
+        calendar: Calendar
+    ) -> Reminder? {
+        reminders.first { reminder in
+            reminder.event?.id == event.id &&
+                calendar.isDate(reminder.resolvedOccurrenceAt, inSameDayAs: occurrenceDate)
+        }
+    }
+
+    private static func eventOccurrenceID(eventID: UUID, date: Date) -> String {
+        "\(eventID.uuidString)-\(CalendarSnapshotBuilder.timelineDateID(date))"
+    }
+
     private static func taskSort(_ lhs: TaskCenterItemSnapshot, _ rhs: TaskCenterItemSnapshot) -> Bool {
         if lhs.scheduledAt == rhs.scheduledAt {
-            return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            let titleOrder = lhs.title.localizedStandardCompare(rhs.title)
+            if titleOrder != .orderedSame {
+                return titleOrder == .orderedAscending
+            }
+            return lhs.id < rhs.id
         }
         return lhs.scheduledAt < rhs.scheduledAt
     }

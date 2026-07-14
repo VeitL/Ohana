@@ -178,6 +178,7 @@ backup_contract_entries=(
   "RecycleBinBatch|EXEMPT:short-lived recycle-bin grouping metadata, not durable user content"
   "Reminder|struct ReminderBackup"
   "SharedCareSession|struct SharedCareSessionBackup"
+  "SharedCareUndoReceipt|EXEMPT:local short-lived crash-recovery coordination state, not user-authored history"
   "ShopPurchaseRecord|struct ShopPurchaseRecordBackup"
   "SymptomLog|struct SymptomLogBackup"
   "WaterLog|struct WaterLogBackup"
@@ -217,8 +218,8 @@ for entry in "${backup_contract_entries[@]}"; do
     "SwiftData model $model should have a matching backup DTO, or a documented exemption if intentionally excluded."
 done
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV85\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV85 model set."
+require_pattern "$shared_container" 'Schema\(ArkSchemaV90\.models\)' \
+  "SharedModelContainer should open the current ArkSchemaV90 model set."
 
 require_pattern "$local_backup_exclusion" 'values\.isExcludedFromBackup = true' \
   "Local persistence must set URLResourceValues.isExcludedFromBackup before storing private data."

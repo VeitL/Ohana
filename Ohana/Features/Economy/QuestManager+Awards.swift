@@ -195,10 +195,24 @@ extension QuestManager {
         context: ModelContext,
         quality: QualityBonus = .none,
         title: String? = nil,
-        executorId: String? = nil
+        executorId: String? = nil,
+        date: Date = Date(),
+        idempotencyKey: String? = nil
     ) -> (humanGot: Int, petGot: Int) {
         let livePets = pets.filter { EconomyWalletWritePolicy.canWrite($0) }
         guard !livePets.isEmpty else { return (0, 0) }
+
+        if let replay = replaySharedCareReward(
+            idempotencyKey: idempotencyKey,
+            type: type,
+            pets: livePets,
+            title: title,
+            executorId: executorId,
+            date: date,
+            context: context
+        ) {
+            return replay
+        }
 
         let human = EconomyRewardOwnerResolver.rewardHuman(
             executorId: executorId,
@@ -211,112 +225,36 @@ extension QuestManager {
             return (0, 0)
         }
         let consumesBoost = isDoubleRewardBoostActive()
-        let isCoolingDown = livePets.allSatisfy { isOnCooldown(petId: $0.id, type: type) }
-        let budgetKeys = economyBudgetKeys(for: human, context: context)
-        let objectKeys = careObjectKeys(for: livePets)
-        let result = CoconutEconomyPolicyV2.sharedReward(
-            for: type,
-            targetCount: livePets.count,
+        let plan = makeSharedCareAwardPlan(
+            type: type,
+            livePets: livePets,
+            human: human,
+            context: context,
             quality: quality,
-            isOnCooldown: isCoolingDown,
-            userKey: budgetKeys.household,
-            memberKey: budgetKeys.member,
-            careObjectKeys: objectKeys,
-            careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
-            hasHumanAccount: human != nil,
-            forcedLuck: consumesBoost ? .golden : nil,
-            context: context
+            title: title,
+            date: date,
+            idempotencyKey: idempotencyKey,
+            consumesBoost: consumesBoost
         )
-        lastEconomyRewardResult = result
-
-        let petAwards = Self.distribute(result.petCoconuts, count: livePets.count)
-
-        let petTotal = petAwards.reduce(0, +)
-        let humanTotal = human == nil ? 0 : result.humanCoconuts
-
-        let l = L10n.current
-        let logEmoji = result.luck == .golden ? "🎁" : type.emoji
-        let petNames = Self.sharedCarePetNames(livePets, l: l)
-        var sharedTitle = title ?? Self.sharedCareTitle(petNames: petNames, l: l)
-        if let luckTitle = Self.economyLuckTitle(result.luck, l: l) {
-            sharedTitle += " · \(luckTitle)"
-        }
-
-        var walletDeltas: [CoconutWalletDelta] = []
-        for (index, pet) in livePets.enumerated() where petAwards[index] > 0 {
-            walletDeltas.append(.pet(
-                pet,
-                delta: petAwards[index],
-                entryKind: .reward,
-                source: .careEvent,
-                title: sharedTitle,
-                emoji: logEmoji,
-                actorId: pet.id.uuidString,
-                actorName: pet.name,
-                subjectKind: .pet,
-                subjectId: pet.id.uuidString,
-                metadataJSON: result.metadataJSON
-            ))
-        }
-        if let human, humanTotal > 0 {
-            walletDeltas.append(.human(
-                human,
-                delta: humanTotal,
-                entryKind: .reward,
-                source: .careEvent,
-                title: Self.sharedCareHumanTitle(isGolden: result.luck == .golden, l: l),
-                emoji: "🥥",
-                actorId: human.id.uuidString,
-                actorName: human.name,
-                subjectKind: .human,
-                subjectId: human.id.uuidString,
-                metadataJSON: result.metadataJSON
-            ))
-        }
+        lastEconomyRewardResult = plan.result
 
         do {
-            try wallet.apply(
-                deltas: walletDeltas,
+            try persistSharedCareAward(
+                plan,
                 context: context,
-                save: false,
-                postsRewardFeedback: false,
-                updatesProjection: true,
-                projectionManager: self
+                date: date,
+                idempotencyKey: idempotencyKey
             )
-            EconomyDailyBudgetStore.commit(
-                result,
-                householdKey: budgetKeys.household,
-                memberKey: budgetKeys.member,
-                careObjectKeys: objectKeys,
-                context: context,
-                save: false,
-                writeDefaults: false
-            )
-            try saveQuestAwardChanges(context: context)
-            EconomyDailyBudgetStore.commit(
-                result,
-                householdKey: budgetKeys.household,
-                memberKey: budgetKeys.member,
-                careObjectKeys: objectKeys,
-                context: nil,
-                save: false
-            )
-            if consumesBoost {
-                clearDoubleRewardBoost()
-            }
-            postEconomyFeedback(
-                result,
+            applySharedCareRuntimeEffects(
+                plan.result,
                 type: type,
-                title: sharedTitle,
-                actorId: human?.id.uuidString ?? livePets.first?.id.uuidString,
-                actorName: human?.name ?? livePets.first?.name
+                pets: livePets,
+                title: plan.sharedTitle,
+                executorId: executorId,
+                date: date,
+                consumesBoost: consumesBoost,
+                context: context
             )
-            for pet in livePets {
-                if !isOnCooldown(petId: pet.id, type: type) {
-                    recordCooldown(petId: pet.id, type: type)
-                }
-                streakRewards.checkAndAward(pet: pet, questManager: self, context: context)
-            }
         } catch {
             context.rollback()
             lastEconomyRewardResult = .empty
@@ -327,7 +265,342 @@ extension QuestManager {
             return (0, 0)
         }
 
-        return (humanTotal, petTotal)
+        return (plan.humanTotal, plan.petTotal)
+    }
+
+    private struct SharedCareAwardPlan {
+        let result: EconomyRewardResult
+        let budgetKeys: (household: String, member: String)
+        let objectKeys: [String]
+        let walletDeltas: [CoconutWalletDelta]
+        let sharedTitle: String
+        let humanTotal: Int
+        let petTotal: Int
+    }
+
+    private func replaySharedCareReward(
+        idempotencyKey: String?,
+        type: OhanaActionType,
+        pets: [Pet],
+        title: String?,
+        executorId: String?,
+        date: Date,
+        context: ModelContext
+    ) -> (humanGot: Int, petGot: Int)? {
+        guard let idempotencyKey,
+              let existing = existingSharedCareReward(
+                  idempotencyKey: idempotencyKey,
+                  context: context
+              ) else { return nil }
+        let restoredResult = Self.rewardResult(from: existing.metadataJSON)
+        lastEconomyRewardResult = restoredResult
+        wallet.refreshQuestProjection(context: context, manager: self)
+        if let restoredResult {
+            applySharedCareRuntimeEffects(
+                restoredResult,
+                type: type,
+                pets: pets,
+                title: title,
+                executorId: executorId,
+                date: date,
+                consumesBoost: Self.boolValue(
+                    named: "consumesBoost",
+                    metadataJSON: existing.metadataJSON
+                ),
+                context: context
+            )
+        }
+        return (
+            existing.entries.filter { $0.ownerKind == .human }.reduce(0) { $0 + max(0, $1.delta) },
+            existing.entries.filter { $0.ownerKind == .pet }.reduce(0) { $0 + max(0, $1.delta) }
+        )
+    }
+
+    private func makeSharedCareAwardPlan(
+        type: OhanaActionType,
+        livePets: [Pet],
+        human: Human?,
+        context: ModelContext,
+        quality: QualityBonus,
+        title: String?,
+        date: Date,
+        idempotencyKey: String?,
+        consumesBoost: Bool
+    ) -> SharedCareAwardPlan {
+        let budgetKeys = economyBudgetKeys(for: human, context: context)
+        let objectKeys = careObjectKeys(for: livePets)
+        let result = CoconutEconomyPolicyV2.sharedReward(
+            for: type,
+            targetCount: livePets.count,
+            quality: quality,
+            isOnCooldown: livePets.allSatisfy { isOnCooldown(petId: $0.id, type: type) },
+            userKey: budgetKeys.household,
+            memberKey: budgetKeys.member,
+            careObjectKeys: objectKeys,
+            careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
+            hasHumanAccount: human != nil,
+            date: date,
+            forcedLuck: consumesBoost ? .golden : nil,
+            context: context
+        )
+        let petAwards = Self.distribute(result.petCoconuts, count: livePets.count)
+        let humanTotal = human == nil ? 0 : result.humanCoconuts
+        let l = L10n.current
+        var sharedTitle = title ?? Self.sharedCareTitle(
+            petNames: Self.sharedCarePetNames(livePets, l: l),
+            l: l
+        )
+        if let luckTitle = Self.economyLuckTitle(result.luck, l: l) {
+            sharedTitle += " · \(luckTitle)"
+        }
+        let walletMetadata = Self.sharedCareRewardMetadata(
+            result.metadataJSON,
+            idempotencyKey: idempotencyKey,
+            consumesBoost: consumesBoost
+        )
+        return SharedCareAwardPlan(
+            result: result,
+            budgetKeys: budgetKeys,
+            objectKeys: objectKeys,
+            walletDeltas: Self.sharedCareWalletDeltas(
+                livePets: livePets,
+                petAwards: petAwards,
+                human: human,
+                humanTotal: humanTotal,
+                humanTitle: Self.sharedCareHumanTitle(isGolden: result.luck == .golden, l: l),
+                sharedTitle: sharedTitle,
+                walletMetadata: walletMetadata,
+                idempotencyKey: idempotencyKey,
+                date: date,
+                logEmoji: result.luck == .golden ? "🎁" : type.emoji
+            ),
+            sharedTitle: sharedTitle,
+            humanTotal: humanTotal,
+            petTotal: petAwards.reduce(0, +)
+        )
+    }
+
+    private static func sharedCareWalletDeltas(
+        livePets: [Pet],
+        petAwards: [Int],
+        human: Human?,
+        humanTotal: Int,
+        humanTitle: String,
+        sharedTitle: String,
+        walletMetadata: String,
+        idempotencyKey: String?,
+        date: Date,
+        logEmoji: String
+    ) -> [CoconutWalletDelta] {
+        let sourceModelName = idempotencyKey == nil ? "" : "SharedCareFinalization"
+        let sourceModelId = idempotencyKey ?? ""
+        var deltas = livePets.enumerated().compactMap { index, pet -> CoconutWalletDelta? in
+            guard petAwards[index] > 0 else { return nil }
+            return .pet(
+                pet,
+                delta: petAwards[index],
+                entryKind: .reward,
+                source: .careEvent,
+                title: sharedTitle,
+                emoji: logEmoji,
+                actorId: pet.id.uuidString,
+                actorName: pet.name,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                sourceModelName: sourceModelName,
+                sourceModelId: sourceModelId,
+                metadataJSON: walletMetadata,
+                occurredAt: date,
+                transactionKey: idempotencyKey.map { "\($0):pet:\(pet.id.uuidString)" }
+            )
+        }
+        if let human, humanTotal > 0 {
+            deltas.append(.human(
+                human,
+                delta: humanTotal,
+                entryKind: .reward,
+                source: .careEvent,
+                title: humanTitle,
+                emoji: "🥥",
+                actorId: human.id.uuidString,
+                actorName: human.name,
+                subjectKind: .human,
+                subjectId: human.id.uuidString,
+                sourceModelName: sourceModelName,
+                sourceModelId: sourceModelId,
+                metadataJSON: walletMetadata,
+                occurredAt: date,
+                transactionKey: idempotencyKey.map { "\($0):human:\(human.id.uuidString)" }
+            ))
+        }
+        if let idempotencyKey, deltas.isEmpty {
+            deltas.append(.island(
+                delta: 0,
+                entryKind: .legacyHistory,
+                source: .careEvent,
+                title: sharedTitle,
+                emoji: "🧾",
+                subjectKind: .household,
+                sourceModelName: sourceModelName,
+                sourceModelId: sourceModelId,
+                metadataJSON: walletMetadata,
+                occurredAt: date,
+                transactionKey: "\(idempotencyKey):marker",
+                affectsBalance: false
+            ))
+        }
+        return deltas
+    }
+
+    private func persistSharedCareAward(
+        _ plan: SharedCareAwardPlan,
+        context: ModelContext,
+        date: Date,
+        idempotencyKey: String?
+    ) throws {
+        try wallet.apply(
+            deltas: plan.walletDeltas,
+            context: context,
+            save: false,
+            postsRewardFeedback: false,
+            updatesProjection: true,
+            projectionManager: self
+        )
+        EconomyDailyBudgetStore.commit(
+            plan.result,
+            householdKey: plan.budgetKeys.household,
+            memberKey: plan.budgetKeys.member,
+            careObjectKeys: plan.objectKeys,
+            date: date,
+            context: context,
+            save: false,
+            writeDefaults: false
+        )
+        try saveQuestAwardChanges(context: context)
+        if idempotencyKey == nil {
+            EconomyDailyBudgetStore.commit(
+                plan.result,
+                householdKey: plan.budgetKeys.household,
+                memberKey: plan.budgetKeys.member,
+                careObjectKeys: plan.objectKeys,
+                date: date,
+                context: nil,
+                save: false
+            )
+        }
+    }
+
+    private struct ExistingSharedCareReward {
+        let entries: [CoconutLedgerEntry]
+        let metadataJSON: String
+    }
+
+    private func existingSharedCareReward(
+        idempotencyKey: String,
+        context: ModelContext
+    ) -> ExistingSharedCareReward? {
+        let sourceModelName = "SharedCareFinalization"
+        var descriptor = FetchDescriptor<CoconutLedgerEntry>(
+            predicate: #Predicate<CoconutLedgerEntry> {
+                $0.sourceModelName == sourceModelName && $0.sourceModelId == idempotencyKey
+            },
+            sortBy: [SortDescriptor(\.occurredAt)]
+        )
+        descriptor.fetchLimit = 64
+        guard let entries = try? context.fetch(descriptor), !entries.isEmpty else { return nil }
+        return ExistingSharedCareReward(
+            entries: entries,
+            metadataJSON: entries.first?.metadataJSON ?? ""
+        )
+    }
+
+    private static func sharedCareRewardMetadata(
+        _ metadataJSON: String,
+        idempotencyKey: String?,
+        consumesBoost: Bool
+    ) -> String {
+        guard let idempotencyKey,
+              let data = metadataJSON.data(using: .utf8),
+              var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return metadataJSON
+        }
+        object["sharedCareIdempotencyKey"] = idempotencyKey
+        object["consumesBoost"] = consumesBoost
+        guard let encoded = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let json = String(data: encoded, encoding: .utf8) else { return metadataJSON }
+        return json
+    }
+
+    private static func rewardResult(from metadataJSON: String) -> EconomyRewardResult? {
+        guard let data = metadataJSON.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        func int(_ key: String) -> Int { (object[key] as? NSNumber)?.intValue ?? 0 }
+        func double(_ key: String) -> Double { (object[key] as? NSNumber)?.doubleValue ?? 0 }
+        func bool(_ key: String) -> Bool { (object[key] as? NSNumber)?.boolValue ?? false }
+        func string(_ key: String) -> String { object[key] as? String ?? "" }
+        let stage = EconomyBudgetStage(rawValue: string("budgetStage")) ?? .normal
+        let luck = EconomyLuckTier(rawValue: string("luck")) ?? .none
+        return EconomyRewardResult(
+            growthXP: int("growthXP"),
+            humanCoconuts: int("humanCoconuts"),
+            petCoconuts: int("petCoconuts"),
+            bonusCoconuts: int("coconutBonus"),
+            luckyCoconuts: int("luckyCoconuts"),
+            budgetMultiplier: double("budgetMultiplier"),
+            budgetStage: stage,
+            reason: string("reason"),
+            actionKey: string("actionKey"),
+            isOnCooldown: bool("cooldown"),
+            baseGrowthXP: int("growthXP"),
+            baseCoconuts: int("coconutBase"),
+            luck: luck
+        )
+    }
+
+    private static func boolValue(named key: String, metadataJSON: String) -> Bool {
+        guard let data = metadataJSON.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+        return (object[key] as? NSNumber)?.boolValue ?? false
+    }
+
+    private func applySharedCareRuntimeEffects(
+        _ result: EconomyRewardResult,
+        type: OhanaActionType,
+        pets: [Pet],
+        title: String?,
+        executorId: String?,
+        date: Date,
+        consumesBoost: Bool,
+        context: ModelContext
+    ) {
+        if consumesBoost {
+            clearDoubleRewardBoost()
+        }
+        let human = EconomyRewardOwnerResolver.rewardHuman(
+            executorId: executorId,
+            activeHumanSelection: activeHumanSelection,
+            context: context,
+            logPrefix: "QuestManager"
+        )
+        let resolvedTitle = title ?? Self.sharedCareTitle(
+            petNames: Self.sharedCarePetNames(pets, l: .current),
+            l: .current
+        )
+        postEconomyFeedback(
+            result,
+            type: type,
+            title: resolvedTitle,
+            actorId: human?.id.uuidString ?? pets.first?.id.uuidString,
+            actorName: human?.name ?? pets.first?.name
+        )
+        for pet in pets {
+            recordCooldown(petId: pet.id, type: type, occurredAt: date)
+            streakRewards.checkAndAward(pet: pet, questManager: self, context: context)
+        }
     }
 
     private static func economyLuckTitle(_ luck: EconomyLuckTier, l: L10n) -> String? {

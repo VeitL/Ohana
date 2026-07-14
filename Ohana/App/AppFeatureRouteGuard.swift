@@ -148,9 +148,9 @@ enum AppFeatureRouteGuard {
         currentLevel: Int,
         starterGiftDefaults: UserDefaults = .standard
     ) -> [VerticalSolidHomeTab] {
-        VerticalSolidHomeTab.allCases.filter {
+        Array(VerticalSolidHomeTab.allCases.prefix {
             allowsHomeTab($0, currentLevel: currentLevel, starterGiftDefaults: starterGiftDefaults)
-        }
+        })
     }
 
     static func visibleHomeTabs(starterGiftDefaults: UserDefaults = .standard) -> [VerticalSolidHomeTab] {

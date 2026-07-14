@@ -17,11 +17,17 @@ enum SharedPetTargetResolver {
         let candidates = targets.isEmpty ? [sourcePet] : targets
         let sourceSpecies = normalizedSpecies(sourcePet.species)
         var seen = Set<UUID>()
-        var liveTargets = candidates.filter { pet in
-            guard EconomyWalletWritePolicy.canWrite(pet), !seen.contains(pet.id) else { return false }
-            guard normalizedSpecies(pet.species) == sourceSpecies else { return false }
+        var liveTargets: [Pet] = []
+        for pet in candidates {
+            guard EconomyWalletWritePolicy.canWrite(pet),
+                  normalizedSpecies(pet.species) == sourceSpecies else {
+                // A stale multi-target selection is one user intent. Do not
+                // silently turn it into a smaller, partially successful write.
+                return []
+            }
+            guard !seen.contains(pet.id) else { continue }
             seen.insert(pet.id)
-            return true
+            liveTargets.append(pet)
         }
         if EconomyWalletWritePolicy.canWrite(sourcePet), !liveTargets.contains(where: { $0.id == sourcePet.id }) {
             liveTargets.insert(sourcePet, at: 0)
@@ -40,6 +46,10 @@ enum SharedPetTargetResolver {
             EconomyWalletWritePolicy.canWrite(pet) && normalizedSpecies(pet.species) == species
         }
         let selected = explicitTargetIds.isEmpty ? sameSpecies : sameSpecies.filter { explicitTargetIds.contains($0.id) }
+        if !explicitTargetIds.isEmpty,
+           Set(selected.map(\.id)) != explicitTargetIds {
+            return []
+        }
         return normalizedTargets(selected, fallback: sourcePet)
     }
 }

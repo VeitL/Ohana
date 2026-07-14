@@ -1,7 +1,7 @@
 # Economy 规则书
 
 确认日期：2026-06-12  
-最近更新：2026-07-11
+最近更新：2026-07-14
 适用范围：Phase 6 Economy 模块；覆盖椰子钱包、正式岛屿总资产、奖励预算 / 冷却、商店消费、宠物成长椰子、成就奖励、财富页与椰子历史。
 
 本规则书覆盖宪法 D2/D3/D7/D8/D12/D13/D14/G2/G4/G5/G8 在 Economy 模块中的首发语义，并保留 GAP-4 总账恒等、GAP-5 触顶感知、GAP-7 补记结算的已验证规则。
@@ -23,7 +23,7 @@
 - 体重、宠物花费、宠物健康、补签结算等由命令层已知执行人的奖励入口必须把 `executorId` 传进统一奖励管线；手动宠物里程碑没有独立 executor picker，奖励与照护账本 actor 均归属当前 active human；seed / 系统里程碑不产生人类 actor。
 - 离世成员的钱包冻结：不再获得奖励、不再消费、不再领取成就，也不计入活跃财富总额 / 榜单 / 趋势；历史流水可见。用户可见回收站 / 可恢复删除已取消，成员删除为确认后物理删除；未来 CloudSync sync tombstone 只传播删除，不形成钱包恢复态。
 - 商店正式消费支持岛屿合资：买家钱包不足但全岛未冻结人类钱包总额足够时，可由其他人类钱包补差额；总额仍不足时必须整体拒绝且不写任何钱包或购买事实。
-- FamilyTasks 悬赏功能首发由 `OnlineFeatureGate` 隐藏；未来解锁前，悬赏确认必须复用 Economy 钱包写入边界。悬赏转账失败时不得把任务标为完成，不得留下 payer / receiver 钱包流水或照护账本事件。
+- `FamilyCollaborationTask` 的本机家庭悬赏属于首发可达能力，不受 `OnlineFeatureGate` 隐藏。执行者提交后进入待审核，只有发布者确认成功才完成奖励转账；转账必须复用 Economy 钱包写入边界。余额不足、钱包冻结、重复确认或持久化失败时不得把任务标为完成，也不得留下半笔 payer / receiver 钱包流水或照护账本事件。跨设备悬赏仍属于 gated 的未来能力。
 - Economy 首发可见 UI、奖励反馈、钱包流水标题与时间文案必须走已注册语言 fallback；Debug / Preview / 内部测试文案不作为本轮首发阻塞。
 - 财富页使用 Economy screen snapshot / read model 聚合，SwiftUI 视图不直接在 body 中重放账本或扫描成员模型；后续若大数据仍卡顿，再继续拆后台 snapshot store。
 - Calendar / Today Focus / 通知中的宠物照护任务完成不是独立经济活动；它必须等价进入照护事实 + `QuestManager.awardAction` 预算 / 冷却管线。普通非照护日程完成不得凭空产生椰子。
@@ -50,7 +50,7 @@
 - ECO-017：财富页 screen model 只吃不可变快照值。图表、榜单、总资产、筛选和颜色计算不得在 SwiftUI body 中直接依赖 SwiftData 模型对象。
 - ECO-018：奖励归属以业务事实执行人为准。已有 `executorId` 的照护 / 花费 / 遛狗 / 喂药 / 时刻记录不得把奖励发给当前 active human；active human 只作为无明确执行人的兜底。
 - ECO-019：商店购买以全岛未冻结人类钱包作为可支配池；买家优先出资，其他人类钱包只补差额并记录各自支出流水。任何一笔出资失败时必须回滚整笔购买。
-- ECO-020：FamilyTasks 悬赏确认是钱包转账事实边界。若 payer 余额不足、钱包冻结、转账重复键冲突或持久化失败，确认命令必须返回失败并保持任务待审核；不得吞错后展示完成态，也不得落下半笔钱包 / ledger 事实。
+- ECO-020：本机 FamilyTasks 悬赏确认是钱包转账事实边界。若 payer 余额不足、钱包冻结、转账重复键冲突或持久化失败，确认命令必须返回失败并保持任务待审核；不得吞错后展示完成态，也不得落下半笔钱包 / ledger 事实。
 - ECO-021：任何新增奖励入口必须能被 `scripts/audit-economy-boundaries.sh --all` 证明没有散落的 actor 归属缺口；若入口没有明确 executor，必须在规则书记录产品理由和 fallback owner。
 - ECO-022：Calendar / Today Focus / 通知完成宠物照护任务时，奖励归属、预算、冷却与钱包写入必须与同类型 QuickCare 照护动作等价；不得再使用单独的“Calendar 完成奖励”小管线。
 - ECO-023：取消完成 Calendar 照护 occurrence 时，必须按 occurrence 幂等撤销该次生成的奖励和预算占用；钱包用 `refund` / reversal 流水冲销，预算使用事件写删除 tombstone 后移除。
@@ -83,7 +83,7 @@
 - 奖励 owner 解析由 `EconomyRewardOwnerResolver` 统一：`Ohana/Features/Economy/EconomyRewardOwnerResolver.swift`。
 - 体重、宠物花费、宠物健康、补签、手动宠物里程碑等奖励入口均由各自 command/service 将 owner 传入 `QuestManager.awardAction`，并由 `OhanaTests/RecurringFindingsRepairTests.swift` 覆盖 executor 不回落 active human。
 - 商店合资出资计划由 `CoconutWalletFundingPlanner` 计算，钱包 mutation 由 `CoconutWalletMutationWriter` 写入；UI 只显示全岛可支配余额：`Ohana/Domain/Economy/CoconutWalletFundingPlanner.swift`。
-- FamilyTasks 悬赏转账暂由隐藏的 FamilyTasks 服务调用 Economy wallet mutation 边界；失败时 `confirmCompletion` 返回 `false` 并保持待审核：`Ohana/Features/FamilyTasks/FamilyTaskService.swift`。
+- 本机家庭悬赏可从 `TaskCenterRouteContainer` 到达；`TaskActionCommandExecutor` 通过 `FamilyCollaborationCommandExecutor` 调用 `FamilyTaskService.confirmCompletion`。确认只有在奖励转账准备和同一持久化边界成功后才进入 completed；失败返回 `false` 并保持 pendingReview。来源：`TaskCenterRouteContainer`、`TaskActionCommandExecutor`、`FamilyCollaborationCommandExecutor`、`FamilyTaskService`。
 - 财富页以 `IslandWealthSnapshot` / `IslandWealthScreenModel` 为 UI 聚合边界。
 
 ## 状态机
@@ -134,6 +134,7 @@
 
 - 本轮不改 SwiftData schema。
 - 本轮不启用 CloudKit，不修改联机同步语义。
+- `OnlineFeatureGate` 继续关闭跨设备协作，但不得阻断同设备家庭悬赏；本地可达性不改变 ECO-020 的审核、幂等与原子转账要求。
 - `system:legacy` 可继续保留在数据库中用于迁移兼容与开发测试，但正式资产总数、财富页排行榜、椰子历史总额不计入它。
 - 补记结算只管“用户提交历史日期照护事实”的奖励预算 / 冷却日期；不改变 Today Focus 每日完成奖、商店、成就、里程碑、绿洲注入包、自动备份或通知预算语义。
 - `CoconutExchangeRequest` 继续参与 schema、备份、恢复与历史数据兼容；首发只是入口不可达，不执行 CloudKit 或合资流程。

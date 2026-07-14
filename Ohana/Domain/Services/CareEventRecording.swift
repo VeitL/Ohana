@@ -207,6 +207,18 @@ protocol CareEventRecording {
     ) -> SharedPetActionResult
 
     @discardableResult
+    func recordPendingSharedLitterScoopFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        context: ModelContext,
+        executorId: String?,
+        date: Date,
+        undoDeadline: Date,
+        corePayloadJSON: String,
+        externalEffectsPayloadJSON: String
+    ) -> SharedPetActionResult
+
+    @discardableResult
     func recordUnknownSharedPotty(
         sourcePet: Pet,
         targets: [Pet],

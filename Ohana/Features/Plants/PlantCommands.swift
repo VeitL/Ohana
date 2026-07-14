@@ -46,7 +46,8 @@ enum PlantCareCommandService {
     static func recordCare(
         _ request: PlantCareCommandRequest,
         context: ModelContext,
-        options: PlantCareCommandOptions
+        options: PlantCareCommandOptions,
+        careTransactionId: String? = nil
     ) -> PlantCareCommandResult {
         let plant = request.plant
         guard !plant.isArchived else {
@@ -71,7 +72,8 @@ enum PlantCareCommandService {
         let log = makeCareLog(
             request,
             authorizedExecutorID: authorizedExecutorID,
-            photoData: persistedPhotoData
+            photoData: persistedPhotoData,
+            careTransactionId: careTransactionId
         )
         log.plant = plant
         context.insert(log)
@@ -202,13 +204,15 @@ enum PlantCareCommandService {
     private static func makeCareLog(
         _ request: PlantCareCommandRequest,
         authorizedExecutorID: String?,
-        photoData: Data?
+        photoData: Data?,
+        careTransactionId: String?
     ) -> PlantCareLog {
         PlantCareLog(
             date: request.now,
             careType: request.careType,
             note: request.careNote,
             executorId: authorizedExecutorID,
+            careTransactionId: careTransactionId ?? UUID().uuidString,
             photoData: photoData,
             healthStatus: request.healthStatus
         )
@@ -259,6 +263,11 @@ enum PlantCareCommandService {
         options: PlantCareCommandOptions
     ) -> CareLedgerEvent {
         let careLedger = options.careLedger ?? CareLedgerService()
+        let metadataJSON = CareLedgerMetadata.addingString(
+            CareLedgerMetadata.careTransactionId,
+            value: log.careTransactionId,
+            to: reward.metadata
+        )
         return careLedger.record(
             occurredAt: log.date,
             actorKind: authorizedExecutorID == nil ? .unknown : .human,
@@ -278,7 +287,7 @@ enum PlantCareCommandService {
             coconutDelta: reward.coconutDelta,
             rewardLogId: nil,
             privacyFieldRaw: nil,
-            metadataJSON: reward.metadata,
+            metadataJSON: metadataJSON,
             context: context,
             save: false
         )

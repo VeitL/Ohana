@@ -347,6 +347,16 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = .crewRoster(mode)
     }
 
+    func openTaskCenter() {
+        if let appSheetRouteSink {
+            appSheetRouteSink(.appSheet(.taskCenter(.all)))
+            modal = nil
+            fullScreen = nil
+            return
+        }
+        modal = .calendar(entityID: nil, humanID: nil, plantID: nil)
+    }
+
     func openAccountSwitcher() {
         if let appSheetRouteSink {
             appSheetRouteSink(.accountSwitcher)

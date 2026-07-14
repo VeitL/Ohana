@@ -34,13 +34,24 @@ enum AppRoute: Hashable, Identifiable {
             id
         }
     }
+
+    var taskCenterContext: TaskCenterRouteContext {
+        switch self {
+        case let .petProfile(id, _):
+            TaskCenterRouteContext(scope: .pet(id), focusedFamilyTaskID: nil)
+        case let .humanProfile(id):
+            .human(id)
+        case let .plantProfile(id):
+            TaskCenterRouteContext(scope: .plant(id), focusedFamilyTaskID: nil)
+        }
+    }
 }
 
 enum AppSheetRoute: Hashable, Identifiable {
     case accountSwitcher
     case addEntity(EntityType)
     case calendar(entityID: String?, humanID: String?, plantID: String?)
-    case taskCenter
+    case taskCenter(TaskCenterRouteContext)
     case coconutLog(CoconutLogSubject?)
     case coconutShop(ShopItem.ShopCategory)
     case crewRoster(CrewRosterMode)
@@ -95,8 +106,8 @@ enum AppSheetRoute: Hashable, Identifiable {
             "add-entity-\(type.id)"
         case let .calendar(entityID, humanID, plantID):
             "calendar-\(entityID ?? "all")-\(humanID ?? "all")-\(plantID ?? "all")"
-        case .taskCenter:
-            "task-center"
+        case let .taskCenter(context):
+            "task-center-\(context.scope.routeID)-\(context.focusedItemID ?? context.focusedFamilyTaskID?.uuidString ?? context.creationPreset?.requestID.uuidString ?? "all")"
         case let .coconutLog(subject):
             "coconut-log-\(subject?.id ?? "all")"
         case let .coconutShop(category):
@@ -364,8 +375,8 @@ final class AppRouteCoordinator: ObservableObject {
         presentSheet(.calendar(entityID: entityID, humanID: humanID, plantID: nil))
     }
 
-    func presentTaskCenter() {
-        presentSheet(.taskCenter)
+    func presentTaskCenter(context: TaskCenterRouteContext = .all) {
+        presentSheet(.taskCenter(context))
     }
 
     func presentCoconutShop(category: ShopItem.ShopCategory = .appIcon) {

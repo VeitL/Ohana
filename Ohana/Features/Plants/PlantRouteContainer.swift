@@ -10,16 +10,21 @@ import SwiftUI
 
 struct AppPlantRouteContainer: View {
     @Query private var plants: [Plant]
+    let onCreateCareTask: ((TaskCreationPreset) -> Void)?
 
-    init(id: UUID) {
+    init(
+        id: UUID,
+        onCreateCareTask: ((TaskCreationPreset) -> Void)? = nil
+    ) {
         _plants = Query(filter: #Predicate<Plant> { plant in
             plant.id == id
         })
+        self.onCreateCareTask = onCreateCareTask
     }
 
     var body: some View {
         if let plant = plants.first {
-            PlantDetailView(plant: plant)
+            PlantDetailView(plant: plant, onCreateCareTask: onCreateCareTask)
         } else {
             PlantRouteMissingEntityView(kind: "plant")
         }

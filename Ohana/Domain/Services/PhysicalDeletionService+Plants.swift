@@ -13,6 +13,14 @@ struct PhysicalPlantDeletionResult: Equatable, Sendable {
 }
 
 extension PhysicalDeletionService {
+    nonisolated static let plantDeletionCascadeCoverageEntityNames: Set<String> = [
+        String(describing: Event.self),
+        String(describing: Reminder.self),
+        String(describing: FamilyCollaborationTask.self),
+        String(describing: PlantCareLog.self),
+        String(describing: CareLedgerEvent.self)
+    ]
+
     @discardableResult
     static func deletePlant(
         _ plant: Plant,
@@ -31,6 +39,12 @@ extension PhysicalDeletionService {
         )
         deletePlantCareRows(
             plant,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+        deleteFamilyTasksReferencingPlant(
+            plantId: plantId,
             context: context,
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId

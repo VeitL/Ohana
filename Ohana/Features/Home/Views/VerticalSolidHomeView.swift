@@ -61,6 +61,9 @@ struct VerticalSolidHomeView: View {
     @State var calendarAddEventTrigger = 0
     @State var embeddedCalendarPreselectedPetId: String?
     @State var embeddedCalendarPreselectedHumanId: String?
+    @State var taskCenterFocusedItemID: String?
+    @State var taskCenterFocusedFamilyTaskID: UUID?
+    @State var taskCenterFocusRequestID: UUID?
     @State var isCalendarAddEventPresented = false
     @State var embeddedCalendarPlants: [Plant] = []
     @State var calendarAddEventPlants: [Plant] = []
@@ -225,7 +228,7 @@ struct VerticalSolidHomeView: View {
         return FocusWalletAvatarCache.cachedEntry(for: id, signature: payload.activeHumanAvatar.signature)?.image
     }
 
-    var body: some View {
+    private var homeGeometryContent: some View {
         GeometryReader { proxy in
             let globalFrame = proxy.frame(in: .global)
             let backgroundViewportTopOffset = max(0, globalFrame.minY)
@@ -247,9 +250,7 @@ struct VerticalSolidHomeView: View {
             let isHomeTabVisible = controller.selectedTab == .home
             let cardHeroProgress = min(max(homeCardHeroProgress, 0), 1)
             let todayFocusVisualProgress = Self.todayFocusVisualProgress(cardHeroProgress: cardHeroProgress)
-            let isWaitingForArrivingCardSnapshot = arrivingHomeCardId.map { arrivingID in
-                !controller.snapshot.cards.contains { $0.id == arrivingID }
-            } ?? false
+            let isWaitingForArrivingCardSnapshot = isWaitingForArrivingHomeCardSnapshot()
             let shouldSuppressTodayFocusDuringArrival = isWaitingForArrivingCardSnapshot &&
                 controller.snapshot.firstPetEmptyState != nil
             let shouldMountTodayFocusChrome = isHomeTabVisible &&
@@ -287,7 +288,7 @@ struct VerticalSolidHomeView: View {
                     localization: l,
                     backgroundViewportSize: backgroundViewportSize,
                     backgroundViewportTopOffset: backgroundViewportTopOffset,
-                    onSelect: selectTab
+                    onSelect: { tab in selectTab(tab) }
                 ) { lifecycle in
                     VerticalSolidHomeDashboardPage(
                         snapshot: controller.snapshot,
@@ -315,81 +316,11 @@ struct VerticalSolidHomeView: View {
                         onAddFirstPet: { routeCoordinator.openAddEntity(.pet) }
                     )
                 } calendar: { lifecycle in
-                    TaskCenterRouteContainer(
-                        presentation: .embeddedHome,
-                        initialSurface: .tasks,
-                        preselectedPetId: embeddedCalendarPreselectedPetId,
-                        preselectedHumanId: embeddedCalendarPreselectedHumanId,
-                        addEventTrigger: calendarAddEventTrigger,
-                        isEmbeddedPrepared: lifecycle.isPrepared,
-                        isEmbeddedVisible: lifecycle.isVisible,
-                        isEmbeddedActive: lifecycle.isLive,
-                        onRequestAddEvent: openCalendarAddEvent,
-                        onPlantsLoaded: { plants in
-                            embeddedCalendarPlants = plants
-                        },
-                        onOpenEventDestination: openCalendarEventDestination,
-                        onPresentCoconutLog: { subject in
-                            onPresentCoconutLog(subject)
-                        },
-                        onBadgeChange: { badge in
-                            guard taskCenterBadge != badge else { return }
-                            taskCenterBadge = badge
-                        }
-                    )
-                    .padding(.top, 4)
+                    embeddedTaskCenterPage(lifecycle: lifecycle)
                 } oasis: { lifecycle in
-                    let treeLevel = treeManager.treeLevel.rawValue
-                    let shopUnlockLevel = GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
-                    let gachaUnlockLevel = GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 0).step.requiredLevel
-                    let critterUnlockLevel = OasisUpgradeRewardCatalog.critter(id: OasisUpgradeRewardCatalog.firstCritterId)?.sourceLevel ?? 10
-                    let shopInitialCategory: ShopItem.ShopCategory = treeLevel >= 5 ? .plantDecor : .effect
-
-                    OasisHomeTabHost(
-                        lifecycle: lifecycle,
-                        treeSnapshot: OasisTreeRenderSnapshot(
-                            level: treeLevel,
-                            progressToNextLevel: treeManager.progressToNextLevel,
-                            totalEnergy: treeManager.totalEnergy,
-                            nextLevelThreshold: treeManager.nextLevelThreshold,
-                            shopLockedLevel: treeLevel >= shopUnlockLevel ? nil : shopUnlockLevel,
-                            shopInitialCategory: shopInitialCategory,
-                            crittersLockedLevel: treeLevel >= critterUnlockLevel ? nil : critterUnlockLevel,
-                            gachaLockedLevel: treeLevel >= gachaUnlockLevel ? nil : gachaUnlockLevel
-                        ),
-                        injectEnergyTrigger: oasisInjectEnergyTrigger,
-                        onPresentCoconutLog: onPresentCoconutLog,
-                        onInjectEnergy: injectEmbeddedOasisEnergy,
-                        onOpenShop: { category in
-                            routeCoordinator.openCoconutShop(category, currentLevel: treeLevel)
-                        }
-                    )
+                    embeddedOasisPage(lifecycle: lifecycle)
                 } plants: { _ in
-                    VerticalSolidHomePlantsPage(
-                        plants: controller.snapshot.plants,
-                        localization: l,
-                        plantQuickActionItemsRaw: $plantQuickActionItemsRaw,
-                        pendingQuickCareKeys: pendingPlantQuickCareKeys,
-                        completedQuickCareKeys: completedPlantQuickCareKeys,
-                        failedQuickCareKeys: failedPlantQuickCareKeys,
-                        topChromeHeight: topChromeHeight,
-                        bottomChromeHeight: 0,
-                        arrivingPlantCardId: arrivingPlantCardId,
-                        onOpenPlant: openPlant,
-                        onOpenFeature: { plant, destination in
-                            openPlantCareFeature(destination, plant: plant)
-                        },
-                        onCareQuickAction: { plant, type in
-                            recordPlantQuickCare(type, plantID: plant.id)
-                        },
-                        onAddPlant: { routeCoordinator.openAddEntity(.plant) },
-                        onOpenBatchCare: {
-                            routeCoordinator.openFunctionMenu(
-                                destination: .plantsBatchCare,
-                                currentLevel: treeManager.treeLevel.rawValue
-                            )
-                        }
-                    )
+                    embeddedPlantsPage(topChromeHeight: topChromeHeight)
                 }
                 .frame(width: proxy.size.width, height: contentHeight)
                 .position(x: proxy.size.width / 2, y: topChromeHeight + contentHeight / 2)
@@ -403,9 +334,15 @@ struct VerticalSolidHomeView: View {
                         onCompleteQuest: completeTodayFocusQuest,
                         onTapNegativeSignal: openTodayFocusNegativeSignal,
                         onTapFamilyTask: openTodayFocusFamilyTask,
+                        onPerformFamilyTask: performTodayFocusTask,
                         onOpenExchange: openTodayFocusExchange,
                         onConfirmExchange: confirmTodayFocusExchange,
-                        onViewAllTasks: { selectTab(.calendar) }
+                        onViewAllTasks: {
+                            taskCenterFocusedItemID = nil
+                            taskCenterFocusedFamilyTaskID = nil
+                            taskCenterFocusRequestID = nil
+                            selectTab(.calendar)
+                        }
                     )
                     .padding(.horizontal, 8)
                     .frame(width: proxy.size.width, height: todayFocusHeight, alignment: .top)
@@ -470,6 +407,10 @@ struct VerticalSolidHomeView: View {
                 safeAreaController.stabilize(from: proxy)
             }
         }
+    }
+
+    var body: some View {
+        homeGeometryContent
         .sheet(isPresented: $isCalendarAddEventPresented, onDismiss: completeCalendarAddEventDismissal) {
             AddEventView(onClose: closeCalendarAddEvent, plants: calendarAddEventPlants)
         }

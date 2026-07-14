@@ -79,8 +79,20 @@ final class CareLedgerAnalysisScreenModel {
         filteredEvents.reduce(0) { $0 + max($1.coconutDelta, 0) }
     }
 
+    /// A shared pet-care session or plant batch is one real-world action even
+    /// when it produces one ledger event per covered subject.
+    var realOperationCount: Int {
+        operationRepresentatives(in: filteredEvents).count
+    }
+
+    /// Ledger child events intentionally stay subject-scoped, so their count
+    /// describes how many pets, plants, or humans the actions covered.
+    var objectCoverageCount: Int {
+        Set(filteredEvents.map(coverageKey(for:))).count
+    }
+
     var kindStats: [(CareLedgerEventKind, Int)] {
-        let grouped = Dictionary(grouping: filteredEvents, by: \.eventKindEnum)
+        let grouped = Dictionary(grouping: operationRepresentatives(in: filteredEvents), by: \.eventKindEnum)
         return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }
     }
 
@@ -89,7 +101,7 @@ final class CareLedgerAnalysisScreenModel {
         let today = calendar.startOfDay(for: Date())
         let dayCount = selectedRange.trendDayCount
         let start = calendar.date(byAdding: .day, value: -(dayCount - 1), to: today) ?? today
-        let eventsInTrendWindow = filteredEvents.filter { event in
+        let eventsInTrendWindow = operationRepresentatives(in: filteredEvents).filter { event in
             event.occurredAt >= start
         }
         let countByDay = Dictionary(grouping: eventsInTrendWindow) { event in
@@ -122,7 +134,7 @@ final class CareLedgerAnalysisScreenModel {
     }
 
     func actorStats(l: L10n) -> [(String, Int)] {
-        let grouped = Dictionary(grouping: filteredEvents) { event in
+        let grouped = Dictionary(grouping: operationRepresentatives(in: filteredEvents)) { event in
             actorName(for: event.actorId, kind: event.actorKind, l: l)
         }
         return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }
@@ -165,5 +177,35 @@ final class CareLedgerAnalysisScreenModel {
             return date.formatted(.dateTime.weekday(.narrow))
         }
         return "\(calendar.component(.day, from: date))"
+    }
+
+    private func operationRepresentatives(in events: [CareLedgerEvent]) -> [CareLedgerEvent] {
+        Dictionary(grouping: events, by: operationKey(for:))
+            .values
+            .compactMap { group in
+                group.min { $0.occurredAt < $1.occurredAt }
+            }
+    }
+
+    private func operationKey(for event: CareLedgerEvent) -> String {
+        let metadata = event.metadataJSON
+        let transactionKey = CareLedgerMetadata.stringValue(
+            named: CareLedgerMetadata.careTransactionId,
+            in: metadata
+        ) ?? CareLedgerMetadata.stringValue(
+            named: CareLedgerMetadata.sharedSessionId,
+            in: metadata
+        ) ?? CareLedgerMetadata.stringValue(
+            named: CareLedgerMetadata.batchID,
+            in: metadata
+        ) ?? event.id.uuidString
+
+        return "\(transactionKey):\(event.eventKind):\(event.actionType)"
+    }
+
+    private func coverageKey(for event: CareLedgerEvent) -> String {
+        let subjectKey = event.subjectId.map { "\(event.subjectKind):\($0)" }
+            ?? "event:\(event.id.uuidString)"
+        return "\(operationKey(for: event)):\(subjectKey)"
     }
 }

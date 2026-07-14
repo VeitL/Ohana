@@ -480,8 +480,9 @@ private nonisolated struct HomeReadModelFetches {
     }
 
     func events() -> [Event] {
-        let start = calendar.startOfDay(for: now)
-        let end = calendar.date(byAdding: .day, value: 14, to: start) ?? start.addingTimeInterval(14 * 24 * 60 * 60)
+        let today = calendar.startOfDay(for: now)
+        let start = calendar.date(byAdding: .day, value: -14, to: today) ?? today
+        let end = calendar.date(byAdding: .day, value: 14, to: today) ?? today.addingTimeInterval(14 * 24 * 60 * 60)
         var windowDescriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
                 event.startDate >= start && event.startDate <= end
@@ -734,7 +735,7 @@ private nonisolated struct HomeReadModelFetches {
         let petSubject = CareLedgerSubjectKind.pet.rawValue
         let weightKind = CareLedgerEventKind.weight.rawValue
         let petWeightAction = "petWeight"
-        var descriptor = FetchDescriptor<CareLedgerEvent>(
+        var ledgerDescriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.subjectKind == petSubject &&
                     event.eventKind == weightKind &&
@@ -742,16 +743,49 @@ private nonisolated struct HomeReadModelFetches {
             },
             sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
         )
-        descriptor.fetchLimit = 240
+        ledgerDescriptor.fetchLimit = 240
+        let ledgerEvents: [CareLedgerEvent]
         do {
-            return try context.fetch(descriptor).compactMap(Self.petWeightQuickActionEntry(from:))
+            ledgerEvents = try context.fetch(ledgerDescriptor)
         } catch {
             OhanaLog.warning(
                 "Home read model pet weight ledger fetch failed: \(error.localizedDescription)",
                 category: "Home"
             )
-            return []
+            ledgerEvents = []
         }
+
+        let ledgerEntries = ledgerEvents.compactMap(Self.petWeightQuickActionEntry(from:))
+        let projectedLogIDs = Set(ledgerEvents.compactMap { event -> UUID? in
+            guard event.legacyModelName == "PetWeightLog",
+                  Self.petWeightQuickActionEntry(from: event) != nil,
+                  let rawID = event.legacyModelId else { return nil }
+            return UUID(uuidString: rawID)
+        })
+        // Keep facts written by the old quick sheet visible while the bounded
+        // v2 ledger backfill catches up; projected logs are excluded above.
+        var legacyDescriptor = FetchDescriptor<PetWeightLog>(
+            sortBy: [SortDescriptor(\PetWeightLog.date, order: .reverse)]
+        )
+        legacyDescriptor.fetchLimit = 240
+        let orphanLogEntries: [HomePetWeightQuickActionEntry]
+        do {
+            orphanLogEntries = try context.fetch(legacyDescriptor).compactMap { log in
+                guard !projectedLogIDs.contains(log.id) else { return nil }
+                return Self.petWeightQuickActionEntry(from: log)
+            }
+        } catch {
+            OhanaLog.warning(
+                "Home read model legacy pet weight fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            orphanLogEntries = []
+        }
+        return Array(
+            (ledgerEntries + orphanLogEntries)
+                .sorted { $0.date > $1.date }
+                .prefix(240)
+        )
     }
 
     func petMomentQuickActionEntries() -> [HomePetMomentQuickActionEntry] {
@@ -872,6 +906,16 @@ private nonisolated struct HomeReadModelFetches {
             petId: subjectId,
             date: event.occurredAt,
             weightKg: event.amountValue
+        )
+    }
+
+    private static func petWeightQuickActionEntry(from log: PetWeightLog) -> HomePetWeightQuickActionEntry? {
+        guard let petId = log.pet?.id, log.weightInKg > 0 else { return nil }
+        return HomePetWeightQuickActionEntry(
+            id: log.id,
+            petId: petId,
+            date: log.date,
+            weightKg: log.weightInKg
         )
     }
 

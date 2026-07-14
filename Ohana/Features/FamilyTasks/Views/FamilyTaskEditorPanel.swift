@@ -2,8 +2,8 @@
 //  FamilyTaskEditorPanel.swift
 //  Ohana
 //
-//  Native household task editor. A published task always carries a positive
-//  coconut reward; the publisher transfers it after confirming completion.
+//  Native household task editor. Rewards are optional; rewarded work transfers
+//  only after the publisher confirms completion.
 //
 
 import Foundation
@@ -67,7 +67,7 @@ struct FamilyTaskEditorPanel: View {
             _selectedHumanId = State(initialValue: firstAssignableId)
             _reward = State(initialValue: suggestedReward)
             _hasDueDate = State(initialValue: true)
-            _dueAt = State(initialValue: context.reminder?.scheduledAt ?? Date())
+            _dueAt = State(initialValue: context.reminder?.resolvedOccurrenceAt ?? Date())
             _emoji = State(initialValue: context.reminder?.event?.emoji ?? "🐾")
         case .editTask:
             let task = context.task
@@ -82,7 +82,7 @@ struct FamilyTaskEditorPanel: View {
             _selectedHumanId = State(initialValue: isExistingAssignable ? existingAssigneeId : firstAssignableId)
             _reward = State(initialValue: min(
                 FamilyTaskService.rewardCap,
-                max(1, task?.rewardCoconuts ?? suggestedReward)
+                max(0, task?.rewardCoconuts ?? suggestedReward)
             ))
             _hasDueDate = State(initialValue: task?.dueAt != nil)
             _dueAt = State(initialValue: task?.dueAt ?? Date())
@@ -139,9 +139,9 @@ struct FamilyTaskEditorPanel: View {
             Text(l.tr(zh: "当前记录归属", en: "Current attribution", de: "Aktuelle Zuordnung"))
         } footer: {
             Text(l.tr(
-                zh: "任务在本机记录。发布时需有足够余额；执行者提交后，由发布者确认并转账奖励。",
-                en: "Tasks are recorded on this device. Publishing requires enough balance; the reward transfers when the publisher confirms completion.",
-                de: "Aufgaben werden auf diesem Gerät gespeichert. Beim Erstellen ist genügend Guthaben nötig; die Prämie wird nach Bestätigung übertragen."
+                zh: "任务只记录在本机。奖励可为 0；设置奖励时，执行者提交后由发布者确认并转账。",
+                en: "Tasks stay on this device. A reward is optional; when offered, it transfers after the publisher approves the submission.",
+                de: "Aufgaben bleiben auf diesem Gerät. Eine Prämie ist optional und wird erst nach Bestätigung übertragen."
             ))
         }
     }
@@ -192,7 +192,7 @@ struct FamilyTaskEditorPanel: View {
 
             LabeledContent {
                 TextField(
-                    "1–\(FamilyTaskService.rewardCap)",
+                    "0–\(FamilyTaskService.rewardCap)",
                     value: $reward,
                     format: .number
                 )
@@ -211,12 +211,12 @@ struct FamilyTaskEditorPanel: View {
                 )
             }
 
-            if reward <= 0 || reward > FamilyTaskService.rewardCap {
+            if reward < 0 || reward > FamilyTaskService.rewardCap {
                 Label(
                     l.tr(
-                        zh: "奖励必须在 1 到 \(FamilyTaskService.rewardCap) 之间。",
-                        en: "The reward must be between 1 and \(FamilyTaskService.rewardCap).",
-                        de: "Die Prämie muss zwischen 1 und \(FamilyTaskService.rewardCap) liegen."
+                        zh: "奖励必须在 0 到 \(FamilyTaskService.rewardCap) 之间。",
+                        en: "The reward must be between 0 and \(FamilyTaskService.rewardCap).",
+                        de: "Die Prämie muss zwischen 0 und \(FamilyTaskService.rewardCap) liegen."
                     ),
                     systemImage: "exclamationmark.triangle.fill"
                 )
@@ -236,9 +236,9 @@ struct FamilyTaskEditorPanel: View {
             Text(l.tr(zh: "分工与奖励", en: "Assignment and reward", de: "Zuweisung und Prämie"))
         } footer: {
             Text(l.tr(
-                zh: "每个家庭任务都必须设置正数椰子奖励。",
-                en: "Every household task requires a positive coconut reward.",
-                de: "Jede Familienaufgabe benötigt eine positive Kokosprämie."
+                zh: "0 表示普通分工，可直接完成；正数奖励需要提交并由发布者审核。",
+                en: "Zero creates a regular assignment that can be completed directly; a positive reward requires submission and approval.",
+                de: "Null erstellt eine normale Aufgabe; eine positive Prämie erfordert Einreichung und Bestätigung."
             ))
         }
     }
@@ -294,7 +294,7 @@ struct FamilyTaskEditorPanel: View {
         switch route {
         case .assignReminder: l.tr(zh: "发布指派", en: "Post assignment", de: "Zuweisung erstellen")
         case .editTask: l.tr(zh: "保存任务", en: "Save task", de: "Aufgabe speichern")
-        case .create: l.tr(zh: "发布奖励任务", en: "Post reward task", de: "Prämienaufgabe erstellen")
+        case .create: l.tr(zh: "发布任务", en: "Post task", de: "Aufgabe erstellen")
         }
     }
 
@@ -321,7 +321,7 @@ struct FamilyTaskEditorPanel: View {
     private var canSave: Bool {
         guard currentHuman != nil,
               selectedHuman != nil,
-              reward > 0,
+              reward >= 0,
               reward <= FamilyTaskService.rewardCap,
               reward <= availableBalance
         else { return false }
@@ -389,16 +389,16 @@ struct FamilyTaskEditorPanel: View {
         if selectedHuman == nil {
             return l.tr(zh: "请选择其他家人。", en: "Choose another household member.", de: "Wähle ein anderes Familienmitglied.")
         }
-        if reward <= 0 || reward > FamilyTaskService.rewardCap {
+        if reward < 0 || reward > FamilyTaskService.rewardCap {
             return l.tr(
-                zh: "奖励必须在 1 到 \(FamilyTaskService.rewardCap) 之间。",
-                en: "The reward must be between 1 and \(FamilyTaskService.rewardCap).",
-                de: "Die Prämie muss zwischen 1 und \(FamilyTaskService.rewardCap) liegen."
+                zh: "奖励必须在 0 到 \(FamilyTaskService.rewardCap) 之间。",
+                en: "The reward must be between 0 and \(FamilyTaskService.rewardCap).",
+                de: "Die Prämie muss zwischen 0 und \(FamilyTaskService.rewardCap) liegen."
             )
         }
         if reward > availableBalance {
             return l.tr(zh: "发布者椰子余额不足。", en: "The publisher does not have enough coconuts.", de: "Der Ersteller hat nicht genug Kokosnüsse.")
         }
-        return l.tr(zh: "请填写任务名称并设置奖励。", en: "Add a task name and reward.", de: "Füge Aufgabenname und Prämie hinzu.")
+        return l.tr(zh: "请填写任务名称。", en: "Add a task name.", de: "Füge einen Aufgabennamen hinzu.")
     }
 }

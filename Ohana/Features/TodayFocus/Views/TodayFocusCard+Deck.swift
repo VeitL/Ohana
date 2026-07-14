@@ -22,7 +22,9 @@ extension TodayFocusCard {
             closedNegativeKeys: Set<String>
         ) -> TodayFocusRenderDeck {
             let pendingQuests = snapshot.refreshedQuests.filter {
-                !$0.isCompleted && !skippedFocusKeys.contains(TodayFocusCard.questSkipKey(for: $0))
+                !$0.isCompleted &&
+                    IslandQuestEngine.isOasisBuildQuest($0.id) &&
+                    !skippedFocusKeys.contains(TodayFocusCard.questSkipKey(for: $0))
             }
             let assignedFamilyTasks = snapshot.assignedFamilyTasks.filter {
                 !skippedFocusKeys.contains(TodayFocusCard.familyTaskSkipKey(for: $0))

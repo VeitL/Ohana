@@ -8,23 +8,61 @@
 import Foundation
 
 nonisolated struct CareLedgerStatsService {
+    struct SubjectCoverage: Hashable, Sendable {
+        let kindRaw: String
+        let id: String
+        let name: String
+
+        var isPet: Bool {
+            kindRaw == CareLedgerSubjectKind.pet.rawValue
+        }
+
+        var isPlant: Bool {
+            kindRaw == CareLedgerSubjectKind.plant.rawValue
+        }
+    }
+
+    struct Totals: Equatable, Sendable {
+        let workloadCount: Int
+        let coverageCount: Int
+        let petCoverageCount: Int
+        let plantCoverageCount: Int
+
+        static let zero = Totals(
+            workloadCount: 0,
+            coverageCount: 0,
+            petCoverageCount: 0,
+            plantCoverageCount: 0
+        )
+    }
+
     struct ReportEntry: Identifiable, Sendable {
         let id: UUID
         let date: Date
         let actorId: String?
+        let participantActorIds: [String]
         let actorName: String
         let petName: String
+        let operationIdentity: String
+        let subjectCoverages: [SubjectCoverage]
         let title: String
         let icon: String
         let colorToken: DomainColorToken
         let coconuts: Int
 
+        var coverageCount: Int {
+            subjectCoverages.count
+        }
+
         init(
             id: UUID = UUID(),
             date: Date,
             actorId: String?,
+            participantActorIds: [String] = [],
             actorName: String,
             petName: String,
+            operationIdentity: String = "",
+            subjectCoverages: [SubjectCoverage] = [],
             title: String,
             icon: String,
             colorToken: DomainColorToken,
@@ -33,8 +71,11 @@ nonisolated struct CareLedgerStatsService {
             self.id = id
             self.date = date
             self.actorId = actorId
+            self.participantActorIds = participantActorIds
             self.actorName = actorName
             self.petName = petName
+            self.operationIdentity = operationIdentity
+            self.subjectCoverages = subjectCoverages
             self.title = title
             self.icon = icon
             self.colorToken = colorToken
@@ -45,32 +86,26 @@ nonisolated struct CareLedgerStatsService {
     func reportEntries(
         events: [CareLedgerEvent],
         pets: [Pet],
+        plants: [Plant] = [],
         humans: [Human],
         interval: DateInterval,
         l: L10n = .current
     ) -> [ReportEntry] {
-        let petById = Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, $0) })
+        let subjectCatalog = SubjectCatalog(pets: pets, plants: plants)
         let humanById = Dictionary(uniqueKeysWithValues: humans.map { ($0.id.uuidString, $0) })
-        return events
-            .filter { event in
-                interval.contains(event.occurredAt)
-                    && event.subjectKind == CareLedgerSubjectKind.pet.rawValue
-                    && event.subjectId.flatMap { petById[$0] } != nil
-                    && isReportable(event.eventKindEnum)
-            }
-            .map { event in
-                let petName = event.subjectId.flatMap { petById[$0]?.name } ?? unknownPetTitle(l: l)
-                let actor = event.actorId.flatMap { humanById[$0] }
-                return ReportEntry(
-                    id: event.id,
-                    date: event.occurredAt,
-                    actorId: event.actorId,
-                    actorName: actor?.name ?? unassignedActorTitle(l: l),
-                    petName: petName,
-                    title: title(for: event, l: l),
-                    icon: icon(for: event),
-                    colorToken: colorToken(for: event),
-                    coconuts: max(event.coconutDelta, 0)
+        let reportableEvents = reportableEvents(
+            events,
+            subjectCatalog: subjectCatalog,
+            interval: interval
+        )
+        return Dictionary(grouping: reportableEvents) { operationIdentity(for: $0) }
+            .compactMap { operationIdentity, operationEvents in
+                makeReportEntry(
+                    operationIdentity: operationIdentity,
+                    events: operationEvents,
+                    subjectCatalog: subjectCatalog,
+                    humanById: humanById,
+                    l: l
                 )
             }
             .sorted { $0.date > $1.date }
@@ -79,24 +114,228 @@ nonisolated struct CareLedgerStatsService {
     func count(
         events: [CareLedgerEvent],
         pets: [Pet],
+        plants: [Plant] = [],
         interval: DateInterval
     ) -> Int {
-        let petIds = Set(pets.map(\.id.uuidString))
-        return events.count(where: { event in
-            interval.contains(event.occurredAt)
-                && event.subjectKind == CareLedgerSubjectKind.pet.rawValue
-                && event.subjectId.map { petIds.contains($0) } == true
-                && isReportable(event.eventKindEnum)
-        })
+        totals(events: events, pets: pets, plants: plants, interval: interval).workloadCount
     }
 
-    private func isReportable(_ kind: CareLedgerEventKind) -> Bool {
-        switch kind {
-        case .care, .potty, .walk, .hygiene, .health, .weight, .medication, .expense:
-            true
-        case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
+    func coverageCount(
+        events: [CareLedgerEvent],
+        pets: [Pet],
+        plants: [Plant] = [],
+        interval: DateInterval
+    ) -> Int {
+        totals(events: events, pets: pets, plants: plants, interval: interval).coverageCount
+    }
+
+    func totals(
+        events: [CareLedgerEvent],
+        pets: [Pet],
+        plants: [Plant] = [],
+        interval: DateInterval
+    ) -> Totals {
+        let subjectCatalog = SubjectCatalog(pets: pets, plants: plants)
+        let reportableEvents = reportableEvents(
+            events,
+            subjectCatalog: subjectCatalog,
+            interval: interval
+        )
+        guard !reportableEvents.isEmpty else { return .zero }
+
+        let workloadCount = Set(reportableEvents.map { operationIdentity(for: $0) }).count
+        var coverageKeys = Set<String>()
+        var petCoverageCount = 0
+        var plantCoverageCount = 0
+        for event in reportableEvents {
+            guard let subjectId = event.subjectId else { continue }
+            let key = "\(operationIdentity(for: event))|\(event.subjectKind)|\(subjectId)"
+            guard coverageKeys.insert(key).inserted else { continue }
+            if event.subjectKind == CareLedgerSubjectKind.pet.rawValue {
+                petCoverageCount += 1
+            } else if event.subjectKind == CareLedgerSubjectKind.plant.rawValue {
+                plantCoverageCount += 1
+            }
+        }
+        return Totals(
+            workloadCount: workloadCount,
+            coverageCount: coverageKeys.count,
+            petCoverageCount: petCoverageCount,
+            plantCoverageCount: plantCoverageCount
+        )
+    }
+
+    func operationIdentity(for event: CareLedgerEvent) -> String {
+        if let sharedSessionId = CareLedgerMetadata.stringValue(
+            named: CareLedgerMetadata.sharedSessionId,
+            in: event.metadataJSON
+        ) {
+            return "shared:\(normalizedOperationComponent(sharedSessionId))"
+        }
+        if let careTransactionId = CareLedgerMetadata.stringValue(
+            named: CareLedgerMetadata.careTransactionId,
+            in: event.metadataJSON
+        ) {
+            return "plant:\(normalizedOperationComponent(careTransactionId))"
+        }
+        if let batchID = CareLedgerMetadata.stringValue(
+            named: CareLedgerMetadata.batchID,
+            in: event.metadataJSON
+        ) {
+            return "batch:\(normalizedOperationComponent(batchID))"
+        }
+        return "ledger:\(event.id.uuidString.lowercased())"
+    }
+
+    private struct SubjectCatalog {
+        let petNamesById: [String: String]
+        let plantNamesById: [String: String]
+
+        init(pets: [Pet], plants: [Plant]) {
+            petNamesById = Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, $0.name) })
+            plantNamesById = Dictionary(uniqueKeysWithValues: plants.map { ($0.id.uuidString, $0.name) })
+        }
+
+        func name(for event: CareLedgerEvent) -> String? {
+            guard let subjectId = event.subjectId else { return nil }
+            switch event.subjectKind {
+            case CareLedgerSubjectKind.pet.rawValue:
+                return petNamesById[subjectId]
+            case CareLedgerSubjectKind.plant.rawValue:
+                return plantNamesById[subjectId]
+            default:
+                return nil
+            }
+        }
+    }
+
+    private func reportableEvents(
+        _ events: [CareLedgerEvent],
+        subjectCatalog: SubjectCatalog,
+        interval: DateInterval
+    ) -> [CareLedgerEvent] {
+        events.filter { event in
+            interval.contains(event.occurredAt) &&
+                subjectCatalog.name(for: event) != nil &&
+                isReportable(event)
+        }
+    }
+
+    private func isReportable(_ event: CareLedgerEvent) -> Bool {
+        switch event.subjectKind {
+        case CareLedgerSubjectKind.pet.rawValue:
+            switch event.eventKindEnum {
+            case .care, .potty, .walk, .hygiene, .health, .weight, .medication, .expense:
+                true
+            case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
+                false
+            }
+        case CareLedgerSubjectKind.plant.rawValue:
+            event.eventKindEnum == .plantCare
+        default:
             false
         }
+    }
+
+    private func makeReportEntry(
+        operationIdentity: String,
+        events: [CareLedgerEvent],
+        subjectCatalog: SubjectCatalog,
+        humanById: [String: Human],
+        l: L10n
+    ) -> ReportEntry? {
+        guard let representative = representativeEvent(in: events) else { return nil }
+        let coverages = subjectCoverages(events: events, subjectCatalog: subjectCatalog)
+        guard !coverages.isEmpty else { return nil }
+        let participantActorIds = participantActorIds(events: events)
+        let primaryActorId = representative.actorId ?? participantActorIds.first
+        let actor = primaryActorId.flatMap { humanById[$0] }
+        let title = operationTitle(events: events, representative: representative, l: l)
+
+        return ReportEntry(
+            id: representative.id,
+            date: events.map(\.occurredAt).max() ?? representative.occurredAt,
+            actorId: primaryActorId,
+            participantActorIds: participantActorIds,
+            actorName: actor?.name ?? unassignedActorTitle(l: l),
+            petName: coverageDisplayName(coverages, l: l),
+            operationIdentity: operationIdentity,
+            subjectCoverages: coverages,
+            title: title,
+            icon: icon(for: representative),
+            colorToken: colorToken(for: representative),
+            coconuts: events.reduce(0) { $0 + max($1.coconutDelta, 0) }
+        )
+    }
+
+    private func representativeEvent(in events: [CareLedgerEvent]) -> CareLedgerEvent? {
+        events.first(where: { $0.coconutDelta > 0 }) ?? events.min {
+            $0.id.uuidString < $1.id.uuidString
+        }
+    }
+
+    private func subjectCoverages(
+        events: [CareLedgerEvent],
+        subjectCatalog: SubjectCatalog
+    ) -> [SubjectCoverage] {
+        var seen = Set<String>()
+        return events
+            .sorted {
+                if $0.occurredAt == $1.occurredAt {
+                    return $0.id.uuidString < $1.id.uuidString
+                }
+                return $0.occurredAt < $1.occurredAt
+            }
+            .compactMap { event in
+                guard let subjectId = event.subjectId,
+                      let name = subjectCatalog.name(for: event) else { return nil }
+                let key = "\(event.subjectKind)|\(subjectId)"
+                guard seen.insert(key).inserted else { return nil }
+                return SubjectCoverage(kindRaw: event.subjectKind, id: subjectId, name: name)
+            }
+    }
+
+    private func participantActorIds(events: [CareLedgerEvent]) -> [String] {
+        var result: [String] = []
+        func append(_ raw: String?) {
+            let normalized = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !normalized.isEmpty, !result.contains(normalized) else { return }
+            result.append(normalized)
+        }
+
+        for event in events.sorted(by: { $0.id.uuidString < $1.id.uuidString }) {
+            append(event.actorId)
+            CareLedgerMetadata.stringArrayValue(named: "executorIds", in: event.metadataJSON)
+                .forEach { append($0) }
+        }
+        return result
+    }
+
+    private func coverageDisplayName(_ coverages: [SubjectCoverage], l: L10n) -> String {
+        guard let first = coverages.first else { return unknownSubjectTitle(l: l) }
+        guard coverages.count > 1 else { return first.name }
+        return l.tr(
+            zh: "\(first.name) 等 \(coverages.count) 个对象",
+            en: "\(first.name) +\(coverages.count - 1)",
+            de: "\(first.name) +\(coverages.count - 1)"
+        )
+    }
+
+    private func operationTitle(
+        events: [CareLedgerEvent],
+        representative: CareLedgerEvent,
+        l: L10n
+    ) -> String {
+        let actionKeys = Set(events.map { "\($0.eventKind)|\($0.actionType)" })
+        guard actionKeys.count > 1 else { return title(for: representative, l: l) }
+        if events.allSatisfy({ $0.eventKindEnum == .plantCare }) {
+            return l.tr(zh: "批量植物照顾", en: "Batch plant care", de: "Pflanzen-Sammelpflege")
+        }
+        return l.tr(zh: "共同照顾", en: "Shared care", de: "Gemeinsame Pflege")
+    }
+
+    private func normalizedOperationComponent(_ raw: String) -> String {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private func title(for event: CareLedgerEvent, l: L10n) -> String {
@@ -117,13 +356,15 @@ nonisolated struct CareLedgerStatsService {
             l.tr(zh: "体重", en: "Weight", de: "Gewicht")
         case .medication:
             l.tr(zh: "吃药", en: "Medication", de: "Medikament")
-        case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
+        case .plantCare:
+            PlantCareType(rawValue: event.actionType)?.displayName(l: l) ?? event.actionType
+        case .reminder, .coconut, .workout, .milestone, .unknown:
             event.actionType
         }
     }
 
-    private func unknownPetTitle(l: L10n) -> String {
-        l.tr(zh: "未知宠物", en: "Unknown pet", de: "Unbekanntes Haustier")
+    private func unknownSubjectTitle(l: L10n) -> String {
+        l.tr(zh: "未知对象", en: "Unknown subject", de: "Unbekanntes Objekt")
     }
 
     private func unassignedActorTitle(l: L10n) -> String {
@@ -188,7 +429,9 @@ nonisolated struct CareLedgerStatsService {
             "scalemass.fill"
         case .medication:
             "pills.fill"
-        case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
+        case .plantCare:
+            PlantCareType(rawValue: event.actionType)?.careCategory.icon ?? "leaf.fill"
+        case .reminder, .coconut, .workout, .milestone, .unknown:
             "circle.grid.2x2.fill"
         }
     }
@@ -211,7 +454,9 @@ nonisolated struct CareLedgerStatsService {
             .hex("80FFEA")
         case .medication:
             .hex("A78BFA")
-        case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
+        case .plantCare:
+            .goTeal
+        case .reminder, .coconut, .workout, .milestone, .unknown:
             .goPrimary
         }
     }

@@ -478,10 +478,17 @@ extension CalendarView {
     }
 
     func toggleEventCompletion(_ event: Event, occurrenceDate: Date) {
+        let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
+        if shouldComplete, let onCompleteEvent {
+            if onCompleteEvent(event, occurrenceDate) {
+                schedulePreparedCalendarSnapshotRebuild(force: true)
+            }
+            return
+        }
         let executor = CalendarCommandExecutor(context: modelContext, services: appServices)
         let command = DomainCommand.calendarEventCompletion(
             eventID: event.id,
-            isCompleted: !event.isOccurrenceMarkedComplete(on: occurrenceDate)
+            isCompleted: shouldComplete
         )
         do {
             try executor.toggleCompletion(

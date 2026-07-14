@@ -197,9 +197,11 @@ For every business-bearing module, check the applicable rows:
 | Localization | Are Chinese and English authored and registered-language fallbacks preserved? |
 | Testing | Do tests cover the invariant and the important failure/recovery boundary rather than implementation detail? |
 
-FamilyTasks/online collaboration is future-gated in the Solo release. Plants is
-first-release reachable and must receive the same business, persistence,
-performance, accessibility, and test scrutiny as other launch modules.
+Local FamilyTasks are first-release reachable through the Task Center. Only
+remote invitations, cross-device identity, and online collaboration remain
+future-gated in the Solo release. Plants and local household assignments must
+receive the same business, persistence, performance, accessibility, and test
+scrutiny as other launch modules.
 
 ## Parallel and Git Safety
 

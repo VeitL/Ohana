@@ -9,6 +9,48 @@ import SwiftData
 import SwiftUI
 import UIKit
 
+struct AddEventTaskCreationState: Equatable {
+    let title: String
+    let eventType: EventType
+    let relatedEntityType: String
+    let relatedEntityId: String
+    let taskCareKindRaw: String
+
+    init(preset: TaskCreationPreset, subjectName: String?, l: L10n) {
+        let careTitle = preset.careKind.localizedTitle(l: l)
+        let cleanSubjectName = subjectName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        title = cleanSubjectName.isEmpty ? careTitle : "\(careTitle) · \(cleanSubjectName)"
+        eventType = preset.careKind.eventType
+        relatedEntityType = switch preset.subjectKind {
+        case .pet: EntityKind.pet.rawValue
+        case .plant: EntityKind.plant.rawValue
+        }
+        relatedEntityId = preset.subjectID.uuidString
+        taskCareKindRaw = preset.careKind.rawValue
+    }
+}
+
+enum AddEventCollaborationPolicy {
+    static func showsControls(activeHumanCount: Int) -> Bool {
+        activeHumanCount > 1
+    }
+
+    static func normalizedReward(
+        _ requestedReward: Int,
+        activeHumanCount: Int,
+        creatorHumanID: UUID?,
+        assigneeHumanID: UUID?
+    ) -> Int {
+        guard showsControls(activeHumanCount: activeHumanCount),
+              let creatorHumanID,
+              let assigneeHumanID,
+              creatorHumanID != assigneeHumanID else {
+            return 0
+        }
+        return FamilyTaskService.cappedReward(requestedReward)
+    }
+}
+
 struct AddEventContentView: View {
     var onClose: (() -> Void)?
     let pets: [Pet]
@@ -16,6 +58,7 @@ struct AddEventContentView: View {
     let plants: [Plant]
     let editingEvent: Event?
     let editingOccurrenceDate: Date?
+    let taskCreationPreset: TaskCreationPreset?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -36,6 +79,7 @@ struct AddEventContentView: View {
     @State private var reminderLeadOption: ReminderLeadOption = .atTime
     @State private var hasReminder = true
     @State private var assigneeId: String? = nil
+    @State private var rewardCoconuts = 0
     @State private var showsTypePicker = false
     @State private var isSaving = false
     @State private var didSave = false
@@ -109,7 +153,10 @@ struct AddEventContentView: View {
         humans: [Human],
         plants: [Plant],
         editingEvent: Event? = nil,
-        editingOccurrenceDate: Date? = nil
+        editingOccurrenceDate: Date? = nil,
+        preselectedEntityType: String? = nil,
+        preselectedEntityId: String? = nil,
+        taskCreationPreset: TaskCreationPreset? = nil
     ) {
         self.onClose = onClose
         self.pets = pets
@@ -118,13 +165,30 @@ struct AddEventContentView: View {
         self.editingEvent = editingEvent
         self.editingOccurrenceDate = editingOccurrenceDate
 
+        let activeTaskCreationPreset = editingEvent == nil ? taskCreationPreset : nil
+        self.taskCreationPreset = activeTaskCreationPreset
+
         let initial = Self.initialState(for: editingEvent, occurrenceDate: editingOccurrenceDate)
-        _title = State(initialValue: initial.title)
-        _eventType = State(initialValue: initial.eventType)
+        let taskCreationState = activeTaskCreationPreset.map { preset in
+            AddEventTaskCreationState(
+                preset: preset,
+                subjectName: Self.subjectName(for: preset, pets: pets, plants: plants),
+                l: .current
+            )
+        }
+        _title = State(initialValue: taskCreationState?.title ?? initial.title)
+        _eventType = State(initialValue: taskCreationState?.eventType ?? initial.eventType)
         _startDate = State(initialValue: initial.startDate)
         _isAllDay = State(initialValue: initial.isAllDay)
-        _relatedEntityType = State(initialValue: initial.relatedEntityType)
-        _relatedEntityId = State(initialValue: initial.relatedEntityId)
+        let usesLegacyPrefill = activeTaskCreationPreset == nil && editingEvent == nil && preselectedEntityId != nil
+        _relatedEntityType = State(
+            initialValue: taskCreationState?.relatedEntityType
+                ?? (usesLegacyPrefill ? (preselectedEntityType ?? "") : initial.relatedEntityType)
+        )
+        _relatedEntityId = State(
+            initialValue: taskCreationState?.relatedEntityId
+                ?? (usesLegacyPrefill ? (preselectedEntityId ?? "") : initial.relatedEntityId)
+        )
         _recurrenceOption = State(initialValue: initial.recurrenceOption)
         _recurrenceDays = State(initialValue: initial.recurrenceDays)
         _recurrenceEndDate = State(initialValue: initial.recurrenceEndDate)
@@ -153,6 +217,42 @@ struct AddEventContentView: View {
         !trimmedTitle.isEmpty && !isSaving
     }
 
+    private var isTypedCareCreation: Bool {
+        taskCreationPreset != nil
+    }
+
+    private var showsCollaborationControls: Bool {
+        AddEventCollaborationPolicy.showsControls(activeHumanCount: activeHumans.count)
+    }
+
+    private var currentHumanID: UUID? {
+        activeHumans.first(where: { $0.id.uuidString == currentActiveHumanId })?.id
+    }
+
+    private var careAssignmentCreatorHumanID: UUID? {
+        currentHumanID ?? (activeHumans.count == 1 ? activeHumans.first?.id : nil)
+    }
+
+    private var selectedAssigneeHumanID: UUID? {
+        guard let assigneeId else { return nil }
+        return activeHumans.first(where: { $0.id.uuidString == assigneeId })?.id
+    }
+
+    private var careAssignmentAssigneeHumanID: UUID? {
+        selectedAssigneeHumanID ?? (activeHumans.count == 1 ? activeHumans.first?.id : nil)
+    }
+
+    private var hasDistinctAssignee: Bool {
+        guard let currentHumanID, let selectedAssigneeHumanID else { return false }
+        return currentHumanID != selectedAssigneeHumanID
+    }
+
+    private var typedSubjectName: String {
+        guard let taskCreationPreset else { return "" }
+        return Self.subjectName(for: taskCreationPreset, pets: pets, plants: plants)
+            ?? l.tr(zh: "对象不可用", en: "Unavailable subject", de: "Objekt nicht verfügbar")
+    }
+
     private var manualEventTypes: [EventType] {
         [.daily, .task, .health, .birthday, .anniversary, .chore, .shoppingList, .medication, .petMedication]
     }
@@ -162,11 +262,17 @@ struct AddEventContentView: View {
     }
 
     private var editorTitle: String {
-        isEditing ? l.tr(zh: "编辑事项", en: "Edit event", de: "Termin bearbeiten") : l.addEvent
+        if isTypedCareCreation {
+            return l.tr(zh: "添加照顾待办", en: "Add care task", de: "Pflegeaufgabe hinzufügen")
+        }
+        return isEditing ? l.tr(zh: "编辑事项", en: "Edit event", de: "Termin bearbeiten") : l.addEvent
     }
 
     private var primaryActionTitle: String {
-        isEditing ? l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen speichern") : l.addEvent
+        if isTypedCareCreation {
+            return l.tr(zh: "添加待办", en: "Add task", de: "Aufgabe hinzufügen")
+        }
+        return isEditing ? l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen speichern") : l.addEvent
     }
 
     private var savedActionTitle: String {
@@ -195,13 +301,23 @@ extension AddEventContentView {
         NavigationStack {
             Form {
                 Section {
-                    Picker(l.tr(zh: "类型", en: "Type", de: "Typ"), selection: $eventType) {
-                        ForEach(manualEventTypes) { type in
-                            Label(eventTypeTitle(type), systemImage: type.silhouetteSymbol)
-                                .tag(type)
+                    if let taskCreationPreset {
+                        LabeledContent(l.tr(zh: "照顾类型", en: "Care type", de: "Pflegeart")) {
+                            Label(
+                                taskCreationPreset.careKind.localizedTitle(l: l),
+                                systemImage: taskCreationPreset.careKind.defaultIcon
+                            )
                         }
+                        .accessibilityIdentifier("add-event-locked-care-type")
+                    } else {
+                        Picker(l.tr(zh: "类型", en: "Type", de: "Typ"), selection: $eventType) {
+                            ForEach(manualEventTypes) { type in
+                                Label(eventTypeTitle(type), systemImage: type.silhouetteSymbol)
+                                    .tag(type)
+                            }
+                        }
+                        .accessibilityIdentifier("add-event-type-picker")
                     }
-                    .accessibilityIdentifier("add-event-type-picker")
 
                     TextField(
                         l.tr(zh: "给这件事起个名字", en: "Name this event", de: "Termin benennen"),
@@ -216,23 +332,33 @@ extension AddEventContentView {
                 }
 
                 Section {
-                    Picker(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen"), selection: relatedEntitySelection) {
-                        Label(l.tr(zh: "无", en: "None", de: "Keine"), systemImage: "circle.slash")
-                            .tag("")
-                        ForEach(activePlants) { plant in
-                            Label(plant.name, systemImage: "leaf.fill")
-                                .tag("\(EntityKind.plant.rawValue)|\(plant.id.uuidString)")
-                                .accessibilityIdentifier("add-event-related-plant-\(plant.name)")
+                    if let taskCreationPreset {
+                        LabeledContent(l.tr(zh: "照顾对象", en: "Care for", de: "Pflegeobjekt")) {
+                            Label(
+                                typedSubjectName,
+                                systemImage: taskCreationPreset.subjectKind == .pet ? "pawprint.fill" : "leaf.fill"
+                            )
                         }
-                        ForEach(activePets) { pet in
-                            Label(pet.name, systemImage: "pawprint.fill")
-                                .tag("\(EntityKind.pet.rawValue)|\(pet.id.uuidString)")
-                                .accessibilityIdentifier("add-event-related-pet-\(pet.name)")
-                        }
-                        ForEach(activeHumans) { human in
-                            Label(human.name, systemImage: "person.fill")
-                                .tag("\(EntityKind.human.rawValue)|\(human.id.uuidString)")
-                                .accessibilityIdentifier("add-event-related-human-\(human.name)")
+                        .accessibilityIdentifier("add-event-locked-care-subject")
+                    } else {
+                        Picker(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen"), selection: relatedEntitySelection) {
+                            Label(l.tr(zh: "无", en: "None", de: "Keine"), systemImage: "circle.slash")
+                                .tag("")
+                            ForEach(activePlants) { plant in
+                                Label(plant.name, systemImage: "leaf.fill")
+                                    .tag("\(EntityKind.plant.rawValue)|\(plant.id.uuidString)")
+                                    .accessibilityIdentifier("add-event-related-plant-\(plant.name)")
+                            }
+                            ForEach(activePets) { pet in
+                                Label(pet.name, systemImage: "pawprint.fill")
+                                    .tag("\(EntityKind.pet.rawValue)|\(pet.id.uuidString)")
+                                    .accessibilityIdentifier("add-event-related-pet-\(pet.name)")
+                            }
+                            ForEach(activeHumans) { human in
+                                Label(human.name, systemImage: "person.fill")
+                                    .tag("\(EntityKind.human.rawValue)|\(human.id.uuidString)")
+                                    .accessibilityIdentifier("add-event-related-human-\(human.name)")
+                            }
                         }
                     }
                 }
@@ -284,7 +410,12 @@ extension AddEventContentView {
                 }
 
                 Section {
-                    Toggle(l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"), isOn: $hasReminder)
+                    Toggle(
+                        isTypedCareCreation
+                            ? l.tr(zh: "系统通知", en: "Notification", de: "Mitteilung")
+                            : l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"),
+                        isOn: $hasReminder
+                    )
                         .tint(Color.goPrimary)
                     if hasReminder {
                         Picker(l.tr(zh: "提前提醒", en: "Remind before", de: "Vorher erinnern"), selection: $reminderLeadOption) {
@@ -295,14 +426,42 @@ extension AddEventContentView {
                     }
                 }
 
-                Section {
-                    Picker(l.tr(zh: "执行人", en: "Assignee", de: "Zuständig"), selection: assigneeSelection) {
-                        Label(l.tr(zh: "任何人", en: "Anyone", de: "Alle"), systemImage: "person.2.fill")
-                            .tag("")
-                        ForEach(activeHumans) { human in
-                            Label(human.name, systemImage: "person.fill")
-                                .tag(human.id.uuidString)
-                                .accessibilityIdentifier("add-event-assignee-human-\(human.name)")
+                if showsCollaborationControls {
+                    Section {
+                        Picker(l.tr(zh: "执行人", en: "Assignee", de: "Zuständig"), selection: assigneeSelection) {
+                            Label(l.tr(zh: "任何人", en: "Anyone", de: "Alle"), systemImage: "person.2.fill")
+                                .tag("")
+                            ForEach(activeHumans) { human in
+                                Label(human.name, systemImage: "person.fill")
+                                    .tag(human.id.uuidString)
+                                    .accessibilityIdentifier("add-event-assignee-human-\(human.name)")
+                            }
+                        }
+
+                        if isTypedCareCreation {
+                            Stepper(
+                                value: $rewardCoconuts,
+                                in: 0 ... FamilyTaskService.rewardCap,
+                                step: 5
+                            ) {
+                                LabeledContent(l.tr(zh: "椰子奖励", en: "Coconut reward", de: "Kokosnuss-Prämie")) {
+                                    Text(
+                                        rewardCoconuts == 0
+                                            ? l.tr(zh: "无", en: "None", de: "Keine")
+                                            : "+\(rewardCoconuts) 🥥"
+                                    )
+                                }
+                            }
+                            .disabled(!hasDistinctAssignee)
+                            .accessibilityIdentifier("add-event-reward-stepper")
+                        }
+                    } footer: {
+                        if isTypedCareCreation, !hasDistinctAssignee {
+                            Text(l.tr(
+                                zh: "选择另一位成员后可设置奖励；0 表示无奖励。",
+                                en: "Choose another member to offer a reward; 0 means no reward.",
+                                de: "Wähle ein anderes Mitglied für eine Prämie; 0 bedeutet keine Prämie."
+                            ))
                         }
                     }
                 }
@@ -358,6 +517,11 @@ extension AddEventContentView {
             let cal = Calendar.current
             if allDay {
                 startDate = cal.startOfDay(for: startDate)
+            }
+        }
+        .onChange(of: assigneeId) { _, _ in
+            if !hasDistinctAssignee {
+                rewardCoconuts = 0
             }
         }
         .onAppear {
@@ -756,7 +920,10 @@ extension AddEventContentView {
             recurrenceDays: repeats ? selectedRecurrenceDays : 0,
             recurrenceEndDate: repeats ? recurrenceEndOfDay : nil,
             reminderLeadMinutes: hasReminder ? reminderLeadOption.rawValue : nil,
-            assigneeId: assigneeId
+            assigneeId: assigneeId,
+            taskCareKindRaw: taskCreationPreset?.careKind.rawValue
+                ?? editingEvent?.taskCareKindRaw
+                ?? ""
         )
     }
 
@@ -773,6 +940,19 @@ extension AddEventContentView {
         let reminderLeadOption: ReminderLeadOption
         let hasReminder: Bool
         let assigneeId: String?
+    }
+
+    private static func subjectName(
+        for preset: TaskCreationPreset,
+        pets: [Pet],
+        plants: [Plant]
+    ) -> String? {
+        switch preset.subjectKind {
+        case .pet:
+            pets.first(where: { $0.id == preset.subjectID })?.name
+        case .plant:
+            plants.first(where: { $0.id == preset.subjectID })?.name
+        }
     }
 
     private static func initialState(for event: Event?, occurrenceDate: Date?) -> InitialState {
@@ -1111,6 +1291,15 @@ extension AddEventContentView {
         titleFocused = false
         GoKeyboard.dismiss()
 
+        if let taskCreationPreset {
+            saveCareAssignment(
+                preset: taskCreationPreset,
+                input: input,
+                command: command
+            )
+            return
+        }
+
         guard input.reminderLeadMinutes == nil else {
             Task { @MainActor in
                 guard await appServices.userNotifications.requestPermission() else {
@@ -1124,6 +1313,71 @@ extension AddEventContentView {
         }
 
         enqueueSaveEvent(input: input, command: command)
+    }
+
+    private func saveCareAssignment(
+        preset: TaskCreationPreset,
+        input: CalendarEventPlanCommandInput,
+        command: DomainCommand
+    ) {
+        let assignment = TaskCareAssignmentCommand(
+            preset: preset,
+            title: input.title,
+            startDate: input.startDate,
+            isAllDay: input.isAllDay,
+            recurrenceDays: input.recurrenceDays,
+            recurrenceEndDate: input.recurrenceEndDate,
+            notificationLeadMinutes: input.reminderLeadMinutes,
+            creatorHumanID: careAssignmentCreatorHumanID,
+            assigneeHumanID: careAssignmentAssigneeHumanID,
+            rewardCoconuts: AddEventCollaborationPolicy.normalizedReward(
+                rewardCoconuts,
+                activeHumanCount: activeHumans.count,
+                creatorHumanID: careAssignmentCreatorHumanID,
+                assigneeHumanID: careAssignmentAssigneeHumanID
+            )
+        )
+
+        guard input.reminderLeadMinutes != nil else {
+            enqueueCareAssignment(
+                assignment,
+                scheduleNotifications: false,
+                command: command
+            )
+            return
+        }
+
+        Task { @MainActor in
+            let permissionGranted = await appServices.userNotifications.requestPermission()
+            enqueueCareAssignment(
+                assignment,
+                scheduleNotifications: permissionGranted,
+                command: command
+            )
+        }
+    }
+
+    private func enqueueCareAssignment(
+        _ assignment: TaskCareAssignmentCommand,
+        scheduleNotifications: Bool,
+        command: DomainCommand
+    ) {
+        commandQueue.enqueue(command) {
+            do {
+                _ = try TaskCareAssignmentCommandExecutor(
+                    modelContext: modelContext,
+                    services: appServices
+                ).execute(
+                    assignment,
+                    scheduleNotifications: scheduleNotifications
+                )
+                finishSuccessfulSave()
+            } catch {
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                appServices.domainRevisions.publishFailure(command: command, error: error)
+            }
+        }
     }
 
     private func enqueueSaveEvent(input: CalendarEventPlanCommandInput, command: DomainCommand) {
@@ -1141,16 +1395,20 @@ extension AddEventContentView {
                     return
                 }
 
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                withAnimation(GoMotion.feedback) { didSave = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-                    closeEditor()
-                }
+                finishSuccessfulSave()
             } catch {
                 isSaving = false
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 appServices.domainRevisions.publishFailure(command: command, error: error)
             }
+        }
+    }
+
+    private func finishSuccessfulSave() {
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        withAnimation(GoMotion.feedback) { didSave = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            closeEditor()
         }
     }
 

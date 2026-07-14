@@ -191,7 +191,8 @@ nonisolated extension DataBackupManager {
             feedRuleKindRaw: dto.feedRuleKindRaw ?? "",
             foodKindRaw: dto.foodKindRaw ?? FeedFoodKind.dry.rawValue,
             feedAmountGrams: dto.feedAmountGrams ?? 0,
-            feedPlanGroupId: dto.feedPlanGroupId ?? ""
+            feedPlanGroupId: dto.feedPlanGroupId ?? "",
+            taskCareKindRaw: dto.taskCareKindRaw ?? ""
         )
     }
 
@@ -199,6 +200,7 @@ nonisolated extension DataBackupManager {
         DomainScheduleRehydrateReminderSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
             scheduledAt: parseDate(dto.scheduledAt) ?? Date(),
+            occurrenceAt: parseDate(dto.occurrenceAt),
             status: dto.status,
             notificationId: dto.notificationId,
             eventId: dto.eventId.flatMap(UUID.init(uuidString:)),
@@ -237,6 +239,7 @@ nonisolated extension DataBackupManager {
             executorId: dto.executorId,
             plantId: dto.plantId.flatMap(UUID.init(uuidString:)),
             healthStatusRaw: dto.healthStatusRaw ?? "",
+            careTransactionId: dto.careTransactionId ?? "",
             photoData: try mediaData(
                 reference: dto.photoRef,
                 legacyBase64: dto.photoBase64,
@@ -775,6 +778,8 @@ nonisolated extension DataBackupManager {
             note: dto.note,
             kindRaw: dto.kindRaw,
             statusRaw: dto.statusRaw,
+            subjectKindRaw: dto.subjectKindRaw,
+            subjectId: dto.subjectId,
             relatedPetId: dto.relatedPetId,
             relatedEventId: dto.relatedEventId,
             relatedReminderId: dto.relatedReminderId,

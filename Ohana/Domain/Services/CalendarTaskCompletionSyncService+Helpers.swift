@@ -220,6 +220,9 @@ extension CalendarTaskCompletionSyncService {
     }
 
     static func careType(for event: Event) -> CareType? {
+        if !event.taskCareKindRaw.isEmpty {
+            return TaskCareKind(rawValue: event.taskCareKindRaw)?.careType
+        }
         let text = normalizedText(for: event)
         if text.contains("换水") || text.contains("water change") { return .waterChange }
         if text.contains("滤") || text.contains("filter") { return .filterClean }
@@ -231,12 +234,18 @@ extension CalendarTaskCompletionSyncService {
     }
 
     static func pottyType(for event: Event) -> PottyType? {
+        if !event.taskCareKindRaw.isEmpty {
+            return TaskCareKind(rawValue: event.taskCareKindRaw)?.pottyType
+        }
         let text = normalizedText(for: event)
         if text.contains("便") || text.contains("potty") || text.contains("poop") { return .perfectPoop }
         return nil
     }
 
     static func hygieneType(for event: Event) -> HygieneType? {
+        if !event.taskCareKindRaw.isEmpty {
+            return TaskCareKind(rawValue: event.taskCareKindRaw)?.hygieneType
+        }
         let text = normalizedText(for: event)
         guard event.eventType == EventType.grooming.rawValue
             || text.contains("洗") || text.contains("澡") || text.contains("刷牙")

@@ -251,6 +251,11 @@ extension PlantDetailContentView {
     @ViewBuilder
     var plantQuickCareOverlay: some View {
         VStack(spacing: 10) {
+            if let token = pendingBatchCareUndoToken {
+                plantDetailBatchCareUndoCard(token)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
             if let toast = quickCareToast {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill") // a11y: allow decorative success glyph; toast text announces the result.
@@ -277,6 +282,7 @@ extension PlantDetailContentView {
         .padding(.bottom, 14)
         .animation(GoMotion.feedback, value: quickCareConfirmDraft?.id)
         .animation(GoMotion.feedback, value: quickCareToast?.id)
+        .animation(GoMotion.feedback, value: pendingBatchCareUndoToken?.id)
     }
 
     func quickCareConfirmCard(_ draft: PlantQuickCareConfirmDraft) -> some View {
@@ -345,11 +351,76 @@ extension PlantDetailContentView {
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityIdentifier("plant-detail-quick-care-detail")
             }
+
+            Button {
+                openBatchQuickRecordFromDetail(careType: draft.careType)
+            } label: {
+                Label(
+                    l.tr(zh: "选择更多植物", en: "Select more plants", de: "Weitere Pflanzen wählen"),
+                    systemImage: "checklist"
+                )
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityHint(l.tr(
+                zh: "当前植物会保持选中，再选择其他植物后一次确认。",
+                en: "Keeps this plant selected so you can add others and confirm once.",
+                de: "Diese Pflanze bleibt ausgewählt; weitere können vor einer Bestätigung ergänzt werden."
+            ))
+            .accessibilityIdentifier("plant-detail-quick-care-select-more")
         }
         .padding(14)
         .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("plant-detail-quick-care-popup")
+    }
+
+    func plantDetailBatchCareUndoCard(_ token: PlantBatchCareUndoToken) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.seal.fill") // a11y: allow decorative batch-success glyph; adjacent text describes the result.
+                .font(OhanaFont.adaptive(size: 16, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 44, height: 44)
+                .background(Color.goPrimary.opacity(0.16), in: Circle())
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.tr(
+                    zh: "已为 \(token.items.count) 株植物记录",
+                    en: "Logged care for \(token.items.count) plants",
+                    de: "Pflege für \(token.items.count) Pflanzen erfasst"
+                ))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+
+                Text(l.tr(
+                    zh: "6 秒内可整批撤销；奖励随后结算。",
+                    en: "Undo the whole batch within 6 seconds; rewards settle after.",
+                    de: "Gesamten Vorgang 6 Sekunden widerrufen; Belohnungen folgen danach."
+                ))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            Button(l.tr(zh: "撤销", en: "Undo", de: "Widerrufen")) {
+                undoPendingBatchCareFromDetail()
+            }
+            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+            .foregroundStyle(Color.goPrimary)
+            .frame(minWidth: 44, minHeight: 44)
+            .accessibilityIdentifier("plant-detail-batch-care-undo")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("plant-detail-batch-care-result")
     }
 
     var nextTaskCard: some View {

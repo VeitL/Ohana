@@ -24,7 +24,7 @@ enum FeatureGroup: String, Hashable, CaseIterable {
         case .archiveMemory:
             l.tr(zh: "成长档案", en: "Growth Records", de: "Wachstumsakte")
         case .householdHub:
-            l.tr(zh: "家庭事务", en: "Household", de: "Haushalt")
+            l.tr(zh: "家庭洞察", en: "Household Insights", de: "Haushaltseinblicke")
         case .oasisRewards:
             l.tr(zh: "绿洲奖励", en: "Oasis Rewards", de: "Oasis-Belohnungen")
         case .plants:

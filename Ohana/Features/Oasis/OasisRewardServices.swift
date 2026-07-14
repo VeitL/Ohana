@@ -98,7 +98,23 @@ protocol OasisRewardManaging {
     func clearFeatured(_ critter: OasisElectronicPet, context: ModelContext) throws
     func normalizeLifecycle(for critter: OasisElectronicPet, context: ModelContext)
     func rewardFeaturedCritterFromCare(type: QuestManager.OhanaActionType, context: ModelContext)
+    func rewardFeaturedCritterFromCare(
+        type: QuestManager.OhanaActionType,
+        context: ModelContext,
+        idempotencyID: UUID
+    ) -> Bool
     func ensureUpgradeCoconuts(from startLevel: Int, through endLevel: Int, context: ModelContext) throws
+}
+
+extension OasisRewardManaging {
+    func rewardFeaturedCritterFromCare(
+        type: QuestManager.OhanaActionType,
+        context: ModelContext,
+        idempotencyID _: UUID
+    ) -> Bool {
+        rewardFeaturedCritterFromCare(type: type, context: context)
+        return true
+    }
 }
 
 @MainActor
@@ -312,6 +328,18 @@ final class StaticOasisRewardManager: OasisRewardManaging {
 
     func rewardFeaturedCritterFromCare(type: QuestManager.OhanaActionType, context: ModelContext) {
         OasisUpgradeRewardService.rewardFeaturedCritterFromCare(type: type, context: context)
+    }
+
+    func rewardFeaturedCritterFromCare(
+        type: QuestManager.OhanaActionType,
+        context: ModelContext,
+        idempotencyID: UUID
+    ) -> Bool {
+        OasisUpgradeRewardService.rewardFeaturedCritterFromCare(
+            type: type,
+            context: context,
+            idempotencyID: idempotencyID
+        )
     }
 
     func ensureUpgradeCoconuts(from startLevel: Int, through endLevel: Int, context: ModelContext) throws {

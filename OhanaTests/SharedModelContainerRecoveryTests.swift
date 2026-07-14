@@ -92,7 +92,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directoryURL) }
 
         let petID = UUID()
-        let schema = Schema(ArkSchemaV85.models)
+        let schema = Schema(ArkSchemaV90.models)
 
         do {
             let container = try SharedModelContainerOpenPolicy.open { storeKind -> ModelContainer in
@@ -156,8 +156,311 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     func testCloudSyncTombstoneDefaultLandsOnLatestLightweightSchema() {
-        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV85.self))
+        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV90.self))
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
+    }
+
+    @MainActor
+    func testV86LegacyPetFamilyTaskOpensOnV87WithCompatibilitySubject() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaFamilyTaskV87MigrationTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let creatorID = UUID()
+        let petID = UUID()
+        let taskID = UUID()
+        do {
+            let schema = Schema(ArkSchemaV86.models)
+            let config = ModelConfiguration("FamilyTaskV86Source", schema: schema, url: storeURL, cloudKitDatabase: .none)
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkSchemaV86OnlyMigrationPlan.self,
+                configurations: [config]
+            )
+            let creator = Human(name: "Publisher")
+            creator.id = creatorID
+            let pet = Pet(name: "Momo", species: "cat")
+            pet.id = petID
+            let task = FamilyCollaborationTask(
+                id: taskID,
+                title: "Feed Momo",
+                kind: .careReminder,
+                relatedPetId: petID.uuidString,
+                createdById: creatorID.uuidString,
+                createdByName: creator.name
+            )
+            // Reproduce a V86 row before the canonical subject columns existed.
+            task.subjectKindRaw = ""
+            task.subjectId = nil
+            container.mainContext.insert(creator)
+            container.mainContext.insert(pet)
+            container.mainContext.insert(task)
+            try container.mainContext.save()
+        }
+
+        do {
+            let schema = Schema(ArkSchemaV87.models)
+            let config = ModelConfiguration("FamilyTaskV87Target", schema: schema, url: storeURL, cloudKitDatabase: .none)
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [config]
+            )
+            var descriptor = FetchDescriptor<FamilyCollaborationTask>(
+                predicate: #Predicate<FamilyCollaborationTask> { $0.id == taskID }
+            )
+            descriptor.fetchLimit = 1
+            let task = try XCTUnwrap(container.mainContext.fetch(descriptor).first)
+
+            XCTAssertEqual(task.subjectKind, .pet)
+            XCTAssertEqual(task.resolvedSubjectId, petID.uuidString)
+            XCTAssertEqual(task.relatedPetId, petID.uuidString)
+        }
+    }
+
+    @MainActor
+    func testV87EventOpensThroughLatestWithEmptyTaskCareKindDefault() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaEventV88MigrationTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let eventID = UUID()
+        do {
+            let schema = Schema(ArkSchemaV87.models)
+            let config = ModelConfiguration("EventV87Source", schema: schema, url: storeURL, cloudKitDatabase: .none)
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkSchemaV87OnlyMigrationPlan.self,
+                configurations: [config]
+            )
+            let event = Event(
+                title: "Legacy task",
+                startDate: Date(timeIntervalSince1970: 1_900_000_000),
+                eventType: EventType.task.rawValue
+            )
+            event.id = eventID
+            event.taskCareKindRaw = ""
+            container.mainContext.insert(event)
+            try container.mainContext.save()
+        }
+
+        do {
+            let schema = Schema(ArkSchemaV90.models)
+            let config = ModelConfiguration("EventLatestTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [config]
+            )
+            var descriptor = FetchDescriptor<Event>(predicate: #Predicate<Event> { $0.id == eventID })
+            descriptor.fetchLimit = 1
+            let event = try XCTUnwrap(container.mainContext.fetch(descriptor).first)
+
+            XCTAssertEqual(event.title, "Legacy task")
+            XCTAssertEqual(event.taskCareKindRaw, "")
+        }
+    }
+
+    @MainActor
+    func testV88ReminderOpensThroughLatestWithLegacyOccurrenceFallback() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaReminderV89MigrationTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let reminderID = UUID()
+        let scheduledAt = Date(timeIntervalSince1970: 1_900_100_000)
+        do {
+            let schema = Schema(ArkSchemaV88.models)
+            let config = ModelConfiguration("ReminderV88Source", schema: schema, url: storeURL, cloudKitDatabase: .none)
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkSchemaV88OnlyMigrationPlan.self,
+                configurations: [config]
+            )
+            let event = Event(title: "Legacy care", startDate: scheduledAt)
+            let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+            reminder.id = reminderID
+            container.mainContext.insert(event)
+            container.mainContext.insert(reminder)
+            try container.mainContext.save()
+        }
+
+        do {
+            let schema = Schema(ArkSchemaV90.models)
+            let config = ModelConfiguration("ReminderLatestTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [config]
+            )
+            var descriptor = FetchDescriptor<Reminder>(predicate: #Predicate<Reminder> { $0.id == reminderID })
+            descriptor.fetchLimit = 1
+            let reminder = try XCTUnwrap(container.mainContext.fetch(descriptor).first)
+
+            XCTAssertNil(reminder.occurrenceAt)
+            XCTAssertEqual(reminder.resolvedOccurrenceAt, scheduledAt)
+        }
+    }
+
+    @MainActor
+    func testV89StoreOpensOnV90WithSharedCareFactsAndNoSyntheticUndoReceipt() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaUndoReceiptV90MigrationTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let sessionID = UUID()
+        let sourcePetID = UUID()
+        do {
+            let schema = Schema(ArkSchemaV89.models)
+            let config = ModelConfiguration(
+                "UndoReceiptV89Source",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkSchemaV89OnlyMigrationPlan.self,
+                configurations: [config]
+            )
+            let session = SharedCareSession(
+                actionKind: .litterScoop,
+                sourcePetId: sourcePetID.uuidString,
+                targetPetIds: [sourcePetID.uuidString],
+                species: "cat"
+            )
+            session.id = sessionID
+            container.mainContext.insert(session)
+            try container.mainContext.save()
+        }
+
+        do {
+            let schema = Schema(ArkSchemaV90.models)
+            let config = ModelConfiguration(
+                "UndoReceiptV90Target",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [config]
+            )
+            let sessions = try container.mainContext.fetch(FetchDescriptor<SharedCareSession>())
+            let receipts = try container.mainContext.fetch(FetchDescriptor<SharedCareUndoReceipt>())
+
+            XCTAssertEqual(sessions.map(\.id), [sessionID])
+            XCTAssertEqual(sessions.first?.sourcePetId, sourcePetID.uuidString)
+            XCTAssertTrue(receipts.isEmpty)
+        }
+    }
+
+    @MainActor
+    func testV90UndoReceiptPersistsAcrossContainerRelaunch() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaUndoReceiptPersistenceTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let receiptID = UUID()
+        let sessionID = UUID()
+        let sourcePetID = UUID()
+        let targetPetID = UUID()
+        let reminderID = UUID()
+        let occurredAt = Date(timeIntervalSinceReferenceDate: 10_000)
+        let undoDeadline = occurredAt.addingTimeInterval(6)
+
+        do {
+            let schema = Schema(ArkSchemaV90.models)
+            let config = ModelConfiguration(
+                "UndoReceiptPersistenceSource",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [config]
+            )
+            let receipt = SharedCareUndoReceipt(
+                id: receiptID,
+                sharedSessionId: sessionID,
+                sourcePetId: sourcePetID,
+                targetPetIds: [sourcePetID, targetPetID, sourcePetID],
+                executorId: "member-1",
+                actionKind: .litterScoop,
+                occurredAt: occurredAt,
+                createdAt: occurredAt,
+                undoDeadline: undoDeadline,
+                state: .externalEffectsPending,
+                reminderOccurrences: [
+                    SharedCareUndoReminderOccurrence(
+                        targetPetId: targetPetID,
+                        reminderId: reminderID,
+                        occurrenceAt: occurredAt
+                    )
+                ],
+                corePayloadJSON: "{\"version\":1}",
+                externalEffectsPayloadJSON: "{\"version\":1}",
+                completedExternalEffects: [.userDefaults, .notifications],
+                attemptCount: 2,
+                lastError: "retryable",
+                nextRetryAt: undoDeadline.addingTimeInterval(5)
+            )
+            container.mainContext.insert(receipt)
+            try container.mainContext.save()
+        }
+
+        do {
+            let schema = Schema(ArkSchemaV90.models)
+            let config = ModelConfiguration(
+                "UndoReceiptPersistenceTarget",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [config]
+            )
+            let receipt = try XCTUnwrap(
+                try container.mainContext.fetch(FetchDescriptor<SharedCareUndoReceipt>()).first
+            )
+
+            XCTAssertEqual(receipt.id, receiptID)
+            XCTAssertEqual(receipt.sharedSessionId, sessionID)
+            XCTAssertEqual(receipt.sourcePetId, sourcePetID)
+            XCTAssertEqual(receipt.targetPetIds, [sourcePetID, targetPetID])
+            XCTAssertEqual(receipt.executorId, "member-1")
+            XCTAssertEqual(receipt.actionKind, .litterScoop)
+            XCTAssertEqual(receipt.state, .externalEffectsPending)
+            XCTAssertEqual(receipt.undoDeadline, undoDeadline)
+            XCTAssertEqual(
+                receipt.reminderOccurrences,
+                [
+                    SharedCareUndoReminderOccurrence(
+                        targetPetId: targetPetID,
+                        reminderId: reminderID,
+                        occurrenceAt: occurredAt
+                    )
+                ]
+            )
+            XCTAssertEqual(receipt.completedExternalEffects, [.userDefaults, .notifications])
+            XCTAssertEqual(receipt.attemptCount, 2)
+            XCTAssertEqual(receipt.lastError, "retryable")
+        }
     }
 
     @MainActor
@@ -184,7 +487,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV85.models)
+            let schema = Schema(ArkSchemaV90.models)
             let config = ModelConfiguration("ModelsMigrationTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -260,7 +563,8 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
                 date: eventStart,
                 careType: .watering,
                 note: "legacy plant water",
-                executorId: humanID.uuidString
+                executorId: humanID.uuidString,
+                careTransactionId: ""
             )
             plantLog.plant = plant
             let careLedger = CareLedgerEvent(
@@ -322,7 +626,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV85.models)
+            let schema = Schema(ArkSchemaV90.models)
             let config = ModelConfiguration("CoreUserDataMigrationTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -346,9 +650,11 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
             XCTAssertEqual(humans.map(\.name), ["Alex"])
             XCTAssertEqual(plants.map(\.name), ["Pothos"])
             XCTAssertEqual(events.map(\.title), ["Water Pothos"])
+            XCTAssertEqual(events.map(\.taskCareKindRaw), [""])
             XCTAssertEqual(reminders.map(\.scheduledAt), [reminderTime])
             XCTAssertEqual(careLogs.map(\.note), ["legacy feed"])
             XCTAssertEqual(plantLogs.map(\.note), ["legacy plant water"])
+            XCTAssertEqual(plantLogs.map(\.careTransactionId), [""])
             XCTAssertEqual(careLedgerEvents.map(\.actionType), [CareType.feeding.rawValue])
             XCTAssertEqual(walletAccounts.map(\.balance), [12])
             XCTAssertEqual(walletEntries.map(\.delta), [1])
@@ -371,5 +677,25 @@ private enum StoreOpenTestError: Error {
 
 private enum ArkSchemaV67OnlyMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] { [ArkSchemaV67.self] }
+    static var stages: [MigrationStage] { [] }
+}
+
+private enum ArkSchemaV86OnlyMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [ArkSchemaV86.self] }
+    static var stages: [MigrationStage] { [] }
+}
+
+private enum ArkSchemaV87OnlyMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [ArkSchemaV87.self] }
+    static var stages: [MigrationStage] { [] }
+}
+
+private enum ArkSchemaV88OnlyMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [ArkSchemaV88.self] }
+    static var stages: [MigrationStage] { [] }
+}
+
+private enum ArkSchemaV89OnlyMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [ArkSchemaV89.self] }
     static var stages: [MigrationStage] { [] }
 }

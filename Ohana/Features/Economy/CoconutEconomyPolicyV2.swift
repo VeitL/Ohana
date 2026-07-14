@@ -278,6 +278,27 @@ struct EconomyDailyBudgetSnapshot: Equatable {
     }
 }
 
+nonisolated struct EconomyBudgetUsageDefaultsReversal: Equatable, Sendable {
+    let dayKey: String
+    let householdKey: String
+    let scopeRaw: String
+    let scopeKey: String
+    let growthXP: Int
+    let coconuts: Int
+    let luckyCoconuts: Int
+
+    @MainActor
+    init(_ event: EconomyBudgetUsageEvent) {
+        dayKey = event.dayKey
+        householdKey = event.householdKey
+        scopeRaw = event.scopeRaw
+        scopeKey = event.scopeKey
+        growthXP = event.growthXPUsed
+        coconuts = event.coconutUsed
+        luckyCoconuts = event.luckyCoconutUsed
+    }
+}
+
 enum EconomyDailyBudgetStore {
     static let luckyCoconutBudget = 12
 
@@ -468,6 +489,69 @@ enum EconomyDailyBudgetStore {
         let defaults = UserDefaults.standard
         for (key, _) in defaults.dictionaryRepresentation() where key.hasPrefix("\(prefix).") {
             defaults.removeObject(forKey: key)
+        }
+    }
+
+    /// Keeps the UserDefaults budget cache aligned after an already-persisted
+    /// economy usage row is explicitly undone. Call only after the SwiftData
+    /// transaction that removed those rows has succeeded.
+    static func reverseDefaults(_ reversals: [EconomyBudgetUsageDefaultsReversal]) {
+        for reversal in reversals {
+            switch EconomyBudgetUsageScope(rawValue: reversal.scopeRaw) {
+            case .household:
+                decrement(
+                    householdStorageKey(householdKey: reversal.householdKey, metric: "xp", dayKey: reversal.dayKey),
+                    by: reversal.growthXP
+                )
+                decrement(
+                    householdStorageKey(householdKey: reversal.householdKey, metric: "coconut", dayKey: reversal.dayKey),
+                    by: reversal.coconuts
+                )
+                decrement(
+                    householdStorageKey(householdKey: reversal.householdKey, metric: "lucky", dayKey: reversal.dayKey),
+                    by: reversal.luckyCoconuts
+                )
+            case .member:
+                decrement(
+                    memberStorageKey(
+                        householdKey: reversal.householdKey,
+                        memberKey: reversal.scopeKey,
+                        metric: "xp",
+                        dayKey: reversal.dayKey
+                    ),
+                    by: reversal.growthXP
+                )
+                decrement(
+                    memberStorageKey(
+                        householdKey: reversal.householdKey,
+                        memberKey: reversal.scopeKey,
+                        metric: "coconut",
+                        dayKey: reversal.dayKey
+                    ),
+                    by: reversal.coconuts
+                )
+            case .careObject:
+                decrement(
+                    careObjectStorageKey(
+                        householdKey: reversal.householdKey,
+                        careObjectKey: reversal.scopeKey,
+                        metric: "xp",
+                        dayKey: reversal.dayKey
+                    ),
+                    by: reversal.growthXP
+                )
+                decrement(
+                    careObjectStorageKey(
+                        householdKey: reversal.householdKey,
+                        careObjectKey: reversal.scopeKey,
+                        metric: "coconut",
+                        dayKey: reversal.dayKey
+                    ),
+                    by: reversal.coconuts
+                )
+            case nil:
+                continue
+            }
         }
     }
 
@@ -769,20 +853,42 @@ enum EconomyDailyBudgetStore {
     }
 
     private static func householdStorageKey(householdKey: String, metric: String, date: Date) -> String {
-        "\(prefix).household.\(householdKey).\(dayKey(for: date)).\(metric)"
+        householdStorageKey(householdKey: householdKey, metric: metric, dayKey: dayKey(for: date))
     }
 
     private static func memberStorageKey(householdKey: String, memberKey: String, metric: String, date: Date) -> String {
-        "\(prefix).member.\(householdKey).\(memberKey).\(dayKey(for: date)).\(metric)"
+        memberStorageKey(householdKey: householdKey, memberKey: memberKey, metric: metric, dayKey: dayKey(for: date))
     }
 
     private static func careObjectStorageKey(householdKey: String, careObjectKey: String, metric: String, date: Date) -> String {
-        "\(prefix).object.\(householdKey).\(careObjectKey).\(dayKey(for: date)).\(metric)"
+        careObjectStorageKey(householdKey: householdKey, careObjectKey: careObjectKey, metric: metric, dayKey: dayKey(for: date))
+    }
+
+    private static func householdStorageKey(householdKey: String, metric: String, dayKey: String) -> String {
+        "\(prefix).household.\(householdKey).\(dayKey).\(metric)"
+    }
+
+    private static func memberStorageKey(householdKey: String, memberKey: String, metric: String, dayKey: String) -> String {
+        "\(prefix).member.\(householdKey).\(memberKey).\(dayKey).\(metric)"
+    }
+
+    private static func careObjectStorageKey(householdKey: String, careObjectKey: String, metric: String, dayKey: String) -> String {
+        "\(prefix).object.\(householdKey).\(careObjectKey).\(dayKey).\(metric)"
     }
 
     private static func increment(_ key: String, by amount: Int) {
         guard amount > 0 else { return }
         UserDefaults.standard.set(UserDefaults.standard.integer(forKey: key) + amount, forKey: key)
+    }
+
+    private static func decrement(_ key: String, by amount: Int) {
+        guard amount > 0 else { return }
+        let updated = max(0, UserDefaults.standard.integer(forKey: key) - amount)
+        if updated == 0 {
+            UserDefaults.standard.removeObject(forKey: key)
+        } else {
+            UserDefaults.standard.set(updated, forKey: key)
+        }
     }
 }
 

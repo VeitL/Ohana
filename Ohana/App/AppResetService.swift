@@ -142,6 +142,7 @@ enum AppResetService {
         try delete(EconomyBudgetUsageEvent.self, in: context)
         try delete(FamilyCollaborationTask.self, in: context)
         try delete(CoconutExchangeRequest.self, in: context)
+        try delete(SharedCareUndoReceipt.self, in: context)
         try delete(SharedCareSession.self, in: context)
         try delete(RecycleBinBatch.self, in: context) // legacy V69 compatibility row
         try delete(ShopPurchaseRecord.self, in: context)

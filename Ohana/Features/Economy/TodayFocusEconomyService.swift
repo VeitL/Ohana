@@ -343,7 +343,7 @@ enum TodayFocusEconomyService {
         let skippedFocusKeys = TodayFocusHiddenStateStore.loadSkippedFocusKeys(date: now, calendar: calendar)
         let closedNegativeKeys = TodayFocusHiddenStateStore.loadClosedNegativeKeys(date: now, calendar: calendar)
         let visibleFamilyTasks = snapshot.assignedFamilyTasks.prefix(TodayFocusLimits.maxFamilyTaskCards).contains {
-            !skippedFocusKeys.contains("familyTask:\($0.id.uuidString)")
+            !skippedFocusKeys.contains("familyTask:\($0.id)")
         }
         let visibleExchangeRequests = CoconutExchangeFeatureGate.isEnabled &&
             snapshot.pendingExchangeRequests.prefix(TodayFocusLimits.maxExchangeCards).contains {

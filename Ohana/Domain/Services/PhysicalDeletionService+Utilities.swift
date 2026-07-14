@@ -60,12 +60,34 @@ extension PhysicalDeletionService {
         deletedByHumanId: String?
     ) -> Int {
         deleteRows(fetchAll(FamilyCollaborationTask.self, context: context).filter { task in
-            idsMatch(task.relatedPetId, petId)
+            (task.subjectKind == .pet && idsMatch(task.resolvedSubjectId, petId)) ||
+                idsMatch(task.relatedPetId, petId)
         }, context: context) {
             markGenericDeleted(
                 entityName: String(describing: FamilyCollaborationTask.self),
                 localRecordId: $0.id,
                 parentId: petId,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId
+            )
+        }
+    }
+
+    @discardableResult
+    nonisolated static func deleteFamilyTasksReferencingPlant(
+        plantId: String,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) -> Int {
+        deleteRows(fetchAll(FamilyCollaborationTask.self, context: context).filter { task in
+            task.subjectKind == .plant && idsMatch(task.resolvedSubjectId, plantId)
+        }, context: context) {
+            markGenericDeleted(
+                entityName: String(describing: FamilyCollaborationTask.self),
+                localRecordId: $0.id,
+                parentId: plantId,
                 context: context,
                 deletedAt: deletedAt,
                 deletedByHumanId: deletedByHumanId
@@ -190,7 +212,8 @@ extension PhysicalDeletionService {
     }
 
     nonisolated static func referencesHuman(_ task: FamilyCollaborationTask, humanId: String) -> Bool {
-        idsMatch(task.createdById, humanId) ||
+        (task.subjectKind == .human && idsMatch(task.resolvedSubjectId, humanId)) ||
+            idsMatch(task.createdById, humanId) ||
             idsMatch(task.assignedToId, humanId) ||
             idsMatch(task.claimedById, humanId) ||
             idsMatch(task.completedById, humanId)

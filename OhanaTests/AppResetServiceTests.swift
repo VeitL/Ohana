@@ -28,10 +28,20 @@ final class AppResetServiceTests: XCTestCase {
             actionKey: "feed",
             source: "test"
         )
+        let undoReceipt = SharedCareUndoReceipt(
+            sharedSessionId: UUID(),
+            sourcePetId: pet.id,
+            targetPetIds: [pet.id],
+            executorId: human.id.uuidString,
+            actionKind: .litterScoop,
+            occurredAt: Date(),
+            undoDeadline: Date().addingTimeInterval(6)
+        )
         context.insert(pet)
         context.insert(human)
         context.insert(careLog)
         context.insert(budgetUsage)
+        context.insert(undoReceipt)
         try context.save()
 
         defaults.set(true, forKey: "ohana_has_onboarded")
@@ -64,6 +74,7 @@ final class AppResetServiceTests: XCTestCase {
         XCTAssertTrue(try context.fetch(FetchDescriptor<Human>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
         XCTAssertTrue(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<SharedCareUndoReceipt>()).isEmpty)
         XCTAssertFalse(defaults.bool(forKey: "ohana_has_onboarded"))
         XCTAssertEqual(defaults.string(forKey: "currentActiveHumanId"), "")
         XCTAssertNil(defaults.object(forKey: "quickActionItems_v2"))
@@ -124,7 +135,7 @@ final class AppResetServiceTests: XCTestCase {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV85.models)
+        let schema = Schema(ArkSchemaV90.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

@@ -16,6 +16,7 @@ struct HumanDetailView: View {
     let allMeds: [HumanMedication]
     let allReports: [HumanHealthReport]
     let onPresentCoconutLog: (CoconutLogSubject?) -> Void
+    let onOpenTasks: () -> Void
 
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.modelContext) var modelContext
@@ -31,7 +32,8 @@ struct HumanDetailView: View {
         allPendingReminders: [Reminder] = [],
         allMeds: [HumanMedication] = [],
         allReports: [HumanHealthReport] = [],
-        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in }
+        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in },
+        onOpenTasks: @escaping () -> Void = {}
     ) {
         self.human = human
         self.allPets = allPets
@@ -40,6 +42,7 @@ struct HumanDetailView: View {
         self.allMeds = allMeds
         self.allReports = allReports
         self.onPresentCoconutLog = onPresentCoconutLog
+        self.onOpenTasks = onOpenTasks
     }
 
     var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }

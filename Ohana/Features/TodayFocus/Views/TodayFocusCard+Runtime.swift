@@ -83,7 +83,7 @@ extension TodayFocusCard {
     }
 
     static func familyTaskSkipKey(for task: TodayFocusFamilyTaskSnapshot) -> String {
-        "familyTask:\(task.id.uuidString)"
+        "familyTask:\(task.id)"
     }
 
     func exchangeSkipKey(_ request: TodayFocusExchangeRequestSnapshot) -> String {
@@ -122,7 +122,7 @@ extension TodayFocusCard {
         }.joined(separator: "|")
         let taskKey = snapshot.assignedFamilyTasks.map { task in
             [
-                task.id.uuidString,
+                task.id,
                 task.title,
                 task.statusRaw,
                 task.createdByName,

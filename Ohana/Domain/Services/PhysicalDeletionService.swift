@@ -57,13 +57,6 @@ nonisolated enum PhysicalDeletionService {
         String(describing: FamilyCollaborationTask.self)
     ]
 
-    private static let plantDeletionCascadeCoverageEntityNames: Set<String> = [
-        String(describing: Event.self),
-        String(describing: Reminder.self),
-        String(describing: PlantCareLog.self),
-        String(describing: CareLedgerEvent.self)
-    ]
-
     static func localPhysicalDeletionCascadeCoverage(parent: CloudSyncPhysicalDeletionParent) -> Set<String> {
         switch parent {
         case .pet:
@@ -143,6 +136,7 @@ nonisolated enum PhysicalDeletionService {
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId
         )
+        deleteSharedCareUndoReceiptsReferencingPet(petId: petId, context: context)
         markPetCascadeDeletedForSync(pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         CloudSyncMutationRecorder.markDeleted(
             pet,
@@ -157,6 +151,7 @@ nonisolated enum PhysicalDeletionService {
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId
         )
+        deleteOrphanedSharedCareUndoReceipts(context: context)
         reconcileWalletAfterEconomyDeletion(context: context)
     }
 
@@ -315,6 +310,7 @@ nonisolated enum PhysicalDeletionService {
                 reconciledAt: deletedAt
             )
         }
+        deleteOrphanedSharedCareUndoReceipts(context: context)
         return didDelete
     }
 
@@ -476,12 +472,14 @@ nonisolated enum PhysicalDeletionService {
         deletedCount += deleteRows(fetchAll(HumanHealthMetricLog.self, context: context).filter { $0.human?.id == human.id }, context: context) {
             CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         }
+        deletedCount += deleteSharedCareUndoReceiptsReferencingHuman(humanId: humanId, context: context)
         deletedCount += scrubSharedCareSessionsReferencingHuman(
             humanId: humanId,
             context: context,
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId
         )
+        deletedCount += deleteOrphanedSharedCareUndoReceipts(context: context)
         deletedCount += scrubRetainedPetFactsReferencingHuman(humanId: humanId, context: context, modifiedAt: deletedAt)
         deletedCount += retireWalletAccounts(ownerKind: .human, ownerId: humanId, context: context, deletedAt: deletedAt)
         deletedCount += scrubCoconutLedgerEntriesReferencingDeletedOwner(

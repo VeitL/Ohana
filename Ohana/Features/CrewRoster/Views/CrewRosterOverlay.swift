@@ -7,7 +7,6 @@
 
 import SwiftData
 import SwiftUI
-import UIKit
 
 // MARK: - Ohana 图鉴主视图
 
@@ -42,9 +41,6 @@ struct CrewRosterOverlay: View {
     var pets: [Pet] = []
     var humans: [Human] = []
     var plants: [Plant] = []
-    var pendingReminders: [Reminder] = []
-    var familyTasks: [FamilyCollaborationTask] = []
-    var careLedgerEntries: [FamilyCareLedgerEntry] = []
     var petSummaries: [UUID: CrewRosterPetSummary] = [:]
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
@@ -57,27 +53,19 @@ struct CrewRosterOverlay: View {
     var safeTopInset: CGFloat = 0
     var safeBottomInset: CGFloat = 0
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+    var onOpenTaskCenter: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @State private var activeFullScreenRoute: CrewRosterFullScreenRoute?
-    @State private var activeSheetRoute: CrewRosterSheetRoute?
-    @State private var selectedRosterMode: CrewRosterMode = .members
-    @State private var collaborationCreateTaskTrigger = 0
-    @State private var collaborationEditorPresented = false
     @State private var pendingInlineSavedPet: Pet? = nil
     @State private var pendingInlineSavedHuman: Human? = nil
     @State private var memberSearchText = ""
     @State private var selectedMemberFilter: CrewRosterMemberFilter = .all
     @FocusState private var isMemberSearchFocused: Bool
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
-    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    private var isMaterial: Bool { false }
-    private var matBg: Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
-    private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
-    private var matAccent: Color { Color(hex: "FF5A00") }
     private var l: L10n { L10n(appLanguage) }
     private var normalizedMemberSearch: String {
         memberSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -102,16 +90,13 @@ struct CrewRosterOverlay: View {
     }
     private var filteredPlants: [Plant] { [] }
     private var isEmpty: Bool { pets.isEmpty && humans.isEmpty && filteredPlants.isEmpty }
-    private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
-    private var activeHumans: [Human] { humans.filter { !$0.hasPassedAway } }
-    private var canPublishFamilyTask: Bool { activeHumans.count > 1 && activeHuman != nil }
 
+    /// Legacy collaboration routes now resolve to the single member-roster surface.
     private var resolvedInitialMode: CrewRosterMode {
-        initialMode
-    }
-
-    private var activeHuman: Human? {
-        activeHumans.first { $0.id.uuidString == activeHumanIdStr } ?? activeHumans.first
+        switch initialMode {
+        case .collaboration, .members:
+            .members
+        }
     }
 
     var body: some View {
@@ -125,29 +110,7 @@ struct CrewRosterOverlay: View {
                 VStack(spacing: 0) {
                     rosterTopChrome
 
-                    if selectedRosterMode == .collaboration {
-                        if canPublishFamilyTask {
-                            FamilyCollaborationDashboardHost(
-                                pets: activePets,
-                                humans: activeHumans,
-                                pendingReminders: pendingReminders,
-                                familyTasks: familyTasks,
-                                careLedgerEntries: careLedgerEntries,
-                                createTaskTrigger: collaborationCreateTaskTrigger,
-                                onEditorVisibilityChanged: { isPresented in
-                                    withAnimation(GoMotion.feedback) {
-                                        collaborationEditorPresented = isPresented
-                                    }
-                                },
-                                onOpenPetActivity: { activeSheetRoute = .familyActivity($0.id) },
-                                onOpenWeeklyReport: { activeSheetRoute = .familyWeeklyReport }
-                            )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                            .transition(.opacity.combined(with: .scale(scale: 0.985)))
-                        } else {
-                            collaborationSetupState
-                        }
-                    } else if isEmpty {
+                    if isEmpty {
                         ScrollView(.vertical, showsIndicators: false) {
                             VStack(spacing: 20) {
                                 emptyState
@@ -160,16 +123,12 @@ struct CrewRosterOverlay: View {
                     } else {
                         rosterWalletDeck
                             .transition(.opacity.combined(with: .scale(scale: 0.992)))
-                            .animation(GoMotion.page, value: selectedRosterMode)
                     }
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
             .crewRosterPresentations(
-                pets: pets,
-                l: l,
                 fullScreenRoute: $activeFullScreenRoute,
-                sheetRoute: $activeSheetRoute,
                 onAddEntityDismissed: resetPendingInlineAddEntity,
                 onAddEntityComplete: completeInlineAddEntity,
                 onPetSaved: { pendingInlineSavedPet = $0 },
@@ -179,17 +138,14 @@ struct CrewRosterOverlay: View {
                 }
             )
             .onAppear {
-                selectedRosterMode = resolvedInitialMode
                 if searchTrigger {
-                    selectedRosterMode = .members
                     focusMemberSearch()
                 }
             }
             .onChange(of: searchTrigger) { _, _ in
-                selectedRosterMode = .members
                 focusMemberSearch()
             }
-            .interactiveDismissDisabled(collaborationEditorPresented)
+            .accessibilityIdentifier("crew-roster-\(resolvedInitialMode.rawValue)")
         }
     }
 
@@ -198,8 +154,8 @@ struct CrewRosterOverlay: View {
     private var rosterTopChrome: some View {
         VStack(spacing: 10) {
             rosterHeader
-            rosterControlRow
-            if selectedRosterMode == .members, !isEmpty {
+            rosterTaskCenterAction
+            if !isEmpty {
                 rosterMemberTools
                 rosterMemberSummaryRow
             }
@@ -220,28 +176,36 @@ struct CrewRosterOverlay: View {
         }
     }
 
-    private var rosterControlRow: some View {
-        Picker(
-            l.tr(zh: "成员页功能", en: "Member page section", de: "Mitgliederbereich"),
-            selection: $selectedRosterMode
-        ) {
-            Text(l.tr(zh: "成员 \(humans.count + pets.count)", en: "Members \(humans.count + pets.count)", de: "Mitglieder \(humans.count + pets.count)"))
-                .tag(CrewRosterMode.members)
-            Text(l.tr(zh: "协作 \(activeFamilyTaskCount)", en: "Tasks \(activeFamilyTaskCount)", de: "Aufgaben \(activeFamilyTaskCount)"))
-                .tag(CrewRosterMode.collaboration)
-        }
-        .pickerStyle(.segmented)
-        .onChange(of: selectedRosterMode) { _, mode in
-            UISelectionFeedbackGenerator().selectionChanged()
-            if mode == .collaboration {
-                isMemberSearchFocused = false
+    @ViewBuilder
+    private var rosterTaskCenterAction: some View {
+        if let onOpenTaskCenter {
+            Button {
+                OhanaFeedback.light()
+                onOpenTaskCenter()
+            } label: {
+                HStack(spacing: 10) {
+                    Label(
+                        l.tr(zh: "查看待办", en: "View tasks", de: "Aufgaben anzeigen"),
+                        systemImage: "checklist"
+                    )
+                    .font(OhanaFont.callout(.bold))
+                    Spacer()
+                    Image(systemName: "chevron.right") // a11y: allow decorative disclosure glyph hidden below
+                        .font(OhanaFont.caption(.black))
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(
+                    Color.ohanaControlFill,
+                    in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                )
+                .contentShape(Rectangle())
             }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("crew-roster-open-task-center")
         }
-        .accessibilityIdentifier("crew-roster-mode-picker")
-    }
-
-    private var activeFamilyTaskCount: Int {
-        familyTasks.count(where: { !$0.isFinished })
     }
 
     @ViewBuilder
@@ -367,9 +331,9 @@ struct CrewRosterOverlay: View {
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(
-                    zh: "档案、钱包与家庭分工",
-                    en: "Profiles, wallets, and household tasks",
-                    de: "Profile, Wallets und Familienaufgaben"
+                    zh: "档案、钱包与成员管理",
+                    en: "Profiles, wallets, and member management",
+                    de: "Profile, Wallets und Mitgliederverwaltung"
                 ))
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -581,34 +545,6 @@ struct CrewRosterOverlay: View {
                 de: "Versuche eine andere Suche oder einen anderen Typ."
             ))
         )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var collaborationSetupState: some View {
-        ContentUnavailableView {
-            Label(
-                l.tr(zh: "先添加另一位家人", en: "Add another household member", de: "Weiteres Familienmitglied hinzufügen"),
-                systemImage: "person.2.badge.plus"
-            )
-        } description: {
-            Text(l.tr(
-                zh: "家庭分工需要至少两位在世人类档案。任务在本机上指派和记录，完成后由发布者确认转账奖励。",
-                en: "Household tasks need at least two living human profiles. Tasks are assigned and recorded on this device; the publisher confirms the reward transfer after completion.",
-                de: "Familienaufgaben benötigen mindestens zwei lebende Personenprofile. Zuweisung und Verlauf bleiben auf diesem Gerät; die Belohnung wird nach Bestätigung übertragen."
-            ))
-        } actions: {
-            Button {
-                addRosterEntity(.human)
-            } label: {
-                Label(
-                    l.tr(zh: "添加人类成员", en: "Add human member", de: "Person hinzufügen"),
-                    systemImage: "person.badge.plus"
-                )
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.goPrimary)
-            .accessibilityIdentifier("crew-roster-collaboration-add-human")
-        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

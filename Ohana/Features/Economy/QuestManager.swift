@@ -155,9 +155,13 @@ final class QuestManager: CoconutProjectionManaging {
 
     /// 记录本次奖励时间戳
     func recordCooldown(petId: UUID?, type: OhanaActionType) {
+        recordCooldown(petId: petId, type: type, occurredAt: Date())
+    }
+
+    func recordCooldown(petId: UUID?, type: OhanaActionType, occurredAt: Date) {
         let key = cooldownKey(petId: petId, type: type)
         var dict = Self.defaults.dictionary(forKey: Keys.cooldownLogs) ?? [:]
-        dict[key] = Date().timeIntervalSince1970
+        dict[key] = occurredAt.timeIntervalSince1970
         Self.defaults.set(dict, forKey: Keys.cooldownLogs)
     }
 

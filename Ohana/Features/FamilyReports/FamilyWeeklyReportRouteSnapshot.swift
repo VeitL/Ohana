@@ -26,6 +26,10 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
     var visibleHumanCount: Int
     var weekInterval: DateInterval
     var entries: [CareLedgerReportEntry]
+    var workloadCount: Int
+    var coverageCount: Int
+    var petCoverageCount: Int
+    var plantCoverageCount: Int
     var rankedMembers: [FamilyWeeklyReportMemberStat]
     var topPet: FamilyWeeklyReportTopPet?
     var mostActiveDay: FamilyWeeklyReportActiveDayStat?
@@ -41,6 +45,10 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
             visibleHumanCount: 0,
             weekInterval: currentWeekInterval(),
             entries: [],
+            workloadCount: 0,
+            coverageCount: 0,
+            petCoverageCount: 0,
+            plantCoverageCount: 0,
             rankedMembers: [],
             topPet: nil,
             mostActiveDay: nil,
@@ -69,8 +77,14 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
             context: context,
             name: "Human"
         )
+        let plants = fetch(
+            FetchDescriptor<Plant>(sortBy: [SortDescriptor(\.createdAt)]),
+            context: context,
+            name: "Plant"
+        )
         let ledgerEvents = fetchLedgerEvents(from: context, now: now, calendar: calendar)
         let activePets = pets.filter { !$0.hasPassedAway }
+        let activePlants = plants.filter { !$0.isArchived }
         let visibleHumans = humans.filter { !$0.hasPassedAway }
         let weekInterval = currentWeekInterval(now: now, calendar: calendar)
         let l = L10n(languageCode)
@@ -78,9 +92,16 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
         let entries = statsService.reportEntries(
             events: ledgerEvents,
             pets: activePets,
+            plants: activePlants,
             humans: humans,
             interval: weekInterval,
             l: l
+        )
+        let totals = statsService.totals(
+            events: ledgerEvents,
+            pets: activePets,
+            plants: activePlants,
+            interval: weekInterval
         )
         let rankedMembers = rankedMembers(
             from: entries,
@@ -90,7 +111,7 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
         let petCoverages = activePets.map { pet in
             FamilyWeeklyReportPetCoverage(
                 pet: pet,
-                count: statsService.count(
+                count: statsService.coverageCount(
                     events: ledgerEvents,
                     pets: [pet],
                     interval: weekInterval
@@ -106,6 +127,10 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
             visibleHumanCount: visibleHumans.count,
             weekInterval: weekInterval,
             entries: entries,
+            workloadCount: totals.workloadCount,
+            coverageCount: totals.coverageCount,
+            petCoverageCount: totals.petCoverageCount,
+            plantCoverageCount: totals.plantCoverageCount,
             rankedMembers: rankedMembers,
             topPet: topPet(from: entries),
             mostActiveDay: mostActiveDay(from: entries, calendar: calendar),
@@ -120,6 +145,7 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
             petCoverages: petCoverages,
             previousWeeks: previousWeeks(
                 activePets: activePets,
+                activePlants: activePlants,
                 ledgerEvents: ledgerEvents,
                 now: now,
                 calendar: calendar,
@@ -138,21 +164,27 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
         var dict: [String: FamilyWeeklyReportMemberStat] = [:]
         let visibleHumansById = Dictionary(uniqueKeysWithValues: visibleHumans.map { ($0.id.uuidString, $0) })
         for entry in entries {
-            let id = entry.actorId ?? "unknown"
-            guard id == "unknown" || visibleHumansById[id] != nil else { continue }
-            let human = visibleHumansById[id]
-            let name = human?.name ?? l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugewiesen")
-            let emoji = human?.avatarEmoji ?? "👤"
-            var stat = dict[id] ?? FamilyWeeklyReportMemberStat(
-                id: id,
-                name: name,
-                emoji: emoji,
-                count: 0,
-                coconuts: 0
-            )
-            stat.count += 1
-            stat.coconuts += entry.coconuts
-            dict[id] = stat
+            let contributorIDs = entry.participantActorIds.isEmpty
+                ? [entry.actorId ?? "unknown"]
+                : entry.participantActorIds
+            for id in contributorIDs {
+                guard id == "unknown" || visibleHumansById[id] != nil else { continue }
+                let human = visibleHumansById[id]
+                let name = human?.name ?? l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugewiesen")
+                let emoji = human?.avatarEmoji ?? "👤"
+                var stat = dict[id] ?? FamilyWeeklyReportMemberStat(
+                    id: id,
+                    name: name,
+                    emoji: emoji,
+                    count: 0,
+                    coconuts: 0
+                )
+                stat.count += 1
+                if id == entry.actorId || (entry.actorId == nil && id == contributorIDs.first) {
+                    stat.coconuts += entry.coconuts
+                }
+                dict[id] = stat
+            }
         }
         return dict.values.sorted {
             if $0.count == $1.count { return $0.coconuts > $1.coconuts }
@@ -161,11 +193,15 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
     }
 
     private static func topPet(from entries: [CareLedgerReportEntry]) -> FamilyWeeklyReportTopPet? {
-        let grouped = Dictionary(grouping: entries, by: \.petName)
-        return grouped
-            .map { FamilyWeeklyReportTopPet(name: $0.key, count: $0.value.count) }
+        let petCoverages = entries.flatMap(\.subjectCoverages).filter(\.isPet)
+        let grouped = Dictionary(grouping: petCoverages, by: \.id)
+        let ranked: [FamilyWeeklyReportTopPet] = grouped.values
+            .compactMap { coverages -> FamilyWeeklyReportTopPet? in
+                guard let first = coverages.first else { return nil }
+                return FamilyWeeklyReportTopPet(name: first.name, count: coverages.count)
+            }
             .sorted { $0.count > $1.count }
-            .first
+        return ranked.first
     }
 
     private static func mostActiveDay(
@@ -215,6 +251,7 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
 
     private static func previousWeeks(
         activePets: [Pet],
+        activePlants: [Plant],
         ledgerEvents: [CareLedgerEvent],
         now: Date,
         calendar: Calendar,
@@ -227,6 +264,7 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
             let count = statsService.count(
                 events: ledgerEvents,
                 pets: activePets,
+                plants: activePlants,
                 interval: interval
             )
             return FamilyWeeklyReportWeekTrend(label: "W\(offset + 1)", count: count)
@@ -239,10 +277,11 @@ nonisolated struct FamilyWeeklyReportRouteSnapshot: Sendable {
         calendar: Calendar
     ) -> [CareLedgerEvent] {
         let petSubject = CareLedgerSubjectKind.pet.rawValue
+        let plantSubject = CareLedgerSubjectKind.plant.rawValue
         let start = fourWeekWindowStart(now: now, calendar: calendar)
         var descriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
-                event.subjectKind == petSubject &&
+                (event.subjectKind == petSubject || event.subjectKind == plantSubject) &&
                     event.occurredAt >= start
             },
             sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]

@@ -7,6 +7,75 @@ import SwiftData
 import SwiftUI
 
 extension VerticalSolidHomeView {
+    func isWaitingForArrivingHomeCardSnapshot() -> Bool {
+        guard let arrivingHomeCardId else { return false }
+        return !controller.snapshot.cards.contains { $0.id == arrivingHomeCardId }
+    }
+
+    func embeddedOasisPage(lifecycle: VerticalSolidHomePageLifecycle) -> some View {
+        let treeLevel = treeManager.treeLevel.rawValue
+        let shopUnlockLevel = GrowthUnlockPolicy.status(
+            for: FMDest.coconutShop,
+            currentLevel: 0
+        ).step.requiredLevel
+        let gachaUnlockLevel = GrowthUnlockPolicy.status(
+            for: FMDest.gacha,
+            currentLevel: 0
+        ).step.requiredLevel
+        let critterUnlockLevel = OasisUpgradeRewardCatalog.critter(
+            id: OasisUpgradeRewardCatalog.firstCritterId
+        )?.sourceLevel ?? 10
+        let shopInitialCategory: ShopItem.ShopCategory = treeLevel >= 5 ? .plantDecor : .effect
+
+        return OasisHomeTabHost(
+            lifecycle: lifecycle,
+            treeSnapshot: OasisTreeRenderSnapshot(
+                level: treeLevel,
+                progressToNextLevel: treeManager.progressToNextLevel,
+                totalEnergy: treeManager.totalEnergy,
+                nextLevelThreshold: treeManager.nextLevelThreshold,
+                shopLockedLevel: treeLevel >= shopUnlockLevel ? nil : shopUnlockLevel,
+                shopInitialCategory: shopInitialCategory,
+                crittersLockedLevel: treeLevel >= critterUnlockLevel ? nil : critterUnlockLevel,
+                gachaLockedLevel: treeLevel >= gachaUnlockLevel ? nil : gachaUnlockLevel
+            ),
+            injectEnergyTrigger: oasisInjectEnergyTrigger,
+            onPresentCoconutLog: onPresentCoconutLog,
+            onInjectEnergy: injectEmbeddedOasisEnergy,
+            onOpenShop: { category in
+                routeCoordinator.openCoconutShop(category, currentLevel: treeLevel)
+            }
+        )
+    }
+
+    func embeddedPlantsPage(topChromeHeight: CGFloat) -> some View {
+        VerticalSolidHomePlantsPage(
+            plants: controller.snapshot.plants,
+            localization: l,
+            plantQuickActionItemsRaw: $plantQuickActionItemsRaw,
+            pendingQuickCareKeys: pendingPlantQuickCareKeys,
+            completedQuickCareKeys: completedPlantQuickCareKeys,
+            failedQuickCareKeys: failedPlantQuickCareKeys,
+            topChromeHeight: topChromeHeight,
+            bottomChromeHeight: 0,
+            arrivingPlantCardId: arrivingPlantCardId,
+            onOpenPlant: openPlant,
+            onOpenFeature: { plant, destination in
+                openPlantCareFeature(destination, plant: plant)
+            },
+            onCareQuickAction: { plant, type in
+                recordPlantQuickCare(type, plantID: plant.id)
+            },
+            onAddPlant: { routeCoordinator.openAddEntity(.plant) },
+            onOpenBatchCare: {
+                routeCoordinator.openFunctionMenu(
+                    destination: .plantsBatchCare,
+                    currentLevel: treeManager.treeLevel.rawValue
+                )
+            }
+        )
+    }
+
     func scheduleHomeAppearHandoff() {
         homeAppearHandoffTask?.cancel()
         let handoffDelay = OnboardingHomeJoinHandoffGate.remainingHomeAppearDelayMilliseconds()

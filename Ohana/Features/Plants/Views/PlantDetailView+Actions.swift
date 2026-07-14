@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -214,6 +215,148 @@ extension PlantDetailContentView {
             showQuickCareToast(type: type, result: result)
             schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
         }
+    }
+
+    func openBatchQuickRecordFromDetail(careType: PlantCareType) {
+        quickCareConfirmDraft = nil
+        batchQuickRecordCareType = careType
+        UISelectionFeedbackGenerator().selectionChanged()
+        reloadBatchQuickRecordTargetsAndPresent()
+    }
+
+    func reloadBatchQuickRecordTargetsAndPresent() {
+        showingBatchQuickRecordSheet = false
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            do {
+                batchQuickRecordTargets = try await batchQuickRecordTargetLoader()
+                showingBatchQuickRecordSheet = true
+            } catch {
+                OhanaLog.warning("Plant detail batch target load failed: \(error.localizedDescription)", category: "Plants")
+                presentBatchCareFailure(nil)
+            }
+        }
+    }
+
+    func batchQuickRecordImageData(for modelID: PersistentIdentifier) async -> Data? {
+        let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
+        return await loader.plantAvatarImageData(modelID: modelID)
+    }
+
+    func recordBatchQuickCareFromDetail(_ selections: [PlantBatchCareSelection]) async -> Bool {
+        guard !selections.isEmpty else { return false }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let executorId = currentExecutorId()
+        await OhanaFrameScheduler.waitAfterNextFrame()
+        let result = commandExecutor.recordPlantBatchQuickCare(
+            selections: selections,
+            executorId: executorId
+        )
+        return handleBatchQuickCareResult(result, selections: selections)
+    }
+
+    func handleBatchQuickCareResult(
+        _ result: PlantBatchCareCommandResult,
+        selections: [PlantBatchCareSelection]
+    ) -> Bool {
+        guard result.didPersist else {
+            presentBatchCareFailure(result.persistenceErrorDescription)
+            return false
+        }
+        guard result.skipped.isEmpty else {
+            presentBatchCareFailure(l.tr(
+                zh: "植物状态已变化，整批未写入。请刷新后重新选择。",
+                en: "Plant status changed, so nothing was written. Refresh and select again.",
+                de: "Der Pflanzenstatus hat sich geändert. Es wurde nichts gespeichert; bitte neu auswählen."
+            ))
+            return false
+        }
+        guard result.didWrite else { return true }
+        guard let token = result.undoToken else { return false }
+        PlantBatchCarePendingRewardStore.upsert(token)
+        publishDetailBatchPendingRewardChange(batchID: token.batchID, action: "batchQuickRecordPendingRewardsChanged")
+        pendingBatchCareUndoToken = token
+        scheduleDetailBatchCareRewardCommit(for: token)
+        showDetailBatchCareSuccess(result, selections: selections)
+        return true
+    }
+
+    func undoPendingBatchCareFromDetail() {
+        guard let token = pendingBatchCareUndoToken else { return }
+        pendingBatchCareRewardTask?.cancel()
+        pendingBatchCareRewardTask = nil
+        pendingBatchCareUndoToken = nil
+        let result = commandExecutor.undoPlantBatchCare(token)
+        guard result.didPersist else {
+            pendingBatchCareUndoToken = token
+            PlantBatchCarePendingRewardStore.upsert(token)
+            publishDetailBatchPendingRewardChange(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
+            presentBatchCareFailure(result.persistenceErrorDescription)
+            scheduleDetailBatchCareRewardCommit(for: token)
+            return
+        }
+        PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
+        publishDetailBatchPendingRewardChange(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
+    }
+
+    func scheduleDetailBatchCareRewardCommit(for token: PlantBatchCareUndoToken) {
+        pendingBatchCareRewardTask?.cancel()
+        pendingBatchCareRewardTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            guard !Task.isCancelled, pendingBatchCareUndoToken?.id == token.id else { return }
+            pendingBatchCareUndoToken = nil
+            let result = commandExecutor.commitPlantBatchCareRewards(for: token)
+            if result.didPersist {
+                PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+            publishDetailBatchPendingRewardChange(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
+            pendingBatchCareRewardTask = nil
+        }
+    }
+
+    func publishDetailBatchPendingRewardChange(batchID: UUID, action: String) {
+        appServices.domainRevisions.publishPlantBatchCarePendingRewardsChanged(
+            batchID: batchID,
+            action: action,
+            pendingCount: PlantBatchCarePendingRewardStore.load().count,
+            note: "plant.detail.batchCare.pendingRewardsChanged"
+        )
+    }
+
+    func showDetailBatchCareSuccess(
+        _ result: PlantBatchCareCommandResult,
+        selections: [PlantBatchCareSelection]
+    ) {
+        let careType = selections.first?.careType ?? .watering
+        quickCareToastClearTask?.cancel()
+        quickCareToast = PlantQuickCareToast(
+            careType: careType,
+            message: l.tr(
+                zh: "已为 \(result.completedCount) 株植物记录",
+                en: "Logged care for \(result.completedCount) plants",
+                de: "Pflege für \(result.completedCount) Pflanzen erfasst"
+            )
+        )
+        quickCareToastClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1800) {
+            withAnimation(GoMotion.selection) {
+                quickCareToast = nil
+            }
+            quickCareToastClearTask = nil
+        }
+        schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
+    }
+
+    func presentBatchCareFailure(_ detail: String?) {
+        batchCareFailureDetail = detail ?? l.tr(
+            zh: "没有写入任何护理记录，请重新选择后再试。",
+            en: "No care records were written. Select the plants and try again.",
+            de: "Es wurden keine Pflegeeinträge gespeichert. Bitte neu auswählen."
+        )
+        showingBatchCareFailure = true
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
     }
 
     func showQuickCareToast(type: PlantCareType, result: PlantCareCommandResult) {

@@ -9,6 +9,24 @@ import SwiftData
 import SwiftUI
 
 extension PlantDashboardView {
+    func showBatchCarePersistenceFailure(_: String?) {
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        appServices.islandToasts.show(l.tr(
+            zh: "保存失败，批量照护未完成",
+            en: "Save failed. Batch care was not completed.",
+            de: "Speichern fehlgeschlagen. Die Batch-Pflege wurde nicht abgeschlossen."
+        ))
+    }
+
+    func showBatchCareSelectionChanged() {
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        appServices.islandToasts.show(l.tr(
+            zh: "选择已变化，本次未记录；请检查刷新后的列表。",
+            en: "The selection changed, so nothing was recorded. Review the refreshed list.",
+            de: "Die Auswahl hat sich geändert; es wurde nichts gespeichert. Bitte die aktualisierte Liste prüfen."
+        ))
+    }
+
     var dashboardOverviewCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 14) {

@@ -217,11 +217,13 @@ nonisolated struct EventBackup: Codable {
     var foodKindRaw: String?
     var feedAmountGrams: Double?
     var feedPlanGroupId: String?
+    var taskCareKindRaw: String? = nil
 }
 
 nonisolated struct ReminderBackup: Codable {
     var id: String
     var scheduledAt: String
+    var occurrenceAt: String? = nil
     var status: String
     var notificationId: String
     var eventId: String?
@@ -348,6 +350,7 @@ nonisolated struct PlantCareLogBackup: Codable {
     var executorId: String?
     var plantId: String?
     var healthStatusRaw: String?
+    var careTransactionId: String? = nil
     var photoBase64: String?
     var photoRef: BackupMediaReference? = nil
 }
@@ -780,6 +783,8 @@ nonisolated struct FamilyCollaborationTaskBackup: Codable {
     var note: String
     var kindRaw: String
     var statusRaw: String
+    var subjectKindRaw: String? = nil
+    var subjectId: String? = nil
     var relatedPetId: String?
     var relatedEventId: String?
     var relatedReminderId: String?

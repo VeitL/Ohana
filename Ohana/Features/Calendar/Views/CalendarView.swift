@@ -21,6 +21,7 @@ struct CalendarView: View {
     var onEmbeddedScrollOffsetChange: ((CGFloat) -> Void)?
     var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)?
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+    var onCompleteEvent: ((Event, Date) -> Bool)?
     var events: [Event] = []
     var pets: [Pet] = []
     var humans: [Human] = []

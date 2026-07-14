@@ -15,8 +15,7 @@ enum FamilyTaskFundingPolicy {
         context: ModelContext
     ) -> FamilyTaskFunding? {
         let reward = FamilyTaskService.cappedReward(rewardCoconuts)
-        guard reward > 0,
-              let human,
+        guard let human,
               let creator = EconomyRewardOwnerResolver.explicitHuman(
                   id: createdById,
                   context: context,
@@ -25,7 +24,7 @@ enum FamilyTaskFundingPolicy {
               creator.id != human.id,
               MemberLifecycleGate.disposition(human: creator, writeKind: .collaboration).allowsDerivedEffects,
               MemberLifecycleGate.disposition(human: human, writeKind: .collaboration).allowsDerivedEffects,
-              CoconutWalletService.balance(for: creator, context: context) >= reward else {
+              reward == 0 || CoconutWalletService.balance(for: creator, context: context) >= reward else {
             return nil
         }
         return FamilyTaskFunding(creator: creator, reward: reward)
@@ -33,7 +32,7 @@ enum FamilyTaskFundingPolicy {
 }
 
 extension FamilyTaskService {
-    static func cappedReward(_ value: Int) -> Int {
+    nonisolated static func cappedReward(_ value: Int) -> Int {
         min(rewardCap, max(0, value))
     }
 

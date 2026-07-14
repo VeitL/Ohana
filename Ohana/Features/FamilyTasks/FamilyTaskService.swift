@@ -9,19 +9,7 @@ import Foundation
 import SwiftData
 
 enum FamilyTaskService {
-    static let rewardCap = 500
-
-    private struct FamilyTaskSubject {
-        let relatedPetId: String?
-        let ledgerSubjectKind: CareLedgerSubjectKind
-        let ledgerSubjectId: String?
-
-        static let household = FamilyTaskSubject(
-            relatedPetId: nil,
-            ledgerSubjectKind: .household,
-            ledgerSubjectId: nil
-        )
-    }
+    nonisolated static let rewardCap = 500
 
     private struct AuthorizedReminderAssigneeUpdate {
         let event: Event
@@ -113,171 +101,6 @@ enum FamilyTaskService {
         )
     }
 
-    static func householdTaskSubjectRequest(assigneeId: String?) -> DomainSubjectResolutionRequest {
-        DomainSubjectResolutionRequest(assigneeId: assigneeId)
-    }
-
-    @MainActor
-    static func taskSubjectRequest(
-        for reminder: Reminder,
-        assigneeId: String?,
-        context _: ModelContext
-    ) -> DomainSubjectResolutionRequest {
-        guard let event = reminder.event else {
-            return householdTaskSubjectRequest(assigneeId: assigneeId)
-        }
-        return DomainSubjectResolutionRequest(
-            link: DomainEntityLink(event: event),
-            assigneeId: assigneeId
-        )
-    }
-
-    @MainActor
-    private static func taskSubjectRequest(
-        for task: FamilyCollaborationTask,
-        assigneeId: String? = nil,
-        context: ModelContext
-    ) -> DomainSubjectResolutionRequest {
-        if let reminder = reminder(for: task, context: context) {
-            return taskSubjectRequest(
-                for: reminder,
-                assigneeId: assigneeId ?? task.assignedToId ?? task.claimedById ?? task.createdById,
-                context: context
-            )
-        }
-        if let relatedPetId = normalizedPetId(task.relatedPetId) {
-            return DomainSubjectResolutionRequest(
-                relatedEntityType: EntityKind.pet.rawValue,
-                relatedEntityId: relatedPetId,
-                assigneeId: assigneeId ?? task.assignedToId ?? task.claimedById
-            )
-        }
-        return householdTaskSubjectRequest(
-            assigneeId: assigneeId ?? task.assignedToId ?? task.claimedById ?? task.createdById
-        )
-    }
-
-    private static func canWriteCollaboration(for human: Human?) -> Bool {
-        guard let human else { return true }
-        return MemberLifecycleGate.disposition(human: human, writeKind: .collaboration).allowsDerivedEffects
-    }
-
-    @MainActor
-    private static func canWriteCollaboration(forHumanId humanId: String?, context: ModelContext) -> Bool {
-        guard let humanId, !humanId.isEmpty else { return true }
-        guard let uuid = UUID(uuidString: humanId),
-              let human = humans(context: context).first(where: { $0.id == uuid }) else {
-            return false
-        }
-        return canWriteCollaboration(for: human)
-    }
-
-    private static func canWriteCollaboration(for pet: Pet) -> Bool {
-        MemberLifecycleGate.disposition(pet: pet, writeKind: .collaboration).allowsDerivedEffects
-    }
-
-    @MainActor
-    private static func canWriteRelatedPet(for task: FamilyCollaborationTask, context: ModelContext) -> Bool {
-        guard let relatedPetId = taskSubject(for: task, context: context).relatedPetId else { return true }
-        guard let pet = pet(idRaw: relatedPetId, context: context) else { return false }
-        return canWriteCollaboration(for: pet)
-    }
-
-    @MainActor
-    private static func reminderTargetsWritableMember(_ reminder: Reminder, context: ModelContext) -> Bool {
-        let activePets = pets(context: context).filter(canWriteCollaboration)
-        let activeHumans = humans(context: context).filter(canWriteCollaboration)
-        let humanMedications = humanMedications(context: context)
-        return MemberLifecycleActiveScheduleResolver.reminderTargetsActiveMember(
-            reminder,
-            activePets: activePets,
-            activeHumans: activeHumans,
-            humanMedications: humanMedications
-        )
-    }
-
-    @MainActor
-    private static func pets(context: ModelContext) -> [Pet] {
-        fetchOrLog(FetchDescriptor<Pet>(), context: context, operation: "fetch pets for family task lifecycle gate")
-    }
-
-    @MainActor
-    private static func humans(context: ModelContext) -> [Human] {
-        fetchOrLog(FetchDescriptor<Human>(), context: context, operation: "fetch humans for family task lifecycle gate")
-    }
-
-    @MainActor
-    private static func humanMedications(context: ModelContext) -> [HumanMedication] {
-        fetchOrLog(FetchDescriptor<HumanMedication>(), context: context, operation: "fetch human medications for family task lifecycle gate")
-    }
-
-    @MainActor
-    private static func pet(idRaw: String, context: ModelContext) -> Pet? {
-        let petIdRaw = idRaw.split(separator: ":").first.map(String.init) ?? idRaw
-        guard let uuid = UUID(uuidString: petIdRaw) else { return nil }
-        return pets(context: context).first { $0.id == uuid }
-    }
-
-    @MainActor
-    private static func taskSubject(for reminder: Reminder, context: ModelContext) -> FamilyTaskSubject {
-        guard let event = reminder.event else { return .household }
-        let resolution = DomainSubjectResolver.resolve(
-            request: DomainSubjectResolutionRequest(event: event),
-            context: context
-        )
-        return taskSubject(from: resolution)
-    }
-
-    @MainActor
-    private static func taskSubject(for task: FamilyCollaborationTask, context: ModelContext) -> FamilyTaskSubject {
-        if let reminder = reminder(for: task, context: context) {
-            return taskSubject(for: reminder, context: context)
-        }
-        guard let relatedPetId = normalizedPetId(task.relatedPetId) else { return .household }
-        return FamilyTaskSubject(
-            relatedPetId: relatedPetId,
-            ledgerSubjectKind: .pet,
-            ledgerSubjectId: relatedPetId
-        )
-    }
-
-    private static func taskSubject(from resolution: DomainSubjectResolution) -> FamilyTaskSubject {
-        switch resolution.owner {
-        case let .pet(petId):
-            FamilyTaskSubject(
-                relatedPetId: petId.uuidString,
-                ledgerSubjectKind: .pet,
-                ledgerSubjectId: petId.uuidString
-            )
-        case let .human(humanId):
-            FamilyTaskSubject(
-                relatedPetId: nil,
-                ledgerSubjectKind: .human,
-                ledgerSubjectId: humanId.uuidString
-            )
-        case nil where resolution.role.isPlantScoped:
-            FamilyTaskSubject(
-                relatedPetId: nil,
-                ledgerSubjectKind: .plant,
-                ledgerSubjectId: normalizedUUIDString(resolution.link.trimmedId)
-            )
-        case nil:
-            .household
-        }
-    }
-
-    private static func normalizedPetId(_ raw: String?) -> String? {
-        guard let raw,
-              let petId = DomainEntityLinkRegistry.petIdFromCompoundStockId(raw.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            return nil
-        }
-        return petId.uuidString
-    }
-
-    private static func normalizedUUIDString(_ raw: String) -> String? {
-        UUID(uuidString: raw.trimmingCharacters(in: .whitespacesAndNewlines))?.uuidString
-    }
-
     @MainActor
     static func assignReminder(
         _ reminder: Reminder,
@@ -329,7 +152,7 @@ enum FamilyTaskService {
                 task.title = taskTitle
                 task.note = note
                 task.status = .active
-                task.relatedPetId = subject.relatedPetId
+                task.setSubject(kind: subject.kind, id: subject.subjectId)
                 task.relatedEventId = reminder.event?.id.uuidString
                 task.relatedReminderId = reminder.id.uuidString
                 task.createdById = funding.creator.id.uuidString
@@ -337,7 +160,7 @@ enum FamilyTaskService {
                 task.assignedToId = human.id.uuidString
                 task.assignedToName = human.name
                 task.rewardCoconuts = reward
-                task.dueAt = reminder.scheduledAt
+                task.dueAt = reminder.resolvedOccurrenceAt
                 task.completedAt = nil
                 task.completedById = nil
                 task.completedByName = nil
@@ -349,6 +172,8 @@ enum FamilyTaskService {
                 title: taskTitle,
                 note: note,
                 kind: reward > 0 ? .bounty : .careReminder,
+                subjectKind: subject.kind,
+                subjectId: subject.subjectId,
                 relatedPetId: subject.relatedPetId,
                 relatedEventId: reminder.event?.id.uuidString,
                 relatedReminderId: reminder.id.uuidString,
@@ -357,7 +182,7 @@ enum FamilyTaskService {
                 assignedToId: human.id.uuidString,
                 assignedToName: human.name,
                 rewardCoconuts: reward,
-                dueAt: reminder.scheduledAt,
+                dueAt: reminder.resolvedOccurrenceAt,
                 emoji: reminder.event?.emoji ?? "🐾",
                 context: context
             )
@@ -439,7 +264,7 @@ enum FamilyTaskService {
             plan: write,
             title: normalizedTitle,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines),
-            kind: .bounty,
+            kind: funding.reward > 0 ? .bounty : .householdTask,
             createdById: funding.creator.id.uuidString,
             createdByName: funding.creator.name,
             assignedToId: human.id.uuidString,
@@ -476,7 +301,7 @@ enum FamilyTaskService {
                   context: context
               ) != nil,
               canWriteCollaboration(for: human),
-              canWriteRelatedPet(for: task, context: context),
+              canWriteSubject(for: task, context: context),
               canWriteCollaboration(forHumanId: task.createdById, context: context),
               canWriteCollaboration(forHumanId: task.claimedById, context: context) else {
             return false
@@ -509,11 +334,32 @@ enum FamilyTaskService {
     }
 
     @MainActor
-    @discardableResult
-    static func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) -> Bool {
+    static func canClaim(
+        _ task: FamilyCollaborationTask,
+        by human: Human,
+        context: ModelContext
+    ) -> Bool {
         guard task.isOpen,
               canWriteCollaboration(for: human),
-              canWriteRelatedPet(for: task, context: context) else { return false }
+              canWriteSubject(for: task, context: context) else {
+            return false
+        }
+        return authorizedCollaborationWrite(
+            subjectRequest: taskSubjectRequest(
+                for: task,
+                assigneeId: human.id.uuidString,
+                context: context
+            ),
+            actor: human,
+            context: context,
+            logPrefix: "FamilyTaskService.claimPreflight"
+        ) != nil
+    }
+
+    @MainActor
+    @discardableResult
+    static func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) -> Bool {
+        guard canClaim(task, by: human, context: context) else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, assigneeId: human.id.uuidString, context: context),
             actor: human,
@@ -526,6 +372,55 @@ enum FamilyTaskService {
             task.touch()
         }
         return persistMutation(context: context)
+    }
+
+    /// Read-only guard for callers that must validate the collaboration half
+    /// before recording an Event-backed care fact.
+    @MainActor
+    static func canComplete(
+        _ task: FamilyCollaborationTask,
+        by human: Human?,
+        context: ModelContext
+    ) -> Bool {
+        if task.hasReward {
+            return canSubmitForReview(task, by: human, context: context)
+        }
+        return passesCompletionPreflight(task, by: human, context: context)
+    }
+
+    /// Read-only counterpart of `submitForReview`; it never consumes an
+    /// authorization or mutates task/reminder/ledger state.
+    @MainActor
+    static func canSubmitForReview(
+        _ task: FamilyCollaborationTask,
+        by human: Human?,
+        context: ModelContext
+    ) -> Bool {
+        passesCompletionPreflight(task, by: human, context: context)
+    }
+
+    @MainActor
+    private static func passesCompletionPreflight(
+        _ task: FamilyCollaborationTask,
+        by human: Human?,
+        context: ModelContext
+    ) -> Bool {
+        guard !task.isFinished,
+              canPerform(task, human: human),
+              canWriteCollaboration(for: human),
+              canWriteSubject(for: task, context: context) else {
+            return false
+        }
+        return authorizedCollaborationWrite(
+            subjectRequest: taskSubjectRequest(
+                for: task,
+                assigneeId: human?.id.uuidString,
+                context: context
+            ),
+            actor: human,
+            context: context,
+            logPrefix: "FamilyTaskService.preflight"
+        ) != nil
     }
 
     @MainActor
@@ -550,10 +445,8 @@ enum FamilyTaskService {
         careLedger: CareLedgerRecording,
         projectionManager _: QuestManager? = nil
     ) -> Bool {
-        guard !task.isFinished,
-              canPerform(task, human: human),
-              canWriteCollaboration(for: human),
-              canWriteRelatedPet(for: task, context: context) else { return false }
+        guard canWriteCollaboration(for: human),
+              canComplete(task, by: human, context: context) else { return false }
         if task.hasReward {
             return submitForReview(task, by: human, context: context, careLedger: careLedger)
         }
@@ -606,10 +499,8 @@ enum FamilyTaskService {
         context: ModelContext,
         careLedger: CareLedgerRecording
     ) -> Bool {
-        guard !task.isFinished,
-              canPerform(task, human: human),
-              canWriteCollaboration(for: human),
-              canWriteRelatedPet(for: task, context: context) else { return false }
+        guard canWriteCollaboration(for: human),
+              canSubmitForReview(task, by: human, context: context) else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, assigneeId: human?.id.uuidString, context: context),
             actor: human,
@@ -698,7 +589,7 @@ enum FamilyTaskService {
         guard task.status == .pendingReview,
               reviewer?.id.uuidString == task.createdById,
               canWriteCollaboration(for: reviewer),
-              canWriteRelatedPet(for: task, context: context) else { return false }
+              canWriteSubject(for: task, context: context) else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, assigneeId: reviewer?.id.uuidString, context: context),
             actor: reviewer,
@@ -776,7 +667,7 @@ enum FamilyTaskService {
         guard task.status == .pendingReview,
               reviewer?.id.uuidString == task.createdById,
               canWriteCollaboration(for: reviewer),
-              canWriteRelatedPet(for: task, context: context) else { return false }
+              canWriteSubject(for: task, context: context) else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, assigneeId: reviewer?.id.uuidString, context: context),
             actor: reviewer,
@@ -863,20 +754,6 @@ enum FamilyTaskService {
         ) else { return false }
         DomainMemberFactWriter.deleteFamilyTask(plan: write, task: task, context: context)
         return persistMutation(context: context)
-    }
-
-    @MainActor
-    private static func reminder(for task: FamilyCollaborationTask, context: ModelContext) -> Reminder? {
-        guard let id = task.relatedReminderId, let uuid = UUID(uuidString: id) else { return nil }
-        var descriptor = FetchDescriptor<Reminder>(
-            predicate: #Predicate<Reminder> { $0.id == uuid }
-        )
-        descriptor.fetchLimit = 1
-        return fetchOrLog(
-            descriptor,
-            context: context,
-            operation: "fetch related reminder for family task"
-        ).first
     }
 
     @MainActor

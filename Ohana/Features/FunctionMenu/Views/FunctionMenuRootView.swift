@@ -164,22 +164,6 @@ struct FunctionMenuRootView: View {
                 icon: "circle.grid.cross.fill",
                 color: Color(hex: "F97316"),
                 destination: .gacha
-            ),
-            ToolEntry(
-                id: "insights",
-                title: l.tr(zh: "高级洞察", en: "Advanced Insights", de: "Erweiterte Einsichten"),
-                subtitle: l.tr(zh: "趋势 · 异常", en: "Trends · Signals", de: "Trends · Signale"),
-                icon: "chart.xyaxis.line",
-                color: Color(hex: "06B6D4"),
-                destination: .careLedgerAnalysis
-            ),
-            ToolEntry(
-                id: "report",
-                title: l.tr(zh: "成长回顾", en: "Growth Review", de: "Wachstumsrückblick"),
-                subtitle: l.tr(zh: "周报 · 归档", en: "Reports · Archive", de: "Berichte · Archiv"),
-                icon: "book.closed.fill",
-                color: Color(hex: "EC4899"),
-                destination: .familyWeeklyReport
             )
         ]
         .filter { AppFeatureRouteGuard.isVisibleFunctionDestination($0.destination, currentLevel: currentTreeLevel) }

@@ -54,7 +54,8 @@ nonisolated struct TodayFocusHumanSnapshot: Identifiable, Equatable, Sendable {
 }
 
 nonisolated struct TodayFocusFamilyTaskSnapshot: Identifiable, Equatable, Sendable {
-    let id: UUID
+    let id: String
+    let taskCenterItem: TaskCenterItemSnapshot
     let title: String
     let statusRaw: String
     let status: FamilyCollaborationTaskStatus
@@ -71,23 +72,46 @@ nonisolated struct TodayFocusFamilyTaskSnapshot: Identifiable, Equatable, Sendab
     let emoji: String
     let hasReward: Bool
 
-    init(task: FamilyCollaborationTask) {
-        id = task.id
-        title = task.title
-        statusRaw = task.statusRaw
-        status = task.status
-        createdByName = task.createdByName
-        assignedToId = task.assignedToId
-        assignedToName = task.assignedToName
-        claimedById = task.claimedById
-        claimedByName = task.claimedByName
-        completedByName = task.completedByName
-        rewardCoconuts = task.rewardCoconuts
-        dueAt = task.dueAt
-        createdAt = task.createdAt
-        updatedAt = task.updatedAt
-        emoji = task.emoji
-        hasReward = task.hasReward
+    init(item: TaskCenterItemSnapshot, familyTask: FamilyCollaborationTask?) {
+        id = item.id
+        taskCenterItem = item
+        title = item.title
+        statusRaw = familyTask?.statusRaw ?? item.workflowStatus.rawValue
+        status = familyTask?.status ?? Self.collaborationStatus(item.workflowStatus)
+        createdByName = familyTask?.createdByName ?? item.subjectName ?? ""
+        assignedToId = familyTask?.assignedToId
+        assignedToName = familyTask?.assignedToName
+        claimedById = familyTask?.claimedById
+        claimedByName = familyTask?.claimedByName
+        completedByName = familyTask?.completedByName
+        rewardCoconuts = familyTask?.rewardCoconuts ?? 0
+        dueAt = item.dueAt
+        createdAt = familyTask?.createdAt ?? item.scheduledAt
+        updatedAt = familyTask?.updatedAt ?? item.scheduledAt
+        emoji = familyTask?.emoji ?? item.eventType?.emoji ?? "📌"
+        hasReward = familyTask?.hasReward ?? false
+    }
+
+    var primaryAction: TaskCenterAvailableAction? {
+        let preferred: [TaskCenterAvailableAction] = [
+            .approve,
+            .claim,
+            .submitForReview,
+            .complete
+        ]
+        return preferred.first { taskCenterItem.availableActions.contains($0) }
+    }
+
+    private static func collaborationStatus(
+        _ status: TaskCenterWorkflowStatus
+    ) -> FamilyCollaborationTaskStatus {
+        switch status {
+        case .scheduled, .active: .active
+        case .claimed: .claimed
+        case .pendingReview: .pendingReview
+        case .completed: .completed
+        case .cancelled: .cancelled
+        }
     }
 }
 
@@ -182,17 +206,20 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             calendar: .current,
             now: now
         )
-        let assignedTasks: [FamilyCollaborationTask] = if activeHumanId.isEmpty {
-            []
-        } else {
-            familyTasks
-                .filter {
-                    !$0.isFinished &&
-                        (($0.status == .pendingReview && $0.createdById == activeHumanId) ||
-                            ($0.status != .pendingReview && ($0.assignedToId == activeHumanId || $0.claimedById == activeHumanId)))
-                }
-                .sorted { ($0.dueAt ?? $0.createdAt) < ($1.dueAt ?? $1.createdAt) }
-        }
+        let assignedTasks = prioritizedTaskItems(
+            TaskCenterSnapshotBuilder.make(
+                events: events,
+                allEvents: events,
+                pets: pets,
+                humans: humans,
+                plants: visiblePlants,
+                humanMedications: humanMedications,
+                reminders: reminders,
+                familyTasks: familyTasks,
+                activeHumanId: activeHumanId,
+                now: now
+            )
+        )
         let pendingExchanges: [CoconutExchangeRequest] = if activeHumanId.isEmpty || !CoconutExchangeFeatureGate.isEnabled {
             []
         } else {
@@ -205,7 +232,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             plants: visiblePlants,
             humans: humans,
             refreshedQuests: refreshedQuests,
-            assignedTasks: assignedTasks,
+            assignedTasks: taskSnapshots(assignedTasks, familyTasks: familyTasks),
             pendingExchanges: pendingExchanges,
             negativeSignals: IslandNegativeFeedback.signals(
                 pets: pets,
@@ -258,17 +285,20 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             now: now,
             questProgress: questProgress
         )
-        let assignedTasks: [FamilyCollaborationTask] = if activeHumanId.isEmpty {
-            []
-        } else {
-            familyTasks
-                .filter {
-                    !$0.isFinished &&
-                        (($0.status == .pendingReview && $0.createdById == activeHumanId) ||
-                            ($0.status != .pendingReview && ($0.assignedToId == activeHumanId || $0.claimedById == activeHumanId)))
-                }
-                .sorted { ($0.dueAt ?? $0.createdAt) < ($1.dueAt ?? $1.createdAt) }
-        }
+        let assignedTasks = prioritizedTaskItems(
+            TaskCenterSnapshotBuilder.make(
+                events: events,
+                allEvents: events,
+                pets: pets,
+                humans: humans,
+                plants: visiblePlants,
+                humanMedications: humanMedications,
+                reminders: reminders,
+                familyTasks: familyTasks,
+                activeHumanId: activeHumanId,
+                now: now
+            )
+        )
         let pendingExchanges: [CoconutExchangeRequest] = if activeHumanId.isEmpty || !CoconutExchangeFeatureGate.isEnabled {
             []
         } else {
@@ -281,7 +311,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             plants: visiblePlants,
             humans: humans,
             refreshedQuests: refreshedQuests,
-            assignedTasks: assignedTasks,
+            assignedTasks: taskSnapshots(assignedTasks, familyTasks: familyTasks),
             pendingExchanges: pendingExchanges,
             negativeSignals: IslandNegativeFeedback.signals(
                 pets: pets,
@@ -307,12 +337,47 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         }
     }
 
+    private static func prioritizedTaskItems(
+        _ snapshot: TaskCenterSnapshot
+    ) -> [TaskCenterItemSnapshot] {
+        let currentMemberIDs = snapshot.memberFilterContext.currentMemberItemIDs
+        let canAct: (TaskCenterItemSnapshot) -> Bool = { item in
+            guard !item.availableActions.isEmpty else { return false }
+            guard snapshot.showsMemberFilters, item.familyTaskID == nil else { return true }
+            return item.participantHumanIDs.isEmpty || currentMemberIDs.contains(item.id)
+        }
+        var seen: Set<String> = []
+        var result: [TaskCenterItemSnapshot] = []
+        for item in snapshot.overdue + snapshot.today where canAct(item) {
+            guard seen.insert(item.id).inserted else { continue }
+            result.append(item)
+        }
+        for item in snapshot.allItems where item.workflowStatus == .pendingReview && canAct(item) {
+            guard seen.insert(item.id).inserted else { continue }
+            result.append(item)
+        }
+        return result
+    }
+
+    private static func taskSnapshots(
+        _ items: [TaskCenterItemSnapshot],
+        familyTasks: [FamilyCollaborationTask]
+    ) -> [TodayFocusFamilyTaskSnapshot] {
+        let familyTasksByID = Dictionary(uniqueKeysWithValues: familyTasks.map { ($0.id, $0) })
+        return items.map { item in
+            TodayFocusFamilyTaskSnapshot(
+                item: item,
+                familyTask: item.familyTaskID.flatMap { familyTasksByID[$0] }
+            )
+        }
+    }
+
     private static func make(
         pets: [Pet],
         plants: [Plant],
         humans: [Human],
         refreshedQuests: [IslandQuest],
-        assignedTasks: [FamilyCollaborationTask],
+        assignedTasks: [TodayFocusFamilyTaskSnapshot],
         pendingExchanges: [CoconutExchangeRequest],
         negativeSignals: [IslandNegativeSignal],
         dayToken: Int
@@ -324,7 +389,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             plants: visiblePlants.map(TodayFocusPlantSnapshot.init),
             humans: humans.map(TodayFocusHumanSnapshot.init),
             refreshedQuests: refreshedQuests,
-            assignedFamilyTasks: assignedTasks.map(TodayFocusFamilyTaskSnapshot.init),
+            assignedFamilyTasks: assignedTasks,
             pendingExchangeRequests: pendingExchanges.map(TodayFocusExchangeRequestSnapshot.init),
             negativeSignals: negativeSignals
         )

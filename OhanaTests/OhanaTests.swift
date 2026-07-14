@@ -1053,13 +1053,23 @@ struct OhanaTests {
             assignedToId: userKey,
             assignedToName: human.name
         )
+        let familyTaskItem = try #require(TaskCenterSnapshotBuilder.make(
+            events: [],
+            allEvents: [],
+            pets: [],
+            humans: [human],
+            plants: [],
+            familyTasks: [familyTask],
+            activeHumanId: userKey,
+            now: date
+        ).allItems.first)
         let visibleSnapshot = TodayFocusSnapshot(
             dayToken: TodayFocusSnapshot.dayToken(for: date),
             pets: [],
             plants: [],
             humans: [TodayFocusHumanSnapshot(human: human)],
             refreshedQuests: visibleQuests,
-            assignedFamilyTasks: [TodayFocusFamilyTaskSnapshot(task: familyTask)],
+            assignedFamilyTasks: [TodayFocusFamilyTaskSnapshot(item: familyTaskItem, familyTask: familyTask)],
             pendingExchangeRequests: [],
             negativeSignals: []
         )
@@ -1998,7 +2008,12 @@ struct OhanaTests {
         let context = container.mainContext
         let human = Human(name: "Guan")
         let event = Event(title: "服药", relatedEntityType: EntityKind.human.rawValue, relatedEntityId: human.id.uuidString)
-        let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3600))
+        let occurrenceAt = Date(timeIntervalSince1970: 1_900_000_000)
+        let reminder = Reminder(
+            event: event,
+            scheduledAt: occurrenceAt.addingTimeInterval(-3600),
+            occurrenceAt: occurrenceAt
+        )
         context.insert(human)
         context.insert(event)
         context.insert(reminder)
@@ -2554,7 +2569,12 @@ struct OhanaTests {
         let sourceContext = source.mainContext
         let petId = UUID().uuidString
         let event = Event(title: "晚餐", eventType: EventType.foodChange.rawValue, relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: petId)
-        let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3600))
+        let occurrenceAt = Date().addingTimeInterval(7200)
+        let reminder = Reminder(
+            event: event,
+            scheduledAt: occurrenceAt.addingTimeInterval(-3600),
+            occurrenceAt: occurrenceAt
+        )
         sourceContext.insert(event)
         sourceContext.insert(reminder)
         CareLedgerService.recordReminderState(
@@ -2576,6 +2596,7 @@ struct OhanaTests {
         let restoredLedger = try targetContext.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(restoredEvents.count == 1)
         #expect(restoredReminders.first?.event?.id == restoredEvents.first?.id)
+        #expect(restoredReminders.first?.occurrenceAt == occurrenceAt)
         #expect(restoredLedger.first?.sourceEventId == event.id.uuidString)
         #expect(restoredLedger.first?.sourceReminderId == reminder.id.uuidString)
     }
@@ -4795,11 +4816,19 @@ struct OhanaTests {
             ).cards
         }
 
-        let pending = IslandQuest(id: "q_custom", emoji: "!", title: "待办", subtitle: "优先", isCompleted: false, targetPetId: nil, targetPlantId: nil)
+        let pending = IslandQuest(
+            id: IslandQuestEngine.oasisThemeQuestId,
+            emoji: "🎨",
+            title: "成长引导",
+            subtitle: "设置岛屿主题",
+            isCompleted: false,
+            targetPetId: nil,
+            targetPlantId: nil
+        )
         if case let .quest(selected) = renderCards(quests: [pending]).first {
-            #expect(selected.id == "q_custom")
+            #expect(selected.id == IslandQuestEngine.oasisThemeQuestId)
         } else {
-            Issue.record("未完成委托应优先成为 Today Focus")
+            Issue.record("未完成的 Oasis 成长引导应保留在 Today Focus")
         }
 
         let done = IslandQuest(id: "q_done", emoji: "✅", title: "已完成", subtitle: "", isCompleted: true, targetPetId: nil, targetPlantId: nil)

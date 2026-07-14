@@ -136,12 +136,22 @@ struct PlantLaunchTests {
             "Ohana/Features/Plants/Views/PlantBatchQuickRecordSheet.swift",
             rootURL: rootURL
         )
+        let batchQuickRecordSnapshotSource = try source(
+            "Ohana/Features/Plants/PlantBatchQuickRecordSnapshot.swift",
+            rootURL: rootURL
+        )
+        let plantDetailDataSource = try source(
+            "Ohana/Features/Plants/PlantDetailDataContainer.swift",
+            rootURL: rootURL
+        )
         let addPlantDataSource = try source(
             "Ohana/Features/Plants/AddPlantDataContainer.swift",
             rootURL: rootURL
         )
 
-        #expect(batchQuickRecordSource.contains(".filter { !$0.isArchived }"))
+        #expect(batchQuickRecordSource.contains("PlantBatchQuickRecordTargetSnapshot"))
+        #expect(batchQuickRecordSnapshotSource.contains(".filter { !$0.isArchived }"))
+        #expect(plantDetailDataSource.contains("#Predicate<Plant> { !$0.isArchived }"))
         #expect(addPlantDataSource.contains("plants.filter { !$0.isArchived }.map"))
     }
 
@@ -745,12 +755,14 @@ struct PlantLaunchTests {
         let source = try makeInMemoryContainer()
         let sourceContext = source.mainContext
         let date = makeDate(year: 2026, month: 6, day: 8, hour: 7)
+        let careTransactionId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
         let plant = Plant(name: "Pilea", species: "Pilea peperomioides", location: "Desk")
         let log = PlantCareLog(
             date: date,
             careType: .newLeaf,
             note: "Tiny new leaf",
             executorId: "plant-owner",
+            careTransactionId: careTransactionId,
             photoData: Data([9, 8, 7]),
             healthStatus: .thriving
         )
@@ -776,9 +788,20 @@ struct PlantLaunchTests {
         #expect(restored.careType == .newLeaf)
         #expect(restored.note == "Tiny new leaf")
         #expect(restored.executorId == "plant-owner")
+        #expect(restored.careTransactionId == careTransactionId)
         #expect(restored.photoData == Data([9, 8, 7]))
         #expect(restored.healthStatus == .thriving)
         #expect(restored.plant?.name == "Pilea")
+    }
+
+    @Test func legacyPlantCareBackupWithoutTransactionIDStillDecodes() throws {
+        let data = Data(
+            #"{"id":"11111111-2222-3333-4444-555555555555","date":"2026-06-08T07:00:00Z","careTypeRaw":"watering","note":"legacy"}"#.utf8
+        )
+
+        let backup = try JSONDecoder().decode(PlantCareLogBackup.self, from: data)
+
+        #expect(backup.careTransactionId == nil)
     }
 
     @Test func plantBackupRestoresReminderPreferencesAndRebuildsCarePlans() throws {
@@ -2360,6 +2383,7 @@ struct PlantLaunchTests {
             $0.eventKind == CareLedgerEventKind.plantCare.rawValue &&
                 $0.legacyModelName == "PlantCareLog"
         }))
+        let log = try #require(try context.fetch(FetchDescriptor<PlantCareLog>()).first)
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         let walletTotal = walletEntries.reduce(0) { $0 + $1.delta }
 
@@ -2367,6 +2391,8 @@ struct PlantLaunchTests {
         #expect(result.coconutDelta >= 2)
         #expect(human.coconutBalance == result.coconutDelta)
         #expect(ledger.coconutDelta == result.coconutDelta)
+        #expect(!log.careTransactionId.isEmpty)
+        #expect(CareLedgerMetadata.stringValue(named: "careTransactionId", in: ledger.metadataJSON) == log.careTransactionId)
         #expect(walletTotal == result.coconutDelta)
     }
 
@@ -2740,16 +2766,21 @@ struct PlantLaunchTests {
         #expect(result.estimatedCoconutDelta == 40)
         #expect(token.items.count == 20)
         #expect(token.restorePoints.count == 20)
-        #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).count == 20)
+        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
+        #expect(logs.count == 20)
+        #expect(logs.allSatisfy { $0.careTransactionId == result.batchID.uuidString })
         #expect(try context.fetch(FetchDescriptor<Event>()).count == 20)
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledgerEvents.count == 20)
         #expect(ledgerEvents.allSatisfy { $0.eventKind == CareLedgerEventKind.plantCare.rawValue })
         #expect(ledgerEvents.allSatisfy { $0.coconutDelta == 0 })
+        #expect(ledgerEvents.allSatisfy {
+            CareLedgerMetadata.stringValue(named: "careTransactionId", in: $0.metadataJSON) == result.batchID.uuidString
+        })
         #expect(plants.allSatisfy { $0.lastWateredDate == now })
     }
 
-    @Test func plantBatchCareSkipsArchivedPlantsWithoutWritingFacts() throws {
+    @Test func plantBatchCareAbortsEntireBatchWhenAnyPlantIsArchived() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = makeDate(year: 2026, month: 7, day: 5, hour: 10)
@@ -2777,17 +2808,117 @@ struct PlantLaunchTests {
         )
 
         #expect(result.didPersist)
-        #expect(result.completedCount == 1)
+        #expect(result.completedCount == 0)
+        #expect(result.undoToken == nil)
         #expect(result.skipped.contains {
             $0.selection.plantID == archived.id && $0.reason == .archivedPlant
         })
-        #expect(active.lastWateredDate == now)
+        #expect(active.lastWateredDate == oldWateredDate)
         #expect(archived.lastWateredDate == oldWateredDate)
-        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
-        #expect(logs.count == 1)
-        #expect(logs.first?.plant?.id == active.id)
-        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
-        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+    }
+
+    @Test func plantBatchCareAbortsEntireBatchForMissingOrUnsupportedTarget() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 7, day: 5, hour: 10)
+        let oldWateredDate = Calendar(identifier: .gregorian).date(byAdding: .day, value: -2, to: now) ?? now
+        let active = Plant(name: "Active Fern", wateringIntervalDays: 1)
+        active.createdAt = oldWateredDate
+        active.lastWateredDate = oldWateredDate
+        context.insert(active)
+        try context.save()
+
+        let missingResult = PlantBatchCareCommandService.recordQuickCare(
+            selections: [
+                PlantBatchCareSelection(plantID: active.id, careType: .watering),
+                PlantBatchCareSelection(plantID: UUID(), careType: .watering)
+            ],
+            context: context,
+            executorId: "human-1",
+            now: now,
+            syncCarePlan: false
+        )
+        let unsupportedResult = PlantBatchCareCommandService.recordQuickCare(
+            selections: [
+                PlantBatchCareSelection(plantID: active.id, careType: .watering),
+                PlantBatchCareSelection(plantID: active.id, careType: .photo)
+            ],
+            context: context,
+            executorId: "human-1",
+            now: now,
+            syncCarePlan: false
+        )
+
+        #expect(missingResult.completedCount == 0)
+        #expect(missingResult.skipped.contains { $0.reason == .missingPlant })
+        #expect(unsupportedResult.completedCount == 0)
+        #expect(unsupportedResult.skipped.contains { $0.reason == .unsupportedCareType })
+        #expect(active.lastWateredDate == oldWateredDate)
+        #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+    }
+
+    @Test func plantBatchDueCareAbortsWhenAnySelectionIsNotDue() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 7, day: 5, hour: 10)
+        let oldWateredDate = Calendar(identifier: .gregorian).date(byAdding: .day, value: -2, to: now) ?? now
+        let due = Plant(name: "Due Fern", wateringIntervalDays: 1)
+        due.createdAt = oldWateredDate
+        due.lastWateredDate = oldWateredDate
+        let notDue = Plant(name: "Fresh Fern", wateringIntervalDays: 7)
+        notDue.createdAt = now
+        notDue.lastWateredDate = now
+        context.insert(due)
+        context.insert(notDue)
+        try context.save()
+
+        let result = PlantBatchCareCommandService.completeDueCare(
+            selections: [
+                PlantBatchCareSelection(plantID: due.id, careType: .watering),
+                PlantBatchCareSelection(plantID: notDue.id, careType: .watering)
+            ],
+            context: context,
+            executorId: "human-1",
+            now: now,
+            syncCarePlan: false
+        )
+
+        #expect(result.completedCount == 0)
+        #expect(result.skipped.contains {
+            $0.selection.plantID == notDue.id && $0.reason == .notDue
+        })
+        #expect(due.lastWateredDate == oldWateredDate)
+        #expect(notDue.lastWateredDate == now)
+        #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+    }
+
+    @Test func plantBatchCareNormalizesDuplicatesWithoutAborting() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 7, day: 5, hour: 10)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 1)
+        context.insert(plant)
+        try context.save()
+        let selection = PlantBatchCareSelection(plantID: plant.id, careType: .watering)
+
+        let result = PlantBatchCareCommandService.recordQuickCare(
+            selections: [selection, selection],
+            context: context,
+            executorId: "human-1",
+            now: now,
+            syncCarePlan: false
+        )
+
+        #expect(result.completedCount == 1)
+        #expect(result.skipped == [PlantBatchCareSkippedSelection(selection: selection, reason: .duplicate)])
+        #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).count == 1)
     }
 
     @Test func plantBatchCareUndoDeletesGeneratedFactsAndRestoresPlantDates() throws {
@@ -2910,6 +3041,43 @@ struct PlantLaunchTests {
         #expect(economy.awardCalls.first?.careObjectKey == plant.id)
         #expect(ledger.coconutDelta == 5)
         #expect(ledger.metadataJSON.contains(token.batchID.uuidString))
+        #expect(CareLedgerMetadata.stringValue(named: "careTransactionId", in: ledger.metadataJSON) == token.batchID.uuidString)
+    }
+
+    @Test func plantBatchCareReplayUsesStableOccurrenceAndTargetKey() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_720_000_000)
+        let first = Plant(name: "Fern", wateringIntervalDays: 3)
+        let second = Plant(name: "Palm", wateringIntervalDays: 4)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+        let selections = [
+            PlantBatchCareSelection(plantID: first.id, careType: .watering),
+            PlantBatchCareSelection(plantID: second.id, careType: .watering)
+        ]
+
+        let initial = PlantBatchCareCommandService.recordQuickCare(
+            selections: selections,
+            context: context,
+            executorId: nil,
+            now: now,
+            syncCarePlan: false
+        )
+        let replay = PlantBatchCareCommandService.recordQuickCare(
+            selections: Array(selections.reversed()),
+            context: context,
+            executorId: nil,
+            now: now.addingTimeInterval(60),
+            syncCarePlan: false
+        )
+
+        #expect(initial.didWrite)
+        #expect(!replay.didWrite)
+        #expect(replay.didPersist)
+        #expect(initial.batchID == replay.batchID)
+        #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).count == 2)
     }
 
     @Test func plantBatchCarePendingRewardStorePersistsAndExpiresTokens() throws {
@@ -2954,7 +3122,7 @@ struct PlantLaunchTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV85.models)
+        let schema = Schema(ArkSchemaV89.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: ArkMigrationPlan.self, configurations: [config])
     }

@@ -64,6 +64,29 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
         return reward
     }
 
+    func awardDeferredSharedCareAction(
+        type: DomainCareRewardAction,
+        pets: [Pet],
+        context: ModelContext,
+        quality: DomainCareRewardQuality,
+        title: String?,
+        executorId: String?,
+        date: Date,
+        idempotencyKey: String
+    ) -> (humanGot: Int, petGot: Int) {
+        // Oasis/runtime feedback is finalized separately from the durable wallet marker.
+        questManager.awardSharedCareAction(
+            type: type,
+            pets: pets,
+            context: context,
+            quality: quality,
+            title: title,
+            executorId: executorId,
+            date: date,
+            idempotencyKey: idempotencyKey
+        )
+    }
+
     func rewardMetadata(for reward: (humanGot: Int, petGot: Int)?) -> String {
         guard let reward else { return "" }
         if let result = questManager.lastEconomyRewardResult,

@@ -1213,6 +1213,270 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func quickPottyLitterExecutorRejectsIncompleteOrInactiveMultiTargetSelectionBeforeWriting() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let source = Pet(name: "Milo", species: "猫")
+        let liveSibling = Pet(name: "Luna", species: "cat")
+        let memorialSibling = Pet(name: "Star", species: "猫")
+        memorialSibling.passedAwayDate = makeDate(year: 2026, month: 6, day: 8, hour: 12, minute: 0)
+        let executorHuman = insertExecutorHuman(in: context)
+        context.insert(source)
+        context.insert(liveSibling)
+        context.insert(memorialSibling)
+        try context.save()
+
+        let executor = QuickPottyCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let date = makeDate(year: 2026, month: 6, day: 8, hour: 21, minute: 30)
+        let missingTargetResult = executor.recordLitterCare(
+            sourcePetID: source.id,
+            targetIDs: [source.id, liveSibling.id, UUID()],
+            executorId: executorHuman.id.uuidString,
+            date: date,
+            isFullChange: false
+        )
+        let inactiveTargetResult = executor.recordLitterCare(
+            sourcePetID: source.id,
+            targetIDs: [source.id, liveSibling.id, memorialSibling.id],
+            executorId: executorHuman.id.uuidString,
+            date: date,
+            isFullChange: false
+        )
+
+        #expect(missingTargetResult == nil)
+        #expect(inactiveTargetResult == nil)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetPottyLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(revisionCenter.homeRevision.value == 0)
+        #expect(revisionCenter.lastMutation == nil)
+    }
+
+    @MainActor
+    @Test func quickPottySharedLitterScoopDefersDerivedEffectsDuringUndoWindow() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeSharedCareUndoContainer()
+        let context = container.mainContext
+        let source = Pet(name: "Milo", species: "猫")
+        let sibling = Pet(name: "Luna", species: "cat")
+        let executorHuman = insertExecutorHuman(in: context)
+        context.insert(source)
+        context.insert(sibling)
+        try context.save()
+
+        let cleanup = isolateSharedCareEconomy(activeHumanID: executorHuman.id.uuidString)
+        defer { cleanup() }
+
+        let occurredAt = Date()
+        let executor = QuickPottyCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let recorded = try #require(executor.recordLitterCare(
+            sourcePetID: source.id,
+            targetIDs: [source.id, sibling.id],
+            executorId: executorHuman.id.uuidString,
+            date: occurredAt,
+            isFullChange: false
+        ))
+        let token = try #require(recorded.undoToken)
+        let receipt = try #require(try context.fetch(FetchDescriptor<SharedCareUndoReceipt>()).first)
+
+        #expect(recorded.targetCount == 2)
+        #expect(recorded.coconutDelta == 0)
+        #expect(token.sourcePetID == source.id)
+        #expect(token.receiptID == receipt.id)
+        #expect(token.undoDeadline == occurredAt.addingTimeInterval(QuickPottyCommandExecutor.sharedLitterUndoWindow))
+        #expect(receipt.state == .pendingUndo)
+        #expect(receipt.sharedSessionId == token.sessionID)
+        #expect(Set(receipt.targetPetIds) == Set([source.id, sibling.id]))
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 2)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(executorHuman.coconutBalance == 0)
+        #expect(source.coconutBalance == 0)
+        #expect(sibling.coconutBalance == 0)
+    }
+
+    @MainActor
+    @Test func quickPottySharedLitterUndoWithinWindowDeletesFactsAndIsIdempotent() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeSharedCareUndoContainer()
+        let context = container.mainContext
+        let source = Pet(name: "Milo", species: "猫")
+        let sibling = Pet(name: "Luna", species: "cat")
+        let executorHuman = insertExecutorHuman(in: context)
+        context.insert(source)
+        context.insert(sibling)
+        try context.save()
+
+        let cleanup = isolateSharedCareEconomy(activeHumanID: executorHuman.id.uuidString)
+        defer { cleanup() }
+
+        let occurredAt = Date()
+        let executor = QuickPottyCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let recorded = try #require(executor.recordLitterCare(
+            sourcePetID: source.id,
+            targetIDs: [source.id, sibling.id],
+            executorId: executorHuman.id.uuidString,
+            date: occurredAt,
+            isFullChange: false
+        ))
+        let token = try #require(recorded.undoToken)
+        let receipt = try #require(try context.fetch(FetchDescriptor<SharedCareUndoReceipt>()).first)
+
+        let firstUndo = try executor.undoSharedCare(
+            token,
+            executorId: executorHuman.id.uuidString,
+            date: occurredAt.addingTimeInterval(3)
+        )
+
+        #expect(firstUndo.disposition == .undone)
+        #expect(Set(firstUndo.targetPetIDs) == Set([source.id, sibling.id]))
+        #expect(firstUndo.deletedCareLogIDs.count == 2)
+        #expect(firstUndo.deletedLedgerEventIDs.isEmpty)
+        #expect(firstUndo.reversalWalletEntryIDs.isEmpty)
+        #expect(firstUndo.deletedBudgetUsageIDs.isEmpty)
+        #expect(receipt.state == .undone)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(revisionCenter.lastMutation?.command == .quickCare(entityID: source.id, action: "undoSharedCare"))
+
+        let secondUndo = try executor.undoSharedCare(
+            token,
+            executorId: executorHuman.id.uuidString,
+            date: occurredAt.addingTimeInterval(4)
+        )
+
+        #expect(secondUndo.disposition == .alreadyUndone)
+        #expect(secondUndo.deletedCareLogIDs.isEmpty)
+        #expect(secondUndo.reversalWalletEntryIDs.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<SharedCareUndoReceipt>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+    }
+
+    @MainActor
+    @Test func sharedCareUndoRejectsUnsupportedActionKindWithoutDeletingSession() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let sourcePetID = UUID()
+        let session = SharedCareSession(
+            actionKind: .litterChange,
+            sourcePetId: sourcePetID.uuidString,
+            targetPetIds: [sourcePetID.uuidString, UUID().uuidString]
+        )
+        context.insert(session)
+        try context.save()
+
+        var caughtError: SharedCareSessionUndoError?
+        do {
+            _ = try SharedCareSessionUndoService.undo(
+                SharedCareUndoToken(sessionID: session.id, sourcePetID: sourcePetID),
+                context: context
+            )
+        } catch let error as SharedCareSessionUndoError {
+            caughtError = error
+        }
+
+        #expect(caughtError == .unsupportedActionKind(SharedCareActionKind.litterChange.rawValue))
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).map(\.id) == [session.id])
+        #expect(try context.fetch(FetchDescriptor<CloudSyncRecordState>()).allSatisfy { !$0.isDeletionTombstone })
+    }
+
+    @MainActor
+    @Test func quickPottySharedLitterFinalizationWritesCoreEffectsOnceAndCanSettleExternalEffects() throws {
+        let revisionCenter = ReadModelRevisionCenter()
+        let container = try makeSharedCareUndoContainer()
+        let context = container.mainContext
+        let source = Pet(name: "Milo", species: "猫")
+        let sibling = Pet(name: "Luna", species: "cat")
+        let executorHuman = insertExecutorHuman(in: context)
+        context.insert(source)
+        context.insert(sibling)
+        try context.save()
+
+        let cleanup = isolateSharedCareEconomy(activeHumanID: executorHuman.id.uuidString)
+        defer { cleanup() }
+
+        let occurredAt = Date()
+        let executor = QuickPottyCommandExecutor(context: context, revisionCenter: revisionCenter)
+        let recorded = try #require(executor.recordLitterCare(
+            sourcePetID: source.id,
+            targetIDs: [source.id, sibling.id],
+            executorId: executorHuman.id.uuidString,
+            date: occurredAt,
+            isFullChange: false
+        ))
+        let token = try #require(recorded.undoToken)
+        let receiptID = try #require(token.receiptID)
+        let deadline = try #require(token.undoDeadline)
+
+        let firstFinalization = try SharedCareUndoFinalizationService.finalize(
+            receiptID: receiptID,
+            context: context,
+            now: deadline.addingTimeInterval(1),
+            dependencies: .live()
+        )
+        let firstCareLedgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let firstWalletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let firstBudgetUsages = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+        let firstBalances = [executorHuman.coconutBalance, source.coconutBalance, sibling.coconutBalance]
+
+        #expect(firstFinalization.disposition == .externalEffectsPending)
+        #expect(firstFinalization.rewardDelta > 0)
+        #expect(firstCareLedgers.count == 2)
+        #expect(firstCareLedgers.count { $0.coconutDelta > 0 } == 1)
+        #expect(!firstWalletEntries.isEmpty)
+        #expect(!firstBudgetUsages.isEmpty)
+
+        let receipt = try #require(try context.fetch(FetchDescriptor<SharedCareUndoReceipt>()).first)
+        receipt.state = .finalizingCore
+        try context.save()
+
+        let retry = try SharedCareUndoFinalizationService.finalize(
+            receiptID: receiptID,
+            context: context,
+            now: deadline.addingTimeInterval(2),
+            dependencies: .live()
+        )
+
+        #expect(retry.disposition == .externalEffectsPending)
+        #expect(retry.rewardDelta == 0)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == firstCareLedgers.count)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).count == firstWalletEntries.count)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).count == firstBudgetUsages.count)
+        #expect([executorHuman.coconutBalance, source.coconutBalance, sibling.coconutBalance] == firstBalances)
+
+        try SharedCareUndoFinalizationService.markExternalEffectsSettled(
+            receiptID: receiptID,
+            context: context,
+            runtimeEffectsSettled: true,
+            notificationsSettled: true,
+            settledAt: deadline.addingTimeInterval(3)
+        )
+
+        #expect(receipt.state == .finalized)
+        #expect(receipt.completedExternalEffects.contains(.runtimeFeedback))
+        #expect(receipt.completedExternalEffects.contains(.notifications))
+
+        let alreadySettled = try SharedCareUndoFinalizationService.finalize(
+            receiptID: receiptID,
+            context: context,
+            now: deadline.addingTimeInterval(4),
+            dependencies: .live()
+        )
+        #expect(alreadySettled.disposition == .alreadySettled)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == firstCareLedgers.count)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).count == firstWalletEntries.count)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).count == firstBudgetUsages.count)
+    }
+
+    @MainActor
     @Test func petCareTrackingCommandServiceRecordsAndDeletesLitterFact() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -2821,8 +3085,6 @@ struct HomeCommandExecutorTests {
         let editHumanSource = try source("Ohana/Features/Members/Views/EditHumanSheet.swift", rootURL: rootURL)
         let plantEditSource = try source("Ohana/Features/Plants/Views/PlantDetailEditSheet.swift", rootURL: rootURL)
         let crewEditSource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift", rootURL: rootURL)
-        let crewOverlaySource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift", rootURL: rootURL)
-        let humanVisibilitySource = try source("Ohana/Features/Members/Views/HumanDetailView+PrivacyAssets.swift", rootURL: rootURL)
         let walkSummarySource = try source("Ohana/Features/Walks/Views/WalkSummarySheet.swift", rootURL: rootURL)
         let walkCardSource = try source("Ohana/Features/Walks/Views/WalkTrackingCard+SummaryFace.swift", rootURL: rootURL)
 
@@ -2841,8 +3103,6 @@ struct HomeCommandExecutorTests {
         #expect(editHumanSource.contains("guard result.didPersist else"))
         #expect(plantEditSource.contains("guard result.didPersist else"))
         #expect(crewEditSource.contains("guard result.didPersist else"))
-        #expect(crewOverlaySource.contains("guard result.didPersist else"))
-        #expect(humanVisibilitySource.contains("if !result.didPersist"))
         #expect(walkSummarySource.contains("guard result.didPersist else"))
         #expect(walkCardSource.contains("guard result.didPersist else"))
     }
@@ -2918,7 +3178,7 @@ struct HomeCommandExecutorTests {
         #expect(syncSource.contains("cooldownsToClear"))
         #expect(syncSource.contains("economy.clearCooldown(petId: cooldown.petId, type: cooldown.action)"))
         #expect(!syncSource.contains("context.safeSave()"))
-        #expect(calendarCommandSource.contains("guard syncResult.didPersist else"))
+        #expect(calendarCommandSource.contains("if !syncResult.didPersist"))
     }
 
     @Test func reminderCompletionStopsSideEffectsWhenPersistenceFails() throws {
@@ -2952,8 +3212,9 @@ struct HomeCommandExecutorTests {
         #expect(syncSource.contains("guard saveResult.didSave else"))
         #expect(syncSource.contains("return .persistenceFailed("))
         #expect(syncSource.contains("PlantCarePlanScheduleService.sync("))
-        #expect(calendarCommandSource.contains("let plantCareSyncResult = PlantCareScheduleSyncService.syncCompletedEvent"))
-        #expect(calendarCommandSource.contains("guard plantCareSyncResult.didPersist else"))
+        #expect(calendarCommandSource.contains("let syncResult = PlantCareScheduleSyncService.syncCompletedEvent"))
+        #expect(calendarCommandSource.contains("syncResult.allowsScheduleCompletion"))
+        #expect(calendarCommandSource.contains("syncPlanSchedule: false"))
     }
 
     @Test func plantCarePlanScheduleCommitsExternalEffectsOnlyAfterPersistence() throws {
@@ -4149,7 +4410,7 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func settingsCommandServiceSyncsHomeStackAfterActiveHumanSwitch() throws {
+    @Test func settingsCommandServiceLeavesProjectedHumanHomeStackUnchangedAfterActiveSwitch() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let oldHuman = Human(name: "Old")
@@ -4172,9 +4433,9 @@ struct HomeCommandExecutorTests {
         )
 
         #expect(result.humanID == newHuman.id)
-        #expect(result.didSyncHomeStack == true)
-        #expect(newHuman.shouldShowOnHome == true)
-        #expect(result.updatedHomeCardOrderRaw.contains(newHuman.id.uuidString))
+        #expect(result.didSyncHomeStack == false)
+        #expect(newHuman.shouldShowOnHome == false)
+        #expect(result.updatedHomeCardOrderRaw == oldHuman.id.uuidString)
     }
 
     @MainActor
@@ -10687,6 +10948,57 @@ struct HomeCommandExecutorTests {
         let schema = Schema(ArkSchemaV85.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func makeSharedCareUndoContainer() throws -> ModelContainer {
+        let schema = Schema(ArkSchemaV90.models)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func isolateSharedCareEconomy(activeHumanID: String) -> () -> Void {
+        let defaults = UserDefaults.standard
+        let oldActiveHuman = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldown = defaults.object(forKey: "quest_cooldownLogs")
+        let oldBoost = defaults.object(forKey: "shop_boostDoubleActive")
+        let oldCoconutCount = TestQuestManagerProjection.manager.coconutCount
+        let oldCoconutLogs = TestQuestManagerProjection.manager.coconutLogs
+        let oldLastReward = TestQuestManagerProjection.manager.lastEconomyRewardResult
+        let oldEconomyValues = defaults.dictionaryRepresentation()
+            .filter { $0.key.hasPrefix("economyV2.dailyBudget.") }
+
+        EconomyDailyBudgetStore.resetAll()
+        defaults.removeObject(forKey: "quest_cooldownLogs")
+        defaults.removeObject(forKey: "shop_boostDoubleActive")
+        defaults.set(activeHumanID, forKey: "currentActiveHumanId")
+        TestQuestManagerProjection.manager.coconutCount = 0
+        TestQuestManagerProjection.manager.coconutLogs = []
+        TestQuestManagerProjection.manager.lastEconomyRewardResult = nil
+
+        return {
+            EconomyDailyBudgetStore.resetAll()
+            for (key, value) in oldEconomyValues {
+                defaults.set(value, forKey: key)
+            }
+            if let oldActiveHuman {
+                defaults.set(oldActiveHuman, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldCooldown {
+                defaults.set(oldCooldown, forKey: "quest_cooldownLogs")
+            } else {
+                defaults.removeObject(forKey: "quest_cooldownLogs")
+            }
+            if let oldBoost {
+                defaults.set(oldBoost, forKey: "shop_boostDoubleActive")
+            } else {
+                defaults.removeObject(forKey: "shop_boostDoubleActive")
+            }
+            TestQuestManagerProjection.manager.coconutCount = oldCoconutCount
+            TestQuestManagerProjection.manager.coconutLogs = oldCoconutLogs
+            TestQuestManagerProjection.manager.lastEconomyRewardResult = oldLastReward
+        }
     }
 
     private struct FixedActiveHumanSelection: ActiveHumanSelecting {

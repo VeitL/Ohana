@@ -9,10 +9,11 @@ import SwiftData
 import SwiftUI
 
 struct PlantBatchQuickRecordSheet: View {
-    let plants: [Plant]
+    let targets: [PlantBatchQuickRecordTargetSnapshot]
     let initialCareType: PlantCareType?
+    let initialSelectedPlantIDs: Set<UUID>
     let imageDataProvider: @Sendable (PersistentIdentifier) async -> Data?
-    let onRecord: ([PlantBatchCareSelection]) -> Void
+    let onRecord: @MainActor ([PlantBatchCareSelection]) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -21,26 +22,30 @@ struct PlantBatchQuickRecordSheet: View {
     @State private var selectedCareCategory: PlantCareCategory
     @State private var selectedCareType: PlantCareType
     @State private var selectedPlantIDs: Set<UUID> = []
+    @State private var isRecording = false
 
     init(
-        plants: [Plant],
+        targets: [PlantBatchQuickRecordTargetSnapshot],
         initialCareType: PlantCareType? = nil,
+        initialSelectedPlantIDs: Set<UUID> = [],
         imageDataProvider: @escaping @Sendable (PersistentIdentifier) async -> Data?,
-        onRecord: @escaping ([PlantBatchCareSelection]) -> Void
+        onRecord: @escaping @MainActor ([PlantBatchCareSelection]) async -> Bool
     ) {
-        self.plants = plants
+        self.targets = targets
         self.initialCareType = initialCareType
+        self.initialSelectedPlantIDs = initialSelectedPlantIDs
         self.imageDataProvider = imageDataProvider
         self.onRecord = onRecord
         let initialType = initialCareType ?? .watering
+        let activePlantIDs = Set(targets.lazy.map(\.id))
         _selectedCareCategory = State(initialValue: initialType.careCategory)
         _selectedCareType = State(initialValue: initialType)
+        _selectedPlantIDs = State(initialValue: initialSelectedPlantIDs.intersection(activePlantIDs))
     }
 
     private var l: L10n { L10n(appLanguage) }
-    private var activePlants: [Plant] {
-        plants
-            .filter { !$0.isArchived }
+    private var activeTargets: [PlantBatchQuickRecordTargetSnapshot] {
+        targets
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
     private var selectedCount: Int { selectedPlantIDs.count }
@@ -57,17 +62,24 @@ struct PlantBatchQuickRecordSheet: View {
     var body: some View {
         OhanaSheetWrapper(
             title: l.tr(zh: "多选快速记录", en: "Multi-select log", de: "Mehrfach erfassen"),
-            onDismiss: { dismiss() }
+            onDismiss: {
+                guard !isRecording else { return }
+                dismiss()
+            }
         ) {
             VStack(alignment: .leading, spacing: 16) {
                 headerCard
                 typeSelector
+                    .disabled(isRecording)
                 selectionToolbar
+                    .disabled(isRecording)
                 plantGrid
+                    .disabled(isRecording)
                 recordButton
             }
             .padding(.vertical, 16)
         }
+        .interactiveDismissDisabled(isRecording)
         .accessibilityIdentifier("plant-batch-quick-record-sheet")
     }
 
@@ -193,7 +205,7 @@ struct PlantBatchQuickRecordSheet: View {
         HStack(spacing: 10) {
             Button {
                 withAnimation(GoMotion.quick) {
-                    selectedPlantIDs = Set(activePlants.map(\.id))
+                    selectedPlantIDs = Set(activeTargets.map(\.id))
                 }
                 UISelectionFeedbackGenerator().selectionChanged()
             } label: {
@@ -227,38 +239,38 @@ struct PlantBatchQuickRecordSheet: View {
 
     private var plantGrid: some View {
         LazyVGrid(columns: columns, spacing: 10) {
-            ForEach(activePlants, id: \.id) { plant in
+            ForEach(activeTargets) { target in
                 Button {
-                    toggle(plant.id)
+                    toggle(target.id)
                 } label: {
-                    plantCard(plant)
+                    plantCard(target)
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .accessibilityIdentifier("plant-batch-quick-plant-\(plant.id.uuidString)")
+                .accessibilityIdentifier("plant-batch-quick-plant-\(target.id.uuidString)")
             }
         }
     }
 
-    private func plantCard(_ plant: Plant) -> some View {
-        let isSelected = selectedPlantIDs.contains(plant.id)
+    private func plantCard(_ target: PlantBatchQuickRecordTargetSnapshot) -> some View {
+        let isSelected = selectedPlantIDs.contains(target.id)
         return HStack(alignment: .top, spacing: 10) {
             FeatureHubAvatar(
-                imageCacheID: "plant-batch-quick-\(plant.id.uuidString)",
-                imageSignature: plant.avatarThumbnailSignature,
-                plantModelID: plant.persistentModelID,
+                imageCacheID: "plant-batch-quick-\(target.id.uuidString)",
+                imageSignature: target.avatarSignature,
+                plantModelID: target.plantModelID,
                 emoji: "",
-                fallback: String(plant.name.prefix(1)),
-                tint: Color(hex: plant.themeColorHex)
+                fallback: String(target.name.prefix(1)),
+                tint: Color(hex: target.tintHex)
             )
             .frame(width: 44, height: 44)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(plant.name)
+                Text(target.name)
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(plant.roomName.isEmpty ? l.tr(zh: "未分组", en: "No room", de: "Kein Raum") : plant.roomName)
+                Text(target.roomName.isEmpty ? l.tr(zh: "未分组", en: "No room", de: "Kein Raum") : target.roomName)
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
@@ -285,9 +297,22 @@ struct PlantBatchQuickRecordSheet: View {
 
     private var recordButton: some View {
         Button {
-            record()
+            Task { @MainActor in
+                await record()
+            }
         } label: {
-            Label(recordTitle, systemImage: "checkmark.circle.fill")
+            Group {
+                if isRecording {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .tint(Color.ohanaPrimaryActionText)
+                            .accessibilityHidden(true)
+                        Text(recordingTitle)
+                    }
+                } else {
+                    Label(recordTitle, systemImage: "checkmark.circle.fill")
+                }
+            }
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .lineLimit(2)
@@ -298,7 +323,8 @@ struct PlantBatchQuickRecordSheet: View {
                 .opacity(selectedCount == 0 ? 0.45 : 1)
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(selectedCount == 0)
+        .disabled(selectedCount == 0 || isRecording)
+        .accessibilityLabel(isRecording ? recordingTitle : recordTitle)
         .accessibilityIdentifier("plant-batch-quick-record-action")
     }
 
@@ -310,12 +336,12 @@ struct PlantBatchQuickRecordSheet: View {
         )
     }
 
+    private var recordingTitle: String {
+        l.tr(zh: "正在记录…", en: "Recording…", de: "Wird erfasst…")
+    }
+
     private var quickCareTypes: [PlantCareType] {
-        [
-            .watering, .fertilizing, .misting, .pruning,
-            .leafCleaning, .rotating, .pestCheck, .repotting,
-            .newLeaf, .yellowLeaf, .pestFound, .customNote
-        ]
+        PlantBatchCareCommandService.supportedQuickCareTypes
     }
 
     private func toggle(_ id: UUID) {
@@ -343,12 +369,19 @@ struct PlantBatchQuickRecordSheet: View {
         quickCareTypes.filter { category.contains($0) }
     }
 
-    private func record() {
+    @MainActor
+    private func record() async {
+        guard !isRecording else { return }
         let selections = selectedPlantIDs.map {
             PlantBatchCareSelection(plantID: $0, careType: selectedCareType)
         }
         guard !selections.isEmpty else { return }
-        onRecord(selections)
+
+        isRecording = true
+        defer { isRecording = false }
+        let didRecord = await onRecord(selections)
+        guard didRecord else { return }
+
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()
     }
@@ -379,5 +412,21 @@ struct PlantBatchQuickRecordSheet: View {
         case .pestCheck, .yellowLeaf, .pestFound: Color.goRed
         case .photo: Color.goPurple
         }
+    }
+}
+
+extension PlantBatchQuickRecordSheet {
+    init(
+        plants: [Plant],
+        initialCareType: PlantCareType? = nil,
+        imageDataProvider: @escaping @Sendable (PersistentIdentifier) async -> Data?,
+        onRecord: @escaping @MainActor ([PlantBatchCareSelection]) async -> Bool
+    ) {
+        self.init(
+            targets: PlantBatchQuickRecordTargetSnapshot.activeTargets(from: plants),
+            initialCareType: initialCareType,
+            imageDataProvider: imageDataProvider,
+            onRecord: onRecord
+        )
     }
 }

@@ -139,25 +139,85 @@ extension DomainGeneralRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) -> AuthorizedDomainRehydratePlan {
-        if let relatedPetId = snapshot.relatedPetId, !relatedPetId.isEmpty {
+        let rawSubjectKind = snapshot.subjectKindRaw?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let subjectKind: FamilyCollaborationTaskSubjectKind
+        if let rawSubjectKind, !rawSubjectKind.isEmpty {
+            guard let explicitKind = FamilyCollaborationTaskSubjectKind(rawValue: rawSubjectKind) else {
+                return DomainRehydrateAuthorizer.rejectSubject(
+                    source: source,
+                    reason: "invalidFamilyTaskSubjectKind"
+                )
+            }
+            subjectKind = explicitKind
+        } else {
+            subjectKind = snapshot.relatedPetId?.isEmpty == false ? .pet : .household
+        }
+
+        switch subjectKind {
+        case .pet:
+            guard let petId = DomainEntityLinkRegistry.petIdFromCompoundStockId(
+                snapshot.subjectId ?? snapshot.relatedPetId ?? ""
+            ) else {
+                return DomainRehydrateAuthorizer.rejectSubject(
+                    source: source,
+                    reason: "missingFamilyTaskPetSubject"
+                )
+            }
             return DomainRehydrateAuthorizer.authorizeSubject(
                 request: DomainSubjectResolutionRequest(
                     relatedEntityType: EntityKind.pet.rawValue,
-                    relatedEntityId: relatedPetId,
+                    relatedEntityId: petId.uuidString,
                     assigneeId: snapshot.assignedToId
                 ),
                 source: source,
                 context: context,
                 requirement: .requiredPet
             )
+        case .human:
+            guard let humanId = snapshot.subjectId.flatMap(UUID.init(uuidString:)) else {
+                return DomainRehydrateAuthorizer.rejectSubject(
+                    source: source,
+                    reason: "missingFamilyTaskHumanSubject"
+                )
+            }
+            return DomainRehydrateAuthorizer.authorizeSubject(
+                request: DomainSubjectResolutionRequest(
+                    relatedEntityType: EntityKind.human.rawValue,
+                    relatedEntityId: humanId.uuidString,
+                    assigneeId: snapshot.assignedToId
+                ),
+                source: source,
+                context: context,
+                requirement: .requiredHuman
+            )
+        case .plant:
+            guard let plantId = snapshot.subjectId.flatMap(UUID.init(uuidString:)),
+                  (try? fetchPlant(id: plantId, context: context)) != nil else {
+                return DomainRehydrateAuthorizer.rejectSubject(
+                    source: source,
+                    reason: "missingFamilyTaskPlantSubject"
+                )
+            }
+            return DomainRehydrateAuthorizer.authorizeSubject(
+                request: DomainSubjectResolutionRequest(
+                    relatedEntityType: EntityKind.plant.rawValue,
+                    relatedEntityId: plantId.uuidString,
+                    assigneeId: snapshot.assignedToId
+                ),
+                source: source,
+                context: context,
+                requirement: .historyCompatible
+            )
+        case .household:
+            return authorizeHumanString(
+                snapshot.createdById,
+                assigneeId: snapshot.assignedToId,
+                source: source,
+                context: context,
+                requirement: .requiredHuman
+            )
         }
-        return authorizeHumanString(
-            snapshot.createdById,
-            assigneeId: snapshot.assignedToId,
-            source: source,
-            context: context,
-            requirement: .requiredHuman
-        )
     }
 
     nonisolated static func authorizeHousehold(

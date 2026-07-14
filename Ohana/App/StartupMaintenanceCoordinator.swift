@@ -576,7 +576,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         static let reminderMaintenanceLastRunAt = "ohana_startup_maintenance_last_run_at"
         static let plantCareOrphanMaintenanceLastRunAt = "ohana_plant_care_orphan_maintenance_last_run_at"
         static let avatarAssetCompactionCompleted = "ohana_avatar_asset_compaction_v1_completed"
-        static let careLedgerBackfillCompleted = "careLedgerBackfill_v1_completed"
+        static let careLedgerBackfillCompleted = "careLedgerBackfill_v2_completed"
         static let mediaAttachmentPresenceBackfillCompleted = "ohana_media_attachment_presence_backfill_v1_completed"
         static let memberThemeColorNormalizationCompleted = "ohana_member_theme_color_normalization_v1_completed"
         static let maintenanceCursor = "ohana_startup_maintenance_cursor"
@@ -585,7 +585,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
 }
 
 private enum CareLedgerBackfillCursorStore {
-    private static let key = "ohana_care_ledger_backfill_cursor_v2"
+    private static let key = "ohana_care_ledger_backfill_cursor_v3"
 
     static func cursor(defaults: UserDefaults) -> CareLedgerBackfillCursor {
         guard let data = defaults.data(forKey: key),

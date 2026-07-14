@@ -7,12 +7,103 @@
 
 import SwiftUI
 
+private struct TaskCenterScrollFocus: Equatable {
+    let itemID: String?
+    let requestID: UUID?
+}
+
+struct TaskCenterCalendarWorkflowStrip: View {
+    let items: [TaskCenterItemSnapshot]
+    let onOpen: (TaskCenterItemSnapshot) -> Void
+    let onAction: (TaskCenterItemSnapshot, TaskCenterAvailableAction) -> Bool
+
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
+
+    var body: some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(l.tr(zh: "家庭分工", en: "Household assignments", de: "Aufgabenverteilung"))
+                        .font(OhanaFont.footnote(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text("\(items.count)")
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(Color.goPurple)
+                    Spacer()
+                }
+                .padding(.horizontal, 18)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 10) {
+                        ForEach(items) { item in
+                            HStack(spacing: 8) {
+                                Button {
+                                    onOpen(item)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.title)
+                                            .font(OhanaFont.caption(.bold))
+                                            .foregroundStyle(Color.ohanaPrimaryText)
+                                            .lineLimit(1)
+                                        Text(item.scheduledAt.formatted(date: .abbreviated, time: .shortened))
+                                            .font(OhanaFont.caption2(.semibold))
+                                            .foregroundStyle(Color.ohanaSecondaryText)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+
+                                if let action = primaryAction(item) {
+                                    Button(actionTitle(action)) {
+                                        _ = onAction(item, action)
+                                    }
+                                    .font(OhanaFont.caption2(.black))
+                                    .buttonStyle(.bordered)
+                                    .tint(action == .reject ? Color.goRed : Color.goPrimary)
+                                }
+                            }
+                            .padding(.leading, 12)
+                            .padding(.trailing, 8)
+                            .frame(minHeight: 52)
+                            .background(Color.ohanaCardSurface, in: Capsule())
+                            .overlay {
+                                Capsule().strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                            }
+                            .accessibilityIdentifier("task-center-calendar-family-\(item.id)")
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                }
+            }
+            .padding(.vertical, 8)
+            .accessibilityIdentifier("task-center-calendar-family-strip")
+        }
+    }
+
+    private func primaryAction(_ item: TaskCenterItemSnapshot) -> TaskCenterAvailableAction? {
+        let order: [TaskCenterAvailableAction] = [.approve, .reject, .claim, .submitForReview, .complete]
+        return order.first(where: item.availableActions.contains)
+    }
+
+    private func actionTitle(_ action: TaskCenterAvailableAction) -> String {
+        switch action {
+        case .complete: l.tr(zh: "完成", en: "Complete", de: "Erledigen")
+        case .claim: l.tr(zh: "领取", en: "Claim", de: "Übernehmen")
+        case .submitForReview: l.tr(zh: "提交", en: "Submit", de: "Einreichen")
+        case .approve: l.tr(zh: "通过", en: "Approve", de: "Bestätigen")
+        case .reject: l.tr(zh: "驳回", en: "Reject", de: "Ablehnen")
+        }
+    }
+}
+
 struct TaskCenterHeader: View {
     @Binding var selectedSurface: TaskCenterSurface
     let snapshot: TaskCenterSnapshot
     let isLoading: Bool
     let showsAddButton: Bool
     let showsCloseButton: Bool
+    let filterLabel: String?
     let onAdd: () -> Void
     let onClose: (() -> Void)?
 
@@ -24,7 +115,7 @@ struct TaskCenterHeader: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(l.tr(zh: "待办中心", en: "Tasks", de: "Aufgaben"))
+                    Text(l.tr(zh: "待办", en: "Tasks", de: "Aufgaben"))
                         .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
@@ -71,6 +162,16 @@ struct TaskCenterHeader: View {
             }
 
             surfacePicker
+
+            if let filterLabel {
+                Label(filterLabel, systemImage: "line.3.horizontal.decrease.circle.fill")
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.goPrimary)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 32)
+                    .background(Color.goPrimary.opacity(0.12), in: Capsule())
+                    .accessibilityIdentifier("task-center-active-filter")
+            }
         }
         .padding(.horizontal, 18)
         .padding(.top, showsCloseButton ? 12 : 6)
@@ -82,7 +183,7 @@ struct TaskCenterHeader: View {
         HStack(spacing: 4) {
             surfaceButton(
                 .tasks,
-                title: l.tr(zh: "待办", en: "Tasks", de: "Aufgaben"),
+                title: l.tr(zh: "清单", en: "List", de: "Liste"),
                 symbol: "checklist"
             )
             surfaceButton(
@@ -153,58 +254,160 @@ struct TaskCenterView: View {
     let snapshot: TaskCenterSnapshot
     let isLoading: Bool
     let bottomClearance: CGFloat
-    let onComplete: (TaskCenterItemSnapshot) -> Bool
+    let showsDailyProgress: Bool
+    let focusedItemID: String?
+    let focusRequestID: UUID?
+    let onAction: (TaskCenterItemSnapshot, TaskCenterAvailableAction) -> Bool
     let onOpen: (TaskCenterItemSnapshot) -> Void
     let onScrollOffsetChange: ((CGFloat) -> Void)?
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var completingIDs: Set<String> = []
+    @State private var performingIDs: Set<String> = []
+    @State private var selectedMemberFilter: TaskCenterMemberFilter = .all
 
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(alignment: .leading, spacing: 22) {
-                if isLoading {
-                    loadingState
-                } else if snapshot.pendingCount == 0 {
-                    emptyState
-                } else {
-                    dailyProgress
-                    taskSection(
-                        title: l.tr(zh: "逾期", en: "Overdue", de: "Überfällig"),
-                        items: visible(snapshot.overdue),
-                        tint: snapshot.criticalCount > 0 ? .goRed : .goOrange,
-                        identifier: "overdue"
-                    )
-                    taskSection(
-                        title: l.tr(zh: "今天", en: "Today", de: "Heute"),
-                        items: visible(snapshot.today),
-                        tint: .goPrimary,
-                        identifier: "today"
-                    )
-                    taskSection(
-                        title: l.tr(zh: "接下来", en: "Upcoming", de: "Als Nächstes"),
-                        items: visible(snapshot.upcoming),
-                        tint: .goTeal,
-                        identifier: "upcoming"
-                    )
+        ScrollViewReader { proxy in
+            ScrollView(showsIndicators: false) {
+                LazyVStack(alignment: .leading, spacing: 22) {
+                    if !isLoading, snapshot.showsMemberFilters {
+                        memberFilterRail
+                    }
+                    if isLoading {
+                        loadingState
+                    } else if displayedSnapshot.pendingCount == 0 {
+                        emptyState
+                    } else {
+                        if showsDailyProgress, selectedMemberFilter == .all {
+                            dailyProgress
+                        }
+                        taskSection(
+                            title: l.tr(zh: "待审核", en: "Needs review", de: "Zu prüfen"),
+                            items: visible(pendingReviewItems),
+                            tint: .goYellow,
+                            identifier: "pending-review"
+                        )
+                        taskSection(
+                            title: l.tr(zh: "逾期", en: "Overdue", de: "Überfällig"),
+                            items: visible(nonReview(displayedSnapshot.overdue)),
+                            tint: displayedSnapshot.criticalCount > 0 ? .goRed : .goOrange,
+                            identifier: "overdue"
+                        )
+                        taskSection(
+                            title: l.tr(zh: "今天", en: "Today", de: "Heute"),
+                            items: visible(nonReview(displayedSnapshot.today)),
+                            tint: .goPrimary,
+                            identifier: "today"
+                        )
+                        taskSection(
+                            title: l.tr(zh: "接下来", en: "Upcoming", de: "Als Nächstes"),
+                            items: visible(nonReview(displayedSnapshot.upcoming)),
+                            tint: .goTeal,
+                            identifier: "upcoming"
+                        )
+                        taskSection(
+                            title: l.tr(zh: "未排期", en: "Unscheduled", de: "Ohne Termin"),
+                            items: visible(nonReview(displayedSnapshot.unscheduled)),
+                            tint: .goPurple,
+                            identifier: "unscheduled"
+                        )
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 8)
+                .padding(.bottom, bottomClearance)
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y
+            } action: { _, offset in
+                onScrollOffsetChange?(offset)
+            }
+            .onChange(of: scrollFocus, initial: true) { _, focus in
+                guard let itemID = focus.itemID else { return }
+                Task { @MainActor in
+                    await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 80)
+                    withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.page) {
+                        proxy.scrollTo(itemID, anchor: .center)
+                    }
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 8)
-            .padding(.bottom, bottomClearance)
-        }
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            geometry.contentOffset.y
-        } action: { _, offset in
-            onScrollOffsetChange?(offset)
         }
         .onChange(of: snapshot) { _, _ in
-            completingIDs.removeAll()
+            performingIDs.removeAll()
+        }
+        .onChange(of: selectedMemberFilter) { _, _ in
+            OhanaFeedback.selection()
         }
         .accessibilityIdentifier("task-center-scroll-view")
+    }
+
+    private var scrollFocus: TaskCenterScrollFocus {
+        TaskCenterScrollFocus(itemID: focusedItemID, requestID: focusRequestID)
+    }
+
+    private var displayedSnapshot: TaskCenterSnapshot {
+        snapshot.filtered(for: selectedMemberFilter)
+    }
+
+    private var memberFilterRail: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(TaskCenterMemberFilter.allCases) { filter in
+                    memberFilterButton(filter)
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("task-center-member-filters")
+    }
+
+    private func memberFilterButton(_ filter: TaskCenterMemberFilter) -> some View {
+        let isSelected = selectedMemberFilter == filter
+        return Button {
+            guard !isSelected else { return }
+            withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.selection) {
+                selectedMemberFilter = filter
+            }
+        } label: {
+            Text(memberFilterTitle(filter))
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 44)
+                .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(memberFilterAccessibilityLabel(filter))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("task-center-member-filter-\(filter.rawValue)")
+    }
+
+    private func memberFilterTitle(_ filter: TaskCenterMemberFilter) -> String {
+        switch filter {
+        case .all:
+            l.tr(zh: "全部", en: "All", de: "Alle")
+        case .currentMember:
+            snapshot.memberFilterContext.activeHumanName
+                ?? l.tr(zh: "当前成员", en: "Current member", de: "Aktuelles Mitglied")
+        case .waitingForOthers:
+            l.tr(zh: "等待他人", en: "Waiting on others", de: "Warten auf andere")
+        case .pendingReview:
+            l.tr(zh: "待审核", en: "Needs review", de: "Zu prüfen")
+        }
+    }
+
+    private func memberFilterAccessibilityLabel(_ filter: TaskCenterMemberFilter) -> String {
+        guard filter == .currentMember,
+              let activeHumanName = snapshot.memberFilterContext.activeHumanName else {
+            return memberFilterTitle(filter)
+        }
+        return l.tr(
+            zh: "当前成员：\(activeHumanName)",
+            en: "Current member: \(activeHumanName)",
+            de: "Aktuelles Mitglied: \(activeHumanName)"
+        )
     }
 
     private var dailyProgress: some View {
@@ -213,7 +416,7 @@ struct TaskCenterView: View {
                 Circle()
                     .stroke(Color.ohanaControlFill, lineWidth: 9)
                 Circle()
-                    .trim(from: 0, to: snapshot.todayCompletionFraction)
+                    .trim(from: 0, to: displayedSnapshot.todayCompletionFraction)
                     .stroke(
                         Color.goPrimary,
                         style: StrokeStyle(lineWidth: 9, lineCap: .round)
@@ -221,7 +424,7 @@ struct TaskCenterView: View {
                     .rotationEffect(.degrees(-90))
 
                 VStack(spacing: 0) {
-                    Text("\(snapshot.todayPendingCount)")
+                    Text("\(displayedSnapshot.todayPendingCount)")
                         .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .monospacedDigit()
@@ -233,24 +436,24 @@ struct TaskCenterView: View {
             .frame(width: 78, height: 78)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(l.tr(
-                zh: "今天完成 \(snapshot.todayCompletedCount) 项，共 \(snapshot.todayTotalCount) 项",
-                en: "\(snapshot.todayCompletedCount) of \(snapshot.todayTotalCount) tasks complete today",
-                de: "Heute \(snapshot.todayCompletedCount) von \(snapshot.todayTotalCount) Aufgaben erledigt"
+                zh: "今天完成 \(displayedSnapshot.todayCompletedCount) 项，共 \(displayedSnapshot.todayTotalCount) 项",
+                en: "\(displayedSnapshot.todayCompletedCount) of \(displayedSnapshot.todayTotalCount) tasks complete today",
+                de: "Heute \(displayedSnapshot.todayCompletedCount) von \(displayedSnapshot.todayTotalCount) Aufgaben erledigt"
             ))
 
             VStack(alignment: .leading, spacing: 10) {
                 metricLine(
-                    value: snapshot.todayPendingCount,
+                    value: displayedSnapshot.todayPendingCount,
                     label: l.tr(zh: "今天待办", en: "Due today", de: "Heute fällig"),
                     tint: .goPrimary
                 )
                 metricLine(
-                    value: snapshot.overdueCount,
+                    value: displayedSnapshot.overdueCount,
                     label: l.tr(zh: "已经逾期", en: "Overdue", de: "Überfällig"),
-                    tint: snapshot.criticalCount > 0 ? .goRed : .goOrange
+                    tint: displayedSnapshot.criticalCount > 0 ? .goRed : .goOrange
                 )
                 metricLine(
-                    value: snapshot.upcoming.count,
+                    value: displayedSnapshot.upcoming.count,
                     label: l.tr(zh: "之后安排", en: "Upcoming", de: "Demnächst"),
                     tint: .goTeal
                 )
@@ -314,6 +517,7 @@ struct TaskCenterView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         taskRow(item)
+                            .id(item.id)
                         if index < items.count - 1 {
                             Divider()
                                 .overlay(Color.ohanaCardStroke.opacity(0.7))
@@ -377,40 +581,48 @@ struct TaskCenterView: View {
             .accessibilityLabel("\(item.title). \(itemSubtitle(item)). \(dueText(item))")
             .accessibilityHint(l.tr(zh: "打开事项", en: "Open task", de: "Aufgabe öffnen"))
 
-            Button {
-                complete(item)
-            } label: {
-                ZStack {
-                    Circle()
-                        .strokeBorder(itemTint(item), lineWidth: 2)
-                        .frame(width: 26, height: 26) // a11y: allow visual ring inside the enclosing 44pt button
-                    if completingIDs.contains(item.id) {
-                        Circle()
-                            .fill(Color.goTeal)
-                            .frame(width: 26, height: 26) // a11y: allow visual fill inside the enclosing 44pt button
-                        Image(systemName: "checkmark") // a11y: allow decorative state glyph inside the labeled button
-                            .font(OhanaFont.adaptive(size: 11, weight: .black))
-                            .foregroundStyle(Color.ohanaPrimaryActionText)
-                            .accessibilityHidden(true)
-                    }
-                }
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .disabled(completingIDs.contains(item.id))
-            .accessibilityLabel(l.tr(
-                zh: "完成 \(item.title)",
-                en: "Complete \(item.title)",
-                de: "\(item.title) erledigen"
-            ))
-            .accessibilityIdentifier("task-center-complete-\(item.id)")
+            actionButtons(for: item)
         }
         .frame(minHeight: 68)
-        .opacity(completingIDs.contains(item.id) ? 0.44 : 1)
-        .scaleEffect(completingIDs.contains(item.id) && !reduceMotion ? 0.985 : 1)
-        .animation(reduceMotion ? GoMotion.reduced : GoMotion.feedback, value: completingIDs.contains(item.id))
+        .opacity(performingIDs.contains(item.id) ? 0.44 : 1)
+        .scaleEffect(performingIDs.contains(item.id) && !reduceMotion ? 0.985 : 1)
+        .animation(reduceMotion ? GoMotion.reduced : GoMotion.feedback, value: performingIDs.contains(item.id))
         .accessibilityIdentifier("task-center-item-\(item.id)")
+    }
+
+    @ViewBuilder
+    private func actionButtons(for item: TaskCenterItemSnapshot) -> some View {
+        if item.availableActions.isEmpty {
+            EmptyView()
+        } else {
+            HStack(spacing: 4) {
+                ForEach(orderedActions(for: item), id: \.self) { action in
+                    Button {
+                        perform(action, for: item)
+                    } label: {
+                        if action == .complete {
+                            Image(systemName: "checkmark") // a11y: allow decorative glyph inside the labeled action button
+                                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                                .frame(width: 28, height: 28) // a11y: allow decorative glyph inside the enclosing 44pt button
+                                .background(itemTint(item).opacity(0.14), in: Circle())
+                                .accessibilityHidden(true)
+                        } else {
+                            Text(actionTitle(action))
+                                .font(OhanaFont.caption2(.black))
+                                .padding(.horizontal, 8)
+                                .frame(minHeight: 32)
+                                .background(actionTint(action).opacity(0.14), in: Capsule())
+                        }
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .foregroundStyle(actionTint(action))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(performingIDs.contains(item.id))
+                    .accessibilityLabel("\(actionTitle(action)) \(item.title)")
+                    .accessibilityIdentifier("task-center-action-\(action.rawValue)-\(item.id)")
+                }
+            }
+        }
     }
 
     private var emptyState: some View {
@@ -471,17 +683,54 @@ struct TaskCenterView: View {
     }
 
     private func visible(_ items: [TaskCenterItemSnapshot]) -> [TaskCenterItemSnapshot] {
-        items.filter { !completingIDs.contains($0.id) }
+        items.filter { !performingIDs.contains($0.id) }
     }
 
-    private func complete(_ item: TaskCenterItemSnapshot) {
-        guard !completingIDs.contains(item.id) else { return }
-        completingIDs.insert(item.id)
-        guard onComplete(item) else {
-            completingIDs.remove(item.id)
+    private var pendingReviewItems: [TaskCenterItemSnapshot] {
+        displayedSnapshot.allItems
+            .filter { $0.workflowStatus == .pendingReview }
+    }
+
+    private func nonReview(_ items: [TaskCenterItemSnapshot]) -> [TaskCenterItemSnapshot] {
+        items.filter { $0.workflowStatus != .pendingReview }
+    }
+
+    private func orderedActions(for item: TaskCenterItemSnapshot) -> [TaskCenterAvailableAction] {
+        let order: [TaskCenterAvailableAction] = [.reject, .approve, .claim, .submitForReview, .complete]
+        return order.filter(item.availableActions.contains)
+    }
+
+    private func perform(_ action: TaskCenterAvailableAction, for item: TaskCenterItemSnapshot) {
+        guard !performingIDs.contains(item.id) else { return }
+        performingIDs.insert(item.id)
+        guard onAction(item, action) else {
+            performingIDs.remove(item.id)
             return
         }
         OhanaFeedback.medium()
+    }
+
+    private func actionTitle(_ action: TaskCenterAvailableAction) -> String {
+        switch action {
+        case .complete:
+            l.tr(zh: "完成", en: "Complete", de: "Erledigen")
+        case .claim:
+            l.tr(zh: "领取", en: "Claim", de: "Übernehmen")
+        case .submitForReview:
+            l.tr(zh: "提交", en: "Submit", de: "Einreichen")
+        case .approve:
+            l.tr(zh: "通过", en: "Approve", de: "Bestätigen")
+        case .reject:
+            l.tr(zh: "驳回", en: "Reject", de: "Ablehnen")
+        }
+    }
+
+    private func actionTint(_ action: TaskCenterAvailableAction) -> Color {
+        switch action {
+        case .reject: .goRed
+        case .approve, .complete: .goTeal
+        case .claim, .submitForReview: .goPrimary
+        }
     }
 
     private func itemTint(_ item: TaskCenterItemSnapshot) -> Color {
@@ -497,7 +746,14 @@ struct TaskCenterView: View {
 
     private func itemSubtitle(_ item: TaskCenterItemSnapshot) -> String {
         let category = item.eventType?.localizedLabel(l)
-        return [item.subjectName, category, item.isRecurring ? l.tr(zh: "重复", en: "Repeats", de: "Wiederholt") : nil]
+        let reward = item.rewardCoconuts > 0 ? "+\(item.rewardCoconuts) 🥥" : nil
+        return [
+            item.subjectName,
+            responsibilityText(item),
+            reward,
+            category,
+            item.isRecurring ? l.tr(zh: "重复", en: "Repeats", de: "Wiederholt") : nil
+        ]
             .compactMap { value in
                 guard let value, !value.isEmpty else { return nil }
                 return value
@@ -505,7 +761,51 @@ struct TaskCenterView: View {
             .joined(separator: " · ")
     }
 
+    private func responsibilityText(_ item: TaskCenterItemSnapshot) -> String? {
+        switch item.workflowStatus {
+        case .pendingReview:
+            guard let name = nonemptyMemberName(item.createdByMember) else { return nil }
+            return l.tr(
+                zh: "等待 \(name) 审核",
+                en: "Review by \(name)",
+                de: "Prüfung durch \(name)"
+            )
+        case .completed:
+            guard let name = nonemptyMemberName(item.completedByMember) else { return nil }
+            return l.tr(
+                zh: "由 \(name) 完成",
+                en: "Completed by \(name)",
+                de: "Erledigt von \(name)"
+            )
+        case .claimed:
+            guard let name = nonemptyMemberName(item.claimedByMember) else { return nil }
+            return l.tr(
+                zh: "\(name) 已领取",
+                en: "Claimed by \(name)",
+                de: "Übernommen von \(name)"
+            )
+        case .active, .scheduled:
+            guard let name = nonemptyMemberName(item.assignedToMember) else { return nil }
+            return l.tr(
+                zh: "分配给 \(name)",
+                en: "Assigned to \(name)",
+                de: "Zugewiesen an \(name)"
+            )
+        case .cancelled:
+            return nil
+        }
+    }
+
+    private func nonemptyMemberName(_ member: TaskMemberSnapshot?) -> String? {
+        guard let name = member?.name.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else { return nil }
+        return name
+    }
+
     private func dueText(_ item: TaskCenterItemSnapshot) -> String {
+        if item.dueAt == nil, item.source == .familyTask {
+            return l.tr(zh: "未排期", en: "Unscheduled", de: "Ohne Termin")
+        }
         if item.urgency == .critical {
             return l.tr(zh: "健康逾期", en: "Health overdue", de: "Gesundheit überfällig")
         }

@@ -184,4 +184,36 @@ struct GrowthUnlockPolicyTests {
             Issue.record("Expected existing plant data to keep the plant dashboard reachable")
         }
     }
+
+    @Test func visibleHomeTabsOnlyAppendWhenOasisUnlocksBeforeGrandfatheredPlants() {
+        PlantUnlockPolicy.clearExistingPlantData()
+        defer { PlantUnlockPolicy.clearExistingPlantData() }
+
+        let suiteName = "GrowthUnlockPolicyTests.visibleHomeTabsOnlyAppendWhenOasisUnlocksBeforeGrandfatheredPlants.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            Issue.record("Expected isolated defaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        PlantUnlockPolicy.noteExistingPlantData()
+        defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+        defaults.set(false, forKey: StarterGiftStorageKey.ceremonySeen)
+
+        #expect(AppFeatureRouteGuard.allowsHomeTab(.plants, currentLevel: 3, starterGiftDefaults: defaults))
+        let beforeOasisUnlock = AppFeatureRouteGuard.visibleHomeTabs(
+            currentLevel: 3,
+            starterGiftDefaults: defaults
+        )
+        #expect(beforeOasisUnlock == [.home, .calendar])
+
+        defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
+
+        let afterOasisUnlock = AppFeatureRouteGuard.visibleHomeTabs(
+            currentLevel: 3,
+            starterGiftDefaults: defaults
+        )
+        #expect(afterOasisUnlock == [.home, .calendar, .oasis, .plants])
+        #expect(Array(afterOasisUnlock.prefix(beforeOasisUnlock.count)) == beforeOasisUnlock)
+    }
 }

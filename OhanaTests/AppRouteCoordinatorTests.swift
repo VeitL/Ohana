@@ -138,8 +138,23 @@ struct AppRouteCoordinatorTests {
 
         #expect(coordinator.overlay == nil)
         #expect(coordinator.fullScreen == nil)
-        #expect(coordinator.sheet == .taskCenter)
-        #expect(coordinator.sheet?.id == "task-center")
+        #expect(coordinator.sheet == .taskCenter(.all))
+        #expect(coordinator.sheet?.id == "task-center-all-all")
+    }
+
+    @Test func profileAndFocusedTaskRoutesCarryTypedTaskCenterContext() {
+        let petID = UUID()
+        let humanID = UUID()
+        let plantID = UUID()
+        let familyTaskID = UUID()
+
+        #expect(AppRoute.petProfile(id: petID, initialTab: .overview).taskCenterContext.scope == .pet(petID))
+        #expect(AppRoute.humanProfile(id: humanID).taskCenterContext.scope == .human(humanID))
+        #expect(AppRoute.plantProfile(id: plantID).taskCenterContext.scope == .plant(plantID))
+
+        let focused = TaskCenterRouteContext.familyTask(familyTaskID)
+        #expect(focused.focusedFamilyTaskID == familyTaskID)
+        #expect(focused.focusRequestID != nil)
     }
 
     @Test func coconutShopUsesGlobalSheetRoute() {
@@ -602,6 +617,19 @@ struct AppRouteCoordinatorTests {
 
     @Test func plantBatchCareNotificationOpensFilteredBatchSheetRoute() {
         let coordinator = AppRouteCoordinator()
+        let treeManager = TestOasisTreeManagerProjection.manager
+        let oldTreeManager = OasisTreeManagerRegistry.current
+        let oldIslandEnergy = treeManager.islandEnergy
+        let oldInjectedEnergy = treeManager.injectedEnergy
+        OasisTreeManagerRegistry.current = treeManager
+        defer {
+            treeManager.setEnergyForTesting(
+                islandEnergy: oldIslandEnergy,
+                injectedEnergy: oldInjectedEnergy
+            )
+            OasisTreeManagerRegistry.current = oldTreeManager
+        }
+        treeManager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 500)
 
         coordinator.openHuman(UUID())
         let outcome = coordinator.handleNotificationEvent(.plantBatchCareRouteRequested(careType: .watering))

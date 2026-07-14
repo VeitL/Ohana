@@ -170,6 +170,34 @@ nonisolated struct PlantBatchCareRewardCommitResult: Equatable, Sendable {
 enum PlantBatchCareCommandService {
     private static let undoWindowSeconds: TimeInterval = 6
 
+    nonisolated static let supportedQuickCareTypes: [PlantCareType] = [
+        .watering,
+        .fertilizing,
+        .misting,
+        .repotting,
+        .pruning,
+        .leafCleaning,
+        .rotating,
+        .pestCheck
+    ]
+
+    private struct PreflightSelection {
+        let selection: PlantBatchCareSelection
+        let plant: Plant
+        let wasDue: Bool
+    }
+
+    private struct PreflightResult {
+        let selections: [PreflightSelection]
+        let failures: [PlantBatchCareSkippedSelection]
+    }
+
+    private struct BatchPreparation {
+        let id: UUID
+        let selections: [PlantBatchCareSelection]
+        let duplicateSkips: [PlantBatchCareSkippedSelection]
+    }
+
     @discardableResult
     static func completeDueCare(
         selections rawSelections: [PlantBatchCareSelection],
@@ -225,9 +253,28 @@ enum PlantBatchCareCommandService {
         syncCarePlan: Bool,
         scheduleNotifications: Bool
     ) -> PlantBatchCareCommandResult {
-        let batchID = UUID()
-        let selections = normalizedSelections(rawSelections)
-        var skipped = skippedDuplicates(in: rawSelections)
+        let preparation = batchPreparation(rawSelections, now: now, requiresDueTask: requiresDueTask, calendar: calendar)
+        if let replay = persistedReplay(for: preparation, context: context) { return replay }
+        let batchID = preparation.id
+        let selections = preparation.selections
+        let preflight = preflight(
+            selections: selections,
+            context: context,
+            now: now,
+            calendar: calendar,
+            requiresDueTask: requiresDueTask
+        )
+        let preflightSkips = preparation.duplicateSkips + preflight.failures
+        guard preflight.failures.isEmpty else {
+            return emptyBatchResult(
+                batchID: batchID,
+                skipped: preflightSkips,
+                didPersist: true,
+                persistenceErrorDescription: nil
+            )
+        }
+
+        var skipped = preparation.duplicateSkips
         var items: [PlantBatchCareUndoItem] = []
         var restorePointsByPlantID: [UUID: PlantBatchCareRestorePoint] = [:]
         var touchedPlants: [Plant] = []
@@ -235,25 +282,9 @@ enum PlantBatchCareCommandService {
         var estimatedCoconutDelta = 0
         let deferredEconomy = PlantBatchCareDeferredEconomyAwarder()
 
-        for selection in selections {
-            guard supportedBatchCareTypes.contains(selection.careType) else {
-                skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .unsupportedCareType))
-                continue
-            }
-            guard let plant = fetchPlant(id: selection.plantID, context: context) else {
-                skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .missingPlant))
-                continue
-            }
-            guard !plant.isArchived else {
-                skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .archivedPlant))
-                continue
-            }
-            let due = isDue(selection.careType, for: plant, now: now, calendar: calendar)
-            guard !requiresDueTask || due else {
-                skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .notDue))
-                continue
-            }
-
+        for validatedSelection in preflight.selections {
+            let selection = validatedSelection.selection
+            let plant = validatedSelection.plant
             let existingRestorePoint = restorePointsByPlantID[plant.id]
             let restorePointBeforeCommand = existingRestorePoint ?? restorePoint(for: plant)
 
@@ -262,18 +293,25 @@ enum PlantBatchCareCommandService {
                 plant: plant,
                 executorId: executorId,
                 now: now,
+                careTransactionId: batchID.uuidString,
                 economy: deferredEconomy,
                 context: context
             )
             guard result.didPersist else {
                 skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .commandRejected))
-                continue
+                context.rollback()
+                return emptyBatchResult(
+                    batchID: batchID,
+                    skipped: skipped,
+                    didPersist: false,
+                    persistenceErrorDescription: result.persistenceError
+                )
             }
             if existingRestorePoint == nil {
                 restorePointsByPlantID[plant.id] = restorePointBeforeCommand
                 touchedPlants.append(plant)
             }
-            let wasRewardEligible = due && PlantCareCommandService.rewardAction(for: selection.careType) != nil
+            let wasRewardEligible = validatedSelection.wasDue && PlantCareCommandService.rewardAction(for: selection.careType) != nil
             if wasRewardEligible, let action = PlantCareCommandService.rewardAction(for: selection.careType) {
                 let rewards = action.baseRewards
                 estimatedCoconutDelta += max(0, rewards.human) + max(0, rewards.pet)
@@ -308,12 +346,9 @@ enum PlantBatchCareCommandService {
             let saveResult = context.safeSaveResult(publishFailureEvent: true)
             guard saveResult.didSave else {
                 context.rollback()
-                return PlantBatchCareCommandResult(
+                return emptyBatchResult(
                     batchID: batchID,
-                    items: [],
                     skipped: skipped,
-                    undoToken: nil,
-                    estimatedCoconutDelta: 0,
                     didPersist: false,
                     persistenceErrorDescription: saveResult.errorDescription
                 )
@@ -345,11 +380,29 @@ enum PlantBatchCareCommandService {
         )
     }
 
+    private static func emptyBatchResult(
+        batchID: UUID,
+        skipped: [PlantBatchCareSkippedSelection],
+        didPersist: Bool,
+        persistenceErrorDescription: String?
+    ) -> PlantBatchCareCommandResult {
+        PlantBatchCareCommandResult(
+            batchID: batchID,
+            items: [],
+            skipped: skipped,
+            undoToken: nil,
+            estimatedCoconutDelta: 0,
+            didPersist: didPersist,
+            persistenceErrorDescription: persistenceErrorDescription
+        )
+    }
+
     private static func recordCare(
         selection: PlantBatchCareSelection,
         plant: Plant,
         executorId: String?,
         now: Date,
+        careTransactionId: String,
         economy: CareEventEconomyAwarding,
         context: ModelContext
     ) -> PlantCareCommandResult {
@@ -370,7 +423,8 @@ enum PlantBatchCareCommandService {
         return PlantCareCommandService.recordCare(
             request,
             context: context,
-            options: options
+            options: options,
+            careTransactionId: careTransactionId
         )
     }
 
@@ -520,6 +574,7 @@ enum PlantBatchCareCommandService {
             ledger.coconutDelta = delta
             ledger.metadataJSON = rewardMetadata(
                 batchID: token.batchID,
+                existingMetadata: ledger.metadataJSON,
                 rewardMetadata: economy.rewardMetadata(for: reward),
                 walletEntries: newWalletEntries,
                 budgetEvents: newBudgetEvents
@@ -560,8 +615,42 @@ enum PlantBatchCareCommandService {
         )
     }
 
-    private static var supportedBatchCareTypes: Set<PlantCareType> {
-        [.watering, .fertilizing, .pestCheck, .leafCleaning, .rotating, .pruning, .repotting, .misting]
+    private nonisolated static let supportedBatchCareTypes = Set(supportedQuickCareTypes)
+
+    private static func preflight(
+        selections: [PlantBatchCareSelection],
+        context: ModelContext,
+        now: Date,
+        calendar: Calendar,
+        requiresDueTask: Bool
+    ) -> PreflightResult {
+        var validatedSelections: [PreflightSelection] = []
+        var failures: [PlantBatchCareSkippedSelection] = []
+
+        for selection in selections {
+            guard supportedBatchCareTypes.contains(selection.careType) else {
+                failures.append(PlantBatchCareSkippedSelection(selection: selection, reason: .unsupportedCareType))
+                continue
+            }
+            guard let plant = fetchPlant(id: selection.plantID, context: context) else {
+                failures.append(PlantBatchCareSkippedSelection(selection: selection, reason: .missingPlant))
+                continue
+            }
+            guard !plant.isArchived else {
+                failures.append(PlantBatchCareSkippedSelection(selection: selection, reason: .archivedPlant))
+                continue
+            }
+            let due = isDue(selection.careType, for: plant, now: now, calendar: calendar)
+            guard !requiresDueTask || due else {
+                failures.append(PlantBatchCareSkippedSelection(selection: selection, reason: .notDue))
+                continue
+            }
+            validatedSelections.append(
+                PreflightSelection(selection: selection, plant: plant, wasDue: due)
+            )
+        }
+
+        return PreflightResult(selections: validatedSelections, failures: failures)
     }
 
     private static func normalizedSelections(_ selections: [PlantBatchCareSelection]) -> [PlantBatchCareSelection] {
@@ -612,18 +701,22 @@ enum PlantBatchCareCommandService {
 
     private static func rewardMetadata(
         batchID: UUID,
+        existingMetadata: String,
         rewardMetadata: String,
         walletEntries: [CoconutLedgerEntry],
         budgetEvents: [EconomyBudgetUsageEvent]
     ) -> String {
-        var object = CalendarTaskCompletionSyncService.metadataDictionary(from: rewardMetadata)
-        object["batchID"] = batchID.uuidString
+        var object = CalendarTaskCompletionSyncService.metadataDictionary(from: existingMetadata)
+        let rewardObject = CalendarTaskCompletionSyncService.metadataDictionary(from: rewardMetadata)
+        object.merge(rewardObject) { _, rewardValue in rewardValue }
+        object[CareLedgerMetadata.careTransactionId] = batchID.uuidString
+        object[CareLedgerMetadata.batchID] = batchID.uuidString
         object["walletEntryIds"] = walletEntries.map(\.id.uuidString)
         object["budgetUsageIds"] = budgetEvents.map(\.id.uuidString)
         object["generatedBy"] = "PlantBatchCareCommandService"
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
               let json = String(data: data, encoding: .utf8) else {
-            return "{\"batchID\":\"\(batchID.uuidString)\"}"
+            return "{\"batchID\":\"\(batchID.uuidString)\",\"careTransactionId\":\"\(batchID.uuidString)\"}"
         }
         return json
     }
@@ -644,6 +737,84 @@ enum PlantBatchCareCommandService {
         var descriptor = FetchDescriptor<PlantCareLog>(predicate: #Predicate<PlantCareLog> { $0.id == id })
         descriptor.fetchLimit = 1
         return fetchOrEmpty(descriptor, context: context).first
+    }
+
+    private static func hasPersistedBatch(_ batchID: UUID, context: ModelContext) -> Bool {
+        let transactionID = batchID.uuidString
+        var descriptor = FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { $0.careTransactionId == transactionID }
+        )
+        descriptor.fetchLimit = 1
+        return !fetchOrEmpty(descriptor, context: context).isEmpty
+    }
+
+    private static func batchPreparation(
+        _ rawSelections: [PlantBatchCareSelection],
+        now: Date,
+        requiresDueTask: Bool,
+        calendar: Calendar
+    ) -> BatchPreparation {
+        let selections = normalizedSelections(rawSelections)
+        return BatchPreparation(
+            id: stableBatchID(
+                selections: selections,
+                occurrenceDate: now,
+                requiresDueTask: requiresDueTask,
+                calendar: calendar
+            ),
+            selections: selections,
+            duplicateSkips: skippedDuplicates(in: rawSelections)
+        )
+    }
+
+    private static func persistedReplay(
+        for preparation: BatchPreparation,
+        context: ModelContext
+    ) -> PlantBatchCareCommandResult? {
+        guard hasPersistedBatch(preparation.id, context: context) else { return nil }
+        return emptyBatchResult(
+            batchID: preparation.id,
+            skipped: preparation.duplicateSkips,
+            didPersist: true,
+            persistenceErrorDescription: nil
+        )
+    }
+
+    private static func stableBatchID(
+        selections: [PlantBatchCareSelection],
+        occurrenceDate: Date,
+        requiresDueTask: Bool,
+        calendar: Calendar
+    ) -> UUID {
+        let day = calendar.dateComponents([.year, .month, .day], from: occurrenceDate)
+        let targetKey = selections
+            .map { "\($0.plantID.uuidString):\($0.careType.rawValue)" }
+            .sorted()
+            .joined(separator: "|")
+        let seed = [
+            requiresDueTask ? "due" : "quick",
+            String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0),
+            targetKey
+        ].joined(separator: ":")
+        var hash = UInt64(1_469_598_103_934_665_603)
+        for byte in seed.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        let a = UInt32(truncatingIfNeeded: hash)
+        let b = UInt16(truncatingIfNeeded: hash >> 32)
+        let c = UInt16(truncatingIfNeeded: hash >> 48)
+        let d = UInt16(truncatingIfNeeded: hash ^ 0xBA7C)
+        let e = UInt64(truncatingIfNeeded: hash ^ 0x0B47_C4A3_5EED_F00D)
+        let value = String(
+            format: "%08X-%04X-%04X-%04X-%012llX",
+            a,
+            b,
+            c,
+            d,
+            e & 0x0000_FFFF_FFFF_FFFF
+        )
+        return UUID(uuidString: value) ?? UUID()
     }
 
     private static func fetchLedgerEvent(id: UUID, context: ModelContext) -> CareLedgerEvent? {

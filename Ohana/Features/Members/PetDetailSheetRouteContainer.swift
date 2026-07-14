@@ -115,6 +115,7 @@ struct AppPetDetailSheetRouteContainer: View {
             case .weightQuick:
                 GenericWeightEntrySheet(
                     target: .pet(pet),
+                    petLedgerSource: .quickAction,
                     onDismiss: onDismiss
                 )
             case .weight:

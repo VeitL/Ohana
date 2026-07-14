@@ -31,9 +31,9 @@ private struct GlobalTaskCenterToolbarModifier: ViewModifier {
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel(L10n(appLanguage).tr(
-                        zh: "打开待办中心",
-                        en: "Open task center",
-                        de: "Aufgabenzentrum öffnen"
+                        zh: "打开待办",
+                        en: "Open tasks",
+                        de: "Aufgaben öffnen"
                     ))
                     .accessibilityIdentifier("global-task-center-action")
                 }

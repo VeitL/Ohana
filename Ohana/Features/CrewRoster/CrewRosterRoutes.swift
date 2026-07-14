@@ -25,17 +25,3 @@ enum CrewRosterFullScreenRoute: Identifiable, Equatable {
         }
     }
 }
-
-enum CrewRosterSheetRoute: Identifiable, Equatable {
-    case familyActivity(UUID)
-    case familyWeeklyReport
-
-    var id: String {
-        switch self {
-        case let .familyActivity(id):
-            "family-activity-\(id.uuidString)"
-        case .familyWeeklyReport:
-            "family-weekly-report"
-        }
-    }
-}

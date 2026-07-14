@@ -132,7 +132,7 @@ enum ReminderSchedulingService {
         let careLedger = providedCareLedger ?? CareLedgerService()
         let now = Date()
         for reminder in reminders {
-            guard reminder.isPending, reminder.scheduledAt < now else { continue }
+            guard reminder.isPending, reminder.resolvedOccurrenceAt < now else { continue }
             let actionType: String
             guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
                 reminder: reminder,

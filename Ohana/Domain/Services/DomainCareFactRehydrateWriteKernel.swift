@@ -31,6 +31,7 @@ nonisolated struct DomainPlantCareLogRehydrateSnapshot: Equatable {
     let executorId: String?
     let plantId: UUID?
     let healthStatusRaw: String
+    let careTransactionId: String
     let photoData: Data?
 }
 
@@ -172,6 +173,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
             careType: PlantCareType(rawValue: snapshot.careTypeRaw) ?? .customNote,
             note: snapshot.note,
             executorId: snapshot.executorId,
+            careTransactionId: snapshot.careTransactionId,
             photoData: snapshot.photoData,
             healthStatus: PlantHealthStatus(rawValue: snapshot.healthStatusRaw)
         )

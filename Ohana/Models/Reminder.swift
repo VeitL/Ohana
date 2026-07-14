@@ -36,6 +36,9 @@ enum ReminderStatus: String, Codable {
 final class Reminder {
     var id: UUID
     var event: Event?
+    /// The task occurrence this reminder represents. `scheduledAt` remains the
+    /// notification delivery time and may be earlier than this value.
+    var occurrenceAt: Date?
     var scheduledAt: Date
     var status: String
     var completedAt: Date?
@@ -45,10 +48,12 @@ final class Reminder {
 
     init(
         event: Event? = nil,
-        scheduledAt: Date = Date()
+        scheduledAt: Date = Date(),
+        occurrenceAt: Date? = nil
     ) {
         self.id = UUID()
         self.event = event
+        self.occurrenceAt = occurrenceAt
         self.scheduledAt = scheduledAt
         self.status = ReminderStatus.pending.rawValue
         self.completedAt = nil
@@ -65,4 +70,8 @@ final class Reminder {
     var isPending: Bool { statusEnum == .pending }
     var isCompleted: Bool { statusEnum == .completed }
     var isFailed: Bool { statusEnum == .failed }
+
+    /// V89 compatibility: older rows treated the notification timestamp as the
+    /// occurrence timestamp, so a missing value preserves that behavior.
+    var resolvedOccurrenceAt: Date { occurrenceAt ?? scheduledAt }
 }
