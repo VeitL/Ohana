@@ -394,59 +394,59 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 onSaved: onFirstSuccessMomentCompleted,
                 onDismiss: { routes.dismissOverlay(routeID: routeID) }
             )
-                case let .petWeightQuick(routeID, petID):
-                    AppPetWeightQuickSheetHost(
-                        id: petID,
-                        onMissing: { routes.dismissOverlay(routeID: routeID) },
-                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
-                    )
-                case let .petExpenseQuick(routeID, petID):
-                    AppPetDetailSheetRouteContainer(
-                        id: petID,
-                        destination: .expenseQuick,
-                        onMissing: { routes.dismissOverlay(routeID: routeID) },
-                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
-                    )
-                case let .humanMedicationQuick(routeID, humanID):
-                    AppHumanDetailSheetRouteContainer(
-                        id: humanID,
-                        destination: .medicationQuick,
-                        onMissing: { routes.dismissOverlay(routeID: routeID) },
-                        onDismiss: { routes.dismissOverlay(routeID: routeID) },
-                        onOpenDestination: { id, destination in
-                            routes.dismissOverlay(routeID: routeID)
-                            OhanaFrameScheduler.runAfterNextFrame {
-                                routes.openSheet(homeHumanDetailRoute(humanID: id, destination: destination))
-                            }
-                        }
-                    )
-                case let .humanWeightQuick(routeID, humanID):
-                    AppHumanWeightQuickSheetHost(
-                        id: humanID,
-                        onMissing: { routes.dismissOverlay(routeID: routeID) },
-                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
-                    )
-                case let .humanWorkoutQuick(routeID, humanID):
-                    AppHumanDetailSheetRouteContainer(
-                        id: humanID,
-                        destination: .workoutQuick,
-                        onMissing: { routes.dismissOverlay(routeID: routeID) },
-                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
-                    )
-                case let .humanExpenseQuick(routeID, humanID):
-                    AppHumanDetailSheetRouteContainer(
-                        id: humanID,
-                        destination: .expenseQuick,
-                        onMissing: { routes.dismissOverlay(routeID: routeID) },
-                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
-                    )
-                case let .humanNoteQuick(routeID, humanID):
-                    AppHumanDetailSheetRouteContainer(
-                        id: humanID,
-                        destination: .noteQuick,
-                        onMissing: { routes.dismissOverlay(routeID: routeID) },
-                        onDismiss: { routes.dismissOverlay(routeID: routeID) }
-                    )
+        case let .petWeightQuick(routeID, petID):
+            AppPetWeightQuickSheetHost(
+                id: petID,
+                onMissing: { routes.dismissOverlay(routeID: routeID) },
+                onDismiss: { routes.dismissOverlay(routeID: routeID) }
+            )
+        case let .petExpenseQuick(routeID, petID):
+            AppPetDetailSheetRouteContainer(
+                id: petID,
+                destination: .expenseQuick,
+                onMissing: { routes.dismissOverlay(routeID: routeID) },
+                onDismiss: { routes.dismissOverlay(routeID: routeID) }
+            )
+        case let .humanMedicationQuick(routeID, humanID):
+            AppHumanDetailSheetRouteContainer(
+                id: humanID,
+                destination: .medicationQuick,
+                onMissing: { routes.dismissOverlay(routeID: routeID) },
+                onDismiss: { routes.dismissOverlay(routeID: routeID) },
+                onOpenDestination: { id, destination in
+                    routes.dismissOverlay(routeID: routeID)
+                    OhanaFrameScheduler.runAfterNextFrame {
+                        routes.openSheet(homeHumanDetailRoute(humanID: id, destination: destination))
+                    }
+                }
+            )
+        case let .humanWeightQuick(routeID, humanID):
+            AppHumanWeightQuickSheetHost(
+                id: humanID,
+                onMissing: { routes.dismissOverlay(routeID: routeID) },
+                onDismiss: { routes.dismissOverlay(routeID: routeID) }
+            )
+        case let .humanWorkoutQuick(routeID, humanID):
+            AppHumanDetailSheetRouteContainer(
+                id: humanID,
+                destination: .workoutQuick,
+                onMissing: { routes.dismissOverlay(routeID: routeID) },
+                onDismiss: { routes.dismissOverlay(routeID: routeID) }
+            )
+        case let .humanExpenseQuick(routeID, humanID):
+            AppHumanDetailSheetRouteContainer(
+                id: humanID,
+                destination: .expenseQuick,
+                onMissing: { routes.dismissOverlay(routeID: routeID) },
+                onDismiss: { routes.dismissOverlay(routeID: routeID) }
+            )
+        case let .humanNoteQuick(routeID, humanID):
+            AppHumanDetailSheetRouteContainer(
+                id: humanID,
+                destination: .noteQuick,
+                onMissing: { routes.dismissOverlay(routeID: routeID) },
+                onDismiss: { routes.dismissOverlay(routeID: routeID) }
+            )
         }
     }
 

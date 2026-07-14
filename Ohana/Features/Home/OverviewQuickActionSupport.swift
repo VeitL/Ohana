@@ -309,15 +309,43 @@ enum OhanaQuickActionGlyphKind: CaseIterable, Equatable, Sendable {
             return exactKind
         }
 
-        return resolveFluidFallback(action: action, symbol: symbol)
-            ?? resolveFoodFallback(action: action, symbol: symbol)
-            ?? resolveMovementFallback(action: action, symbol: symbol)
-            ?? resolveHygieneFallback(action: action, symbol: symbol)
-            ?? resolveHealthFallback(action: action, symbol: symbol)
-            ?? resolveLifestyleFallback(action: action, symbol: symbol)
-            ?? resolvePeopleFallback(action: action, symbol: symbol)
-            ?? resolvePlantFallback(action: action, symbol: symbol)
-            ?? resolveUtilityFallback(action: action, symbol: symbol)
+        if let kind = resolveCareFallback(action: action, symbol: symbol) {
+            return kind
+        }
+        if let kind = resolveWellbeingFallback(action: action, symbol: symbol) {
+            return kind
+        }
+        return resolveContextFallback(action: action, symbol: symbol)
+    }
+
+    private static func resolveCareFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
+        if let kind = resolveFluidFallback(action: action, symbol: symbol) {
+            return kind
+        }
+        if let kind = resolveFoodFallback(action: action, symbol: symbol) {
+            return kind
+        }
+        return resolveMovementFallback(action: action, symbol: symbol)
+    }
+
+    private static func resolveWellbeingFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
+        if let kind = resolveHygieneFallback(action: action, symbol: symbol) {
+            return kind
+        }
+        if let kind = resolveHealthFallback(action: action, symbol: symbol) {
+            return kind
+        }
+        return resolveLifestyleFallback(action: action, symbol: symbol)
+    }
+
+    private static func resolveContextFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
+        if let kind = resolvePeopleFallback(action: action, symbol: symbol) {
+            return kind
+        }
+        if let kind = resolvePlantFallback(action: action, symbol: symbol) {
+            return kind
+        }
+        return resolveUtilityFallback(action: action, symbol: symbol)
     }
 
     private static let exactActionKinds: [String: OhanaQuickActionGlyphKind] = [

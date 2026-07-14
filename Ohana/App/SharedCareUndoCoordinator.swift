@@ -205,12 +205,9 @@ struct SharedCareUndoBannerView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
+        .background {
+            OhanaPopupGlassSurface(cornerRadius: OhanaRadius.card)
         }
-        .shadow(color: Color.black.opacity(0.18), radius: 18, y: 8)
         .accessibilityElement(children: .contain)
     }
 }
