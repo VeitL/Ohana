@@ -6209,6 +6209,31 @@ struct OhanaTests {
         func confirmCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
         func complete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
         func claim(_: FamilyCollaborationTask, by _: Human, context _: ModelContext) -> Bool { false }
+        func canClaim(_: FamilyCollaborationTask, by _: Human, context _: ModelContext) -> Bool { false }
+        func canComplete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
+        func canSubmitForReview(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
+
+        func prepareCompletedReminder(
+            _ reminder: Reminder,
+            completedBy humanId: String?,
+            context: ModelContext
+        ) -> FamilyTaskReminderCompletionPreparation {
+            FamilyTaskService.prepareCompletedReminder(
+                reminder,
+                completedBy: humanId,
+                context: context
+            )
+        }
+
+        func authorizeCollaborationWrite(
+            subjectRequest _: DomainSubjectResolutionRequest,
+            actor _: Human?,
+            occurredAt _: Date,
+            context _: ModelContext,
+            logPrefix _: String
+        ) -> AuthorizedDomainMemberFactWrite? {
+            nil
+        }
 
         func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context _: ModelContext) -> Bool {
             completedReminderIDs.append(reminder.id)

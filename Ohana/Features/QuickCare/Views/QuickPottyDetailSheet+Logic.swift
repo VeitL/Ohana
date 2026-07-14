@@ -261,7 +261,7 @@ extension QuickPottyDetailSheet {
                 return
             }
             if let undoToken = result.undoToken {
-                SharedCareUndoCoordinator.shared.register(
+                appServices.sharedCareUndo.register(
                     undoToken,
                     targetCount: result.targetCount
                 )

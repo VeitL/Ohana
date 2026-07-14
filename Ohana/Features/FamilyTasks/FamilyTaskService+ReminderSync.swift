@@ -9,12 +9,6 @@
 import Foundation
 import SwiftData
 
-enum FamilyTaskReminderCompletionPreparation: Equatable {
-    case notLinked
-    case prepared
-    case rejected
-}
-
 extension FamilyTaskService {
     @MainActor
     @discardableResult
@@ -51,9 +45,9 @@ extension FamilyTaskService {
             context: context
         ) {
         case .notLinked, .rejected:
-            return false
+            false
         case .prepared:
-            return saveChanges ? persistMutation(context: context) : true
+            saveChanges ? persistMutation(context: context) : true
         }
     }
 

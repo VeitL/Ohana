@@ -129,6 +129,46 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
         FamilyTaskService.claim(task, by: human, context: context)
     }
 
+    func canClaim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) -> Bool {
+        FamilyTaskService.canClaim(task, by: human, context: context)
+    }
+
+    func canComplete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool {
+        FamilyTaskService.canComplete(task, by: human, context: context)
+    }
+
+    func canSubmitForReview(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool {
+        FamilyTaskService.canSubmitForReview(task, by: human, context: context)
+    }
+
+    func prepareCompletedReminder(
+        _ reminder: Reminder,
+        completedBy humanId: String?,
+        context: ModelContext
+    ) -> FamilyTaskReminderCompletionPreparation {
+        FamilyTaskService.prepareCompletedReminder(
+            reminder,
+            completedBy: humanId,
+            context: context
+        )
+    }
+
+    func authorizeCollaborationWrite(
+        subjectRequest: DomainSubjectResolutionRequest,
+        actor: Human?,
+        occurredAt: Date,
+        context: ModelContext,
+        logPrefix: String
+    ) -> AuthorizedDomainMemberFactWrite? {
+        FamilyTaskService.authorizedCollaborationWrite(
+            subjectRequest: subjectRequest,
+            actor: actor,
+            occurredAt: occurredAt,
+            context: context,
+            logPrefix: logPrefix
+        )
+    }
+
     @discardableResult
     func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext) -> Bool {
         FamilyTaskService.syncCompletedReminder(

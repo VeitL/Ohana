@@ -377,7 +377,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         let sourcePetID = UUID()
         let targetPetID = UUID()
         let reminderID = UUID()
-        let occurredAt = Date(timeIntervalSinceReferenceDate: 10_000)
+        let occurredAt = Date(timeIntervalSinceReferenceDate: 10000)
         let undoDeadline = occurredAt.addingTimeInterval(6)
 
         do {

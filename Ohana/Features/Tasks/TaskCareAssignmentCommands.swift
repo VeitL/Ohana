@@ -42,7 +42,7 @@ nonisolated struct TaskCareAssignmentCommand: Equatable, Sendable {
         self.notificationLeadMinutes = notificationLeadMinutes.map { max(0, $0) }
         self.creatorHumanID = creatorHumanID
         self.assigneeHumanID = assigneeHumanID
-        self.rewardCoconuts = FamilyTaskService.cappedReward(rewardCoconuts)
+        self.rewardCoconuts = FamilyTaskRewardPolicy.capped(rewardCoconuts)
     }
 
     var cleanTitle: String {
@@ -268,7 +268,7 @@ struct TaskCareAssignmentCommandExecutor {
             relatedEntityId: command.preset.subjectID.uuidString,
             assigneeId: assignee.id.uuidString
         )
-        guard let plan = FamilyTaskService.authorizedCollaborationWrite(
+        guard let plan = services.familyTasks.authorizeCollaborationWrite(
             subjectRequest: request,
             actor: creator,
             occurredAt: Date(),

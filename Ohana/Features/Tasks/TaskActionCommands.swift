@@ -141,8 +141,7 @@ struct TaskActionCommandExecutor {
                 familyTask.status == .claimed {
                 return success(command, disposition: .alreadyApplied, event: event, familyTask: familyTask)
             }
-            let didApply = FamilyCollaborationCommandExecutor(modelContext: modelContext)
-                .claim(familyTask, by: activeHuman)
+            let didApply = collaborationExecutor.claim(familyTask, by: activeHuman)
             return didApply
                 ? success(command, event: event, familyTask: familyTask)
                 : rejected(command, event: event, familyTask: familyTask)
@@ -152,8 +151,7 @@ struct TaskActionCommandExecutor {
                     ? success(command, disposition: .alreadyApplied, event: event, familyTask: familyTask)
                     : rejected(command, event: event, familyTask: familyTask)
             }
-            let didApply = FamilyCollaborationCommandExecutor(modelContext: modelContext)
-                .confirmCompletion(familyTask, by: activeHuman)
+            let didApply = collaborationExecutor.confirmCompletion(familyTask, by: activeHuman)
             return didApply
                 ? success(command, event: event, familyTask: familyTask)
                 : rejected(command, event: event, familyTask: familyTask)
@@ -161,8 +159,7 @@ struct TaskActionCommandExecutor {
             guard let familyTask, familyTask.status == .pendingReview else {
                 return rejected(command, event: event, familyTask: familyTask)
             }
-            let didApply = FamilyCollaborationCommandExecutor(modelContext: modelContext)
-                .rejectCompletion(familyTask, by: activeHuman)
+            let didApply = collaborationExecutor.rejectCompletion(familyTask, by: activeHuman)
             return didApply
                 ? success(command, event: event, familyTask: familyTask)
                 : rejected(command, event: event, familyTask: familyTask)
@@ -189,7 +186,7 @@ struct TaskActionCommandExecutor {
                 return rejected(command, event: event, familyTask: familyTask)
             }
             if implicitlyClaimableTask {
-                guard FamilyTaskService.canClaim(
+                guard services.familyTasks.canClaim(
                     familyTask,
                     by: activeHuman,
                     context: modelContext
@@ -199,13 +196,13 @@ struct TaskActionCommandExecutor {
             } else {
                 let passesPreflight = switch command.action {
                 case .complete:
-                    FamilyTaskService.canComplete(
+                    services.familyTasks.canComplete(
                         familyTask,
                         by: activeHuman,
                         context: modelContext
                     )
                 case .submitForReview:
-                    FamilyTaskService.canSubmitForReview(
+                    services.familyTasks.canSubmitForReview(
                         familyTask,
                         by: activeHuman,
                         context: modelContext
@@ -258,7 +255,7 @@ struct TaskActionCommandExecutor {
         if let familyTask,
            familyTask.status != .completed,
            familyTask.status != .pendingReview {
-            let collaboration = FamilyCollaborationCommandExecutor(modelContext: modelContext)
+            let collaboration = collaborationExecutor
             if implicitlyClaimableTask,
                let activeHuman,
                familyTask.isOpen {
@@ -292,6 +289,14 @@ struct TaskActionCommandExecutor {
         }
         let activeHumans = humans.filter { !$0.hasPassedAway }
         return activeHumans.count == 1 ? activeHumans[0] : nil
+    }
+
+    private var collaborationExecutor: FamilyCollaborationCommandExecutor {
+        FamilyCollaborationCommandExecutor(
+            modelContext: modelContext,
+            familyTasks: services.familyTasks,
+            revisions: services.domainRevisions
+        )
     }
 
     private func fetchEvent(id: UUID) throws -> Event {

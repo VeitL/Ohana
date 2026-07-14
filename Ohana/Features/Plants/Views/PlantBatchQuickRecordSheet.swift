@@ -341,7 +341,7 @@ struct PlantBatchQuickRecordSheet: View {
     }
 
     private var quickCareTypes: [PlantCareType] {
-        PlantBatchCareCommandService.supportedQuickCareTypes
+        PlantBatchCarePolicy.supportedQuickCareTypes
     }
 
     private func toggle(_ id: UUID) {

@@ -175,9 +175,8 @@ struct SharedCareUndoBannerView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
                 .foregroundStyle(Color.goPrimary)
-                .accessibilityHidden(true)
             Text(
                 L10n.current.tr(
                     zh: "已为 \(snapshot.targetCount) 只猫记录铲砂",

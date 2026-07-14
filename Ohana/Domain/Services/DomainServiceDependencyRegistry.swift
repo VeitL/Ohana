@@ -257,6 +257,23 @@ private final class DomainNoOpFamilyTaskManager: FamilyTaskManaging {
     func confirmCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
     func complete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
     func claim(_: FamilyCollaborationTask, by _: Human, context _: ModelContext) -> Bool { false }
+    func canClaim(_: FamilyCollaborationTask, by _: Human, context _: ModelContext) -> Bool { false }
+    func canComplete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
+    func canSubmitForReview(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
+    func prepareCompletedReminder(
+        _: Reminder,
+        completedBy _: String?,
+        context _: ModelContext
+    ) -> FamilyTaskReminderCompletionPreparation { .notLinked }
+
+    func authorizeCollaborationWrite(
+        subjectRequest _: DomainSubjectResolutionRequest,
+        actor _: Human?,
+        occurredAt _: Date,
+        context _: ModelContext,
+        logPrefix _: String
+    ) -> AuthorizedDomainMemberFactWrite? { nil }
+
     func syncCompletedReminder(_: Reminder, completedBy _: String?, context _: ModelContext) -> Bool { false }
     func syncReopenedReminder(_: Reminder, context _: ModelContext) -> Bool { false }
 }

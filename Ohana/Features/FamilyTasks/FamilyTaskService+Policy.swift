@@ -1,6 +1,14 @@
 import Foundation
 import SwiftData
 
+nonisolated enum FamilyTaskRewardPolicy {
+    static let cap = 500
+
+    static func capped(_ value: Int) -> Int {
+        min(cap, max(0, value))
+    }
+}
+
 struct FamilyTaskFunding {
     let creator: Human
     let reward: Int
@@ -14,7 +22,7 @@ enum FamilyTaskFundingPolicy {
         rewardCoconuts: Int,
         context: ModelContext
     ) -> FamilyTaskFunding? {
-        let reward = FamilyTaskService.cappedReward(rewardCoconuts)
+        let reward = FamilyTaskRewardPolicy.capped(rewardCoconuts)
         guard let human,
               let creator = EconomyRewardOwnerResolver.explicitHuman(
                   id: createdById,
@@ -33,7 +41,7 @@ enum FamilyTaskFundingPolicy {
 
 extension FamilyTaskService {
     nonisolated static func cappedReward(_ value: Int) -> Int {
-        min(rewardCap, max(0, value))
+        FamilyTaskRewardPolicy.capped(value)
     }
 
     static func canPerform(_ task: FamilyCollaborationTask, human: Human?) -> Bool {

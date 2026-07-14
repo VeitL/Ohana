@@ -10,6 +10,13 @@ import Observation
 import SwiftData
 
 @MainActor
+protocol SharedCareUndoRegistering {
+    func register(_ token: SharedCareUndoToken, targetCount: Int)
+}
+
+extension SharedCareUndoCoordinator: SharedCareUndoRegistering {}
+
+@MainActor
 @Observable
 final class AppServices {
     let careEvents: CareEventRecording
@@ -53,6 +60,7 @@ final class AppServices {
     let domainRevisions: DomainRevisionPublishing
     let lifecycle: AppLifecycleHandling
     let cloudSync: CloudSyncManaging
+    let sharedCareUndo: SharedCareUndoRegistering
     var walkingPresentationRevision = 0
 
     convenience init(modelContainer: ModelContainer? = nil) {
@@ -234,7 +242,8 @@ final class AppServices {
         careLedgerStats: CareLedgerStatsReading,
         domainRevisions: DomainRevisionPublishing,
         lifecycle: AppLifecycleHandling,
-        cloudSync: CloudSyncManaging
+        cloudSync: CloudSyncManaging,
+        sharedCareUndo: SharedCareUndoRegistering? = nil
     ) {
         self.careEvents = careEvents
         self.activeHumanSelection = activeHumanSelection
@@ -277,6 +286,7 @@ final class AppServices {
         self.domainRevisions = domainRevisions
         self.lifecycle = lifecycle
         self.cloudSync = cloudSync
+        self.sharedCareUndo = sharedCareUndo ?? SharedCareUndoCoordinator.shared
     }
 
     func publishWalkingPresentationChange() {

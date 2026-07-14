@@ -174,7 +174,7 @@ final class ReminderCompletionService: ReminderCompleting {
         ) else {
             return false
         }
-        let familyTaskPreparation = FamilyTaskService.prepareCompletedReminder(
+        let familyTaskPreparation = familyTasks.prepareCompletedReminder(
             reminder,
             completedBy: humanId,
             context: context

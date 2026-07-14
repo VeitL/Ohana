@@ -88,7 +88,7 @@ struct PlantBatchQuickRecordLayoutTests {
             .pestCheck
         ]
         let unsupported: Set<PlantCareType> = [.newLeaf, .yellowLeaf, .pestFound, .customNote]
-        let offered = PlantBatchCareCommandService.supportedQuickCareTypes
+        let offered = PlantBatchCarePolicy.supportedQuickCareTypes
         let sheetSource = try source(
             "Ohana/Features/Plants/Views/PlantBatchQuickRecordSheet.swift",
             rootURL: repositoryRootURL()
@@ -96,7 +96,7 @@ struct PlantBatchQuickRecordLayoutTests {
 
         #expect(offered == expected)
         #expect(Set(offered).isDisjoint(with: unsupported))
-        #expect(sheetSource.contains("PlantBatchCareCommandService.supportedQuickCareTypes"))
+        #expect(sheetSource.contains("PlantBatchCarePolicy.supportedQuickCareTypes"))
     }
 
     @Test func batchQuickRecordWaitsForCommandSuccessBeforeFeedbackAndDismissal() throws {

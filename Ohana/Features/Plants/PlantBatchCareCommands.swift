@@ -166,11 +166,8 @@ nonisolated struct PlantBatchCareRewardCommitResult: Equatable, Sendable {
     }
 }
 
-@MainActor
-enum PlantBatchCareCommandService {
-    private static let undoWindowSeconds: TimeInterval = 6
-
-    nonisolated static let supportedQuickCareTypes: [PlantCareType] = [
+nonisolated enum PlantBatchCarePolicy {
+    static let supportedQuickCareTypes: [PlantCareType] = [
         .watering,
         .fertilizing,
         .misting,
@@ -180,6 +177,11 @@ enum PlantBatchCareCommandService {
         .rotating,
         .pestCheck
     ]
+}
+
+@MainActor
+enum PlantBatchCareCommandService {
+    private static let undoWindowSeconds: TimeInterval = 6
 
     private struct PreflightSelection {
         let selection: PlantBatchCareSelection
@@ -615,7 +617,7 @@ enum PlantBatchCareCommandService {
         )
     }
 
-    private nonisolated static let supportedBatchCareTypes = Set(supportedQuickCareTypes)
+    private nonisolated static let supportedBatchCareTypes = Set(PlantBatchCarePolicy.supportedQuickCareTypes)
 
     private static func preflight(
         selections: [PlantBatchCareSelection],

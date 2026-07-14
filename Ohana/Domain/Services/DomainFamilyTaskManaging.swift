@@ -1,6 +1,12 @@
 import Foundation
 import SwiftData
 
+nonisolated enum FamilyTaskReminderCompletionPreparation: Equatable, Sendable {
+    case notLinked
+    case prepared
+    case rejected
+}
+
 @MainActor
 protocol FamilyTaskManaging {
     func migrateLegacyBountiesIfNeeded(context: ModelContext)
@@ -44,6 +50,21 @@ protocol FamilyTaskManaging {
     func complete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool
     @discardableResult
     func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) -> Bool
+    func canClaim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) -> Bool
+    func canComplete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool
+    func canSubmitForReview(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool
+    func prepareCompletedReminder(
+        _ reminder: Reminder,
+        completedBy humanId: String?,
+        context: ModelContext
+    ) -> FamilyTaskReminderCompletionPreparation
+    func authorizeCollaborationWrite(
+        subjectRequest: DomainSubjectResolutionRequest,
+        actor: Human?,
+        occurredAt: Date,
+        context: ModelContext,
+        logPrefix: String
+    ) -> AuthorizedDomainMemberFactWrite?
     @discardableResult
     func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext) -> Bool
     @discardableResult

@@ -81,7 +81,7 @@ struct FamilyTaskEditorPanel: View {
             _note = State(initialValue: task?.note ?? "")
             _selectedHumanId = State(initialValue: isExistingAssignable ? existingAssigneeId : firstAssignableId)
             _reward = State(initialValue: min(
-                FamilyTaskService.rewardCap,
+                FamilyTaskRewardPolicy.cap,
                 max(0, task?.rewardCoconuts ?? suggestedReward)
             ))
             _hasDueDate = State(initialValue: task?.dueAt != nil)
@@ -192,7 +192,7 @@ struct FamilyTaskEditorPanel: View {
 
             LabeledContent {
                 TextField(
-                    "0–\(FamilyTaskService.rewardCap)",
+                    "0–\(FamilyTaskRewardPolicy.cap)",
                     value: $reward,
                     format: .number
                 )
@@ -211,12 +211,12 @@ struct FamilyTaskEditorPanel: View {
                 )
             }
 
-            if reward < 0 || reward > FamilyTaskService.rewardCap {
+            if reward < 0 || reward > FamilyTaskRewardPolicy.cap {
                 Label(
                     l.tr(
-                        zh: "奖励必须在 0 到 \(FamilyTaskService.rewardCap) 之间。",
-                        en: "The reward must be between 0 and \(FamilyTaskService.rewardCap).",
-                        de: "Die Prämie muss zwischen 0 und \(FamilyTaskService.rewardCap) liegen."
+                        zh: "奖励必须在 0 到 \(FamilyTaskRewardPolicy.cap) 之间。",
+                        en: "The reward must be between 0 and \(FamilyTaskRewardPolicy.cap).",
+                        de: "Die Prämie muss zwischen 0 und \(FamilyTaskRewardPolicy.cap) liegen."
                     ),
                     systemImage: "exclamationmark.triangle.fill"
                 )
@@ -322,7 +322,7 @@ struct FamilyTaskEditorPanel: View {
         guard currentHuman != nil,
               selectedHuman != nil,
               reward >= 0,
-              reward <= FamilyTaskService.rewardCap,
+              reward <= FamilyTaskRewardPolicy.cap,
               reward <= availableBalance
         else { return false }
 
@@ -389,11 +389,11 @@ struct FamilyTaskEditorPanel: View {
         if selectedHuman == nil {
             return l.tr(zh: "请选择其他家人。", en: "Choose another household member.", de: "Wähle ein anderes Familienmitglied.")
         }
-        if reward < 0 || reward > FamilyTaskService.rewardCap {
+        if reward < 0 || reward > FamilyTaskRewardPolicy.cap {
             return l.tr(
-                zh: "奖励必须在 0 到 \(FamilyTaskService.rewardCap) 之间。",
-                en: "The reward must be between 0 and \(FamilyTaskService.rewardCap).",
-                de: "Die Prämie muss zwischen 0 und \(FamilyTaskService.rewardCap) liegen."
+                zh: "奖励必须在 0 到 \(FamilyTaskRewardPolicy.cap) 之间。",
+                en: "The reward must be between 0 and \(FamilyTaskRewardPolicy.cap).",
+                de: "Die Prämie muss zwischen 0 und \(FamilyTaskRewardPolicy.cap) liegen."
             )
         }
         if reward > availableBalance {

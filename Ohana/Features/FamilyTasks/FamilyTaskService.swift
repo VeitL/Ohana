@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 enum FamilyTaskService {
-    nonisolated static let rewardCap = 500
+    nonisolated static let rewardCap = FamilyTaskRewardPolicy.cap
 
     private struct AuthorizedReminderAssigneeUpdate {
         let event: Event
@@ -352,7 +352,7 @@ enum FamilyTaskService {
             ),
             actor: human,
             context: context,
-            logPrefix: "FamilyTaskService.claimPreflight"
+            logPrefix: "FamilyTask.claimPreflight"
         ) != nil
     }
 
@@ -419,7 +419,7 @@ enum FamilyTaskService {
             ),
             actor: human,
             context: context,
-            logPrefix: "FamilyTaskService.preflight"
+            logPrefix: "FamilyTask.preflight"
         ) != nil
     }
 
