@@ -305,74 +305,137 @@ enum OhanaQuickActionGlyphKind: CaseIterable, Equatable, Sendable {
             return .waterChange
         }
 
-        switch action {
-        case "feed", "feeding": return .feed
-        case "calendar": return .calendar
-        case "walk": return .walk
-        case "water": return .water
-        case "potty": return .potty
-        case "medication", "humanmedication", "medicine": return .medicine
-        case "groom", "brushing", "teeth", "nails", "ears": return .groom
-        case "health": return .health
-        case "rest", "sleep": return .sleep
-        case "vet", "vaccine", "visit", "deworming": return .vet
-        case "weight", "humanweight": return .weight
-        case "reminder": return .reminder
-        case "plantwater", "waterplant": return .plantWater
-        case "misting", "plantmisting": return .misting
-        case "play": return .play
-        case "bath": return .bath
-        case "task": return .task
-        case "allfeatures", "humanallfeatures": return .allFeatures
-        case "foodinventory", "foodstock", "inventory", "stock", "restock": return .foodStock
-        case "dryfood", "fooddry", "dry": return .dryFood
-        case "wetfood", "foodwet", "wet", "canned", "can": return .wetFood
-        case "treat": return .treat
-        case "foodbag": return .foodBag
-        case "feeder", "autofeeder": return .feeder
-        case "waterchange": return .waterChange
-        case "filterclean", "filterchange": return .filterChange
-        case "litter": return .litter
-        case "cleanup", "cagecleaning", "plantleafcleaning": return .cleanup
-        case "walkmap": return .walkMap
-        case "distance": return .distance
-        case "training": return .training
-        case "freeflight": return .freeFlight
-        case "humanworkout", "workout": return .workout
-        case "mood": return .mood
-        case "checkin": return .checkIn
-        case "family": return .family
-        case "profile", "plantdetail": return .profile
-        case "privacy": return .privacy
-        case "expense", "humanexpense": return .expense
-        case "insurance": return .insurance
-        case "document", "humannote", "plantnote", "note": return .document
-        case "moment", "photo": return .photo
-        case "birthday": return .birthday
-        case "reward": return .reward
-        case "temperature", "humidity": return .temperature
-        case "substratechange": return .substrateChange
-        case "fertilizeplant": return .plantFertilize
-        case "plantpruning": return .plantPruning
-        case "plantpestcheck": return .plantPestCheck
-        case "plantrotating": return .plantRotating
-        case "plantrepotting": return .plantRepotting
-        case "plantnewleaf": return .plantNewLeaf
-        case "plantyellowleaf", "plantpestfound", "plantissue": return .plantIssue
-        case "notificationhealth": return .notificationHealth
-        case "settings", "setting": return .settings
-        default: break
+        if let exactKind = exactActionKinds[action] {
+            return exactKind
         }
 
+        return resolveFluidFallback(action: action, symbol: symbol)
+            ?? resolveFoodFallback(action: action, symbol: symbol)
+            ?? resolveMovementFallback(action: action, symbol: symbol)
+            ?? resolveHygieneFallback(action: action, symbol: symbol)
+            ?? resolveHealthFallback(action: action, symbol: symbol)
+            ?? resolveLifestyleFallback(action: action, symbol: symbol)
+            ?? resolvePeopleFallback(action: action, symbol: symbol)
+            ?? resolvePlantFallback(action: action, symbol: symbol)
+            ?? resolveUtilityFallback(action: action, symbol: symbol)
+    }
+
+    private static let exactActionKinds: [String: OhanaQuickActionGlyphKind] = [
+        "feed": .feed,
+        "feeding": .feed,
+        "calendar": .calendar,
+        "walk": .walk,
+        "water": .water,
+        "potty": .potty,
+        "medication": .medicine,
+        "humanmedication": .medicine,
+        "medicine": .medicine,
+        "groom": .groom,
+        "brushing": .groom,
+        "teeth": .groom,
+        "nails": .groom,
+        "ears": .groom,
+        "health": .health,
+        "rest": .sleep,
+        "sleep": .sleep,
+        "vet": .vet,
+        "vaccine": .vet,
+        "visit": .vet,
+        "deworming": .vet,
+        "weight": .weight,
+        "humanweight": .weight,
+        "reminder": .reminder,
+        "plantwater": .plantWater,
+        "waterplant": .plantWater,
+        "misting": .misting,
+        "plantmisting": .misting,
+        "play": .play,
+        "bath": .bath,
+        "task": .task,
+        "allfeatures": .allFeatures,
+        "humanallfeatures": .allFeatures,
+        "foodinventory": .foodStock,
+        "foodstock": .foodStock,
+        "inventory": .foodStock,
+        "stock": .foodStock,
+        "restock": .foodStock,
+        "dryfood": .dryFood,
+        "fooddry": .dryFood,
+        "dry": .dryFood,
+        "wetfood": .wetFood,
+        "foodwet": .wetFood,
+        "wet": .wetFood,
+        "canned": .wetFood,
+        "can": .wetFood,
+        "treat": .treat,
+        "foodbag": .foodBag,
+        "feeder": .feeder,
+        "autofeeder": .feeder,
+        "waterchange": .waterChange,
+        "filterclean": .filterChange,
+        "filterchange": .filterChange,
+        "litter": .litter,
+        "cleanup": .cleanup,
+        "cagecleaning": .cleanup,
+        "plantleafcleaning": .cleanup,
+        "walkmap": .walkMap,
+        "distance": .distance,
+        "training": .training,
+        "freeflight": .freeFlight,
+        "humanworkout": .workout,
+        "workout": .workout,
+        "mood": .mood,
+        "checkin": .checkIn,
+        "family": .family,
+        "profile": .profile,
+        "plantdetail": .profile,
+        "privacy": .privacy,
+        "expense": .expense,
+        "humanexpense": .expense,
+        "insurance": .insurance,
+        "document": .document,
+        "humannote": .document,
+        "plantnote": .document,
+        "note": .document,
+        "moment": .photo,
+        "photo": .photo,
+        "birthday": .birthday,
+        "reward": .reward,
+        "temperature": .temperature,
+        "humidity": .temperature,
+        "substratechange": .substrateChange,
+        "fertilizeplant": .plantFertilize,
+        "plantpruning": .plantPruning,
+        "plantpestcheck": .plantPestCheck,
+        "plantrotating": .plantRotating,
+        "plantrepotting": .plantRepotting,
+        "plantnewleaf": .plantNewLeaf,
+        "plantyellowleaf": .plantIssue,
+        "plantpestfound": .plantIssue,
+        "plantissue": .plantIssue,
+        "notificationhealth": .notificationHealth,
+        "settings": .settings,
+        "setting": .settings
+    ]
+
+    private static func resolveFluidFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
         if action.contains("filter") { return .filterChange }
         if action.contains("waterchange") || symbol.contains("water.waves") || symbol.contains("arrow.2.circlepath") { return .waterChange }
         if action.contains("plant") && (action.contains("water") || action.contains("mist")) { return .plantWater }
+        return nil
+    }
+
+    private static func resolveFoodFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
         if action.contains("dryfood") || action.contains("fooddry") || symbol.contains("hexagongrid") { return .dryFood }
         if action.contains("wetfood") || action.contains("foodwet") || action.contains("canned") || symbol.contains("takeoutbag") { return .wetFood }
         if action.contains("inventory") || action.contains("stock") { return .foodStock }
         if action.contains("feeder") { return .feeder }
         if action.contains("treat") { return .treat }
         if action.contains("feed") || action.contains("food") || symbol.contains("fork") { return .feed }
+        return nil
+    }
+
+    private static func resolveMovementFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
         if symbol.contains("calendar") { return .calendar }
         if action.contains("walkmap") { return .walkMap }
         if action.contains("distance") { return .distance }
@@ -382,19 +445,35 @@ enum OhanaQuickActionGlyphKind: CaseIterable, Equatable, Sendable {
         if action.contains("potty") || action.contains("poop") || action == "pee" || symbol.contains("allergens") { return .potty }
         if action.contains("litter") || symbol.contains("trash") { return .litter }
         if action.contains("bath") || symbol.contains("bubbles") { return .bath }
+        return nil
+    }
+
+    private static func resolveHygieneFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
         if action.contains("groom") || action.contains("hygiene") || action.contains("teeth") || action.contains("nails") || action.contains("brushing") || action.contains("ears") || symbol.contains("scissors") || symbol.contains("comb") { return .groom }
         if action.contains("vaccine") || action.contains("visit") || symbol.contains("stethoscope") || symbol.contains("syringe") { return .vet }
+        return nil
+    }
+
+    private static func resolveHealthFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
         if action.contains("health") || symbol.contains("heart") || symbol.contains("cross") { return .health }
         if action.contains("medication") || action.contains("medicine") || symbol.contains("pill") { return .medicine }
         if action.contains("weight") || symbol.contains("scale") { return .weight }
         if action.contains("reminder") || symbol.contains("bell") { return .reminder }
         if action.contains("expense") || symbol.contains("credit") || symbol.contains("banknote") || symbol.contains("yensign") || symbol.contains("dollarsign") || symbol.contains("eurosign") || symbol.contains("sterlingsign") { return .expense }
+        return nil
+    }
+
+    private static func resolveLifestyleFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
         if action.contains("play") || symbol.contains("gamecontroller") || symbol.contains("tennisball") { return .play }
         if action.contains("rest") || action.contains("sleep") || symbol.contains("zzz") || symbol.contains("tent") { return .sleep }
         if action.contains("moment") || symbol.contains("camera") { return .photo }
         if action.contains("cleanup") || action.contains("cleaning") || symbol.contains("basket") { return .cleanup }
         if action.contains("freeflight") || symbol.contains("bird") { return .freeFlight }
         if action.contains("workout") || symbol.contains("figure.run") { return .workout }
+        return nil
+    }
+
+    private static func resolvePeopleFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
         if action.contains("training") { return .training }
         if action.contains("mood") { return .mood }
         if action.contains("checkin") || symbol.contains("checkmark.seal") { return .checkIn }
@@ -406,6 +485,10 @@ enum OhanaQuickActionGlyphKind: CaseIterable, Equatable, Sendable {
         if action.contains("birthday") || symbol.contains("birthday") { return .birthday }
         if action.contains("reward") || symbol.contains("medal") { return .reward }
         if action.contains("temperature") || action.contains("humidity") || symbol.contains("thermometer") { return .temperature }
+        return nil
+    }
+
+    private static func resolvePlantFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
         if action.contains("pruning") { return .plantPruning }
         if action.contains("pestcheck") || symbol.contains("ladybug") { return .plantPestCheck }
         if action.contains("rotating") || symbol.contains("arrow.triangle.2.circlepath") { return .plantRotating }
@@ -415,6 +498,10 @@ enum OhanaQuickActionGlyphKind: CaseIterable, Equatable, Sendable {
         if action.contains("pest") { return .notificationHealth }
         if action.contains("substrate") { return .substrateChange }
         if action.contains("fertilize") || symbol.contains("leaf") { return .plantFertilize }
+        return nil
+    }
+
+    private static func resolveUtilityFallback(action: String, symbol: String) -> OhanaQuickActionGlyphKind? {
         if action.contains("allfeatures") || symbol.contains("square.grid") { return .allFeatures }
         if action.contains("task") { return .task }
         if action.contains("settings") || action.contains("setting") || symbol.contains("gear") { return .settings }

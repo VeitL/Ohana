@@ -147,87 +147,115 @@ extension OhanaQuickActionGlyphKind {
     }
 
     func motionAnchor(for elementIndex: Int) -> UnitPoint {
-        func point(_ x: CGFloat, _ y: CGFloat) -> UnitPoint {
-            UnitPoint(x: x / 32, y: y / 32)
-        }
+        primaryMotionAnchor(for: elementIndex) ??
+            secondaryMotionAnchor(for: elementIndex) ??
+            extendedMotionAnchor(for: elementIndex) ??
+            .center
+    }
 
-        switch self {
+    private func primaryMotionAnchor(for elementIndex: Int) -> UnitPoint? {
+        let anchor: UnitPoint? = switch self {
         case .feed:
-            return [point(12.2, 12.1), point(16.4, 11.1), point(20.4, 12.6)][elementIndex]
+            [motionPoint(12.2, 12.1), motionPoint(16.4, 11.1), motionPoint(20.4, 12.6)][elementIndex]
         case .calendar:
-            return [point(16, 11.5), point(11.3, 17.3), point(16, 17.3), point(20.7, 17.3), point(18, 21.8)][elementIndex]
+            [motionPoint(16, 11.5), motionPoint(11.3, 17.3), motionPoint(16, 17.3), motionPoint(20.7, 17.3), motionPoint(18, 21.8)][elementIndex]
         case .walk:
-            return [point(11, 11.8), point(6.6, 8.8), point(25.1, 14.7)][elementIndex]
+            [motionPoint(11, 11.8), motionPoint(6.6, 8.8), motionPoint(25.1, 14.7)][elementIndex]
         case .water:
-            return point(16, 15.2)
+            motionPoint(16, 15.2)
         case .potty:
-            return point(16, 13.2)
+            motionPoint(16, 13.2)
         case .sleep:
-            return elementIndex == 0 ? point(21.1, 8.4) : point(25, 12.4)
+            elementIndex == 0 ? motionPoint(21.1, 8.4) : motionPoint(25, 12.4)
         case .weight:
-            return point(16, 17.3)
+            motionPoint(16, 17.3)
         case .reminder:
-            return point(23.3, 8.7)
+            motionPoint(23.3, 8.7)
         case .plantWater:
-            return point(24.3, 19)
+            motionPoint(24.3, 19)
         case .play:
-            return [point(12.3, 17.2), point(21, 16.4), point(23.9, 19)][elementIndex]
+            [motionPoint(12.3, 17.2), motionPoint(21, 16.4), motionPoint(23.9, 19)][elementIndex]
         case .bath:
-            return elementIndex == 0 ? point(22.6, 8.3) : point(18.6, 11.2)
+            elementIndex == 0 ? motionPoint(22.6, 8.3) : motionPoint(18.6, 11.2)
         case .task:
-            return elementIndex == 0 ? point(16, 16) : point(22.7, 22.7)
+            elementIndex == 0 ? motionPoint(16, 16) : motionPoint(22.7, 22.7)
         case .dryFood:
-            let points = [(11.0, 15.8), (15.1, 14.2), (19.2, 15.7), (13.0, 18.8), (17.2, 18.9), (21.1, 18.1)]
-            return point(points[elementIndex].0, points[elementIndex].1)
-        case .treat:
-            return [point(8.8, 20.7), point(23.2, 11.3), point(16, 15.25)][elementIndex]
-        case .feeder:
-            return elementIndex == 0 ? point(16, 10.5) : point(16, 16)
-        case .filterChange:
-            return elementIndex == 3 ? point(16, 16) : point(16, 12 + CGFloat(elementIndex) * 3.9)
-        case .litter:
-            return [point(10.3, 16.8), point(13.4, 15.8), point(20.2, 12)][elementIndex]
-        case .cleanup:
-            return [point(22.7, 8.5), point(25.4, 13), point(8.2, 24.5)][elementIndex]
-        case .distance:
-            return elementIndex == 0 ? point(7.8, 22.4) : point(24.2, 6.8)
-        case .mood:
-            return elementIndex == 0 ? point(20.2, 12.2) : point(16, 18.8)
-        case .family:
-            return elementIndex == 0 ? point(20.1, 11.9) : point(21, 21.5)
-        case .profile:
-            return elementIndex == 0 ? point(16, 13) : point(16, 20)
-        case .birthday:
-            return elementIndex == 0 ? point(16, 14.6) : point(16, 7)
-        case .temperature:
-            return elementIndex == 0 ? point(11.3, 24.5) : point(22.5, 15)
-        case .plantFertilize:
-            return elementIndex == 0 ? point(23.8, 20.5) : point(25.8, 15.6)
-        case .allFeatures:
-            return point(21.5, 21.5)
-        case .freeFlight:
-            return elementIndex == 0 ? point(16.5, 14.2) : point(7.3, 20.2)
-        case .misting:
-            return [point(11, 23), point(16, 25), point(21, 23)][elementIndex]
-        case .substrateChange:
-            return point(16, 14 + CGFloat(elementIndex) * 3.6)
-        case .workout:
-            return [point(16, 16), point(7.1, 8.6), point(24.9, 8.6)][elementIndex]
-        case .plantPruning:
-            return point(21.2, 12.8)
-        case .plantPestCheck:
-            return point(18.8, 15.3)
-        case .plantRotating:
-            return point(16, 15.8)
-        case .plantRepotting:
-            return point(17.6, 15.2)
-        case .plantNewLeaf:
-            return point(21.4, 11.2)
-        case .plantIssue:
-            return point(17.8, 15.8)
+            dryFoodMotionAnchor(for: elementIndex)
         default:
-            return .center
+            nil
         }
+        return anchor
+    }
+
+    private func secondaryMotionAnchor(for elementIndex: Int) -> UnitPoint? {
+        let anchor: UnitPoint? = switch self {
+        case .treat:
+            [motionPoint(8.8, 20.7), motionPoint(23.2, 11.3), motionPoint(16, 15.25)][elementIndex]
+        case .feeder:
+            elementIndex == 0 ? motionPoint(16, 10.5) : motionPoint(16, 16)
+        case .filterChange:
+            elementIndex == 3 ? motionPoint(16, 16) : motionPoint(16, 12 + CGFloat(elementIndex) * 3.9)
+        case .litter:
+            [motionPoint(10.3, 16.8), motionPoint(13.4, 15.8), motionPoint(20.2, 12)][elementIndex]
+        case .cleanup:
+            [motionPoint(22.7, 8.5), motionPoint(25.4, 13), motionPoint(8.2, 24.5)][elementIndex]
+        case .distance:
+            elementIndex == 0 ? motionPoint(7.8, 22.4) : motionPoint(24.2, 6.8)
+        case .mood:
+            elementIndex == 0 ? motionPoint(20.2, 12.2) : motionPoint(16, 18.8)
+        case .family:
+            elementIndex == 0 ? motionPoint(20.1, 11.9) : motionPoint(21, 21.5)
+        case .profile:
+            elementIndex == 0 ? motionPoint(16, 13) : motionPoint(16, 20)
+        case .birthday:
+            elementIndex == 0 ? motionPoint(16, 14.6) : motionPoint(16, 7)
+        case .temperature:
+            elementIndex == 0 ? motionPoint(11.3, 24.5) : motionPoint(22.5, 15)
+        case .plantFertilize:
+            elementIndex == 0 ? motionPoint(23.8, 20.5) : motionPoint(25.8, 15.6)
+        case .allFeatures:
+            motionPoint(21.5, 21.5)
+        default:
+            nil
+        }
+        return anchor
+    }
+
+    private func extendedMotionAnchor(for elementIndex: Int) -> UnitPoint? {
+        let anchor: UnitPoint? = switch self {
+        case .freeFlight:
+            elementIndex == 0 ? motionPoint(16.5, 14.2) : motionPoint(7.3, 20.2)
+        case .misting:
+            [motionPoint(11, 23), motionPoint(16, 25), motionPoint(21, 23)][elementIndex]
+        case .substrateChange:
+            motionPoint(16, 14 + CGFloat(elementIndex) * 3.6)
+        case .workout:
+            [motionPoint(16, 16), motionPoint(7.1, 8.6), motionPoint(24.9, 8.6)][elementIndex]
+        case .plantPruning:
+            motionPoint(21.2, 12.8)
+        case .plantPestCheck:
+            motionPoint(18.8, 15.3)
+        case .plantRotating:
+            motionPoint(16, 15.8)
+        case .plantRepotting:
+            motionPoint(17.6, 15.2)
+        case .plantNewLeaf:
+            motionPoint(21.4, 11.2)
+        case .plantIssue:
+            motionPoint(17.8, 15.8)
+        default:
+            nil
+        }
+        return anchor
+    }
+
+    private func motionPoint(_ x: CGFloat, _ y: CGFloat) -> UnitPoint {
+        UnitPoint(x: x / 32, y: y / 32)
+    }
+
+    private func dryFoodMotionAnchor(for elementIndex: Int) -> UnitPoint {
+        let points = [(11.0, 15.8), (15.1, 14.2), (19.2, 15.7), (13.0, 18.8), (17.2, 18.9), (21.1, 18.1)]
+        return motionPoint(points[elementIndex].0, points[elementIndex].1)
     }
 }
 
@@ -281,8 +309,31 @@ private struct OhanaQuickActionGlyphDrawing {
         self.primaryColor = primaryColor
         self.accentColor = accentColor
     }
+}
 
+private extension OhanaQuickActionGlyphDrawing {
     mutating func drawBase(_ kind: OhanaQuickActionGlyphKind) {
+        switch kind {
+        case .feed, .calendar, .walk, .water, .potty, .medicine, .groom,
+             .health, .sleep, .vet, .weight, .reminder, .plantWater, .play,
+             .bath, .task:
+            drawCoreBase(kind)
+        case .foodStock, .dryFood, .wetFood, .treat, .foodBag, .feeder,
+             .waterChange, .filterChange, .litter, .cleanup, .walkMap,
+             .distance, .training, .mood:
+            drawFoodAndActivityBase(kind)
+        case .checkIn, .family, .profile, .privacy, .expense, .insurance,
+             .document, .photo, .birthday, .reward, .temperature,
+             .plantFertilize, .notificationHealth, .settings, .allFeatures:
+            drawHouseholdBase(kind)
+        case .freeFlight, .misting, .substrateChange, .workout,
+             .plantPruning, .plantPestCheck, .plantRotating,
+             .plantRepotting, .plantNewLeaf, .plantIssue:
+            drawExtendedBase(kind)
+        }
+    }
+
+    private mutating func drawCoreBase(_ kind: OhanaQuickActionGlyphKind) {
         switch kind {
         case .feed:
             fill(ellipse(x: 6.6, y: 9.8, width: 18.8, height: 8.8), primaryColor, opacity: 0.22)
@@ -337,6 +388,13 @@ private struct OhanaQuickActionGlyphDrawing {
             stroke(bathWavePath(), primaryColor, width: 4.2)
         case .task:
             fill(roundedRect(x: 6.5, y: 6.5, width: 19, height: 19, radius: 6), primaryColor)
+        default:
+            return
+        }
+    }
+
+    private mutating func drawFoodAndActivityBase(_ kind: OhanaQuickActionGlyphKind) {
+        switch kind {
         case .foodStock, .foodBag:
             fill(foodBagPath(), primaryColor)
             fill(capsule(x: 11, y: 8.8, width: 10, height: 2.7), primaryColor, opacity: 0.22)
@@ -373,6 +431,13 @@ private struct OhanaQuickActionGlyphDrawing {
             fill(rotated(capsule(x: 22.2, y: 5.5, width: 5.4, height: 3.2), degrees: 35, center: CGPoint(x: 24.9, y: 7.1)), primaryColor)
         case .mood:
             fill(circle(cx: 16, cy: 16, r: 10.2), primaryColor)
+        default:
+            return
+        }
+    }
+
+    private mutating func drawHouseholdBase(_ kind: OhanaQuickActionGlyphKind) {
+        switch kind {
         case .checkIn:
             fill(roundedRect(x: 6.5, y: 6.5, width: 19, height: 19, radius: 9.5), primaryColor)
         case .family:
@@ -416,6 +481,13 @@ private struct OhanaQuickActionGlyphDrawing {
                     fill(roundedRect(x: x, y: y, width: 7, height: 7, radius: 2.2), primaryColor)
                 }
             }
+        default:
+            return
+        }
+    }
+
+    private mutating func drawExtendedBase(_ kind: OhanaQuickActionGlyphKind) {
+        switch kind {
         case .freeFlight:
             fill(birdBodyPath(), primaryColor)
         case .misting:
@@ -449,10 +521,38 @@ private struct OhanaQuickActionGlyphDrawing {
             fill(plantLeftLeafPath(), primaryColor)
         case .plantIssue:
             fill(genericLeafPath(), primaryColor)
+        default:
+            return
         }
     }
 
     mutating func drawAccent(_ kind: OhanaQuickActionGlyphKind, index: Int) {
+        switch kind {
+        case .feed, .calendar, .walk, .water, .potty, .medicine, .groom,
+             .health:
+            drawCoreAccent(kind, index: index)
+        case .sleep, .vet, .weight, .reminder, .plantWater, .play, .bath,
+             .task:
+            drawCareStateAccent(kind, index: index)
+        case .foodStock, .dryFood, .wetFood, .treat, .foodBag, .feeder:
+            drawFoodAccent(kind, index: index)
+        case .waterChange, .filterChange, .litter, .cleanup, .walkMap,
+             .distance, .training, .mood:
+            drawMaintenanceAccent(kind, index: index)
+        case .checkIn, .family, .profile, .privacy, .expense, .insurance,
+             .document, .photo, .birthday, .reward:
+            drawHouseholdAccent(kind, index: index)
+        case .temperature, .plantFertilize, .notificationHealth, .settings,
+             .allFeatures:
+            drawStatusAccent(kind, index: index)
+        case .freeFlight, .misting, .substrateChange, .workout,
+             .plantPruning, .plantPestCheck, .plantRotating,
+             .plantRepotting, .plantNewLeaf, .plantIssue:
+            drawExtendedAccent(kind, index: index)
+        }
+    }
+
+    private mutating func drawCoreAccent(_ kind: OhanaQuickActionGlyphKind, index: Int) {
         switch kind {
         case .feed:
             let dots = [(12.2, 12.1, 2.2), (16.4, 11.1, 2.55), (20.4, 12.6, 2.1)]
@@ -486,6 +586,13 @@ private struct OhanaQuickActionGlyphDrawing {
             fill(capsule(x: xValues[index], y: 13.2, width: 1.55, height: 10.7), accentColor)
         case .health:
             fill(heartPath(), accentColor)
+        default:
+            return
+        }
+    }
+
+    private mutating func drawCareStateAccent(_ kind: OhanaQuickActionGlyphKind, index: Int) {
+        switch kind {
         case .sleep:
             if index == 0 {
                 drawLabel("Z", at: CGPoint(x: 21.1, y: 8.4), size: 7.4, color: accentColor)
@@ -522,6 +629,13 @@ private struct OhanaQuickActionGlyphDrawing {
             } else {
                 fill(circle(cx: 22.7, cy: 22.7, r: 2.2), accentColor)
             }
+        default:
+            return
+        }
+    }
+
+    private mutating func drawFoodAccent(_ kind: OhanaQuickActionGlyphKind, index: Int) {
+        switch kind {
         case .foodStock, .foodBag:
             let bars = [(10.0, 15.1, 12.0), (10.0, 19.0, 9.2), (10.0, 22.9, 6.4)]
             fill(capsule(x: bars[index].0, y: bars[index].1, width: bars[index].2, height: 2.3), accentColor)
@@ -551,6 +665,13 @@ private struct OhanaQuickActionGlyphDrawing {
             } else {
                 fill(circle(cx: 16, cy: 16, r: 2.6), accentColor)
             }
+        default:
+            return
+        }
+    }
+
+    private mutating func drawMaintenanceAccent(_ kind: OhanaQuickActionGlyphKind, index: Int) {
+        switch kind {
         case .waterChange:
             stroke(waterChangeUpperArrowPath(), accentColor, width: 3)
             fill(waterChangeUpperArrowHead(), accentColor)
@@ -599,6 +720,13 @@ private struct OhanaQuickActionGlyphDrawing {
             } else {
                 stroke(smilePath(), accentColor, width: 3)
             }
+        default:
+            return
+        }
+    }
+
+    private mutating func drawHouseholdAccent(_ kind: OhanaQuickActionGlyphKind, index: Int) {
+        switch kind {
         case .checkIn:
             if index == 0 {
                 stroke(checkInPath(), accentColor, width: 3)
@@ -647,6 +775,13 @@ private struct OhanaQuickActionGlyphDrawing {
             }
         case .reward:
             fill(circle(cx: 16, cy: 12.6, r: 3.2), accentColor)
+        default:
+            return
+        }
+    }
+
+    private mutating func drawStatusAccent(_ kind: OhanaQuickActionGlyphKind, index: Int) {
+        switch kind {
         case .temperature:
             if index == 0 {
                 fill(capsule(x: 10.2, y: 9.2, width: 2.2, height: 12), accentColor)
@@ -666,6 +801,13 @@ private struct OhanaQuickActionGlyphDrawing {
             fill(circle(cx: 16, cy: 16, r: 4.1), accentColor)
         case .allFeatures:
             fill(roundedRect(x: 18, y: 18, width: 7, height: 7, radius: 2.2), accentColor)
+        default:
+            return
+        }
+    }
+
+    private mutating func drawExtendedAccent(_ kind: OhanaQuickActionGlyphKind, index: Int) {
+        switch kind {
         case .freeFlight:
             if index == 0 {
                 fill(birdWingPath(), accentColor)
@@ -703,9 +845,13 @@ private struct OhanaQuickActionGlyphDrawing {
         case .plantIssue:
             fill(capsule(x: 16.4, y: 10, width: 2.8, height: 8.9), accentColor)
             fill(circle(cx: 17.8, cy: 22, r: 1.7), accentColor)
+        default:
+            return
         }
     }
+}
 
+private extension OhanaQuickActionGlyphDrawing {
     private mutating func fill(_ path: Path, _ color: Color, opacity: Double = 1) {
         context.fill(path, with: .color(color.opacity(opacity)))
     }

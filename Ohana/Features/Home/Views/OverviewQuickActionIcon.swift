@@ -212,86 +212,138 @@ struct OhanaQuickActionAccentMotionModifier: ViewModifier {
     private func transform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
         switch kind {
         case .drop:
-            switch phase {
-            case .anticipation: return .init(y: -7, scaleX: 0.58, scaleY: 0.58)
-            case .peak: return .init(y: 1, scaleX: 1.12, scaleY: 1.12)
-            default: return .init()
-            }
+            dropTransform(for: phase)
         case .step:
-            switch phase {
-            case .anticipation: return .init(x: -2, y: -1, rotation: -6)
-            case .peak: return .init(x: 2, rotation: 4)
-            default: return .init()
-            }
+            stepTransform(for: phase)
         case .float:
-            switch phase {
-            case .anticipation: return .init(y: -4, scaleX: 1.06, scaleY: 1.06)
-            case .peak: return .init(y: 1, scaleX: 0.96, scaleY: 0.96)
-            default: return .init()
-            }
+            floatTransform(for: phase)
         case .sweep:
-            switch phase {
-            case .anticipation: return .init(x: -3, rotation: -7)
-            case .peak: return .init(x: 3, rotation: 6)
-            case .rebound: return .init(x: -1, rotation: -2)
-            default: return .init()
-            }
+            sweepTransform(for: phase)
         case .gauge:
-            switch phase {
-            case .anticipation: return .init(rotation: -18, scaleX: 0.9, scaleY: 0.9)
-            case .peak: return .init(rotation: 9, scaleX: 1.08, scaleY: 1.08)
-            case .rebound: return .init(rotation: -4)
-            default: return .init()
-            }
+            gaugeTransform(for: phase)
         case .bounce:
-            switch phase {
-            case .anticipation: return .init(y: 1, rotation: 5, scaleX: 1.05, scaleY: 0.94)
-            case .peak: return .init(y: -5, rotation: 18, scaleX: 0.98, scaleY: 1.03)
-            case .rebound: return .init(y: 1, rotation: 30, scaleX: 1.04, scaleY: 0.95)
-            default: return .init()
-            }
+            bounceTransform(for: phase)
         case .pulse, .confirm:
-            switch phase {
-            case .anticipation: return .init(scaleX: 0.48, scaleY: 0.48)
-            case .peak: return .init(scaleX: 1.16, scaleY: 1.16)
-            default: return .init()
-            }
+            pulseTransform(for: phase)
         case .tilt:
-            switch phase {
-            case .anticipation: return .init(rotation: -8, scaleX: 0.96, scaleY: 0.96)
-            case .peak: return .init(rotation: 5, scaleX: 1.04, scaleY: 1.04)
-            default: return .init()
-            }
+            tiltTransform(for: phase)
         case .waterDrop:
-            switch phase {
-            case .anticipation: return .init(y: -6, scaleX: 0.72, scaleY: 0.72)
-            case .peak: return .init(y: 1, scaleX: 1.08, scaleY: 1.08)
-            default: return .init()
-            }
+            waterDropTransform(for: phase)
         case .waterChange:
-            switch phase {
-            case .peak: return .init(rotation: 18)
-            default: return .init()
-            }
+            waterChangeTransform(for: phase)
         case .litterScoop:
-            switch phase {
-            case .resting, .settled: return .init(rotation: 18)
-            case .anticipation: return .init(x: -2, y: 2, rotation: 10)
-            case .peak: return .init(x: 1, y: -1, rotation: 22)
-            case .rebound: return .init(rotation: 16)
-            }
+            litterScoopTransform(for: phase)
         case .temperatureMercury:
-            switch phase {
-            case .anticipation: return .init(scaleY: 0.48)
-            case .peak: return .init(scaleY: 1.08)
-            default: return .init()
-            }
+            temperatureMercuryTransform(for: phase)
         case .sleep:
-            switch phase {
-            case .anticipation: return .init(y: 2, scaleX: 0.7, scaleY: 0.7)
-            case .peak: return .init(x: 1, y: -3, scaleX: 1.08, scaleY: 1.08)
-            default: return .init()
-            }
+            sleepTransform(for: phase)
+        }
+    }
+
+    private func dropTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(y: -7, scaleX: 0.58, scaleY: 0.58)
+        case .peak: .init(y: 1, scaleX: 1.12, scaleY: 1.12)
+        default: .init()
+        }
+    }
+
+    private func stepTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(x: -2, y: -1, rotation: -6)
+        case .peak: .init(x: 2, rotation: 4)
+        default: .init()
+        }
+    }
+
+    private func floatTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(y: -4, scaleX: 1.06, scaleY: 1.06)
+        case .peak: .init(y: 1, scaleX: 0.96, scaleY: 0.96)
+        default: .init()
+        }
+    }
+
+    private func sweepTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(x: -3, rotation: -7)
+        case .peak: .init(x: 3, rotation: 6)
+        case .rebound: .init(x: -1, rotation: -2)
+        default: .init()
+        }
+    }
+
+    private func gaugeTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(rotation: -18, scaleX: 0.9, scaleY: 0.9)
+        case .peak: .init(rotation: 9, scaleX: 1.08, scaleY: 1.08)
+        case .rebound: .init(rotation: -4)
+        default: .init()
+        }
+    }
+
+    private func bounceTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(y: 1, rotation: 5, scaleX: 1.05, scaleY: 0.94)
+        case .peak: .init(y: -5, rotation: 18, scaleX: 0.98, scaleY: 1.03)
+        case .rebound: .init(y: 1, rotation: 30, scaleX: 1.04, scaleY: 0.95)
+        default: .init()
+        }
+    }
+
+    private func pulseTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(scaleX: 0.48, scaleY: 0.48)
+        case .peak: .init(scaleX: 1.16, scaleY: 1.16)
+        default: .init()
+        }
+    }
+
+    private func tiltTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(rotation: -8, scaleX: 0.96, scaleY: 0.96)
+        case .peak: .init(rotation: 5, scaleX: 1.04, scaleY: 1.04)
+        default: .init()
+        }
+    }
+
+    private func waterDropTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(y: -6, scaleX: 0.72, scaleY: 0.72)
+        case .peak: .init(y: 1, scaleX: 1.08, scaleY: 1.08)
+        default: .init()
+        }
+    }
+
+    private func waterChangeTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .peak: .init(rotation: 18)
+        default: .init()
+        }
+    }
+
+    private func litterScoopTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .resting, .settled: .init(rotation: 18)
+        case .anticipation: .init(x: -2, y: 2, rotation: 10)
+        case .peak: .init(x: 1, y: -1, rotation: 22)
+        case .rebound: .init(rotation: 16)
+        }
+    }
+
+    private func temperatureMercuryTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(scaleY: 0.48)
+        case .peak: .init(scaleY: 1.08)
+        default: .init()
+        }
+    }
+
+    private func sleepTransform(for phase: OhanaQuickActionAccentPhase) -> OhanaQuickActionMotionTransform {
+        switch phase {
+        case .anticipation: .init(y: 2, scaleX: 0.7, scaleY: 0.7)
+        case .peak: .init(x: 1, y: -3, scaleX: 1.08, scaleY: 1.08)
+        default: .init()
         }
     }
 }
