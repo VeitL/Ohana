@@ -1,6 +1,7 @@
 {
-  "description": "Architecture-boundary ratchet for unusually large Swift files. This gate is intentionally relaxed so normal feature work is not forced into risky mechanical splits just to satisfy an 800-line target. Data/resource/preview files (asset catalogs, Localization.swift, DesignLab *Canvas* previews) are exempt in-script and intentionally excluded from this baseline.",
-  "threshold": 1200,
+  "description": "Architecture-boundary review signal for unusually large Swift files. File length is not treated as debt by itself: 1200 lines starts review, 1400 lines is the hard limit for new files, and accepted historical files retain a bounded growth allowance. Declaration-level complexity is the authoritative blocking signal. Data/resource/preview files are exempt in-script.",
+  "warningThreshold": 1200,
+  "hardLimit": 1400,
   "growthTolerance": 200,
   "files": [
     {

@@ -108,9 +108,10 @@ enum AppResetService {
             : .notRequired
 
         resetLocalDefaults(defaults, preservedValues: preservedDefaults)
-        // The local reset boundary always disables future automatic backups.
-        // The shared asynchronous coordinator owns cancellation and removal of
-        // the existing managed iCloud Drive file.
+        // AutomaticBackupStatusStore exclusively owns its prefix so reset does
+        // not enumerate and remove the same CFPreferences keys twice. The
+        // shared asynchronous coordinator owns cancellation and removal of the
+        // existing managed iCloud Drive file.
         AutomaticBackupStatusStore.resetAfterAppReset(defaults: defaults)
         if options.deleteCustomBackground {
             CustomAppBackgroundStore.deleteImage()
@@ -279,7 +280,6 @@ enum AppResetService {
         "achievement_",
         "appBackground",
         "appCustomBackground",
-        "automaticBackup.",
         "appPowerSavingMode",
         "avatar2d_",
         "calendar_",

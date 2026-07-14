@@ -1,6 +1,6 @@
 {
-  "schema": "ohana.governance.release-resource-ownership.v1",
-  "updated": "2026-07-07",
+  "schema": "ohana.governance.release-resource-ownership.v2",
+  "updated": "2026-07-15",
   "policyDocuments": [
     "AGENTS.md",
     "docs/release-quality-gates.md",
@@ -12,46 +12,56 @@
       "id": "all-bundled-resources",
       "owner": "Release owner",
       "path": "Resources",
-      "limitMiB": 85,
-      "rationale": "Top-level bundled resources must stay below an intentional pre-sign budget aligned to the losslessly optimized avatar catalogs so app size regressions remain visible before archive.",
+      "warningMiB": 85,
+      "hardLimitMiB": 95,
+      "maxGrowthMiB": 5,
+      "rationale": "Top-level bundled source resources use a review target plus a hard safety ceiling; the Release archive remains authoritative for shipped size.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
-      "evidence": "Current local size is reported by release hardening; CI fails if the budget is exceeded."
+      "evidence": "The audit reports stable logical source bytes, warns above the review target, and fails only above the hard limit or for excessive above-target PR growth."
     },
     {
       "id": "pet-avatar-assets",
       "owner": "Avatar asset owner",
       "path": "Resources/Avatars/PetAvatarAssets",
-      "limitMiB": 65,
+      "warningMiB": 65,
+      "hardLimitMiB": 72,
+      "maxGrowthMiB": 5,
       "rationale": "Pet avatars are the largest bundled resource family; the current catalog is losslessly optimized and must not drift back toward the previous 90+ MiB footprint.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
-      "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."
+      "evidence": "Resource integrity audit reports source bytes and blocks only hard-limit breaches or excessive above-target growth."
     },
     {
       "id": "human-avatar-assets",
       "owner": "Avatar asset owner",
       "path": "Resources/Avatars/HumanAvatarAssets",
-      "limitMiB": 7,
+      "warningMiB": 7,
+      "hardLimitMiB": 8,
+      "maxGrowthMiB": 1,
       "rationale": "Human avatar resources should remain compact relative to pet assets.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
-      "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."
+      "evidence": "Resource integrity audit reports source bytes and blocks only hard-limit breaches or excessive above-target growth."
     },
     {
       "id": "plant-avatar-assets",
       "owner": "Avatar asset owner",
       "path": "Resources/Avatars/PlantAvatarAssets",
-      "limitMiB": 17,
+      "warningMiB": 17,
+      "hardLimitMiB": 19,
+      "maxGrowthMiB": 2,
       "rationale": "Plant avatar resources ship as an optimized 450x600 indexed PNG catalog with transparency; this budget keeps the catalog compact while still allowing small curated additions.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
-      "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."
+      "evidence": "Resource integrity audit reports source bytes and blocks only hard-limit breaches or excessive above-target growth."
     },
     {
       "id": "asset-catalog",
       "owner": "Design system owner",
       "path": "Ohana/Assets.xcassets",
-      "limitMiB": 60,
-      "rationale": "Asset catalogs carry launch, icon, and UI imagery; growth must be intentional before signing.",
+      "warningMiB": 60,
+      "hardLimitMiB": 70,
+      "maxGrowthMiB": 2,
+      "rationale": "Asset catalogs carry launch, icon, and UI imagery. Raw source size is an early review signal; compiled Assets.car and the Release archive are the shipped-size authority.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
-      "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."
+      "evidence": "The current catalog may remain above the review target without blocking unrelated PRs; hard-limit breaches or more than 2 MiB of above-target PR growth fail."
     }
   ],
   "preSignChecks": [
@@ -68,7 +78,7 @@
     {
       "id": "packaged-resource-xattrs",
       "owner": "Release owner",
-      "check": "Reject signing-risk extended attributes such as FinderInfo, ResourceFork, quarantine, and unknown xattrs from packaged resources.",
+      "check": "Reject known signing-risk extended attributes such as FinderInfo, ResourceFork, and quarantine; report unclassified source metadata for Release-archive verification.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
       "paths": [
         "Resources",

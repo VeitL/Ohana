@@ -46,6 +46,8 @@ final class AppResetServiceTests: XCTestCase {
 
         defaults.set(true, forKey: "ohana_has_onboarded")
         defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.set(true, forKey: AutomaticBackupStatusStore.enabledKey)
+        defaults.set("stale", forKey: "automaticBackup.lastFailureMessage.v1")
         defaults.set("en", forKey: "appLanguage")
         defaults.set("DE", forKey: AppCountry.storageKey)
         defaults.set("{}", forKey: "quickActionItems_v2")
@@ -88,6 +90,7 @@ final class AppResetServiceTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: "ohanaGrowthOnboardingCompletedV1"))
         XCTAssertNil(defaults.object(forKey: "economyV2.dailyBudget.household.local.2026-07-10"))
         XCTAssertFalse(AutomaticBackupStatusStore(defaults: defaults).snapshot().isEnabled)
+        XCTAssertNil(defaults.object(forKey: "automaticBackup.lastFailureMessage.v1"))
         XCTAssertEqual(defaults.string(forKey: "appLanguage"), "en")
         XCTAssertEqual(defaults.string(forKey: AppCountry.storageKey), "DE")
     }

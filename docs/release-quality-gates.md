@@ -2,6 +2,30 @@
 
 Ohana changes must be safe to ship, diagnose, and recover.
 
+## Gate Severity And Ownership
+
+- Correctness boundaries with a zero baseline—data safety, privacy, migration,
+  rewards/ledger writes, and architecture ownership—remain full-repository hard
+  failures.
+- Heuristic proxies with accepted history—file length, raw source-resource size,
+  and formatting—must not make an unrelated PR responsible for old debt. PR and
+  push checks use warning bands or the merge-base diff; explicit release/debt
+  scans may still report the whole repository.
+- File length starts review at 1200 lines and hard-fails a new file above 1400
+  lines. Declaration-level complexity remains the authoritative blocker because
+  it measures behavior more directly than total lines.
+- Resource source bytes use a warning target, hard ceiling, and allowed growth
+  from the base revision. The compiled `Assets.car` and Release archive are the
+  authority for shipped size; raw `.xcassets` size is only an early signal.
+- Known CodeSign-risk metadata such as FinderInfo, ResourceFork, and quarantine
+  remains a hard failure. Benign or unclassified source xattrs are advisory
+  until the signed Release archive provides the authoritative result.
+- A temporary baseline or waiver must be reviewed and bounded. Updating a
+  baseline is not evidence that the underlying issue was fixed.
+- A test-host crash must be isolated from the rest of the portfolio rather than
+  repeatedly rerunning the whole suite. CI builds once, retains the main-suite
+  result, and runs each known crash-prone reset test in a fresh process.
+
 ## Test Portfolio Contract
 
 - Business rules are owned by Unit/Integration tests; UI tests do not inspect

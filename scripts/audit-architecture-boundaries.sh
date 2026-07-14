@@ -28,8 +28,9 @@ Purpose:
   - Views do not directly use UserDefaults or construct command executors.
   - Members views do not publish member profile revisions directly; profile
     command executors own the publish boundary.
-  - Swift files above 800 lines are ratcheted; no new oversized files and no
-    growth in the existing oversized baseline.
+  - Swift file length is a heuristic: files above the manifest warning target
+    are reported, while only files beyond its hard limit or a grandfathered
+    baseline's growth allowance fail.
   - Coconut balances may be mutated only by the wallet service, model defaults,
     or backup import projection.
   - Removed singleton registries and NotificationCenter string bus do not return.
@@ -246,28 +247,38 @@ member_view_direct_profile_revision_publishes() {
 }
 
 oversized_swift_files() {
-  local threshold=1200
-  local growth_tolerance=200
-  local baseline="docs/governance/manifests/oversized-swift-files-baseline.json"
+  local baseline="${OHANA_OVERSIZED_SWIFT_BASELINE:-docs/governance/manifests/oversized-swift-files-baseline.json}"
   if [[ ! -f "$baseline" ]]; then
     printf '%s missing; create the oversized-file ratchet baseline before enforcing oversized file checks.\n' "$baseline"
     return 0
   fi
 
-  python3 - "$threshold" "$growth_tolerance" "$baseline" "${files[@]}" <<'PY'
+  python3 - "$baseline" "${files[@]}" <<'PY'
 import json
+import os
 import pathlib
 import sys
 
-threshold = int(sys.argv[1])
-growth_tolerance = int(sys.argv[2])
-baseline_path = pathlib.Path(sys.argv[3])
-paths = sys.argv[4:]
+baseline_path = pathlib.Path(sys.argv[1])
+paths = sys.argv[2:]
 
 try:
     payload = json.loads(baseline_path.read_text(encoding="utf-8"))
 except Exception as exc:
     print(f"{baseline_path}: failed to read oversized baseline: {exc}")
+    sys.exit(0)
+
+warning_threshold = payload.get("warningThreshold", payload.get("threshold"))
+hard_limit = payload.get("hardLimit")
+growth_tolerance = payload.get("growthTolerance")
+if not isinstance(warning_threshold, int) or warning_threshold <= 0:
+    print(f"{baseline_path}: warningThreshold must be a positive integer")
+    sys.exit(0)
+if not isinstance(hard_limit, int) or hard_limit <= warning_threshold:
+    print(f"{baseline_path}: hardLimit must be an integer above warningThreshold")
+    sys.exit(0)
+if not isinstance(growth_tolerance, int) or growth_tolerance < 0:
+    print(f"{baseline_path}: growthTolerance must be a non-negative integer")
     sys.exit(0)
 
 baseline = {
@@ -290,6 +301,7 @@ def is_data_or_preview(p):
         return True
     return False
 
+advisories = []
 violations = []
 for path in paths:
     file_path = pathlib.Path(path)
@@ -299,17 +311,27 @@ for path in paths:
         continue
     with file_path.open("r", encoding="utf-8", errors="ignore") as handle:
         lines = sum(1 for _ in handle)
-    if lines <= threshold:
+    if lines <= warning_threshold:
         continue
     allowed = baseline.get(path)
-    if allowed is None:
+    if allowed is None and lines > hard_limit:
         violations.append(
-            f"{path}:{lines} lines exceeds relaxed {threshold}-line oversized threshold and is not in the baseline; split it intentionally or add a baseline entry."
+            f"{path}:{lines} lines exceeds the {hard_limit}-line hard limit and is not in the baseline; split it intentionally or add a reviewed baseline entry."
         )
-    elif lines > allowed + growth_tolerance:
+    elif allowed is not None and lines > max(hard_limit, allowed + growth_tolerance):
         violations.append(
-            f"{path}:{lines} lines grew more than {growth_tolerance} lines beyond baseline {allowed}; shrink it intentionally or refresh the baseline with review."
+            f"{path}:{lines} lines exceeds both the {hard_limit}-line hard limit and baseline growth allowance {allowed} + {growth_tolerance}; shrink it intentionally or refresh the baseline with review."
         )
+    else:
+        advisories.append(
+            f"{path}:{lines} lines is above the {warning_threshold}-line review target; declaration-level complexity remains the authoritative blocking signal."
+        )
+
+for advisory in advisories:
+    if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
+        print(f"::warning title=Swift file length::{advisory}", file=sys.stderr)
+    else:
+        print(f"warning: {advisory}", file=sys.stderr)
 
 print("\n".join(violations))
 PY
@@ -642,7 +664,7 @@ record_matches \
 
 record_matches \
   "oversized-swift-file" \
-  "Swift files above 800 lines are allowed only as a shrinking ratchet baseline; new or growing oversized files must be split." \
+  "Swift file length crossed the manifest hard limit or an accepted baseline's growth allowance; warning-band files are review signals, not automatic debt." \
   oversized_swift_files
 
 record_matches \

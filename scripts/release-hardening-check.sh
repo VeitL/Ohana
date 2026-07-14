@@ -75,6 +75,9 @@ git diff --check
 section "Audit self-tests (fixtures + scope floor)"
 scripts/tests/run-audit-fixture-tests.sh
 
+section "CI severity / diff policy self-tests"
+scripts/tests/run-ci-policy-tests.sh
+
 section "UI test shard completeness"
 scripts/audit-ui-test-shards.sh
 

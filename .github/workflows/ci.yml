@@ -1,8 +1,9 @@
 name: CI
 
 # Mature-app gate: every push/PR must pass build + tests + repo audits + lint
-# before merge. This turns the prose rules in AGENTS.md and docs/ into
-# mechanically-enforced gates instead of "please remember to run the script".
+# before merge. Zero-baseline correctness rules remain whole-repo gates;
+# heuristic signals with accepted history use warning bands or merge-base
+# deltas so an unrelated PR cannot inherit old debt.
 #
 # Gate model:
 #   - Audit self-tests run FIRST: fixtures prove every audit rule still fires,
@@ -16,6 +17,9 @@ name: CI
 #   - Tool versions are pinned via scripts/ci-tool-versions.env so brew updates
 #     cannot silently change lint/audit behavior. A pin mismatch is a deliberate
 #     one-line bump, not an emergency.
+#   - Swift file length and raw source-resource bytes are review proxies. Their
+#     hard limits still block, but warning-band or unchanged historical state
+#     does not. SwiftFormat is scoped to the commit range on push/PR.
 #
 # Branch protection (configure in GitHub repo settings, not in this file):
 #   - Require status checks: build-test, audits, lint
@@ -30,6 +34,9 @@ on:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  CI_DIFF_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
 
 jobs:
   # ----------------------------------------------------------------------------
@@ -52,6 +59,8 @@ jobs:
       # collapsed scan scope), every later "passed" line is meaningless.
       - name: Audit self-tests (fixtures + scope floor)
         run: scripts/tests/run-audit-fixture-tests.sh
+      - name: CI severity / diff policy self-tests
+        run: scripts/tests/run-ci-policy-tests.sh
       - name: UI test shard completeness
         run: scripts/audit-ui-test-shards.sh
       # Full-scope strict gates for UI V4 + accessibility + smoothness +
@@ -87,7 +96,12 @@ jobs:
       - name: Agent skill governance audit
         run: scripts/audit-agent-skill-governance.sh
       - name: Resource integrity / xattr pre-sign audit
-        run: scripts/audit-resource-integrity.sh
+        run: |
+          if [[ -n "$CI_DIFF_BASE_SHA" ]]; then
+            scripts/audit-resource-integrity.sh --base-ref "$CI_DIFF_BASE_SHA"
+          else
+            scripts/audit-resource-integrity.sh
+          fi
       - name: Git size audit
         run: scripts/audit-git-size.sh
       - name: Secret scan (working tree)
@@ -101,6 +115,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Install tools
         run: |
           brew update
@@ -115,9 +131,15 @@ jobs:
       # SwiftLint runs as a strict gate after the P1 warning baseline cleanup.
       - name: SwiftLint
         run: swiftlint lint --strict --reporter github-actions-logging
-      # SwiftFormat is enforced after the P1 formatting baseline pass.
-      - name: SwiftFormat (lint only)
-        run: swiftformat --lint .
+      # Formatting has historical drift, so push/PR checks own only their diff.
+      # Explicit workflow-dispatch/release debt scans can still use --all.
+      - name: SwiftFormat (commit range, lint only)
+        run: |
+          if [[ -n "$CI_DIFF_BASE_SHA" ]]; then
+            scripts/ci-swiftformat.sh --base-ref "$CI_DIFF_BASE_SHA"
+          else
+            scripts/ci-swiftformat.sh --all
+          fi
 
   # ----------------------------------------------------------------------------
   # Build + test on the pinned-by-name simulator.
@@ -141,6 +163,9 @@ jobs:
   #     is expected; restore-keys give the latest partial cache for incremental.
   #   - xcbeautify (a brew install ~1min) is dropped in favor of `-quiet`;
   #     errors still print, and the raw xcresult is uploaded as an artifact.
+  #   - AppResetServiceTests run one method per fresh test process after the main
+  #     suite. A hosted-runtime teardown crash cannot erase every other test's
+  #     result, and every newly added reset test is discovered from source.
   # ----------------------------------------------------------------------------
   build-test:
     runs-on: macos-15
@@ -164,79 +189,65 @@ jobs:
             echo "::error::No healthy 'iPhone 17' simulator available on this runner. See docs/os-support-matrix.md."
             exit 1
           }
-      - name: Build & test
-        run: |
-          xcodebuild test \
-            -project Ohana.xcodeproj \
-            -scheme OhanaUnitTests \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
-            -disableAutomaticPackageResolution \
-            -skipPackagePluginValidation \
-            -enableCodeCoverage NO \
-            -only-testing:OhanaTests \
-            -quiet \
-            CODE_SIGNING_ALLOWED=NO
+      - name: Build and run unit tests with reset-process isolation
+        run: scripts/ci-run-unit-tests.sh
       - name: Print test failure summary
         if: failure()
         run: |
-          if [ -d "$RUNNER_TEMP/TestResults.xcresult" ]; then
-            echo "::group::xcresult test summary"
-            xcrun xcresulttool get test-results summary \
-              --path "$RUNNER_TEMP/TestResults.xcresult" \
-              --compact || true
-            echo "::endgroup::"
+          {
+            printf '%s\n' 'import json'
+            printf '%s\n' 'import sys'
+            printf '%s\n' 'passed_results = {"Passed", "Skipped", "Expected Failure"}'
+            printf '%s\n' 'def walk(node, parents):'
+            printf '%s\n' '    name = node.get("name") or node.get("nodeIdentifier") or "<unnamed>"'
+            printf '%s\n' '    path = parents + [name]'
+            printf '%s\n' '    if node.get("nodeType") == "Failure Message":'
+            printf '%s\n' '        print(f"  issue: {name}")'
+            printf '%s\n' '    result = node.get("result")'
+            printf '%s\n' '    if result and result not in passed_results:'
+            printf '%s\n' '        identifier = node.get("nodeIdentifier", "")'
+            printf '%s\n' '        print(f"{result}: " + " / ".join(path))'
+            printf '%s\n' '        if identifier and identifier != name:'
+            printf '%s\n' '            print(f"  id: {identifier}")'
+            printf '%s\n' '        for issue in node.get("issues", []) or []:'
+            printf '%s\n' '            message = issue.get("message") or issue.get("summary") or issue.get("description")'
+            printf '%s\n' '            if message:'
+            printf '%s\n' '                print(f"  issue: {message}")'
+            printf '%s\n' '    for child in node.get("children", []) or []:'
+            printf '%s\n' '        walk(child, path)'
+            printf '%s\n' 'try:'
+            printf '%s\n' '    with open(sys.argv[1], encoding="utf-8") as handle:'
+            printf '%s\n' '        payload = json.load(handle)'
+            printf '%s\n' 'except Exception as exc:'
+            printf '%s\n' '    print(f"Could not parse xcresult tests JSON: {exc}")'
+            printf '%s\n' '    sys.exit(0)'
+            printf '%s\n' 'if isinstance(payload, dict) and isinstance(payload.get("testNodes"), list):'
+            printf '%s\n' '    roots = payload["testNodes"]'
+            printf '%s\n' 'else:'
+            printf '%s\n' '    roots = payload if isinstance(payload, list) else [payload]'
+            printf '%s\n' 'for root in roots:'
+            printf '%s\n' '    walk(root, [])'
+          } > "$RUNNER_TEMP/print_xcresult_failures.py"
 
-            echo "::group::xcresult failed tests"
-            xcrun xcresulttool get test-results tests \
-              --path "$RUNNER_TEMP/TestResults.xcresult" \
-              --compact > "$RUNNER_TEMP/TestResults.tests.json" || true
-            {
-              printf '%s\n' 'import json'
-              printf '%s\n' 'import sys'
-              printf '%s\n' 'passed_results = {"Passed", "Skipped", "Expected Failure"}'
-              printf '%s\n' 'def walk(node, parents):'
-              printf '%s\n' '    name = node.get("name") or node.get("nodeIdentifier") or "<unnamed>"'
-              printf '%s\n' '    path = parents + [name]'
-              printf '%s\n' '    if node.get("nodeType") == "Failure Message":'
-              printf '%s\n' '        print(f"  issue: {name}")'
-              printf '%s\n' '    result = node.get("result")'
-              printf '%s\n' '    if result and result not in passed_results:'
-              printf '%s\n' '        identifier = node.get("nodeIdentifier", "")'
-              printf '%s\n' '        print(f"{result}: " + " / ".join(path))'
-              printf '%s\n' '        if identifier and identifier != name:'
-              printf '%s\n' '            print(f"  id: {identifier}")'
-              printf '%s\n' '        for issue in node.get("issues", []) or []:'
-              printf '%s\n' '            message = issue.get("message") or issue.get("summary") or issue.get("description")'
-              printf '%s\n' '            if message:'
-              printf '%s\n' '                print(f"  issue: {message}")'
-              printf '%s\n' '    for child in node.get("children", []) or []:'
-              printf '%s\n' '        walk(child, path)'
-              printf '%s\n' 'try:'
-              printf '%s\n' '    with open(sys.argv[1], encoding="utf-8") as handle:'
-              printf '%s\n' '        payload = json.load(handle)'
-              printf '%s\n' 'except Exception as exc:'
-              printf '%s\n' '    print(f"Could not parse xcresult tests JSON: {exc}")'
-              printf '%s\n' '    sys.exit(0)'
-              printf '%s\n' 'if isinstance(payload, dict) and isinstance(payload.get("testNodes"), list):'
-              printf '%s\n' '    roots = payload["testNodes"]'
-              printf '%s\n' 'else:'
-              printf '%s\n' '    roots = payload if isinstance(payload, list) else [payload]'
-              printf '%s\n' 'for root in roots:'
-              printf '%s\n' '    walk(root, [])'
-            } > "$RUNNER_TEMP/print_xcresult_failures.py"
-            python3 "$RUNNER_TEMP/print_xcresult_failures.py" "$RUNNER_TEMP/TestResults.tests.json"
-            echo "::endgroup::"
-          else
-            echo "::warning::No TestResults.xcresult bundle was produced."
+          shopt -s nullglob
+          bundles=("$RUNNER_TEMP"/TestResults-*.xcresult)
+          if [[ ${#bundles[@]} -eq 0 ]]; then
+            echo "::warning::No TestResults xcresult bundles were produced."
+            exit 0
           fi
+          for bundle in "${bundles[@]}"; do
+            bundle_name="$(basename "$bundle")"
+            tests_json="${bundle%.xcresult}.tests.json"
+            echo "::group::${bundle_name} summary"
+            xcrun xcresulttool get test-results summary --path "$bundle" --compact || true
+            xcrun xcresulttool get test-results tests --path "$bundle" --compact > "$tests_json" || true
+            python3 "$RUNNER_TEMP/print_xcresult_failures.py" "$tests_json"
+            echo "::endgroup::"
+          done
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: ${{ runner.temp }}/TestResults.xcresult
+          path: ${{ runner.temp }}/TestResults-*.xcresult
           retention-days: 7

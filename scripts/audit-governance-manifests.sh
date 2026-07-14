@@ -190,9 +190,15 @@ for entry in release_resource.get("resourceBudgets", []):
     where = f"resource budget {entry.get('id', '<missing id>')}"
     for key in ("id", "owner", "path", "rationale", "releaseGate", "evidence"):
         require_text(entry, key, where)
-    limit = entry.get("limitMiB")
-    if not isinstance(limit, int) or limit <= 0:
-        fail(f"{where} must define positive integer limitMiB.")
+    warning = entry.get("warningMiB")
+    hard_limit = entry.get("hardLimitMiB")
+    max_growth = entry.get("maxGrowthMiB")
+    if not isinstance(warning, int) or warning <= 0:
+        fail(f"{where} must define positive integer warningMiB.")
+    if not isinstance(hard_limit, int) or not isinstance(warning, int) or hard_limit <= warning:
+        fail(f"{where} hardLimitMiB must be an integer above warningMiB.")
+    if not isinstance(max_growth, int) or max_growth <= 0:
+        fail(f"{where} must define positive integer maxGrowthMiB.")
     require_paths({"paths": [entry.get("path", "")]}, "paths", where)
 
 for entry in release_resource.get("preSignChecks", []):

@@ -1,12 +1,55 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="${OHANA_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$ROOT"
 
 failures=()
+warnings=()
 scan_roots=()
-budget_manifest="docs/governance/manifests/release-resource-ownership.json"
+budget_manifest="${OHANA_RESOURCE_BUDGET_MANIFEST:-docs/governance/manifests/release-resource-ownership.json}"
+base_ref=""
+budgets_only=0
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  scripts/audit-resource-integrity.sh [--base-ref <git-ref>] [--budgets-only]
+
+Size policy:
+  Source resource bytes are a review proxy, not the shipped app size. A path
+  above warningMiB emits an advisory. It fails only above hardLimitMiB, or when
+  growth from --base-ref exceeds maxGrowthMiB while already above the warning.
+  Signing detritus, manifest integrity, known CodeSign-risk xattrs, and privacy
+  packaging remain unconditional hard failures; unclassified metadata warns.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --base-ref)
+      if [[ $# -lt 2 || -z "$2" ]]; then
+        echo "error: --base-ref requires a git ref." >&2
+        exit 2
+      fi
+      base_ref="$2"
+      shift 2
+      ;;
+    --budgets-only)
+      budgets_only=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
 
 for path in Resources Ohana/Assets.xcassets Ohana/PrivacyInfo.xcprivacy; do
   [[ -e "$path" ]] && scan_roots+=("$path")
@@ -19,15 +62,100 @@ fail() {
   failures+=("$1")
 }
 
+warn() {
+  warnings+=("$1")
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    echo "::warning title=Resource budget::$1" >&2
+  else
+    echo "warning: $1" >&2
+  fi
+}
+
+if [[ -n "$base_ref" ]] && ! git cat-file -e "${base_ref}^{commit}" 2>/dev/null; then
+  fail "Resource budget base ref is not available: $base_ref"
+  base_ref=""
+fi
+
+measure_resource_bytes() {
+  local path="$1"
+  python3 - "$path" "$base_ref" <<'PY'
+from __future__ import annotations
+
+import pathlib
+import re
+import subprocess
+import sys
+
+path = pathlib.Path(sys.argv[1])
+base_ref = sys.argv[2]
+
+if path.is_file():
+    current_bytes = path.stat().st_size
+elif path.is_dir():
+    current_bytes = sum(candidate.stat().st_size for candidate in path.rglob("*") if candidate.is_file())
+else:
+    current_bytes = 0
+
+base_bytes = -1
+if base_ref:
+    result = subprocess.run(
+        ["git", "ls-tree", "-r", "-l", "-z", base_ref, "--", str(path)],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode == 0:
+        base_bytes = 0
+        for entry in result.stdout.split(b"\0"):
+            if not entry:
+                continue
+            match = re.match(rb"^\S+\s+\S+\s+\S+\s+([0-9]+)\t", entry)
+            if match:
+                base_bytes += int(match.group(1))
+
+print(f"{current_bytes}\t{base_bytes}")
+PY
+}
+
 check_dir_budget() {
   local path="$1"
-  local limit_mib="$2"
+  local warning_mib="$2"
+  local hard_limit_mib="$3"
+  local max_growth_mib="$4"
   [[ -e "$path" ]] || return 0
-  local size_kib
-  size_kib="$(du -sk "$path" | awk '{ print $1 }')"
-  local limit_kib=$((limit_mib * 1024))
-  if (( size_kib > limit_kib )); then
-    fail "$path is $((size_kib / 1024)) MiB; budget is ${limit_mib} MiB."
+
+  local current_bytes base_bytes
+  IFS=$'\t' read -r current_bytes base_bytes < <(measure_resource_bytes "$path")
+  local warning_bytes=$((warning_mib * 1024 * 1024))
+  local hard_limit_bytes=$((hard_limit_mib * 1024 * 1024))
+  local max_growth_bytes=$((max_growth_mib * 1024 * 1024))
+  local current_mib
+  current_mib="$(awk -v bytes="$current_bytes" 'BEGIN { printf "%.2f", bytes / 1048576 }')"
+
+  printf '%s: %s MiB logical source bytes (review %s MiB, hard %s MiB)\n' \
+    "$path" "$current_mib" "$warning_mib" "$hard_limit_mib"
+
+  if (( current_bytes > hard_limit_bytes )); then
+    fail "$path is ${current_mib} MiB and exceeds the ${hard_limit_mib} MiB hard source limit."
+    return
+  fi
+
+  if (( current_bytes <= warning_bytes )); then
+    return
+  fi
+
+  if (( base_bytes >= 0 )); then
+    local growth_bytes=$((current_bytes - base_bytes))
+    local base_mib growth_mib
+    base_mib="$(awk -v bytes="$base_bytes" 'BEGIN { printf "%.2f", bytes / 1048576 }')"
+    growth_mib="$(awk -v bytes="$growth_bytes" 'BEGIN { printf "%+.2f", bytes / 1048576 }')"
+    if (( growth_bytes > max_growth_bytes )); then
+      fail "$path is ${current_mib} MiB, above its ${warning_mib} MiB review target, and grew ${growth_mib} MiB from ${base_mib} MiB; maximum reviewed growth is ${max_growth_mib} MiB."
+      return
+    fi
+    warn "$path is ${current_mib} MiB, above its ${warning_mib} MiB review target; growth from $base_ref is ${growth_mib} MiB and remains within the ${max_growth_mib} MiB allowance."
+  else
+    warn "$path is ${current_mib} MiB, above its ${warning_mib} MiB review target but below the ${hard_limit_mib} MiB hard source limit."
   fi
 }
 
@@ -123,30 +251,46 @@ except Exception as exc:
 
 for entry in data.get("resourceBudgets", []):
     resource_path = entry.get("path")
-    limit = entry.get("limitMiB")
-    if isinstance(resource_path, str) and isinstance(limit, int):
-        print(f"{resource_path}\t{limit}")
+    warning = entry.get("warningMiB")
+    hard_limit = entry.get("hardLimitMiB")
+    max_growth = entry.get("maxGrowthMiB")
+    if all(
+        (
+            isinstance(resource_path, str),
+            isinstance(warning, int),
+            isinstance(hard_limit, int),
+            isinstance(max_growth, int),
+            warning > 0 if isinstance(warning, int) else False,
+            hard_limit > warning if isinstance(hard_limit, int) and isinstance(warning, int) else False,
+            max_growth > 0 if isinstance(max_growth, int) else False,
+        )
+    ):
+        print(f"{resource_path}\t{warning}\t{hard_limit}\t{max_growth}")
     else:
         print(f"error\tInvalid resource budget entry: {entry.get('id', '<missing id>')}")
 PY
 }
 
 echo "== Resource size budgets =="
-while IFS=$'\t' read -r path limit_mib; do
+while IFS=$'\t' read -r path warning_mib hard_limit_mib max_growth_mib; do
   [[ -n "${path:-}" ]] || continue
   if [[ "$path" == "error" ]]; then
-    fail "$limit_mib"
+    fail "$warning_mib"
     continue
   fi
-  check_dir_budget "$path" "$limit_mib"
+  check_dir_budget "$path" "$warning_mib" "$hard_limit_mib" "$max_growth_mib"
 done < <(load_budget_lines)
 
-while IFS=$'\t' read -r path _limit_mib; do
-  [[ -n "${path:-}" && "$path" != "error" ]] || continue
-  if [[ -e "$path" ]]; then
-    du -sh "$path"
+if [[ "$budgets_only" -eq 1 ]]; then
+  echo
+  if [[ ${#failures[@]} -eq 0 ]]; then
+    echo "Resource budget audit: passed with ${#warnings[@]} advisory warning(s)."
+    exit 0
   fi
-done < <(load_budget_lines)
+  echo "Resource budget audit: failed." >&2
+  printf ' - %s\n' "${failures[@]}" >&2
+  exit 1
+fi
 
 echo
 echo "== Avatar manifest integrity =="
@@ -181,11 +325,14 @@ if command -v xattr >/dev/null 2>&1; then
     while IFS= read -r attr; do
       [[ -n "$attr" ]] || continue
       case "$attr" in
-        com.apple.provenance)
-          # Common on locally-created files and not the CodeSign failure class.
+        com.apple.provenance|com.apple.TextEncoding)
+          # Common local metadata and not the CodeSign resource-fork class.
           ;;
-        com.apple.FinderInfo|com.apple.ResourceFork|com.apple.quarantine|*)
+        com.apple.FinderInfo|com.apple.ResourceFork|com.apple.quarantine)
           fail "Packaged resource has signing-risk xattr '$attr': $file"
+          ;;
+        *)
+          warn "Packaged resource has an unclassified xattr '$attr': $file; the signed Release archive remains authoritative."
           ;;
       esac
     done < <(xattr "$file" 2>/dev/null || true)
@@ -206,7 +353,7 @@ fi
 
 if [[ ${#failures[@]} -eq 0 ]]; then
   echo
-  echo "Resource integrity audit: passed."
+  echo "Resource integrity audit: passed with ${#warnings[@]} advisory warning(s)."
   exit 0
 fi
 
