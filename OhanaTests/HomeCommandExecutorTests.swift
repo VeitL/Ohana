@@ -3167,7 +3167,10 @@ struct HomeCommandExecutorTests {
     @Test func calendarTaskCompletionStopsWhenPersistenceFails() throws {
         let rootURL = repositoryRootURL()
         let syncSource = try source("Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift", rootURL: rootURL)
-        let calendarCommandSource = try source("Ohana/Features/Calendar/CalendarCommands.swift", rootURL: rootURL)
+        let calendarCommandSource = try source(
+            "Ohana/Features/Calendar/CalendarEventCompletionCommands.swift",
+            rootURL: rootURL
+        )
 
         #expect(syncSource.contains("case persistenceFailed"))
         #expect(syncSource.contains("var didPersist: Bool"))
@@ -3200,7 +3203,10 @@ struct HomeCommandExecutorTests {
     @Test func plantCareScheduleSyncStopsPlanSyncWhenPersistenceFails() throws {
         let rootURL = repositoryRootURL()
         let syncSource = try source("Ohana/Domain/Services/PlantCareScheduleSyncService.swift", rootURL: rootURL)
-        let calendarCommandSource = try source("Ohana/Features/Calendar/CalendarCommands.swift", rootURL: rootURL)
+        let calendarCommandSource = try source(
+            "Ohana/Features/Calendar/CalendarEventCompletionCommands.swift",
+            rootURL: rootURL
+        )
 
         #expect(syncSource.contains("case persistenceFailed"))
         #expect(syncSource.contains("var didPersist: Bool"))

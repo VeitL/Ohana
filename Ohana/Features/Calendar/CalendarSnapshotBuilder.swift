@@ -187,6 +187,23 @@ extension CalendarEventOccurrenceReference {
     }
 }
 
+nonisolated enum CalendarTimelineWindowPolicy {
+    static let pastMonths = -3
+    static let futureMonths = 3
+    static let windowedEventFetchLimit = 600
+    static let recurringEventFetchLimit = 500
+
+    static func bounds(
+        around now: Date,
+        calendar: Calendar = .current
+    ) -> (start: Date, end: Date) {
+        (
+            calendar.date(byAdding: .month, value: pastMonths, to: now) ?? now,
+            calendar.date(byAdding: .month, value: futureMonths, to: now) ?? now
+        )
+    }
+}
+
 nonisolated enum CalendarSnapshotBuilder {
     static let preparedSnapshotWindowKey = "rolling-window-v1"
 
@@ -339,8 +356,9 @@ nonisolated enum CalendarSnapshotBuilder {
     ) -> [CalendarEventOccurrence] {
         let now = visibilityContext.now
         let calendar = visibilityContext.calendar
-        let cutoff = calendar.date(byAdding: .month, value: -3, to: now) ?? now
-        let future = calendar.date(byAdding: .month, value: 3, to: now) ?? now
+        let window = CalendarTimelineWindowPolicy.bounds(around: now, calendar: calendar)
+        let cutoff = window.start
+        let future = window.end
         var result: [CalendarEventOccurrence] = []
 
         for event in events {

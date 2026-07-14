@@ -791,7 +791,7 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
     }
 
-    @Test func sharedCareFiltersDeceasedTargetsBeforeWritingFacts() throws {
+    @Test func sharedCareRejectsTheWholeSelectionWhenATargetIsDeceased() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
@@ -823,10 +823,9 @@ struct CareCompletionChokepointCharacterizationTests {
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
 
         #expect(sharedSessions.isEmpty)
-        #expect(careLogs.count == 1)
-        #expect(careLogs.allSatisfy { $0.pet?.id == sourcePet.id })
-        #expect(walletEntries.allSatisfy { $0.ownerId != deceasedPet.id.uuidString })
-        #expect(ledgerEvents.allSatisfy { $0.subjectId != deceasedPet.id.uuidString })
+        #expect(careLogs.isEmpty)
+        #expect(walletEntries.isEmpty)
+        #expect(ledgerEvents.isEmpty)
     }
 
     @Test func deceasedPetCareFactIsNoopAtFactBoundary() throws {

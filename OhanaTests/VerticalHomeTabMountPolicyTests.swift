@@ -640,7 +640,7 @@ struct VerticalHomeTabMountPolicyTests {
     }
 
     @Test func rootNavigationUsesNativeTabViewAndSystemScrollMinimization() throws {
-        let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
+        let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePageDeck.swift")
         let homeSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift")
         let backgroundSource = try source("Ohana/Shared/Design/ArkBackgroundView.swift")
         let staticBackgroundSource = backgroundSource
@@ -1393,7 +1393,7 @@ struct VerticalHomeTabMountPolicyTests {
     }
 
     @Test func nativeTabsUseLocalizedTitlesAndAccessibilityLabels() throws {
-        let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
+        let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePageDeck.swift")
 
         #expect(componentsSource.contains("Label(tab.title(localization), systemImage: tab.icon)"))
         #expect(componentsSource.contains(".accessibilityLabel(tabAccessibilityLabel(for: tab))"))

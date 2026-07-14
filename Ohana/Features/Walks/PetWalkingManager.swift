@@ -35,6 +35,15 @@ struct WalkStopRewardSummary: Equatable {
         persistenceErrorDescription: nil
     )
 
+    static let invalidTargets = WalkStopRewardSummary(
+        walkLogID: nil,
+        coconutDelta: 0,
+        walkCoconutDelta: 0,
+        pottyCoconutDelta: 0,
+        didPersist: false,
+        persistenceErrorDescription: nil
+    )
+
     static func failed(_ errorDescription: String?) -> WalkStopRewardSummary {
         WalkStopRewardSummary(
             walkLogID: nil,
@@ -280,6 +289,17 @@ final class PetWalkingManager {
     @discardableResult
     func stop(modelContext: ModelContext, sharedTargets: [Pet] = [], executorIds sharedExecutorIds: [String] = []) -> WalkStopRewardSummary {
         walkStopStartedAt = CFAbsoluteTimeGetCurrent()
+        guard let pet = currentPet, WalkFeaturePolicy.canStartWalk(for: pet) else {
+            reset()
+            walkStopStartedAt = nil
+            return .empty
+        }
+        let normalizedTargets = WalkFeaturePolicy.normalizedWalkTargets(sharedTargets, fallback: pet)
+        guard !normalizedTargets.isEmpty else {
+            walkStopStartedAt = nil
+            return .invalidTargets
+        }
+
         // 最终elapsed：已暂停部分 + 本次跑步部分
         if let r = resumeTime {
             pausedElapsed += Date().timeIntervalSince(r)
@@ -293,12 +313,6 @@ final class PetWalkingManager {
         let elapsed = elapsedTime
         let poopMarkers = activePoopMarkers
         let poop = max(poopCount, poopMarkers.count)
-
-        guard let pet = currentPet, WalkFeaturePolicy.canStartWalk(for: pet) else {
-            reset()
-            walkStopStartedAt = nil
-            return .empty
-        }
 
         // 隐式读取当前设备执行者（静默，不弹窗）
         let executorId = activeHumanSelection.currentHumanId
@@ -317,7 +331,6 @@ final class PetWalkingManager {
 
         // N2/Phase54: 遛狗椰子奖励（距离 < 20m 不发放奖励，日志正常保存）
         let isTooShortForReward = !CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
-        let normalizedTargets = WalkFeaturePolicy.normalizedWalkTargets(sharedTargets, fallback: pet)
         let walkLogs: [PetWalkLog]
         var walkCoconutDelta = 0
         var pottyCoconutDelta = 0

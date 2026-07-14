@@ -206,13 +206,18 @@ extension WalkTrackingCard {
 
     func finishWalkAndFlip() {
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        SharedPetSelectionMemory.saveSelection(
-            Set(selectedWalkTargets.map(\.id)),
-            sourcePet: pet,
-            scope: "walk.shared",
-            candidates: sameSpeciesWalkPets
-        )
-        let rewardSummary = onStopWalk(selectedWalkTargets, selectedWalkExecutorIds)
+        let targets = selectedWalkTargets
+        guard !targets.isEmpty else {
+            selectedSharedWalkPetIds = [pet.id]
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            appServices.islandToasts.show(L10n(appLanguage).tr(
+                zh: "同行宠物已变化，已刷新选择，请再次确认。",
+                en: "Walk companions changed. Review the refreshed selection and try again.",
+                de: "Die Begleittiere haben sich geändert. Prüfe die Auswahl und versuche es erneut."
+            ))
+            return
+        }
+        let rewardSummary = onStopWalk(targets, selectedWalkExecutorIds)
         guard rewardSummary.didPersist else {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             appServices.islandToasts.show(L10n(appLanguage).tr(
@@ -222,6 +227,12 @@ extension WalkTrackingCard {
             ))
             return
         }
+        SharedPetSelectionMemory.saveSelection(
+            Set(targets.map(\.id)),
+            sourcePet: pet,
+            scope: "walk.shared",
+            candidates: sameSpeciesWalkPets
+        )
         lastStopRewardSummary = rewardSummary.hasReward ? rewardSummary : nil
         if rewardSummary.hasReward {
             OhanaFeedback.success()

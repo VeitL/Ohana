@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Ohana
 
@@ -119,6 +120,115 @@ struct TodayFocusTaskProjectionTests {
         #expect(route.focusRequestID != nil)
     }
 
+    @Test func futureLinkedReviewKeepsTheFullTaskCenterIdentity() throws {
+        let now = Date(timeIntervalSince1970: 1_784_000_000)
+        let reviewer = Human(name: "Parent")
+        let worker = Human(name: "Kid")
+        let futureEvent = Event(
+            title: "Review plant care",
+            startDate: now.addingTimeInterval(30 * 86400),
+            eventType: EventType.task.rawValue
+        )
+        let reviewTask = FamilyCollaborationTask(
+            title: futureEvent.title,
+            kind: .bounty,
+            status: .pendingReview,
+            relatedEventId: futureEvent.id.uuidString,
+            createdById: reviewer.id.uuidString,
+            createdByName: reviewer.name,
+            assignedToId: worker.id.uuidString,
+            assignedToName: worker.name,
+            rewardCoconuts: 10,
+            dueAt: futureEvent.startDate
+        )
+        let unified = TaskCenterSnapshotBuilder.make(
+            events: [futureEvent],
+            allEvents: [futureEvent],
+            pets: [],
+            humans: [reviewer, worker],
+            plants: [],
+            familyTasks: [reviewTask],
+            activeHumanId: reviewer.id.uuidString,
+            now: now
+        )
+        let projected = snapshot(
+            activeHuman: reviewer,
+            humans: [reviewer, worker],
+            events: [futureEvent],
+            tasks: [reviewTask],
+            now: now
+        )
+
+        let unifiedItem = try #require(unified.allItems.first { $0.familyTaskID == reviewTask.id })
+        let focusItem = try #require(projected.assignedFamilyTasks.first)
+        #expect(focusItem.id == unifiedItem.id)
+        #expect(focusItem.taskCenterItem == unifiedItem)
+        #expect(focusItem.primaryAction == .approve)
+    }
+
+    @Test func homeReadModelKeepsFutureLinkedReviewIdentityAlignedWithTaskCenter() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let reviewer = Human(name: "Parent")
+        let worker = Human(name: "Kid")
+        let futureDate = Calendar.current.date(byAdding: .day, value: 30, to: now) ?? now
+        let futureEvent = Event(
+            title: "Review plant care",
+            startDate: futureDate,
+            eventType: EventType.task.rawValue
+        )
+        let reviewTask = FamilyCollaborationTask(
+            title: futureEvent.title,
+            kind: .bounty,
+            status: .pendingReview,
+            relatedEventId: futureEvent.id.uuidString,
+            createdById: reviewer.id.uuidString,
+            createdByName: reviewer.name,
+            assignedToId: worker.id.uuidString,
+            assignedToName: worker.name,
+            rewardCoconuts: 10,
+            dueAt: futureDate
+        )
+        context.insert(reviewer)
+        context.insert(worker)
+        context.insert(futureEvent)
+        context.insert(reviewTask)
+        try context.save()
+
+        let store = HomeReadModelStore()
+        await store.refreshImmediately(
+            context: context,
+            activeHumanIdRaw: reviewer.id.uuidString,
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            language: AppLanguage.code,
+            externalRevision: HomeRevision(),
+            force: true
+        )
+
+        let matchingProjectedItem = store.payload.snapshot.todayFocus.assignedFamilyTasks.first {
+            $0.taskCenterItem.familyTaskID == reviewTask.id
+        }
+        let projectedItem = try #require(matchingProjectedItem)
+        let unified = TaskCenterSnapshotBuilder.make(
+            events: [futureEvent],
+            allEvents: [futureEvent],
+            pets: [],
+            humans: [reviewer, worker],
+            plants: [],
+            familyTasks: [reviewTask],
+            activeHumanId: reviewer.id.uuidString,
+            now: now
+        )
+        let unifiedItem = try #require(unified.allItems.first { $0.familyTaskID == reviewTask.id })
+
+        #expect(projectedItem.id == unifiedItem.id)
+        #expect(projectedItem.taskCenterItem == unifiedItem)
+        #expect(projectedItem.primaryAction == .approve)
+    }
+
     @Test func todayFocusAndHumanDetailUseTheUnifiedTaskEntryPoints() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -201,5 +311,11 @@ struct TodayFocusTaskProjectionTests {
             clinicalAlerts: [],
             now: now
         )
+    }
+
+    private func makeContainer() throws -> ModelContainer {
+        let schema = Schema(ArkSchemaV90.models)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return try ModelContainer(for: schema, configurations: [config])
     }
 }

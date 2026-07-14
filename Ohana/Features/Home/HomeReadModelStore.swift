@@ -480,29 +480,37 @@ private nonisolated struct HomeReadModelFetches {
     }
 
     func events() -> [Event] {
-        let today = calendar.startOfDay(for: now)
-        let start = calendar.date(byAdding: .day, value: -14, to: today) ?? today
-        let end = calendar.date(byAdding: .day, value: 14, to: today) ?? today.addingTimeInterval(14 * 24 * 60 * 60)
+        // Today Focus and the full Task Center must resolve linked work from
+        // the same bounded event window so a task keeps one stable identity.
+        let window = CalendarTimelineWindowPolicy.bounds(around: now, calendar: calendar)
+        let start = window.start
+        let end = window.end
         var windowDescriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
                 event.startDate >= start && event.startDate <= end
             },
-            sortBy: [SortDescriptor(\Event.startDate)]
+            sortBy: [
+                SortDescriptor(\Event.startDate),
+                SortDescriptor(\Event.id)
+            ]
         )
-        windowDescriptor.fetchLimit = 400
+        windowDescriptor.fetchLimit = CalendarTimelineWindowPolicy.windowedEventFetchLimit
         let windowEvents: [Event] = fetchOrLog(windowDescriptor, operation: "fetch home event window")
 
         var recurringDescriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
                 event.recurrenceDays > 0 && event.startDate <= end
             },
-            sortBy: [SortDescriptor(\Event.startDate, order: .reverse)]
+            sortBy: [
+                SortDescriptor(\Event.startDate, order: .reverse),
+                SortDescriptor(\Event.id)
+            ]
         )
-        recurringDescriptor.fetchLimit = 400
+        recurringDescriptor.fetchLimit = CalendarTimelineWindowPolicy.recurringEventFetchLimit
         let recurringEvents: [Event] = fetchOrLog(recurringDescriptor, operation: "fetch home recurring events")
             .filter { event in
                 guard let recurrenceEndDate = event.recurrenceEndDate else { return true }
-                return calendar.startOfDay(for: recurrenceEndDate) >= start
+                return recurrenceEndDate >= start
             }
 
         var seen: Set<UUID> = []

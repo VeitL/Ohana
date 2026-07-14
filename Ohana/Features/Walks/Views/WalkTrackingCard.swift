@@ -64,8 +64,14 @@ struct WalkTrackingCard: View {
     }
 
     var selectedWalkTargets: [Pet] {
-        let selected = sameSpeciesWalkPets.filter { selectedSharedWalkPetIds.contains($0.id) }
-        return SharedPetTargetResolver.normalizedTargets(selected, fallback: pet)
+        guard !selectedSharedWalkPetIds.isEmpty else {
+            return SharedPetTargetResolver.normalizedTargets([], fallback: pet)
+        }
+        return SharedPetTargetResolver.sameSpeciesTargets(
+            sourcePet: pet,
+            allPets: allPets,
+            explicitTargetIds: selectedSharedWalkPetIds
+        )
     }
 
     var activeWalkHumanId: String? {

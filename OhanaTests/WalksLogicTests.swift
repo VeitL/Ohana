@@ -17,7 +17,7 @@ struct WalksLogicTests {
         #expect(!WalkFeaturePolicy.canStartWalk(for: deceasedDog))
     }
 
-    @Test func sharedWalkTargetsKeepOnlyEligibleDogs() {
+    @Test func sharedWalkTargetsRejectTheWholeSelectionWhenAnyTargetIsIneligible() {
         let source = Pet(name: "Piper", species: "狗")
         let secondDog = Pet(name: "Rex", species: "dog")
         let cat = Pet(name: "Mochi", species: "猫")
@@ -29,7 +29,35 @@ struct WalksLogicTests {
             fallback: source
         )
 
-        #expect(targets.map(\.id) == [source.id, secondDog.id])
+        #expect(targets.isEmpty)
+    }
+
+    @Test func stoppingSharedWalkWithAnIneligibleTargetPersistsNothing() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let source = Pet(name: "Piper", species: "狗")
+        let ineligible = Pet(name: "Mochi", species: "猫")
+        context.insert(source)
+        context.insert(ineligible)
+        try context.save()
+
+        let location = FakeWalkLocationManager()
+        location.totalDistance = 120
+        let manager = PetWalkingManager(locationManager: location, questManager: QuestManager())
+        manager.start(pet: source)
+
+        let result = manager.stop(
+            modelContext: context,
+            sharedTargets: [source, ineligible]
+        )
+
+        #expect(result == .invalidTargets)
+        #expect(!result.didPersist)
+        #expect(manager.currentPet?.id == source.id)
+        #expect(manager.phase == .running)
+        #expect(try context.fetch(FetchDescriptor<PetWalkLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     @Test func trackingSnapshotUsesPersistedWalksAndPoopMarkers() {
@@ -69,8 +97,12 @@ struct WalksLogicTests {
 
         #expect(cardSource.contains("var onStopWalk: ([Pet], [String]) -> WalkStopRewardSummary"))
         #expect(cardSource.contains("@State var lastStopRewardSummary: WalkStopRewardSummary?"))
-        #expect(actionsSource.contains("let rewardSummary = onStopWalk(selectedWalkTargets, selectedWalkExecutorIds)"))
+        #expect(actionsSource.contains("guard !targets.isEmpty else"))
+        #expect(actionsSource.contains("let rewardSummary = onStopWalk(targets, selectedWalkExecutorIds)"))
         #expect(actionsSource.contains("guard rewardSummary.didPersist else"))
+        let persistenceGuard = try #require(actionsSource.range(of: "guard rewardSummary.didPersist else"))
+        let selectionWrite = try #require(actionsSource.range(of: "SharedPetSelectionMemory.saveSelection("))
+        #expect(persistenceGuard.lowerBound < selectionWrite.lowerBound)
         #expect(actionsSource.contains("lastStopRewardSummary = rewardSummary.hasReward ? rewardSummary : nil"))
         #expect(summarySource.contains("summaryRewardBadge(delta: coconutDelta)"))
         #expect(summarySource.contains("walk-tracking-summary-coconut-reward"))

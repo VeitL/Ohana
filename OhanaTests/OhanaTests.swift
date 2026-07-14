@@ -2569,7 +2569,7 @@ struct OhanaTests {
         let sourceContext = source.mainContext
         let petId = UUID().uuidString
         let event = Event(title: "晚餐", eventType: EventType.foodChange.rawValue, relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: petId)
-        let occurrenceAt = Date().addingTimeInterval(7200)
+        let occurrenceAt = Date(timeIntervalSince1970: 2_000_000_000)
         let reminder = Reminder(
             event: event,
             scheduledAt: occurrenceAt.addingTimeInterval(-3600),

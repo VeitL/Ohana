@@ -207,9 +207,8 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             now: now
         )
         let assignedTasks = prioritizedTaskItems(
-            TaskCenterSnapshotBuilder.make(
+            focusTaskCenterSnapshot(
                 events: events,
-                allEvents: events,
                 pets: pets,
                 humans: humans,
                 plants: visiblePlants,
@@ -286,9 +285,8 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             questProgress: questProgress
         )
         let assignedTasks = prioritizedTaskItems(
-            TaskCenterSnapshotBuilder.make(
+            focusTaskCenterSnapshot(
                 events: events,
-                allEvents: events,
                 pets: pets,
                 humans: humans,
                 plants: visiblePlants,
@@ -357,6 +355,76 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             result.append(item)
         }
         return result
+    }
+
+    private static func focusTaskCenterSnapshot(
+        events: [Event],
+        pets: [Pet],
+        humans: [Human],
+        plants: [Plant],
+        humanMedications: [HumanMedication],
+        reminders: [Reminder],
+        familyTasks: [FamilyCollaborationTask],
+        activeHumanId: String,
+        now: Date,
+        calendar: Calendar = .current
+    ) -> TaskCenterSnapshot {
+        let focusEvents = focusEventCandidates(
+            events,
+            reminders: reminders,
+            familyTasks: familyTasks,
+            now: now,
+            calendar: calendar
+        )
+        return TaskCenterSnapshotBuilder.make(
+            events: focusEvents,
+            allEvents: events,
+            pets: pets,
+            humans: humans,
+            plants: plants,
+            humanMedications: humanMedications,
+            reminders: reminders,
+            familyTasks: familyTasks,
+            activeHumanId: activeHumanId,
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    private static func focusEventCandidates(
+        _ events: [Event],
+        reminders: [Reminder],
+        familyTasks: [FamilyCollaborationTask],
+        now: Date,
+        calendar: Calendar
+    ) -> [Event] {
+        let today = calendar.startOfDay(for: now)
+        let window = CalendarTimelineWindowPolicy.bounds(around: now, calendar: calendar)
+        let cutoff = calendar.startOfDay(for: window.start)
+        var remindersByID: [UUID: Reminder] = [:]
+        for reminder in reminders + events.flatMap(\.reminders) {
+            remindersByID[reminder.id] = reminder
+        }
+        var linkedEventIDs: Set<UUID> = Set(familyTasks.compactMap { task -> UUID? in
+            guard !task.isFinished, let rawID = task.relatedEventId else { return nil }
+            return UUID(uuidString: rawID)
+        })
+        for task in familyTasks where !task.isFinished {
+            guard let rawReminderID = task.relatedReminderId,
+                  let reminderID = UUID(uuidString: rawReminderID),
+                  let eventID = remindersByID[reminderID]?.event?.id else { continue }
+            linkedEventIDs.insert(eventID)
+        }
+
+        return events.filter { event in
+            if linkedEventIDs.contains(event.id) { return true }
+            let eventStart = calendar.startOfDay(for: event.startDate)
+            guard eventStart <= today else { return false }
+            let eventEnd = event.recurrenceDays > 0
+                ? (event.recurrenceEndDate.map { calendar.startOfDay(for: $0) } ?? today)
+                : calendar.startOfDay(for: event.endDate ?? event.startDate)
+            return eventEnd >= cutoff
+        }
     }
 
     private static func taskSnapshots(

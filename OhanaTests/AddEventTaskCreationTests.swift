@@ -60,10 +60,12 @@ struct AddEventTaskCreationTests {
             "Ohana/Features/Calendar/AddEventDataContainer.swift",
             rootURL: rootURL
         )
-        let editorSource = try source(
+        let editorSource = try [
             "Ohana/Features/Calendar/Views/AddEventView.swift",
-            rootURL: rootURL
-        )
+            "Ohana/Features/Calendar/Views/AddEventView+Actions.swift"
+        ]
+        .map { try source($0, rootURL: rootURL) }
+        .joined(separator: "\n")
 
         #expect(containerSource.contains("var taskCreationPreset: TaskCreationPreset?"))
         #expect(containerSource.contains("taskCreationPreset: taskCreationPreset"))

@@ -975,7 +975,7 @@ struct ManualFeedCommandTests {
         )
         let result = try SaveFeedPlanCommand.run(
             pet: petA,
-            targets: [petB, petC],
+            targets: [petB],
             kind: .manualReminder,
             draft: draft,
             allEvents: [],

@@ -648,10 +648,6 @@ private struct TaskCenterRouteData {
 
 @ModelActor
 private actor TaskCenterDataActor {
-    private static let eventFetchPastMonths = -3
-    private static let eventFetchFutureMonths = 3
-    private static let eventFetchLimit = 600
-    private static let recurringEventFetchLimit = 500
     private static let completedFamilyTaskFetchLimit = 300
 
     func load(
@@ -725,24 +721,31 @@ private actor TaskCenterDataActor {
 
     private func fetchVisibleEvents(now: Date) -> [Event] {
         let calendar = Calendar.current
-        let windowStart = calendar.date(byAdding: .month, value: Self.eventFetchPastMonths, to: now) ?? now
-        let windowEnd = calendar.date(byAdding: .month, value: Self.eventFetchFutureMonths, to: now) ?? now
+        let window = CalendarTimelineWindowPolicy.bounds(around: now, calendar: calendar)
+        let windowStart = window.start
+        let windowEnd = window.end
         var windowedDescriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
                 event.startDate >= windowStart && event.startDate <= windowEnd
             },
-            sortBy: [SortDescriptor(\.startDate)]
+            sortBy: [
+                SortDescriptor(\.startDate),
+                SortDescriptor(\.id)
+            ]
         )
-        windowedDescriptor.fetchLimit = Self.eventFetchLimit
+        windowedDescriptor.fetchLimit = CalendarTimelineWindowPolicy.windowedEventFetchLimit
         let windowedEvents = fetch(windowedDescriptor, name: "Event.window")
 
         var recurringDescriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
                 event.recurrenceDays > 0 && event.startDate <= windowEnd
             },
-            sortBy: [SortDescriptor(\.startDate)]
+            sortBy: [
+                SortDescriptor(\.startDate, order: .reverse),
+                SortDescriptor(\.id)
+            ]
         )
-        recurringDescriptor.fetchLimit = Self.recurringEventFetchLimit
+        recurringDescriptor.fetchLimit = CalendarTimelineWindowPolicy.recurringEventFetchLimit
         let recurringEvents = fetch(recurringDescriptor, name: "Event.recurring").filter { event in
             guard let recurrenceEndDate = event.recurrenceEndDate else { return true }
             return recurrenceEndDate >= windowStart

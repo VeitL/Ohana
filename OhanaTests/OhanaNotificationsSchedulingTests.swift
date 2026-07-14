@@ -716,7 +716,7 @@ struct OhanaNotificationsSchedulingTests {
     }
 
     @Test func calendarEventEditorRequestsNotificationPermissionBeforeSavingReminder() throws {
-        let addEventSource = try source("Ohana/Features/Calendar/Views/AddEventView.swift")
+        let addEventSource = try source("Ohana/Features/Calendar/Views/AddEventView+Actions.swift")
 
         #expect(addEventSource.contains("guard input.reminderLeadMinutes == nil else"))
         #expect(addEventSource.contains("await appServices.userNotifications.requestPermission()"))
