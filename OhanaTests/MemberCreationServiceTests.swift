@@ -51,6 +51,57 @@ struct MemberCreationServiceTests {
         #expect(try context.fetch(FetchDescriptor<Pet>()).count == 1)
     }
 
+    @Test func petCreationRequiresBoyOrGirl() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        var draft = petDraft(name: "Momo", source: .placeholder)
+        draft.petGender = "unknown"
+
+        do {
+            _ = try saveMember(
+                draft: draft,
+                existingPets: [],
+                existingHumans: [],
+                context: container.mainContext,
+                countryCode: "CN"
+            )
+            Issue.record("Expected incomplete pet profile rejection")
+        } catch let error as MemberCreationService.ServiceError {
+            guard case .incompletePetProfile = error else {
+                Issue.record("Expected the binary sex requirement")
+                return
+            }
+        }
+
+        #expect(try container.mainContext.fetch(FetchDescriptor<Pet>()).isEmpty)
+    }
+
+    @Test func petCreationAllowsNoPersonalityAndLimitsPersistedSelectionToThree() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        var optionalDraft = petDraft(name: "Momo", source: .placeholder)
+        optionalDraft.personalityTagIds = []
+        let optionalPet = try #require(saveMember(
+            draft: optionalDraft,
+            existingPets: [],
+            existingHumans: [],
+            context: container.mainContext,
+            countryCode: "CN"
+        ).pet)
+        #expect(optionalPet.personalityTagIdList.isEmpty)
+
+        var limitedDraft = petDraft(name: "Kiki", source: .placeholder)
+        limitedDraft.personalityTagIds = ["curious", "lazy", "smart", "foodie"]
+        let limitedPet = try #require(saveMember(
+            draft: limitedDraft,
+            existingPets: [optionalPet],
+            existingHumans: [],
+            context: container.mainContext,
+            countryCode: "CN"
+        ).pet)
+        #expect(limitedPet.personalityTagIdList == ["curious", "lazy", "smart"])
+    }
+
     @Test func petCreationSanitizesLargeAvatarBeforePersistence() throws {
         resetGlobalState()
         let container = try makeContainer()
@@ -472,7 +523,7 @@ struct MemberCreationServiceTests {
         #expect(result?.role == "owner")
     }
 
-    @Test func homeVisibleCardsLimitToSixAndPromoteNewMember() throws {
+    @Test func homeVisibleCardsIncludeSeventhMemberAndPromotePreferredMember() throws {
         resetGlobalState()
         UserDefaults.standard.set("zh", forKey: "appLanguage")
         let humans = (0 ..< 7).map { index in
@@ -499,8 +550,8 @@ struct MemberCreationServiceTests {
             popoutData: [:]
         )
 
-        #expect(FocusHomeCardDataSource.maxCardsPerPage == 6)
-        #expect(visible.count == 6)
+        #expect(FocusHomeCardDataSource.firstScreenMediaBudget == 6)
+        #expect(visible.count == 7)
         #expect(visible.first?.id == promoted.id)
     }
 
@@ -568,11 +619,11 @@ struct MemberCreationServiceTests {
         #expect(!cards.contains { $0.id == memorialHuman.id })
     }
 
-    @Test func newHumanDefaultsHiddenFromHomeWhenHomeStackIsFull() throws {
+    @Test func newHumanRemainsVisibleBeyondFirstScreenMediaBudget() throws {
         resetGlobalState()
         let container = try makeContainer()
         let context = container.mainContext
-        let humans = makeVisibleHumans(count: HomeCardVisibility.maxVisibleCards)
+        let humans = makeVisibleHumans(count: FocusHomeCardDataSource.firstScreenMediaBudget)
         humans.forEach { context.insert($0) }
         try context.save()
 
@@ -584,14 +635,14 @@ struct MemberCreationServiceTests {
             countryCode: "CN"
         )
 
-        #expect(result.human?.shouldShowOnHome == false)
+        #expect(result.human?.shouldShowOnHome == true)
     }
 
-    @Test func newPetDefaultsHiddenFromHomeWhenHomeStackIsFull() throws {
+    @Test func newPetRemainsVisibleBeyondFirstScreenMediaBudget() throws {
         resetGlobalState()
         let container = try makeContainer()
         let context = container.mainContext
-        let humans = makeVisibleHumans(count: HomeCardVisibility.maxVisibleCards)
+        let humans = makeVisibleHumans(count: FocusHomeCardDataSource.firstScreenMediaBudget)
         humans.forEach { context.insert($0) }
         try context.save()
 
@@ -605,8 +656,8 @@ struct MemberCreationServiceTests {
         let pet = try #require(result.pet)
         let hiddenRaw = UserDefaults.standard.string(forKey: HomeCardVisibility.hiddenPetIDsKey) ?? ""
 
-        #expect(HomeCardVisibility.isPetVisible(pet, raw: hiddenRaw) == false)
-        #expect(HomeCardVisibility.visibleCardCount(pets: [pet], humans: humans, raw: hiddenRaw) == HomeCardVisibility.maxVisibleCards)
+        #expect(HomeCardVisibility.isPetVisible(pet, raw: hiddenRaw))
+        #expect(HomeCardVisibility.visibleCardCount(pets: [pet], humans: humans, raw: hiddenRaw) == humans.count + 1)
     }
 
     @Test func petCreationWritesBirthdayHomeMilestonesAndRevision() throws {
@@ -712,6 +763,8 @@ struct MemberCreationServiceTests {
         draft.name = name
         draft.species = "狗"
         draft.breed = "柴犬"
+        draft.petGender = "boy"
+        draft.coatColor = "赤色"
         draft.avatarSource = source
         draft.avatarImageData = avatarData
         draft.hasBirthday = false

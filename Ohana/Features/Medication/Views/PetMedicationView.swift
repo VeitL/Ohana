@@ -141,10 +141,20 @@ struct PetMedicationContentView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .overlay {
-                if showingAddSheet {
-                    addMedicationOverlay
-                }
+            .sheet(isPresented: $showingAddSheet) {
+                AddPetMedicationSheet(
+                    pet: pet,
+                    isInlinePopup: false,
+                    onClose: closeAddMedicationPopup,
+                    onSaved: {
+                        appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
+                        doseRefreshToken = UUID()
+                        onDataChanged?()
+                        closeAddMedicationPopup()
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationContentInteraction(.scrolls)
             }
             .overlay(alignment: .bottomTrailing) {
                 if !pet.hasPassedAway, !showingAddSheet {
@@ -164,43 +174,6 @@ struct PetMedicationContentView: View {
             .animation(GoMotion.feedback, value: toastMessage)
             .animation(GoMotion.sheet, value: showingAddSheet)
         }
-    }
-
-    private var addMedicationOverlay: some View {
-        GeometryReader { proxy in
-            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: showingAddSheet) {
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(colorScheme == .dark ? 0.16 : 0.08), // ui-v4: allow modal scrim
-                        Color.black.opacity(colorScheme == .dark ? 0.42 : 0.22) // ui-v4: allow modal scrim
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                .onTapGesture {
-                    closeAddMedicationPopup()
-                }
-
-                AddPetMedicationSheet(
-                    pet: pet,
-                    isInlinePopup: true,
-                    onClose: closeAddMedicationPopup,
-                    onSaved: {
-                        appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
-                        doseRefreshToken = UUID()
-                        onDataChanged?()
-                        closeAddMedicationPopup()
-                    }
-                )
-                .frame(maxHeight: min(proxy.size.height * 0.88, 690))
-                .padding(.horizontal, 6)
-                .padding(.bottom, max(proxy.safeAreaInsets.bottom, 8) + 6)
-            }
-            .animation(GoMotion.sheet, value: showingAddSheet)
-        }
-        .ignoresSafeArea()
-        .zIndex(40)
     }
 
     private var addMedicationFab: some View {

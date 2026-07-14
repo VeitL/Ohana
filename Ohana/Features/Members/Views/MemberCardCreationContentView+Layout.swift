@@ -109,15 +109,17 @@ extension MemberCardCreationContentView {
     var currentStepContent: some View {
         switch currentStep {
         case .basicInfo:
-            if kind == .pet {
-                petBasicInfoStep
-            } else {
-                humanBasicInfoStep
-            }
-        case .petProfile:
-            petProfileSection
+            humanBasicInfoStep
+        case .petName:
+            petNameStep
+        case .petIdentity:
+            petIdentityStep
+        case .petAppearance:
+            petAppearanceStep
         case .avatar:
             avatarSection
+        case .petPersonality:
+            petPersonalityStep
         case .theme:
             themeSection
         }

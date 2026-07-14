@@ -219,7 +219,6 @@ extension VerticalSolidHomeView {
     }
 
     func applyQuickActionExecutorFeedback(_ feedback: ExpandedQuickActionExecutor.Feedback) {
-        refreshHeaderStreak()
         if feedback.coconutDelta > 0 {
             OhanaFeedback.success()
         }
@@ -352,53 +351,6 @@ extension VerticalSolidHomeView {
             routeCoordinator.showHumanPrivacy()
         case .none:
             break
-        }
-    }
-
-    func expandedFabShortcuts(for card: FocusCard) -> [ExpandedCardFabShortcut] {
-        let shortcuts = interaction.expandedActions(for: card.id).fabShortcuts
-        guard !shortcuts.isEmpty else {
-            if card.isHuman {
-                return FocusHomeFabShortcutPolicy.humanShortcuts(localization: l)
-            }
-            return [
-                ExpandedCardFabShortcut(
-                    label: l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"),
-                    icon: "ellipsis.circle.fill",
-                    action: .allFeatures
-                )
-            ]
-        }
-        return shortcuts
-    }
-
-    func openExpandedFabShortcut(_ shortcut: ExpandedCardFabShortcut, card: FocusCard) {
-        closeVerticalFabMenu(immediate: true)
-        switch shortcut.action {
-        case let .quick(actionType):
-            GrowthNewFeatureStore.markVisited(quickActionType: actionType)
-            guard interaction.activePet(id: card.id) != nil else { return }
-            openPetQuickKey(actionType, petID: card.id)
-        case let .detail(feature):
-            GrowthNewFeatureStore.markVisited(feature: feature)
-            guard interaction.activePet(id: card.id) != nil else { return }
-            openPetFeature(feature, petID: card.id)
-        case .allFeatures:
-            if card.isHuman {
-                routeCoordinator.openSheet(.humanAllFeatures(card.id))
-            } else if interaction.pet(id: card.id) != nil {
-                routeCoordinator.openSheet(.petAllFeatures(card.id))
-            }
-        case let .humanQuick(actionType):
-            guard interaction.containsHuman(card.id) else { return }
-            if interaction.expandedActions(for: card.id).statesByActionType[actionType]?.isLocked == true {
-                routeCoordinator.showHumanPrivacy()
-                return
-            }
-            openHumanQuickKey(actionType, humanID: card.id)
-        case .humanAllFeatures:
-            guard interaction.containsHuman(card.id) else { return }
-            routeCoordinator.openSheet(.humanAllFeatures(card.id))
         }
     }
 

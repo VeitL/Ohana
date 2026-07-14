@@ -53,8 +53,7 @@ enum Avatar2DCandidateProvider {
             species: draft.species,
             breed: draft.resolvedBreed,
             gender: draft.petGender,
-            coatColor: draft.coatColor,
-            eyeColor: draft.eyeColor
+            coatColor: draft.coatColor
         )
         let allFilenames = bundledFilenames(directory: PetAvatarAssetCatalog.assetDirectory)
         let speciesPrefix = petSpeciesPrefix(draft.species)

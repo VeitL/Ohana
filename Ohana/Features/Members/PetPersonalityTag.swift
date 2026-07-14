@@ -2,7 +2,7 @@
 //  PetPersonalityTag.swift
 //  Ohana
 //
-//  添加宠物可选「性格标签」，最多 3 个；用于首页问候语趣味变体。
+//  添加宠物可选「性格标签」，最多 3 个；用于问候语与轻量互动反馈。
 //
 
 import Foundation
@@ -107,6 +107,9 @@ nonisolated struct PetPersonalityTag: Identifiable, Hashable {
         .init(id: "foodthief", sfSymbol: "hand.raised.fill", titleZh: "偷食小贼", titleEn: "Food bandit", titleDe: "Futterdieb"),
         .init(id: "chatty", sfSymbol: "bubble.left.fill", titleZh: "碎碎念", titleEn: "Chatty", titleDe: "Plaudrig")
     ]
+
+    /// 第一版创建与主性格编辑共同使用的精简目录。
+    static let primaryChoices = Array(allTags.prefix(8))
 
     static func lookup(_ id: String) -> PetPersonalityTag? {
         allTags.first { $0.id == id }
@@ -271,87 +274,71 @@ nonisolated enum PetTagGreeting {
     }
 }
 
-// MARK: - 标签驱动的轻量行为偏好
+// MARK: - 主性格编辑与照护反馈
 
-nonisolated enum PetPersonalityBehavior {
-    static func priorityBonus(for actionType: String, pet: Pet) -> Int {
-        let tags = Set(pet.personalityTagIdList)
-        guard !tags.isEmpty else { return 0 }
+nonisolated enum PetPrimaryPersonalitySelection {
+    static func replacingPrimary(in existingIDs: [String], with newPrimaryID: String) -> [String] {
+        let normalizedExisting = normalized(existingIDs)
+        let primary = newPrimaryID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !primary.isEmpty else { return normalizedExisting }
+        guard normalizedExisting.first != primary else { return normalizedExisting }
 
-        switch actionType {
-        case "play":
-            return score(tags, [
-                "energetic": 5, "playful": 5, "toy": 5, "curious": 3,
-                "mischief": 3, "social": 2, "sunny": 2, "smart": 1
-            ])
-        case "walk":
-            return score(tags, [
-                "energetic": 5, "brave": 3, "social": 3, "guardian": 2,
-                "escape_artist": 2, "curious": 2, "loyal": 1
-            ])
-        case "feed":
-            return score(tags, [
-                "foodie": 5, "greedy": 5, "foodthief": 4, "trainable": 2,
-                "spoiled": 1
-            ])
-        case "groom", "litter", "waterChange", "filterClean":
-            return score(tags, [
-                "clean": 5, "gentle": 2, "quiet": 2, "anxious": 1
-            ])
-        case "moment":
-            return score(tags, [
-                "photogenic": 5, "drama": 3, "mischief": 3, "curious": 2,
-                "snuggler": 2, "social": 2, "vocal": 1, "chatty": 1
-            ])
-        case "weight":
-            return score(tags, [
-                "foodie": 2, "greedy": 2, "lazy": 2, "sleepy": 1,
-                "chill": 1
-            ])
-        case "water":
-            return score(tags, [
-                "energetic": 2, "playful": 2, "clean": 1
-            ])
-        default:
-            return 0
+        let preservedSecondary = normalizedExisting
+            .dropFirst()
+            .filter { $0 != primary }
+        return normalized([primary] + preservedSecondary)
+    }
+
+    static func normalized(_ ids: [String]) -> [String] {
+        var seen: Set<String> = []
+        return Array(
+            ids
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty && seen.insert($0).inserted }
+                .prefix(3)
+        )
+    }
+}
+
+nonisolated enum PetPersonalityCareReaction {
+    static func line(petName: String, primaryTagID: String?, l: L10n) -> String {
+        let name = petName.isEmpty ? l.tr(zh: "小家伙", en: "Your pet", de: "Dein Tier") : petName
+        switch primaryTagID {
+        case "curious", "detective", "collector", "escape_artist":
+            return l.tr(zh: "\(name) 已认真检查：这次照护合格。", en: "\(name) inspected everything: care approved.", de: "\(name) hat alles geprüft: Pflege genehmigt.")
+        case "lazy", "sleepy", "chill", "zen":
+            return l.tr(zh: "\(name) 舒服得决定再躺五分钟。", en: "\(name) is comfy enough for five more minutes of lounging.", de: "\(name) ist bequem genug für fünf Minuten mehr Pause.")
+        case "energetic", "playful", "sunny":
+            return l.tr(zh: "\(name) 电量回满，又准备出发了。", en: "\(name)'s battery is full and ready to go again.", de: "\(name)s Akku ist voll und bereit für die nächste Runde.")
+        case "clingy", "snuggler", "loyal", "jealous":
+            return l.tr(zh: "\(name) 贴过来确认：这次也算抱抱吧？", en: "\(name) leans in: this counts as a cuddle too, right?", de: "\(name) rückt näher: Das zählt auch als Kuscheln, oder?")
+        case "smart", "trainable":
+            return l.tr(zh: "\(name) 点点头：流程通过。", en: "\(name) gives a knowing nod: process approved.", de: "\(name) nickt wissend: Ablauf genehmigt.")
+        case "toy", "mischief":
+            return l.tr(zh: "\(name)：照护完成，现在轮到玩了吧？", en: "\(name): care done — playtime now?", de: "\(name): Pflege fertig — jetzt spielen?")
+        case "foodie", "greedy", "foodthief":
+            return l.tr(zh: "\(name)：做得不错，奖励在哪里？", en: "\(name): nicely done. Where is the reward?", de: "\(name): Gut gemacht. Wo ist die Belohnung?")
+        case "drama", "vocal", "moody", "chatty":
+            return l.tr(zh: "\(name) 已为这次照护献上完整谢幕。", en: "\(name) gives this care moment a full curtain call.", de: "\(name) gibt diesem Pflegemoment einen großen Schlussapplaus.")
+        case "clean":
+            return l.tr(zh: "\(name) 对这次清爽程度表示满意。", en: "\(name) approves the fresh-and-clean result.", de: "\(name) ist mit dem frischen Ergebnis zufrieden.")
+        case "shy", "anxious", "gentle", "quiet":
+            return l.tr(zh: "\(name) 悄悄给了你一个开心的小信号。", en: "\(name) sends you one tiny, happy signal.", de: "\(name) schickt dir ein kleines, glückliches Zeichen.")
+        case "brave", "guardian", "independent", "stubborn":
+            return l.tr(zh: "\(name) 很认真地点头：可以。", en: "\(name) gives one very serious nod: acceptable.", de: "\(name) nickt sehr ernst: akzeptiert.")
+        case "social":
+            return l.tr(zh: "\(name) 已经准备把照护成果告诉全家。", en: "\(name) is ready to announce the result to everyone.", de: "\(name) möchte das Ergebnis gleich allen erzählen.")
+        case "spoiled":
+            return l.tr(zh: "\(name) 完成验收：本次服务符合标准。", en: "\(name)'s inspection is complete: service meets expectations.", de: "\(name)s Abnahme ist fertig: Service entspricht den Erwartungen.")
+        case "photogenic":
+            return l.tr(zh: "\(name) 表示：照护后照片可以安排了。", en: "\(name) says the after-care photo can happen now.", de: "\(name) meint: Jetzt kann das Nachher-Foto kommen.")
+        case "nightowl":
+            return l.tr(zh: "\(name) 先收下照护，夸奖留到夜里再说。", en: "\(name) accepts the care and saves the compliments for later.", de: "\(name) nimmt die Pflege an und spart das Lob für später.")
+        case let .some(tagID):
+            let tag = PetPersonalityTag.displayTitle(for: tagID, l: l)
+            return l.tr(zh: "\(name) 的「\(tag)」模式表示：收到。", en: "\(name)'s \(tag) side says: care accepted.", de: "\(name)s \(tag)-Seite sagt: Pflege angenommen.")
+        case .none:
+            return l.tr(zh: "\(name) 认真收下了这次照护。", en: "\(name) happily accepts this bit of care.", de: "\(name) nimmt diese Pflege gern an.")
         }
-    }
-
-    static func prioritized<T>(
-        _ values: [T],
-        actionType: (T) -> String,
-        stableRank: (T) -> Int,
-        pet: Pet
-    ) -> [T] {
-        values.sorted { lhs, rhs in
-            let lhsScore = priorityBonus(for: actionType(lhs), pet: pet)
-            let rhsScore = priorityBonus(for: actionType(rhs), pet: pet)
-            if lhsScore != rhsScore { return lhsScore > rhsScore }
-            return stableRank(lhs) < stableRank(rhs)
-        }
-    }
-
-    static func preferredPet(
-        from pets: [Pet],
-        actionType: String,
-        calendar _: Calendar = .current,
-        now _: Date = Date(),
-        isAlreadyDone: (Pet) -> Bool
-    ) -> Pet? {
-        pets
-            .enumerated()
-            .filter { !isAlreadyDone($0.element) }
-            .sorted { lhs, rhs in
-                let lhsScore = priorityBonus(for: actionType, pet: lhs.element)
-                let rhsScore = priorityBonus(for: actionType, pet: rhs.element)
-                if lhsScore != rhsScore { return lhsScore > rhsScore }
-                return lhs.offset < rhs.offset
-            }
-            .first?
-            .element
-    }
-
-    private static func score(_ tags: Set<String>, _ weights: [String: Int]) -> Int {
-        tags.reduce(0) { partial, tag in partial + (weights[tag] ?? 0) }
     }
 }

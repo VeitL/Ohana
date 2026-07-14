@@ -7,12 +7,12 @@ struct UiV4GoodFixture: View {
             OhanaAppBackground()
             Text("hello").foregroundStyle(Color.ohanaPrimaryText)
             Text("hint").foregroundStyle(Color.ohanaSecondaryText)
-            Button("tap") {}.buttonStyle(ScaleButtonStyle())
-            OhanaTextField(placeholder: "name", text: .constant(""))
+            Button("tap") {}
+            TextField("name", text: .constant(""))
             RoundedRectangle(cornerRadius: OhanaRadius.card, style: .continuous)
         }
         .sheet(isPresented: .constant(false)) {
-            Text("sheet").presentationDetents(OhanaSheetDetents.overview)
+            Text("sheet").presentationDetents([.medium, .large])
         }
         .onTapGesture {
             withAnimation(GoMotion.feedback) {}

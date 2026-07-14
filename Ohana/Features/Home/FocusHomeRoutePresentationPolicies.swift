@@ -44,11 +44,10 @@ extension AppPresentationPolicyProvider {
     static func policy(for route: HomeSheetRoute) -> AppPresentationPolicy {
         if route.isQuickEntry {
             return AppPresentationPolicy(
-                surface: .sheetPage,
+                surface: .compactSheet,
                 loading: .immediate,
                 instrumentationName: "home.\(route.presentationName)",
-                detents: [.large],
-                cornerRadius: OhanaRadius.sheetPage
+                detents: [.medium, .large]
             )
         }
         return homeSheetPagePolicy("home.\(route.presentationName)")
@@ -64,9 +63,10 @@ extension AppPresentationPolicyProvider {
 
     static func policy(for route: HomeOverlayRoute) -> AppPresentationPolicy {
         AppPresentationPolicy(
-            surface: .inlineOverlay,
+            surface: .compactSheet,
             loading: .immediate,
-            instrumentationName: "home.\(route.presentationName)"
+            instrumentationName: "home.\(route.presentationName)",
+            detents: [.medium, .large]
         )
     }
 

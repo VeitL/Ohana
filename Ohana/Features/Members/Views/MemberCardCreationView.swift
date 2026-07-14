@@ -35,7 +35,6 @@ struct MemberCardCreationContentView: View {
     @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
     @AppStorage(Avatar2DAccess.extraPassInventoryKey) var avatarPassCount = 0
-    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) var hiddenHomePetIDsRaw = ""
     @AppStorage(StarterGiftStorageKey.pending) var starterGiftPending = false
     @AppStorage(StarterGiftStorageKey.claimed) var starterGiftClaimed = false
     @SceneStorage("memberCreation.pet.mediaReturnStep") var petMediaReturnStepRaw = ""
@@ -59,7 +58,7 @@ struct MemberCardCreationContentView: View {
     @State var shouldApply2DAfterPurchase = false
     @State var didShowSuccess = false
     @State var isPreparingCamera = false
-    @State var currentStep: MemberCreationStep = .basicInfo
+    @State var currentStep: MemberCreationStep
     @State var lastCustomAvatarImageData: Data?
     @State var avatarMediaReturnStep: MemberCreationStep?
     @State var isAvatarMediaTransitioning = false
@@ -104,6 +103,7 @@ struct MemberCardCreationContentView: View {
         self.recoverySessionId = recoverySessionId
         self.presentationStyle = presentationStyle
         _draft = State(initialValue: MemberCreationDraft(kind: kind))
+        _currentStep = State(initialValue: kind == .pet ? .petName : .basicInfo)
     }
 
     var l: L10n { L10n(appLanguage) }
@@ -126,12 +126,14 @@ struct MemberCardCreationContentView: View {
             && !isJoinHandoffRunning
             && !draft.trimmedName.isEmpty
             && !duplicateName
-            && (kind != .pet || hasRequiredPetIdentity)
+            && (kind != .pet || hasRequiredPetProfile)
     }
 
-    // 宠物必选:物种 + 品种。
-    var hasRequiredPetIdentity: Bool {
-        !draft.species.isEmpty && !draft.resolvedBreed.isEmpty
+    var hasRequiredPetProfile: Bool {
+        !draft.species.isEmpty
+            && !draft.resolvedBreed.isEmpty
+            && ["boy", "girl"].contains(draft.petGender)
+            && !draft.coatColor.isEmpty
     }
 
     var creationSteps: [MemberCreationStep] { MemberCreationStep.steps(for: kind) }
@@ -139,20 +141,20 @@ struct MemberCardCreationContentView: View {
     var isLastStep: Bool { currentStepIndex == creationSteps.count - 1 }
     var canAdvanceStep: Bool {
         guard !isSaving, !isJoinHandoffRunning else { return false }
-        if currentStep == .basicInfo {
-            guard !draft.trimmedName.isEmpty, !duplicateName else { return false }
-            // 宠物:物种与品种在此步,设为必选后才能进入下一步。
-            return kind != .pet || hasRequiredPetIdentity
+        switch currentStep {
+        case .basicInfo, .petName:
+            return !draft.trimmedName.isEmpty && !duplicateName
+        case .petIdentity:
+            return !draft.species.isEmpty && !draft.resolvedBreed.isEmpty
+        case .petAppearance:
+            return ["boy", "girl"].contains(draft.petGender) && !draft.coatColor.isEmpty
+        case .avatar, .petPersonality, .theme:
+            return true
         }
-        return true
     }
 
     var canRunHomeJoinHandoff: Bool {
-        HomeCardVisibility.visibleCardCount(
-            pets: existingPets,
-            humans: existingHumans,
-            raw: hiddenHomePetIDsRaw
-        ) < HomeCardVisibility.maxVisibleCards
+        true
     }
 
     var mbtiSignature: String {

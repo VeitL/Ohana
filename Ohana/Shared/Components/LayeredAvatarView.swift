@@ -2,15 +2,11 @@
 //  LayeredAvatarView.swift
 //  Ohana
 //
-//  Phase 1+2: 分层 Avatar 引擎 + ColorPickerPopup
-//  - 有头像时：图片叠加色彩滤镜层可调整
-//  - 无头像时：矢量剪影 + 可着色
-//  - 点击眼部区域 → 眼色选择器弹窗
-//  - 点击躯体区域 → 毛色选择器弹窗
+//  Layered avatar with optional fur-color customization.
 
 import SwiftUI
 
-// MARK: - Eye & Fur Color Presets
+// MARK: - Fur Color Presets
 
 struct AvatarColorPreset: Identifiable {
     let id = UUID()
@@ -20,18 +16,6 @@ struct AvatarColorPreset: Identifiable {
 }
 
 extension AvatarColorPreset {
-    static let eyePresets: [AvatarColorPreset] = [
-        .init(name: "琥珀", hex: "D4A017"),
-        .init(name: "深棕", hex: "5C3317"),
-        .init(name: "浅棕", hex: "8B5E3C"),
-        .init(name: "蓝灰", hex: "7BA7BC"),
-        .init(name: "绿色", hex: "4A7C59"),
-        .init(name: "冰蓝", hex: "A8D8EA"),
-        .init(name: "灰色", hex: "9E9E9E"),
-        .init(name: "榛色", hex: "8E6B3E"),
-        .init(name: "黑色", hex: "1A1A1A")
-    ]
-
     static let furPresets: [AvatarColorPreset] = [
         .init(name: "象牙白", hex: "F5F0E8"),
         .init(name: "奶油", hex: "F0E0C0"),
@@ -47,15 +31,6 @@ extension AvatarColorPreset {
 
     func localizedName(_ l: L10n) -> String {
         switch name {
-        case "琥珀": l.tr(zh: "琥珀", en: "Amber", de: "Bernstein")
-        case "深棕": l.tr(zh: "深棕", en: "Dark brown", de: "Dunkelbraun")
-        case "浅棕": l.tr(zh: "浅棕", en: "Light brown", de: "Hellbraun")
-        case "蓝灰": l.tr(zh: "蓝灰", en: "Blue gray", de: "Blaugrau")
-        case "绿色": l.tr(zh: "绿色", en: "Green", de: "Gruen")
-        case "冰蓝": l.tr(zh: "冰蓝", en: "Ice blue", de: "Eisblau")
-        case "灰色": l.tr(zh: "灰色", en: "Gray", de: "Grau")
-        case "榛色": l.tr(zh: "榛色", en: "Hazel", de: "Haselnuss")
-        case "黑色": l.tr(zh: "黑色", en: "Black", de: "Schwarz")
         case "象牙白": l.tr(zh: "象牙白", en: "Ivory", de: "Elfenbein")
         case "奶油": l.tr(zh: "奶油", en: "Cream", de: "Creme")
         case "金黄": l.tr(zh: "金黄", en: "Golden", de: "Gold")
@@ -79,14 +54,11 @@ struct LayeredAvatarView: View {
     let species: String
 
     @Binding var furHex: String
-    @Binding var eyeHex: String
 
     /// When false, suppresses the picker popups (e.g. read-only display)
     var allowCustomize: Bool = true
 
-    @State private var showEyePicker = false
     @State private var showFurPicker = false
-    @State private var eyePressScale: CGFloat = 1
     @State private var bodyPressScale: CGFloat = 1
     @State private var decodedAvatarImage: UIImage?
     @State private var decodedAvatarIsTransparent = false
@@ -94,7 +66,6 @@ struct LayeredAvatarView: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var furColor: Color { Color(hex: furHex.isEmpty ? "D4A847" : furHex) }
-    private var eyeColor: Color { Color(hex: eyeHex.isEmpty ? "D4A017" : eyeHex) }
     private var avatarSignature: String {
         imageData.map { FocusWalletAvatarCache.signature(for: $0) } ?? "empty"
     }
@@ -114,15 +85,6 @@ struct LayeredAvatarView: View {
                 customizeHint
             }
         }
-        .sheet(isPresented: $showEyePicker) {
-            ColorPickerPopup(
-                title: l.tr(zh: "眼睛颜色", en: "Eye color", de: "Augenfarbe"),
-                presets: AvatarColorPreset.eyePresets,
-                selectedHex: $eyeHex
-            )
-            .presentationDetents(OhanaSheetDetents.compactMedium)
-            .presentationCornerRadius(OhanaRadius.sheetCompact)
-        }
         .sheet(isPresented: $showFurPicker) {
             ColorPickerPopup(
                 title: l.tr(zh: "毛发颜色", en: "Fur color", de: "Fellfarbe"),
@@ -130,7 +92,6 @@ struct LayeredAvatarView: View {
                 selectedHex: $furHex
             )
             .presentationDetents(OhanaSheetDetents.compactMedium)
-            .presentationCornerRadius(OhanaRadius.sheetCompact)
         }
         .task(id: avatarSignature) {
             guard let imageData else {
@@ -166,24 +127,13 @@ struct LayeredAvatarView: View {
                 .frame(width: geo.size.width, height: geo.size.height)
             }
 
-            // Eye region overlay (top-third of circle, centered)
             if allowCustomize {
                 GeometryReader { geo in
                     let w = geo.size.width
                     let h = geo.size.height
-                    // Eye tap zone: upper third
-                    Color.clear
-                        .frame(width: w * 0.6, height: h * 0.3)
-                        .position(x: w / 2, y: h * 0.35)
-                        .contentShape(Circle().scale(0.6).offset(y: -h * 0.15))
-                        .onTapGesture {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation(GoMotion.feedback) { showEyePicker = true }
-                        }
-                    // Body tap zone: lower two-thirds
                     Color.clear
                         .frame(width: w * 0.8, height: h * 0.55)
-                        .position(x: w / 2, y: h * 0.7)
+                        .position(x: w / 2, y: h / 2)
                         .onTapGesture {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             withAnimation(GoMotion.feedback) { showFurPicker = true }
@@ -213,7 +163,7 @@ struct LayeredAvatarView: View {
                 .font(OhanaFont.adaptive(size: 56)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .frame(width: 80, height: 80)
 
-            // Eye dots overlay
+            // Fixed facial details keep the silhouette readable without adding another profile field.
             GeometryReader { geo in
                 let w = geo.size.width
                 let eyeY = w * 0.36
@@ -222,14 +172,14 @@ struct LayeredAvatarView: View {
                 ZStack {
                     // Left eye
                     Circle()
-                        .fill(eyeColor)
+                        .fill(Color.arkInk)
                         .overlay(Circle().fill(Color.arkInk.opacity(0.6)).scaleEffect(0.5))
                         .overlay(Circle().fill(Color.goCardWhite.opacity(0.55)).scaleEffect(0.28).offset(x: -eyeSize * 0.15, y: -eyeSize * 0.15))
                         .frame(width: eyeSize, height: eyeSize)
                         .position(x: w / 2 - spacing, y: eyeY)
                     // Right eye
                     Circle()
-                        .fill(eyeColor)
+                        .fill(Color.arkInk)
                         .overlay(Circle().fill(Color.arkInk.opacity(0.6)).scaleEffect(0.5))
                         .overlay(Circle().fill(Color.goCardWhite.opacity(0.55)).scaleEffect(0.28).offset(x: eyeSize * 0.15, y: -eyeSize * 0.15))
                         .frame(width: eyeSize, height: eyeSize)
@@ -242,24 +192,9 @@ struct LayeredAvatarView: View {
                 GeometryReader { geo in
                     let w = geo.size.width
                     let h = geo.size.height
-                    // Eye zone
                     Color.clear
-                        .frame(width: w * 0.7, height: h * 0.32)
-                        .position(x: w / 2, y: h * 0.38)
-                        .onTapGesture {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation(GoMotion.feedback) {
-                                eyePressScale = 0.95
-                                showEyePicker = true
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                withAnimation(GoMotion.feedback) { eyePressScale = 1 }
-                            }
-                        }
-                    // Body zone
-                    Color.clear
-                        .frame(width: w * 0.8, height: h * 0.5)
-                        .position(x: w / 2, y: h * 0.7)
+                        .frame(width: w * 0.8, height: h * 0.7)
+                        .position(x: w / 2, y: h / 2)
                         .onTapGesture {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             withAnimation(GoMotion.feedback) {
@@ -403,18 +338,16 @@ private extension Color {
 #Preview {
     struct PreviewWrapper: View {
         @State var fur = "D4A847"
-        @State var eye = "D4A017"
         var body: some View {
             VStack(spacing: 24) {
                 LayeredAvatarView(
                     imageData: nil,
                     petName: "小橘",
                     species: "猫",
-                    furHex: $fur,
-                    eyeHex: $eye
+                    furHex: $fur
                 )
                 .frame(width: 160, height: 160)
-                Text("Fur: #\(fur)  Eye: #\(eye)")
+                Text("Fur: #\(fur)")
                     .font(.caption.monospaced())
             }
             .padding()

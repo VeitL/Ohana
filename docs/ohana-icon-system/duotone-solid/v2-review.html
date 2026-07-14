@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ohana 快捷图标 V2 评审稿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f2f5f4;
+      --surface: #ffffff;
+      --surface-raised: #f8faf9;
+      --ink: #172126;
+      --muted: #66747b;
+      --line: rgba(23, 33, 38, .09);
+      --icon: #237db5;
+      --icon-soft: .15;
+      --icon-detail: .58;
+      --icon-size: 28px;
+      --success: #16866f;
+    }
+
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --page: #101616;
+      --surface: #192120;
+      --surface-raised: #202a29;
+      --ink: #f5f8f6;
+      --muted: #a8b5b2;
+      --line: rgba(255, 255, 255, .09);
+      --icon: #b9f542;
+      --icon-soft: .16;
+      --icon-detail: .62;
+      --success: #77d7bd;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--page);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+    }
+
+    button, input { font: inherit; }
+
+    main {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 38px 0 64px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--icon);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 42px);
+      line-height: 1.05;
+      letter-spacing: -.035em;
+    }
+
+    .intro {
+      max-width: 720px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .original-link {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 12px;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 28px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: color-mix(in srgb, var(--surface) 90%, transparent);
+      backdrop-filter: blur(18px);
+    }
+
+    .control-group {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      min-height: 42px;
+      padding: 4px;
+      border-radius: 14px;
+      background: var(--surface-raised);
+    }
+
+    .control-label {
+      padding: 0 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .control-button {
+      min-width: 44px;
+      min-height: 34px;
+      padding: 0 11px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .control-button[aria-pressed="true"] {
+      background: var(--surface);
+      color: var(--icon);
+      box-shadow: 0 1px 0 var(--line);
+    }
+
+    .color-control {
+      gap: 8px;
+      padding-right: 9px;
+    }
+
+    input[type="color"] {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .rule-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+
+    .rule {
+      min-height: 82px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+    }
+
+    .rule strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+
+    .rule span {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .group { margin-top: 30px; }
+
+    .group-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 0 0 12px;
+    }
+
+    .group-heading h2 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -.01em;
+    }
+
+    .group-heading span {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+      gap: 12px;
+    }
+
+    .icon-card {
+      position: relative;
+      min-height: 158px;
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 17px;
+      padding: 20px 14px 14px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--surface);
+      color: var(--icon);
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .icon-card:hover {
+      border-color: color-mix(in srgb, var(--icon) 24%, var(--line));
+      transform: translateY(-2px);
+    }
+
+    .icon-card:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--icon) 48%, transparent);
+      outline-offset: 3px;
+    }
+
+    .icon-stage {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      display: grid;
+      place-items: center;
+      border-radius: 20px;
+      background: var(--surface-raised);
+    }
+
+    .glyph {
+      width: var(--icon-size);
+      height: var(--icon-size);
+      display: block;
+      overflow: visible;
+      transform-origin: center;
+    }
+
+    .asset-glyph {
+      object-fit: contain;
+      filter: url(#icon-tint);
+    }
+
+    .solid { fill: currentColor; }
+    .soft { fill: currentColor; opacity: var(--icon-soft); }
+    .detail { fill: currentColor; opacity: var(--icon-detail); }
+    .line {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .line-soft { opacity: var(--icon-detail); }
+
+    .done-badge {
+      position: absolute;
+      right: 7px;
+      bottom: 7px;
+      width: 17px;
+      height: 17px;
+      display: grid;
+      place-items: center;
+      border: 2px solid var(--surface-raised);
+      border-radius: 50%;
+      background: var(--success);
+      color: var(--surface);
+      opacity: 0;
+      transform: scale(.62);
+      transition: opacity 180ms ease, transform 260ms cubic-bezier(.2, .9, .25, 1.2);
+    }
+
+    .done-badge::before {
+      content: "";
+      width: 6px;
+      height: 3px;
+      border-left: 1.8px solid currentColor;
+      border-bottom: 1.8px solid currentColor;
+      transform: translateY(-1px) rotate(-45deg);
+    }
+
+    .icon-card[data-state="done"] .done-badge {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .icon-card[data-state="active"] .glyph {
+      animation: glyph-tap 420ms cubic-bezier(.2, .9, .25, 1.2);
+    }
+
+    .icon-card[data-state="active"] .asset-glyph { will-change: transform; }
+
+    .icon-card[data-icon="walk"][data-state="active"] .asset-glyph {
+      animation: walk-trot 520ms cubic-bezier(.2, .8, .25, 1);
+    }
+
+    .icon-card[data-icon="potty"][data-state="active"] .asset-glyph {
+      animation: potty-scoop 520ms cubic-bezier(.2, .8, .25, 1);
+    }
+
+    .icon-card[data-icon="litter"][data-state="active"] .asset-glyph {
+      animation: litter-scoop 520ms cubic-bezier(.2, .8, .25, 1);
+    }
+
+    .icon-card[data-icon="groom"][data-state="active"] .asset-glyph {
+      animation: groom-sweep 500ms cubic-bezier(.2, .8, .25, 1);
+    }
+
+    .icon-card[data-icon="bath"][data-state="active"] .asset-glyph {
+      animation: bath-bob 520ms cubic-bezier(.2, .8, .25, 1);
+    }
+
+    .icon-card[data-icon="medicine"][data-state="active"] .asset-glyph {
+      animation: capsule-settle 500ms cubic-bezier(.2, .8, .25, 1);
+    }
+
+    .icon-card[data-icon="play"][data-state="active"] .asset-glyph {
+      animation: ball-bounce 540ms cubic-bezier(.2, .8, .25, 1);
+    }
+
+    .icon-card[data-icon="cleanup"][data-state="active"] .asset-glyph {
+      animation: clean-sweep 520ms cubic-bezier(.2, .8, .25, 1);
+    }
+
+    .icon-card[data-state="done"] .state-detail { opacity: .9; }
+    .icon-card[data-state="idle"] .state-detail { opacity: .18; transform: scale(.74); }
+
+    .state-detail {
+      transform-box: fill-box;
+      transform-origin: center;
+      transition: opacity 180ms ease, transform 240ms cubic-bezier(.2, .9, .25, 1.2);
+    }
+
+    .icon-card[data-state="active"] .feed-grain {
+      animation: grain-drop 540ms cubic-bezier(.2, .9, .25, 1.1) both;
+      animation-delay: var(--delay);
+    }
+
+    .weight-needle {
+      transform-box: view-box;
+      transform-origin: 16px 17.3px;
+      transform: rotate(-42deg);
+    }
+
+    .icon-card[data-state="active"] .weight-needle {
+      animation: needle-swing 560ms ease-out;
+    }
+
+    .icon-card[data-state="active"] .water-ripple {
+      animation: ripple 520ms ease-out;
+    }
+
+    .icon-copy { width: 100%; text-align: center; }
+
+    .icon-copy strong {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .icon-copy span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.2;
+    }
+
+    @keyframes glyph-tap {
+      0%, 100% { transform: scale(1); }
+      42% { transform: scale(.9); }
+      72% { transform: scale(1.06); }
+    }
+
+    @keyframes grain-drop {
+      0% { opacity: 0; transform: translateY(-5px) scale(.55); }
+      70% { opacity: 1; transform: translateY(1px) scale(1.08); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes needle-swing {
+      0% { transform: rotate(-42deg); }
+      35% { transform: rotate(-5deg); }
+      62% { transform: rotate(-31deg); }
+      82% { transform: rotate(-17deg); }
+      100% { transform: rotate(-22deg); }
+    }
+
+    @keyframes ripple {
+      0% { opacity: 0; transform: scale(.6); }
+      60% { opacity: .65; transform: scale(1.12); }
+      100% { opacity: .2; transform: scale(1); }
+    }
+
+    @keyframes walk-trot {
+      0%, 100% { transform: translate(0, 0) rotate(0); }
+      24% { transform: translate(-2px, -1px) rotate(-3deg); }
+      50% { transform: translate(2px, 0) rotate(2deg); }
+      74% { transform: translate(0, -2px) rotate(-1deg); }
+    }
+
+    @keyframes potty-scoop {
+      0%, 100% { transform: rotate(0) scale(1); }
+      30% { transform: translateY(1px) rotate(-7deg) scale(.96); }
+      58% { transform: translateY(-1px) rotate(5deg) scale(1.04); }
+      80% { transform: rotate(-2deg); }
+    }
+
+    @keyframes litter-scoop {
+      0%, 100% { transform: translateY(0) rotate(0); }
+      30% { transform: translateY(2px) rotate(4deg); }
+      58% { transform: translateY(-2px) rotate(-5deg); }
+      82% { transform: translateY(0) rotate(2deg); }
+    }
+
+    @keyframes groom-sweep {
+      0%, 100% { transform: translateX(0) rotate(0); }
+      28% { transform: translateX(-3px) rotate(-6deg); }
+      56% { transform: translateX(3px) rotate(5deg); }
+      80% { transform: translateX(-1px) rotate(-2deg); }
+    }
+
+    @keyframes bath-bob {
+      0%, 100% { transform: translateY(0) scale(1); }
+      34% { transform: translateY(-3px) scale(1.03); }
+      66% { transform: translateY(1px) scale(.98); }
+    }
+
+    @keyframes capsule-settle {
+      0%, 100% { transform: rotate(0) scale(1); }
+      32% { transform: rotate(-16deg) scale(.96); }
+      64% { transform: rotate(7deg) scale(1.04); }
+      84% { transform: rotate(-3deg); }
+    }
+
+    @keyframes ball-bounce {
+      0%, 100% { transform: translateY(0) rotate(0) scale(1); }
+      20% { transform: translateY(1px) rotate(8deg) scale(1.06, .92); }
+      48% { transform: translateY(-6px) rotate(36deg) scale(.97, 1.03); }
+      76% { transform: translateY(1px) rotate(62deg) scale(1.05, .94); }
+    }
+
+    @keyframes clean-sweep {
+      0%, 100% { transform: translateX(0) rotate(0); }
+      28% { transform: translateX(-3px) rotate(-8deg); }
+      58% { transform: translateX(3px) rotate(7deg); }
+      82% { transform: translateX(-1px) rotate(-3deg); }
+    }
+
+    @media (max-width: 740px) {
+      header { grid-template-columns: 1fr; }
+      .original-link { justify-self: start; }
+      .rule-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .toolbar { position: static; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 1ms !important;
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+    <filter id="icon-tint" color-interpolation-filters="sRGB">
+      <feFlood flood-color="var(--icon)" result="tint"></feFlood>
+      <feComposite in="tint" in2="SourceAlpha" operator="in"></feComposite>
+    </filter>
+  </svg>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Web review · V2 · Object truth</p>
+        <h1>看物体，就知道要做什么</h1>
+        <p class="intro">已采用第 1 套“物体真相”方向：用狗与牵引绳、拾便铲、猫砂盆、针梳、浴缸、清洁刷、胶囊和网球直接表达动作。点击任意卡片可查看未打卡、进行中和已完成状态。</p>
+      </div>
+      <a class="original-link" href="preview.html">查看原版对照</a>
+    </header>
+
+    <section class="toolbar" aria-label="图标预览控制">
+      <div class="control-group" data-control="size">
+        <span class="control-label">尺寸</span>
+        <button class="control-button" data-size="24" aria-pressed="false">24</button>
+        <button class="control-button" data-size="28" aria-pressed="true">28</button>
+        <button class="control-button" data-size="32" aria-pressed="false">32</button>
+      </div>
+      <div class="control-group" data-control="state">
+        <span class="control-label">状态</span>
+        <button class="control-button" data-state="idle" aria-pressed="true">未打卡</button>
+        <button class="control-button" data-state="active" aria-pressed="false">进行中</button>
+        <button class="control-button" data-state="done" aria-pressed="false">已完成</button>
+      </div>
+      <div class="control-group" data-control="theme">
+        <span class="control-label">外观</span>
+        <button class="control-button" data-theme="light" aria-pressed="true">浅色</button>
+        <button class="control-button" data-theme="dark" aria-pressed="false">深色</button>
+      </div>
+      <label class="control-group color-control">
+        <span class="control-label">主色</span>
+        <input id="iconColor" type="color" value="#237db5" aria-label="图标主色">
+      </label>
+    </section>
+
+    <section class="rule-strip" aria-label="V2 设计规则">
+      <article class="rule"><strong>32 × 32 网格</strong><span>主体落在 20–22pt 视觉边界内，24pt 仍可读。</span></article>
+      <article class="rule"><strong>2.2pt 主描边</strong><span>容器型图标统一描边，避免小尺寸糊成方块。</span></article>
+      <article class="rule"><strong>单色双色阶</strong><span>功能图标只使用 goPrimary，层级依靠透明度。</span></article>
+      <article class="rule"><strong>一次性语义动效</strong><span>喂食落粮、遛狗迈步、梳毛横扫、网球弹跳；Reduce Motion 下直接切换。</span></article>
+    </section>
+
+    <div id="groups"></div>
+  </main>
+
+  <script>
+    const icons = [
+      {
+        group: "高频护理", id: "feed", zh: "喂食", en: "Feed",
+        svg: `<ellipse class="soft" cx="16" cy="15" rx="9.6" ry="3.5"/><path class="solid" d="M5.8 15.4h20.4l-1.5 6.8a4.8 4.8 0 0 1-4.7 3.6h-8a4.8 4.8 0 0 1-4.7-3.6l-1.5-6.8Z"/><circle class="solid state-detail feed-grain" style="--delay:0ms" cx="11.7" cy="13" r="2"/><circle class="solid state-detail feed-grain" style="--delay:70ms" cx="16" cy="11.8" r="2.35"/><circle class="solid state-detail feed-grain" style="--delay:140ms" cx="20.4" cy="13.1" r="1.95"/>`
+      },
+      {
+        group: "高频护理", id: "water", zh: "喝水", en: "Water",
+        svg: `<path class="soft" d="M16 5c4.7 5.6 7 9.3 7 12.9a7 7 0 0 1-14 0C9 14.3 11.3 10.6 16 5Z"/><path class="line" d="M16 5c4.7 5.6 7 9.3 7 12.9a7 7 0 0 1-14 0C9 14.3 11.3 10.6 16 5Z"/><path class="line line-soft" d="m12.3 15.9 1.8-3"/><ellipse class="soft water-ripple" cx="16" cy="26" rx="6" ry="1.7"/>`
+      },
+      {
+        group: "高频护理", id: "walk", zh: "遛狗", en: "Walk",
+        asset: "v2-assets/ohana-care-walk-v2.png"
+      },
+      {
+        group: "高频护理", id: "potty", zh: "如厕", en: "Potty",
+        asset: "v2-assets/ohana-care-potty-v2.png"
+      },
+      {
+        group: "高频护理", id: "litter", zh: "猫砂", en: "Litter",
+        asset: "v2-assets/ohana-care-litter-v2.png"
+      },
+      {
+        group: "高频护理", id: "groom", zh: "梳毛", en: "Groom",
+        asset: "v2-assets/ohana-care-groom-v2.png"
+      },
+      {
+        group: "高频护理", id: "bath", zh: "洗澡", en: "Bath",
+        asset: "v2-assets/ohana-care-bath-v2.png"
+      },
+      {
+        group: "健康记录", id: "health", zh: "健康", en: "Health",
+        svg: `<rect class="soft" x="7" y="6" width="18" height="21" rx="5.2"/><rect class="line" x="7" y="6" width="18" height="21" rx="5.2"/><rect class="solid" x="11.2" y="5" width="9.6" height="3.2" rx="1.6"/><path class="detail" d="M16 23s-5.3-3-5.3-6.6c0-2 1.3-3.3 3.1-3.3 1 0 1.8.5 2.2 1.3.4-.8 1.2-1.3 2.2-1.3 1.8 0 3.1 1.3 3.1 3.3 0 3.6-5.3 6.6-5.3 6.6Z"/>`
+      },
+      {
+        group: "健康记录", id: "medicine", zh: "用药", en: "Medicine",
+        asset: "v2-assets/ohana-care-medicine-v2.png"
+      },
+      {
+        group: "健康记录", id: "weight", zh: "体重", en: "Weight",
+        svg: `<rect class="soft" x="5.5" y="8" width="21" height="18.5" rx="6"/><rect class="line" x="5.5" y="8" width="21" height="18.5" rx="6"/><rect class="detail" x="10" y="11" width="12" height="3" rx="1.5"/><g class="weight-needle"><path class="line" d="M16 17.3h5.5"/><circle class="solid" cx="16" cy="17.3" r="2.45"/></g>`
+      },
+      {
+        group: "健康记录", id: "expense", zh: "花费", en: "Expense",
+        svg: `<rect class="soft" x="5.5" y="8.5" width="21" height="16.8" rx="5.2"/><rect class="line" x="5.5" y="8.5" width="21" height="16.8" rx="5.2"/><rect class="detail" x="8.8" y="12" width="9.5" height="2.5" rx="1.25"/><circle class="detail" cx="20.6" cy="18.6" r="3.1"/><circle class="soft" cx="20.6" cy="18.6" r="1.1"/>`
+      },
+      {
+        group: "健康记录", id: "calendar", zh: "日历", en: "Calendar",
+        svg: `<rect class="soft" x="5.5" y="7" width="21" height="19.5" rx="5"/><rect class="line" x="5.5" y="7" width="21" height="19.5" rx="5"/><path class="line" d="M6.2 12.6h19.6"/><circle class="detail" cx="11.5" cy="18.2" r="1.65"/><circle class="soft" cx="16" cy="18.2" r="1.65"/><circle class="soft" cx="20.5" cy="18.2" r="1.65"/>`
+      },
+      {
+        group: "健康记录", id: "photo", zh: "记录", en: "Moment",
+        svg: `<rect class="soft" x="5.5" y="10" width="21" height="15.5" rx="5"/><rect class="line" x="5.5" y="10" width="21" height="15.5" rx="5"/><rect class="solid" x="9" y="7.2" width="7.5" height="4.8" rx="2.2"/><circle class="line line-soft" cx="16" cy="17.8" r="4.2"/><circle class="detail" cx="22.5" cy="14" r="1.3"/>`
+      },
+      {
+        group: "饮食管理", id: "dry-food", zh: "干粮", en: "Dry food",
+        svg: `<path class="solid" d="M6.2 18h19.6l-1.3 4.8a4.2 4.2 0 0 1-4.1 3.2h-8.8a4.2 4.2 0 0 1-4.1-3.2L6.2 18Z"/><circle class="detail" cx="11.2" cy="15.8" r="1.8"/><circle class="detail" cx="15.8" cy="14.4" r="1.8"/><circle class="detail" cx="20.3" cy="16" r="1.8"/>`
+      },
+      {
+        group: "饮食管理", id: "wet-food", zh: "湿粮", en: "Wet food",
+        svg: `<rect class="soft" x="8" y="7" width="16" height="19" rx="4.5"/><rect class="line" x="8" y="7" width="16" height="19" rx="4.5"/><rect class="solid" x="8.4" y="7.4" width="15.2" height="4.3" rx="2.15"/><rect class="detail" x="11.2" y="15.3" width="9.6" height="3.2" rx="1.6"/>`
+      },
+      {
+        group: "饮食管理", id: "food-stock", zh: "粮食库存", en: "Food stock",
+        svg: `<path class="soft" d="M10 6.2h12l3 20H7Z"/><path class="line" d="M10 6.2h12l3 20H7Z"/><rect class="solid" x="10.4" y="7.4" width="11.2" height="3" rx="1.5"/><path class="line line-soft" d="M10.4 16.2h11.2M10.4 20.5h8.2"/>`
+      },
+      {
+        group: "生活互动", id: "play", zh: "陪玩", en: "Play",
+        asset: "v2-assets/ohana-care-play-v2.png"
+      },
+      {
+        group: "生活互动", id: "rest", zh: "休息", en: "Rest",
+        svg: `<path class="solid" d="M20.8 6.2c-8.7.9-11.6 12.7 1 18-9 2.8-16-7.9-1-18Z"/><circle class="detail" cx="22.7" cy="9.1" r="1.7"/>`
+      },
+      {
+        group: "生活互动", id: "cleanup", zh: "清洁", en: "Clean",
+        asset: "v2-assets/ohana-care-clean-v2.png"
+      },
+      {
+        group: "生活互动", id: "training", zh: "训练", en: "Training",
+        svg: `<circle class="soft" cx="16" cy="16" r="10.2"/><circle class="line" cx="16" cy="16" r="10.2"/><circle class="line line-soft" cx="16" cy="16" r="5.9"/><circle class="solid" cx="16" cy="16" r="2.3"/>`
+      },
+      {
+        group: "更多操作", id: "water-change", zh: "换水", en: "Water change",
+        svg: `<path class="soft" d="M16 10c2.7 3.3 4.1 5.4 4.1 7.5a4.1 4.1 0 0 1-8.2 0c0-2.1 1.4-4.2 4.1-7.5Z"/><path class="line line-soft" d="M16 10c2.7 3.3 4.1 5.4 4.1 7.5a4.1 4.1 0 0 1-8.2 0c0-2.1 1.4-4.2 4.1-7.5Z"/><path class="line" d="M8.5 8.5A10 10 0 0 1 25 12m-1.5-4 1.5 4-4-.5M23.5 23.5A10 10 0 0 1 7 20m1.5 4L7 20l4 .5"/>`
+      },
+      {
+        group: "更多操作", id: "plant-fertilize", zh: "施肥", en: "Fertilize",
+        svg: `<path class="solid" d="M9.1 18h13.8l-1 4.8a4 4 0 0 1-4 3.2h-3.8a4 4 0 0 1-4-3.2L9.1 18Z"/><path class="solid" d="M15.5 17.8c-4.5-.7-7.3-3-8.3-6.5 4.1.2 7.2 2.4 8.3 6.5ZM16.7 17.2c.8-4.2 3.5-7 7.8-8-.2 4.2-2.8 7-7.8 8Z"/><circle class="detail" cx="24.2" cy="20.5" r="1.8"/><circle class="detail" cx="25.9" cy="16" r="1.25"/>`
+      },
+      {
+        group: "更多操作", id: "document", zh: "笔记", en: "Note",
+        svg: `<path class="soft" d="M9 5.5h10.4l4.1 4.2v16.8H9Z"/><path class="line" d="M9 5.5h10.4l4.1 4.2v16.8H9Z"/><path class="detail" d="M19.1 5.6v5h4.5Z"/><path class="line line-soft" d="M12 16.2h8M12 20.7h6.2"/>`
+      },
+      {
+        group: "更多操作", id: "settings", zh: "设置", en: "Settings",
+        svg: `<g class="solid"><rect x="14.8" y="4.6" width="2.4" height="5.8" rx="1.2"/><rect x="14.8" y="21.6" width="2.4" height="5.8" rx="1.2"/><rect x="4.6" y="14.8" width="5.8" height="2.4" rx="1.2"/><rect x="21.6" y="14.8" width="5.8" height="2.4" rx="1.2"/></g><circle class="soft" cx="16" cy="16" r="7.8"/><circle class="line" cx="16" cy="16" r="7.8"/><circle class="detail" cx="16" cy="16" r="2.8"/>`
+      }
+    ];
+
+    const groupOrder = ["高频护理", "健康记录", "饮食管理", "生活互动", "更多操作"];
+    const groupsRoot = document.querySelector("#groups");
+
+    function iconMarkup(icon) {
+      const glyph = icon.asset
+        ? `<img class="glyph asset-glyph" src="${icon.asset}" alt="" draggable="false" aria-hidden="true">`
+        : `<svg class="glyph" viewBox="0 0 32 32" aria-hidden="true">${icon.svg}</svg>`;
+      return `<button class="icon-card" type="button" data-icon="${icon.id}" data-state="idle" aria-label="${icon.zh}，未打卡">
+        <span class="icon-stage">
+          ${glyph}
+          <span class="done-badge" aria-hidden="true"></span>
+        </span>
+        <span class="icon-copy"><strong>${icon.zh}</strong><span>${icon.en}</span></span>
+      </button>`;
+    }
+
+    for (const groupName of groupOrder) {
+      const groupIcons = icons.filter((icon) => icon.group === groupName);
+      const section = document.createElement("section");
+      section.className = "group";
+      section.innerHTML = `<div class="group-heading"><h2>${groupName}</h2><span>${groupIcons.length} 个图标</span></div><div class="grid">${groupIcons.map(iconMarkup).join("")}</div>`;
+      groupsRoot.append(section);
+    }
+
+    const cards = [...document.querySelectorAll(".icon-card")];
+    const stateLabels = { idle: "未打卡", active: "进行中", done: "已完成" };
+
+    function setCardState(card, state) {
+      card.dataset.state = state;
+      const title = card.querySelector("strong").textContent;
+      card.setAttribute("aria-label", `${title}，${stateLabels[state]}`);
+    }
+
+    function setPressed(button, selector) {
+      document.querySelectorAll(selector).forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+    }
+
+    document.querySelectorAll("[data-size]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.documentElement.style.setProperty("--icon-size", `${button.dataset.size}px`);
+        setPressed(button, "[data-size]");
+      });
+    });
+
+    document.querySelectorAll("[data-state]").forEach((button) => {
+      if (!button.classList.contains("control-button")) return;
+      button.addEventListener("click", () => {
+        cards.forEach((card) => setCardState(card, button.dataset.state));
+        setPressed(button, ".control-button[data-state]");
+      });
+    });
+
+    document.querySelectorAll("[data-theme]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.documentElement.dataset.theme = button.dataset.theme;
+        iconColor.value = button.dataset.theme === "dark" ? "#b9f542" : "#237db5";
+        document.documentElement.style.setProperty("--icon", iconColor.value);
+        setPressed(button, "[data-theme]");
+      });
+    });
+
+    const iconColor = document.querySelector("#iconColor");
+    iconColor.addEventListener("input", () => document.documentElement.style.setProperty("--icon", iconColor.value));
+
+    cards.forEach((card) => {
+      let timer;
+      card.addEventListener("click", () => {
+        clearTimeout(timer);
+        if (card.dataset.state === "done") {
+          setCardState(card, "idle");
+          return;
+        }
+        setCardState(card, "active");
+        timer = window.setTimeout(() => setCardState(card, "done"), 620);
+      });
+    });
+  </script>
+</body>
+</html>

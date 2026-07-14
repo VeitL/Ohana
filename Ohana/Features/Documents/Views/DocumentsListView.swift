@@ -53,10 +53,6 @@ struct DocumentsListContentView: View {
         routeInsurances.sorted { $0.renewalDate < $1.renewalDate }
     }
 
-    private var showingInlinePopup: Bool {
-        activePopup != nil
-    }
-
     var body: some View {
         ZStack {
             OhanaAppBackground().ignoresSafeArea()
@@ -72,35 +68,20 @@ struct DocumentsListContentView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
             }
-            .disabled(showingInlinePopup)
-            .blur(radius: showingInlinePopup ? 1.1 : 0)
-
-            if let activePopup {
-                switch activePopup {
-                case .addDocument:
-                    ProtectionDocumentPopup(pet: pet, existing: nil) {
-                        withAnimation(GoMotion.page) { self.activePopup = nil }
-                    }
-                    .zIndex(30)
-                case let .editDocument(doc):
-                    ProtectionDocumentPopup(pet: pet, existing: doc) {
-                        withAnimation(GoMotion.page) { self.activePopup = nil }
-                    }
-                    .zIndex(30)
-                case .addInsurance:
-                    ProtectionInsurancePopup(pet: pet, existing: nil) {
-                        withAnimation(GoMotion.page) { self.activePopup = nil }
-                    }
-                    .zIndex(31)
-                case let .editInsurance(insurance):
-                    ProtectionInsurancePopup(pet: pet, existing: insurance) {
-                        withAnimation(GoMotion.page) { self.activePopup = nil }
-                    }
-                    .zIndex(31)
-                }
-            }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .sheet(item: $activePopup) { popup in
+            switch popup {
+            case .addDocument:
+                ProtectionDocumentPopup(pet: pet, existing: nil) { activePopup = nil }
+            case let .editDocument(doc):
+                ProtectionDocumentPopup(pet: pet, existing: doc) { activePopup = nil }
+            case .addInsurance:
+                ProtectionInsurancePopup(pet: pet, existing: nil) { activePopup = nil }
+            case let .editInsurance(insurance):
+                ProtectionInsurancePopup(pet: pet, existing: insurance) { activePopup = nil }
+            }
+        }
         .sheet(item: $detailDoc) { doc in
             DocumentDetailSheet(doc: doc, pet: pet, onEdit: { activePopup = .editDocument(doc) })
         }

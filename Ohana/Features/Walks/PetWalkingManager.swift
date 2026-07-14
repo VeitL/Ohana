@@ -131,18 +131,21 @@ final class PetWalkingManager {
     private let questManager: QuestManager
     private let careLedger: CareLedgerRecording
     private let walkCareEvents: WalkCareEventManaging
+    private let revisions: DomainRevisionPublishing
     private let activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
 
     init(
         locationManager: any WalkLocationManaging,
         questManager: QuestManager,
         careLedger: CareLedgerRecording = CareLedgerService(),
-        walkCareEvents: WalkCareEventManaging? = nil
+        walkCareEvents: WalkCareEventManaging? = nil,
+        revisions: DomainRevisionPublishing? = nil
     ) {
         self.locationManager = locationManager
         self.questManager = questManager
         self.careLedger = careLedger
         self.walkCareEvents = walkCareEvents ?? StaticWalkCareEventManager()
+        self.revisions = revisions ?? SharedDomainRevisionPublisher()
     }
 
     convenience init(locationManager: any WalkLocationManaging) {
@@ -505,12 +508,8 @@ final class PetWalkingManager {
             return .failed(saveResult.errorDescription)
         }
 
-        generateMapSnapshot(
-            for: walkLogs,
-            routeLocations: routeLocations,
-            poopMarkers: poopMarkers,
-            modelContext: modelContext
-        )
+        publishWalkCompletion(petID: pet.id, targets: normalizedTargets, walkLogs: walkLogs, pottyLogs: pottyLogs, endedAt: endedAt)
+        generateMapSnapshot(for: walkLogs, routeLocations: routeLocations, poopMarkers: poopMarkers, modelContext: modelContext)
 
         deleteRecoveryCheckpointIfPossible(modelContext: modelContext)
 
@@ -539,6 +538,27 @@ final class PetWalkingManager {
             pottyCoconutDelta: pottyCoconutDelta,
             didPersist: true,
             persistenceErrorDescription: nil
+        )
+    }
+
+    private func publishWalkCompletion(
+        petID: UUID,
+        targets: [Pet],
+        walkLogs: [PetWalkLog],
+        pottyLogs: [PetPottyLog],
+        endedAt: Date
+    ) {
+        var affectedEntityIDs = Set(targets.map(\.id))
+        affectedEntityIDs.formUnion(walkLogs.map(\.id))
+        affectedEntityIDs.formUnion(pottyLogs.map(\.id))
+        revisions.publish(
+            DomainMutationResult(
+                command: .petWalkCompletion(petID: petID),
+                affectedEntityIDs: affectedEntityIDs,
+                wroteBusinessFact: true,
+                occurredAt: endedAt,
+                note: "walk.stop"
+            )
         )
     }
 

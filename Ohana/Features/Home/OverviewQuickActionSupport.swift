@@ -167,33 +167,138 @@ extension L10n {
     }
 }
 
-enum OhanaQuickActionGlyphKind {
+enum OhanaQuickActionGlyphKind: CaseIterable, Equatable, Sendable {
     case feed
-    case dryFood
-    case wetFood
-    case foodInventory
     case calendar
     case walk
     case water
-    case waterChange
     case potty
-    case litter
+    case medicine
     case groom
     case health
-    case medicine
+    case sleep
+    case vet
     case weight
-    case expense
+    case reminder
+    case plantWater
     case play
-    case rest
-    case photo
+    case bath
+    case task
+    case foodStock
+    case dryFood
+    case wetFood
+    case treat
+    case foodBag
+    case feeder
+    case waterChange
+    case filterChange
+    case litter
     case cleanup
+    case walkMap
+    case distance
     case training
-    case plantFertilize
+    case mood
+    case checkIn
+    case family
+    case profile
+    case privacy
+    case expense
+    case insurance
     case document
+    case photo
+    case birthday
+    case reward
+    case temperature
+    case plantFertilize
+    case notificationHealth
     case settings
 
+    // Production-only extensions for live quick actions that are not part of
+    // the original 44-icon review sheet. They keep the same duotone grammar.
+    case allFeatures
+    case freeFlight
+    case misting
+    case substrateChange
+    case workout
+    case plantPruning
+    case plantPestCheck
+    case plantRotating
+    case plantRepotting
+    case plantNewLeaf
+    case plantIssue
+
+    static let previewCases: [Self] = [
+        .feed, .calendar, .walk, .water, .potty, .medicine, .groom, .health,
+        .sleep, .vet, .weight, .reminder, .plantWater, .play, .bath, .task,
+        .foodStock, .dryFood, .wetFood, .treat, .foodBag, .feeder, .waterChange,
+        .filterChange, .litter, .cleanup, .walkMap, .distance, .training, .mood,
+        .checkIn, .family, .profile, .privacy, .expense, .insurance, .document,
+        .photo, .birthday, .reward, .temperature, .plantFertilize,
+        .notificationHealth, .settings
+    ]
+
+    var previewSlug: String {
+        switch self {
+        case .feed: "feed"
+        case .calendar: "calendar"
+        case .walk: "walk"
+        case .water: "water"
+        case .potty: "potty"
+        case .medicine: "medicine"
+        case .groom: "groom"
+        case .health: "health"
+        case .sleep: "sleep"
+        case .vet: "vet"
+        case .weight: "weight"
+        case .reminder: "reminder"
+        case .plantWater: "plant-water"
+        case .play: "play"
+        case .bath: "bath"
+        case .task: "task"
+        case .foodStock: "food-stock"
+        case .dryFood: "dry-food"
+        case .wetFood: "wet-food"
+        case .treat: "treat"
+        case .foodBag: "food-bag"
+        case .feeder: "feeder"
+        case .waterChange: "water-change"
+        case .filterChange: "filter-change"
+        case .litter: "litter"
+        case .cleanup: "cleanup"
+        case .walkMap: "walk-map"
+        case .distance: "distance"
+        case .training: "training"
+        case .mood: "mood"
+        case .checkIn: "check-in"
+        case .family: "family"
+        case .profile: "profile"
+        case .privacy: "privacy"
+        case .expense: "expense"
+        case .insurance: "insurance"
+        case .document: "document"
+        case .photo: "photo"
+        case .birthday: "birthday"
+        case .reward: "reward"
+        case .temperature: "temperature"
+        case .plantFertilize: "plant-fertilize"
+        case .notificationHealth: "notification-health"
+        case .settings: "settings"
+        case .allFeatures: "all-features"
+        case .freeFlight: "free-flight"
+        case .misting: "misting"
+        case .substrateChange: "substrate-change"
+        case .workout: "workout"
+        case .plantPruning: "plant-pruning"
+        case .plantPestCheck: "plant-pest-check"
+        case .plantRotating: "plant-rotating"
+        case .plantRepotting: "plant-repotting"
+        case .plantNewLeaf: "plant-new-leaf"
+        case .plantIssue: "plant-issue"
+        }
+    }
+
     static func resolve(actionType: String, fallbackSystemName: String) -> OhanaQuickActionGlyphKind? {
-        let action = actionType.lowercased()
+        let action = actionType.lowercased().filter { $0.isLetter || $0.isNumber }
         let symbol = fallbackSystemName.lowercased()
 
         if action == "water", symbol.contains("water.waves") {
@@ -201,80 +306,117 @@ enum OhanaQuickActionGlyphKind {
         }
 
         switch action {
-        case "feed":
-            return .feed
-        case "dryfood", "fooddry", "dry":
-            return .dryFood
-        case "wetfood", "foodwet", "wet", "canned", "can":
-            return .wetFood
-        case "foodinventory", "foodstock", "inventory", "stock", "restock":
-            return .foodInventory
-        case "calendar":
-            return .calendar
-        case "walk":
-            return .walk
-        case "water":
-            return .water
-        case "waterchange", "filterclean":
-            return .waterChange
-        case "potty":
-            return .potty
-        case "litter":
-            return .litter
-        case "groom":
-            return .groom
-        case "health":
-            return .health
-        case "medication", "humanmedication":
-            return .medicine
-        case "weight", "humanweight":
-            return .weight
-        case "expense", "humanexpense":
-            return .expense
-        case "play":
-            return .play
-        case "rest", "sleep":
-            return .rest
-        case "moment":
-            return .photo
-        case "cagecleaning":
-            return .cleanup
-        case "freeflight", "humanworkout":
-            return .training
-        case "misting":
-            return .water
-        case "substratechange", "fertilizeplant":
-            return .plantFertilize
-        case "humannote", "note":
-            return .document
-        case "settings", "setting":
-            return .settings
-        default:
-            break
+        case "feed", "feeding": return .feed
+        case "calendar": return .calendar
+        case "walk": return .walk
+        case "water": return .water
+        case "potty": return .potty
+        case "medication", "humanmedication", "medicine": return .medicine
+        case "groom", "brushing", "teeth", "nails", "ears": return .groom
+        case "health": return .health
+        case "rest", "sleep": return .sleep
+        case "vet", "vaccine", "visit", "deworming": return .vet
+        case "weight", "humanweight": return .weight
+        case "reminder": return .reminder
+        case "plantwater", "waterplant": return .plantWater
+        case "misting", "plantmisting": return .misting
+        case "play": return .play
+        case "bath": return .bath
+        case "task": return .task
+        case "allfeatures", "humanallfeatures": return .allFeatures
+        case "foodinventory", "foodstock", "inventory", "stock", "restock": return .foodStock
+        case "dryfood", "fooddry", "dry": return .dryFood
+        case "wetfood", "foodwet", "wet", "canned", "can": return .wetFood
+        case "treat": return .treat
+        case "foodbag": return .foodBag
+        case "feeder", "autofeeder": return .feeder
+        case "waterchange": return .waterChange
+        case "filterclean", "filterchange": return .filterChange
+        case "litter": return .litter
+        case "cleanup", "cagecleaning", "plantleafcleaning": return .cleanup
+        case "walkmap": return .walkMap
+        case "distance": return .distance
+        case "training": return .training
+        case "freeflight": return .freeFlight
+        case "humanworkout", "workout": return .workout
+        case "mood": return .mood
+        case "checkin": return .checkIn
+        case "family": return .family
+        case "profile", "plantdetail": return .profile
+        case "privacy": return .privacy
+        case "expense", "humanexpense": return .expense
+        case "insurance": return .insurance
+        case "document", "humannote", "plantnote", "note": return .document
+        case "moment", "photo": return .photo
+        case "birthday": return .birthday
+        case "reward": return .reward
+        case "temperature", "humidity": return .temperature
+        case "substratechange": return .substrateChange
+        case "fertilizeplant": return .plantFertilize
+        case "plantpruning": return .plantPruning
+        case "plantpestcheck": return .plantPestCheck
+        case "plantrotating": return .plantRotating
+        case "plantrepotting": return .plantRepotting
+        case "plantnewleaf": return .plantNewLeaf
+        case "plantyellowleaf", "plantpestfound", "plantissue": return .plantIssue
+        case "notificationhealth": return .notificationHealth
+        case "settings", "setting": return .settings
+        default: break
         }
 
+        if action.contains("filter") { return .filterChange }
+        if action.contains("waterchange") || symbol.contains("water.waves") || symbol.contains("arrow.2.circlepath") { return .waterChange }
+        if action.contains("plant") && (action.contains("water") || action.contains("mist")) { return .plantWater }
         if action.contains("dryfood") || action.contains("fooddry") || symbol.contains("hexagongrid") { return .dryFood }
         if action.contains("wetfood") || action.contains("foodwet") || action.contains("canned") || symbol.contains("takeoutbag") { return .wetFood }
-        if action.contains("inventory") || action.contains("stock") || action.contains("restock") || symbol.contains("shippingbox") { return .foodInventory }
+        if action.contains("inventory") || action.contains("stock") { return .foodStock }
+        if action.contains("feeder") { return .feeder }
+        if action.contains("treat") { return .treat }
         if action.contains("feed") || action.contains("food") || symbol.contains("fork") { return .feed }
         if symbol.contains("calendar") { return .calendar }
+        if action.contains("walkmap") { return .walkMap }
+        if action.contains("distance") { return .distance }
         if action.contains("walk") || symbol.contains("figure.walk") { return .walk }
-        if action.contains("waterchange") || action.contains("filterclean") || symbol.contains("water.waves") || symbol.contains("arrow.2.circlepath") { return .waterChange }
-        if action.contains("water") || action.contains("misting") || symbol.contains("drop") || symbol.contains("cloud.drizzle") { return .water }
+        if action.contains("misting") || symbol.contains("cloud.drizzle") { return .misting }
+        if action.contains("water") || symbol.contains("drop") { return .water }
         if action.contains("potty") || action.contains("poop") || action == "pee" || symbol.contains("allergens") { return .potty }
         if action.contains("litter") || symbol.contains("trash") { return .litter }
-        if action.contains("groom") || action.contains("hygiene") || action.contains("bath") || action.contains("teeth") || action.contains("nails") || action.contains("brushing") || action.contains("ears") || symbol.contains("scissors") || symbol.contains("comb") || symbol.contains("bubbles") { return .groom }
-        if action.contains("health") || action.contains("visit") || symbol.contains("heart") || symbol.contains("stethoscope") || symbol.contains("cross") { return .health }
-        if action.contains("medication") || action.contains("medicine") || action.contains("vaccine") || action.contains("deworming") || symbol.contains("pill") || symbol.contains("syringe") || symbol.contains("shield") { return .medicine }
+        if action.contains("bath") || symbol.contains("bubbles") { return .bath }
+        if action.contains("groom") || action.contains("hygiene") || action.contains("teeth") || action.contains("nails") || action.contains("brushing") || action.contains("ears") || symbol.contains("scissors") || symbol.contains("comb") { return .groom }
+        if action.contains("vaccine") || action.contains("visit") || symbol.contains("stethoscope") || symbol.contains("syringe") { return .vet }
+        if action.contains("health") || symbol.contains("heart") || symbol.contains("cross") { return .health }
+        if action.contains("medication") || action.contains("medicine") || symbol.contains("pill") { return .medicine }
         if action.contains("weight") || symbol.contains("scale") { return .weight }
+        if action.contains("reminder") || symbol.contains("bell") { return .reminder }
         if action.contains("expense") || symbol.contains("credit") || symbol.contains("banknote") || symbol.contains("yensign") || symbol.contains("dollarsign") || symbol.contains("eurosign") || symbol.contains("sterlingsign") { return .expense }
         if action.contains("play") || symbol.contains("gamecontroller") || symbol.contains("tennisball") { return .play }
-        if action.contains("rest") || action.contains("sleep") || symbol.contains("zzz") || symbol.contains("tent") { return .rest }
+        if action.contains("rest") || action.contains("sleep") || symbol.contains("zzz") || symbol.contains("tent") { return .sleep }
         if action.contains("moment") || symbol.contains("camera") { return .photo }
-        if action.contains("cagecleaning") || symbol.contains("basket") { return .cleanup }
-        if action.contains("freeflight") || action.contains("workout") { return .training }
-        if action.contains("substratechange") || action.contains("fertilizeplant") || symbol.contains("leaf") { return .plantFertilize }
+        if action.contains("cleanup") || action.contains("cleaning") || symbol.contains("basket") { return .cleanup }
+        if action.contains("freeflight") || symbol.contains("bird") { return .freeFlight }
+        if action.contains("workout") || symbol.contains("figure.run") { return .workout }
+        if action.contains("training") { return .training }
+        if action.contains("mood") { return .mood }
+        if action.contains("checkin") || symbol.contains("checkmark.seal") { return .checkIn }
+        if action.contains("family") || symbol.contains("person.2") { return .family }
+        if action.contains("profile") { return .profile }
+        if action.contains("privacy") || symbol.contains("lock") { return .privacy }
+        if action.contains("insurance") { return .insurance }
         if action.contains("note") || action.contains("document") || symbol.contains("note") || symbol.contains("doc") { return .document }
+        if action.contains("birthday") || symbol.contains("birthday") { return .birthday }
+        if action.contains("reward") || symbol.contains("medal") { return .reward }
+        if action.contains("temperature") || action.contains("humidity") || symbol.contains("thermometer") { return .temperature }
+        if action.contains("pruning") { return .plantPruning }
+        if action.contains("pestcheck") || symbol.contains("ladybug") { return .plantPestCheck }
+        if action.contains("rotating") || symbol.contains("arrow.triangle.2.circlepath") { return .plantRotating }
+        if action.contains("repot") || symbol.contains("shippingbox") { return .plantRepotting }
+        if action.contains("newleaf") || symbol.contains("leaf.arrow") { return .plantNewLeaf }
+        if action.contains("pestfound") || action.contains("yellowleaf") { return .plantIssue }
+        if action.contains("pest") { return .notificationHealth }
+        if action.contains("substrate") { return .substrateChange }
+        if action.contains("fertilize") || symbol.contains("leaf") { return .plantFertilize }
+        if action.contains("allfeatures") || symbol.contains("square.grid") { return .allFeatures }
+        if action.contains("task") { return .task }
         if action.contains("settings") || action.contains("setting") || symbol.contains("gear") { return .settings }
         return nil
     }

@@ -2,46 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleIcons</key>
+	<key>UILaunchScreen</key>
 	<dict>
-		<key>CFBundlePrimaryIcon</key>
-		<dict>
-			<key>CFBundleIconName</key>
-			<string>AppIcon</string>
-		</dict>
-		<key>CFBundleAlternateIcons</key>
-		<dict>
-			<key>AppIconLimeNight</key>
-			<dict>
-				<key>CFBundleIconName</key>
-				<string>AppIconLimeNight</string>
-			</dict>
-			<key>AppIconCleanBlue</key>
-			<dict>
-				<key>CFBundleIconName</key>
-				<string>AppIconCleanBlue</string>
-			</dict>
-			<key>AppIconCoconut</key>
-			<dict>
-				<key>CFBundleIconName</key>
-				<string>AppIconCoconut</string>
-			</dict>
-			<key>AppIconPawDuo</key>
-			<dict>
-				<key>CFBundleIconName</key>
-				<string>AppIconPawDuo</string>
-			</dict>
-			<key>AppIconMinimalO</key>
-			<dict>
-				<key>CFBundleIconName</key>
-				<string>AppIconMinimalO</string>
-			</dict>
-			<key>AppIconNeonSmile</key>
-			<dict>
-				<key>CFBundleIconName</key>
-				<string>AppIconNeonSmile</string>
-			</dict>
-		</dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+		<key>UIImageName</key>
+		<string>LaunchMark</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<true/>
 	</dict>
 	<key>CFBundleLocalizations</key>
 	<array>
@@ -60,7 +28,7 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>用于在切换受保护成员或访问成员门禁时，通过系统 Face ID 代替输入本地 PIN。</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>用于在你主动连接 Apple Health 时读取步数、距离、活动能量和运动记录，并在本机生成此成员的运动摘要。</string>
+	<string>用于在你主动设置 Apple Health 时读取步数、距离、活动能量、锻炼与站立时间、活动目标和运动记录，并在本机显示此成员的健康摘要。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>用于导入你选择的头像、时刻图片或收据附件；Ohana 只处理你选中的项目。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

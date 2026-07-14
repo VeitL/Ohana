@@ -628,7 +628,6 @@ struct ShopAppliedPreview: View {
             PetSilhouetteView(
                 species: pet.species,
                 coatColor: Color(hex: pet.coatColor.isEmpty ? "E8C49A" : pet.coatColor),
-                eyeColor: Color(hex: pet.eyeColor.isEmpty ? "6B3A2A" : pet.eyeColor),
                 isAnimationEnabled: false
             )
             .frame(width: size, height: size)
@@ -652,23 +651,7 @@ struct AppIconPreview: View {
 
     var body: some View {
         ZStack {
-            if let image = UIImage(named: assetName) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: descriptor.gradientHex.map { Color(hex: $0) },
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                Image(systemName: descriptor.previewSymbol)
-                    .font(OhanaFont.adaptive(size: 42, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(descriptor.itemId == "appicon_minimal_o" ? Color.arkInk : Color.ohanaPrimaryActionText)
-            }
+            AppIconArtwork(descriptor: descriptor)
 
             if isSelected {
                 VStack {
@@ -684,9 +667,5 @@ struct AppIconPreview: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
-    }
-
-    private var assetName: String {
-        descriptor.alternateIconName ?? "AppIcon"
     }
 }

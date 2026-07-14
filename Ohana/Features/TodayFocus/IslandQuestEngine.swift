@@ -196,16 +196,12 @@ nonisolated enum IslandQuestEngine {
         )
         if quests.count < maxQuests,
            !playEquivalentDoneToday,
-           let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "play", isAlreadyDone: { _ in false }) {
+           let pet = activePets.first {
             quests.append(IslandQuest(
                 id: "q_play_\(pet.id.uuidString)",
                 emoji: "🎾",
                 title: localized(zh: "陪 \(pet.name) 玩一会儿", en: "Play with \(pet.name)"),
-                subtitle: personalitySubtitle(
-                    for: "play",
-                    pet: pet,
-                    fallback: localized(zh: "轻松互动，不是固定照护计划", en: "A light check-in, not a fixed care plan")
-                ),
+                subtitle: localized(zh: "轻松互动，不是固定照护计划", en: "A light check-in, not a fixed care plan"),
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
@@ -213,18 +209,14 @@ nonisolated enum IslandQuestEngine {
         }
 
         if quests.count < maxQuests,
-           let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "weight", calendar: cal, now: now, isAlreadyDone: { p in
-               hasPetWeightLedgerEntry(petId: p.id, entries: careLedgerEntries, calendar: cal, now: now)
+           let pet = activePets.first(where: { p in
+               !hasPetWeightLedgerEntry(petId: p.id, entries: careLedgerEntries, calendar: cal, now: now)
            }) {
             quests.append(IslandQuest(
                 id: "q_weight_\(pet.id.uuidString)",
                 emoji: "⚖️",
                 title: localized(zh: "记录 \(pet.name) 的体重", en: "Log \(pet.name)'s weight"),
-                subtitle: personalitySubtitle(
-                    for: "weight",
-                    pet: pet,
-                    fallback: localized(zh: "建立健康趋势，从第一条数据开始", en: "Start a health trend with the first entry")
-                ),
+                subtitle: localized(zh: "建立健康趋势，从第一条数据开始", en: "Start a health trend with the first entry"),
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
@@ -232,18 +224,14 @@ nonisolated enum IslandQuestEngine {
         }
 
         if quests.count < maxQuests,
-           let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "moment", calendar: cal, now: now, isAlreadyDone: { p in
-               p.photoLogs.contains { cal.isDate($0.date, inSameDayAs: now) }
+           let pet = activePets.first(where: { p in
+               !p.photoLogs.contains { cal.isDate($0.date, inSameDayAs: now) }
            }) {
             quests.append(IslandQuest(
                 id: "q_moment_\(pet.id.uuidString)",
                 emoji: "📝",
                 title: localized(zh: "记录 \(pet.name) 的日常", en: "Capture \(pet.name)'s day"),
-                subtitle: personalitySubtitle(
-                    for: "moment",
-                    pet: pet,
-                    fallback: localized(zh: "写一句话或加一张照片，留下今天", en: "Add a note or photo from today")
-                ),
+                subtitle: localized(zh: "写一句话或加一张照片，留下今天", en: "Add a note or photo from today"),
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
@@ -591,49 +579,6 @@ nonisolated enum IslandQuestEngine {
         case generic
     }
 
-    private static func personalitySubtitle(for actionType: String, pet: Pet, fallback: String) -> String {
-        guard PetPersonalityBehavior.priorityBonus(for: actionType, pet: pet) > 0 else { return fallback }
-        let tags = Set(pet.personalityTagIdList)
-        switch actionType {
-        case "play":
-            if tags.contains("energetic") || tags.contains("playful") || tags.contains("toy") {
-                return localized(
-                    zh: "按 \(pet.name) 的性格，今天更适合主动陪玩",
-                    en: "\(pet.name)'s traits make active play a good fit today"
-                )
-            }
-            if tags.contains("shy") || tags.contains("anxious") || tags.contains("gentle") {
-                return localized(
-                    zh: "用温柔一点的方式陪 \(pet.name) 放松",
-                    en: "Use a gentler play style to help \(pet.name) relax"
-                )
-            }
-        case "weight":
-            if tags.contains("foodie") || tags.contains("greedy") || tags.contains("lazy") {
-                return localized(
-                    zh: "结合性格标签，体重趋势值得持续观察",
-                    en: "Their traits make weight trends worth watching"
-                )
-            }
-        case "moment":
-            if tags.contains("photogenic") || tags.contains("drama") {
-                return localized(
-                    zh: "\(pet.name) 今天也很适合留下一张照片",
-                    en: "\(pet.name) looks ready for a photo today"
-                )
-            }
-            if tags.contains("mischief") || tags.contains("curious") {
-                return localized(
-                    zh: "记录一下 \(pet.name) 今天的新发现",
-                    en: "Capture what \(pet.name) discovered today"
-                )
-            }
-        default:
-            break
-        }
-        return fallback
-    }
-
     private static func oasisBuildQuests(activePets: [Pet], humans: [Human], questProgress: TodayFocusQuestProgress) -> [IslandQuest] {
         var quests: [IslandQuest] = []
         let hasAnyMember = !activePets.isEmpty || !humans.isEmpty
@@ -686,7 +631,7 @@ nonisolated enum IslandQuestEngine {
         now: Date
     ) -> Human? {
         humans
-            .filter(\.shouldShowOnHome)
+            .filter { !$0.hasPassedAway }
             .first { human in
                 !hasInitialHumanWeightRecordedToday(humanId: human.id, calendar: calendar, now: now) &&
                     !human.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }

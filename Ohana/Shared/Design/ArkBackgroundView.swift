@@ -38,8 +38,28 @@ struct ArkBackgroundView: View {
             StaticGradientBackground(colors: style.gradientColors(for: colorScheme))
         case .coastalFresh, .lavenderDawn, .mintFrost, .peachCloud, .graphitePulse:
             StaticGradientBackground(colors: style.gradientColors(for: colorScheme))
+        case .ohanaWarmth, .botanicalMoon, .pawLeafWhisper, .silverSymbiosis:
+            if let assetName = style.imageAssetName {
+                OfficialImageBackground(assetName: assetName)
+            }
         case .customPhoto: CustomPhotoBackground(version: customBackgroundVersion)
         }
+    }
+}
+
+private struct OfficialImageBackground: View {
+    let assetName: String
+
+    var body: some View {
+        GeometryReader { proxy in
+            Image(assetName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .clipped()
+                .allowsHitTesting(false)
+        }
+        .ignoresSafeArea()
     }
 }
 
@@ -78,9 +98,48 @@ struct OhanaStaticAppBackground: View {
         AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland
     }
 
+    @ViewBuilder
     var body: some View {
-        StaticGradientBackground(colors: style.gradientColors(for: colorScheme))
-            .ignoresSafeArea()
+        if let assetName = style.imageAssetName {
+            OfficialImageBackground(assetName: assetName)
+        } else {
+            StaticGradientBackground(colors: style.gradientColors(for: colorScheme))
+                .ignoresSafeArea()
+        }
+    }
+}
+
+/// A window-sized static backdrop that never changes the caller's safe-area
+/// layout. Tab pages use this canvas to sample the same crop as the root shell.
+struct OhanaStaticBackgroundCanvas: View {
+    @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var style: AppBackgroundStyle {
+        AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            if let assetName = style.imageAssetName {
+                Image(assetName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+            } else {
+                LinearGradient(
+                    colors: style.gradientColors(for: colorScheme),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .overlay {
+                    NoiseTextureView()
+                        .opacity(0.014)
+                        .blendMode(.overlay)
+                }
+            }
+        }
     }
 }
 

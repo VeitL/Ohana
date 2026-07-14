@@ -260,66 +260,51 @@ struct AddExpenseSheetContent: View {
     // MARK: - Body
 
     var body: some View {
-        GeometryReader { proxy in
-            let maxPanelHeight = max(430, proxy.size.height * 0.92)
-            let scrollMaxHeight = max(250, maxPanelHeight - 166)
-            let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, 430))
-            let hiddenOffset = panelHeightEstimate + 72
-
-            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: popupVisible) {
-                popupBackdrop
-                    .opacity(popupVisible ? 1 : 0)
-
-                VStack(spacing: 0) {
-                    popupDragHandle
-                        .padding(.top, 4)
-                    header
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 16) {
-                            amountEntry
-                            quickAmountStrip
-                            categoryStrip
-                            sharedExpenseTargetSection
-                            payerSection
-                            receiptSection
-                            if selectedCategory == .insurancePremium {
-                                insurancePolicyNotice
-                            }
-                            moreSection
-
-                            if hasSavedMedicalExpense {
-                                claimHintCard
-                            }
-                        }
-                        .padding(.bottom, 18)
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    Text(pet.name)
+                        .font(OhanaFont.subheadline(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                    amountEntry
+                    quickAmountStrip
+                    categoryStrip
+                    sharedExpenseTargetSection
+                    payerSection
+                    receiptSection
+                    if selectedCategory == .insurancePremium {
+                        insurancePolicyNotice
                     }
-                    .scrollDismissesKeyboard(.interactively)
-                    .frame(maxHeight: scrollMaxHeight)
+                    moreSection
 
-                    bottomActionBar
+                    if hasSavedMedicalExpense {
+                        claimHintCard
+                    }
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
-                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
-                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow confirmed inline popup liftedAlert shadow token
-                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow confirmed inline popup liftedAlert shadow token
-                .padding(.horizontal, 6)
-                .padding(.bottom, 8)
-                .offset(y: popupVisible ? popupDragOffset : hiddenOffset)
-                .frame(maxHeight: maxPanelHeight, alignment: .bottom)
-                .ohanaAdaptiveSheetContentHeight(
-                    $adaptiveSheetHeight,
-                    minHeight: 430,
-                    maxHeight: maxPanelHeight,
-                    chromePadding: 18
-                )
+                .padding(.vertical, 12)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle(l.tr(zh: "添加花费", en: "Add Expense", de: "Ausgabe hinzufügen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, role: .cancel) { closeSheet() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if hasSavedMedicalExpense {
+                        Button(l.quickExpenseApplyClaim) {
+                            inputFocused = false
+                            GoKeyboard.dismiss()
+                            showClaimSheet = true
+                        }
+                    } else {
+                        Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { saveExpense() }
+                            .disabled(!canSave || isSaving)
+                    }
+                }
             }
         }
-        .allowsHitTesting(popupVisible && !isClosing)
-        .animation(popupAnimation, value: popupVisible)
-        .presentationBackground(.clear)
-        .presentationDetents([.height(adaptiveSheetHeight)])
-        .presentationDragIndicator(.hidden)
+        .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
         .sheet(isPresented: $showClaimSheet) {
             if let firstInsurance = activeInsurances.first {
@@ -381,13 +366,6 @@ struct AddExpenseSheetContent: View {
                 candidates: sameSpeciesExpensePets,
                 defaultToAll: false
             )
-            popupVisible = false
-            isClosing = false
-            DispatchQueue.main.async {
-                withAnimation(popupAnimation) {
-                    popupVisible = true
-                }
-            }
         }
         .onChange(of: amountInput) { _, newValue in
             let sanitized = CountryDecimalInput.sanitize(newValue, countryCode: appCountry, maxFractionDigits: 2)

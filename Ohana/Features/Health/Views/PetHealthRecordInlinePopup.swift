@@ -89,132 +89,86 @@ struct PetHealthRecordInlinePopup: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            Capsule()
-                .fill(Color.ohanaPrimaryText.opacity(0.26))
-                .frame(width: 48, height: 5)
-                .padding(.top, 8)
-
-            HStack(spacing: 12) {
-                Image(systemName: healthIcon(for: selectedType))
-                    .font(OhanaFont.adaptive(size: 20, weight: .black))
-                    .foregroundStyle(accent)
-                    .frame(width: 46, height: 46)
-                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(typeLabel)
-                        .font(OhanaFont.title3(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(pet.name)
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                Spacer()
-                OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) {
-                    guard !isSaving else { return }
-                    onClose()
-                }
-                .accessibilityIdentifier("pet-health-record-close-action")
-            }
-            .padding(.horizontal, 18)
-
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 12) {
-                    if let entryMode {
-                        healthSubtypeSelector(mode: entryMode)
-                    }
-
-                    if showsNameField {
-                        inlineField(icon: "pencil.line", tint: accent) {
-                            TextField(l.tr(zh: "名称（可选）", en: "Name (optional)", de: "Name (optional)"), text: $name) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                .font(OhanaFont.subheadline(.semibold))
-                                .foregroundStyle(Color.ohanaPrimaryText)
+        NavigationStack {
+            Form {
+                if let entryMode {
+                    Section {
+                        Picker(l.tr(zh: "记录类型", en: "Record type", de: "Eintragstyp"), selection: $selectedType) {
+                            ForEach(healthSubtypeOptions(mode: entryMode), id: \.self) { type in
+                                Label(healthTypeTitle(type), systemImage: healthIcon(for: type))
+                                    .tag(type)
+                            }
                         }
                     }
+                }
 
-                    inlineField(icon: "calendar", tint: accent) {
-                        DatePicker(l.tr(zh: "记录日期", en: "Date", de: "Datum"), selection: $date, displayedComponents: .date)
-                            .datePickerStyle(.compact)
-                            .tint(accent)
+                Section {
+                    if showsNameField {
+                        TextField(l.tr(zh: "名称（可选）", en: "Name (optional)", de: "Name (optional)"), text: $name)
                     }
+                    DatePicker(l.tr(zh: "记录日期", en: "Date", de: "Datum"), selection: $date, displayedComponents: .date)
+                }
 
-                    if showsExpiration {
-                        inlineToggleDateBlock(
-                            title: l.tr(zh: "有效期提醒", en: "Expiry reminder", de: "Ablauf-Erinnerung"),
-                            isOn: $hasExpiration,
-                            date: $expirationDate,
-                            range: date...,
-                            tint: Color.goTeal
-                        )
-                    }
-
-                    if showsNextCheckup {
-                        inlineToggleDateBlock(
-                            title: l.tr(zh: "下次体检提醒", en: "Next checkup reminder", de: "Nächster Check-up"),
-                            isOn: $hasNextCheckup,
-                            date: $nextCheckupDate,
-                            range: date...,
-                            tint: Color.goTeal
-                        )
-                    }
-
-                    inlineField(icon: "stethoscope", tint: Color.goTeal) {
-                        TextField(l.tr(zh: "医生 / 诊所（可选）", en: "Vet / clinic (optional)", de: "Tierarzt / Klinik (optional)"), text: $vetName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                            .font(OhanaFont.subheadline(.semibold))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                    }
-
-                    inlineField(icon: AppCurrency.systemIconName, tint: Color.goYellow) {
-                        InlineNumericInput(
-                            text: $cost,
-                            placeholder: l.tr(zh: "费用（可选）", en: "Cost (optional)", de: "Kosten (optional)"),
-                            maxFractionDigits: 2,
-                            accent: Color.goYellow,
-                            step: 10,
-                            valueFont: OhanaFont.subheadline(.semibold),
-                            valueAlignment: .leading,
-                            fill: Color.clear,
-                            cornerRadius: OhanaRadius.chip,
-                            horizontalPadding: 4,
-                            verticalPadding: 0
-                        )
-                    }
-
-                    inlineField(icon: "note.text", tint: Color.ohanaSecondaryText) {
-                        TextField(l.tr(zh: "备注（可选）", en: "Note (optional)", de: "Notiz (optional)"), text: $note, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                            .font(OhanaFont.subheadline(.semibold))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .lineLimit(2 ... 4)
+                if showsExpiration {
+                    Section {
+                        Toggle(l.tr(zh: "有效期提醒", en: "Expiry reminder", de: "Ablauf-Erinnerung"), isOn: $hasExpiration)
+                            .tint(Color.goPrimary)
+                        if hasExpiration {
+                            DatePicker(
+                                l.tr(zh: "有效期至", en: "Valid until", de: "Gültig bis"),
+                                selection: $expirationDate,
+                                in: date...,
+                                displayedComponents: .date
+                            )
+                        }
                     }
                 }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 4)
-            }
 
-            Button(action: save) {
-                HStack(spacing: 8) {
-                    Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    Text(isSaving
-                        ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
-                        : l.tr(zh: "保存记录", en: "Save record", de: "Eintrag speichern")
-                    )
+                if showsNextCheckup {
+                    Section {
+                        Toggle(l.tr(zh: "下次体检提醒", en: "Next checkup reminder", de: "Nächster Check-up"), isOn: $hasNextCheckup)
+                            .tint(Color.goPrimary)
+                        if hasNextCheckup {
+                            DatePicker(
+                                l.tr(zh: "提醒日期", en: "Reminder date", de: "Erinnerungsdatum"),
+                                selection: $nextCheckupDate,
+                                in: date...,
+                                displayedComponents: .date
+                            )
+                        }
+                    }
                 }
-                .font(OhanaFont.body(.black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 15)
-                .background(isSaving ? Color.ohanaControlFill : accent, in: Capsule())
+
+                Section {
+                    TextField(l.tr(zh: "医生 / 诊所（可选）", en: "Vet / clinic (optional)", de: "Tierarzt / Klinik (optional)"), text: $vetName)
+                    TextField(l.tr(zh: "费用（可选）", en: "Cost (optional)", de: "Kosten (optional)"), text: $cost)
+                        .keyboardType(.decimalPad)
+                    TextField(l.tr(zh: "备注（可选）", en: "Note (optional)", de: "Notiz (optional)"), text: $note, axis: .vertical)
+                        .lineLimit(2 ... 4)
+                } header: {
+                    Text(l.tr(zh: "详情", en: "Details", de: "Details"))
+                }
             }
-            .buttonStyle(ScaleButtonStyle())
-            .disabled(isSaving || !pet.canWriteHealthFacts)
-            .accessibilityIdentifier("pet-health-record-save-action")
-            .padding(.horizontal, 18)
-            .padding(.bottom, 14)
+            .navigationTitle(typeLabel)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, role: .cancel) {
+                        guard !isSaving else { return }
+                        onClose()
+                    }
+                    .accessibilityIdentifier("pet-health-record-close-action")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
+                        save()
+                    }
+                    .disabled(isSaving || !pet.canWriteHealthFacts)
+                    .accessibilityIdentifier("pet-health-record-save-action")
+                }
+            }
         }
-        .background {
-            FeedInlineSheetGlassSurface(cornerRadius: OhanaRadius.inlinePopup, glassMode: .regular)
-        }
-        .accessibilityIdentifier("pet-health-record-inline-popup")
+        .accessibilityIdentifier("pet-health-record-sheet")
         .onAppear(perform: applyDefaultsForSelectedType)
         .onChange(of: selectedType) { _, _ in applyDefaultsForSelectedType() }
         .onChange(of: date) { _, newDate in
@@ -224,6 +178,27 @@ struct PetHealthRecordInlinePopup: View {
         }
         .onDisappear {
             commandQueue.cancelAll()
+        }
+    }
+
+    private func healthSubtypeOptions(mode: HealthRecordEntryMode) -> [HealthLogType] {
+        switch mode {
+        case .preventive:
+            [.vaccine, .dewormingInternal, .dewormingExternal, .checkup]
+        case .visit:
+            [.surgery, .general]
+        }
+    }
+
+    private func healthTypeTitle(_ type: HealthLogType) -> String {
+        switch type {
+        case .vaccine: l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
+        case .dewormingInternal: l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .dewormingExternal: l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
+        case .checkup: l.tr(zh: "体检", en: "Checkup", de: "Check-up")
+        case .surgery: l.tr(zh: "就诊", en: "Visit", de: "Besuch")
+        case .general: l.tr(zh: "常规", en: "General", de: "Allgemein")
+        default: type.rawValue
         }
     }
 

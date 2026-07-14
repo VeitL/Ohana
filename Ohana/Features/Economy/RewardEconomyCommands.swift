@@ -774,8 +774,7 @@ enum Avatar2DUpgradeCommandService {
             species: pet.species,
             breed: pet.breed,
             gender: pet.gender,
-            coatColor: pet.coatColor,
-            eyeColor: pet.eyeColor
+            coatColor: pet.coatColor
         ) else {
             return Avatar2DUpgradeCommandResult(
                 entityID: pet.id,

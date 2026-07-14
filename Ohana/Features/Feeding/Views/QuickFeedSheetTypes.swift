@@ -66,12 +66,7 @@ enum ActiveFeedSheet: Identifiable, Equatable {
     }
 
     var usesInlineOverlay: Bool {
-        switch self {
-        case .manual, .treat, .plan, .stock, .stockManage, .manage, .editLog:
-            true
-        case .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
-            false
-        }
+        false
     }
 
     var needsFullCareLogs: Bool {

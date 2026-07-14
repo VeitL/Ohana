@@ -164,6 +164,7 @@ struct OhanaUISpecShowcaseView: View {
             settingsRowSample
             controlRowSamples
             inputSamples
+            sharedStateComponentSamples
             miniChartSample
             shortPopupSample
             componentReferenceCard
@@ -501,6 +502,54 @@ struct OhanaUISpecShowcaseView: View {
         }
     }
 
+    private var sharedStateComponentSamples: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionMiniTitle(l.tr(zh: "共享状态组件", en: "Shared State Components"), icon: "square.stack.3d.up.fill")
+
+            OhanaPickerRow(
+                label: l.tr(zh: "提前提醒", en: "Reminder lead time"),
+                valueText: leadTitle(sampleLeadDays),
+                accessibilityIdentifier: "ui-spec-showcase-picker-row"
+            ) {
+                sampleLeadDays = sampleLeadDays == 7 ? 0 : sampleLeadDays + 1
+            }
+
+            OhanaPermissionCard(
+                permission: .notifications,
+                state: sampleToggle ? .granted : .notRequested,
+                title: l.tr(zh: "通知", en: "Notifications"),
+                stateLabel: sampleToggle
+                    ? l.tr(zh: "已允许", en: "Allowed")
+                    : l.tr(zh: "尚未请求", en: "Not requested"),
+                message: l.tr(
+                    zh: "在你选择的时间接收护理提醒。",
+                    en: "Receive care reminders at the time you choose."
+                ),
+                actionLabel: sampleToggle
+                    ? l.tr(zh: "已开启", en: "Enabled")
+                    : l.tr(zh: "允许", en: "Allow"),
+                accessibilityIdentifier: "ui-spec-showcase-permission-card",
+                action: sampleToggle ? nil : { sampleToggle = true }
+            )
+
+            OhanaFeedbackState(
+                state: sampleToggle ? .success : .error,
+                title: sampleToggle
+                    ? l.tr(zh: "一切就绪", en: "All set")
+                    : l.tr(zh: "出现了问题", en: "Something went wrong"),
+                message: l.tr(
+                    zh: "状态说明与恢复动作保持在同一个表面。",
+                    en: "State guidance and its recovery action stay on one surface."
+                ),
+                actionLabel: sampleToggle
+                    ? l.tr(zh: "完成", en: "Done")
+                    : l.tr(zh: "重试", en: "Try again"),
+                accessibilityIdentifier: "ui-spec-showcase-feedback-state",
+                action: sampleToggle ? nil : { sampleToggle = true }
+            )
+        }
+    }
+
     private var miniChartSample: some View {
         specCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -528,6 +577,9 @@ struct OhanaUISpecShowcaseView: View {
             VStack(alignment: .leading, spacing: 10) {
                 sectionMiniTitle(l.tr(zh: "生成代码时照抄这些入口", en: "Copy These Entry Points"), icon: "curlybraces")
                 codeLine("OhanaTextField(placeholder:text:style:)")
+                codeLine("OhanaPickerRow(label:valueText:action:)")
+                codeLine("OhanaPermissionCard(permission:state:...)")
+                codeLine("OhanaFeedbackState(state:title:message:...)")
                 codeLine("Toggle { specControlLabel(...) }.tint(Color.goTeal)")
                 codeLine("DatePicker(selection:displayedComponents:) { specControlLabel(...) }")
                 codeLine("Picker(...).pickerStyle(.segmented)")

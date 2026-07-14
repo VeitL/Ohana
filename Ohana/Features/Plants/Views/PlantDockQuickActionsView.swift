@@ -18,6 +18,7 @@ struct PlantDockQuickActionsView: View {
     let localization: L10n
     @Binding var quickActionItemsRaw: String
     var shouldReduceWork = false
+    var accentColor: Color = .goTeal
     var forcesSubmenusBelow = false
     var onLimitReached: () -> Void = {
         OhanaFeedback.warning()
@@ -46,6 +47,7 @@ struct PlantDockQuickActionsView: View {
             isEditMode: isEditMode,
             jiggle: jiggle,
             shouldReduceWork: shouldReduceWork || workloadPolicy.interactionMotionBudget(isVisible: true) != .full,
+            accentColor: accentColor,
             forcesSubmenusBelow: forcesSubmenusBelow,
             draggingItemId: $draggingItemId,
             onToggleEdit: toggleEditMode,
@@ -139,6 +141,7 @@ struct PlantDockQuickActionsView: View {
             icon: item.icon,
             actionType: item.actionType,
             statusText: statusText(for: dockAction, isDue: isDue, isPending: isPending, didComplete: didComplete, didFail: didFail),
+            isInProgress: isPending,
             isCompleted: didComplete,
             showsAttention: (isDue || didFail) && !didComplete && !isPending,
             attentionLevel: attentionLevel(isDue: isDue, isOverdue: isOverdue, didFail: didFail, didComplete: didComplete, isPending: isPending),

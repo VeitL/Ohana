@@ -14,6 +14,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
     let icon: String
     let actionType: String
     let statusText: String?
+    let isInProgress: Bool
     let isCompleted: Bool
     let showsAttention: Bool
     let attentionLevel: HomeQuickActionAttentionLevel
@@ -37,6 +38,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         icon: String,
         actionType: String? = nil,
         statusText: String? = nil,
+        isInProgress: Bool = false,
         isCompleted: Bool,
         showsAttention: Bool = false,
         attentionLevel: HomeQuickActionAttentionLevel? = nil,
@@ -59,6 +61,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         self.icon = icon
         self.actionType = actionType ?? Self.inferredActionType(id: id, icon: icon)
         self.statusText = statusText
+        self.isInProgress = isInProgress
         self.isCompleted = isCompleted
         let resolvedAttention = attentionLevel ?? (showsAttention ? .urgent : .none)
         self.showsAttention = showsAttention || resolvedAttention != .none
@@ -115,6 +118,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
     var isEditMode = false
     var jiggle = false
     var shouldReduceWork = false
+    var accentColor: Color = .goPrimary
     var forcesSubmenusBelow = true
     var draggingItemId: Binding<String?>?
     var onToggleEdit: (() -> Void)?
@@ -336,7 +340,10 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     actionType: item.actionType,
                     fallbackSystemName: item.icon,
                     size: iconSize,
-                    color: state.foreground,
+                    color: accentColor,
+                    primaryColor: Color.goCardWhite,
+                    isStateful: !isEditMode,
+                    isInProgress: item.isInProgress,
                     isCompleted: state.showsCompleted,
                     showsCompletionBadge: state.showsCompleted,
                     animationTrigger: iconAnimationTokens[item.id, default: 0],
@@ -512,7 +519,8 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 actionType: actionType,
                 fallbackSystemName: icon,
                 size: 20,
-                color: foreground,
+                color: accentColor,
+                primaryColor: foreground,
                 animatesStateChanges: false
             )
             .frame(
@@ -631,7 +639,8 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     actionType: item.actionType,
                     fallbackSystemName: item.icon,
                     size: 23,
-                    color: item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaFunctionalIcon
+                    color: accentColor.opacity(item.isAddDisabled ? 0.5 : 1),
+                    primaryColor: item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryText
                 )
                 Text(item.title)
                     .font(OhanaFont.adaptive(size: 9.5, weight: .black, design: .rounded))
@@ -681,7 +690,8 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         actionType: item.actionType,
                         fallbackSystemName: item.icon,
                         size: 34,
-                        color: Color.goPrimary
+                        color: accentColor,
+                        primaryColor: Color.ohanaPrimaryText
                     )
                     .frame(width: 44, height: 44)
                     Text(item.title)

@@ -1356,6 +1356,7 @@ struct MemberLifecycleGateTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let creator = Human(name: "Guan")
+        creator.coconutBalance = 20
         let assignee = Human(name: "Ava")
         let humanOwner = Human(name: "Mira")
         let pet = Pet(name: "Momo", species: "cat")
@@ -1394,7 +1395,7 @@ struct MemberLifecycleGateTests {
             petReminder,
             to: assignee,
             by: creator,
-            rewardCoconuts: 0,
+            rewardCoconuts: 5,
             context: context
         ))
         let humanTask = try #require(FamilyTaskService.assignReminder(
@@ -1416,6 +1417,393 @@ struct MemberLifecycleGateTests {
             .first { $0.actionType == "familyTaskSubmitReview" })
         #expect(reviewLedger.subjectKind == CareLedgerSubjectKind.human.rawValue)
         #expect(reviewLedger.subjectId == humanOwner.id.uuidString)
+    }
+
+    @Test func familyTaskCreationRequiresFundedPositiveRewardAndDifferentAssignee() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let creator = Human(name: "Guan")
+        let assignee = Human(name: "Ava")
+        creator.coconutBalance = 60
+        context.insert(creator)
+        context.insert(assignee)
+        try context.save()
+
+        let missingCreator = FamilyTaskService.createHouseholdTask(
+            title: "Water plants",
+            note: "",
+            assignedTo: assignee,
+            by: nil,
+            rewardCoconuts: 20,
+            dueAt: nil,
+            emoji: "🌱",
+            context: context
+        )
+        let selfAssigned = FamilyTaskService.createHouseholdTask(
+            title: "Water plants",
+            note: "",
+            assignedTo: creator,
+            by: creator,
+            rewardCoconuts: 20,
+            dueAt: nil,
+            emoji: "🌱",
+            context: context
+        )
+        let zeroReward = FamilyTaskService.createHouseholdTask(
+            title: "Water plants",
+            note: "",
+            assignedTo: assignee,
+            by: creator,
+            rewardCoconuts: 0,
+            dueAt: nil,
+            emoji: "🌱",
+            context: context
+        )
+        let underfunded = FamilyTaskService.createHouseholdTask(
+            title: "Water plants",
+            note: "",
+            assignedTo: assignee,
+            by: creator,
+            rewardCoconuts: 61,
+            dueAt: nil,
+            emoji: "🌱",
+            context: context
+        )
+        let emptyTitle = FamilyTaskService.createHouseholdTask(
+            title: "   ",
+            note: "",
+            assignedTo: assignee,
+            by: creator,
+            rewardCoconuts: 20,
+            dueAt: nil,
+            emoji: "🌱",
+            context: context
+        )
+        let created = FamilyTaskService.createHouseholdTask(
+            title: "Water plants",
+            note: "",
+            assignedTo: assignee,
+            by: creator,
+            rewardCoconuts: 60,
+            dueAt: nil,
+            emoji: "🌱",
+            context: context
+        )
+
+        #expect(missingCreator == nil)
+        #expect(selfAssigned == nil)
+        #expect(zeroReward == nil)
+        #expect(underfunded == nil)
+        #expect(emptyTitle == nil)
+        #expect(created?.kind == .bounty)
+        #expect(created?.rewardCoconuts == 60)
+        #expect(created?.createdById == creator.id.uuidString)
+        #expect(created?.assignedToId == assignee.id.uuidString)
+        #expect(CoconutWalletService.balance(for: creator, context: context) == 60)
+        #expect(try context.fetch(FetchDescriptor<FamilyCollaborationTask>()).count == 1)
+    }
+
+    @Test func reminderAssignmentRequiresFundedPositiveRewardAndCreator() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let creator = Human(name: "Guan")
+        let replacementCreator = Human(name: "Mira")
+        let assignee = Human(name: "Ava")
+        creator.coconutBalance = 40
+        replacementCreator.coconutBalance = 30
+        let event = Event(
+            title: "Feed Momo",
+            startDate: Date(timeIntervalSince1970: 1_900_000_000),
+            eventType: EventType.task.rawValue
+        )
+        let reminder = Reminder(event: event, scheduledAt: event.startDate)
+        context.insert(creator)
+        context.insert(replacementCreator)
+        context.insert(assignee)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        #expect(FamilyTaskService.assignReminder(
+            reminder,
+            to: assignee,
+            by: nil,
+            rewardCoconuts: 20,
+            context: context
+        ) == nil)
+        #expect(FamilyTaskService.assignReminder(
+            reminder,
+            to: creator,
+            by: creator,
+            rewardCoconuts: 20,
+            context: context
+        ) == nil)
+        #expect(FamilyTaskService.assignReminder(
+            reminder,
+            to: assignee,
+            by: creator,
+            rewardCoconuts: 0,
+            context: context
+        ) == nil)
+        #expect(FamilyTaskService.assignReminder(
+            reminder,
+            to: assignee,
+            by: creator,
+            rewardCoconuts: 41,
+            context: context
+        ) == nil)
+
+        let task = FamilyTaskService.assignReminder(
+            reminder,
+            to: assignee,
+            by: creator,
+            rewardCoconuts: 40,
+            context: context
+        )
+
+        let removedReward = task.map { task in
+            FamilyTaskService.updateTask(
+                task,
+                title: task.title,
+                note: task.note,
+                assignedTo: assignee,
+                rewardCoconuts: 0,
+                dueAt: task.dueAt,
+                emoji: task.emoji,
+                by: creator,
+                context: context
+            )
+        }
+
+        #expect(task?.rewardCoconuts == 40)
+        #expect(task?.createdById == creator.id.uuidString)
+        #expect(task?.assignedToId == assignee.id.uuidString)
+        #expect(event.assigneeId == assignee.id.uuidString)
+        #expect(CoconutWalletService.balance(for: creator, context: context) == 40)
+        #expect(removedReward == false)
+
+        let reassigned = FamilyTaskService.assignReminder(
+            reminder,
+            to: assignee,
+            by: replacementCreator,
+            rewardCoconuts: 30,
+            context: context
+        )
+
+        #expect(reassigned?.id == task?.id)
+        #expect(reassigned?.createdById == replacementCreator.id.uuidString)
+        #expect(reassigned?.createdByName == replacementCreator.name)
+        #expect(reassigned?.rewardCoconuts == 30)
+        #expect(CoconutWalletService.balance(for: replacementCreator, context: context) == 30)
+    }
+
+    @Test func householdTaskUpdateRejectsZeroOrUnderfundedReward() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let creator = Human(name: "Guan")
+        let assignee = Human(name: "Ava")
+        creator.coconutBalance = 80
+        context.insert(creator)
+        context.insert(assignee)
+        try context.save()
+        let task = try #require(FamilyTaskService.createHouseholdTask(
+            title: "Water plants",
+            note: "Original",
+            assignedTo: assignee,
+            by: creator,
+            rewardCoconuts: 20,
+            dueAt: nil,
+            emoji: "🌱",
+            context: context
+        ))
+
+        let removedReward = FamilyTaskService.updateTask(
+            task,
+            title: "No reward",
+            note: "Changed",
+            assignedTo: assignee,
+            rewardCoconuts: 0,
+            dueAt: nil,
+            emoji: "🧹",
+            by: creator,
+            context: context
+        )
+        let underfunded = FamilyTaskService.updateTask(
+            task,
+            title: "Too expensive",
+            note: "Changed",
+            assignedTo: assignee,
+            rewardCoconuts: 81,
+            dueAt: nil,
+            emoji: "🧹",
+            by: creator,
+            context: context
+        )
+        let reassignedToCreator = FamilyTaskService.updateTask(
+            task,
+            title: "Self assigned",
+            note: "Changed",
+            assignedTo: creator,
+            rewardCoconuts: 20,
+            dueAt: nil,
+            emoji: "🧹",
+            by: creator,
+            context: context
+        )
+        let updated = FamilyTaskService.updateTask(
+            task,
+            title: "Mop kitchen",
+            note: "Tonight",
+            assignedTo: assignee,
+            rewardCoconuts: 80,
+            dueAt: nil,
+            emoji: "🧹",
+            by: creator,
+            context: context
+        )
+
+        #expect(!removedReward)
+        #expect(!underfunded)
+        #expect(!reassignedToCreator)
+        #expect(updated)
+        #expect(task.title == "Mop kitchen")
+        #expect(task.note == "Tonight")
+        #expect(task.rewardCoconuts == 80)
+        #expect(task.assignedToId == assignee.id.uuidString)
+    }
+
+    @Test func householdTaskEditAndDeleteRequireCreatorActor() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let creator = Human(name: "Guan")
+        let assignee = Human(name: "Ava")
+        creator.coconutBalance = 80
+        context.insert(creator)
+        context.insert(assignee)
+        try context.save()
+
+        let task = try #require(FamilyTaskService.createHouseholdTask(
+            title: "Mop kitchen",
+            note: "Tonight",
+            assignedTo: assignee,
+            by: creator,
+            rewardCoconuts: 20,
+            dueAt: nil,
+            emoji: "🧹",
+            context: context
+        ))
+
+        #expect(!FamilyTaskService.updateTask(
+            task,
+            title: "Changed by assignee",
+            note: "Unauthorized",
+            assignedTo: assignee,
+            rewardCoconuts: 20,
+            dueAt: nil,
+            emoji: "🧹",
+            by: assignee,
+            context: context
+        ))
+        #expect(!FamilyTaskService.delete(task, by: assignee, context: context))
+        #expect(task.title == "Mop kitchen")
+        #expect(FamilyTaskService.delete(task, by: creator, context: context))
+    }
+
+    @Test func familyTaskClaimOnlyAcceptsOpenTasks() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let creator = Human(name: "Guan")
+        let assignee = Human(name: "Ava")
+        let claimant = Human(name: "Mira")
+        let assignedTask = FamilyCollaborationTask(
+            title: "Assigned",
+            kind: .householdTask,
+            createdById: creator.id.uuidString,
+            createdByName: creator.name,
+            assignedToId: assignee.id.uuidString,
+            assignedToName: assignee.name
+        )
+        let openTask = FamilyCollaborationTask(
+            title: "Open",
+            kind: .householdTask,
+            createdById: creator.id.uuidString,
+            createdByName: creator.name
+        )
+        context.insert(creator)
+        context.insert(assignee)
+        context.insert(claimant)
+        context.insert(assignedTask)
+        context.insert(openTask)
+        try context.save()
+
+        let claimedAssignedTask = FamilyTaskService.claim(assignedTask, by: claimant, context: context)
+        let claimedOpenTask = FamilyTaskService.claim(openTask, by: claimant, context: context)
+        let claimedAgain = FamilyTaskService.claim(openTask, by: assignee, context: context)
+
+        #expect(!claimedAssignedTask)
+        #expect(assignedTask.status == .active)
+        #expect(assignedTask.claimedById == nil)
+        #expect(claimedOpenTask)
+        #expect(!claimedAgain)
+        #expect(openTask.status == .claimed)
+        #expect(openTask.claimedById == claimant.id.uuidString)
+    }
+
+    @Test func familyTaskCompletionOnlyAcceptsAssigneeOrClaimant() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let creator = Human(name: "Guan")
+        let assignee = Human(name: "Ava")
+        let outsider = Human(name: "Mira")
+        creator.coconutBalance = 100
+        let assignedTask = FamilyCollaborationTask(
+            title: "Assigned",
+            kind: .householdTask,
+            createdById: creator.id.uuidString,
+            createdByName: creator.name,
+            assignedToId: assignee.id.uuidString,
+            assignedToName: assignee.name
+        )
+        let rewardedTask = FamilyCollaborationTask(
+            title: "Rewarded",
+            kind: .bounty,
+            createdById: creator.id.uuidString,
+            createdByName: creator.name,
+            assignedToId: assignee.id.uuidString,
+            assignedToName: assignee.name,
+            rewardCoconuts: 20
+        )
+        let claimedTask = FamilyCollaborationTask(
+            title: "Claimed",
+            kind: .bounty,
+            status: .claimed,
+            createdById: creator.id.uuidString,
+            createdByName: creator.name,
+            rewardCoconuts: 20
+        )
+        claimedTask.claimedById = assignee.id.uuidString
+        claimedTask.claimedByName = assignee.name
+        context.insert(creator)
+        context.insert(assignee)
+        context.insert(outsider)
+        context.insert(assignedTask)
+        context.insert(rewardedTask)
+        context.insert(claimedTask)
+        try context.save()
+
+        #expect(!FamilyTaskService.complete(assignedTask, by: outsider, context: context))
+        #expect(assignedTask.status == .active)
+        #expect(FamilyTaskService.complete(assignedTask, by: assignee, context: context))
+        #expect(assignedTask.status == .completed)
+
+        #expect(!FamilyTaskService.submitForReview(rewardedTask, by: outsider, context: context))
+        #expect(rewardedTask.status == .active)
+        #expect(FamilyTaskService.submitForReview(rewardedTask, by: assignee, context: context))
+        #expect(rewardedTask.status == .pendingReview)
+
+        #expect(!FamilyTaskService.submitForReview(claimedTask, by: outsider, context: context))
+        #expect(FamilyTaskService.submitForReview(claimedTask, by: assignee, context: context))
+        #expect(claimedTask.status == .pendingReview)
     }
 
     @Test func memberDeletionResultsUseDomainResolverForIndirectScheduleLinks() throws {
@@ -2334,7 +2722,7 @@ struct MemberLifecycleGateTests {
         }
         #expect(bountySource.contains("careLedgerEntries: [FamilyCareLedgerEntry]"))
         #expect(bountyRouteSource.contains("FamilyCareLedgerEntry.fetchPetEntries"))
-        #expect(crewRouteSource.contains("careLedgerEntries: isCollaborationEnabled ? FamilyCareLedgerEntry.fetchPetEntries"))
+        #expect(crewRouteSource.contains("careLedgerEntries: FamilyCareLedgerEntry.fetchPetEntries"))
         #expect(collaborationSource.contains("careLedgerEntries.compactMap"))
         #expect(collaborationActivitySource.contains("careLedgerEntries.contains"))
     }
@@ -3778,7 +4166,7 @@ struct MemberLifecycleGateTests {
 
         for surface in [rootSource, groupSource, aggregateSource] {
             #expect(surface.contains("private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }"))
-            #expect(surface.contains("private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome && !$0.hasPassedAway } }"))
+            #expect(surface.contains("private var visibleHumans: [Human] { humans.filter { !$0.hasPassedAway } }"))
         }
         #expect(aggregateSource.contains("ForEach(chipsForFeature)"))
         #expect(aggregateSource.contains("ForEach(humansForFeature)"))

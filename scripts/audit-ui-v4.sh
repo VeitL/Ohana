@@ -21,7 +21,7 @@ Scope note:
   fixture tests in scripts/tests/ enforce a minimum scanned-file floor.
 
 Allowlist:
-  Add "ui-v4: allow <reason>" on a line that intentionally violates a rule.
+  Add "ui-v4: allow <reason>" or "native-ui: allow <reason>" on a line that intentionally violates a rule.
 USAGE
 }
 
@@ -115,7 +115,7 @@ scan_rule() {
 
   rg --pcre2 -nH --no-heading "$pattern" "${files[@]}" 2>/dev/null \
     | while IFS= read -r match; do
-        if [[ "$match" == *"ui-v4: allow"* ]]; then
+        if [[ "$match" == *"ui-v4: allow"* || "$match" == *"native-ui: allow"* ]]; then
           continue
         fi
         printf '[%s] %s\n  %s\n  Prefer: %s\n' "$rule_id" "$match" "$message" "$suggestion" >> "$warnings_file"
@@ -165,34 +165,70 @@ scan_rule \
   "GoMotion.page / GoMotion.feedback / GoMotion.fab / GoMotion.quick / GoMotion.reduced"
 
 scan_rule \
-  "plain-button" \
-  '\.buttonStyle\(\s*\.plain\s*\)' \
-  "Plain buttons miss the default V4 press feedback unless the interaction is truly inert." \
-  "ScaleButtonStyle(), or add ui-v4: allow with a reason"
-
-scan_rule \
-  "regular-sheet" \
-  'presentationBackground\(\s*\.(regularMaterial|ultraThinMaterial|thinMaterial)|presentationDetents\(\s*\[\s*\.large\s*\]\s*\)' \
-  "New sheets should default to bottom clear glass and minimum useful height." \
-  ".presentationBackground(.clear), pill close, compact detents unless the sheet is a long overview/history"
-
-scan_rule \
-  "raw-textfield" \
-  '\bTextField\(' \
-  "Raw TextField bypasses the V4 flat-input token (font, surface, stroke, focus emphasis drift per call site)." \
-  "OhanaTextField(placeholder:text:style:), InlineNumericInput, or GoDraftInput; // ui-v4: allow only inside blessed input wrappers"
-
-scan_rule \
   "hardcoded-detent-height" \
   'presentationDetents\(\s*\[[^]]*\.height\(\s*[0-9]' \
   "Per-sheet numeric detent heights fragment sheet geometry across the app." \
-  "OhanaSheetDetents.overview/.full/.compactMedium, ohanaSheetPagePresentation/ohanaCompactSheetPresentation, or a computed adaptive height"
+  "Native .medium/.large detents, or a computed adaptive height only when content cannot fit a semantic system detent"
 
 scan_rule \
   "hardcoded-corner-radius" \
   'cornerRadius:\s*[0-9]|\.cornerRadius\(\s*[0-9]|presentationCornerRadius\(\s*[0-9]' \
   "Literal corner radii drift (12/14/16/18/20/22/24... all coexist); use the semantic radius scale." \
   "OhanaRadius.input/.card/.cardLarge/.sheetCompact/.sheetPage/.inlinePopup"
+
+scan_rule \
+  "native-sheet-chrome" \
+  'presentationBackground\s*\(|presentationCornerRadius\s*\(|presentationDragIndicator\(\s*\.hidden' \
+  "System sheets must own their background, corner geometry, drag affordance, keyboard behavior, and transition." \
+  "Use .sheet/.fullScreenCover with semantic detents only; keep Ohana styling inside the presented content"
+
+scan_rule \
+  "native-custom-sheet-scene" \
+  'OhanaMotionScene\(\s*role:\s*\.sheet' \
+  "A custom motion scene is recreating the system sheet transition, scrim, drag behavior, and geometry." \
+  ".sheet(item:), .sheet(isPresented:), or .fullScreenCover with NavigationStack/Form content"
+
+scan_rule \
+  "native-inline-presentation" \
+  '(OhanaDeferredInlinePageCover|OhanaInlinePageRouteHost)\s*\(' \
+  "A custom in-page cover recreates native Sheet or full-screen presentation behavior." \
+  ".sheet(item:), .sheet(isPresented:), .alert, .confirmationDialog, or .fullScreenCover"
+
+scan_rule \
+  "native-settings-card" \
+  'SettingsSectionCard\s*\(' \
+  "Settings rows should inherit platform grouping, separators, Dynamic Type, and accessibility behavior." \
+  "Form with Section, Toggle, Picker, Button, NavigationLink, and LabeledContent"
+
+scan_rule \
+  "native-custom-search" \
+  '\b(catalogSearchField|searchField)\b' \
+  "Hand-built search fields duplicate system search placement, clear behavior, keyboard handling, and accessibility." \
+  ".searchable(text:placement:prompt:) on the relevant NavigationStack/List/content"
+
+scan_rule \
+  "native-manual-toggle" \
+  '\b(plantReminderToggleIndicator|shopTogglePill|trackFill|knobFill)\b' \
+  "A hand-drawn track or knob recreates the system Toggle." \
+  "Toggle with .switch or .button style and a semantic tint"
+
+scan_rule \
+  "native-custom-segment" \
+  '\b(plantViewSwitcherButton|iconModeBtn)\s*\(' \
+  "Multiple custom buttons are recreating a mutually exclusive system selection control." \
+  "Picker with .segmented for 2–5 options, or .menu for larger sets"
+
+scan_rule \
+  "native-legacy-overlay-call" \
+  '\b(inlineFeedSheetOverlay|inlineWaterSheetOverlay|inlinePoopSheetOverlay|inlineTaskEditorOverlay|healthRecordInlineOverlay|medicationInlineOverlay|playPlanInlineOverlay|addMedicationOverlay)\b' \
+  "A runtime call to a legacy inline renderer recreates native sheet behavior." \
+  ".sheet(item:), .sheet(isPresented:), .alert, .confirmationDialog, or Menu; compatibility definitions must carry a native-ui allow comment"
+
+scan_rule \
+  "native-inline-popup-mode" \
+  'isInlinePopup:\s*true' \
+  "Inline popup mode draws its own sheet chrome and transition." \
+  "Present the standard content with .sheet and use its non-inline mode"
 
 if [[ ! -s "$warnings_file" ]]; then
   echo "V4 UI audit: passed (${#files[@]} file(s))."
@@ -203,7 +239,7 @@ echo "V4 UI audit: found potential issues in ${#files[@]} file(s)."
 echo
 cat "$warnings_file"
 echo
-echo "Fix warnings or add an inline allowlist comment: // ui-v4: allow <reason>"
+echo "Fix warnings or add an inline allowlist comment: // ui-v4: allow <reason> or // native-ui: allow <reason>"
 
 if [[ "$strict" -eq 1 ]]; then
   exit 1

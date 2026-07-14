@@ -9,7 +9,11 @@ enum AppIconService {
         var errorDescription: String? {
             switch self {
             case .unsupported:
-                "This device does not support changing the app icon inside the app."
+                L10n().tr(
+                    zh: "当前设备不支持在 App 内切换图标。",
+                    en: "This device does not support changing the app icon inside the app.",
+                    de: "Dieses Gerät unterstützt das Ändern des App-Symbols in der App nicht."
+                )
             case let .system(error):
                 error.localizedDescription
             }

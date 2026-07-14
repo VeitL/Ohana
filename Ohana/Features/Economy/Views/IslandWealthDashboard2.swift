@@ -14,6 +14,7 @@ struct IslandWealthDashboardContentView: View {
     let humans: [Human]
     let walletAccounts: [CoconutAccount]
     let walletLedgerEntries: [CoconutLedgerEntry]
+    let presentation: IslandWealthDashboardPresentation
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
@@ -22,6 +23,20 @@ struct IslandWealthDashboardContentView: View {
     @State private var chartProgress: Double = 0
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    init(
+        pets: [Pet],
+        humans: [Human],
+        walletAccounts: [CoconutAccount],
+        walletLedgerEntries: [CoconutLedgerEntry],
+        presentation: IslandWealthDashboardPresentation = .standalone
+    ) {
+        self.pets = pets
+        self.humans = humans
+        self.walletAccounts = walletAccounts
+        self.walletLedgerEntries = walletLedgerEntries
+        self.presentation = presentation
+    }
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -63,15 +78,19 @@ struct IslandWealthDashboardContentView: View {
 
     var body: some View {
         ZStack {
-            OhanaAppBackground().ignoresSafeArea()
+            if presentation == .standalone {
+                OhanaAppBackground().ignoresSafeArea()
+            }
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
-                    // 顶部 navBar 占位
-                    Spacer().frame(height: navBarHeight)
+                    if presentation == .standalone {
+                        // 顶部 navBar 占位
+                        Spacer().frame(height: navBarHeight)
 
-                    // 全岛总资产
-                    totalAssetsRow
+                        // 全岛总资产
+                        totalAssetsRow
+                    }
 
                     // 时间筛选
                     timePicker
@@ -92,10 +111,15 @@ struct IslandWealthDashboardContentView: View {
                     Spacer().frame(height: 40)
                 }
                 .padding(.horizontal, 20)
+                .padding(.top, presentation == .embedded ? 12 : 0)
             }
         }
         .navigationBarHidden(true)
-        .overlay(alignment: .top) { navBar }
+        .overlay(alignment: .top) {
+            if presentation == .standalone {
+                navBar
+            }
+        }
         .onAppear {
             syncVM()
             replayChartAnimation()

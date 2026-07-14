@@ -102,23 +102,22 @@ struct WalletPetCardBack: View {
     // MARK: - Body
     var body: some View {
         ZStack {
-            MeshGradient(
-                width: 3, height: 3,
-                points: [
-                    SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
-                    SIMD2(0.0, 0.5), SIMD2(0.52, 0.38), SIMD2(1.0, 0.5),
-                    SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
-                ],
-                colors: WalletPetCardTheme.meshColors(for: pet.themeColorHex)
+            WalletMemberHeroBackground(
+                themeColorHex: pet.themeColorHex,
+                fallbackColor: Color(hex: "D95D55")
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
 
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [.black.opacity(0.18), .clear],
+                        stops: [
+                            .init(color: .black.opacity(0.56), location: 0),
+                            .init(color: .black.opacity(0.22), location: 0.46),
+                            .init(color: .black.opacity(0.34), location: 1)
+                        ],
                         startPoint: .top,
-                        endPoint: .center
+                        endPoint: .bottom
                     )
                 )
 
@@ -142,7 +141,13 @@ struct WalletPetCardBack: View {
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(.white.opacity(0.18), lineWidth: 0.5) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                .strokeBorder(
+                    WalletMemberHeroPalette(
+                        themeColorHex: pet.themeColorHex,
+                        fallbackColor: Color(hex: "D95D55")
+                    ).border,
+                    lineWidth: 1
+                )
         )
     }
 

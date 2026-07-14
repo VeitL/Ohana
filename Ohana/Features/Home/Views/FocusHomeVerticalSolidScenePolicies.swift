@@ -98,6 +98,55 @@ nonisolated enum FocusHomeVerticalSolidExpandedVerticalPlacement {
     case viewportTop(topInset: CGFloat, scrollOffsetY: CGFloat)
 }
 
+nonisolated enum VerticalSolidHomeMemberWalletScrollPolicy {
+    static let extendedLayoutMinimumCardCount = 8
+    static let bottomContentInset: CGFloat = 28
+    static let expandedCardViewportTopInset: CGFloat = 36
+    static let expandedCardHeightEstimate: CGFloat = 386
+        * FocusHomeVerticalSolidCollapsedLayoutPolicy.cardAspectRatio
+
+    static func usesExtendedLayout(cardCount: Int) -> Bool {
+        cardCount >= extendedLayoutMinimumCardCount
+    }
+
+    static func sceneHeight(
+        cardCount: Int,
+        viewportHeight: CGFloat,
+        collapsedTopInset: CGFloat
+    ) -> CGFloat {
+        guard cardCount > 0 else { return 0 }
+        let viewportHeight = max(0, viewportHeight)
+        guard usesExtendedLayout(cardCount: cardCount) else {
+            return viewportHeight
+        }
+
+        let extendedHeight = max(0, collapsedTopInset)
+            + FocusHomeVerticalSolidCollapsedLayoutPolicy.scrollExtendedMinimumSceneHeight(cardCount: cardCount)
+            + bottomContentInset
+        return max(viewportHeight, extendedHeight)
+    }
+
+    static func anchoredExpandedSceneHeight(
+        baseHeight: CGFloat,
+        selectedCardId: UUID?,
+        scrollOffsetY: CGFloat
+    ) -> CGFloat {
+        guard selectedCardId != nil else { return baseHeight }
+
+        return max(
+            baseHeight,
+            max(0, scrollOffsetY)
+                + expandedCardViewportTopInset
+                + expandedCardHeightEstimate
+                + bottomContentInset
+        )
+    }
+
+    static func scrollIsDisabled(selectedCardId: UUID?) -> Bool {
+        selectedCardId != nil
+    }
+}
+
 nonisolated enum FocusHomeVerticalSolidCollapsedLayoutPolicy {
     static let defaultVerticalBias: CGFloat = 0
     static let bottomExtendedVerticalBias: CGFloat = 0.12

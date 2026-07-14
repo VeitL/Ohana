@@ -304,7 +304,6 @@ struct HumanWishlistContentView: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.hidden)
     }
 
     // MARK: - Command Intents

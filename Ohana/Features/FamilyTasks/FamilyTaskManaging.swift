@@ -74,6 +74,7 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
         rewardCoconuts: Int,
         dueAt: Date?,
         emoji: String,
+        by editor: Human?,
         context: ModelContext
     ) -> Bool {
         FamilyTaskService.updateTask(
@@ -84,13 +85,14 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
             rewardCoconuts: rewardCoconuts,
             dueAt: dueAt,
             emoji: emoji,
+            by: editor,
             context: context
         )
     }
 
     @discardableResult
-    func delete(_ task: FamilyCollaborationTask, context: ModelContext) -> Bool {
-        FamilyTaskService.delete(task, context: context)
+    func delete(_ task: FamilyCollaborationTask, by editor: Human?, context: ModelContext) -> Bool {
+        FamilyTaskService.delete(task, by: editor, context: context)
     }
 
     @discardableResult

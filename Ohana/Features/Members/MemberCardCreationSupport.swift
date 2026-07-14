@@ -138,15 +138,14 @@ struct MemberCreationDraft: Equatable {
     var avatarImageData: Data?
     var usesPurchasedOrInventoryPass = false
 
-    var species = "dog"
+    var species = ""
     var breed = ""
     var customBreed = ""
     var isCustomBreed = false
-    var petGender = "unknown"
+    var petGender = ""
     var isNeutered = false
     var coatColor = ""
-    var eyeColor = ""
-    var hasBirthday = true
+    var hasBirthday = false
     var birthday = Calendar.current.date(byAdding: .year, value: -1, to: Date()) ?? Date()
     var hasHomeDate = false
     var homeDate = Date()
@@ -206,7 +205,6 @@ struct MemberCreationMediaRecoverySnapshot: Codable {
     var petGender: String
     var isNeutered: Bool
     var coatColor: String
-    var eyeColor: String
     var hasBirthday: Bool
     var birthday: Date
     var hasHomeDate: Bool
@@ -240,7 +238,6 @@ struct MemberCreationMediaRecoverySnapshot: Codable {
         petGender = draft.petGender
         isNeutered = draft.isNeutered
         coatColor = draft.coatColor
-        eyeColor = draft.eyeColor
         hasBirthday = draft.hasBirthday
         birthday = draft.birthday
         hasHomeDate = draft.hasHomeDate
@@ -270,10 +267,9 @@ struct MemberCreationMediaRecoverySnapshot: Codable {
         draft.breed = breed
         draft.customBreed = customBreed
         draft.isCustomBreed = isCustomBreed
-        draft.petGender = petGender
+        draft.petGender = ["boy", "girl"].contains(petGender) ? petGender : ""
         draft.isNeutered = isNeutered
         draft.coatColor = coatColor
-        draft.eyeColor = eyeColor
         draft.hasBirthday = hasBirthday
         draft.birthday = birthday
         draft.hasHomeDate = hasHomeDate
@@ -315,8 +311,11 @@ struct MemberCardRenderSnapshot {
 
 enum MemberCreationStep: String, Identifiable, Hashable {
     case basicInfo
-    case petProfile
+    case petName
+    case petIdentity
+    case petAppearance
     case avatar
+    case petPersonality
     case theme
 
     var id: String { rawValue }
@@ -326,7 +325,7 @@ enum MemberCreationStep: String, Identifiable, Hashable {
         case .human:
             [.basicInfo, .avatar, .theme]
         case .pet:
-            [.basicInfo, .petProfile, .avatar, .theme]
+            [.petName, .petIdentity, .petAppearance, .avatar, .petPersonality]
         }
     }
 
@@ -334,10 +333,16 @@ enum MemberCreationStep: String, Identifiable, Hashable {
         switch self {
         case .basicInfo:
             l.tr(zh: "基础信息", en: "Basic info", de: "Basisdaten")
-        case .petProfile:
-            l.tr(zh: "品种与性格", en: "Breed & vibe", de: "Rasse & Charakter")
+        case .petName:
+            l.tr(zh: "名字", en: "Name", de: "Name")
+        case .petIdentity:
+            l.tr(zh: "物种与品种", en: "Species & breed", de: "Art & Rasse")
+        case .petAppearance:
+            l.tr(zh: "外观", en: "Appearance", de: "Aussehen")
         case .avatar:
             l.tr(zh: "头像", en: "Avatar", de: "Avatar")
+        case .petPersonality:
+            l.tr(zh: "性格", en: "Personality", de: "Charakter")
         case .theme:
             l.tr(zh: "主题色", en: "Theme color", de: "Themenfarbe")
         }

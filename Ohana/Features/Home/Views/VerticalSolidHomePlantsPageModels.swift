@@ -91,30 +91,6 @@ enum VerticalSolidHomePlantWalletScrollPolicy {
     }
 }
 
-nonisolated enum VerticalSolidHomeBottomChromeScrollPolicy {
-    static let hideThreshold: CGFloat = 24
-    static let showAtTopThreshold: CGFloat = 6
-
-    static func hidesBottomChrome(scrollOffset: CGFloat, currentHidden: Bool) -> Bool {
-        if scrollOffset > hideThreshold {
-            return true
-        }
-        if scrollOffset <= showAtTopThreshold {
-            return false
-        }
-        return currentHidden
-    }
-}
-
-nonisolated enum VerticalSolidHomePlantScrollChromePolicy {
-    static func hidesBottomChrome(scrollOffset: CGFloat, currentHidden: Bool) -> Bool {
-        VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome(
-            scrollOffset: scrollOffset,
-            currentHidden: currentHidden
-        )
-    }
-}
-
 nonisolated enum VerticalSolidHomePlantRoomRailPolicy {
     static func shouldShow(plantCount: Int, selectedCardId: UUID?, heroDirection: Int) -> Bool {
         plantCount > 0 && selectedCardId == nil && heroDirection == 0

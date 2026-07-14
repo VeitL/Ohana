@@ -3,7 +3,7 @@
 Status: Draft for App Store review notes, in-app rationale copy, and
 `Info.plist` usage-description review.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-12
 
 ## Current Permission Inventory
 
@@ -15,7 +15,7 @@ Last updated: 2026-07-10
 | Location Always | `NSLocationAlwaysAndWhenInUseUsageDescription`, `requestAlwaysAuthorization()` | User upgrades while walk background tracking is needed | Continue recording the current walk route when Ohana is backgrounded or the screen is locked. |
 | Notifications | `UNUserNotificationCenter.requestAuthorization` | User creates reminder/care/medication notification flows | Deliver local reminders and allow notification actions such as Done, Skip, or Tomorrow. |
 | Face ID / Biometrics | `NSFaceIDUsageDescription`, `LAContext.evaluatePolicy` | User enables or uses member-gate biometrics | Let the device verify the current user as a shortcut to a local member PIN. Ohana receives only success/failure. |
-| Apple Health / HealthKit | `NSHealthShareUsageDescription`, `HKHealthStore.requestAuthorization` | User taps the Apple Health setup action in Human Workout | Read steps, walking/running distance, active energy, Activity Summary, and workouts for the selected Human's local workout summary/import. |
+| Apple Health / HealthKit | `NSHealthShareUsageDescription`, `HKHealthStore.requestAuthorization` | User taps the Apple Health setup action in Human Workout | Read steps, walking/running distance, active energy, exercise and stand time, Activity Summary goals, and workouts for the selected Human's read-only local summary. |
 | iCloud Drive backup | iCloud ubiquity entitlement and `ICloudDriveAutomaticBackupFileStore` | Automatic backup is enabled or user taps Back Up Now | Save a backup file to the user's own iCloud Drive container. Developer does not receive it. |
 | Remote notifications / CloudKit | Not declared by the Solo capability profile; dormant CloudKit code remains | Not reachable in the Solo release | Future-only. Adding APNs, `remote-notification`, CloudKit sharing, or remote sync requires an explicit capability change, policy update, and release validation. |
 
@@ -156,15 +156,15 @@ Review rationale:
 
 Current Chinese:
 
-> 用于在你主动连接 Apple Health 时读取步数、距离、活动能量和运动记录，并在本机生成此成员的运动摘要。
+> 用于在你主动设置 Apple Health 时读取步数、距离、活动能量、锻炼与站立时间、活动目标和运动记录，并在本机显示此成员的健康摘要。
 
 Recommended Chinese:
 
-> 用于在你主动连接 Apple Health 时读取步数、距离、活动能量和运动记录，并在本机生成此成员的运动摘要。
+> 用于在你主动设置 Apple Health 时读取步数、距离、活动能量、锻炼与站立时间、活动目标和运动记录，并在本机显示此成员的健康摘要。
 
 Recommended English:
 
-> Used when you connect Apple Health to read steps, distance, active energy, and workouts for this member's local summary.
+> Used when you set up Apple Health to read steps, distance, active energy, exercise and stand time, activity goals, and workouts for this member's local summary.
 
 Review rationale:
 
@@ -172,8 +172,10 @@ Review rationale:
   action.
 - V1 is read-only: Ohana declares `NSHealthShareUsageDescription` and does not
   declare `NSHealthUpdateUsageDescription`.
-- HealthKit daily activity is shown as a page snapshot; only workouts the user
-  imports are saved into the local Human workout log.
+- HealthKit daily activity and recent workouts are queried and shown as
+  read-only page data. They are not copied into the local Human workout log.
+- Ohana manual workouts remain local records. Existing external-source copies
+  created by older builds are preserved as fallback and are not exported.
 - Ohana does not send Apple Health data to the developer.
 
 ### iCloud Drive Backup
@@ -205,12 +207,12 @@ Suggested short review note for the current release:
 > Ohana is local-first and does not send user data to the developer. Camera,
 > photo, location, local notification, Face ID, Apple Health read access, and iCloud
 > Drive backup features are user initiated. Apple Health access is read-only and
-> used for the selected Human's local workout summary/import. Location Always is
-> used only during an active walk to continue recording the route in the
+> used to show the selected Human's local workout summary and history. Location
+> Always is used only during an active walk to continue recording the route in the
 > background. Family CloudKit collaboration code is gated off in the current
 > release by `OnlineFeatureGate.allows(.onlineCollaboration) == false`. The Solo
 > target does not declare APNs, the `remote-notification` background mode, or a
-> CloudKit service entitlement.
+> CloudKit service entitlement or Sign in with Apple capability.
 
 ## Must Not Claim Yet
 
@@ -219,7 +221,9 @@ Do not claim the following until implemented and revalidated:
 - Production CloudKit family sync. The code exists, but the current gate is
   false, the Solo capability profile does not declare the required capabilities,
   and real-device CloudKit validation is still deferred.
-- Developer-hosted account sync, analytics, support upload, or crash-report data
+- Developer-hosted accounts, account sync, or uploads of health, care, route,
+  note, photo, document, PIN, or economy-ledger data.
+- Analytics, advertising, tracking, support upload, or third-party crash-report
   collection.
 
 ## Release Checklist
@@ -234,8 +238,9 @@ Do not claim the following until implemented and revalidated:
   with the default Chinese `Info.plist` wording.
 - `docs/privacy-policy.md` is published at the Settings privacy-policy URL
   before App Store submission.
-- App Store Connect privacy answers are updated if CloudKit sync, analytics,
-  tracking, support upload, or any third-party SDK data collection is enabled.
+- App Store Connect privacy answers are updated if an account backend, CloudKit
+  sync, analytics, tracking, support upload, or any third-party SDK data
+  collection is enabled.
 
 ## Sources Used For This Draft
 

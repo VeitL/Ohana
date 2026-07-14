@@ -198,12 +198,35 @@ struct AppBackgroundPickerSheet: View {
                 customPhotoPairHalf(image: image, isDarkPreview: false)
                 customPhotoPairHalf(image: image, isDarkPreview: true)
             }
+        } else if let assetName = style.imageAssetName {
+            HStack(spacing: 0) {
+                officialImagePairHalf(assetName, scheme: .light, label: l.tr(zh: "浅", en: "Light", de: "Hell"))
+                officialImagePairHalf(assetName, scheme: .dark, label: l.tr(zh: "深", en: "Dark", de: "Dunkel"))
+            }
         } else {
             HStack(spacing: 0) {
                 officialPairHalf(style, scheme: .light, label: l.tr(zh: "浅", en: "Light", de: "Hell"))
                 officialPairHalf(style, scheme: .dark, label: l.tr(zh: "深", en: "Dark", de: "Dunkel"))
             }
         }
+    }
+
+    private func officialImagePairHalf(_ assetName: String, scheme: ColorScheme, label: String) -> some View {
+        Image(assetName)
+            .resizable()
+            .scaledToFill()
+            .environment(\.colorScheme, scheme)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+            .overlay(alignment: .bottomLeading) {
+                Text(label)
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(scheme == .dark ? Color(hex: "F8FAFC").opacity(0.82) : Color(hex: "26364D").opacity(0.72))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background((scheme == .dark ? Color(hex: "0B1020") : Color(hex: "F8FAFC")).opacity(0.18), in: Capsule())
+                    .padding(7)
+            }
     }
 
     private func officialPairHalf(_ style: AppBackgroundStyle, scheme: ColorScheme, label: String) -> some View {

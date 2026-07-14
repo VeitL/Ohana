@@ -9,6 +9,235 @@ import SwiftData
 import SwiftUI
 import UIKit
 
+// MARK: - Member Hero Card (Figma theme atmosphere + native glass)
+
+/// Shared semantic palette for pet, human, and plant identity cards.
+/// The member theme stays concentrated in the middle of the card; the top is
+/// deliberately near-white and the bottom deliberately near-black so text
+/// contrast is location-based instead of inferred from theme luminance.
+struct WalletMemberHeroPalette {
+    let highlight: Color
+    let light: Color
+    let accent: Color
+    let deep: Color
+    let ink: Color
+
+    init(themeColorHex: String, fallbackColor: Color) {
+        let normalized = themeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+        let theme = normalized.isEmpty ? fallbackColor : Color(hex: normalized)
+        highlight = theme.mix(with: .white, by: 0.92)
+        light = theme.mix(with: .white, by: 0.58)
+        accent = theme
+        deep = theme.mix(with: .black, by: 0.56)
+        ink = theme.mix(with: .black, by: 0.94)
+    }
+
+    var border: Color {
+        Color.goCardWhite.opacity(0.30)
+    }
+}
+
+/// One native glass surface sits beneath one static Canvas that reproduces the
+/// five oversized theme light fields from the approved Figma Member Hero Card.
+/// This keeps the identity card visibly refractive without stacking five live
+/// blur views in scrolling and hero-motion surfaces.
+struct WalletMemberHeroBackground: View {
+    let themeColorHex: String
+    var fallbackColor: Color = Color(hex: "D95D55")
+    var reducesEffects = false
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var palette: WalletMemberHeroPalette {
+        WalletMemberHeroPalette(themeColorHex: themeColorHex, fallbackColor: fallbackColor)
+    }
+
+    var body: some View {
+        if reducesEffects || reduceTransparency {
+            opaqueFallback
+        } else {
+            ZStack {
+                Rectangle()
+                    .fill(.clear)
+                    .glassEffect(
+                        .regular
+                            .tint(palette.accent.opacity(colorScheme == .dark ? 0.18 : 0.11))
+                            .interactive(false),
+                        in: Rectangle()
+                    )
+
+                themeAtmosphere
+
+                LinearGradient(
+                    stops: [
+                        .init(color: Color.goCardWhite.opacity(colorScheme == .dark ? 0.24 : 0.42), location: 0.00),
+                        .init(color: Color.clear, location: 0.38),
+                        .init(color: Color.arkInk.opacity(colorScheme == .dark ? 0.18 : 0.10), location: 1.00)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
+    }
+
+    private var opaqueFallback: some View {
+        LinearGradient(
+            stops: [
+                .init(color: palette.highlight, location: 0.00),
+                .init(color: palette.light, location: 0.27),
+                .init(color: palette.accent, location: 0.49),
+                .init(color: palette.deep, location: 0.69),
+                .init(color: palette.ink, location: 1.00)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    private var themeAtmosphere: some View {
+        Canvas(opaque: false, colorMode: .extendedLinear, rendersAsynchronously: false) { context, size in
+            context.fill(
+                Path(CGRect(origin: .zero, size: size)),
+                with: .color(palette.highlight.opacity(colorScheme == .dark ? 0.62 : 0.74))
+            )
+
+            drawLightField(
+                context: context,
+                size: size,
+                rect: CGRect(x: -0.129, y: 0.115, width: 1.261, height: 1.767),
+                top: Color.goCardWhite.opacity(0.76),
+                bottom: palette.light.opacity(0.74),
+                bottomLocation: 0.45
+            )
+            drawLightField(
+                context: context,
+                size: size,
+                rect: CGRect(x: -0.043, y: 0.316, width: 1.086, height: 1.523),
+                top: palette.light.opacity(0.72),
+                bottom: palette.accent.opacity(0.78),
+                bottomLocation: 0.146467
+            )
+            drawLightField(
+                context: context,
+                size: size,
+                rect: CGRect(x: 0.096, y: 0.338, width: 0.807, height: 1.273),
+                top: palette.light.opacity(0.66),
+                bottom: palette.accent.opacity(0.72),
+                bottomLocation: 0.226293
+            )
+            drawLightField(
+                context: context,
+                size: size,
+                rect: CGRect(x: 0.179, y: 0.383, width: 0.643, height: 1.011),
+                top: palette.accent.opacity(0.72),
+                bottom: palette.deep.opacity(0.80),
+                bottomLocation: 0.226293
+            )
+            drawLightField(
+                context: context,
+                size: size,
+                rect: CGRect(x: -0.286, y: 0.633, width: 1.564, height: 1.523),
+                top: palette.deep.opacity(0.78),
+                bottom: palette.ink.opacity(0.88),
+                bottomLocation: 0.146467
+            )
+        }
+    }
+
+    private func drawLightField(
+        context: GraphicsContext,
+        size: CGSize,
+        rect normalizedRect: CGRect,
+        top: Color,
+        bottom: Color,
+        bottomLocation: CGFloat
+    ) {
+        let rect = CGRect(
+            x: normalizedRect.minX * size.width,
+            y: normalizedRect.minY * size.height,
+            width: normalizedRect.width * size.width,
+            height: normalizedRect.height * size.height
+        )
+        var layer = context
+        layer.addFilter(.blur(radius: max(24, size.width * 0.125)))
+        layer.fill(
+            Path(ellipseIn: rect),
+            with: .linearGradient(
+                Gradient(stops: [
+                    .init(color: top, location: 0),
+                    .init(color: bottom, location: min(max(bottomLocation, 0.01), 1))
+                ]),
+                startPoint: CGPoint(x: rect.midX, y: rect.minY),
+                endPoint: CGPoint(x: rect.midX, y: rect.maxY)
+            )
+        )
+    }
+}
+
+/// Plant-card surface based on Figma's "Light Blue Card" reference.
+/// The caller owns the card's existing size and corner radius; this view only
+/// supplies one noninteractive native glass layer plus the cool-white tint.
+struct WalletPlantLightBlueGlassBackground: View {
+    var reducesEffects = false
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+
+    static let rimColor = Color.goCardWhite.opacity(0.92)
+    static let rimWidth: CGFloat = 3
+
+    var body: some View {
+        if reducesEffects || reduceTransparency {
+            opaqueFallback
+        } else {
+            ZStack {
+                Rectangle()
+                    .fill(.clear)
+                    .glassEffect(
+                        .regular
+                            .tint(Color(hex: "DCEEFF").opacity(colorScheme == .dark ? 0.24 : 0.18))
+                            .interactive(false),
+                        in: Rectangle()
+                    )
+
+                LinearGradient(
+                    stops: [
+                        .init(color: Color.goCardWhite.opacity(colorScheme == .dark ? 0.48 : 0.62), location: 0.00),
+                        .init(color: Color(hex: "F4F5F7").opacity(colorScheme == .dark ? 0.56 : 0.68), location: 0.46),
+                        .init(color: Color(hex: "DCEEFF").opacity(colorScheme == .dark ? 0.42 : 0.50), location: 1.00)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                RadialGradient(
+                    colors: [
+                        Color.goCardWhite.opacity(colorScheme == .dark ? 0.20 : 0.34),
+                        Color.clear
+                    ],
+                    center: .topLeading,
+                    startRadius: 0,
+                    endRadius: 260
+                )
+            }
+        }
+    }
+
+    private var opaqueFallback: some View {
+        LinearGradient(
+            colors: [
+                Color.goCardWhite,
+                Color(hex: "F4F5F7"),
+                Color(hex: "DCEEFF")
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 // MARK: - 钱包卡右侧可读性叠层（材质模糊 + 压暗；全幅绘制 + 软 mask，避免中间竖向硬分界）
 
 struct WalletCardTrailingReadabilityOverlay: View {
@@ -115,13 +344,15 @@ struct WalletCardVerticalPhotoBlendLayer: View {
     let themeColorHex: String
     var shadowDepth: Double = 1
 
-    private var themeTop: Color {
-        WalletPetCardTheme.gradientPair(for: themeColorHex).0
+    private var palette: WalletMemberHeroPalette {
+        WalletMemberHeroPalette(
+            themeColorHex: themeColorHex,
+            fallbackColor: Color(hex: "D95D55")
+        )
     }
 
-    private var themeBottom: Color {
-        WalletPetCardTheme.gradientPair(for: themeColorHex).1
-    }
+    private var themeTop: Color { palette.light }
+    private var themeBottom: Color { palette.ink }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -233,7 +464,6 @@ struct WalletPetCardDraftFront: View {
     var decodedAvatar: UIImage?
     var decodedAvatarIsTransparent: Bool = false
     var coatColor: Color
-    var eyeColor: Color
     var coatPatternName: String?
     var hasBirthday: Bool
     /// 与 `Pet.ageText` 风格一致的一句年龄（空则脚注省略年龄）
@@ -243,11 +473,6 @@ struct WalletPetCardDraftFront: View {
     /// 与主题色选择同步的卡面渐变（与 `Pet.themeColorHex` 一致）
     var themeColorHex: String
     let cornerRadius: CGFloat
-
-    private let accent = Color(hex: "FF5A3D")
-
-    private var cardGradientTop: Color { WalletPetCardTheme.gradientPair(for: themeColorHex).0 }
-    private var cardGradientBottom: Color { WalletPetCardTheme.gradientPair(for: themeColorHex).1 }
 
     private var headlineText: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -281,34 +506,31 @@ struct WalletPetCardDraftFront: View {
             }()
             let hasPopout = isTransparent && avatarImage != nil
             let usesFullBleedPhoto = avatarImage != nil && !isTransparent
-            let useDarkText = !usesFullBleedPhoto && WalletPetCardTheme.prefersDarkForeground(for: themeColorHex)
-            let primaryText = useDarkText ? Color.arkInk : Color.goCardWhite
-            let secondaryText = primaryText.opacity(useDarkText ? 0.72 : 0.70)
+            let headlineTextColor = usesFullBleedPhoto ? Color.goCardWhite : Color.arkInk
+            let primaryText = Color.goCardWhite
+            let secondaryText = primaryText.opacity(0.72)
+            let memberPalette = WalletMemberHeroPalette(
+                themeColorHex: themeColorHex,
+                fallbackColor: Color(hex: "D95D55")
+            )
 
             ZStack {
-                MeshGradient(
-                    width: 3, height: 3,
-                    points: [
-                        SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
-                        SIMD2(0.0, 0.5), SIMD2(0.52, 0.38), SIMD2(1.0, 0.5),
-                        SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
-                    ],
-                    colors: WalletPetCardTheme.meshColors(for: themeColorHex)
+                WalletMemberHeroBackground(
+                    themeColorHex: themeColorHex,
+                    fallbackColor: Color(hex: "D95D55")
                 )
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                .clear,
-                                useDarkText
-                                    ? Color.goCardWhite.opacity(0.20)
-                                    : Color.arkInk.opacity(usesFullBleedPhoto ? 0.12 : 0.22)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
+
+                if usesFullBleedPhoto {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [.clear, Color.arkInk.opacity(0.18)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                         )
-                    )
+                }
 
                 if let img = avatarImage, !isTransparent {
                     WalletCardAdaptivePhotoLayer(image: img, width: w, height: h, mode: .compact)
@@ -317,7 +539,7 @@ struct WalletPetCardDraftFront: View {
 
                 Text(headlineText)
                     .font(.system(size: WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: headlineText.count), weight: .black, design: .rounded))
-                    .foregroundStyle(accent.opacity(0.85))
+                    .foregroundStyle(headlineTextColor.opacity(0.90))
                     .lineLimit(1)
                     .minimumScaleFactor(0.22)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -345,7 +567,7 @@ struct WalletPetCardDraftFront: View {
 
                     Text("Days Together")
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(primaryText.opacity(useDarkText ? 0.82 : 0.92))
+                        .foregroundStyle(primaryText.opacity(0.82))
 
                     Text(footnote)
                         .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .rounded))
@@ -364,7 +586,7 @@ struct WalletPetCardDraftFront: View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.goCardWhite.opacity(0.15), lineWidth: 0.5)
+                    .strokeBorder(memberPalette.border, lineWidth: 1)
             )
         }
     }
@@ -394,7 +616,6 @@ struct WalletPetCardDraftFront: View {
                 PetSilhouetteView(
                     species: Pet.canonicalSpeciesKey(species),
                     coatColor: coatColor,
-                    eyeColor: eyeColor,
                     patternName: coatPatternName,
                     isAnimationEnabled: false
                 )

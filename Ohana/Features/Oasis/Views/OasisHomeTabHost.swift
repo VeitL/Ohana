@@ -29,6 +29,7 @@ struct OasisHomeTabHost: View {
     let treeSnapshot: OasisTreeRenderSnapshot
     let injectEnergyTrigger: Int
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+    var onInjectEnergy: () -> Void = {}
     var onOpenShop: (ShopItem.ShopCategory) -> Void = { _ in }
 
     @State private var showsTreeContent = false
@@ -59,6 +60,7 @@ struct OasisHomeTabHost: View {
             } else if rendersFrozenTree {
                 VerticalSolidHomeOasisFrozenTreeStage(
                     snapshot: treeSnapshot,
+                    onInjectEnergy: onInjectEnergy,
                     onOpenShop: onOpenShop
                 )
             } else {

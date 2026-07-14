@@ -39,6 +39,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
             isEditMode: isEditMode,
             jiggle: jiggle,
             shouldReduceWork: reduceMotion || workloadPolicy.interactionMotionBudget(isVisible: true) != .full,
+            accentColor: Color(hex: card.themeColorHex),
             forcesSubmenusBelow: false,
             draggingItemId: $draggingItemId,
             onToggleEdit: toggleEditMode,

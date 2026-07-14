@@ -52,29 +52,22 @@ struct VerticalSolidHomeView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.scenePhase) var scenePhase
     @ObservedObject var workloadPolicy = AppWorkloadPolicy.shared
 
     @State var headerContextCardId: UUID?
-    @State var fabExpanded = false
-    @State var fabMenuItemsVisible = false
-    @State var plantBottomChromeHidden = false
-    @State var calendarBottomChromeHidden = false
+    @State var taskCenterBadge = TaskCenterBadgeSnapshot.empty
     @State var calendarAddEventTrigger = 0
     @State var embeddedCalendarPreselectedPetId: String?
     @State var embeddedCalendarPreselectedHumanId: String?
     @State var isCalendarAddEventPresented = false
-    @State var calendarAddEventProgress: CGFloat = 0
     @State var embeddedCalendarPlants: [Plant] = []
     @State var calendarAddEventPlants: [Plant] = []
-    @State var isCalendarAddEventContentMounted = false
-    @State var calendarAddEventPresentationTask: Task<Void, Never>?
-    @State var calendarAddEventContentMountTask: Task<Void, Never>?
     @State var oasisInjectEnergyTrigger = 0
     @State var oasisEnergyInjectionTask: Task<Void, Never>?
     @State var pendingOasisEnergyInjectionCount = 0
     @State var avatarCacheRevision = 0
-    @State var headerStreak = 0
     @State var isHomeCardExpandedOrTransitioning = false
     @State var isHomeCardHeroAnimating = false
     @State var homeCardHeroProgress: CGFloat = 0
@@ -216,11 +209,6 @@ struct VerticalSolidHomeView: View {
         return card
     }
 
-    var expandedBottomBarShortcuts: [ExpandedCardFabShortcut] {
-        guard let card = expandedBottomBarCard else { return [] }
-        return expandedFabShortcuts(for: card)
-    }
-
     var headerCoconutBalance: Int {
         headerContextCard?.coconutBalance ?? islandCoconutBalance
     }
@@ -239,15 +227,20 @@ struct VerticalSolidHomeView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let safeTop = safeAreaController.resolvedTop(in: proxy)
+            let globalFrame = proxy.frame(in: .global)
+            let backgroundViewportTopOffset = max(0, globalFrame.minY)
+            let backgroundViewportSize = ScreenCompat.bounds.size
+            let safeTop: CGFloat = 0
             let safeBottom = safeAreaController.resolvedBottom(in: proxy)
-            let headerTopGap: CGFloat = 8
-            let headerContentHeight: CGFloat = 30
+            let headerTopGap: CGFloat = 0
+            let headerContentHeight: CGFloat = 0
             let focusTopGap: CGFloat = 2
-            let todayFocusHeight = min(
-                TodayFocusCardLayout.homeChromeMaxHeight,
-                max(TodayFocusCardLayout.homeChromeMinHeight, proxy.size.height * TodayFocusCardLayout.homeChromeHeightRatio)
-            )
+            let todayFocusHeight = dynamicTypeSize.isAccessibilitySize
+                ? min(220, max(196, proxy.size.height * 0.24))
+                : min(
+                    TodayFocusCardLayout.homeChromeMaxHeight,
+                    max(TodayFocusCardLayout.homeChromeMinHeight, proxy.size.height * TodayFocusCardLayout.homeChromeHeightRatio)
+                )
             let focusHeight = todayFocusHeight
             let contentTopGap: CGFloat = 4
             let compactContentGap: CGFloat = 8
@@ -278,11 +271,9 @@ struct VerticalSolidHomeView: View {
                 topChromeHeight: topChromeHeight,
                 bottomChromeHeight: bottomHeight
             )
-            let bottomChromeHidden = (plantBottomChromeHidden && controller.selectedTab == .plants)
-                || (calendarBottomChromeHidden && controller.selectedTab == .calendar)
 
             ZStack(alignment: .top) {
-                OhanaAppBackground()
+                OhanaStaticAppBackground()
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
 
@@ -292,7 +283,11 @@ struct VerticalSolidHomeView: View {
                     preparingTab: controller.preparingTab,
                     preparedTabs: controller.preparedTabs,
                     visibleTabs: AppFeatureRouteGuard.visibleHomeTabs(currentLevel: treeManager.treeLevel.rawValue),
-                    canAnimate: canAnimate
+                    taskCenterBadge: taskCenterBadge,
+                    localization: l,
+                    backgroundViewportSize: backgroundViewportSize,
+                    backgroundViewportTopOffset: backgroundViewportTopOffset,
+                    onSelect: selectTab
                 ) { lifecycle in
                     VerticalSolidHomeDashboardPage(
                         snapshot: controller.snapshot,
@@ -315,16 +310,16 @@ struct VerticalSolidHomeView: View {
                         onQuickActionForCard: openQuickActionItem,
                         onQuickActionOptionForCard: openQuickActionOption,
                         onQuickActionLimitReached: { routeCoordinator.showQuickActionLimit() },
-                        onExpandedCardCollapseIntent: dismissExpandedFabBeforeCardCollapse,
+                        onExpandedCardCollapseIntent: { false },
                         onWalkCardMinimizeToFloatingControl: minimizeWalkCardToFloatingControl,
                         onAddFirstPet: { routeCoordinator.openAddEntity(.pet) }
                     )
                 } calendar: { lifecycle in
-                    CalendarRouteContainer(
+                    TaskCenterRouteContainer(
+                        presentation: .embeddedHome,
+                        initialSurface: .tasks,
                         preselectedPetId: embeddedCalendarPreselectedPetId,
                         preselectedHumanId: embeddedCalendarPreselectedHumanId,
-                        hideToolbar: true,
-                        showsEmbeddedControls: true,
                         addEventTrigger: calendarAddEventTrigger,
                         isEmbeddedPrepared: lifecycle.isPrepared,
                         isEmbeddedVisible: lifecycle.isVisible,
@@ -333,10 +328,13 @@ struct VerticalSolidHomeView: View {
                         onPlantsLoaded: { plants in
                             embeddedCalendarPlants = plants
                         },
-                        onEmbeddedScrollOffsetChange: updateCalendarBottomChromeVisibility,
                         onOpenEventDestination: openCalendarEventDestination,
                         onPresentCoconutLog: { subject in
                             onPresentCoconutLog(subject)
+                        },
+                        onBadgeChange: { badge in
+                            guard taskCenterBadge != badge else { return }
+                            taskCenterBadge = badge
                         }
                     )
                     .padding(.top, 4)
@@ -361,6 +359,7 @@ struct VerticalSolidHomeView: View {
                         ),
                         injectEnergyTrigger: oasisInjectEnergyTrigger,
                         onPresentCoconutLog: onPresentCoconutLog,
+                        onInjectEnergy: injectEmbeddedOasisEnergy,
                         onOpenShop: { category in
                             routeCoordinator.openCoconutShop(category, currentLevel: treeLevel)
                         }
@@ -370,12 +369,11 @@ struct VerticalSolidHomeView: View {
                         plants: controller.snapshot.plants,
                         localization: l,
                         plantQuickActionItemsRaw: $plantQuickActionItemsRaw,
-                        hidesBottomChrome: $plantBottomChromeHidden,
                         pendingQuickCareKeys: pendingPlantQuickCareKeys,
                         completedQuickCareKeys: completedPlantQuickCareKeys,
                         failedQuickCareKeys: failedPlantQuickCareKeys,
                         topChromeHeight: topChromeHeight,
-                        bottomChromeHeight: bottomHeight,
+                        bottomChromeHeight: 0,
                         arrivingPlantCardId: arrivingPlantCardId,
                         onOpenPlant: openPlant,
                         onOpenFeature: { plant, destination in
@@ -406,7 +404,8 @@ struct VerticalSolidHomeView: View {
                         onTapNegativeSignal: openTodayFocusNegativeSignal,
                         onTapFamilyTask: openTodayFocusFamilyTask,
                         onOpenExchange: openTodayFocusExchange,
-                        onConfirmExchange: confirmTodayFocusExchange
+                        onConfirmExchange: confirmTodayFocusExchange,
+                        onViewAllTasks: { selectTab(.calendar) }
                     )
                     .padding(.horizontal, 8)
                     .frame(width: proxy.size.width, height: todayFocusHeight, alignment: .top)
@@ -421,55 +420,6 @@ struct VerticalSolidHomeView: View {
                     .zIndex(8)
                 }
 
-                FocusHomeHeaderView(
-                    safeTop: safeTop,
-                    topGap: headerTopGap,
-                    contentHeight: headerContentHeight,
-                    streak: headerStreak,
-                    coconutBalance: headerCoconutBalance,
-                    coconutDeltaContext: headerCoconutDeltaContext,
-                    activeHumanDisplayName: activeHumanDisplayName,
-                    activeHumanAvatarImage: activeHumanAvatarImage,
-                    activeHumanAvatarEmoji: activeHumanAvatarEmoji,
-                    onStreak: { routeCoordinator.openStreakDetail() },
-                    onCoconut: openHeaderCoconutDestination,
-                    onCrew: { routeCoordinator.openCrewRoster() },
-                    onAccountSwitcher: { routeCoordinator.openAccountSwitcher() },
-                    onCalendar: { controller.select(.calendar) },
-                    onSettings: { routeCoordinator.openSettings() }
-                )
-                .contentShape(Rectangle())
-                .zIndex(10)
-
-                VerticalSolidHomeBottomBar(
-                    selectedTab: controller.selectedTab,
-                    isFabExpanded: $fabExpanded,
-                    itemsVisible: $fabMenuItemsVisible,
-                    activeCard: expandedBottomBarCard,
-                    homeShortcuts: HomeFabShortcutCatalog.primaryShortcuts(l: l),
-                    plantShortcuts: HomeFabShortcutCatalog.plantShortcuts(
-                        l: l,
-                        dueTaskCount: controller.snapshot.plants.count(where: \.needsCare)
-                    ),
-                    expandedShortcuts: expandedBottomBarShortcuts,
-                    safeBottom: safeBottom,
-                    treeLevel: treeManager.treeLevel.rawValue,
-                    treeProgress: treeManager.progressToNextLevel,
-                    canAnimate: canAnimate,
-                    localization: l,
-                    onSelect: selectTab,
-                    onHomeShortcut: openHomeFabShortcut,
-                    onExpandedShortcut: openExpandedFabShortcut,
-                    onCenter: centerAction
-                )
-                .offset(y: bottomChromeHidden ? max(126, safeBottom + 108) : 0)
-                .opacity(bottomChromeHidden ? 0 : 1)
-                .allowsHitTesting(!bottomChromeHidden)
-                .accessibilityHidden(bottomChromeHidden)
-                .animation(canAnimate ? GoMotion.page : GoMotion.reduced, value: bottomChromeHidden)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .zIndex(9)
-
                 if shouldShowStarterOasisTabPrompt {
                     StarterOasisTabPromptView(localization: l)
                         .padding(.horizontal, 18)
@@ -478,17 +428,6 @@ struct VerticalSolidHomeView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .zIndex(12)
                         .allowsHitTesting(false)
-                }
-
-                if isCalendarAddEventPresented || calendarAddEventProgress > 0.001 {
-                    OhanaDeferredInlinePageCover(
-                        progress: calendarAddEventProgress,
-                        isContentMounted: isCalendarAddEventContentMounted,
-                        reservesSafeArea: false
-                    ) {
-                        AddEventView(onClose: closeCalendarAddEvent, plants: calendarAddEventPlants)
-                    }
-                    .zIndex(40)
                 }
 
                 if let growthLoopPulseStatus {
@@ -531,8 +470,27 @@ struct VerticalSolidHomeView: View {
                 safeAreaController.stabilize(from: proxy)
             }
         }
-        .ignoresSafeArea(.container, edges: [.top, .bottom])
-        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $isCalendarAddEventPresented, onDismiss: completeCalendarAddEventDismissal) {
+            AddEventView(onClose: closeCalendarAddEvent, plants: calendarAddEventPlants)
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar {
+            FocusHomeToolbar(
+                selectedTab: controller.selectedTab,
+                coconutBalance: headerCoconutBalance,
+                activeHumanDisplayName: activeHumanDisplayName,
+                primaryActionIcon: homeToolbarPrimaryActionIcon,
+                primaryActionAccessibilityLabel: homeToolbarPrimaryActionAccessibilityLabel,
+                localization: l,
+                onCoconut: openHeaderCoconutDestination,
+                onPrimaryAction: performHomeToolbarPrimaryAction,
+                onOpenPlantData: { openFunctionMenu(destination: .plantFeatureCollection) },
+                onCrew: { routeCoordinator.openCrewRoster() },
+                onAccountSwitcher: { routeCoordinator.openAccountSwitcher() },
+                onSettings: { routeCoordinator.openSettings() }
+            )
+        }
         .onAppear {
             scheduleHomeAppearHandoff()
             scheduleMemberMediaAttachmentIndexRepair()
@@ -557,8 +515,6 @@ struct VerticalSolidHomeView: View {
             homeAppearHandoffTask?.cancel()
             homeAppearHandoffTask = nil
             clearArrivalState()
-            calendarAddEventPresentationTask?.cancel()
-            calendarAddEventContentMountTask?.cancel()
             growthOnboardingTask?.cancel()
             growthUnlockToastPresentationTask?.cancel()
             growthUnlockToastDismissTask?.cancel()
@@ -616,41 +572,6 @@ struct VerticalSolidHomeView: View {
                 startWalkFromQuickAction(petID: petID)
             }
         )
-        .onChange(of: activeHumanIdRaw) { _, _ in
-            refreshHeaderStreak()
-        }
-        .onChange(of: controller.selectedTab) { _, _ in
-            closeVerticalFabMenu(immediate: true)
-            if plantBottomChromeHidden {
-                withAnimation(canAnimate ? GoMotion.quick : GoMotion.reduced) {
-                    plantBottomChromeHidden = false
-                }
-            }
-            if calendarBottomChromeHidden {
-                resetCalendarBottomChromeForTabSelection()
-            }
-        }
-        .onChange(of: starterGiftCeremonySeen) { _, _ in
-            closeVerticalFabMenu(immediate: true)
-        }
-        .onReceive(routeCoordinator.$sheet) { sheet in
-            if sheet != nil {
-                closeVerticalFabMenu(immediate: true)
-            }
-        }
-        .onChange(of: expandedBottomBarCard?.id) { _, _ in
-            closeVerticalFabMenu(immediate: true)
-        }
-        .onChange(of: plantBottomChromeHidden) { _, isHidden in
-            if isHidden {
-                closeVerticalFabMenu(immediate: false)
-            }
-        }
-        .onChange(of: calendarBottomChromeHidden) { _, isHidden in
-            if isHidden {
-                closeVerticalFabMenu(immediate: false)
-            }
-        }
         .onChange(of: treeManager.treeLevel.rawValue) { _, _ in
             scheduleGrowthUnlockFeedbackIfNeeded()
             requestHomeSnapshotRefresh()

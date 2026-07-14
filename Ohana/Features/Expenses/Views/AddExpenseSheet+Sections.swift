@@ -313,61 +313,36 @@ extension AddExpenseSheetContent {
     }
 
     var moreSection: some View {
-        VStack(spacing: 10) {
-            Button {
-                withAnimation(GoMotion.feedback) {
-                    showMore.toggle()
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "ellipsis.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(tertiaryText)
-                    Text(l.quickExpenseMore)
-                        .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(primaryText)
-                    Spacer()
-                    Text(moreSummary)
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(tertiaryText)
-                    Image(systemName: "chevron.down") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(tertiaryText)
-                        .rotationEffect(.degrees(showMore ? 180 : 0))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-            }
-            .disabled(hasSavedMedicalExpense)
-            .buttonStyle(ScaleButtonStyle())
-            .padding(.horizontal, 20)
-
-            if showMore {
-                VStack(spacing: 10) {
-                    infoRow(icon: "calendar", label: l.quickExpenseDate) {
-                        DatePicker("", selection: $date, in: ...Date(), displayedComponents: [.date])
-                            .datePickerStyle(.compact)
-                            .labelsHidden()
-                            .tint(sheetTint)
-                            .disabled(hasSavedMedicalExpense)
-                    }
-
-                    infoRow(icon: "note.text", label: l.quickExpenseNote) {
-                        GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                            l.quickExpenseOptional,
-                            text: $noteInput
-                        )
-                        .font(OhanaFont.subheadline(.semibold))
-                        .foregroundStyle(primaryText)
-                        .multilineTextAlignment(.trailing)
-                        .textFieldStyle(.plain)
+        DisclosureGroup(isExpanded: $showMore) {
+            VStack(spacing: 10) {
+                infoRow(icon: "calendar", label: l.quickExpenseDate) {
+                    DatePicker("", selection: $date, in: ...Date(), displayedComponents: [.date])
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .tint(sheetTint)
                         .disabled(hasSavedMedicalExpense)
-                    }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+
+                infoRow(icon: "note.text", label: l.quickExpenseNote) {
+                    GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                        l.quickExpenseOptional,
+                        text: $noteInput
+                    )
+                    .font(OhanaFont.subheadline(.semibold))
+                    .foregroundStyle(primaryText)
+                    .multilineTextAlignment(.trailing)
+                    .textFieldStyle(.plain)
+                    .disabled(hasSavedMedicalExpense)
+                }
             }
+        } label: {
+            Label(l.quickExpenseMore, systemImage: "ellipsis.circle.fill")
+                .font(OhanaFont.callout(.bold))
+                .foregroundStyle(primaryText)
+                .badge(moreSummary)
         }
+        .disabled(hasSavedMedicalExpense)
+        .padding(.horizontal, 20)
     }
 
     var claimHintCard: some View {

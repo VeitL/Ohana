@@ -151,7 +151,6 @@ nonisolated struct L10n {
         "性别": ["es": "Sexo", "pt": "Gênero", "fr": "Sexe"],
         "未知": ["es": "Desconocido", "pt": "Desconhecido", "fr": "Inconnu"],
         "毛色": ["es": "Pelaje", "pt": "Pelagem", "fr": "Robe"],
-        "瞳色": ["es": "Ojos", "pt": "Olhos", "fr": "Yeux"],
         "自定义": ["es": "Personalizado", "pt": "Personalizado", "fr": "Personnalisé"],
         "保存中…": ["es": "Guardando…", "pt": "Salvando…", "fr": "Enregistrement…"],
         "保存失败": ["es": "No se pudo guardar", "pt": "Não foi possível salvar", "fr": "Échec de l'enregistrement"],
@@ -297,7 +296,6 @@ nonisolated struct L10n {
         "性别": ["ja": "性別", "ko": "성별", "it": "Sesso"],
         "未知": ["ja": "不明", "ko": "알 수 없음", "it": "Sconosciuto"],
         "毛色": ["ja": "毛色", "ko": "털색", "it": "Mantello"],
-        "瞳色": ["ja": "瞳の色", "ko": "눈 색", "it": "Occhi"],
         "自定义": ["ja": "カスタム", "ko": "직접 설정", "it": "Personalizzato"],
         "保存中…": ["ja": "保存中…", "ko": "저장 중…", "it": "Salvataggio…"],
         "保存失败": ["ja": "保存できません", "ko": "저장 실패", "it": "Salvataggio non riuscito"],
@@ -758,14 +756,11 @@ nonisolated struct L10n {
     var petWizGender: String { tr(zh: "性别", en: "Gender", de: "Geschlecht") }
     var petWizGenderBoy: String { tr(zh: "♂ 男孩", en: "♂ Boy", de: "♂ Junge") }
     var petWizGenderGirl: String { tr(zh: "♀ 女孩", en: "♀ Girl", de: "♀ Mädchen") }
-    var petWizGenderUnknown: String { tr(zh: "未知", en: "Unknown", de: "Unbekannt") }
     var petWizCoatSection: String { tr(zh: "毛色", en: "Coat", de: "Fell") }
-    var petWizEyeSection: String { tr(zh: "瞳色", en: "Eyes", de: "Augen") }
     var petWizThemeSection: String { tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe") }
     var petWizCardThemeCaption: String { tr(zh: "宠物卡片主题色", en: "Wallet card accent", de: "Kartenakzent") }
     var petWizCardPreviewHex: String { tr(zh: "卡片预览色 #", en: "Preview swatch #", de: "Vorschaufarbe #") }
     var petWizTapBodyCoat: String { tr(zh: "点击身体 → 毛色", en: "Tap body → coat", de: "Körper tippen → Fell") }
-    var petWizTapEyeColor: String { tr(zh: "点击眼睛 → 瞳色", en: "Tap eyes → peepers", de: "Augen tippen → Farbe") }
     var petWizCardBgCaption: String { tr(zh: "卡片背景色", en: "Card backdrop", de: "Kartenhintergrund") }
     var petWizPassportLabel: String { tr(zh: "护照号码", en: "Passport #", de: "Passnummer") }
     var petWizMicrochipLabel: String { tr(zh: "芯片号 (Microchip ID)", en: "Microchip ID", de: "Microchip-ID") }
@@ -777,20 +772,8 @@ nonisolated struct L10n {
     var petWizCrossBreedHint: String { tr(zh: "不同品种间没有亲属关系，直接跳过", en: "Cross-breed bonds aren't tracked. Skip ahead!", de: "Artübergreifende Bindungen werden nicht verfolgt. Weiter!") }
     var petWizPickRelationIntro: String { tr(zh: "选择与每只宠物的关系（可多选，选填）", en: "Pick a vibe with each pet (multi, optional)", de: "Beziehung zu jedem Tier wählen (optional)") }
     var petWizPickCoatTitle: String { tr(zh: "选择毛色", en: "Pick coat color", de: "Fellfarbe wählen") }
-    var petWizPickEyeTitle: String { tr(zh: "选择瞳色", en: "Pick eye color", de: "Augenfarbe wählen") }
     var petWizCustomColorPickerTitle: String { tr(zh: "自定义颜色", en: "Custom color", de: "Eigene Farbe") }
     var petCustomSwatch: String { tr(zh: "自定义", en: "Custom", de: "Eigen") }
-    var petWizAppearanceNoBreedHint: String {
-        tr(
-            zh: "尚未选择品种时显示通用毛色与瞳色；选定品种后选项会自动收窄到该品种常见表型。",
-            en: "No breed yet? Universal coat & eye swatches are here. Pick a breed to narrow phenotypes.",
-            de: "Noch keine Rasse? Erst gibt es universelle Fell- und Augenfarben. Mit Rasse wird es genauer.",
-            es: "¿Sin raza aún? Mostramos pelaje y ojos universales. Elige raza para afinar.",
-            pt: "Sem raça ainda? Mostramos pelagem e olhos gerais. Escolha a raça para afinar.",
-            fr: "Pas encore de race ? Robe et yeux génériques d'abord. Choisis une race pour affiner."
-        )
-    }
-
     var petWizSaving: String { tr(zh: "保存中…", en: "Saving…", de: "Speichert…") }
     var petWizSavingShort: String { tr(zh: "保存中...", en: "Saving...", de: "Speichert...") }
     var petWizSaveFailedTitle: String { tr(zh: "保存失败", en: "Couldn't save", de: "Speichern fehlgeschlagen") }

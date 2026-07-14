@@ -6,10 +6,11 @@
   <title>Ohana Duotone Solid Icon Set</title>
   <style>
     :root {
-      --ohana-icon-primary: #1f8a8a;
-      --ohana-icon-accent: #ff755f;
+      --ohana-icon-primary: #ffffff;
+      --ohana-icon-accent: #ff5252;
       --page-bg: #eef3ef;
-      --card-bg: #fffaf0;
+      --card-bg: #17201f;
+      --card-bg-raised: #1d2927;
       --ink: #1f2930;
       --muted: #65727a;
     }
@@ -68,6 +69,27 @@
       border: 1px solid rgba(31, 41, 48, .08);
       border-radius: 18px;
     }
+    .base-color-chip {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #ffffff;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 750;
+      box-shadow: inset 0 0 0 1px rgba(31, 41, 48, .08);
+    }
+    .base-color-chip::before {
+      content: "";
+      width: 14px;
+      height: 14px;
+      border: 1px solid rgba(31, 41, 48, .16);
+      border-radius: 50%;
+      background: #ffffff;
+    }
     label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); }
     input[type="color"] { width: 34px; height: 34px; border: 0; padding: 0; background: transparent; }
     button {
@@ -84,19 +106,39 @@
     }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 16px; }
     .icon-card {
+      position: relative;
       margin: 0;
       min-height: 150px;
       padding: 18px 14px 14px;
       border-radius: 28px;
       background: var(--card-bg);
+      color: #ffffff;
       display: grid;
       place-items: center;
       gap: 10px;
+      border: 1px solid color-mix(in srgb, var(--ohana-icon-accent) 18%, transparent);
+      cursor: pointer;
+      transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+    }
+    .icon-card:hover {
+      transform: translateY(-2px);
+      border-color: color-mix(in srgb, var(--ohana-icon-accent) 42%, transparent);
+      background: var(--card-bg-raised);
+    }
+    .icon-card:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--ohana-icon-accent) 68%, transparent);
+      outline-offset: 3px;
     }
     .icon-box { width: 72px; height: 72px; display: grid; place-items: center; }
-    .icon-box svg { width: 72px; height: 72px; display: block; }
+    .icon-box svg {
+      width: 72px;
+      height: 72px;
+      display: block;
+      overflow: visible;
+      transform-origin: center;
+    }
     figcaption { text-align: center; font-size: 13px; font-weight: 760; line-height: 1.25; }
-    figcaption small { display: block; margin-top: 3px; font-size: 10px; color: var(--muted); font-weight: 650; }
+    figcaption small { display: block; margin-top: 3px; font-size: 10px; color: #aab8b5; font-weight: 650; }
 
     .motion-demo {
       margin: 0 0 24px;
@@ -112,7 +154,7 @@
     .motion-stage {
       min-height: 310px;
       border-radius: 22px;
-      background: #eaf3ef;
+      background: var(--card-bg);
       display: grid;
       place-items: center;
       text-align: center;
@@ -124,9 +166,9 @@
       border-radius: 32px;
       display: grid;
       place-items: center;
-      background: #eef7f3;
+      background: var(--card-bg-raised);
       box-shadow:
-        inset 0 0 0 1px rgba(31, 138, 138, .1),
+        inset 0 0 0 1px color-mix(in srgb, var(--ohana-icon-accent) 22%, transparent),
         0 18px 36px rgba(25, 68, 64, .12);
       transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
       -webkit-tap-highlight-color: transparent;
@@ -134,7 +176,7 @@
     .motion-icon-button:hover {
       transform: translateY(-2px);
       box-shadow:
-        inset 0 0 0 1px rgba(31, 138, 138, .14),
+        inset 0 0 0 1px color-mix(in srgb, var(--ohana-icon-accent) 42%, transparent),
         0 24px 46px rgba(25, 68, 64, .16);
     }
     .motion-icon-button:active { transform: scale(.97); }
@@ -175,7 +217,7 @@
       transform: scale(.6);
       transition: opacity 180ms ease, transform 180ms ease;
     }
-    .motion-demo[data-feed-state="feeding"] .motion-icon-button { background: #edf6f2; }
+    .motion-demo[data-feed-state="feeding"] .motion-icon-button { background: #23302e; }
     .motion-demo[data-feed-state="feeding"] .motion-bowl {
       animation: motion-bowl-ready 680ms cubic-bezier(.2, .9, .24, 1);
     }
@@ -291,6 +333,187 @@
       transform: translateY(-1px);
     }
 
+    .icon-card .accent,
+    .icon-card .accent-soft,
+    .icon-card .accent-line,
+    .icon-card .accent-thin-line {
+      transform-box: fill-box;
+      transform-origin: center;
+      transition: opacity 220ms ease;
+    }
+    .icon-card[data-motion-state="idle"] .accent,
+    .icon-card[data-motion-state="idle"] .accent-soft,
+    .icon-card[data-motion-state="idle"] .accent-line,
+    .icon-card[data-motion-state="idle"] .accent-thin-line {
+      opacity: .16;
+    }
+    .icon-card[data-motion-state="active"] .accent,
+    .icon-card[data-motion-state="active"] .accent-soft,
+    .icon-card[data-motion-state="active"] .accent-line,
+    .icon-card[data-motion-state="active"] .accent-thin-line,
+    .icon-card[data-motion-state="done"] .accent,
+    .icon-card[data-motion-state="done"] .accent-soft,
+    .icon-card[data-motion-state="done"] .accent-line,
+    .icon-card[data-motion-state="done"] .accent-thin-line {
+      opacity: 1;
+    }
+    .water-change-arrows,
+    .filter-change-arrows,
+    .litter-scoop,
+    .temperature-mercury {
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    .litter-scoop { transform: rotate(18deg); }
+    .temperature-mercury { transform-origin: center bottom; }
+    .icon-card[data-motion-state="active"] {
+      border-color: color-mix(in srgb, var(--ohana-icon-accent) 64%, transparent);
+      background: var(--card-bg-raised);
+    }
+    .icon-card[data-motion-state="done"] {
+      border-color: color-mix(in srgb, var(--ohana-icon-accent) 40%, transparent);
+    }
+    .icon-card[data-motion-state="active"][data-motion="drop"] .accent,
+    .icon-card[data-motion-state="active"][data-motion="drop"] .accent-soft {
+      animation: card-detail-drop 520ms cubic-bezier(.18, .92, .24, 1);
+      animation-delay: calc(var(--motion-index, 0) * 55ms);
+    }
+    .icon-card[data-motion-state="active"][data-motion="step"] .accent,
+    .icon-card[data-motion-state="active"][data-motion="step"] .accent-soft,
+    .icon-card[data-motion-state="active"][data-motion="step"] .accent-line,
+    .icon-card[data-motion-state="active"][data-motion="step"] .accent-thin-line {
+      animation: card-step-detail 500ms cubic-bezier(.2, .82, .25, 1);
+    }
+    .icon-card[data-motion-state="active"][data-motion="float"] .accent,
+    .icon-card[data-motion-state="active"][data-motion="float"] .accent-soft {
+      animation: card-float-detail 500ms cubic-bezier(.2, .9, .25, 1.12);
+      animation-delay: calc(var(--motion-index, 0) * 45ms);
+    }
+    .icon-card[data-motion-state="active"][data-motion="sweep"] .accent,
+    .icon-card[data-motion-state="active"][data-motion="sweep"] .accent-soft,
+    .icon-card[data-motion-state="active"][data-motion="sweep"] .accent-line,
+    .icon-card[data-motion-state="active"][data-motion="sweep"] .accent-thin-line {
+      animation: card-sweep-detail 500ms cubic-bezier(.2, .82, .25, 1);
+      animation-delay: calc(var(--motion-index, 0) * 28ms);
+    }
+    .icon-card[data-motion-state="active"][data-motion="gauge"] .accent,
+    .icon-card[data-motion-state="active"][data-motion="gauge"] .accent-line,
+    .icon-card[data-motion-state="active"][data-motion="gauge"] .accent-thin-line {
+      animation: card-gauge 540ms cubic-bezier(.18, .92, .24, 1);
+    }
+    .icon-card[data-motion-state="active"][data-motion="bounce"] .accent,
+    .icon-card[data-motion-state="active"][data-motion="bounce"] .accent-soft {
+      animation: card-bounce-detail 520ms cubic-bezier(.2, .82, .25, 1);
+      animation-delay: calc(var(--motion-index, 0) * 36ms);
+    }
+    .icon-card[data-motion-state="active"][data-motion="pulse"] .accent,
+    .icon-card[data-motion-state="active"][data-motion="pulse"] .accent-soft {
+      animation: card-detail-pop 440ms cubic-bezier(.2, .9, .25, 1.18);
+    }
+    .icon-card[data-motion-state="active"][data-motion="confirm"] .accent,
+    .icon-card[data-motion-state="active"][data-motion="confirm"] .accent-soft,
+    .icon-card[data-motion-state="active"][data-motion="confirm"] .accent-line,
+    .icon-card[data-motion-state="active"][data-motion="confirm"] .accent-thin-line {
+      animation: card-detail-pop 460ms cubic-bezier(.2, .9, .25, 1.18);
+      animation-delay: calc(var(--motion-index, 0) * 38ms);
+    }
+    .icon-card[data-motion-state="active"][data-motion="tilt"] .accent,
+    .icon-card[data-motion-state="active"][data-motion="tilt"] .accent-soft,
+    .icon-card[data-motion-state="active"][data-motion="tilt"] .accent-line,
+    .icon-card[data-motion-state="active"][data-motion="tilt"] .accent-thin-line {
+      animation: card-tilt-detail 480ms cubic-bezier(.2, .84, .25, 1);
+    }
+    .icon-card[data-motion-state="active"][data-motion="water-drop"] .water-drop {
+      animation: water-drop-fall 540ms cubic-bezier(.18, .92, .24, 1);
+    }
+    .icon-card[data-motion-state="active"][data-motion="water-change"] .water-change-arrows {
+      animation: water-change-arrows 540ms cubic-bezier(.2, .86, .25, 1);
+    }
+    .icon-card[data-motion-state="active"][data-motion="filter-change"] .filter-change-arrows {
+      animation: water-change-arrows 540ms cubic-bezier(.2, .86, .25, 1);
+    }
+    .icon-card[data-motion-state="active"][data-motion="litter-scoop"] .litter-scoop {
+      animation: litter-scoop 540ms cubic-bezier(.2, .84, .25, 1);
+    }
+    .icon-card[data-motion-state="active"][data-motion="temperature"] .temperature-mercury {
+      animation: temperature-rise 520ms cubic-bezier(.18, .92, .24, 1);
+    }
+    .icon-card[data-motion-state="active"][data-motion="temperature"] .temperature-drop {
+      animation: card-float-detail 500ms cubic-bezier(.2, .9, .25, 1.12);
+    }
+    .icon-card[data-motion-state="active"][data-motion="sleep"] .sleep-z {
+      animation: sleep-z-drift 560ms cubic-bezier(.2, .82, .25, 1);
+      animation-delay: calc(var(--motion-index, 0) * 80ms);
+    }
+
+    @keyframes card-detail-drop {
+      0% { opacity: .08; transform: translateY(-7px) scale(.58); }
+      68% { opacity: 1; transform: translateY(1px) scale(1.12); }
+      100% { transform: translateY(0) scale(1); }
+    }
+    @keyframes card-detail-pop {
+      0% { opacity: .12; transform: scale(.48); }
+      68% { opacity: 1; transform: scale(1.16); }
+      100% { transform: scale(1); }
+    }
+    @keyframes card-step-detail {
+      0%, 100% { transform: translate(0, 0) rotate(0); }
+      28% { transform: translate(-2px, -1px) rotate(-6deg); }
+      60% { transform: translate(2px, 0) rotate(4deg); }
+    }
+    @keyframes card-float-detail {
+      0%, 100% { transform: translateY(0) scale(1); }
+      36% { transform: translateY(-4px) scale(1.06); }
+      70% { transform: translateY(1px) scale(.96); }
+    }
+    @keyframes card-sweep-detail {
+      0%, 100% { transform: translateX(0) rotate(0); }
+      28% { transform: translateX(-3px) rotate(-7deg); }
+      58% { transform: translateX(3px) rotate(6deg); }
+      82% { transform: translateX(-1px) rotate(-2deg); }
+    }
+    @keyframes card-gauge {
+      0%, 100% { transform: rotate(0) scale(1); }
+      32% { transform: rotate(-18deg) scale(.9); }
+      62% { transform: rotate(9deg) scale(1.08); }
+      84% { transform: rotate(-4deg); }
+    }
+    @keyframes card-bounce-detail {
+      0%, 100% { transform: translateY(0) rotate(0) scale(1); }
+      22% { transform: translateY(1px) rotate(5deg) scale(1.05, .94); }
+      50% { transform: translateY(-5px) rotate(18deg) scale(.98, 1.03); }
+      78% { transform: translateY(1px) rotate(30deg) scale(1.04, .95); }
+    }
+    @keyframes card-tilt-detail {
+      0%, 100% { transform: rotate(0) scale(1); }
+      34% { transform: rotate(-8deg) scale(.96); }
+      68% { transform: rotate(5deg) scale(1.04); }
+    }
+    @keyframes water-drop-fall {
+      0% { opacity: .18; transform: translateY(-6px) scale(.72); }
+      62% { opacity: 1; transform: translateY(1px) scale(1.08); }
+      100% { transform: translateY(0) scale(1); }
+    }
+    @keyframes water-change-arrows {
+      0%, 100% { transform: rotate(0); }
+      55% { transform: rotate(18deg); }
+    }
+    @keyframes litter-scoop {
+      0%, 100% { transform: translate(0, 0) rotate(18deg); }
+      36% { transform: translate(-2px, 2px) rotate(10deg); }
+      68% { transform: translate(1px, -1px) rotate(22deg); }
+    }
+    @keyframes temperature-rise {
+      0% { transform: scaleY(.48); }
+      64% { transform: scaleY(1.08); }
+      100% { transform: scaleY(1); }
+    }
+    @keyframes sleep-z-drift {
+      0% { opacity: .12; transform: translate(0, 2px) scale(.7); }
+      60% { opacity: 1; transform: translate(1px, -3px) scale(1.08); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
+
     @media (max-width: 720px) {
       header { align-items: stretch; flex-direction: column; }
       .controls { align-self: start; }
@@ -300,7 +523,9 @@
     @media (prefers-reduced-motion: reduce) {
       .motion-demo *,
       .motion-demo *::before,
-      .motion-demo *::after {
+      .motion-demo *::after,
+      .icon-card,
+      .icon-card * {
         animation-duration: 1ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 1ms !important;
@@ -313,16 +538,16 @@
     <header>
       <div>
         <h1>Ohana 双色实心几何图标</h1>
-        <p>透明 SVG 图标。用下方色板切换全套主色和强调色，图标文件内也保留同名 CSS 变量。</p>
+        <p>白色为固定主体，宠物或人类主题色负责动作重点。点击任意图标卡可播放一次语义动效。</p>
       </div>
       <section class="controls" aria-label="Icon color controls">
-        <label>主色 <input id="primary" type="color" value="#1f8a8a"></label>
-        <label>强调 <input id="accent" type="color" value="#ff755f"></label>
-        <button data-primary="#1f8a8a" data-accent="#ff755f">Teal Coral</button>
-        <button data-primary="#3f74d8" data-accent="#c8ff3d">Blue Lime</button>
-        <button data-primary="#2f8e62" data-accent="#7be4d4">Island Mint</button>
-        <button data-primary="#5f6fd8" data-accent="#ffd36c">Lavender Sun</button>
-        <button data-primary="#27313a" data-accent="#ff9a6a">Ink Apricot</button>
+        <span class="base-color-chip">主体固定白色</span>
+        <label>主题色 <input id="accent" type="color" value="#ff5252"></label>
+        <button data-accent="#ff5252">宠物主题</button>
+        <button data-accent="#f97316">人类主题</button>
+        <button data-accent="#e84393">宠物粉</button>
+        <button data-accent="#8a2be2">宠物紫</button>
+        <button data-accent="#f39c12">成员琥珀</button>
       </section>
     </header>
 
@@ -440,9 +665,9 @@
   <title>Water / 饮水</title>
   <g>
 
-      <path class="primary" d="M16 4.8c4.8 5.7 7.1 9.5 7.1 13.1a7.1 7.1 0 0 1-14.2 0c0-3.6 2.3-7.4 7.1-13.1Z"/>
-      <path class="accent" d="M7.2 20.2h17.6l-1 3.3A4.3 4.3 0 0 1 19.7 26h-7.4a4.3 4.3 0 0 1-4.1-2.5l-1-3.3Z" opacity=".38"/>
-      <ellipse class="accent-soft" cx="16" cy="20.3" rx="8.8" ry="3" opacity=".18"/>
+      <path class="accent water-drop" d="M16 4.8c4.8 5.7 7.1 9.5 7.1 13.1a7.1 7.1 0 0 1-14.2 0c0-3.6 2.3-7.4 7.1-13.1Z"/>
+      <path class="primary" d="M7.2 20.2h17.6l-1 3.3A4.3 4.3 0 0 1 19.7 26h-7.4a4.3 4.3 0 0 1-4.1-2.5l-1-3.3Z"/>
+      <ellipse class="primary-soft" cx="16" cy="20.3" rx="8.8" ry="3"/>
   </g>
 </svg>
 
@@ -528,8 +753,8 @@
 
       <path class="primary" d="M16 6.4 27 26.2H5Z"/>
       <path class="accent-soft" d="M15.9 14.1 20.6 25.8H11.2Z"/>
-      <text class="accent" x="21.1" y="10.9" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="7.4" font-weight="900">Z</text>
-      <text class="accent-soft" x="25" y="14.6" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="5.9" font-weight="900">z</text>
+      <text class="accent sleep-z" x="21.1" y="10.9" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="7.4" font-weight="900">Z</text>
+      <text class="accent-soft sleep-z" x="25" y="14.6" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="5.9" font-weight="900">z</text>
   </g>
 </svg>
 
@@ -768,16 +993,43 @@
   <title>Water change / 换水</title>
   <g>
 
-      <path class="primary" d="M12.8 6.2c4.1 4.9 6.1 8 6.1 11.1a6.1 6.1 0 0 1-12.2 0c0-3.1 2-6.2 6.1-11.1Z"/>
-      <path class="accent-line" d="M23.2 8.2a6 6 0 0 1-1 10"/>
-      <path class="accent-line" d="m22.3 18.2 4.1-.5-2.6-3.5"/>
-      <path class="accent-line" d="M8.8 23.8a6 6 0 0 1 1-10"/>
-      <path class="accent-line" d="m9.7 13.8-4.1.5 2.6 3.5"/>
+      <path class="primary" d="M11.2 5.1c4.1 4.8 6.1 8.1 6.1 11a6.1 6.1 0 0 1-12.2 0c0-2.9 2-6.2 6.1-11Z"/>
+      <g class="water-change-arrows">
+        <path class="accent-line" d="M19.4 10.2a7.2 7.2 0 0 1 6.5 4.1"/>
+        <path class="accent" d="m23.3 11.7 3.7 3-4.5 1.5Z"/>
+        <path class="accent-line" d="M25.4 19.2a7.2 7.2 0 0 1-5.8 4.5"/>
+        <path class="accent" d="m21.6 21.1-2.7 3.8-1.8-4.4Z"/>
+      </g>
   </g>
 </svg>
 
           </div>
           <figcaption>换水<small>Water change</small></figcaption>
+        </figure>
+
+        <figure class="icon-card" aria-label="Filter change">
+          <div class="icon-box">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Filter change / 换滤芯" class="ohana-duotone-icon">
+  <title>Filter change / 换滤芯</title>
+  <g>
+
+      <rect class="primary" x="10" y="6.2" width="12" height="19.6" rx="4"/>
+      <rect class="primary-soft" x="8.5" y="6.2" width="15" height="3.2" rx="1.6"/>
+      <rect class="primary-soft" x="8.5" y="22.6" width="15" height="3.2" rx="1.6"/>
+      <rect class="accent" x="13" y="11" width="6" height="2.2" rx="1.1"/>
+      <rect class="accent" x="13" y="14.9" width="6" height="2.2" rx="1.1"/>
+      <rect class="accent" x="13" y="18.8" width="6" height="2.2" rx="1.1"/>
+      <g class="filter-change-arrows">
+        <path class="accent-line" d="M6.8 11.2a10.5 10.5 0 0 0 .1 9.8"/>
+        <path class="accent" d="m4.4 18.8 2.7 3.6 1.5-4.1Z"/>
+        <path class="accent-line" d="M25.2 20.8a10.5 10.5 0 0 0-.1-9.8"/>
+        <path class="accent" d="m27.6 13.2-2.7-3.6-1.5 4.1Z"/>
+      </g>
+  </g>
+</svg>
+
+          </div>
+          <figcaption>换滤芯<small>Filter change</small></figcaption>
         </figure>
 
         <figure class="icon-card" aria-label="Litter">
@@ -786,13 +1038,18 @@
   <title>Litter / 猫砂</title>
   <g>
 
-      <path class="primary" d="M6.5 17.2h19l-1.4 6a4 4 0 0 1-3.9 2.8h-8.4a4 4 0 0 1-3.9-2.8l-1.4-6Z"/>
-      <ellipse class="primary-soft" cx="16" cy="16.6" rx="9.5" ry="3.9"/>
-      <circle class="accent" cx="10.2" cy="15.3" r="1.05"/>
-      <circle class="accent" cx="13.3" cy="14.1" r=".86"/>
-      <circle class="accent" cx="16.4" cy="15.5" r="1.18"/>
-      <circle class="accent" cx="19.6" cy="14.2" r=".94"/>
-      <circle class="accent" cx="22.1" cy="16.1" r=".78"/>
+      <path class="primary" d="M5.8 18.2h20.4l-1.3 5.2a4 4 0 0 1-3.9 2.8H11a4 4 0 0 1-3.9-2.8l-1.3-5.2Z"/>
+      <ellipse class="primary-soft" cx="16" cy="17.7" rx="10.2" ry="3.5"/>
+      <circle class="accent-soft" cx="10.3" cy="16.8" r=".9"/>
+      <circle class="accent-soft" cx="13.4" cy="15.8" r=".75"/>
+      <g class="litter-scoop">
+        <rect class="accent" x="18.5" y="4.6" width="3.6" height="10.4" rx="1.8"/>
+        <rect class="accent" x="15.2" y="12" width="10" height="7.2" rx="2.5"/>
+        <circle class="primary" cx="18.1" cy="15" r=".68"/>
+        <circle class="primary" cx="21" cy="15" r=".68"/>
+        <circle class="primary" cx="19.5" cy="17.2" r=".68"/>
+        <circle class="primary" cx="22.4" cy="17.2" r=".68"/>
+      </g>
   </g>
 </svg>
 
@@ -1052,11 +1309,14 @@
   <title>Temperature / 温湿度</title>
   <g>
 
-      <rect class="primary" x="13" y="5.2" width="6" height="15" rx="3"/>
-      <circle class="primary" cx="16" cy="22" r="5.2"/>
-      <rect class="accent" x="15" y="9.2" width="2" height="11.8" rx="1"/>
-      <circle class="accent" cx="16" cy="22" r="2.4"/>
-      <circle class="accent-soft" cx="23.7" cy="9.4" r="2.2"/>
+      <rect class="primary" x="8.2" y="5.2" width="6.2" height="15.8" rx="3.1"/>
+      <circle class="primary" cx="11.3" cy="22" r="5.2"/>
+      <g class="temperature-mercury">
+        <rect class="accent" x="10.2" y="9.2" width="2.2" height="12" rx="1.1"/>
+        <circle class="accent" cx="11.3" cy="22" r="2.45"/>
+      </g>
+      <path class="accent temperature-drop" d="M22.5 6.4c3.2 3.8 4.7 6.3 4.7 8.7a4.7 4.7 0 0 1-9.4 0c0-2.4 1.5-4.9 4.7-8.7Z"/>
+      <path class="primary-thin-line" d="M21.1 13.4c.7-1.2 1.5-2.2 2.4-3.2"/>
   </g>
 </svg>
 
@@ -1116,18 +1376,14 @@
   </main>
   <script>
     const root = document.documentElement;
-    const primary = document.querySelector("#primary");
     const accent = document.querySelector("#accent");
-    function setColors(nextPrimary, nextAccent) {
-      root.style.setProperty("--ohana-icon-primary", nextPrimary);
+    function setAccent(nextAccent) {
       root.style.setProperty("--ohana-icon-accent", nextAccent);
-      primary.value = nextPrimary;
       accent.value = nextAccent;
     }
-    primary.addEventListener("input", () => root.style.setProperty("--ohana-icon-primary", primary.value));
     accent.addEventListener("input", () => root.style.setProperty("--ohana-icon-accent", accent.value));
-    document.querySelectorAll("button[data-primary]").forEach((button) => {
-      button.addEventListener("click", () => setColors(button.dataset.primary, button.dataset.accent));
+    document.querySelectorAll("button[data-accent]").forEach((button) => {
+      button.addEventListener("click", () => setAccent(button.dataset.accent));
     });
 
     const motionDemo = document.querySelector(".motion-demo");
@@ -1184,6 +1440,65 @@
       }
       setFeedMotionState("clearing");
       scheduleFeedMotion("empty", 560);
+    });
+
+    function motionKindFor(label) {
+      if (/^Water$/i.test(label)) return "water-drop";
+      if (/Water change/i.test(label)) return "water-change";
+      if (/Filter change/i.test(label)) return "filter-change";
+      if (/Litter/i.test(label)) return "litter-scoop";
+      if (/Temperature/i.test(label)) return "temperature";
+      if (/Sleep/i.test(label)) return "sleep";
+      if (/Feeding|Dry food|Auto feeder|Plant fertilize/i.test(label)) return "drop";
+      if (/Dog walking|Walk map|Distance/i.test(label)) return "step";
+      if (/Plant watering|Bath/i.test(label)) return "float";
+      if (/Potty cleanup|Grooming|Cleanup/i.test(label)) return "sweep";
+      if (/Weight/i.test(label)) return "gauge";
+      if (/Play|Treat|Reward|Birthday/i.test(label)) return "bounce";
+      if (/Health record|Vaccination|Training|Mood|Notification health/i.test(label)) return "pulse";
+      if (/Calendar|Task|Food stock|Check-in|Reminder|Insurance|Document|Photo|Privacy|Settings/i.test(label)) return "confirm";
+      return "tilt";
+    }
+
+    document.querySelectorAll(".icon-card").forEach((card) => {
+      const label = card.getAttribute("aria-label") || card.querySelector("figcaption")?.textContent || "图标";
+      card.dataset.motion = motionKindFor(label);
+      card.dataset.motionState = "idle";
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", "0");
+      card.setAttribute("aria-pressed", "false");
+      card.setAttribute("aria-label", `${label}，未打卡，点击打卡`);
+      card.querySelectorAll(".accent, .accent-soft, .accent-line, .accent-thin-line").forEach((detail, index) => {
+        detail.style.setProperty("--motion-index", index);
+      });
+
+      let motionTimer;
+      const setCardState = (state) => {
+        card.dataset.motionState = state;
+        card.setAttribute("aria-pressed", String(state === "done"));
+        const stateCopy = state === "active" ? "打卡中" : state === "done" ? "已打卡，点击撤销" : "未打卡，点击打卡";
+        card.setAttribute("aria-label", `${label}，${stateCopy}`);
+      };
+      const playMotion = () => {
+        clearTimeout(motionTimer);
+        if (card.dataset.motionState === "done") {
+          setCardState("idle");
+          return;
+        }
+        setCardState("idle");
+        void card.offsetWidth;
+        setCardState("active");
+        motionTimer = window.setTimeout(() => {
+          setCardState("done");
+        }, reducedMotion.matches ? 1 : 680);
+      };
+
+      card.addEventListener("click", playMotion);
+      card.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        playMotion();
+      });
     });
 
   </script>

@@ -47,6 +47,8 @@ struct QuickPlayDetailSheet: View {
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingPlayPlanEditor = false
+    // Compatibility state for the retired inline renderer kept below until its
+    // visual helpers can be removed independently. Runtime presentation is a native sheet.
     @State private var inlineSheetVisible = false
     @State private var inlineSheetDragOffset: CGFloat = 0
     @State private var playPlanIntervalDays = 3
@@ -192,11 +194,6 @@ struct QuickPlayDetailSheet: View {
                     .padding(.top, 18)
                     .padding(.bottom, 42)
                 }
-
-                if showingPlayPlanEditor {
-                    playPlanInlineOverlay
-                        .zIndex(10)
-                }
             }
             .navigationBarHidden(true)
             .overlay(alignment: .top) {
@@ -213,6 +210,26 @@ struct QuickPlayDetailSheet: View {
                 isSavingPlayPlan = false
                 isCommittingPlay = false
                 commandQueue.cancelAll()
+            }
+            .sheet(isPresented: $showingPlayPlanEditor) {
+                NavigationStack {
+                    ScrollView {
+                        playPlanEditorContent
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 24)
+                    }
+                    .navigationTitle(l.tr(zh: "陪玩计划", en: "Play plan", de: "Spielplan"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(l.cancel) {
+                                closePlayPlanEditor()
+                            }
+                        }
+                    }
+                }
+                .presentationDetents([.medium, .large])
+                .presentationContentInteraction(.scrolls)
             }
         }
         .accessibilityIdentifier("quick-play-detail-sheet")
@@ -535,7 +552,7 @@ struct QuickPlayDetailSheet: View {
         .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
-    private var playPlanInlineOverlay: some View {
+    private var playPlanInlineOverlay: some View { // native-ui: allow retired compatibility renderer; runtime uses sheet(isPresented:)
         GeometryReader { proxy in
             let bottomInset = CGFloat(8)
             let panelHeight = min(max(376, proxy.size.height * 0.42), proxy.size.height * 0.78)
@@ -744,19 +761,11 @@ struct QuickPlayDetailSheet: View {
 
     private func openPlayPlanEditor() {
         loadPlayPlanDraft()
-        inlineSheetDragOffset = 0
         showingPlayPlanEditor = true
     }
 
     private func closePlayPlanEditor() {
-        withAnimation(GoMotion.page) {
-            inlineSheetVisible = false
-            inlineSheetDragOffset = 0
-        }
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 180_000_000)
-            showingPlayPlanEditor = false
-        }
+        showingPlayPlanEditor = false
     }
 
     private func loadPlayPlanDraft() {

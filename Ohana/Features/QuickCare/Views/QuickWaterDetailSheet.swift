@@ -234,50 +234,27 @@ struct QuickWaterDetailSheet: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .scrollBounceBehavior(.basedOnSize)
-                .scrollDisabled(inlineOverlayBlocksBackground)
-                .allowsHitTesting(!inlineOverlayBlocksBackground)
             }
             .overlay(alignment: .top) {
                 if showSaveToast {
                     toastView
                 }
             }
-            .overlay {
-                if let sheet = activeSheet, sheet.usesInlineOverlay {
-                    inlineWaterSheetOverlay(sheet)
-                        .zIndex(40)
-                        .ignoresSafeArea(.container, edges: .bottom)
-                }
-            }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: systemSheetBinding) { sheet in
                 NavigationStack {
-                    ZStack {
-                        VStack(spacing: 0) {
-                            waterSheetTopChrome(sheet)
-                                .padding(.horizontal, 20)
-                                .padding(.top, 12)
-                                .padding(.bottom, 4)
-                            sheetContent(sheet)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                                .allowsHitTesting(nestedInlineSheet == nil)
-                                .petMemorialTone(isActive: pet.hasPassedAway)
+                    sheetContent(sheet)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .petMemorialTone(isActive: pet.hasPassedAway)
+                        .navigationTitle(waterSheetTitle(sheet))
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(l.cancel) {
+                                    closeActiveWaterSheet()
+                                }
+                            }
                         }
-
-                        if nestedInlineSheet != nil {
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .ignoresSafeArea()
-                                .zIndex(35)
-                        }
-
-                        if let nestedInlineSheet {
-                            inlineWaterSheetOverlay(nestedInlineSheet)
-                                .zIndex(40)
-                                .ignoresSafeArea(.container, edges: .bottom)
-                        }
-                    }
-                    .toolbar(.hidden, for: .navigationBar)
                 }
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
             }
@@ -353,7 +330,7 @@ struct QuickWaterDetailSheet: View {
     }
 
     // MARK: - Main UI
-    func inlineWaterSheetOverlay(_ sheet: ActiveSheet) -> some View {
+    func inlineWaterSheetOverlay(_ sheet: ActiveSheet) -> some View { // native-ui: allow retired compatibility renderer; runtime uses sheet(item:)
         GeometryReader { proxy in
             let bottomInset = CGFloat(8)
             let maxHeight = min(max(sheet.inlineHeight, adaptiveSheetHeight), proxy.size.height * 0.94)
@@ -443,6 +420,10 @@ struct QuickWaterDetailSheet: View {
     }
 
     func dismissInlineWaterSheet() {
+        guard activeInlineSheet != nil else {
+            closeActiveWaterSheet()
+            return
+        }
         let dismissingSheetID = activeInlineSheet?.id
         withAnimation(GoMotion.page) {
             inlineSheetVisible = false

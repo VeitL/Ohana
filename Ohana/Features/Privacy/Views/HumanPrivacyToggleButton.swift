@@ -9,7 +9,7 @@
 import SwiftData
 import SwiftUI
 
-/// 单字段隐私开关胶囊按钮
+/// 单字段隐私开关
 /// - 仅当 activeHumanId == human.id 时允许切换（即本人查看时）
 /// - 其他家庭成员查看时按钮半透明且不可交互
 struct HumanPrivacyToggleButton: View {
@@ -39,42 +39,23 @@ struct HumanPrivacyToggleButton: View {
 
     var body: some View {
         if HumanLocalPrivacyPolicy.isEnabled {
-            Button {
-                guard isOwner else { return }
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                togglePrivacy()
-            } label: {
-                ZStack {
-                    Capsule()
-                        .fill(trackFill)
-                        .frame(width: 68, height: 34)
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(trackStroke, lineWidth: 1.25)
-                        }
-
-                    Circle()
-                        .fill(knobFill)
-                        .frame(width: 26, height: 26) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                        .overlay {
-                            Circle()
-                                .strokeBorder(Color.ohanaCardStroke.opacity(displayIsPrivate ? 0.25 : 0.9), lineWidth: 1)
-                        }
-                        .overlay {
-                            Image(systemName: displayIsPrivate ? "lock.fill" : "lock.open.fill")
-                                .font(OhanaFont.adaptive(size: 10, weight: .black))
-                                .foregroundStyle(knobIconColor)
-                        }
-                        .offset(x: displayIsPrivate ? 17 : -17)
-                }
-                .frame(width: 74, height: 44)
-                .contentShape(Rectangle())
-                .animation(GoMotion.feedback, value: displayIsPrivate)
-                .accessibilityLabel(displayIsPrivate ? l.tr(zh: "隐私已开启，仅本人可见", en: "Privacy on, only owner can view", de: "Privat, nur selbst sichtbar") : l.tr(zh: "隐私已关闭，家庭成员可见", en: "Privacy off, visible to family", de: "Offen, für Familie sichtbar"))
+            Toggle(
+                isOn: Binding(
+                    get: { displayIsPrivate },
+                    set: { setPrivacy($0) }
+                )
+            ) {
+                Label(
+                    l.tr(zh: "仅本人可见", en: "Only visible to me", de: "Nur für mich sichtbar"),
+                    systemImage: displayIsPrivate ? "lock.fill" : "lock.open.fill"
+                )
             }
-            .buttonStyle(ScaleButtonStyle())
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .tint(Color.goPrimary)
             .opacity(isOwner ? 1 : 0.5)
             .disabled(!isOwner)
+            .accessibilityLabel(displayIsPrivate ? l.tr(zh: "隐私已开启，仅本人可见", en: "Privacy on, only owner can view", de: "Privat, nur selbst sichtbar") : l.tr(zh: "隐私已关闭，家庭成员可见", en: "Privacy off, visible to family", de: "Offen, für Familie sichtbar"))
             .onDisappear {
                 commandQueue.cancelAll()
                 optimisticIsPrivate = nil
@@ -82,8 +63,9 @@ struct HumanPrivacyToggleButton: View {
         }
     }
 
-    private func togglePrivacy() {
-        let nextValue = !displayIsPrivate
+    private func setPrivacy(_ nextValue: Bool) {
+        guard isOwner, nextValue != displayIsPrivate else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         optimisticIsPrivate = nextValue
         let action = "field.\(field.rawValue).\(nextValue ? "private" : "public")"
         let command = DomainCommand.humanPrivacy(humanID: human.id, action: action)
@@ -101,26 +83,6 @@ struct HumanPrivacyToggleButton: View {
                 appServices.domainRevisions.publishFailure(command: command, error: error)
             }
         }
-    }
-
-    private var trackFill: Color {
-        displayIsPrivate
-            ? Color.goYellow.opacity(0.16)
-            : Color.ohanaControlFill
-    }
-
-    private var trackStroke: Color {
-        displayIsPrivate
-            ? Color.goYellow.opacity(0.55)
-            : Color.ohanaCardStroke.opacity(0.95)
-    }
-
-    private var knobFill: Color {
-        displayIsPrivate ? Color.goYellow : Color.ohanaCardSurfaceElevated
-    }
-
-    private var knobIconColor: Color {
-        displayIsPrivate ? Color.arkInk : Color.ohanaSecondaryText
     }
 }
 

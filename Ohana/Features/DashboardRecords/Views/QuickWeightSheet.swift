@@ -138,7 +138,6 @@ struct QuickWeightSheet: View {
             .padding(.bottom, 32)
         }
         .background(Color.ohanaCardSurface)
-        .presentationBackground(.clear)
         .onAppear {
             scheduleLatestPetWeightLoad()
         }

@@ -8,7 +8,6 @@ extension QuickFeedDetailContent {
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                inlineSheetScrollTopMarker
                 sheetHero(
                     icon: kind.iconName,
                     title: kind == .manualReminder ? l.tr(zh: "喂食计划", en: "Feeding plan", de: "Fütterungsplan") : l.tr(zh: "自动猫粮机", en: "Auto feeder", de: "Futterautomat"),
@@ -97,14 +96,6 @@ extension QuickFeedDetailContent {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(FeedScrollBounceConfigurator(isBouncingEnabled: false))
-        .coordinateSpace(name: FeedInlineSheetScrollCoordinateSpace.name)
-        .onPreferenceChange(FeedInlineSheetScrollTopPreferenceKey.self) { value in
-            inlineSheetScrollTopOffset = value
-            if value < -8 {
-                inlineSheetTopPullDismissArmed = false
-            }
-        }
-        .simultaneousGesture(inlineSheetTopPullDismissGesture)
         .navigationTitle(kind == .manualReminder ? l.tr(zh: "计划", en: "Plan", de: "Plan") : l.tr(zh: "自动", en: "Auto", de: "Auto"))
     }
 

@@ -2,7 +2,7 @@
 //  HumanWorkoutPetWalkSnapshotBuilder.swift
 //  Ohana
 //
-//  Builds lightweight dog-walk workout candidates for the human workout screen.
+//  Builds lightweight read-only dog-walk snapshots for the human workout screen.
 //
 
 import Foundation

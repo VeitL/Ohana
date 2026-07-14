@@ -8,20 +8,21 @@ import SwiftUI
 extension SettingsView {
     @ViewBuilder
     var settingsBodySections: some View {
-        AnyView(settingsHeader)
-        AnyView(settingsDataSections)
-        AnyView(settingsDeferredHeavySections)
-        AnyView(settingsPreferencesSection)
-        if isLanguageCommitInFlight {
-            AnyView(settingsLanguageCommitPlaceholderSection)
-        } else {
-            AnyView(privacySecuritySection)
-            AnyView(settingsNotificationsSection)
-            AnyView(backupSection)
-            AnyView(settingsAboutSection)
-            AnyView(settingsResetSection)
+        if SettingsDebugTools.isRunningUITests {
+            settingsUITestShortcutSection
         }
-        Spacer(minLength: 40)
+        settingsDataSections
+        settingsDeferredHeavySections
+        settingsPreferencesSection
+        if isLanguageCommitInFlight {
+            settingsLanguageCommitPlaceholderSection
+        } else {
+            privacySecuritySection
+            settingsNotificationsSection
+            backupSection
+            settingsAboutSection
+            settingsResetSection
+        }
     }
 
     @ViewBuilder
@@ -39,20 +40,13 @@ extension SettingsView {
     var settingsPreferencesSection: some View {
         settingsSection(title: l.preferences) {
             settingsCountryRegionRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             settingsLanguageRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             settingsMeasurementUnitsRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             settingsCurrencyRow
             settingsAppearanceRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             settingsBackgroundRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             performanceToggleRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             reducedVisualEffectsToggleRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             settingsReplayOnboardingRow
         }
     }
@@ -241,11 +235,8 @@ extension SettingsView {
     var settingsNotificationsSection: some View {
         settingsSection(title: l.notifications) {
             settingsNotificationPermissionRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             routineNotificationsToggleRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             petMedicationNotificationPrivacyRow
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             advancedNotificationSettingsDisclosure
         }
     }
@@ -268,7 +259,6 @@ extension SettingsView {
                 ) {}
 
                 if let reviewURL = OhanaPublicLinks.appStoreReview {
-                    OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                     settingsRow(
                         icon: "star.fill",
                         title: l.tr(zh: "评价 App", en: "Rate App", de: "App bewerten"),
@@ -277,7 +267,6 @@ extension SettingsView {
                         UIApplication.shared.open(reviewURL)
                     }
                 }
-                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                 settingsRow(
                     icon: "hand.raised.fill",
                     title: l.tr(zh: "隐私政策", en: "Privacy Policy", de: "Datenschutzrichtlinie"),
@@ -287,7 +276,6 @@ extension SettingsView {
                     UIApplication.shared.open(OhanaPublicLinks.privacyPolicy)
                 }
                 .accessibilityIdentifier("settings-privacy-policy-action")
-                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                 settingsRow(
                     icon: "questionmark.bubble.fill",
                     title: l.tr(zh: "获取支持", en: "Get Support", de: "Support erhalten"),

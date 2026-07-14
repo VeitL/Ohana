@@ -196,7 +196,6 @@ struct InventoryContentView: View {
         .sheet(item: $equipPopoutPet) { pet in
             EquipPopoutCardSheet(pet: pet)
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.hidden)
         }
     }
 
@@ -540,19 +539,7 @@ private struct AppIconInventoryPreview: View {
     let descriptor: AppIconShopDescriptor
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: descriptor.gradientHex.map { Color(hex: $0) },
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            Image(systemName: descriptor.previewSymbol)
-                .font(OhanaFont.adaptive(size: 20, weight: .black))
-                .foregroundStyle(descriptor.itemId == "appicon_minimal_o" ? Color.arkInk : Color.white) // ui-v4: allow asset-specific icon ink
-        }
+        AppIconArtwork(descriptor: descriptor)
         .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 }

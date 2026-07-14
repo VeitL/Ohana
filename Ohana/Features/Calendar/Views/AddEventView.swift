@@ -188,55 +188,140 @@ struct AddEventContentView: View {
     private var selectedRecurrenceDays: Int {
         recurrenceOption.presetDays ?? max(2, recurrenceDays)
     }
+}
 
+extension AddEventContentView {
     var body: some View {
-        GeometryReader { proxy in
-            let effectiveSafeTop = max(proxy.safeAreaInsets.top, inlinePageSafeAreaInsets.top)
-            let stableSafeBottom = Self.stableBottomSafeInset(
-                proxyBottom: proxy.safeAreaInsets.bottom,
-                inlineBottom: inlinePageSafeAreaInsets.bottom
-            )
-            let headerTopInset = max(14, effectiveSafeTop + 12)
-            let bottomControlInset = max(18, stableSafeBottom + 14)
-            let isKeyboardVisible = titleFocused || keyboardHeight > 1
-            let scrollBottomInset: CGFloat = 18
-
-            ZStack {
-                OhanaAppBackground()
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        titleFocused = false
-                        showsTypePicker = false
-                        GoKeyboard.dismiss()
-                    }
-
-                VStack(spacing: 0) {
-                    header
-                        .padding(.horizontal, 20)
-                        .padding(.top, headerTopInset)
-                        .padding(.bottom, 10)
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 14) {
-                            titleSection
-                                .zIndex(showsTypePicker ? 10 : 0)
-                            relatedSection
-                            timeSection
-                            recurrenceSection
-                            if recurrenceOption != .none {
-                                recurrenceEndSection
-                            }
-                            reminderLeadSection
-                            assigneeSection
+        NavigationStack {
+            Form {
+                Section {
+                    Picker(l.tr(zh: "类型", en: "Type", de: "Typ"), selection: $eventType) {
+                        ForEach(manualEventTypes) { type in
+                            Label(eventTypeTitle(type), systemImage: type.silhouetteSymbol)
+                                .tag(type)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, scrollBottomInset)
                     }
-                    .scrollDismissesKeyboard(.interactively)
+                    .accessibilityIdentifier("add-event-type-picker")
 
-                    if !isKeyboardVisible {
-                        saveBar(safeBottom: bottomControlInset)
+                    TextField(
+                        l.tr(zh: "给这件事起个名字", en: "Name this event", de: "Termin benennen"),
+                        text: $title
+                    )
+                    .focused($titleFocused)
+                    .submitLabel(.done)
+                    .textInputAutocapitalization(.sentences)
+                    .accessibilityIdentifier("add-event-title-input")
+                } header: {
+                    Text(l.tr(zh: "事项", en: "Event", de: "Termin"))
+                }
+
+                Section {
+                    Picker(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen"), selection: relatedEntitySelection) {
+                        Label(l.tr(zh: "无", en: "None", de: "Keine"), systemImage: "circle.slash")
+                            .tag("")
+                        ForEach(activePlants) { plant in
+                            Label(plant.name, systemImage: "leaf.fill")
+                                .tag("\(EntityKind.plant.rawValue)|\(plant.id.uuidString)")
+                                .accessibilityIdentifier("add-event-related-plant-\(plant.name)")
+                        }
+                        ForEach(activePets) { pet in
+                            Label(pet.name, systemImage: "pawprint.fill")
+                                .tag("\(EntityKind.pet.rawValue)|\(pet.id.uuidString)")
+                                .accessibilityIdentifier("add-event-related-pet-\(pet.name)")
+                        }
+                        ForEach(activeHumans) { human in
+                            Label(human.name, systemImage: "person.fill")
+                                .tag("\(EntityKind.human.rawValue)|\(human.id.uuidString)")
+                                .accessibilityIdentifier("add-event-related-human-\(human.name)")
+                        }
                     }
+                }
+
+                Section {
+                    Toggle(l.tr(zh: "全天", en: "All day", de: "Ganztägig"), isOn: $isAllDay)
+                        .tint(Color.goPrimary)
+                    DatePicker(
+                        l.tr(zh: "日期", en: "Date", de: "Datum"),
+                        selection: $startDate,
+                        displayedComponents: .date
+                    )
+                    if !isAllDay {
+                        DatePicker(
+                            l.tr(zh: "时间", en: "Time", de: "Uhrzeit"),
+                            selection: $startDate,
+                            displayedComponents: .hourAndMinute
+                        )
+                    }
+                } header: {
+                    Text(l.tr(zh: "时间", en: "Time", de: "Zeit"))
+                }
+
+                Section {
+                    Picker(l.tr(zh: "循环", en: "Repeat", de: "Wiederholen"), selection: $recurrenceOption) {
+                        ForEach(RecurrenceOption.allCases) { option in
+                            Text(option.title(l)).tag(option)
+                        }
+                    }
+                    if recurrenceOption == .custom {
+                        Stepper(
+                            l.tr(
+                                zh: "每 \(recurrenceDays) 天",
+                                en: "Every \(recurrenceDays) days",
+                                de: "Alle \(recurrenceDays) Tage"
+                            ),
+                            value: $recurrenceDays,
+                            in: 2 ... 90
+                        )
+                    }
+                    if recurrenceOption != .none {
+                        DatePicker(
+                            l.tr(zh: "结束日期", en: "End date", de: "Enddatum"),
+                            selection: $recurrenceEndDate,
+                            in: startDate...,
+                            displayedComponents: .date
+                        )
+                    }
+                }
+
+                Section {
+                    Toggle(l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"), isOn: $hasReminder)
+                        .tint(Color.goPrimary)
+                    if hasReminder {
+                        Picker(l.tr(zh: "提前提醒", en: "Remind before", de: "Vorher erinnern"), selection: $reminderLeadOption) {
+                            ForEach(allowedReminderLeadOptions) { option in
+                                Text(option.title(l)).tag(option)
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    Picker(l.tr(zh: "执行人", en: "Assignee", de: "Zuständig"), selection: assigneeSelection) {
+                        Label(l.tr(zh: "任何人", en: "Anyone", de: "Alle"), systemImage: "person.2.fill")
+                            .tag("")
+                        ForEach(activeHumans) { human in
+                            Label(human.name, systemImage: "person.fill")
+                                .tag(human.id.uuidString)
+                                .accessibilityIdentifier("add-event-assignee-human-\(human.name)")
+                        }
+                    }
+                }
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle(editorTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, role: .cancel) {
+                        closeEditor()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(didSave ? savedActionTitle : primaryActionTitle) {
+                        saveEvent()
+                    }
+                    .disabled(!canSave)
+                    .accessibilityIdentifier("add-event-save-action")
                 }
             }
         }
@@ -264,18 +349,15 @@ struct AddEventContentView: View {
         .onChange(of: recurrenceOption) { _, option in
             normalizeRecurrenceState(for: option)
         }
+        .onChange(of: eventType) { _, type in
+            if trimmedTitle.isEmpty {
+                title = eventTypeTitle(type)
+            }
+        }
         .onChange(of: isAllDay) { _, allDay in
             let cal = Calendar.current
             if allDay {
                 startDate = cal.startOfDay(for: startDate)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
-            updateKeyboardHeight(notification)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            if keyboardHeight > 0 {
-                keyboardHeight = 0
             }
         }
         .onAppear {
@@ -288,6 +370,27 @@ struct AddEventContentView: View {
         .onDisappear {
             commandQueue.cancelAll()
         }
+    }
+
+    private var relatedEntitySelection: Binding<String> {
+        Binding(
+            get: {
+                guard !relatedEntityType.isEmpty, !relatedEntityId.isEmpty else { return "" }
+                return "\(relatedEntityType)|\(relatedEntityId)"
+            },
+            set: { value in
+                let parts = value.split(separator: "|", maxSplits: 1).map(String.init)
+                relatedEntityType = parts.first ?? ""
+                relatedEntityId = parts.count == 2 ? parts[1] : ""
+            }
+        )
+    }
+
+    private var assigneeSelection: Binding<String> {
+        Binding(
+            get: { assigneeId ?? "" },
+            set: { assigneeId = $0.isEmpty ? nil : $0 }
+        )
     }
 
     private var header: some View {

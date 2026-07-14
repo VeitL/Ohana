@@ -398,46 +398,54 @@ struct MemberCreationJoinHandoffModifier: ViewModifier {
 struct MemberCreationJoinHandoffCard: View {
     let snapshot: MemberCardRenderSnapshot
 
-    private var accent: Color {
-        Color(hex: snapshot.themeColorHex)
+    private var palette: WalletMemberHeroPalette {
+        WalletMemberHeroPalette(
+            themeColorHex: snapshot.themeColorHex,
+            fallbackColor: Color(hex: "D95D55")
+        )
     }
 
-    private var prefersDarkText: Bool {
-        WalletPetCardTheme.prefersDarkForeground(for: snapshot.themeColorHex)
+    private var usesWidePhoto: Bool {
+        snapshot.avatarImage != nil
+            && snapshot.avatarSource == .customImage
+            && !snapshot.avatarIsTransparent
     }
 
-    private var primaryText: Color {
-        prefersDarkText ? Color.arkInk : Color.goCardWhite
+    private var topPrimaryText: Color {
+        usesWidePhoto ? Color.goCardWhite : Color.arkInk
     }
 
-    private var secondaryText: Color {
-        primaryText.opacity(0.66)
+    private var topSecondaryText: Color {
+        topPrimaryText.opacity(0.66)
     }
 
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
-            RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
-                .fill(cardGradient)
+            ZStack {
+                WalletMemberHeroBackground(
+                    themeColorHex: snapshot.themeColorHex,
+                    fallbackColor: Color(hex: "D95D55")
+                )
+                avatar(width: width, height: height)
+            }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous))
                 .overlay(alignment: .topLeading) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(snapshot.title)
                             .font(.system(size: min(max(width * 0.115, 32), 46), weight: .black, design: .rounded))
-                            .foregroundStyle(primaryText)
+                            .foregroundStyle(topPrimaryText)
                             .lineLimit(2)
                             .minimumScaleFactor(0.62)
                         Text(snapshot.subtitle)
                             .font(OhanaFont.callout(.bold))
-                            .foregroundStyle(secondaryText)
+                            .foregroundStyle(topSecondaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                     }
                     .padding(.top, 24)
                     .padding(.horizontal, 22)
-                }
-                .overlay {
-                    avatar(width: width, height: height)
                 }
                 .overlay(alignment: .bottomLeading) {
                     HStack(spacing: 7) {
@@ -447,29 +455,17 @@ struct MemberCreationJoinHandoffCard: View {
                             .minimumScaleFactor(0.7)
                     }
                     .font(OhanaFont.caption(.black))
-                    .foregroundStyle(primaryText)
+                    .foregroundStyle(Color.goCardWhite)
                     .padding(.horizontal, 12)
                     .frame(height: 34)
-                    .background(primaryText.opacity(prefersDarkText ? 0.10 : 0.14), in: Capsule())
+                    .background(Color.goCardWhite.opacity(0.14), in: Capsule())
                     .padding(18)
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
-                        .strokeBorder(Color.goCardWhite.opacity(0.24), lineWidth: 1)
+                        .strokeBorder(palette.border, lineWidth: 1)
                 }
         }
-    }
-
-    private var cardGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                accent.mix(with: .white, by: 0.14),
-                accent,
-                accent.mix(with: .black, by: 0.34)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 
     @ViewBuilder
@@ -496,7 +492,7 @@ struct MemberCreationJoinHandoffCard: View {
         } else {
             Image(systemName: snapshot.fallbackSymbol)
                 .font(.system(size: min(width * 0.32, 110), weight: .black))
-                .foregroundStyle(primaryText.opacity(0.86))
+                .foregroundStyle(Color.goCardWhite.opacity(0.86))
                 .frame(width: width * 0.58, height: height * 0.42)
                 .position(x: width * 0.54, y: height * 0.53)
         }

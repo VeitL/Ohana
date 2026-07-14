@@ -349,8 +349,10 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
         equippedTitleRaw: String,
         language: String
     ) -> [FocusCard] {
-        cards.map { card in
+        _ = hiddenPetIDsRaw
+        return cards.map { card in
             var copy = card
+            copy.isShownOnHome = true
             if let pet = pets.first(where: { $0.id == card.id }) {
                 copy.modelID = pet.persistentModelID
                 copy.avatarImageData = nil
@@ -365,12 +367,10 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 copy.petBondNameplateText = copy.petBondNameplateActive
                     ? L10n(language).tr(zh: "羁绊", en: "Bond", de: "Bindung")
                     : nil
-                copy.isShownOnHome = HomeCardVisibility.isPetVisible(pet, raw: hiddenPetIDsRaw)
             } else if let human = humans.first(where: { $0.id == card.id }) {
                 copy.modelID = human.persistentModelID
                 copy.avatarImageData = nil
                 copy.avatarImageSignature = human.avatarThumbnailSignature
-                copy.isShownOnHome = human.shouldShowOnHome
                 if human.id.uuidString == activeHumanIdRaw {
                     copy.equippedTitleBadgeText = equippedTitleBadgeText(for: equippedTitleRaw)
                 }
@@ -845,7 +845,7 @@ nonisolated enum VerticalSolidHomePreloadPlanner {
             )
         }
 
-        for card in snapshot.cards.prefix(FocusHomeCardDataSource.maxCardsPerPage) {
+        for card in snapshot.cards.prefix(FocusHomeCardDataSource.firstScreenMediaBudget) {
             if let pet = petsById[card.id] {
                 appendPet(pet, cardStyleRaw: card.cardStyleRaw)
             } else if let human = humansById[card.id] {
@@ -876,7 +876,7 @@ nonisolated enum VerticalSolidHomePreloadPlanner {
 
     static func avatarPayloads(snapshot: VerticalSolidHomeSnapshot) -> [FocusWalletAvatarCache.Payload] {
         snapshot.cards
-            .prefix(FocusHomeCardDataSource.maxCardsPerPage)
+            .prefix(FocusHomeCardDataSource.firstScreenMediaBudget)
             .map { card in
                 FocusWalletAvatarCache.Payload(id: card.id, data: card.avatarImageData)
             }
@@ -888,7 +888,7 @@ nonisolated enum VerticalSolidHomePreloadPlanner {
 
     static func popoutPayloads(snapshot: VerticalSolidHomeSnapshot) -> [FocusWalletAvatarCache.Payload] {
         snapshot.cards
-            .prefix(FocusHomeCardDataSource.maxCardsPerPage)
+            .prefix(FocusHomeCardDataSource.firstScreenMediaBudget)
             .map { card in
                 FocusWalletAvatarCache.Payload(id: card.id, data: card.cardPopoutImageData)
             }

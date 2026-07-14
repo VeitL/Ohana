@@ -11,7 +11,7 @@ struct FunctionMenuRootView: View {
     @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
-    private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome && !$0.hasPassedAway } }
+    private var visibleHumans: [Human] { humans.filter { !$0.hasPassedAway } }
     private var l: L10n { L10n(appLanguage) }
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }
 

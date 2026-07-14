@@ -35,7 +35,6 @@ struct FocusWalletCardView: View {
     var equipFxLimeGlow: Bool = false
     var equipFxPopoutCard: Bool = true
 
-    private let accent = Color(hex: "FF5A3D")
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
@@ -48,10 +47,6 @@ struct FocusWalletCardView: View {
 
     private var showsCardTextBadges: Bool {
         presentation == .home || presentation == .plant
-    }
-
-    private var showsHomeVisibilityStatusBadge: Bool {
-        presentation == .home
     }
 
     private var walletAnimation: Animation {
@@ -96,7 +91,7 @@ struct FocusWalletCardView: View {
                         .allowsHitTesting(false)
                 }
 
-                backgroundHeadlineLayer(w: w, progress: visualProgress)
+                backgroundHeadlineLayer(w: w, usesFullBleed: usesFullBleed, progress: visualProgress)
                     .opacity(Double(WalletHeroTimeline.smooth(visualProgress, 0.02, 0.16)))
 
                 if !usesFullBleed, !usesPopoutOverlay {
@@ -187,16 +182,25 @@ struct FocusWalletCardView: View {
         card.petBondNameplateActive
     }
 
+    private var usesPlantLightBlueGlass: Bool {
+        card.isPlant || presentation == .plant
+    }
+
     private var cardBorderColor: Color {
         if card.isElectronicPet { return electronicPetTint.opacity(electronicPetNeedsCare ? 0.90 : 0.72) }
+        if usesPlantLightBlueGlass { return WalletPlantLightBlueGlassBackground.rimColor }
         if petBondBorderActive { return Color.goYellow.opacity(0.78) }
         if equipFxLimeGlow { return Color.goPrimary.opacity(0.72) }
-        return .white.opacity(0.15)
+        return WalletMemberHeroPalette(
+            themeColorHex: card.themeColorHex,
+            fallbackColor: card.color
+        ).border
     }
 
     private var cardBorderWidth: CGFloat {
         if card.isElectronicPet { return electronicPetNeedsCare ? 1.8 : 1.25 }
-        return petBondBorderActive ? 1.8 : (equipFxLimeGlow ? 1.4 : 0.5)
+        if usesPlantLightBlueGlass { return WalletPlantLightBlueGlassBackground.rimWidth }
+        return petBondBorderActive ? 1.8 : (equipFxLimeGlow ? 1.4 : 1)
     }
 
     private var cardBorderShadow: Color {
@@ -246,7 +250,7 @@ struct FocusWalletCardView: View {
         return OhanaHeroGeometry.lerp(collapsed, expanded, progress: progress)
     }
 
-    private func backgroundHeadlineLayer(w: CGFloat, progress: CGFloat) -> some View {
+    private func backgroundHeadlineLayer(w: CGFloat, usesFullBleed: Bool, progress: CGFloat) -> some View {
         let headlineSize = WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: card.name.count)
         let textScale = OhanaHeroGeometry.lerp(0.24, 1, progress: WalletHeroTimeline.smooth(progress, 0, 1))
         return VStack(spacing: 4) {
@@ -255,7 +259,7 @@ struct FocusWalletCardView: View {
                     size: headlineSize,
                     weight: .black, design: .rounded
                 ))
-                .foregroundStyle(accent.opacity(0.85))
+                .foregroundStyle((usesFullBleed ? Color.goCardWhite : Color.arkInk).opacity(0.90))
                 .lineLimit(1)
                 .minimumScaleFactor(0.22)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -269,46 +273,27 @@ struct FocusWalletCardView: View {
 
     @ViewBuilder
     private func cardBackground(usesFullBleed: Bool, progress: CGFloat) -> some View {
-        if !card.themeColorHex.isEmpty {
-            let palette = WalletPetCardTheme.meshColors(for: card.themeColorHex)
-            if shouldReduceWork {
-                LinearGradient(
-                    colors: [palette[0], palette[4], palette[8]],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            } else {
-                MeshGradient(
-                    width: 3, height: 3,
-                    points: [
-                        SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
-                        SIMD2(0.0, 0.5), SIMD2(0.52, 0.38), SIMD2(1.0, 0.5),
-                        SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
-                    ],
-                    colors: palette
-                )
-            }
+        if usesPlantLightBlueGlass {
+            WalletPlantLightBlueGlassBackground(reducesEffects: shouldReduceWork)
         } else {
-            LinearGradient(
-                colors: [
-                    card.color.mix(with: .white, by: 0.22),
-                    card.color,
-                    card.color.mix(with: .black, by: 0.12)
-                ],
-                startPoint: .topLeading, endPoint: .bottomTrailing
+            WalletMemberHeroBackground(
+                themeColorHex: card.themeColorHex,
+                fallbackColor: card.color,
+                reducesEffects: shouldReduceWork
             )
         }
-        let useDarkText = !usesFullBleed && WalletPetCardTheme.prefersDarkForeground(for: card.themeColorHex)
-        LinearGradient(
-            colors: [
-                .clear,
-                useDarkText
-                    ? Color.goCardWhite.opacity(Double(OhanaHeroGeometry.lerp(0.20, 0.30, progress: progress)))
-                    : Color.arkInk.opacity(usesFullBleed ? 0.12 : 0.28)
-            ],
-            startPoint: .top, endPoint: .bottom
-        )
-        .allowsHitTesting(false)
+
+        if usesFullBleed {
+            LinearGradient(
+                colors: [
+                    Color.arkInk.opacity(0.08),
+                    Color.arkInk.opacity(Double(OhanaHeroGeometry.lerp(0.20, 0.34, progress: progress)))
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .allowsHitTesting(false)
+        }
     }
 
     @ViewBuilder
@@ -411,7 +396,6 @@ struct FocusWalletCardView: View {
                 PetSilhouetteView(
                     species: silSpecies,
                     coatColor: card.coatColor,
-                    eyeColor: card.eyeColor,
                     patternName: card.patternName,
                     isAnimationEnabled: false
                 )
@@ -659,11 +643,6 @@ struct FocusWalletCardView: View {
                 } else {
                     petInfoStack(usesFullBleed: usesFullBleed, progress: progress)
                 }
-                if showsHomeVisibilityStatusBadge {
-                    homeVisibilityStatusBadge
-                        .padding(.top, 8)
-                        .opacity(Double(WalletHeroTimeline.smooth(progress, 0.72, 1)))
-                }
             }
             .padding(.trailing, 16).padding(.top, 18).padding(.bottom, 16)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -765,31 +744,12 @@ struct FocusWalletCardView: View {
         card.togetherHeadlineText ?? card.daysTogetherText ?? ""
     }
 
-    private var homeVisibilityStatusBadge: some View {
-        let isShown = card.isShownOnHome
-        return HStack(spacing: 6) {
-            Image(systemName: isShown ? "house.fill" : "house.slash.fill")
-                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text(isShown ? l.tr(zh: "首页显示中", en: "Shown on Home", de: "Auf Startseite sichtbar") : l.tr(zh: "未显示在首页", en: "Hidden from Home", de: "Nicht auf Startseite"))
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .foregroundStyle(isShown ? Color.arkInk : Color.goCardWhite.opacity(0.74))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(isShown ? Color.goPrimary : Color.arkInk.opacity(0.26), in: Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(isShown ? Color.clear : Color.goCardWhite.opacity(0.16), lineWidth: 0.6)
-        )
-    }
-
     private func topIdentityBar(usesFullBleed: Bool) -> some View {
-        HStack(spacing: 8) {
+        let identityText = usesFullBleed ? Color.goCardWhite : Color.arkInk
+        return HStack(spacing: 8) {
             Text(card.name)
                 .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed).opacity(0.9))
+                .foregroundStyle(identityText.opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
             if showsCardTextBadges, petBondNameplateActive, let nameplate = card.petBondNameplateText {
@@ -830,12 +790,8 @@ struct FocusWalletCardView: View {
         card.isHuman ? card.equippedTitleBadgeText : nil
     }
 
-    private func useDarkCardText(usesFullBleed: Bool) -> Bool {
-        !usesFullBleed && WalletPetCardTheme.prefersDarkForeground(for: card.themeColorHex)
-    }
-
     private func cardPrimaryText(usesFullBleed: Bool) -> Color {
-        useDarkCardText(usesFullBleed: usesFullBleed) ? Color.arkInk : Color.goCardWhite
+        usesPlantLightBlueGlass && !usesFullBleed ? Color.arkInk : Color.goCardWhite
     }
 
     private func cardSecondaryText(usesFullBleed: Bool, opacity: Double) -> Color {
@@ -843,9 +799,9 @@ struct FocusWalletCardView: View {
     }
 
     private func topIdentityScrimColors(usesFullBleed: Bool) -> [Color] {
-        useDarkCardText(usesFullBleed: usesFullBleed)
-            ? [Color.goCardWhite.opacity(0.34), Color.goCardWhite.opacity(0.10), .clear]
-            : [Color.arkInk.opacity(0.22), Color.arkInk.opacity(0.06), .clear]
+        usesFullBleed
+            ? [Color.arkInk.opacity(0.30), Color.arkInk.opacity(0.06), .clear]
+            : [Color.goCardWhite.opacity(0.20), Color.goCardWhite.opacity(0.04), .clear]
     }
 
     private static func normalizeSpecies(_ s: String) -> String {

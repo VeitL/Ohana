@@ -29,6 +29,7 @@ private struct MemberCreationExistingMembers {
 enum MemberCreationError: LocalizedError {
     case emptyName
     case duplicateName
+    case incompletePetProfile
     case avatarPassRequired
     case insufficientCoconuts(missing: Int)
     case missingActiveHuman
@@ -41,6 +42,8 @@ enum MemberCreationError: LocalizedError {
             "Name is required."
         case .duplicateName:
             "Name already exists."
+        case .incompletePetProfile:
+            "Species, breed, sex, and coat are required."
         case .avatarPassRequired:
             "A 2.5D avatar pass is required."
         case let .insufficientCoconuts(missing):
@@ -147,6 +150,12 @@ final class MemberCreationService: MemberCreating {
 
         switch draft.kind {
         case .pet:
+            guard !draft.species.isEmpty,
+                  !draft.resolvedBreed.isEmpty,
+                  ["boy", "girl"].contains(draft.petGender),
+                  !draft.coatColor.isEmpty else {
+                throw ServiceError.incompletePetProfile
+            }
             return try savePet(
                 draft: draft,
                 existingPets: currentMembers.pets,
@@ -228,22 +237,9 @@ final class MemberCreationService: MemberCreating {
         let persistedAvatarImageData = MemberAvatarImageProcessor.persistableAvatarData(draft.avatarImageData)
         pet.updateAvatarImageData(persistedAvatarImageData)
         pet.coatColor = draft.coatColor
-        pet.eyeColor = draft.eyeColor
-        pet.personalityTagsRaw = draft.personalityTagIds.joined(separator: ",")
-        let previousHiddenHomePetIDsRaw = HomeCardVisibility.storedHiddenPetIDsRawIfPresent()
-        let currentHiddenHomePetIDsRaw = previousHiddenHomePetIDsRaw ?? ""
-        let shouldShowOnHome = shouldShowNewMemberOnHome(
-            existingPets: existingPets,
-            existingHumans: existingHumans,
-            hiddenPetIDsRaw: currentHiddenHomePetIDsRaw
-        )
-        if !shouldShowOnHome {
-            HomeCardVisibility.setPetVisible(
-                pet,
-                visible: false,
-                raw: currentHiddenHomePetIDsRaw
-            )
-        }
+        pet.personalityTagsRaw = PetPrimaryPersonalitySelection
+            .normalized(draft.personalityTagIds)
+            .joined(separator: ",")
         context.insert(pet)
         CloudSyncMutationRecorder.markModified(pet, context: context)
         insertInitialPetWeightIfNeeded(
@@ -260,9 +256,6 @@ final class MemberCreationService: MemberCreating {
         )
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
-            if !shouldShowOnHome {
-                HomeCardVisibility.restoreHiddenPetIDsRaw(previousHiddenHomePetIDsRaw)
-            }
             context.rollback()
             throw ServiceError.saveFailed(saveResult.errorDescription ?? "Member creation was not saved.")
         }
@@ -372,11 +365,7 @@ final class MemberCreationService: MemberCreating {
         human.updateAvatarImageData(persistedAvatarImageData)
         human.themeColorHex = draft.normalizedThemeHex
         human.genderIdentityRaw = HumanProfileOptions.storedGenderIdentity(draft.humanGender)
-        human.shouldShowOnHome = shouldShowNewMemberOnHome(
-            existingPets: existingPets,
-            existingHumans: existingHumans,
-            hiddenPetIDsRaw: HomeCardVisibility.storedHiddenPetIDsRaw()
-        )
+        human.shouldShowOnHome = true
         human.mbti = draft.mbti.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         human.notes = humanNotes(draft: draft)
         if let height = CountryDecimalInput.parse(draft.heightText, countryCode: countryCode), height > 0 {
@@ -444,18 +433,6 @@ final class MemberCreationService: MemberCreating {
         )
         publishMemberCreation(id: human.id, kind: "human", revisions: revisions)
         return SaveResult(pet: nil, human: human)
-    }
-
-    private func shouldShowNewMemberOnHome(
-        existingPets: [Pet],
-        existingHumans: [Human],
-        hiddenPetIDsRaw: String
-    ) -> Bool {
-        HomeCardVisibility.visibleCardCount(
-            pets: existingPets,
-            humans: existingHumans,
-            raw: hiddenPetIDsRaw
-        ) < HomeCardVisibility.maxVisibleCards
     }
 
     private func insertPetRelatedRecords(pet: Pet, draft: MemberCreationDraft, context: ModelContext) {

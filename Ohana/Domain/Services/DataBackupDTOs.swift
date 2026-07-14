@@ -151,6 +151,7 @@ nonisolated struct PetBackup: Codable {
     var createdAt: String
     var notes: String
     var coatColor: String
+    // Legacy transport field retained for restoring older backups.
     var eyeColor: String
     var currentStreak: Int
     var lastCheckInDate: String?

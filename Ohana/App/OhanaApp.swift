@@ -69,40 +69,100 @@ private struct OhanaBootstrapRootView: View {
     @State private var bootstrapStatus: OhanaBootstrapStatus = .preparing
     @State private var bootstrapTask: Task<Void, Never>?
     @State private var bootstrapWatchdogTask: Task<Void, Never>?
+    @State private var launchRevealTask: Task<Void, Never>?
+    @State private var launchRevealProgress: CGFloat = 0
+    @State private var isLaunchOverlayVisible = true
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Group {
+        ZStack {
             if let payload {
-                RootView(appLanguage: appLanguage)
-                    .modelContainer(payload.modelContainer)
-                    .environment(payload.appServices)
-                    .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-                        payload.appServices.lifecycle.handle(.didEnterBackground)
+                appContent(for: payload)
+                    .allowsHitTesting(!isLaunchOverlayVisible)
+                    .accessibilityHidden(isLaunchOverlayVisible)
+                    .zIndex(0)
+            }
+
+            if isLaunchOverlayVisible {
+                GeometryReader { proxy in
+                    OhanaBootstrapShell(
+                        status: bootstrapStatus,
+                        onRetry: retryBootstrap
+                    )
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .mask {
+                        OhanaLaunchCircularDismissMask(
+                            progress: reduceMotion ? 0 : launchRevealProgress
+                        )
+                        .fill(.white, style: FillStyle(eoFill: true)) // ui-v4: allow alpha-only launch transition mask ink.
+                        .blur(radius: reduceMotion ? 0 : 1.5)
+                        .frame(width: proxy.size.width, height: proxy.size.height)
                     }
-                    .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-                        payload.appServices.lifecycle.handle(.willResignActive)
-                    }
-                    .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                        payload.appServices.lifecycle.handle(.didBecomeActive)
-                    }
-                    .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
-                        payload.appServices.lifecycle.handle(.willTerminate)
-                    }
-            } else {
-                OhanaBootstrapShell(
-                    status: bootstrapStatus,
-                    onRetry: retryBootstrap
-                )
+                }
+                .ignoresSafeArea()
+                .opacity(reduceMotion ? 1 - launchRevealProgress : 1)
+                .allowsHitTesting(payload == nil)
+                .zIndex(1)
             }
         }
+        .background(Color(red: 0.035, green: 0.035, blue: 0.035).ignoresSafeArea())
         .tint(Color.goPrimary)
         .preferredColorScheme(preferredScheme)
-        .onAppear(perform: startBootstrapIfNeeded)
+        .onAppear {
+            startBootstrapIfNeeded()
+            beginLaunchRevealIfReady()
+        }
+        .onChange(of: payload != nil) { _, isReady in
+            guard isReady else { return }
+            beginLaunchRevealIfReady()
+        }
         .onDisappear {
             bootstrapTask?.cancel()
             bootstrapTask = nil
             bootstrapWatchdogTask?.cancel()
             bootstrapWatchdogTask = nil
+            launchRevealTask?.cancel()
+            launchRevealTask = nil
+        }
+    }
+
+    private func appContent(for payload: OhanaBootstrapPayload) -> some View {
+        RootView(appLanguage: appLanguage)
+            .modelContainer(payload.modelContainer)
+            .environment(payload.appServices)
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                payload.appServices.lifecycle.handle(.didEnterBackground)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+                payload.appServices.lifecycle.handle(.willResignActive)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                payload.appServices.lifecycle.handle(.didBecomeActive)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
+                payload.appServices.lifecycle.handle(.willTerminate)
+            }
+    }
+
+    private func beginLaunchRevealIfReady() {
+        guard payload != nil, isLaunchOverlayVisible, launchRevealTask == nil else { return }
+        let duration = reduceMotion ? 0.14 : 0.48
+        let animation: Animation = reduceMotion
+            ? .easeOut(duration: duration)
+            : .timingCurve(0.2, 0.78, 0.2, 1, duration: duration)
+
+        launchRevealTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 16)
+            guard !Task.isCancelled else { return }
+            withAnimation(animation) {
+                launchRevealProgress = 1
+            }
+            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            isLaunchOverlayVisible = false
+            launchRevealTask = nil
+            OhanaStartupProbe.mark("bootstrap.reveal-complete")
         }
     }
 
@@ -243,21 +303,12 @@ private struct OhanaBootstrapRootView: View {
 #endif
 }
 
-private enum OhanaBootstrapStatus {
+private enum OhanaBootstrapStatus: Equatable {
     case preparing
     case openingStore
     case buildingServices
     case slowOpeningStore
     case storeUnavailable
-
-    var allowsRetry: Bool {
-        switch self {
-        case .slowOpeningStore, .storeUnavailable:
-            true
-        case .preparing, .openingStore, .buildingServices:
-            false
-        }
-    }
 }
 
 private struct OhanaBootstrapShell: View {
@@ -267,6 +318,19 @@ private struct OhanaBootstrapShell: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     var body: some View {
+        if case .storeUnavailable = status {
+            recoveryContent
+        } else {
+            OhanaLaunchLoadingView(
+                accessibilityLabel: statusMessage,
+                showsSlowRecovery: status == .slowOpeningStore,
+                retryTitle: l.tr(zh: "重试启动", en: "Retry startup", de: "Start erneut versuchen"),
+                onRetry: onRetry
+            )
+        }
+    }
+
+    private var recoveryContent: some View {
         ZStack {
             LinearGradient(
                 colors: AppBackgroundStyle.goIsland.gradientColors(for: .dark),
@@ -278,47 +342,32 @@ private struct OhanaBootstrapShell: View {
                 Text("Ohana")
                     .font(OhanaFont.largeTitle(.heavy))
                     .foregroundStyle(Color.white.opacity(0.96)) // ui-v4: allow bootstrap shell ink on dark gradient
-                if case .storeUnavailable = status {
-                    Image(systemName: "externaldrive.badge.exclamationmark") // a11y: allow decorative icon; adjacent status text names the failure
-                        .font(OhanaFont.title(.bold))
-                        .foregroundStyle(Color.white.opacity(0.9)) // ui-v4: allow bootstrap shell ink on dark gradient
-                        .accessibilityHidden(true)
-                } else {
-                    ProgressView()
-                        .tint(Color.white.opacity(0.86)) // ui-v4: allow bootstrap shell ink on dark gradient
-                        .scaleEffect(0.86)
-                        .accessibilityLabel(l.tr(
-                            zh: "正在准备 Ohana",
-                            en: "Preparing Ohana",
-                            de: "Ohana wird vorbereitet"
-                        ))
-                }
+                Image(systemName: "externaldrive.badge.exclamationmark") // a11y: allow decorative icon; adjacent status text names the failure
+                    .font(OhanaFont.title(.bold))
+                    .foregroundStyle(Color.white.opacity(0.9)) // ui-v4: allow bootstrap shell ink on dark gradient
+                    .accessibilityHidden(true)
                 Text(statusMessage)
                     .font(OhanaFont.footnote(.bold))
                     .foregroundStyle(Color.white.opacity(0.68)) // ui-v4: allow bootstrap shell ink on dark gradient
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
-                if status.allowsRetry {
-                    Button(action: onRetry) {
-                        Text(l.tr(zh: "重试启动", en: "Retry startup", de: "Start erneut versuchen"))
-                            .font(OhanaFont.footnote(.black))
-                            .foregroundStyle(Color(red: 0.05, green: 0.09, blue: 0.25))
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: 44)
-                            .background(Color.white.opacity(0.88), in: Capsule()) // ui-v4: allow bootstrap retry pill on dark gradient
-                    }
-                    .accessibilityIdentifier("bootstrap-retry-button")
+                Button(action: onRetry) {
+                    Text(l.tr(zh: "重试启动", en: "Retry startup", de: "Start erneut versuchen"))
+                        .font(OhanaFont.footnote(.black))
+                        .foregroundStyle(Color(red: 0.05, green: 0.09, blue: 0.25))
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .background(Color.white.opacity(0.88), in: Capsule()) // ui-v4: allow bootstrap retry pill on dark gradient
                 }
-                if case .storeUnavailable = status {
-                    Link(destination: OhanaPublicLinks.support) {
-                        Text(l.tr(zh: "联系支持", en: "Contact support", de: "Support kontaktieren"))
-                            .font(OhanaFont.footnote(.bold))
-                            .foregroundStyle(Color.white.opacity(0.9)) // ui-v4: allow bootstrap shell ink on dark gradient
-                            .frame(minHeight: 44)
-                            .padding(.horizontal, 14)
-                    }
-                    .accessibilityIdentifier("bootstrap-support-action")
+                .accessibilityIdentifier("bootstrap-retry-button")
+                Link(destination: OhanaPublicLinks.support) {
+                    Text(l.tr(zh: "联系支持", en: "Contact support", de: "Support kontaktieren"))
+                        .font(OhanaFont.footnote(.bold))
+                        .foregroundStyle(Color.white.opacity(0.9)) // ui-v4: allow bootstrap shell ink on dark gradient
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, 14)
                 }
+                .accessibilityIdentifier("bootstrap-support-action")
             }
         }
     }
@@ -348,6 +397,180 @@ private struct OhanaBootstrapShell: View {
 
     private var l: L10n {
         L10n(appLanguage)
+    }
+}
+
+private struct OhanaLaunchLoadingView: View {
+    let accessibilityLabel: String
+    let showsSlowRecovery: Bool
+    let retryTitle: String
+    let onRetry: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var animationStartedAt = Date()
+
+    private var canAnimate: Bool {
+        !reduceMotion && workloadPolicy.shouldRunRepeatingAnimation(isVisible: true)
+    }
+
+    var body: some View {
+        ZStack {
+            Color(red: 0.035, green: 0.035, blue: 0.035)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+
+            GeometryReader { proxy in
+                TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !canAnimate)) { context in
+                    ZStack {
+                        OhanaLaunchExpansionField(
+                            phase: canAnimate ? animationPhase(at: context.date) : 0.36,
+                            diameter: min(proxy.size.width * 0.48, 196)
+                        )
+
+                        OhanaLaunchMark(phase: canAnimate ? animationPhase(at: context.date) : 0.36)
+                            .frame(width: 72, height: 58)
+                    }
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .accessibilityHidden(true)
+                }
+            }
+            .allowsHitTesting(false)
+
+            if showsSlowRecovery {
+                VStack {
+                    Spacer()
+                    Button(retryTitle, action: onRetry)
+                        .buttonStyle(.bordered)
+                        .tint(.white)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("bootstrap-retry-button")
+                        .padding(.bottom, 48)
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    private func animationPhase(at date: Date) -> CGFloat {
+        CGFloat(date.timeIntervalSince(animationStartedAt).truncatingRemainder(dividingBy: 1.35) / 1.35)
+    }
+}
+
+private struct OhanaLaunchExpansionField: View {
+    let phase: CGFloat
+    let diameter: CGFloat
+
+    var body: some View {
+        OhanaLaunchExpansionWave(progress: phase, diameter: diameter)
+            .drawingGroup()
+    }
+}
+
+private struct OhanaLaunchExpansionWave: View {
+    let progress: CGFloat
+    let diameter: CGFloat
+
+    var body: some View {
+        let clampedProgress = min(max(progress, 0), 1)
+        let smoothProgress = clampedProgress * clampedProgress * (3 - 2 * clampedProgress)
+        let visibility = sin(clampedProgress * .pi)
+
+        ZStack {
+            Circle()
+                .fill(.white.opacity(0.05)) // ui-v4: allow the Figma-authored launch diffusion on its fixed dark canvas.
+            Circle()
+                .stroke(.white.opacity(0.18), lineWidth: 1.2) // ui-v4: allow the Figma-authored launch diffusion on its fixed dark canvas.
+        }
+        .frame(width: diameter, height: diameter)
+        .scaleEffect(0.28 + 0.76 * smoothProgress)
+        .opacity(visibility)
+    }
+}
+
+private struct OhanaLaunchMark: View {
+    let phase: CGFloat
+
+    var body: some View {
+        let cycle = phase * .pi * 2
+        let pulse = (sin(cycle - .pi / 2) + 1) / 2
+
+        ZStack {
+            OhanaLaunchSmileShape()
+                .fill(.white) // ui-v4: allow Figma-authored launch mark ink on the fixed dark launch canvas.
+                .frame(width: 66, height: 30)
+                .offset(y: 13)
+
+            Circle()
+                .fill(.white) // ui-v4: allow Figma-authored launch mark ink on the fixed dark launch canvas.
+                .frame(width: 18, height: 18) // a11y: allow decorative noninteractive launch-mark eye.
+                .offset(x: -15, y: -12)
+
+            Circle()
+                .fill(.white) // ui-v4: allow Figma-authored launch mark ink on the fixed dark launch canvas.
+                .frame(width: 17, height: 17) // a11y: allow decorative noninteractive launch-mark eye.
+                .offset(x: 15, y: -10)
+        }
+        .drawingGroup()
+        .shadow(color: .white.opacity(0.16 + 0.07 * pulse), radius: 18) // ui-v4: allow the Figma launch mark's intentional soft halo.
+        .scaleEffect(0.985 + 0.015 * pulse)
+    }
+}
+
+private struct OhanaLaunchCircularDismissMask: Shape {
+    var progress: CGFloat
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let clampedProgress = min(max(progress, 0), 1)
+        let maximumRadius = hypot(rect.width, rect.height) * 0.52
+        let radius = maximumRadius * clampedProgress
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+
+        var path = Path()
+        path.addRect(rect)
+        path.addEllipse(in: CGRect(
+            x: center.x - radius,
+            y: center.y - radius,
+            width: radius * 2,
+            height: radius * 2
+        ))
+        return path
+    }
+}
+
+private struct OhanaLaunchSmileShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            path.addCurve(
+                to: CGPoint(x: rect.maxX, y: rect.minY),
+                control1: CGPoint(x: rect.width * 0.18, y: rect.height * 0.58),
+                control2: CGPoint(x: rect.width * 0.82, y: rect.height * 0.58)
+            )
+            path.addCurve(
+                to: CGPoint(x: rect.width * 0.73, y: rect.height * 0.86),
+                control1: CGPoint(x: rect.width * 0.97, y: rect.height * 0.46),
+                control2: CGPoint(x: rect.width * 0.87, y: rect.height * 0.76)
+            )
+            path.addCurve(
+                to: CGPoint(x: rect.width * 0.27, y: rect.height * 0.86),
+                control1: CGPoint(x: rect.width * 0.63, y: rect.maxY),
+                control2: CGPoint(x: rect.width * 0.37, y: rect.maxY)
+            )
+            path.addCurve(
+                to: CGPoint(x: rect.minX, y: rect.minY),
+                control1: CGPoint(x: rect.width * 0.13, y: rect.height * 0.76),
+                control2: CGPoint(x: rect.width * 0.03, y: rect.height * 0.46)
+            )
+            path.closeSubpath()
+        }
     }
 }
 

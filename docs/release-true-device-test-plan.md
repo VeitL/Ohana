@@ -121,6 +121,9 @@ CloudKit live apply 在首发继续关闭 CloudKit 时只需确认本轮不测�
 
 - Archive 的 `UIDeviceFamily` 仅包含 `1`，App Store Connect 不要求 iPad 截图，
   不包含 watchOS app 或 complication。
+- 签名 App 与 target entitlement 一致，只保留当前需要的 HealthKit 与
+  CloudDocuments；不包含 Sign in with Apple、CloudKit、APNs、remote notification
+  或 App Group。Developer Portal 与 distribution profile 不保留未使用能力。
 - 最低系统为 iOS 26.2；最小与当前 iPhone 都能完成核心 smoke，关键操作不截断、
   不被安全区遮挡、没有启动或持久化失败。
 - 记录实际开放的 storefront。原生 iPad、原生 Watch 与更低 iOS 不得写入首发宣传。
@@ -150,7 +153,30 @@ Pet 奖励余额 `9`、`system:legacy=0`，同时存在 Pet `-50`、岛屿 `+50`
 项目目录受 File Provider 管理时，`.build` 内归档会在签名前重新附加
 `com.apple.FinderInfo`；将 DerivedData 与 Archive 移到 `/tmp` 后成功，归档内
 未残留 FinderInfo / ResourceFork。R0 保持未勾选，直至最小设备、当前设备完整
-smoke 与 App Store Connect / storefront 均有记录。
+smoke 与 App Store Connect / storefront 均有记录。该 Archive 的无 Sign in with
+Apple、HealthKit + CloudDocuments 能力边界与当前产品决定一致，但它早于当前
+HealthKit 和文档变更；仍须用当前 worktree 生成新签名包重测。
+
+历史记录（2026-07-12，不得用于当前验收）：一份短期 Apple 身份原型 Archive
+`/tmp/OhanaArchives/2026-07-12-105335/Ohana-c2aa2af859-dirty.xcarchive`
+曾包含 Sign in with Apple，并完成覆盖安装、数据保留、取消和授权观察；后续
+Create Human handoff 曾卡住。该原型及后续 Supabase 账号原型均未进入产品，现已连同
+登录 UI、Auth 依赖、账号 entitlement/config/privacy 声明一起移除。此 Archive 不再
+匹配当前 target，不能签收 R0 或任何账号能力；未来设计仅见
+`docs/planning/account-backend-extension.md`。
+
+记录（2026-07-12，当前 local-only 包已安装，用户观察待完成）：
+`scripts/archive-release-local.sh` 成功生成并验证
+`/tmp/OhanaArchives/2026-07-12-180306/Ohana-c2aa2af859-dirty.xcarchive`。
+WMO Archive、Xcode store validation、strict `codesign`、designated requirement、
+xattr 检查均通过；产物为 arm64、iPhone-only、iOS 26.2+，不含 extension/watchOS。
+签名 App 只申领 HealthKit + CloudDocuments，不含 Sign in with Apple、CloudKit、APNs、
+App Group 或 remote-notification mode；`PrivacyInfo.xcprivacy` 无 collected data、tracking
+或 tracking domain，也无 Supabase/crypto 产物。该 App 已在不卸载、不清空数据的前提下
+覆盖安装并通过 CLI 启动于 iPhone 17 Pro Max / iOS 26.5.2，进程保持存在。development
+profile 仍允许比 App 更宽的 Apple 登录/APNs/iCloud/HealthKit 能力，因此 distribution
+profile / Developer Portal 卫生仍是 R0；用户尚未确认原数据保留以及修复后的
+Exercise/Stand/活动环/Recent Workouts，R0 与 HealthKit P1 均保持未勾选。
 
 ### R1. 公开政策与支持入口
 
@@ -158,8 +184,9 @@ smoke 与 App Store Connect / storefront 均有记录。
 
 通过标准：
 
-- 隐私政策打开公开 HTTPS 页面，内容与当前 Solo 实现一致：CloudKit/APNs/远程
-  同步关闭，自动 iCloud Drive 包不含人类健康/HealthKit/体重/运动/用药/健康报告。
+- 隐私政策打开公开 HTTPS 页面，内容与当前实现一致：无 Ohana 账号、登录、开发者
+  后端、分析、追踪或照护数据远程同步；自动 iCloud Drive 包由用户自己的 iCloud
+  持有，且不含人类健康/HealthKit/体重/运动/用药/健康报告。
 - 支持入口打开邮件撰写，收件人正确，且不会自动附带任何记录、日志、截图或诊断数据。
 
 记录（2026-07-11，外部 URL 预检）：公开隐私政策 HTTPS 页面可匿名访问，页面
@@ -294,7 +321,7 @@ smoke 与 App Store Connect / storefront 均有记录。
 
 已测过：
 
-- 首启 reset -> 创建主人 -> starter gift -> Today Focus 创建首宠 -> Home Oasis -> Settings 已有真机 smoke 通过。
+- Pet-first 首启 -> 创建首宠 -> 第一笔照护 -> starter gift -> Home Oasis -> Settings 已有真机 smoke 通过。
 - 一人一宠进入 Function Menu 的模拟器预检已通过。
 - 2026-06-30 模拟器 GUI 批次已覆盖 Home FAB -> More -> Function Menu -> Coconut Shop，Lime Glow 购买确认弹窗、确认后人类余额从 1000🥥 到 700🥥、购买反馈显示。
 - 2026-07-01 broad GUI 批次已再次覆盖首启创建 Human / Pet、starter gift、Oasis Lv1、Home FAB -> More -> Function Menu，且未出现单人家庭缺员文案。
@@ -303,8 +330,16 @@ smoke 与 App Store Connect / storefront 均有记录。
 真机还要测：
 
 - 覆盖安装或重新 build 后不卸载 App，确认不会白屏或卡在启动图。
-- App reset 后重新首启，创建主人和首宠，不应长时间停在半完成首页。
+- App reset 后重新首启，创建首宠和第一笔照护，不应长时间停在半完成首页，也不应要求创建 Human。
 - 打开 Settings，页面应立即可用，不停在 opening shell。
+- 在没有 Human 的状态打开 Settings，确认没有 Ohana 账号、Apple/Google 登录或登录
+  提示，也不会出现系统登录授权页；建 Pet、照护和备份均可正常使用。
+- 手动创建 Human：姓名必填，性别和生日可保持未设置；App 不从 Apple 账号读取或
+  自动填充身份资料，也不自动创建、合并或认领 Human。
+- 启用 iCloud Drive 自动备份、退出并重开 App，确认备份状态恢复且从未要求 App 登录；
+  断网/iCloud 不可用时本地照护继续可用，备份失败可见并可重试。
+- App Reset 后确认本机数据删除，并按 R6 验证 app-managed iCloud Drive 备份清理的
+  成功、失败、重试和重复操作；不存在远程 Ohana 账号删除步骤。
 - 创建第二个人类和第二只宠物后回首页，卡片和账户选择应正常。
 - CrewRoster 连续点击成员卡片，确认放大 / 缩小动画顺滑，缩小时不被其他卡片盖住、不跳层、不闪烁。
 - CrewRoster 和 FunctionMenu 扫描一遍，确认只出现首发可达功能。
@@ -313,6 +348,8 @@ smoke 与 App Store Connect / storefront 均有记录。
 
 - 没有白屏、卡死、长时间不可点击、卡片消失或必须切 tab 才恢复。
 - 联机、CloudKit、植物未解锁入口仍被门禁收起。
+- 当前产品不存在登录门槛或账号同步声明；启动、建 Pet、照护、备份和恢复在无 Human、
+  无网络或无 App 账号的状态下仍符合各自规则。iCloud Drive 错误可见且可重试。
 - 详情入口、删除入口、标记离世入口的视觉和文案一致。
 
 记录：
@@ -469,6 +506,10 @@ smoke 与 App Store Connect / storefront 均有记录。
 已测过：
 
 - HumanHealth / HumanNotes / Workouts 的添加、回读、删除后消失已测；当前首发本地查看者策略为同设备成员资料可见。
+- HealthKit 页面已改为直接展示可读的活动摘要与 `HKWorkout`；不再要求二次导入，
+  HealthKit / PetWalk 行只读，只有 Ohana 手动运动记录可删。每个活动环独立根据真实目标
+  显示，并支持活动能量与 Apple Move Time 两种 Move 模式。相关 Unit / 源码契约测试
+  通过 10/10，但真实 HealthKit 读取仍需下方真机签收。
 - Human medication 添加和回读 UI 已测。
 - 2026-07-01 broad GUI 批次已复测 Human Feature Hub 多个模块入口：weight、body metrics、workout、health report、medication、basic info、expense、wishlist、notes、profile，并复测 Home 人类快捷操作 weight / expense / medication sheet 打开和关闭。
 - 2026-07-01 broad GUI 批次 B 已复测 Human weight / expense / medication / note 持久化、扩展模块 TSH / workout / health report / wishlist / profile 写入、health metric / workout / health report / human note 删除后消失、同设备成员资料可见策略。
@@ -479,12 +520,21 @@ smoke 与 App Store Connect / storefront 均有记录。
 
 - 添加健康指标、健康报告、笔记、锻炼和人类用药。
 - 删除上述记录，确认普通入口不再显示。
+- 在已签名新构建中授予步数、距离、活动能量、锻炼时间、站立时间、活动摘要和
+  运动记录读取权限；确认真实 Exercise / Stand 值、活动能量或 Move Time 目标及每个
+  可用圆环都正确。单个目标缺失时，其他圆环仍必须显示真实进度。
+- 确认 Recent Workouts 直接显示 Apple Health 和 Ohana 遛狗来源，不出现导入或删除按钮；
+  与遛狗重合的记录只显示一行，覆盖安装后不产生新的本地副本或重复行。
+- 重启 App，然后分别拒绝一个类型与撤销 HealthKit 权限；确认页面不把“已发起授权”
+  误报为“已确认可读”，不可读的单项如实显示为无数据，其他允许项继续显示。
 - 切换同设备查看者 / 操作者，确认归属文案和可见策略一致，不出现“本机资料应被锁住”的误导。
 - 用长文案、长备注和键盘输入检查是否遮挡或溢出。
 
 通过标准：
 
 - 添加、回读、删除都稳定。
+- HealthKit 值和每个可用目标圆环与 Apple Health 一致；Recent Workouts 是只读直接展示，
+  没有二次导入、不可删除外部事实，且重启、单项拒绝和撤权时状态诚实可恢复。
 - 键盘不遮挡关键按钮，长文案不破版。
 - 同设备查看者策略和当前首发说明一致，不出现过期的隐私锁提示或误导。
 
@@ -492,7 +542,10 @@ smoke 与 App Store Connect / storefront 均有记录。
 
 - 设备 / iOS：
 - 构建：
-- 结果：2026-07-01 Human Feature Hub / Home 人类快捷操作模拟器 GUI 预检通过，真机键盘、长文案和手感待测。
+- 结果：2026-07-01 Human Feature Hub / Home 人类快捷操作模拟器 GUI 预检通过。2026-07-11
+  真机旧签名构建已确认 HealthKit 授权和大部分数值，但 Exercise、Stand 和活动环失败，且
+  旧导入交互不清晰。本地已完成上述直读修复并通过 10/10 定向测试；新签名构建的
+  HealthKit 实数据、重启、拒绝和撤权复测，以及真机键盘、长文案和手感仍待测。
 - 预检证据：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-gui-broad-20260701-a scripts/test-simulator.sh ... '-only-testing:OhanaUITests/OhanaUITests/testHumanFeatureHubRoutesOpenFromHome' '-only-testing:OhanaUITests/OhanaUITests/testHumanHomeQuickActionsOpenExpectedSheets' ...`，`iPhone 17` simulator，7 条 GUI 用例合跑 `Executed 7 tests, with 0 failures`，xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-a/Logs/Test/Test-Ohana-2026.07.01_00-39-04-+0200.xcresult`。
 - 预检证据：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-gui-broad-20260701-b scripts/test-simulator.sh ...`，`iPhone 17` simulator，初跑 10 条中 9 条通过；唯一失败定位为 UI 测试脚本 `dismissKeyboardIfPresent` 的全局 swipe 误关 Human Note 弹窗。修正后单独复跑 `testHumanRecordOperationsPersistFromFeatureHub`，结果 `Executed 1 test, with 0 failures`；初跑 xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-b/Logs/Test/Test-Ohana-2026.07.01_00-57-31-+0200.xcresult`，复跑 xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-b/Logs/Test/Test-Ohana-2026.07.01_01-25-41-+0200.xcresult`。
 - 预检证据：2026-07-01 broad GUI 批次 H 初跑 15 条中 12 条通过；修复后 `testHumanRecordOperationsPersistFromFeatureHub` 在复跑中通过，`testHumanExtendedModuleDeletesDisappearFromFeatureHub` 单条复测通过；xcresult `/tmp/OhanaDerivedData-gui-broad-20260701-h-rerun/Logs/Test/Test-Ohana-2026.07.01_04-52-30-+0200.xcresult` 和 `/tmp/OhanaDerivedData-gui-broad-20260701-h-rerun/Logs/Test/Test-Ohana-2026.07.01_05-14-00-+0200.xcresult`。

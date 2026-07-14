@@ -394,18 +394,17 @@ private struct SettingsPlantReminderPanelContent: View {
                                 .lineLimit(1)
                         }
                         Spacer()
-                        Button {
-                            togglePlantReminders(for: plant)
-                        } label: {
-                            plantReminderToggleIndicator(isOn: plantRemindersEnabled(for: plant))
+                        Toggle(
+                            isOn: Binding(
+                                get: { plantRemindersEnabled(for: plant) },
+                                set: { setPlantRemindersEnabled($0, for: plant) }
+                            )
+                        ) {
+                            Text(plantReminderAccessibilityLabel(plant))
                         }
-                        .buttonStyle(.plain) // ui-v4: allow switch indicator owns visual state; scale feedback delayed UI-test idle on this compact control
-                        .contentShape(Rectangle())
-                        .transaction { transaction in
-                            transaction.animation = nil
-                        }
-                        .frame(width: 50, height: 30)
-                        .accessibilityElement(children: .ignore)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .tint(accentColor)
                         .accessibilityLabel(plantReminderAccessibilityLabel(plant))
                         .accessibilityValue(plantReminderAccessibilityValue(plant))
                         .accessibilityHint(l.tr(
@@ -444,36 +443,30 @@ private struct SettingsPlantReminderPanelContent: View {
     }
 
     private var bulkDeferRow: some View {
-        HStack(spacing: 12) {
-            settingsIcon("clock.arrow.circlepath", color: Color.goYellow)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "全部延后一天", en: "Defer all by one day", de: "Alle um einen Tag verschieben"))
-                    .font(OhanaFont.body(.semibold))
-                    .foregroundStyle(primaryText)
-                Text(l.tr(
-                    zh: "只处理当前已到期的植物任务",
-                    en: "Only applies to currently due plant tasks",
-                    de: "Gilt nur für aktuell fällige Pflanzenaufgaben"
-                ))
-                .font(OhanaFont.caption2(.semibold))
-                .foregroundStyle(tertiaryText)
+        Button(action: performBulkDefer) {
+            HStack(spacing: 12) {
+                settingsIcon("clock.arrow.circlepath", color: Color.goYellow)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l.tr(zh: "全部延后一天", en: "Defer all by one day", de: "Alle um einen Tag verschieben"))
+                        .font(OhanaFont.body(.semibold))
+                        .foregroundStyle(primaryText)
+                    Text(l.tr(
+                        zh: "只处理当前已到期的植物任务",
+                        en: "Only applies to currently due plant tasks",
+                        de: "Gilt nur für aktuell fällige Pflanzenaufgaben"
+                    ))
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(tertiaryText)
+                }
+                .padding(.bottom, 18)
+                Spacer()
             }
-            .padding(.bottom, 18)
-            Spacer()
-            Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding button text
-                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
-                .foregroundStyle(tertiaryText.opacity(0.6))
-                .accessibilityHidden(true)
+            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-        .contentShape(Rectangle())
+        .buttonStyle(.borderless)
+        .disabled(isBulkDeferPending)
         .opacity(isBulkDeferPending ? 0.62 : 1)
-        .onTapGesture {
-            performBulkDefer()
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { performBulkDefer() }
         .accessibilityValue(statusMessage ?? "")
         .accessibilityIdentifier("settings-plant-reminders-defer-all")
     }
@@ -663,30 +656,6 @@ private struct SettingsPlantReminderPanelContent: View {
         return slug.isEmpty ? plant.id.uuidString.lowercased() : slug
     }
 
-    private func plantReminderToggleIndicator(isOn: Bool) -> some View {
-        ZStack(alignment: isOn ? .trailing : .leading) {
-            Circle()
-                .fill(Color.ohanaCardSurface)
-                .frame(width: 22, height: 22) // a11y: allow decorative toggle knob; compact button owns the accessible label/value
-        }
-        .padding(3)
-        .frame(width: 50, height: 30)
-        .background(
-            Capsule().fill(isOn ? accentColor : Color.ohanaControlFill)
-        )
-        .overlay(
-            Capsule().stroke(isOn ? Color.clear : dividerLine.opacity(0.7), lineWidth: 1)
-        )
-    }
-
-    private func togglePlantReminders(for plant: Plant) {
-        var transaction = Transaction()
-        transaction.animation = nil
-        withTransaction(transaction) {
-            setPlantRemindersEnabled(!plantRemindersEnabled(for: plant), for: plant)
-        }
-    }
-
     private func setPlantRemindersEnabled(_ enabled: Bool, for plant: Plant) {
         plantReminderDisplayState[plant.id] = enabled
         if plant.remindersEnabled == enabled {
@@ -788,12 +757,10 @@ private struct SettingsPlantReminderPanelContent: View {
     }
 
     private func settingsIcon(_ systemName: String, color: Color) -> some View {
-        ZStack {
-            Circle().fill(color.opacity(0.14))
-            Image(systemName: systemName)
-                .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow compact decorative settings token
-                .foregroundStyle(color)
-        }
+        Image(systemName: systemName)
+            .font(OhanaFont.adaptive(size: 16, weight: .semibold))
+            .foregroundStyle(color)
+            .symbolRenderingMode(.monochrome)
         .frame(width: 44, height: 44)
         .accessibilityHidden(true)
     }

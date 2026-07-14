@@ -31,10 +31,11 @@ protocol FamilyTaskManaging {
         rewardCoconuts: Int,
         dueAt: Date?,
         emoji: String,
+        by editor: Human?,
         context: ModelContext
     ) -> Bool
     @discardableResult
-    func delete(_ task: FamilyCollaborationTask, context: ModelContext) -> Bool
+    func delete(_ task: FamilyCollaborationTask, by editor: Human?, context: ModelContext) -> Bool
     @discardableResult
     func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) -> Bool
     @discardableResult

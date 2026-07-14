@@ -1,0 +1,67 @@
+{
+  "variants": [
+    {
+      "assetSet": "AppIcon",
+      "displayName": "Default Ohana",
+      "appearances": {
+        "default": { "backgroundStart": "#F8F6F1", "backgroundEnd": "#DED8CD", "mark": "#101114", "accent": "#FFFFFF" },
+        "dark": { "backgroundStart": "#242321", "backgroundEnd": "#070807", "mark": "#F7F5EF", "accent": "#78716C" },
+        "tinted": { "backgroundStart": "#101113", "backgroundEnd": "#050506", "mark": "#F6F6F2", "accent": "#FFFFFF" }
+      }
+    },
+    {
+      "assetSet": "AppIconLimeNight",
+      "displayName": "Lime Night",
+      "appearances": {
+        "default": { "backgroundStart": "#20301A", "backgroundEnd": "#090D08", "mark": "#C8FF00", "accent": "#89A83A" },
+        "dark": { "backgroundStart": "#111A0E", "backgroundEnd": "#020402", "mark": "#D4FF35", "accent": "#506A1A" },
+        "tinted": { "backgroundStart": "#101113", "backgroundEnd": "#050506", "mark": "#F6F6F2", "accent": "#FFFFFF" }
+      }
+    },
+    {
+      "assetSet": "AppIconCleanBlue",
+      "displayName": "Clean Blue",
+      "appearances": {
+        "default": { "backgroundStart": "#EAF2FF", "backgroundEnd": "#6DA4F7", "mark": "#102447", "accent": "#FFFFFF" },
+        "dark": { "backgroundStart": "#183A70", "backgroundEnd": "#07111F", "mark": "#E8F2FF", "accent": "#7AB1FF" },
+        "tinted": { "backgroundStart": "#101113", "backgroundEnd": "#050506", "mark": "#F6F6F2", "accent": "#FFFFFF" }
+      }
+    },
+    {
+      "assetSet": "AppIconCoconut",
+      "displayName": "Coconut",
+      "appearances": {
+        "default": { "backgroundStart": "#FFF2D9", "backgroundEnd": "#C79260", "mark": "#4A2715", "accent": "#FFFFFF" },
+        "dark": { "backgroundStart": "#5A321B", "backgroundEnd": "#1D1009", "mark": "#FFF0D3", "accent": "#B77A43" },
+        "tinted": { "backgroundStart": "#101113", "backgroundEnd": "#050506", "mark": "#F6F6F2", "accent": "#FFFFFF" }
+      }
+    },
+    {
+      "assetSet": "AppIconPawDuo",
+      "displayName": "Paw Duo",
+      "appearances": {
+        "default": { "backgroundStart": "#EEE5F5", "backgroundEnd": "#A58BC1", "mark": "#33254A", "accent": "#FFFFFF" },
+        "dark": { "backgroundStart": "#432D5D", "backgroundEnd": "#171124", "mark": "#F1E7FA", "accent": "#BDA4D6" },
+        "tinted": { "backgroundStart": "#101113", "backgroundEnd": "#050506", "mark": "#F6F6F2", "accent": "#FFFFFF" }
+      }
+    },
+    {
+      "assetSet": "AppIconMinimalO",
+      "displayName": "Minimal O",
+      "appearances": {
+        "default": { "backgroundStart": "#FAFAF7", "backgroundEnd": "#C8C7C1", "mark": "#171719", "accent": "#FFFFFF" },
+        "dark": { "backgroundStart": "#303033", "backgroundEnd": "#09090A", "mark": "#F5F5F1", "accent": "#8A8A8D" },
+        "tinted": { "backgroundStart": "#101113", "backgroundEnd": "#050506", "mark": "#F6F6F2", "accent": "#FFFFFF" }
+      }
+    },
+    {
+      "assetSet": "AppIconNeonSmile",
+      "displayName": "Neon Smile",
+      "appearances": {
+        "default": { "backgroundStart": "#171A14", "backgroundEnd": "#000000", "mark": "#C8FF00", "accent": "#E4FF80" },
+        "dark": { "backgroundStart": "#0A0E07", "backgroundEnd": "#000000", "mark": "#D8FF48", "accent": "#C8FF00" },
+        "tinted": { "backgroundStart": "#101113", "backgroundEnd": "#050506", "mark": "#F6F6F2", "accent": "#FFFFFF" }
+      }
+    }
+  ]
+}

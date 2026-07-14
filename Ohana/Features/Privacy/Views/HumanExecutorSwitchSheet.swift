@@ -54,8 +54,7 @@ struct HumanExecutorSwitchSheet: View {
             .padding(.top, 18)
             .padding(.bottom, 20)
         }
-        .presentationDetents([.height(pendingHuman == nil ? 330 : (canUseBiometricMemberGate ? 500 : 430))])
-        .presentationDragIndicator(.hidden)
+        .presentationDetents([.medium, .large])
         .animation(GoMotion.feedback, value: pendingHuman?.id)
         .onAppear {
             biometricAvailability = MemberGateBiometricAuthenticator.availability()

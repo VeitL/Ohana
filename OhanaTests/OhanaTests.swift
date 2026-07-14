@@ -6171,10 +6171,11 @@ struct OhanaTests {
             rewardCoconuts _: Int,
             dueAt _: Date?,
             emoji _: String,
+            by _: Human?,
             context _: ModelContext
         ) -> Bool { false }
 
-        func delete(_: FamilyCollaborationTask, context _: ModelContext) -> Bool { false }
+        func delete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
         func rejectCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
         func confirmCompletion(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }
         func complete(_: FamilyCollaborationTask, by _: Human?, context _: ModelContext) -> Bool { false }

@@ -111,6 +111,8 @@ final class Pet {
     var notes: String
     // Phase 9 扩展字段
     var coatColor: String
+    // Retained only so existing SwiftData stores and backups remain readable.
+    // Active profile, editor, and avatar code must not read or write this field.
     var eyeColor: String
     // Phase 19 羁绊值
     var currentStreak: Int
@@ -471,6 +473,14 @@ final class Pet {
         canonicalSpeciesKey(species) == "hamster"
     }
 
+    static func canonicalSex(_ rawValue: String) -> String? {
+        switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "boy", "male", "男", "男孩", "公": "boy"
+        case "girl", "female", "女", "女孩", "母": "girl"
+        default: nil
+        }
+    }
+
     static func speciesSilhouetteSymbol(forSpecies species: String) -> String {
         switch canonicalSpeciesKey(species) {
         case "dog": "dog.fill"
@@ -568,10 +578,10 @@ final class Pet {
     }
 
     var genderSymbol: String {
-        switch gender {
-        case "male": "♂"
-        case "female": "♀"
-        default: "⚧"
+        switch Self.canonicalSex(gender) {
+        case "boy": "♂"
+        case "girl": "♀"
+        default: ""
         }
     }
 

@@ -194,3 +194,65 @@ struct OhanaChoiceChipRow: View {
         .accessibilityIdentifier("\(identifierPrefix ?? "ohana-choice-chip")-\(index)")
     }
 }
+
+// MARK: - Picker Row
+
+/// Canonical full-row picker affordance for values presented in a sheet,
+/// menu, or another typed route. The row owns only finger-first visual
+/// feedback; its caller owns presentation state and any business work.
+struct OhanaPickerRow: View {
+    let label: String
+    let valueText: String
+    var hasValue = true
+    var accessibilityIdentifier: String?
+    let action: () -> Void
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Text(label)
+                    .font(OhanaFont.callout(.bold))
+                    .foregroundStyle(isEnabled ? Color.ohanaPrimaryText : Color.ohanaTertiaryText)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                Spacer(minLength: 12)
+
+                HStack(spacing: 8) {
+                    Text(valueText)
+                        .font(OhanaFont.subheadline(.semibold))
+                        .foregroundStyle(valueColor)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.trailing)
+
+                    Image(systemName: "chevron.right") // a11y: allow decorative disclosure icon covered by picker row label and value
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(isEnabled ? Color.ohanaFunctionalIcon : Color.ohanaTertiaryText)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 64)
+            .background(rowFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(label)
+        .accessibilityValue(valueText)
+        .if(accessibilityIdentifier != nil) { view in
+            view.accessibilityIdentifier(accessibilityIdentifier ?? "ohana-picker-row")
+        }
+    }
+
+    private var valueColor: Color {
+        guard isEnabled else { return Color.ohanaTertiaryText }
+        return hasValue ? Color.goPrimary : Color.ohanaSecondaryText
+    }
+
+    private var rowFill: Color {
+        isEnabled ? Color.ohanaCardSurfaceElevated : Color.ohanaControlFill
+    }
+}

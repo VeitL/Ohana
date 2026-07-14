@@ -343,8 +343,7 @@ struct EquipPopoutCardSheet: View {
             species: pet.species,
             breed: pet.breed,
             gender: pet.gender,
-            coatColor: pet.coatColor,
-            eyeColor: pet.eyeColor
+            coatColor: pet.coatColor
         ) else {
             showToast(l.tr(zh: "请先补全物种、品种或外貌信息。", en: "Complete species, breed, or appearance first.", de: "Ergänze zuerst Art, Rasse oder Aussehen."), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
             return

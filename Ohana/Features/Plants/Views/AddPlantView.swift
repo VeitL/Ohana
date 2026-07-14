@@ -276,8 +276,6 @@ struct AddPlantView: View {
                 }
                 .accessibilityElement(children: .contain)
             }
-
-            catalogSearchField
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -668,42 +666,6 @@ struct AddPlantView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
         .accessibilityIdentifier("add-plant-avatar-picker")
-    }
-
-    var catalogSearchField: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass") // a11y: allow decorative search glyph; text field placeholder labels the search input.
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .accessibilityHidden(true)
-            TextField(l.tr(zh: "搜索绿萝、Monstera、吊兰…", en: "Search pothos, Monstera, spider plant...", de: "Efeutute, Monstera, Grünlilie suchen..."), text: $catalogQuery) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
-                .textFieldStyle(.plain)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
-                .focused($focusedField, equals: .catalogSearch)
-                .submitLabel(.next)
-                .onSubmit { focusAfterSubmit(.catalogSearch) }
-                .accessibilityIdentifier("add-plant-catalog-search-input")
-
-            if !catalogQuery.isEmpty {
-                Button {
-                    catalogQuery = ""
-                    focusedField = nil
-                } label: {
-                    Image(systemName: "xmark.circle.fill") // a11y: allow decorative clear-search glyph; button has an explicit accessibility label.
-                        .font(OhanaFont.adaptive(size: 16, weight: .black))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .frame(width: 44, height: 44)
-                        .accessibilityHidden(true)
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "清空搜索", en: "Clear search", de: "Suche löschen"))
-                .accessibilityIdentifier("add-plant-catalog-search-clear")
-            }
-        }
-        .padding(.leading, 14)
-        .padding(.trailing, catalogQuery.isEmpty ? 14 : 2)
-        .frame(minHeight: 48)
-        .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     var catalogSearchResultsList: some View {

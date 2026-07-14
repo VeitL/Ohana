@@ -47,12 +47,7 @@ enum QuickPottyActiveSheet: String, Identifiable {
     var id: String { rawValue }
 
     var usesInlineOverlay: Bool {
-        switch self {
-        case .pottyType, .scoopCheckIn, .litterChangeCheckIn, .scoopSettings, .litterSettings:
-            true
-        case .pottyOverview, .scoopOverview, .litterOverview, .pottyHistory, .scoopHistory, .litterHistory, .history:
-            false
-        }
+        false
     }
 
     var inlineHeight: CGFloat {

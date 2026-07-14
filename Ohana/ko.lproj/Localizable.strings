@@ -388,9 +388,7 @@
 "百日" = "Hundred days";
 "相伴" = "accompany";
 "相册" = "photo album";
-"眼色" = "wink";
 "睡神" = "sleep god";
-"瞳色" = "Eye color";
 "破壳" = "Break the shell";
 "确认" = "확인";
 "福冈" = "Fukuoka";
@@ -1279,7 +1277,6 @@
 "百日之交" = "The turn of a hundred days";
 "相伴百日" = "Stay together for a hundred days";
 "相处天数" = "Number of days together";
-"眼睛颜色" = "eye color";
 "破土嫩芽" = "sprouts";
 "破土新芽" = "Breaking ground and sprouting";
 "硕果累累" = "fruitful";
@@ -1419,7 +1416,6 @@
 "选择宠物" = "Select pet";
 "选择文件" = "Select file";
 "选择毛色" = "Choose coat color";
-"选择瞳色" = "Choose eye color";
 "选择颜色" = "Choose color";
 "逗玩互动" = "Fun and interactive";
 "逗玩打卡" = "Check in for fun";
@@ -2204,7 +2200,6 @@
 "每日喂食量 (g)" = "Daily feeding amount (g)";
 "消耗1个补签包确认" = "Consumes 1 re-signing package to confirm";
 "滑条 Slider" = "Slider";
-"点击眼睛 → 瞳色" = "Click on the eye → eye color";
 "点击身体 → 毛色" = "Click on the body → Coat color";
 "特殊说明 & 备注" = "Special Instructions & Remarks";
 "确认喂食  +1🥥" = "Confirm feeding +1🥥";
@@ -2262,7 +2257,6 @@
 "开始记录这个疗程 💊" = "Start recording this treatment 💊";
 "欢迎来到 Ohana" = "Welcome to Ohana";
 "每日登录奖励 +1🥥" = "Daily login bonus +1🥥";
-"毛色、瞳色和主题颜色" = "Coat color, eye color and theme color";
 "注意保暖，冬季需穿衣" = "Keep warm and wear clothes in winter";
 "激活 3D 破框卡片" = "Activate 3D frame-breaking cards";
 "点击任意一张完成选择" = "Click on any one to complete your selection";

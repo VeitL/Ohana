@@ -231,6 +231,7 @@ extension FamilyCollaborationDashboardView {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(color, in: Capsule())
+                .frame(minWidth: 44, minHeight: 44)
         }
         .buttonStyle(ScaleButtonStyle())
     }

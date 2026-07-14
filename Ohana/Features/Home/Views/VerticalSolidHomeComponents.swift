@@ -71,14 +71,11 @@ enum VerticalSolidHomePageContentHeightPolicy {
         topChromeHeight: CGFloat,
         bottomChromeHeight: CGFloat
     ) -> CGFloat {
-        let reservedBottom = selectedTab.extendsBehindFloatingBottomChrome ? 0 : bottomChromeHeight
-        return max(300, containerHeight - topChromeHeight - reservedBottom)
-    }
-}
-
-extension VerticalSolidHomeTab {
-    var extendsBehindFloatingBottomChrome: Bool {
-        self == .calendar || self == .plants
+        _ = selectedTab
+        _ = bottomChromeHeight
+        // The native TabView owns bottom-bar and safe-area layout. Reserving a
+        // second custom chrome inset would leave the selected page visibly short.
+        return max(300, containerHeight - topChromeHeight)
     }
 }
 
@@ -88,27 +85,75 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     let preparingTab: VerticalSolidHomeTab?
     let preparedTabs: Set<VerticalSolidHomeTab>
     let visibleTabs: [VerticalSolidHomeTab]
-    let canAnimate: Bool
+    let taskCenterBadge: TaskCenterBadgeSnapshot
+    let localization: L10n
+    let backgroundViewportSize: CGSize
+    let backgroundViewportTopOffset: CGFloat
+    let onSelect: (VerticalSolidHomeTab) -> Void
     @ViewBuilder var home: (VerticalSolidHomePageLifecycle) -> HomePage
     @ViewBuilder var calendar: (VerticalSolidHomePageLifecycle) -> CalendarPage
     @ViewBuilder var oasis: (VerticalSolidHomePageLifecycle) -> OasisPage
     @ViewBuilder var plants: (VerticalSolidHomePageLifecycle) -> PlantsPage
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                ForEach(visibleTabs) { tab in
-                    page(for: tab)
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .offset(x: CGFloat(tab.index - selectedTab.index) * proxy.size.width)
-                        .opacity(isMounted(tab) ? 1 : 0)
-                        .allowsHitTesting(tab == selectedTab && isMounted(tab))
-                        .accessibilityHidden(tab != selectedTab)
-                        .zIndex(tab == selectedTab ? 2 : 1)
-                }
+        TabView(selection: selection) {
+            ForEach(visibleTabs) { tab in
+                page(for: tab)
+                    .background {
+                        viewportAlignedPageBackground(for: tab)
+                    }
+                    .tabItem {
+                        Image(systemName: tab.icon)
+                            .accessibilityIdentifier("home-tab-\(tab.rawValue)")
+                            .accessibilityLabel(tabAccessibilityLabel(for: tab))
+                    }
+                    .tag(tab)
+                    .badge(tab == .calendar ? taskCenterBadge.overdueCount : 0)
             }
-            .clipped()
-            .animation(canAnimate ? GoMotion.page : GoMotion.reduced, value: selectedTab)
+        }
+        .tint(Color.goPrimary)
+        .tabBarMinimizeBehavior(.onScrollDown)
+        .accessibilityIdentifier("home-native-tab-view")
+    }
+
+    private var selection: Binding<VerticalSolidHomeTab> {
+        Binding(
+            get: { selectedTab },
+            set: { tab in
+                guard tab != selectedTab else { return }
+                onSelect(tab)
+            }
+        )
+    }
+
+    private func tabAccessibilityLabel(for tab: VerticalSolidHomeTab) -> String {
+        if tab == .calendar, taskCenterBadge.overdueCount > 0 {
+            return localization.tr(
+                zh: "\(tab.title(localization))，\(taskCenterBadge.overdueCount) 项逾期",
+                en: "\(tab.title(localization)), \(taskCenterBadge.overdueCount) overdue",
+                de: "\(tab.title(localization)), \(taskCenterBadge.overdueCount) überfällig"
+            )
+        }
+        return tab.title(localization)
+    }
+
+    @ViewBuilder
+    private func viewportAlignedPageBackground(for tab: VerticalSolidHomeTab) -> some View {
+        if lifecycle(for: tab).isVisible {
+            GeometryReader { proxy in
+                ZStack(alignment: .top) {
+                    OhanaStaticBackgroundCanvas()
+                        .frame(
+                            width: backgroundViewportSize.width,
+                            height: backgroundViewportSize.height
+                        )
+                        .offset(y: -backgroundViewportTopOffset)
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+                .clipped()
+                .allowsHitTesting(false)
+            }
+            .ignoresSafeArea(.container, edges: .bottom)
         }
     }
 
@@ -201,8 +246,11 @@ struct VerticalSolidHomeDashboardPage: View {
     @State private var heroDirection: Int = 0
     @State private var heroGeneration = 0
     @State private var collapseCleanupTask: Task<Void, Never>?
+    @State private var cardScrollOffsetTracker = VerticalSolidHomeMemberCardScrollOffsetTracker()
+    @State private var expandedCardScrollOffsetY: CGFloat = 0
+
     var body: some View {
-        GeometryReader { _ in
+        GeometryReader { proxy in
             ZStack(alignment: .top) {
                 if let firstPetEmptyState = snapshot.firstPetEmptyState, arrivingCardId == nil {
                     VerticalSolidHomeFirstPetEmptyStateView(
@@ -212,46 +260,14 @@ struct VerticalSolidHomeDashboardPage: View {
                     .padding(.horizontal, 22)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 } else if !snapshot.cards.isEmpty {
-                    FocusHomeVerticalSolidScene(
-                        cards: snapshot.cards,
-                        safeTop: 0,
-                        safeBottom: 0,
-                        selectedCardId: selectedCardId,
-                        preparedHeroSnapshots: preparedHeroSnapshots,
-                        heroSnapshot: activeHeroSnapshot,
-                        progress: heroProgress,
-                        heroDirection: heroDirection,
-                        arrivingCardId: arrivingCardId,
-                        reduceMotion: reduceMotion,
-                        localization: localization,
-                        allowsAmbientFloat: allowsAmbientFloat,
-                        isVisible: isLive,
-                        walkPresentationRevision: walkPresentationRevision,
-                        embedsQuickActionsInCard: true,
-                        collapsedTopInset: collapsedTopInset,
-                        quickActions: { card in
-                            VerticalSolidHomeExpandedCardActions(
-                                card: card,
-                                actionSnapshot: interaction.expandedActions(for: card.id),
-                                localization: localization,
-                                activeHumanID: activeHumanID,
-                                quickActionItemsRaw: $quickActionItemsRaw,
-                                onAction: { item, usesPrimaryAction in
-                                    onQuickActionForCard(item, card, usesPrimaryAction)
-                                },
-                                onOptionAction: { item, optionId in
-                                    onQuickActionOptionForCard(item, card, optionId)
-                                },
-                                onLimitReached: onQuickActionLimitReached
-                            )
-                        },
-                        contextMenu: { _ in EmptyView() },
-                        onSelect: expandCard,
-                        onCollapse: handleExpandedCardCollapseIntent,
-                        onWalkCardMinimizeToFloatingControl: onWalkCardMinimizeToFloatingControl,
-                        onOpenDetails: onOpenCardDetails
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if VerticalSolidHomeMemberWalletScrollPolicy.usesExtendedLayout(
+                        cardCount: snapshot.cards.count
+                    ) {
+                        extendedMemberCardDeck(viewportHeight: proxy.size.height)
+                    } else {
+                        memberCardScene()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
             }
         }
@@ -282,6 +298,93 @@ struct VerticalSolidHomeDashboardPage: View {
         }
     }
 
+    private func extendedMemberCardDeck(viewportHeight: CGFloat) -> some View {
+        let baseSceneHeight = VerticalSolidHomeMemberWalletScrollPolicy.sceneHeight(
+            cardCount: snapshot.cards.count,
+            viewportHeight: viewportHeight,
+            collapsedTopInset: collapsedTopInset
+        )
+        let sceneHeight = VerticalSolidHomeMemberWalletScrollPolicy.anchoredExpandedSceneHeight(
+            baseHeight: baseSceneHeight,
+            selectedCardId: selectedCardId,
+            scrollOffsetY: expandedCardScrollOffsetY
+        )
+
+        return ScrollView(.vertical, showsIndicators: true) {
+            LazyVStack(spacing: 0) {
+                memberCardScene(
+                    collapsedLayoutMode: .scrollExtended,
+                    expandedVerticalPlacement: .viewportTop(
+                        topInset: VerticalSolidHomeMemberWalletScrollPolicy.expandedCardViewportTopInset,
+                        scrollOffsetY: expandedCardScrollOffsetY
+                    )
+                )
+                .frame(height: sceneHeight)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDisabled(
+            VerticalSolidHomeMemberWalletScrollPolicy.scrollIsDisabled(
+                selectedCardId: selectedCardId
+            )
+        )
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.y
+        } action: { _, offsetY in
+            guard selectedCardId == nil else { return }
+            cardScrollOffsetTracker.offsetY = max(0, offsetY)
+        }
+        .accessibilityIdentifier("home-member-card-scroll-view")
+    }
+
+    private func memberCardScene(
+        collapsedLayoutMode: FocusHomeVerticalSolidCollapsedLayoutMode = .balanced,
+        expandedVerticalPlacement: FocusHomeVerticalSolidExpandedVerticalPlacement = .sceneCenter
+    ) -> some View {
+        FocusHomeVerticalSolidScene(
+            cards: snapshot.cards,
+            safeTop: 0,
+            safeBottom: 0,
+            selectedCardId: selectedCardId,
+            preparedHeroSnapshots: preparedHeroSnapshots,
+            heroSnapshot: activeHeroSnapshot,
+            progress: heroProgress,
+            heroDirection: heroDirection,
+            arrivingCardId: arrivingCardId,
+            reduceMotion: reduceMotion,
+            localization: localization,
+            allowsAmbientFloat: allowsAmbientFloat,
+            isVisible: isLive,
+            walkPresentationRevision: walkPresentationRevision,
+            embedsQuickActionsInCard: true,
+            collapsedTopInset: collapsedTopInset,
+            collapsedLayoutMode: collapsedLayoutMode,
+            expandedVerticalPlacement: expandedVerticalPlacement,
+            quickActions: { card in
+                VerticalSolidHomeExpandedCardActions(
+                    card: card,
+                    actionSnapshot: interaction.expandedActions(for: card.id),
+                    localization: localization,
+                    activeHumanID: activeHumanID,
+                    quickActionItemsRaw: $quickActionItemsRaw,
+                    onAction: { item, usesPrimaryAction in
+                        onQuickActionForCard(item, card, usesPrimaryAction)
+                    },
+                    onOptionAction: { item, optionId in
+                        onQuickActionOptionForCard(item, card, optionId)
+                    },
+                    onLimitReached: onQuickActionLimitReached
+                )
+            },
+            contextMenu: { _ in EmptyView() },
+            onSelect: expandCard,
+            onCollapse: handleExpandedCardCollapseIntent,
+            onWalkCardMinimizeToFloatingControl: onWalkCardMinimizeToFloatingControl,
+            onOpenDetails: onOpenCardDetails
+        )
+    }
+
     private func expandCard(_ snapshot: FocusHomeVerticalSolidHeroSnapshot) {
         let card = snapshot.card
         let canReopenSettledCard = selectedCardId == card.id
@@ -292,10 +395,14 @@ struct VerticalSolidHomeDashboardPage: View {
         collapseCleanupTask = nil
         heroGeneration += 1
         let generation = heroGeneration
+        let frozenScrollOffsetY = VerticalSolidHomeMemberWalletScrollPolicy.usesExtendedLayout(
+            cardCount: self.snapshot.cards.count
+        ) ? cardScrollOffsetTracker.offsetY : 0
         OhanaFeedback.light()
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
+            expandedCardScrollOffsetY = frozenScrollOffsetY
             selectedCardId = card.id
             activeHeroSnapshot = snapshot
             heroDirection = 1
@@ -515,6 +622,10 @@ struct VerticalSolidHomeDashboardPage: View {
     }
 }
 
+private final class VerticalSolidHomeMemberCardScrollOffsetTracker {
+    var offsetY: CGFloat = 0
+}
+
 private struct VerticalSolidHomeFirstPetEmptyStateView: View {
     let state: VerticalSolidHomeFirstPetEmptyState
     let onAddPet: () -> Void
@@ -611,29 +722,129 @@ struct VerticalSolidHomeTodayFocusChrome: View {
     let onTapFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void
     let onOpenExchange: (TodayFocusExchangeRequestSnapshot) -> Void
     let onConfirmExchange: (TodayFocusExchangeRequestSnapshot) -> Void
+    let onViewAllTasks: () -> Void
+
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        TodayFocusCard(
-            snapshot: snapshot,
-            presentation: .compactStack,
-            onOpenQuest: onOpenQuest,
-            onCompleteQuest: onCompleteQuest,
-            onTapNegativeSignal: onTapNegativeSignal,
-            onTapOasis: onOpenOasis,
-            onTapFamilyTask: onTapFamilyTask,
-            onOpenExchange: onOpenExchange,
-            onConfirmExchange: onConfirmExchange,
-            freezesToFrontCard: !isLive,
-            allowsAmbientMotion: false
-        )
-        .transaction { transaction in
-            if !isLive {
-                transaction.animation = nil
-                transaction.disablesAnimations = true
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                accessibilityFocusButton
+            } else {
+                compactFocusDeck
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .allowsHitTesting(isLive)
+    }
+
+    private var compactFocusDeck: some View {
+        ZStack(alignment: .bottomTrailing) {
+            TodayFocusCard(
+                snapshot: snapshot,
+                presentation: .compactStack,
+                onOpenQuest: onOpenQuest,
+                onCompleteQuest: onCompleteQuest,
+                onTapNegativeSignal: onTapNegativeSignal,
+                onTapOasis: onOpenOasis,
+                onTapFamilyTask: onTapFamilyTask,
+                onOpenExchange: onOpenExchange,
+                onConfirmExchange: onConfirmExchange,
+                freezesToFrontCard: !isLive,
+                allowsAmbientMotion: false
+            )
+            .transaction { transaction in
+                if !isLive {
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
+            }
+
+            Button {
+                OhanaFeedback.light()
+                onViewAllTasks()
+            } label: {
+                Label(l.tr(zh: "全部", en: "All", de: "Alle"), systemImage: "checklist")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.arkInk.opacity(0.76))
+                    .padding(.horizontal, 9)
+                    .frame(height: 28)
+                    .background(Color.goCardWhite.opacity(0.72), in: Capsule())
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .disabled(!isLive)
+            .accessibilityLabel(l.tr(zh: "查看全部待办", en: "View all tasks", de: "Alle Aufgaben anzeigen"))
+            .accessibilityIdentifier("today-focus-view-all-tasks")
+            .padding(.trailing, 24)
+            .padding(.bottom, 1)
+            .zIndex(30)
+        }
+    }
+
+    private var accessibilityFocusButton: some View {
+        Button {
+            OhanaFeedback.light()
+            onViewAllTasks()
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(
+                    l.tr(zh: "待办", en: "Tasks", de: "Aufgaben"),
+                    systemImage: "checklist"
+                )
+                .font(.headline)
+
+                Text(accessibilityFocusTitle)
+                    .font(.body)
+                    .foregroundStyle(.secondary) // native-ui: allow semantic secondary color inside native bordered Button
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .disabled(!isLive)
+        .accessibilityLabel("\(l.tr(zh: "查看全部待办", en: "View all tasks", de: "Alle Aufgaben anzeigen")), \(accessibilityFocusDetail)")
+        .accessibilityIdentifier("today-focus-view-all-tasks")
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+    }
+
+    private var accessibilityFocusTitle: String {
+        if !snapshot.negativeSignals.isEmpty {
+            return l.tr(zh: "关注", en: "Alert", de: "Hinweis")
+        }
+        if !snapshot.assignedFamilyTasks.isEmpty {
+            return l.tr(zh: "协作", en: "Shared", de: "Team")
+        }
+        if CoconutExchangeFeatureGate.isEnabled, snapshot.pendingExchangeRequests.first != nil {
+            return l.tr(zh: "收款", en: "Payment", de: "Zahlung")
+        }
+        if snapshot.refreshedQuests.contains(where: { !$0.isCompleted }) {
+            return l.tr(zh: "待完成", en: "Pending", de: "Offen")
+        }
+        return l.tr(zh: "已完成", en: "Done", de: "Erledigt")
+    }
+
+    private var accessibilityFocusDetail: String {
+        if let signal = snapshot.negativeSignals.first {
+            return signal.title
+        }
+        if let task = snapshot.assignedFamilyTasks.first {
+            return task.title
+        }
+        if CoconutExchangeFeatureGate.isEnabled, snapshot.pendingExchangeRequests.first != nil {
+            return l.tr(zh: "确认线下收款", en: "Confirm cash received", de: "Zahlung bestätigen")
+        }
+        if let quest = snapshot.refreshedQuests.first(where: { !$0.isCompleted }) {
+            return quest.title
+        }
+        return accessibilityFocusTitle
     }
 }
 
@@ -732,6 +943,7 @@ struct OasisTreeRenderSnapshot: Equatable {
 
 struct VerticalSolidHomeOasisFrozenTreeStage: View {
     let snapshot: OasisTreeRenderSnapshot
+    var onInjectEnergy: () -> Void = {}
     var onOpenShop: (ShopItem.ShopCategory) -> Void = { _ in }
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -793,6 +1005,10 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
                     .padding(.horizontal, 18)
                     .padding(.bottom, 6)
 
+                frozenInjectEnergyButton
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 8)
+
                 frozenProgressRail
                     .padding(.horizontal, 18)
                     .padding(.bottom, 14)
@@ -805,6 +1021,34 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("level \(snapshot.level)")
         .accessibilityIdentifier("oasis-tree-level-control")
+    }
+
+    private var frozenInjectEnergyButton: some View {
+        let cost = OasisTreeEnergyInjectionPolicy.starterPackageCost
+        return Button {
+            OhanaFeedback.medium()
+            onInjectEnergy()
+        } label: {
+            Label(
+                l.tr(
+                    zh: "注入能量 · \(cost)🥥",
+                    en: "Inject energy · \(cost)🥥",
+                    de: "Energie einspeisen · \(cost)🥥"
+                ),
+                systemImage: "bolt.fill"
+            )
+            .font(.headline)
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(Color.goPrimary)
+        .accessibilityIdentifier("oasis-inject-energy-action")
+        .accessibilityHint(l.tr(
+            zh: "消耗椰子并提升椰子树能量",
+            en: "Spend coconuts to grow the Coconut Tree",
+            de: "Kokosnüsse ausgeben und den Kokosbaum stärken"
+        ))
     }
 
     private var frozenBentoGrid: some View {

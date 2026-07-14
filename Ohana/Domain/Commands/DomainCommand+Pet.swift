@@ -56,6 +56,10 @@ extension DomainCommand {
         command("walks", "summary", ["petID": petID.uuidString, "walkID": walkID.uuidString])
     }
 
+    static func petWalkCompletion(petID: UUID) -> DomainCommand {
+        command("walks", "complete", ["petID": petID.uuidString])
+    }
+
     static func petBondVaultUnlock(petID: UUID, itemID: String) -> DomainCommand {
         command("bondVault", "unlock", ["petID": petID.uuidString, "itemID": itemID])
     }

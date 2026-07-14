@@ -1,7 +1,7 @@
 # Members 业务规则书
 
-> 状态：已按 2026-06-14 产品主人二态删除模型更新；S-MEM-006 仍为余留项。
-> 范围：`Ohana/Features/Members`。来源行号按 2026-06-14 当前工作区记录。
+> 状态：已按 2026-07-14 成员管理与本机家庭分工重设计更新；S-MEM-006 仍为余留项。
+> 范围：`Ohana/Features/Members`、`Ohana/Features/CrewRoster` 与成员页承载的本机 `FamilyTasks` 入口。
 
 ## 1. 业务不变量
 
@@ -17,17 +17,17 @@
 
 任何情况下，购买 2.5D 头像券会优先使用当前 active human；找不到 active human 时退回 `humans.first`，没人则抛 `missingActiveHuman`。余额不足抛 `insufficientCoconuts`；余额足够时写一条 care ledger coconut 事件，调用 wallet 扣款，保存成功后才给库存加 1 张券。来源：`Ohana/Features/Members/MemberCreationService.swift:71`、`Ohana/Features/Members/MemberCreationService.swift:79`、`Ohana/Features/Members/MemberCreationService.swift:85`、`Ohana/Features/Members/MemberCreationService.swift:88`、`Ohana/Features/Members/MemberCreationService.swift:95`、`Ohana/Features/Members/MemberCreationService.swift:119`、`Ohana/Features/Members/MemberCreationService.swift:145`、`Ohana/Features/Members/MemberCreationService.swift:151`。
 
-### MBR-004 新宠物创建会写 Pet、本地首页可见性、相关日历事实和首宠完成标记
+### MBR-004 新宠物创建会写 Pet、相关日历事实和首宠完成标记
 
-任何情况下，新宠物会从草稿写入核心资料、头像数据、毛色/眼色和性格标签；如果首页可见卡片已满，会把该宠物写入隐藏首页列表。Pet 插入后会标记 CloudSync modified。保存成功后，生日会创建生日 Event + Reminder，到家日会创建周年 Event 和若干 PetMilestone，并确保默认 CarePlan 日历计划；生日 Event、生日 Reminder、到家周年 Event 都必须写入 CloudSync 本地 dirty state。首只宠物只设置 pet wizard quest flag；D17 的 50 椰子启动赠礼由 `StarterGiftService` 在第一笔照护事实持久化后独立写入 `system:island`，不属于 Pet 创建事务，也不绑定 Pet/Human。来源：`Ohana/Features/Members/MemberCreationService.swift`、`Ohana/Features/Economy/StarterGiftService.swift`、`docs/specs/Onboarding-logic.md`。
+任何情况下，新宠物会从草稿写入核心资料、头像数据、性别、毛色和性格标签；创建流程不再分配“首页可见名额”，也不写新的隐藏首页偏好。Pet 插入后会标记 CloudSync modified。保存成功后，若草稿包含生日则创建生日 Event + Reminder，若包含到家日则创建周年 Event 和若干 PetMilestone，并确保默认 CarePlan 日历计划；生日 Event、生日 Reminder、到家周年 Event 都必须写入 CloudSync 本地 dirty state。首只宠物只设置 pet wizard quest flag；D17 的 50 椰子启动赠礼由 `StarterGiftService` 在第一笔照护事实持久化后独立写入 `system:island`，不属于 Pet 创建事务，也不绑定 Pet/Human。来源：`Ohana/Features/Members/MemberCreationService.swift`、`Ohana/Features/Economy/StarterGiftService.swift`、`docs/specs/Onboarding-logic.md`。
 
 ### MBR-005 新人类创建会写 Human、可选初始体重、生日 Event 和隐私字段
 
 任何情况下，新人类会从草稿写入姓名、生日、血型、性别头像、角色、国籍/居住地、头像数据、主题色、MBTI、notes、高度和 privacy fields。第一个人类或显式角色草稿可保留选择角色，否则新成员角色固定为 `member`。初始体重大于 0 时创建 `HumanWeightLog`，executorId 来自当前 active human，并标记初始体重 quest 状态。生日打开时创建 `relatedEntityType == "Human"` 的年度生日 Event，并写入 CloudSync 本地 dirty state。Human 插入后会标记 CloudSync modified。来源：`Ohana/Features/Members/MemberCreationService.swift:308`、`Ohana/Features/Members/MemberCreationService.swift:337`、`Ohana/Features/Members/MemberCreationService.swift:338`、`Ohana/Features/Members/MemberCreationService.swift:339`、`Ohana/Features/Members/MemberCreationService.swift:344`、`Ohana/Features/Members/MemberCreationService.swift:355`。
 
-### MBR-006 创建保存失败只回滚已经插入的主实体
+### MBR-006 创建保存失败回滚未提交的创建事务
 
-任何情况下，Pet 首次 `context.save()` 失败时，会恢复首页隐藏列表并删除刚插入的 Pet；Human 首次 `context.save()` 失败时，会删除刚插入的 Human。来源：`Ohana/Features/Members/MemberCreationService.swift:229`、`Ohana/Features/Members/MemberCreationService.swift:232`、`Ohana/Features/Members/MemberCreationService.swift:235`、`Ohana/Features/Members/MemberCreationService.swift:356`、`Ohana/Features/Members/MemberCreationService.swift:359`。
+任何情况下，Pet 或 Human 首次 `context.save()` 失败时，会调用 `context.rollback()` 回滚本次尚未提交的成员创建事务，包括主实体及同事务派生事实；没有需要恢复的首页隐藏列表副作用。来源：`Ohana/Features/Members/MemberCreationService.swift`。
 
 ### MBR-007 成员资料更新走 Members command service
 
@@ -73,6 +73,10 @@
 
 任何情况下，人类创建步骤为 basicInfo -> avatar -> theme；宠物创建步骤为 basicInfo -> petProfile -> avatar -> theme。来源：`Ohana/Features/Members/MemberCardCreationSupport.swift:309`、`Ohana/Features/Members/MemberCardCreationSupport.swift:317`。
 
+### MBR-018 成员页统一管理档案、钱包与本机家庭分工
+
+成员页只保留“成员”和“协作”两个一级面。成员面以首页同源的 `FocusHomeVerticalSolidCardSurface` 整齐网格排列 Human / Pet，支持搜索、类型筛选、添加成员和进入详情；每张卡必须可读出该成员椰子余额，头像媒体只随 LazyVGrid 可见单元按需加载。成员页不提供“是否显示在首页”开关。协作面要求至少两位在世 Human，当前 Human 作为发布者，可把正奖励任务指派给另一位 Human；发布时验证余额但不扣款或托管，执行者提交后只有发布者能确认转账、编辑或删除任务。来源：`Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift`、`Ohana/Features/CrewRoster/Views/CrewRosterWalletScene.swift`、`Ohana/Features/FamilyTasks/FamilyTaskService.swift`、`docs/specs/product-foundation.md` D5。
+
 ## 2. 状态机
 
 ### 2.1 Member creation draft
@@ -88,7 +92,7 @@ stateDiagram-v2
     theme --> Error: empty name / duplicate / avatar pass / save failure
 ```
 
-代码实际约束：步骤列表由 `MemberCreationStep.steps(for:)` 静态决定；保存时才执行名称、2.5D 权限、首页可见性、SwiftData 写入和派生事件/里程碑。来源：`Ohana/Features/Members/MemberCardCreationSupport.swift:317`、`Ohana/Features/Members/MemberCreationService.swift:154`。
+代码实际约束：步骤列表由 `MemberCreationStep.steps(for:)` 静态决定；保存时才执行名称、2.5D 权限、SwiftData 写入和派生事件/里程碑。来源：`Ohana/Features/Members/MemberCardCreationSupport.swift`、`Ohana/Features/Members/MemberCreationService.swift`。
 
 ### 2.2 Avatar media route
 
@@ -136,17 +140,17 @@ stateDiagram-v2
 
 ### 多成员
 
-- 当前 active human 只影响头像券购买付款人、初始 HumanWeightLog executorId、隐私查看者、删除 Human 后是否需要 account switch。来源：`Ohana/Features/Members/MemberCreationService.swift:71`、`Ohana/Features/Members/MemberCreationService.swift:339`、`Ohana/Models/Human.swift:387`、`Ohana/Features/Members/MemberDeletionCommands.swift:96`。
+- 当前 active Human 决定头像券购买付款人、初始 HumanWeightLog executorId、隐私查看者、删除 Human 后是否需要 account switch，也决定本机家庭任务中的当前发布者、执行者/确认者与对应成员钱包归属。来源：`Ohana/Features/Members/MemberCreationService.swift`、`Ohana/Models/Human.swift`、`Ohana/Features/Members/MemberDeletionCommands.swift`、`Ohana/Features/FamilyTasks/Views/FamilyCollaborationDashboardView.swift`、`Ohana/Features/FamilyTasks/FamilyTaskService.swift`。
 - 删除非 active human 时不会清空 `currentActiveHumanId`；删除 active human 时由 UI 清空 active id 并发布 route event。来源：`Ohana/Features/Members/MemberDeletionCommands.swift:111`、`Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift:673`。
 
-### 多宠物
+### 多成员卡片
 
-- 新宠物和新人类共享首页最多可见卡片计数；可见位满时，新成员默认隐藏或写入隐藏 Pet ID 列表。来源：`Ohana/Features/Members/MemberCreationService.swift:213`、`Ohana/Features/Members/MemberCreationService.swift:322`、`Ohana/Features/Members/MemberCreationService.swift:382`。
+- Home 不再使用 `shouldShowOnHome` 或 `hiddenHomePetIDs` 过滤在世 Human / Pet，也没有旧 6 卡业务容量；8 张起切换为纵向滚动布局。当前 Home 高频 read model 仍以 80 Pet + 40 Human 的受控查询边界保护启动与内存，这不是成员页可配置的显隐规则。来源：`Ohana/Features/Home/FocusHomeCardDataSource.swift`、`Ohana/Features/Home/HomeReadModelStore.swift`、`Ohana/Features/Home/Views/FocusHomeVerticalSolidScenePolicies.swift`。
 - Pet 删除会移除 quick action 中该 Pet 的两种引用格式：`petId` 或 `entityId + entityKindRaw == Pet`。来源：`Ohana/Features/Members/MemberDeletionCommands.swift:147`。
 
 ### 多设备 / CloudSync
 
-- Pet/Human 创建、active 成员资料更新、生命周期标记与不可恢复删除会写 CloudSync state；离世成员资料更新 / 首页显示开关 / 清空记录命令在服务层 no-op，不发布假 revision。来源：`Ohana/Features/Members/MemberCreationService.swift:228`、`Ohana/Features/Members/MemberCreationService.swift:338`、`Ohana/Features/Members/MemberProfileCommands.swift:207`、`Ohana/Features/Members/MemberProfileCommands.swift:282`、`Ohana/Features/Members/MemberInteractionCommands.swift:47`、`Ohana/Domain/Events/ReadModelRevisionCenter+AppAndMembers.swift:24`。
+- Pet/Human 创建、active 成员资料更新、生命周期标记与不可恢复删除会写 CloudSync state；离世成员资料更新 / 清空记录命令在服务层 no-op，不发布假 revision。旧首页显隐字段和 command 仅为 schema、备份与历史数据兼容，不再有用户入口，也不决定 Home 卡片集合。来源：`Ohana/Features/Members/MemberCreationService.swift`、`Ohana/Features/Members/MemberProfileCommands.swift`、`Ohana/Features/Members/MemberInteractionCommands.swift`、`Ohana/Features/Home/FocusHomeCardDataSource.swift`。
 - Members 创建的生日 / 到家日 Event 与生日 Reminder 会写 CloudSync 本地 dirty state；删除成员时相关 Event、Reminder、成员和从属记录在 `PhysicalDeletionService` 边界写不可见 sync tombstone 后物理删除。`Reminder` 及若干人类侧模型目前只记录本地 sync metadata，不扩大 `CloudSyncEntityRegistry.uploadPipelineEntityNames`，因此不启用 CloudKit 上传 / 拉取流水线。来源：`Ohana/Features/Members/MemberCreationService.swift:355`、`Ohana/Features/Members/MemberCreationService.swift:407`、`Ohana/Features/Members/MemberCreationService.swift:410`、`Ohana/Features/Members/MemberCreationService.swift:423`、`Ohana/Domain/Services/PhysicalDeletionService.swift:14`、`Ohana/Domain/Services/PhysicalDeletionService.swift:44`。
 
 ### 时区 / 跨午夜 / 时间回拨
@@ -174,7 +178,7 @@ GAP-9 已改为：UI 文案不再承诺删除；Members command 委托 `RainbowB
 
 ### S-MEM-005 离世成员 command 层只读硬门（已修复）
 
-2026-06-14 二态模型修复结果：Pet/Human profile 更新、Human 首页显示开关、清空离世宠物记录在 command/service 层 no-op，且 revision 发布器不会为 no-op 发布假派生。删除成员仍属于 D8 明确确认后的不可恢复删除路径，不走回收站。覆盖测试：`HomeCommandExecutorTests.memberCommandsNoOpForPassedAwayProfileVisibilityAndRecordClear`、`PetActivityRecordCleanupServiceTests.cleanupNoOpsForPassedAwayPet`。
+2026-06-14 二态模型修复结果：Pet/Human profile 更新、legacy Human 首页显示 command、清空离世宠物记录在 command/service 层 no-op，且 revision 发布器不会为 no-op 发布假派生。2026-07-14 已移除该 legacy 显隐能力的用户入口和 Home 过滤语义。删除成员仍属于 D8 明确确认后的不可恢复删除路径，不走回收站。覆盖测试：`HomeCommandExecutorTests.memberCommandsNoOpForPassedAwayProfileVisibilityAndRecordClear`、`PetActivityRecordCleanupServiceTests.cleanupNoOpsForPassedAwayPet`。
 
 ### S-MEM-006 本地化覆盖不完整（余留）
 

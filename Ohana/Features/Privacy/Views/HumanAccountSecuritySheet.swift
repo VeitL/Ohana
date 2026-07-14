@@ -49,7 +49,6 @@ struct HumanAccountSecuritySheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.hidden)
         .accessibilityIdentifier("human-account-security-sheet")
         .sheet(isPresented: $showingPasscodeSheet) {
             HumanPasscodeManagementSheet(human: human)

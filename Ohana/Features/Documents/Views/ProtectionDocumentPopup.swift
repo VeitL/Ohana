@@ -2,7 +2,7 @@
 //  ProtectionDocumentPopup.swift
 //  Ohana
 //
-//  Inline V4 popup for creating pet protection documents.
+//  Native sheet form for creating pet protection documents.
 //
 
 import PhotosUI
@@ -20,8 +20,6 @@ struct ProtectionDocumentContentPopup: View {
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
-    @State private var visible = false
-    @State private var dragOffset: CGFloat = 0
     @State private var title = ""
     @State private var category: DocumentCategory = .passport
     @State private var hasIssueDate = false
@@ -42,8 +40,6 @@ struct ProtectionDocumentContentPopup: View {
     @State private var isSaving = false
 
     private var isEdit: Bool { existing != nil }
-    private var animation: Animation { GoMotion.page }
-    private var hiddenOffset: CGFloat { 760 }
     private var canSave: Bool { !isSaving && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var l: L10n { L10n(appLanguage) }
     private var formSpec: ProtectionDocumentFormSpec { ProtectionDocumentFormSpec.spec(for: category, petName: pet.name, l: l) }
@@ -72,87 +68,112 @@ struct ProtectionDocumentContentPopup: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: visible) {
-                LinearGradient(
-                    colors: [Color.black.opacity(0.08), Color.black.opacity(0.34)], // ui-v4: allow popup scrimGradient
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    OhanaPopupDragHandle(tint: Color.ohanaPrimaryText.opacity(0.24))
-                        .padding(.top, 8)
-                        .gesture(handleDrag)
-
-                    HStack(spacing: 12) {
-                        Image(systemName: "doc.badge.plus") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.arkInk)
-                            .frame(width: 48, height: 48)
-                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(isEdit
-                                ? l.tr(zh: "编辑证件", en: "Edit Document", de: "Dokument bearbeiten")
-                                : l.tr(zh: "添加证件", en: "Add Document", de: "Dokument hinzufügen"))
-                                .font(OhanaFont.title3(.black))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                            Text(pet.name)
-                                .font(OhanaFont.caption(.semibold))
-                                .foregroundStyle(Color.ohanaSecondaryText)
+        NavigationStack {
+            Form {
+                Section {
+                    Picker(l.tr(zh: "证件类型", en: "Document type", de: "Dokumenttyp"), selection: $category) {
+                        ForEach(DocumentCategory.protectionDocumentCases, id: \.rawValue) { option in
+                            Text("\(option.emoji) \(option.rawValue)").tag(option)
                         }
-                        Spacer()
-                        OhanaPopupCloseButton(tint: Color.ohanaPrimaryText, action: close)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 4)
 
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 12) {
-                            categoryPicker
-                            keyFieldsSection
-                            dateRows
-                            attachmentSection
-                            costSection
+                    if !formSpec.quickTitles.isEmpty {
+                        Menu(l.tr(zh: "快速标题", en: "Quick title", de: "Schnelltitel")) {
+                            ForEach(formSpec.quickTitles, id: \.self) { option in
+                                Button(option) { title = option }
+                            }
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
                     }
-                    .scrollDismissesKeyboard(.interactively)
-                    .frame(maxHeight: min(proxy.size.height * 0.58, 560))
 
-                    Button(action: save) {
-                        Text(l.tr(zh: "保存", en: "Save", de: "Sichern"))
-                            .font(OhanaFont.subheadline(.black))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .disabled(!canSave)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 22)
+                    TextField(formSpec.titlePlaceholder, text: $title)
+                    TextField(formSpec.authorityPlaceholder, text: $issuingAuthority)
+                    TextField(formSpec.notesPlaceholder, text: $notes, axis: .vertical)
+                        .lineLimit(2 ... 4)
+                } header: {
+                    Text(formSpec.sectionTitle)
                 }
-                .frame(maxWidth: .infinity)
-                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
-                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
-                .shadow(color: Color.black.opacity(0.54), radius: 46, x: 0, y: -16) // ui-v4: allow popup liftedAlert shadow
-                .shadow(color: Color(hex: "0B102C").opacity(0.38), radius: 26, x: 0, y: 12) // ui-v4: allow popup liftedAlert shadow
-                .padding(.horizontal, 6)
-                .padding(.bottom, max(8, proxy.safeAreaInsets.bottom + 2))
-                .offset(y: visible ? dragOffset : hiddenOffset)
+
+                Section {
+                    Toggle(formSpec.issueDateLabel, isOn: $hasIssueDate)
+                        .tint(Color.goPrimary)
+                    if hasIssueDate {
+                        DatePicker(formSpec.issueDateLabel, selection: $issueDate, displayedComponents: .date)
+                    }
+                    Toggle(formSpec.expiryDateLabel, isOn: $hasExpiryDate)
+                        .tint(Color.goPrimary)
+                    if hasExpiryDate {
+                        DatePicker(formSpec.expiryDateLabel, selection: $expiryDate, displayedComponents: .date)
+                    }
+                } header: {
+                    Text(l.tr(zh: "日期", en: "Dates", de: "Daten"))
+                }
+
+                Section {
+                    Button {
+                        presentCamera()
+                    } label: {
+                        Label(l.tr(zh: "拍照", en: "Take photo", de: "Foto aufnehmen"), systemImage: "camera.fill")
+                    }
+                    PhotosPicker(selection: $photoItem, matching: .images) {
+                        Label(l.tr(zh: "从相册选择", en: "Choose photo", de: "Foto auswählen"), systemImage: "photo.fill")
+                    }
+                    Button {
+                        showingFileImporter = true
+                    } label: {
+                        Label(l.tr(zh: "选择文件", en: "Choose file", de: "Datei auswählen"), systemImage: "paperclip")
+                    }
+                    if attachmentData != nil || !attachmentFilename.isEmpty {
+                        Label(attachmentFilename, systemImage: attachmentIsImage ? "photo.fill" : "doc.fill")
+                            .lineLimit(1)
+                    }
+                } header: {
+                    Text(l.tr(zh: "附件", en: "Attachment", de: "Anhang"))
+                }
+
+                Section {
+                    TextField(
+                        l.tr(zh: "费用", en: "Cost", de: "Kosten"),
+                        text: $costText
+                    )
+                    .keyboardType(.decimalPad)
+                    if humans.count > 1 {
+                        Picker(l.tr(zh: "支付人", en: "Payer", de: "Zahler"), selection: Binding(
+                            get: { selectedPayerId ?? currentPayerId ?? "" },
+                            set: { selectedPayerId = $0 }
+                        )) {
+                            ForEach(humans) { human in
+                                Text(human.name).tag(human.id.uuidString)
+                            }
+                        }
+                    }
+                }
             }
-            .animation(animation, value: dragOffset)
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle(isEdit
+                ? l.tr(zh: "编辑证件", en: "Edit Document", de: "Dokument bearbeiten")
+                : l.tr(zh: "添加证件", en: "Add Document", de: "Dokument hinzufügen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, role: .cancel, action: close)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern"), action: save)
+                        .disabled(!canSave)
+                }
+            }
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear {
             selectedPayerId = currentPayerId
             if !isEdit {
                 applyCategoryDefaults(force: true)
             }
-            withAnimation(animation) { visible = true }
+        }
+        .onChange(of: category) { oldValue, newValue in
+            let previousSpec = ProtectionDocumentFormSpec.spec(for: oldValue, petName: pet.name, l: l)
+            let replaceTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                title == previousSpec.defaultTitle || previousSpec.quickTitles.contains(title)
+            applyCategoryDefaults(for: newValue, replaceTitle: replaceTitle, resetDates: true)
         }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
@@ -207,20 +228,6 @@ struct ProtectionDocumentContentPopup: View {
                 showingCamera = false
             }
         }
-    }
-
-    private var handleDrag: some Gesture {
-        DragGesture(minimumDistance: 10)
-            .onChanged { value in
-                dragOffset = max(0, value.translation.height)
-            }
-            .onEnded { value in
-                if value.translation.height > 54 {
-                    close()
-                } else {
-                    withAnimation(animation) { dragOffset = 0 }
-                }
-            }
     }
 
     private var currentPayerId: String? {
@@ -495,13 +502,7 @@ struct ProtectionDocumentContentPopup: View {
 
     private func close() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        withAnimation(animation) {
-            visible = false
-            dragOffset = 0
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            onClose()
-        }
+        onClose()
     }
 
     private func save() {

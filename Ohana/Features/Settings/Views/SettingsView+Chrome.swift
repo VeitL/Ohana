@@ -8,127 +8,88 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 extension SettingsView {
-    // MARK: - Header
-    var settingsHeader: some View {
-        HStack(spacing: 12) {
-            Text(l.tr(zh: "设置", en: "Settings", de: "Einstellungen"))
-                .font(OhanaFont.largeTitle(.black))
-                .foregroundStyle(primaryText)
-            Spacer()
-            if SettingsDebugTools.isVisible {
-                Button {
-                    openCoconutBalanceDebugTool()
-                } label: {
-                    Image(systemName: "hammer.fill") // a11y: allow decorative icon covered by surrounding label
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
-                        .foregroundStyle(Color.goYellow)
-                        .frame(width: 44, height: 44)
-                        .background(Color.ohanaControlFill, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "Debug 椰子", en: "Debug Coconuts", de: "Debug-Kokosnüsse"))
-                .accessibilityIdentifier("settings-debug-coconuts-shortcut")
-
-                Button {
-                    showingReminderObservability = true
-                } label: {
-                    Image(systemName: "list.clipboard.fill") // a11y: allow decorative icon covered by surrounding label
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
-                        .foregroundStyle(Color.goPrimary)
-                        .frame(width: 44, height: 44)
-                        .background(Color.ohanaControlFill, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(
-                    zh: "提醒可观测面板",
-                    en: "Reminder Observability",
-                    de: "Erinnerungsbeobachtung"
-                ))
-                .accessibilityIdentifier("settings-debug-reminder-observability-shortcut")
-
-                if SettingsDebugTools.isRunningUITests {
-                    Button {
-                        showingFamilyWeeklyReportDebug = true
-                    } label: {
-                        Image(systemName: "chart.bar.doc.horizontal") // a11y: allow decorative icon covered by surrounding label
-                            .font(OhanaFont.adaptive(size: 13, weight: .black))
-                            .foregroundStyle(Color.goPrimary)
-                            .frame(width: 44, height: 44)
-                            .background(Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(l.tr(
-                        zh: "Debug 家庭周报",
-                        en: "Debug Weekly Report",
-                        de: "Debug-Wochenbericht"
-                    ))
-                    .accessibilityIdentifier("settings-debug-family-weekly-report-shortcut")
-
-                    Button {
-                        applyUITestRewardTierShortcut()
-                    } label: {
-                        Image(systemName: "bag.fill") // a11y: allow decorative icon covered by surrounding label
-                            .font(OhanaFont.adaptive(size: 13, weight: .black))
-                            .foregroundStyle(Color.goPrimary)
-                            .frame(width: 44, height: 44)
-                            .background(Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(l.tr(
-                        zh: "Debug 奖励层",
-                        en: "Debug Reward Tier",
-                        de: "Debug-Belohnungsstufe"
-                    ))
-                    .accessibilityIdentifier("settings-debug-reward-tier-shortcut")
-
-                    Button {
-                        applyUITestEconomyBudgetResetShortcut()
-                    } label: {
-                        Image(systemName: "arrow.counterclockwise.circle.fill") // a11y: allow decorative icon covered by surrounding label
-                            .font(OhanaFont.adaptive(size: 13, weight: .black))
-                            .foregroundStyle(Color.goTeal)
-                            .frame(width: 44, height: 44)
-                            .background(Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(l.tr(
-                        zh: "Debug 重置奖励预算",
-                        en: "Debug Reset Reward Budget",
-                        de: "Debug-Belohnungsbudget zurücksetzen"
-                    ))
-                    .accessibilityIdentifier("settings-debug-economy-budget-reset-shortcut")
-
-                    Button {
-                        applyUITestPlantBaselineShortcut()
-                    } label: {
-                        Image(systemName: "leaf.fill") // a11y: allow decorative icon covered by surrounding label
-                            .font(OhanaFont.adaptive(size: 13, weight: .black))
-                            .foregroundStyle(Color.goTeal)
-                            .frame(width: 44, height: 44)
-                            .background(Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(l.tr(
-                        zh: "Debug 植物基线",
-                        en: "Debug Plant Baseline",
-                        de: "Debug-Pflanzenbasis"
-                    ))
-                    .accessibilityIdentifier("settings-debug-plant-baseline-shortcut")
-                }
+    // MARK: - Toolbar
+    @ToolbarContentBuilder
+    var settingsToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button(role: .cancel) {
+                closeSettings()
+            } label: {
+                Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
             }
-            Button { closeSettings() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(primaryText)
-                    .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.ohanaControlFill, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
             .accessibilityIdentifier("settings-close-action")
         }
-        .padding(.horizontal, 2)
-        .padding(.top, 2)
-        .padding(.bottom, 4)
+
+        ToolbarItem(placement: .primaryAction) {
+            if SettingsDebugTools.isVisible {
+                Menu {
+                    Button {
+                        openCoconutBalanceDebugTool()
+                    } label: {
+                        Label(l.tr(zh: "Debug 椰子", en: "Debug Coconuts", de: "Debug-Kokosnüsse"), systemImage: "hammer.fill")
+                    }
+                    .accessibilityIdentifier("settings-debug-coconuts-shortcut")
+
+                    Button {
+                        showingReminderObservability = true
+                    } label: {
+                        Label(
+                            l.tr(zh: "提醒可观测面板", en: "Reminder Observability", de: "Erinnerungsbeobachtung"),
+                            systemImage: "list.clipboard.fill"
+                        )
+                    }
+                    .accessibilityIdentifier("settings-debug-reminder-observability-shortcut")
+                } label: {
+                    Label(l.tr(zh: "调试工具", en: "Debug Tools", de: "Debug-Werkzeuge"), systemImage: "ellipsis.circle")
+                }
+            }
+        }
+    }
+
+    var settingsUITestShortcutSection: some View {
+        Section(l.tr(zh: "UI 测试快捷方式", en: "UI Test Shortcuts", de: "UI-Test-Kurzbefehle")) {
+            Button {
+                openCoconutBalanceDebugTool()
+            } label: {
+                Label(l.tr(zh: "Debug 椰子", en: "Debug Coconuts", de: "Debug-Kokosnüsse"), systemImage: "hammer.fill")
+            }
+            .accessibilityIdentifier("settings-debug-coconuts-shortcut")
+
+            Button {
+                showingReminderObservability = true
+            } label: {
+                Label(l.tr(zh: "提醒可观测面板", en: "Reminder Observability", de: "Erinnerungsbeobachtung"), systemImage: "list.clipboard.fill")
+            }
+            .accessibilityIdentifier("settings-debug-reminder-observability-shortcut")
+
+            Button {
+                showingFamilyWeeklyReportDebug = true
+            } label: {
+                Label(l.tr(zh: "Debug 家庭周报", en: "Debug Weekly Report", de: "Debug-Wochenbericht"), systemImage: "chart.bar.doc.horizontal")
+            }
+            .accessibilityIdentifier("settings-debug-family-weekly-report-shortcut")
+
+            Button {
+                applyUITestRewardTierShortcut()
+            } label: {
+                Label(l.tr(zh: "Debug 奖励层", en: "Debug Reward Tier", de: "Debug-Belohnungsstufe"), systemImage: "bag.fill")
+            }
+            .accessibilityIdentifier("settings-debug-reward-tier-shortcut")
+
+            Button {
+                applyUITestEconomyBudgetResetShortcut()
+            } label: {
+                Label(l.tr(zh: "Debug 重置奖励预算", en: "Debug Reset Reward Budget", de: "Debug-Belohnungsbudget zurücksetzen"), systemImage: "arrow.counterclockwise.circle.fill")
+            }
+            .accessibilityIdentifier("settings-debug-economy-budget-reset-shortcut")
+
+            Button {
+                applyUITestPlantBaselineShortcut()
+            } label: {
+                Label(l.tr(zh: "Debug 植物基线", en: "Debug Plant Baseline", de: "Debug-Pflanzenbasis"), systemImage: "leaf.fill")
+            }
+            .accessibilityIdentifier("settings-debug-plant-baseline-shortcut")
+        }
     }
 
     func closeSettings() {
@@ -141,20 +102,15 @@ extension SettingsView {
 
     // MARK: - Settings Section
     func settingsSection(title: String, @ViewBuilder content: () -> some View) -> some View {
-        SettingsSectionCard(
-            title: title,
-            tertiaryText: tertiaryText,
-            reduceTransparency: reduceTransparency,
-            content: content
-        )
+        Section {
+            content()
+        } header: {
+            Text(title)
+        }
     }
 
     func settingsRow(icon: String, title: String, subtitle: String, iconColor: Color = Color.goPrimary, action: @escaping () -> Void) -> some View {
-        Button {
-            withAnimation(GoMotion.feedback) {
-                action()
-            }
-        } label: {
+        Button(action: action) {
             HStack(spacing: 12) {
                 settingsIcon(icon, color: iconColor)
                 Text(title)
@@ -172,7 +128,6 @@ extension SettingsView {
             }
             .frame(minHeight: 44)
         }
-        .buttonStyle(ScaleButtonStyle())
     }
 
     var performanceToggleRow: some View {
@@ -243,7 +198,6 @@ extension SettingsView {
         settingsSection(title: l.tr(zh: "隐私与安全", en: "Privacy & Security", de: "Datenschutz & Sicherheit")) {
             appSwitcherSnapshotPrivacyRow
             if HumanLocalPrivacyPolicy.isEnabled {
-                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                 memberGateBiometricRow
             }
         }
@@ -386,39 +340,22 @@ extension SettingsView {
     }
 
     var advancedNotificationSettingsDisclosure: some View {
-        VStack(spacing: 0) {
-            Button {
-                withAnimation(GoMotion.feedback) {
-                    showAdvancedNotificationSettings.toggle()
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    settingsIcon("slider.horizontal.3", color: Color.goTeal)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(l.tr(zh: "高级提醒设置", en: "Advanced reminder settings", de: "Erweiterte Erinnerungen"))
-                            .font(OhanaFont.body(.semibold))
-                            .foregroundStyle(primaryText)
-                        Text(routineNotificationSummary)
-                            .font(OhanaFont.footnote())
-                            .foregroundStyle(tertiaryText)
-                    }
-                    Spacer()
-                    Image(systemName: showAdvancedNotificationSettings ? "chevron.up" : "chevron.down")
-                        .font(OhanaFont.footnote(.bold))
-                        .symbolRenderingMode(.monochrome)
+        DisclosureGroup(isExpanded: $showAdvancedNotificationSettings) {
+            advancedNotificationSettingsRows
+        } label: {
+            HStack(spacing: 12) {
+                settingsIcon("slider.horizontal.3", color: Color.goTeal)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l.tr(zh: "高级提醒设置", en: "Advanced reminder settings", de: "Erweiterte Erinnerungen"))
+                        .font(OhanaFont.body(.semibold))
+                        .foregroundStyle(primaryText)
+                    Text(routineNotificationSummary)
+                        .font(OhanaFont.footnote())
                         .foregroundStyle(tertiaryText)
                 }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityIdentifier("settings-advanced-notifications-disclosure")
-
-            if showAdvancedNotificationSettings {
-                advancedNotificationSettingsRows
             }
         }
-        .animation(GoMotion.feedback, value: showAdvancedNotificationSettings)
+        .accessibilityIdentifier("settings-advanced-notifications-disclosure")
     }
 
     var advancedNotificationSettingsRows: some View {
@@ -429,30 +366,25 @@ extension SettingsView {
                 title: l.tr(zh: "用药提醒", en: "Medication reminders", de: "Medikamentenerinnerungen"),
                 group: .medication
             )
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             notificationToggleRow(
                 icon: "calendar.badge.clock",
                 iconColor: Color.goBlue,
                 title: l.tr(zh: "日历事项提醒", en: "Calendar event reminders", de: "Kalendererinnerungen"),
                 group: .calendar
             )
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             notificationToggleRow(
                 icon: "fork.knife",
                 iconColor: Color.goPrimary,
                 title: l.tr(zh: "喂食提醒", en: "Feeding reminders", de: "Fütterungserinnerungen"),
                 group: .feeding
             )
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             notificationToggleRow(
                 icon: "bubbles.and.sparkles.fill",
                 iconColor: Color.goTeal,
                 title: l.tr(zh: "护理提醒", en: "Care reminders", de: "Pflegeerinnerungen"),
                 group: .hygiene
             )
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             plantReminderSettingsPanel
-            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
             notificationToggleRow(
                 icon: "checkmark.seal.fill",
                 iconColor: Color.goYellow,
@@ -460,8 +392,6 @@ extension SettingsView {
                 group: .checkIn
             )
         }
-        .padding(.top, 10)
-        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     func notificationToggleRow(icon: String, iconColor: Color, title: String, group: NotificationPreferenceGroup) -> some View {

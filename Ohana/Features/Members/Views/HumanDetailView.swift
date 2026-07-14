@@ -22,7 +22,6 @@ struct HumanDetailView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(AppServices.self) var appServices
     @AppStorage("currentActiveHumanId") var activeHumanIdStr = ""
-    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) var hiddenHomePetIDsRaw = ""
     @Environment(\.ohanaAppLanguageCode) var appLanguage
 
     init(
@@ -55,8 +54,6 @@ struct HumanDetailView: View {
     @State var showingMedication = false
     @State var showingHealthReport = false
     @State var showingHealthMetrics = false
-    @State var showingHomeStackFullAlert = false
-    @State var homeVisibilityOverride: Bool?
     @State var avatarSignature = ""
     @State var avatarCacheKey = "human-detail-avatar-empty"
 
@@ -121,7 +118,6 @@ struct HumanDetailView: View {
                     } else {
                         badgesCard
                         statsBento
-                        showOnHomeCard
 
                         sectionHeader(l.tr(zh: "健康 & 身体", en: "Health & Body", de: "Gesundheit & Körper"))
 
@@ -231,15 +227,6 @@ struct HumanDetailView: View {
         }
         .navigationDestination(isPresented: $showingHealthReport) { HumanHealthReportView(human: human) }
         .navigationDestination(isPresented: $showingHealthMetrics) { HumanHealthCheckupView(human: human) }
-        .alert(l.tr(zh: "首页卡片堆已满", en: "Home card stack is full", de: "Startkartenstapel ist voll"), isPresented: $showingHomeStackFullAlert) {
-            Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {}
-        } message: {
-            Text(l.tr(
-                zh: "首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。",
-                en: "Home can show up to \(HomeCardVisibility.maxVisibleCards) cards. Remove a pet or human card from Home before adding \(human.name).",
-                de: "Auf der Startseite können bis zu \(HomeCardVisibility.maxVisibleCards) Karten angezeigt werden. Entferne zuerst eine Haustier- oder Menschenkarte, bevor du \(human.name) hinzufügst."
-            ))
-        }
         .task(id: avatarSourceKey) {
             await prepareAvatar()
         }

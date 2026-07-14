@@ -8,7 +8,9 @@
 import Foundation
 
 nonisolated enum FocusHomeCardDataSource {
-    nonisolated static let maxCardsPerPage = 6
+    /// Bounds eager media work for the cards initially visible above the fold.
+    /// This is a performance budget, not a member-card capacity limit.
+    nonisolated static let firstScreenMediaBudget = 6
 
     static func buildSnapshot(
         pets: [Pet],
@@ -19,17 +21,25 @@ nonisolated enum FocusHomeCardDataSource {
         showDummyCards: Bool,
         l: L10n = .current
     ) -> [FocusCard] {
+        // Keep consuming the legacy hidden-pet payload for backup compatibility,
+        // but the scrollable Home member deck no longer treats it as a visibility rule.
+        _ = hiddenPetIDsRaw
         let real = (
             pets
-                .filter { !$0.hasPassedAway && HomeCardVisibility.isPetVisible($0, raw: hiddenPetIDsRaw) }
+                .filter { !$0.hasPassedAway }
                 .map { FocusCard.from($0, includeAvatarData: false, l: l) }
                 + humans
-                .filter { $0.shouldShowOnHome && !$0.hasPassedAway }
+                .filter { !$0.hasPassedAway }
                 .map { FocusCard.from($0, includeAvatarData: false) }
                 + electronicPets
                 .filter { !$0.isArchived && $0.lifeState != .dead && $0.isFeaturedOnOasis }
                 .map { FocusCard.from($0) }
         )
+        .map { card in
+            var card = card
+            card.isShownOnHome = true
+            return card
+        }
         .sorted { lhs, rhs in
             if lhs.createdAt != rhs.createdAt {
                 return lhs.createdAt > rhs.createdAt
@@ -105,7 +115,7 @@ nonisolated enum FocusHomeCardDataSource {
         _ = pets
         _ = humans
         _ = equipFxPopoutCard
-        let targetCards = Array(source.prefix(maxCardsPerPage))
+        let targetCards = Array(source.prefix(firstScreenMediaBudget))
         let targetIds = targetCards.map(\.id)
         let targetIdSet = Set(targetIds)
         var avatarData = currentAvatarData
@@ -136,7 +146,7 @@ nonisolated enum FocusHomeCardDataSource {
         avatarData: [UUID: Data],
         popoutData: [UUID: Data]
     ) -> [FocusCard] {
-        var visible = Array(cards.prefix(maxCardsPerPage))
+        var visible = cards
         if let rosterPreviewCard,
            isExpanded || activeCardId == rosterPreviewCard.id,
            !visible.contains(where: { $0.id == rosterPreviewCard.id }) {
@@ -146,7 +156,7 @@ nonisolated enum FocusHomeCardDataSource {
     }
 
     static func visibleIdsSignature(cards: [FocusCard], rosterPreviewCard: FocusCard?) -> String {
-        var ids = Array(cards.prefix(maxCardsPerPage)).map(\.id)
+        var ids = cards.map(\.id)
         if let rosterPreviewCard {
             ids.append(rosterPreviewCard.id)
         }

@@ -359,7 +359,9 @@ actor HomeReadModelActor {
         let humanWeightLogs = fetches.humanWeightLogs()
         try Task.checkCancellation()
 
-        let familyTasks = OnlineFeatureGate.allows(.onlineCollaboration) ? fetches.familyTasks() : []
+        // Same-device household tasks are local Solo records and remain visible
+        // while remote collaboration is disabled.
+        let familyTasks = fetches.familyTasks()
         let exchangeRequests = fetches.exchangeRequests()
         try Task.checkCancellation()
 

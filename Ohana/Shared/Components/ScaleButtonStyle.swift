@@ -80,54 +80,10 @@ struct OhanaButtonPressFeedbackModifier: ViewModifier {
 }
 
 struct OhanaPillToggleStyle: ToggleStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.isEnabled) private var isEnabled
-
     func makeBody(configuration: Configuration) -> some View {
-        Button {
-            withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.selection) {
-                configuration.isOn.toggle()
-            }
-        } label: {
-            HStack(spacing: 12) {
-                configuration.label
-
-                Capsule()
-                    .fill(trackFill(isOn: configuration.isOn))
-                    .frame(width: 50, height: 28)
-                    .overlay(alignment: configuration.isOn ? .trailing : .leading) {
-                        Circle()
-                            .fill(Color.ohanaPrimaryText)
-                            .frame(width: 22, height: 22) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                            .shadow( // ui-v4: allow switch thumb depth for state clarity
-                                color: Color.arkInk.opacity(configuration.isOn ? 0.18 : 0.10),
-                                radius: configuration.isOn ? 7 : 4,
-                                x: 0,
-                                y: configuration.isOn ? 3 : 1
-                            )
-                            .padding(3)
-                    }
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(
-                                configuration.isOn ? Color.goPrimary.opacity(0.55) : Color.ohanaGlassStroke.opacity(0.9),
-                                lineWidth: 1
-                            )
-                    }
-                    .animation(reduceMotion ? GoMotion.reduced : GoMotion.selection, value: configuration.isOn)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .opacity(isEnabled ? 1 : 0.55)
-        .accessibilityValue(configuration.isOn ? Text("On") : Text("Off"))
-    }
-
-    private func trackFill(isOn: Bool) -> Color {
-        if isOn {
-            return Color.goPrimary
-        }
-        return Color.ohanaControlFill
+        Toggle(configuration)
+            .toggleStyle(.switch)
+            .tint(Color.goPrimary)
     }
 }
 

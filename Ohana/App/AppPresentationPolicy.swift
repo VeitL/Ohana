@@ -72,10 +72,26 @@ enum AppPresentationPolicyProvider {
 
     static func policy(for route: AppSheetRoute) -> AppPresentationPolicy {
         switch route {
-        case .accountSwitcher, .requiredAccountSwitch:
+        case .accountSwitcher,
+             .requiredAccountSwitch:
             AppPresentationPolicy(
                 surface: .compactSheet,
                 loading: .shellFirst(delayMS: 64),
+                instrumentationName: route.presentationName,
+                detents: [.medium, .large],
+                cornerRadius: OhanaRadius.sheetCompact
+            )
+        case .petMomentQuick,
+             .petWeightQuick,
+             .petExpenseQuick,
+             .humanMedicationQuick,
+             .humanWeightQuick,
+             .humanWorkoutQuick,
+             .humanExpenseQuick,
+             .humanNoteQuick:
+            AppPresentationPolicy(
+                surface: .compactSheet,
+                loading: .immediate,
                 instrumentationName: route.presentationName,
                 detents: [.medium, .large],
                 cornerRadius: OhanaRadius.sheetCompact
@@ -109,9 +125,10 @@ enum AppPresentationPolicyProvider {
 
     static func policy(for route: AppOverlayRoute) -> AppPresentationPolicy {
         AppPresentationPolicy(
-            surface: .inlineOverlay,
+            surface: .compactSheet,
             loading: .immediate,
-            instrumentationName: route.presentationName
+            instrumentationName: route.presentationName,
+            detents: [.medium, .large]
         )
     }
 }
@@ -230,9 +247,6 @@ extension View {
     func appPresentationSheet(_ policy: AppPresentationPolicy) -> some View {
         self
             .presentationDetents(policy.detents)
-            .presentationDragIndicator(.hidden)
-            .presentationCornerRadius(policy.cornerRadius)
-            .presentationBackground(Color.clear)
             .presentationContentInteraction(policy.contentInteraction)
     }
 }
@@ -259,6 +273,8 @@ private extension AppSheetRoute {
             "addEntity"
         case .calendar:
             "calendar"
+        case .taskCenter:
+            "taskCenter"
         case .coconutLog:
             "coconutLog"
         case .coconutShop:
@@ -299,6 +315,8 @@ private extension AppSheetRoute {
             "petHealth"
         case .petMedication:
             "petMedication"
+        case .petMomentQuick:
+            "petMomentQuick"
         case .petMomentHistory:
             "petMomentHistory"
         case .petDocuments:

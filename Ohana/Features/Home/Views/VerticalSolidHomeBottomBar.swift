@@ -2,7 +2,7 @@
 //  VerticalSolidHomeBottomBar.swift
 //  Ohana
 //
-//  Adaptive bottom navigation chrome for the vertical solid home surface.
+//  Quick-action menu that sits above the system-owned root tab bar.
 //
 
 import Foundation
@@ -14,7 +14,6 @@ struct HomeBottomNavigationLayoutMetrics: Equatable {
     let leadingPadding: CGFloat
     let trailingPadding: CGFloat
     let tabSpacing: CGFloat
-    let actionGap: CGFloat
     let actionDiameter: CGFloat
     let actionHitSize: CGFloat
     let showsSelectedLabel: Bool
@@ -24,19 +23,17 @@ enum HomeBottomNavigationLayoutPolicy {
     static func metrics(tabCount: Int, isAccessibilitySize: Bool = false) -> HomeBottomNavigationLayoutMetrics {
         let normalizedCount = max(tabCount, 1)
         let showsSelectedLabel = false
-        let actionDiameter: CGFloat = 48
-        let barHeight: CGFloat = isAccessibilitySize ? 58 : 56
-        let tabSpacing: CGFloat = isAccessibilitySize ? 2 : (normalizedCount >= 5 ? 2 : 4)
+        let barHeight: CGFloat = isAccessibilitySize ? 72 : 64
+        let tabSpacing: CGFloat = normalizedCount >= 5 ? 0 : 2
 
         return HomeBottomNavigationLayoutMetrics(
             barHeight: barHeight,
-            horizontalPadding: 14,
-            leadingPadding: 6,
-            trailingPadding: 6,
+            horizontalPadding: 10,
+            leadingPadding: 8,
+            trailingPadding: 8,
             tabSpacing: tabSpacing,
-            actionGap: 10,
-            actionDiameter: actionDiameter,
-            actionHitSize: max(actionDiameter, 52),
+            actionDiameter: 48,
+            actionHitSize: 52,
             showsSelectedLabel: showsSelectedLabel
         )
     }
@@ -51,8 +48,6 @@ enum HomeBottomNavigationLayoutPolicy {
         let fixedWidth = metrics.horizontalPadding * 2
             + metrics.leadingPadding
             + metrics.trailingPadding
-            + metrics.actionHitSize
-            + metrics.actionGap
             + CGFloat(max(normalizedCount - 1, 0)) * metrics.tabSpacing
         let availableWidth = max(44 * CGFloat(normalizedCount), containerWidth - fixedWidth)
         return availableWidth / CGFloat(normalizedCount)
@@ -62,6 +57,7 @@ enum HomeBottomNavigationLayoutPolicy {
 nonisolated enum HomeFabShortcutHitAreaPolicy {
     static let minimumHitSize: CGFloat = 44
     static let visualDiameter: CGFloat = 42
+    static let menuColumnWidth: CGFloat = 52
     static let expandedCardEmbeddedActionClearance: CGFloat = 184
 }
 
@@ -79,14 +75,14 @@ nonisolated enum HomeBottomNavigationPrimaryActionPresentation {
         }
         switch selectedTab {
         case .home: return "plus"
-        case .calendar: return "calendar.badge.plus"
+        case .calendar: return "plus"
         case .oasis: return "bolt.fill"
         case .plants: return "plus"
         }
     }
 }
 
-struct VerticalSolidHomeBottomBar: View {
+struct VerticalSolidHomeQuickActionMenu: View {
     let selectedTab: VerticalSolidHomeTab
     @Binding var isFabExpanded: Bool
     @Binding var itemsVisible: Bool
@@ -95,49 +91,43 @@ struct VerticalSolidHomeBottomBar: View {
     let plantShortcuts: [HomeFabFunctionShortcut]
     let expandedShortcuts: [ExpandedCardFabShortcut]
     let safeBottom: CGFloat
-    let treeLevel: Int
-    let treeProgress: Double
     let canAnimate: Bool
+    let primaryActionIcon: String
+    let primaryActionAccessibilityLabel: String
     let localization: L10n
-    let onSelect: (VerticalSolidHomeTab) -> Void
     let onHomeShortcut: (HomeFabFunctionShortcut) -> Void
     let onExpandedShortcut: (ExpandedCardFabShortcut, FocusCard) -> Void
-    let onCenter: () -> Void
+    let onPrimaryAction: () -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var activeHomeSubmenu: HomeFabShortcutSubmenu?
     @State private var submenuItemsVisible = false
 
     private var l: L10n { localization }
-    private var visibleTabs: [VerticalSolidHomeTab] {
-        AppFeatureRouteGuard.visibleHomeTabs(currentLevel: treeLevel)
-    }
-    private var metrics: HomeBottomNavigationLayoutMetrics {
-        HomeBottomNavigationLayoutPolicy.metrics(
-            tabCount: visibleTabs.count,
-            isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
-        )
-    }
-    private var usesFullVisualEffects: Bool {
-        workloadPolicy.visualEffectsBudget(isVisible: true).usesFullEffects
-    }
+
     var body: some View {
-        let barBottomInset = max(safeBottom - 2, 4)
-
-        ZStack(alignment: .bottom) {
+        ZStack(alignment: .bottomTrailing) {
             menuRows
-                .frame(width: metrics.actionHitSize, alignment: .center)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.trailing, metrics.horizontalPadding)
-                .padding(.bottom, menuRowsBottomPadding(metrics: metrics))
+                .frame(width: HomeFabShortcutHitAreaPolicy.menuColumnWidth, alignment: .center)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .padding(.trailing, 14)
+                .padding(.bottom, menuRowsBottomPadding)
 
-            navigationChrome(metrics: metrics)
-                .padding(.horizontal, metrics.horizontalPadding)
-                .padding(.bottom, barBottomInset)
+            Button(action: onPrimaryAction) {
+                Label(primaryActionAccessibilityLabel, systemImage: primaryActionIcon)
+                    .labelStyle(.iconOnly)
+                    .font(.title3.weight(.semibold))
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.circle)
+            .controlSize(.large)
+            .tint(Color.goPrimary)
+            .accessibilityLabel(primaryActionAccessibilityLabel)
+            .accessibilityIdentifier("home-primary-action")
+            .padding(.trailing, 14)
+            .padding(.bottom, primaryActionBottomPadding)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: isFabExpanded)
         .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: itemsVisible)
         .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: activeHomeSubmenu)
@@ -152,159 +142,14 @@ struct VerticalSolidHomeBottomBar: View {
         }
     }
 
-    private func navigationChrome(metrics: HomeBottomNavigationLayoutMetrics) -> some View {
-        GeometryReader { proxy in
-            let tabBackgroundWidth = tabBackgroundWidth(for: proxy.size.width, metrics: metrics)
-
-            HStack(alignment: .center, spacing: metrics.actionGap) {
-                tabStrip(metrics: metrics)
-                    .padding(.leading, metrics.leadingPadding)
-                    .padding(.trailing, metrics.leadingPadding)
-                    .frame(width: tabBackgroundWidth, height: metrics.barHeight)
-                    .background(navBackground)
-                    .layoutPriority(1)
-
-                Spacer(minLength: 0)
-
-                HomeBottomNavigationPrimaryAction(
-                    icon: centerIcon,
-                    isExpanded: isFabExpanded,
-                    diameter: metrics.actionDiameter,
-                    hitSize: metrics.actionHitSize,
-                    usesFullVisualEffects: usesFullVisualEffects,
-                    accessibilityLabel: centerButtonAccessibilityLabel
-                ) {
-                    OhanaFeedback.medium()
-                    if usesFabMenu {
-                        toggleFab()
-                        return
-                    }
-                    onCenter()
-                }
-            }
-            .frame(width: proxy.size.width, height: metrics.barHeight)
-        }
-        .frame(height: metrics.barHeight)
-        .accessibilityElement(children: .contain)
-    }
-
-    private func menuRowsBottomPadding(metrics: HomeBottomNavigationLayoutMetrics) -> CGFloat {
-        let basePadding = safeBottom + metrics.barHeight + 18
+    private var menuRowsBottomPadding: CGFloat {
+        let basePadding = safeBottom + 76
         guard activeCard != nil else { return basePadding }
         return basePadding + HomeFabShortcutHitAreaPolicy.expandedCardEmbeddedActionClearance
     }
 
-    private func tabStrip(metrics: HomeBottomNavigationLayoutMetrics) -> some View {
-        HStack(spacing: metrics.tabSpacing) {
-            ForEach(visibleTabs) { tab in
-                HomeBottomNavigationTabButton(
-                    tab: tab,
-                    isSelected: selectedTab == tab,
-                    showsSelectedLabel: metrics.showsSelectedLabel,
-                    treeLevel: treeLevel,
-                    treeProgress: treeProgress,
-                    localization: l,
-                    selectionAnimation: canAnimate ? GoMotion.selection : GoMotion.reduced,
-                    action: onSelect
-                )
-                .frame(maxWidth: .infinity)
-            }
-        }
-    }
-
-    private func tabBackgroundWidth(for availableWidth: CGFloat, metrics: HomeBottomNavigationLayoutMetrics) -> CGFloat {
-        let requestedWidth = availableWidth * 0.66
-        let minimumWidth = CGFloat(visibleTabs.count) * 44
-            + CGFloat(max(visibleTabs.count - 1, 0)) * metrics.tabSpacing
-            + metrics.leadingPadding * 2
-        let maximumWidth = max(minimumWidth, availableWidth - metrics.actionHitSize - metrics.actionGap)
-        return min(max(requestedWidth, minimumWidth), maximumWidth)
-    }
-
-    private var centerIcon: String {
-        HomeBottomNavigationPrimaryActionPresentation.icon(
-            selectedTab: selectedTab,
-            isFabExpanded: isFabExpanded,
-            usesFabMenu: usesFabMenu
-        )
-    }
-
-    private var centerButtonAccessibilityLabel: String {
-        if isFabExpanded {
-            return l.tr(zh: "收起菜单", en: "Close menu", de: "Menü schließen")
-        }
-        if activeCard != nil {
-            return l.tr(zh: "显示该成员剩余功能", en: "Show remaining member features", de: "Weitere Funktionen anzeigen")
-        }
-        if selectedTab == .home {
-            return l.tr(zh: "展开首页快捷菜单", en: "Show home shortcuts", de: "Home-Schnellzugriffe anzeigen")
-        }
-        if selectedTab == .plants {
-            return l.tr(zh: "展开植物快捷菜单", en: "Show plant shortcuts", de: "Pflanzen-Schnellzugriffe anzeigen")
-        }
-        switch selectedTab {
-        case .home:
-            return l.tr(zh: "更多功能", en: "More features", de: "Weitere Funktionen")
-        case .calendar:
-            return l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen")
-        case .oasis:
-            return l.tr(zh: "注入能量", en: "Inject energy", de: "Energie einspeisen")
-        case .plants:
-            return l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen")
-        }
-    }
-
-    @ViewBuilder
-    private var navBackground: some View {
-        if usesFullVisualEffects && !reduceTransparency {
-            Capsule()
-                .fill(Color.clear)
-                .glassEffect(.regular.tint(navGlassTint).interactive(true), in: Capsule()) // ui-v4: allow app-level Liquid Glass bottom navigation background
-                .overlay(navStroke)
-                .shadow( // ui-v4: allow floating Instagram-style glass navigation depth
-                    color: Color.arkInk.opacity(colorScheme == .dark ? 0.22 : 0.10),
-                    radius: 18,
-                    x: 0,
-                    y: 10
-                )
-        } else {
-            Capsule()
-                .fill(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.88 : 0.94))
-                .overlay(navStroke)
-                .shadow( // ui-v4: allow reduced-mode floating nav separation without Liquid Glass.
-                    color: Color.arkInk.opacity(colorScheme == .dark ? 0.08 : 0.04),
-                    radius: 6,
-                    x: 0,
-                    y: 3
-                )
-        }
-    }
-
-    private var navStroke: some View {
-        Capsule()
-            .strokeBorder(
-                LinearGradient(
-                    colors: [
-                        Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
-                        navSpecularStroke,
-                        Color.ohanaGlassStroke.opacity(usesFullVisualEffects ? 0.20 : 0.12)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
-            )
-    }
-
-    private var navGlassTint: Color {
-        if reduceTransparency {
-            return Color.ohanaCardSurface.opacity(0.94)
-        }
-        return Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.34 : 0.42)
-    }
-
-    private var navSpecularStroke: Color {
-        colorScheme == .dark ? Color.ohanaPrimaryText.opacity(0.18) : Color.ohanaSecondaryText.opacity(0.10)
+    private var primaryActionBottomPadding: CGFloat {
+        max(safeBottom - 2, 4)
     }
 
     @ViewBuilder
@@ -312,7 +157,10 @@ struct VerticalSolidHomeBottomBar: View {
         if isFabExpanded, let activeCard {
             VStack(spacing: 10) {
                 ForEach(Array(expandedShortcuts.enumerated()), id: \.element.id) { index, shortcut in
-                    VerticalSolidHomeFabShortcutButton(shortcut: shortcut) {
+                    VerticalSolidHomeFabShortcutButton(
+                        shortcut: shortcut,
+                        accentColor: Color(hex: activeCard.themeColorHex)
+                    ) {
                         guard shortcut.isAvailable else {
                             OhanaFeedback.light()
                             return
@@ -400,35 +248,6 @@ struct VerticalSolidHomeBottomBar: View {
         }
     }
 
-    private var usesFabMenu: Bool {
-        activeCard != nil || selectedTab == .home || selectedTab == .plants
-    }
-
-    private func toggleFab() {
-        if isFabExpanded {
-            resetHomeSubmenu()
-            withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
-                itemsVisible = false
-            }
-            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
-                guard !itemsVisible else { return }
-                withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
-                    isFabExpanded = false
-                }
-            }
-        } else {
-            itemsVisible = false
-            withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
-                isFabExpanded = true
-            }
-            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 16) {
-                withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
-                    itemsVisible = true
-                }
-            }
-        }
-    }
-
     private func handleHomeShortcut(_ shortcut: HomeFabFunctionShortcut) {
         switch shortcut.action {
         case .submenu(.addMember):
@@ -496,286 +315,9 @@ struct StarterOasisTabPromptView: View {
     }
 }
 
-private struct HomeBottomNavigationTabButton: View {
-    let tab: VerticalSolidHomeTab
-    let isSelected: Bool
-    let showsSelectedLabel: Bool
-    let treeLevel: Int
-    let treeProgress: Double
-    let localization: L10n
-    let selectionAnimation: Animation
-    let action: (VerticalSolidHomeTab) -> Void
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var title: String {
-        HomeBottomNavigationTreePresentation.title(for: tab, treeLevel: treeLevel, localization: localization)
-    }
-
-    var body: some View {
-        Button {
-            action(tab)
-        } label: {
-            tabContent
-                .foregroundStyle(isSelected ? selectedIconColor : inactiveIconColor)
-                .frame(width: isSelected && showsSelectedLabel ? 70 : 44, height: 44)
-                .background {
-                    selectionHalo
-                }
-                .overlay(alignment: .bottom) {
-                    selectedIndicator
-                        .offset(y: 2)
-                }
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .animation(selectionAnimation, value: isSelected)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityIdentifier("home-tab-\(tab.rawValue)")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    @ViewBuilder
-    private var tabContent: some View {
-        if isSelected, showsSelectedLabel {
-            HStack(spacing: 5) {
-                icon
-                Text(title)
-                    .font(OhanaFont.caption2(.black))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.68)
-            }
-        } else {
-            iconOnly
-        }
-    }
-
-    @ViewBuilder
-    private var selectionHalo: some View {
-        if isSelected {
-            Circle()
-                .fill(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.20 : 0.34))
-                .overlay {
-                    Circle()
-                        .strokeBorder(
-                            Color.ohanaGlassStroke.opacity(colorScheme == .dark ? 0.24 : 0.34),
-                            lineWidth: 1
-                        )
-                }
-        } else {
-            Circle()
-                .fill(Color.clear)
-        }
-    }
-
-    @ViewBuilder
-    private var selectedIndicator: some View {
-        if isSelected {
-            Capsule()
-                .fill(Color.goPrimary)
-                .frame(width: 15, height: 3) // a11y: allow decorative selected-tab indicator; parent tab owns the 44pt hit target
-                .shadow( // ui-v4: allow tiny selected-tab glow for floating nav clarity
-                    color: Color.goPrimary.opacity(0.26),
-                    radius: 5,
-                    x: 0,
-                    y: 2
-                )
-                .transition(.scale(scale: 0.72).combined(with: .opacity))
-        }
-    }
-
-    private var selectedIconColor: Color {
-        colorScheme == .dark ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText
-    }
-
-    private var inactiveIconColor: Color {
-        Color.ohanaSecondaryText.opacity(colorScheme == .dark ? 0.72 : 0.78)
-    }
-
-    private var iconOnly: some View {
-        Group {
-            if tab == .oasis {
-                VStack(spacing: 0) {
-                    icon
-                    Text(HomeBottomNavigationTreePresentation.levelText(treeLevel))
-                        .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.68)
-                        .monospacedDigit()
-                }
-            } else {
-                icon
-            }
-        }
-        .frame(width: 44, height: 44) // a11y: allow icon-only nav tab; this is the complete 44pt hit target.
-    }
-
-    @ViewBuilder
-    private var icon: some View {
-        if tab == .oasis {
-            HomeBottomNavigationTreeIcon(
-                progress: treeProgress,
-                isSelected: isSelected,
-                size: isSelected ? 17 : 16
-            )
-        } else {
-            Image(systemName: tab.icon)
-                .font(OhanaFont.adaptive(size: isSelected ? 16 : 15, weight: .black))
-                .symbolRenderingMode(.monochrome)
-                .contentTransition(.symbolEffect(.replace))
-                .accessibilityHidden(true)
-        }
-    }
-
-    private var accessibilityLabel: String {
-        if tab == .oasis {
-            return localization.tr(
-                zh: "椰子树 \(HomeBottomNavigationTreePresentation.levelText(treeLevel))",
-                en: "Coconut Tree \(HomeBottomNavigationTreePresentation.levelText(treeLevel))",
-                de: "Kokosbaum \(HomeBottomNavigationTreePresentation.levelText(treeLevel))"
-            )
-        }
-        return tab.title(localization)
-    }
-}
-
-enum HomeBottomNavigationTreePresentation {
-    static func levelText(_ level: Int) -> String {
-        "Lv.\(max(0, level))"
-    }
-
-    static func progressFill(_ progress: Double) -> CGFloat {
-        guard progress.isFinite else { return 0 }
-        return CGFloat(min(1, max(0, progress)))
-    }
-
-    static func title(for tab: VerticalSolidHomeTab, treeLevel: Int, localization: L10n) -> String {
-        if tab == .oasis {
-            return levelText(treeLevel)
-        }
-        return tab.title(localization)
-    }
-}
-
-private struct HomeBottomNavigationTreeIcon: View {
-    let progress: Double
-    let isSelected: Bool
-    let size: CGFloat
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var fillProgress: CGFloat {
-        HomeBottomNavigationTreePresentation.progressFill(progress)
-    }
-
-    var body: some View {
-        treeSymbol
-            .foregroundStyle(baseColor)
-            .overlay {
-                treeSymbol
-                    .foregroundStyle(progressGradient)
-                    .mask {
-                        GeometryReader { proxy in
-                            let fillHeight = finiteFillHeight(for: proxy.size.height)
-                            VStack(spacing: 0) {
-                                Spacer(minLength: 0)
-                                Rectangle()
-                                    .frame(height: fillHeight)
-                            }
-                        }
-                    }
-            }
-            .shadow( // ui-v4: allow tree icon separation from selected tab fill
-                color: isSelected ? Color.arkInk.opacity(0.38) : Color.goPrimary.opacity(0.24),
-                radius: isSelected ? 2.8 : 1.6,
-                x: 0,
-                y: isSelected ? 1.8 : 1
-            )
-            .accessibilityHidden(true)
-    }
-
-    private var treeSymbol: some View {
-        Image(systemName: "tree.fill") // a11y: allow decorative tree glyph inside the labeled 44pt navigation tab
-            .font(OhanaFont.adaptive(size: size, weight: .black))
-            .symbolRenderingMode(.monochrome)
-            .frame(width: 22, height: 22) // a11y: allow decorative glyph frame; parent tab owns the 44pt hit target
-            .contentTransition(.symbolEffect(.replace))
-    }
-
-    private func finiteFillHeight(for height: CGFloat) -> CGFloat {
-        guard height.isFinite, height > 0 else { return 1 }
-        let candidate = height * fillProgress
-        guard candidate.isFinite else { return 1 }
-        return max(1, candidate)
-    }
-
-    private var baseColor: Color {
-        if isSelected {
-            return colorScheme == .dark
-                ? Color.ohanaPrimaryActionText.opacity(0.90)
-                : Color.ohanaPrimaryText.opacity(0.90)
-        }
-        return Color.ohanaSecondaryText.opacity(0.52)
-    }
-
-    private var progressGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color.goPrimary,
-                Color.goTeal
-            ],
-            startPoint: .bottom,
-            endPoint: .top
-        )
-    }
-}
-
-private struct HomeBottomNavigationPrimaryAction: View {
-    let icon: String
-    let isExpanded: Bool
-    let diameter: CGFloat
-    let hitSize: CGFloat
-    let usesFullVisualEffects: Bool
-    let accessibilityLabel: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 21, weight: .black))
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: diameter, height: diameter)
-                .background(primaryActionBackground)
-                .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                .contentTransition(.symbolEffect(.replace))
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .frame(width: hitSize, height: hitSize)
-        .contentShape(Circle())
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityIdentifier("home-primary-action")
-    }
-
-    private var primaryActionBackground: some View {
-        Circle()
-            .fill(Color.goPrimary)
-            .overlay {
-                Circle()
-                    .strokeBorder(Color.ohanaPrimaryActionText.opacity(0.22), lineWidth: 1)
-            }
-            .shadow( // ui-v4: allow detached primary FAB depth
-                color: Color.goPrimary.opacity(usesFullVisualEffects ? 0.28 : 0.12),
-                radius: usesFullVisualEffects ? 16 : 6,
-                x: 0,
-                y: usesFullVisualEffects ? 8 : 3
-            )
-    }
-}
-
 private struct VerticalSolidHomeFabShortcutButton: View {
     let shortcut: ExpandedCardFabShortcut
+    let accentColor: Color
     let action: () -> Void
     @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
@@ -795,7 +337,9 @@ private struct VerticalSolidHomeFabShortcutButton: View {
                         actionType: iconActionType,
                         fallbackSystemName: shortcut.icon,
                         size: 24,
-                        color: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54)
+                        color: accentColor.opacity(shortcut.isAvailable ? 1 : 0.54),
+                        primaryColor: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54),
+                        animatesStateChanges: false
                     )
                     .frame(width: HomeFabShortcutHitAreaPolicy.visualDiameter, height: HomeFabShortcutHitAreaPolicy.visualDiameter) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
 
@@ -886,6 +430,7 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
                         fallbackSystemName: shortcut.icon,
                         size: 24,
                         color: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54),
+                        primaryColor: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54),
                         animatesStateChanges: false
                     )
                     .frame(width: HomeFabShortcutHitAreaPolicy.visualDiameter, height: HomeFabShortcutHitAreaPolicy.visualDiameter) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.

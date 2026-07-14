@@ -45,66 +45,49 @@ extension MemberCardCreationContentView {
         }
     }
 
-    var petBasicInfoStep: some View {
+    var petNameStep: some View {
         MemberCreationSection(
-            title: l.tr(zh: "必要信息", en: "Essentials", de: "Wichtiges"),
+            title: l.tr(zh: "它叫什么名字？", en: "What's their name?", de: "Wie heißt dein Tier?"),
             icon: "pawprint.fill",
             foreground: cardForeground
         ) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    compactNameInput(width: 148)
-                    compactGenderIconRow(
-                        options: petGenderOptions,
-                        selection: $draft.petGender,
-                        label: petGenderLabel,
-                        icon: petGenderIcon
-                    )
-                }
-                HStack(spacing: 10) {
-                    compactMenuPicker(
-                        title: l.tr(zh: "物种", en: "Species", de: "Art"),
-                        value: speciesLabel(draft.species)
-                    ) {
-                        ForEach(speciesOptions, id: \.self) { species in
-                            Button(speciesLabel(species)) {
-                                draft.species = species
-                                draft.breed = ""
-                                draft.customBreed = ""
-                                draft.isCustomBreed = false
-                                clampPetAppearance()
-                            }
+            petNameInput()
+        }
+    }
+
+    var petIdentityStep: some View {
+        MemberCreationSection(
+            title: l.tr(zh: "它是什么伙伴？", en: "What kind of pet?", de: "Was für ein Tier?"),
+            icon: "pawprint.fill",
+            foreground: cardForeground
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                compactMenuPicker(
+                    title: l.tr(zh: "物种", en: "Species", de: "Art"),
+                    value: draft.species.isEmpty
+                        ? l.tr(zh: "选择物种", en: "Choose species", de: "Art wählen")
+                        : speciesLabel(draft.species)
+                ) {
+                    ForEach(speciesOptions, id: \.self) { species in
+                        Button(speciesLabel(species)) {
+                            draft.species = species
+                            draft.breed = ""
+                            draft.customBreed = ""
+                            draft.isCustomBreed = false
+                            draft.coatColor = ""
                         }
                     }
+                }
+                .accessibilityIdentifier("member-pet-species-picker")
+
+                if !draft.species.isEmpty {
                     compactBreedPicker
+                        .accessibilityIdentifier("member-pet-breed-picker")
                 }
                 if draft.isCustomBreed {
-                    flatTextField(l.tr(zh: "自定义品种", en: "Custom breed", de: "Eigene Rasse"), text: $draft.customBreed) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                }
-                VStack(alignment: .leading, spacing: 7) {
-                    MemberCompactDateRow(
-                        title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
-                        icon: "birthday.cake.fill",
-                        isEnabled: $draft.hasBirthday,
-                        date: $draft.birthday,
-                        range: birthdayRange,
-                        foreground: cardForeground,
-                        secondaryForeground: cardSecondaryForeground,
-                        fill: cardControlFill,
-                        stroke: cardControlStroke,
-                        accent: cardAccent
-                    )
-                    MemberCompactDateRow(
-                        title: l.tr(zh: "到家日", en: "Home date", de: "Einzugstag"),
-                        icon: "house.fill",
-                        isEnabled: $draft.hasHomeDate,
-                        date: $draft.homeDate,
-                        range: birthdayRange,
-                        foreground: cardForeground,
-                        secondaryForeground: cardSecondaryForeground,
-                        fill: cardControlFill,
-                        stroke: cardControlStroke,
-                        accent: cardAccent
+                    flatTextField(
+                        l.tr(zh: "输入品种", en: "Enter breed", de: "Rasse eingeben"),
+                        text: $draft.customBreed
                     )
                 }
             }
@@ -120,62 +103,46 @@ extension MemberCardCreationContentView {
                 Button(breed.name) {
                     draft.isCustomBreed = breed.name == "其他"
                     draft.breed = breed.name == "其他" ? "" : breed.name
+                    draft.coatColor = ""
                     clampPetAppearance()
                 }
             }
         }
     }
 
-    var petProfileSection: some View {
+    var petAppearanceStep: some View {
         MemberCreationSection(
-            title: l.tr(zh: "毛色与性格", en: "Coat & vibe", de: "Fell & Charakter"),
-            icon: "list.bullet.clipboard.fill",
+            title: l.tr(zh: "它长什么样？", en: "What do they look like?", de: "Wie sieht dein Tier aus?"),
+            icon: "paintpalette.fill",
             foreground: cardForeground
         ) {
             VStack(alignment: .leading, spacing: 12) {
+                Text(l.tr(zh: "性别", en: "Sex", de: "Geschlecht"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(cardSecondaryForeground)
+                compactGenderIconRow(
+                    options: petGenderOptions,
+                    selection: $draft.petGender,
+                    label: petGenderLabel,
+                    icon: petGenderIcon
+                )
+
+                Text(l.tr(zh: "毛色", en: "Coat", de: "Fell"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(cardSecondaryForeground)
                 compactMenuPicker(
                     title: l.tr(zh: "毛色", en: "Coat", de: "Fell"),
-                    value: draft.coatColor.isEmpty ? l.tr(zh: "自动", en: "Auto", de: "Auto") : draft.coatColor
+                    value: draft.coatColor.isEmpty
+                        ? l.tr(zh: "选择毛色", en: "Choose coat", de: "Fell wählen")
+                        : draft.coatColor
                 ) {
                     ForEach(petCoatOptions, id: \.self) { option in
                         Button(option) {
                             draft.coatColor = option
-                            clampPetAppearance()
                         }
                     }
                 }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 7)], spacing: 7) {
-                    ForEach(Array(PetPersonalityTag.allTags.prefix(8).map(\.id)), id: \.self) { id in
-                        let isSelected = draft.personalityTagIds.contains(id)
-                        Button {
-                            withAnimation(GoMotion.selection) {
-                                if draft.personalityTagIds.contains(id) {
-                                    draft.personalityTagIds.removeAll { $0 == id }
-                                } else {
-                                    if draft.personalityTagIds.count >= 3 {
-                                        draft.personalityTagIds.removeFirst()
-                                    }
-                                    draft.personalityTagIds.append(id)
-                                }
-                            }
-                            UISelectionFeedbackGenerator().selectionChanged()
-                        } label: {
-                            Text(personalityLabel(id))
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.62)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 34)
-                                .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
-                                .overlay {
-                                    Capsule()
-                                        .strokeBorder(cardControlStroke, lineWidth: 1)
-                                }
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                    }
-                }
+                .accessibilityIdentifier("member-pet-coat-picker")
             }
         }
     }
@@ -210,29 +177,21 @@ extension MemberCardCreationContentView {
     }
 
     var avatar2DToggleButton: some View {
-        let isOn = draft.avatarSource == .avatar2D
-        return Button {
-            toggle2DAvatar()
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "wand.and.stars").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                Text("2.5D")
-                    .font(OhanaFont.caption(.black))
-                Circle()
-                    .fill(isOn ? cardSelectedForeground : cardForeground)
-                    .frame(width: 8, height: 8) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+        Toggle(
+            isOn: Binding(
+                get: { draft.avatarSource == .avatar2D },
+                set: { nextValue in
+                    guard nextValue != (draft.avatarSource == .avatar2D) else { return }
+                    toggle2DAvatar()
+                }
+            )
+        ) {
+            Label("2.5D", systemImage: "wand.and.stars")
+                .font(OhanaFont.caption(.black))
             }
-            .foregroundStyle(isOn ? cardSelectedForeground : cardForeground)
-            .padding(.horizontal, 12)
-            .frame(height: 34)
-            .background(isOn ? cardSelectedFill : cardControlFill, in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(cardControlStroke, lineWidth: 1)
-            }
-        }
-        .buttonStyle(ScaleButtonStyle())
+        .toggleStyle(.button)
+        .buttonStyle(.bordered)
+        .tint(Color.goPrimary)
         .accessibilityLabel(l.tr(zh: "2.5D 头像开关", en: "2.5D avatar switch", de: "2,5D-Avatar-Schalter"))
     }
 
@@ -251,52 +210,104 @@ extension MemberCardCreationContentView {
         return nil
     }
 
-    var petVibeSection: some View {
+    var petPersonalityStep: some View {
         MemberCreationSection(
-            title: l.tr(zh: "性格", en: "Vibe", de: "Charakter"),
+            title: l.tr(zh: "它是什么性格？", en: "What's their personality?", de: "Wie ist der Charakter?"),
             icon: "heart.fill",
             foreground: cardForeground
         ) {
             VStack(alignment: .leading, spacing: 12) {
-                compactTogglePill(
-                    title: l.tr(zh: "已绝育", en: "Neutered", de: "Kastriert"),
-                    icon: "checkmark.seal.fill",
-                    isOn: $draft.isNeutered
-                )
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 7)], spacing: 7) {
-                    ForEach(Array(PetPersonalityTag.allTags.prefix(8).map(\.id)), id: \.self) { id in
+                HStack(spacing: 8) {
+                    Text(l.tr(zh: "可跳过，最多选择 3 个", en: "Optional, choose up to 3", de: "Optional, bis zu 3 auswählen"))
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(cardSecondaryForeground)
+                        .lineLimit(2)
+                    Spacer(minLength: 8)
+                    Text("\(draft.personalityTagIds.count)/3")
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(cardForeground)
+                        .contentTransition(.numericText())
+                }
+
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2),
+                    spacing: 10
+                ) {
+                    ForEach(PetPersonalityTag.primaryChoices) { tag in
+                        let id = tag.id
                         let isSelected = draft.personalityTagIds.contains(id)
+                        let isAtLimit = draft.personalityTagIds.count >= 3 && !isSelected
                         Button {
-                            withAnimation(GoMotion.selection) {
-                                if draft.personalityTagIds.contains(id) {
-                                    draft.personalityTagIds.removeAll { $0 == id }
-                                } else {
-                                    if draft.personalityTagIds.count >= 3 {
-                                        draft.personalityTagIds.removeFirst()
-                                    }
-                                    draft.personalityTagIds.append(id)
+                            togglePetPersonality(id)
+                        } label: {
+                            ZStack(alignment: .topTrailing) {
+                                VStack(spacing: 6) {
+                                    Image(systemName: tag.sfSymbol)
+                                        .font(OhanaFont.adaptive(size: 18, weight: .bold))
+                                        .accessibilityHidden(true)
+                                    Text(personalityLabel(id))
+                                        .font(OhanaFont.caption(.black))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.72)
+                                }
+                                .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+                                .frame(maxWidth: .infinity, minHeight: 58)
+
+                                if isSelected {
+                                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative selected-state icon; button exposes a text value.
+                                        .font(OhanaFont.adaptive(size: 15, weight: .bold))
+                                        .foregroundStyle(cardSelectedForeground)
+                                        .padding(8)
+                                        .accessibilityHidden(true)
                                 }
                             }
-                            UISelectionFeedbackGenerator().selectionChanged()
-                        } label: {
-                            Text(personalityLabel(id))
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.62)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 34)
-                                .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
-                                .overlay {
-                                    Capsule()
-                                        .strokeBorder(cardControlStroke, lineWidth: 1)
-                                }
+                            .frame(maxWidth: .infinity, minHeight: 58)
+                            .background(
+                                isSelected ? cardSelectedFill : cardControlFill,
+                                in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                                    .strokeBorder(isSelected ? cardAccent.opacity(0.62) : cardControlStroke, lineWidth: 1)
+                            }
+                            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                            .opacity(isAtLimit ? 0.58 : 1)
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .accessibilityIdentifier("member-pet-personality-\(id)")
+                        .accessibilityLabel(personalityLabel(id))
+                        .accessibilityValue(
+                            isSelected
+                                ? l.tr(zh: "已选择", en: "Selected", de: "Ausgewählt")
+                                : l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt")
+                        )
+                        .accessibilityHint(
+                            isAtLimit
+                                ? l.tr(zh: "请先取消一个已选性格", en: "Deselect one personality first", de: "Zuerst eine Auswahl aufheben")
+                                : ""
+                        )
                     }
                 }
             }
         }
+    }
+
+    func togglePetPersonality(_ id: String) {
+        if draft.personalityTagIds.contains(id) {
+            withAnimation(GoMotion.selection) {
+                draft.personalityTagIds.removeAll { $0 == id }
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+            return
+        }
+        guard draft.personalityTagIds.count < 3 else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return
+        }
+        withAnimation(GoMotion.selection) {
+            draft.personalityTagIds.append(id)
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
     }
 
     var humanRegionSection: some View {
@@ -469,7 +480,6 @@ extension MemberCardCreationContentView {
             draft.resolvedBreed,
             draft.petGender,
             draft.coatColor,
-            draft.eyeColor,
             draft.humanGender,
             "\(draft.hasBirthday)",
             "\(draft.birthday.timeIntervalSince1970.rounded())"
@@ -479,7 +489,11 @@ extension MemberCardCreationContentView {
     var cardSubtitle: String {
         switch kind {
         case .pet:
-            [speciesLabel(draft.species), draft.resolvedBreed, draft.petGender == "unknown" ? "" : petGenderLabel(draft.petGender)]
+            [
+                draft.species.isEmpty ? "" : speciesLabel(draft.species),
+                draft.resolvedBreed,
+                draft.petGender.isEmpty ? "" : petGenderLabel(draft.petGender)
+            ]
                 .filter { !$0.isEmpty }
                 .joined(separator: " · ")
         case .human:
@@ -502,7 +516,7 @@ extension MemberCardCreationContentView {
     }
 
     var petGenderOptions: [String] {
-        ["unknown", "boy", "girl"]
+        ["boy", "girl"]
     }
 
     var humanGenderOptions: [String] {
@@ -527,25 +541,4 @@ extension MemberCardCreationContentView {
         return options.map(\.name)
     }
 
-    var petEyeOptions: [String] {
-        let options = PetAvatarAssetCatalog.eyeColors(species: draft.species, breed: draft.resolvedBreed, coatColor: draft.coatColor)
-            ?? PetBreedDatabase.genericEyeColors
-        return options.map(\.name)
-    }
-
-    var personalitySelection: Binding<String> {
-        Binding(
-            get: { draft.personalityTagIds.first ?? "" },
-            set: { id in
-                if draft.personalityTagIds.contains(id) {
-                    draft.personalityTagIds.removeAll { $0 == id }
-                } else {
-                    if draft.personalityTagIds.count >= 3 {
-                        draft.personalityTagIds.removeFirst()
-                    }
-                    draft.personalityTagIds.append(id)
-                }
-            }
-        )
-    }
 }

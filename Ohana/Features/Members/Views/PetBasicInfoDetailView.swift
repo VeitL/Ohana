@@ -37,7 +37,6 @@ struct PetBasicInfoDetailView: View {
     @State var eHasHomeDate = false
     @State var eHomeDate = Date()
     @State var eCoatColor = ""
-    @State var eEyeColor = ""
     @State var eMicrochipID = ""
     @State var eVetContact = "" // 电话
     @State var eVetClinicName = ""
@@ -54,6 +53,7 @@ struct PetBasicInfoDetailView: View {
     @State var eNotes = ""
     @State var eThemeColorHex = ""
     @State var eAvatarImageData: Data? = nil
+    @State var ePrimaryPersonalityTagID = ""
 
     let speciesOptions = Pet.canonicalSpeciesOptions
     let themePresets: [(String, String)] = [
@@ -90,9 +90,10 @@ struct PetBasicInfoDetailView: View {
                     } label: {
                         Text(l.save)
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.goPrimary)
+                            .foregroundStyle(Pet.canonicalSex(eGender) == nil ? Color.ohanaSecondaryText : Color.goPrimary)
                     }
                     .accessibilityIdentifier("pet-basic-info-save-action")
+                    .disabled(Pet.canonicalSex(eGender) == nil)
                 } else if !pet.hasPassedAway {
                     Button {
                         loadEditState()

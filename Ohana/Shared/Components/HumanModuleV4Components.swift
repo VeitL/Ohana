@@ -67,7 +67,7 @@ struct HumanModulePageHeader<Trailing: View>: View {
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(ScaleButtonStyle())
+                .ohanaGlassIconButton()
                 .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
             }
         }
@@ -147,8 +147,7 @@ struct HumanModuleFloatingActionButton: View {
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 22)
             .frame(height: 54)
-            .background(Color.goPrimary, in: Capsule())
         }
-        .buttonStyle(ScaleButtonStyle())
+        .ohanaGlassProminentButton()
     }
 }

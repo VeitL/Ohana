@@ -182,15 +182,19 @@ struct HomeSnapshotBuilderTests {
         #expect(cards[2].isReal)
     }
 
-    @Test func snapshotHonorsHiddenPetsAndHiddenHumans() {
+    @Test func snapshotIncludesAllLivingMembersDespiteLegacyHomeVisibilityPreferences() {
         let visiblePet = Pet(name: "Visible", species: "狗")
         let hiddenPet = Pet(name: "Hidden", species: "猫")
         let hiddenHuman = Human(name: "Private")
         hiddenHuman.shouldShowOnHome = false
+        let memorialPet = Pet(name: "Memorial Pet", species: "狗")
+        memorialPet.passedAwayDate = Date()
+        let memorialHuman = Human(name: "Memorial Human")
+        memorialHuman.passedAwayDate = Date()
 
         let cards = HomeSnapshotBuilder.buildCards(
-            pets: [visiblePet, hiddenPet],
-            humans: [hiddenHuman],
+            pets: [visiblePet, hiddenPet, memorialPet],
+            humans: [hiddenHuman, memorialHuman],
             electronicPets: [],
             events: [],
             humanMedications: [],
@@ -200,7 +204,51 @@ struct HomeSnapshotBuilderTests {
             showDummyCards: false
         )
 
-        #expect(cards.map(\.id) == [visiblePet.id])
+        let cardIDs = Set(cards.map(\.id))
+        let expectedIDs: Set<UUID> = [visiblePet.id, hiddenPet.id, hiddenHuman.id]
+        let allCardsShown = cards.allSatisfy(\.isShownOnHome)
+        #expect(cardIDs == expectedIDs)
+        #expect(allCardsShown)
+    }
+
+    @Test func homeMemberWalletScrollPolicyExtendsAtEightCardsAndLocksOnlyWhileExpanded() {
+        let viewportHeight: CGFloat = 694
+        let collapsedTopInset: CGFloat = 120
+        let selectedCardId = UUID()
+
+        #expect(FocusHomeCardDataSource.firstScreenMediaBudget == 6)
+        #expect(!VerticalSolidHomeMemberWalletScrollPolicy.usesExtendedLayout(cardCount: 7))
+        #expect(VerticalSolidHomeMemberWalletScrollPolicy.usesExtendedLayout(cardCount: 8))
+        #expect(VerticalSolidHomeMemberWalletScrollPolicy.sceneHeight(
+            cardCount: 7,
+            viewportHeight: viewportHeight,
+            collapsedTopInset: collapsedTopInset
+        ) == viewportHeight)
+
+        let extendedHeight = VerticalSolidHomeMemberWalletScrollPolicy.sceneHeight(
+            cardCount: 8,
+            viewportHeight: viewportHeight,
+            collapsedTopInset: collapsedTopInset
+        )
+        let expandedHeight = VerticalSolidHomeMemberWalletScrollPolicy.anchoredExpandedSceneHeight(
+            baseHeight: extendedHeight,
+            selectedCardId: selectedCardId,
+            scrollOffsetY: 600
+        )
+        let collapsedHeightAfterReturn = VerticalSolidHomeMemberWalletScrollPolicy.anchoredExpandedSceneHeight(
+            baseHeight: extendedHeight,
+            selectedCardId: nil,
+            scrollOffsetY: 600
+        )
+
+        #expect(extendedHeight > viewportHeight)
+        #expect(extendedHeight >= collapsedTopInset
+            + FocusHomeVerticalSolidCollapsedLayoutPolicy.scrollExtendedMinimumSceneHeight(cardCount: 8)
+            + VerticalSolidHomeMemberWalletScrollPolicy.bottomContentInset)
+        #expect(expandedHeight > extendedHeight)
+        #expect(collapsedHeightAfterReturn == extendedHeight)
+        #expect(!VerticalSolidHomeMemberWalletScrollPolicy.scrollIsDisabled(selectedCardId: nil))
+        #expect(VerticalSolidHomeMemberWalletScrollPolicy.scrollIsDisabled(selectedCardId: selectedCardId))
     }
 
     @Test func snapshotAppliesPreferredCardOrder() {
@@ -382,7 +430,7 @@ struct HomeSnapshotBuilderTests {
         #expect(first.heroPreparationRevision != second.heroPreparationRevision)
     }
 
-    @Test func avatarPreloadSignatureUsesPreparedSnapshotCardsOnly() {
+    @Test func avatarPreloadSignatureIncludesMembersMarkedHiddenByLegacyPreference() {
         let visiblePet = Pet(name: "Momo", species: "猫")
         visiblePet.updateAvatarImageData(Data([1, 2, 3, 4]))
         let hiddenPet = Pet(name: "Hidden", species: "狗")
@@ -402,9 +450,9 @@ struct HomeSnapshotBuilderTests {
         )
         let signature = VerticalSolidHomePreloadPlanner.mediaSignature(for: requests)
 
-        #expect(requests.map(\.id) == [visiblePet.id])
+        #expect(Set(requests.map(\.id)) == Set([visiblePet.id, hiddenPet.id]))
         #expect(signature.contains(visiblePet.id.uuidString))
-        #expect(!signature.contains(hiddenPet.id.uuidString))
+        #expect(signature.contains(hiddenPet.id.uuidString))
     }
 
     @Test func verticalSnapshotCardsCarryAvatarSignature() throws {
@@ -441,7 +489,7 @@ struct HomeSnapshotBuilderTests {
         #expect(humanCard.modelID == human.persistentModelID)
     }
 
-    @Test func popoutPreloadSignatureUsesPreparedSnapshotCardsOnly() {
+    @Test func popoutPreloadSignatureIncludesMembersMarkedHiddenByLegacyPreference() {
         let visiblePet = Pet(name: "Momo", species: "猫")
         visiblePet.cardStyleRaw = "popout"
         visiblePet.updateCardPopoutImageData(Data([1, 3, 5, 7]))
@@ -462,11 +510,12 @@ struct HomeSnapshotBuilderTests {
             activeHuman: nil
         )
         let signature = VerticalSolidHomePreloadPlanner.mediaSignature(for: requests)
+        let allRequestsWantPopout = requests.allSatisfy { $0.wantsPopout }
 
-        #expect(requests.map(\.id) == [visiblePet.id])
-        #expect(requests.first?.wantsPopout == true)
+        #expect(Set(requests.map(\.id)) == Set([visiblePet.id, hiddenPet.id]))
+        #expect(allRequestsWantPopout)
         #expect(signature.contains(visiblePet.id.uuidString))
-        #expect(!signature.contains(hiddenPet.id.uuidString))
+        #expect(signature.contains(hiddenPet.id.uuidString))
     }
 
     @Test func verticalSnapshotCardsCarryPopoutSignature() throws {

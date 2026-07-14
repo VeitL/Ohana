@@ -13,14 +13,13 @@ extension PetBasicInfoDetailView {
         eName = pet.name
         eSpecies = Pet.canonicalSpeciesKey(pet.species)
         eBreed = pet.breed
-        eGender = pet.gender
+        eGender = Pet.canonicalSex(pet.gender) ?? ""
         eIsNeutered = pet.isNeutered
         eHasBirthday = pet.birthday != nil
         eBirthday = pet.birthday ?? Date()
         eHasHomeDate = pet.homeDate != nil
         eHomeDate = pet.homeDate ?? Date()
         eCoatColor = pet.coatColor
-        eEyeColor = pet.eyeColor
         eMicrochipID = pet.microchipID
         eVetContact = pet.vetContact
         eVetClinicName = pet.vetClinicName
@@ -37,6 +36,7 @@ extension PetBasicInfoDetailView {
         eNotes = pet.notes
         eThemeColorHex = pet.safeThemeColorHex
         eAvatarImageData = pet.avatarImageData
+        ePrimaryPersonalityTagID = pet.personalityTagIdList.first ?? ""
     }
 
     func saveChanges() {
@@ -53,7 +53,6 @@ extension PetBasicInfoDetailView {
             themeHex: eThemeColorHex,
             notes: eNotes,
             coatColor: eCoatColor,
-            eyeColor: eEyeColor,
             microchipID: eMicrochipID,
             vetContact: eVetContact,
             vetClinicName: eVetClinicName,
@@ -68,7 +67,13 @@ extension PetBasicInfoDetailView {
             birthCity: eBirthCity,
             lineageInfo: eLineageInfo,
             foodBrand: pet.foodBrand,
-            dailyPortionGrams: pet.dailyPortionGrams
+            dailyPortionGrams: pet.dailyPortionGrams,
+            personalityTagIDs: ePrimaryPersonalityTagID.isEmpty
+                ? nil
+                : PetPrimaryPersonalitySelection.replacingPrimary(
+                    in: pet.personalityTagIdList,
+                    with: ePrimaryPersonalityTagID
+                )
         )
         commandQueue.enqueue(.memberProfile(entityID: pet.id, kind: EntityKind.pet.rawValue)) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).updatePetProfile(

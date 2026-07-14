@@ -7,57 +7,193 @@
 
 import SwiftUI
 
+struct FocusHomeToolbar: ToolbarContent {
+    let selectedTab: VerticalSolidHomeTab
+    let coconutBalance: Int
+    let activeHumanDisplayName: String
+    let primaryActionIcon: String
+    let primaryActionAccessibilityLabel: String
+    let localization: L10n
+    let onCoconut: () -> Void
+    let onPrimaryAction: () -> Void
+    let onOpenPlantData: () -> Void
+    let onCrew: () -> Void
+    let onAccountSwitcher: () -> Void
+    let onSettings: () -> Void
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button(action: onCoconut) {
+                FocusHomeCoconutToolbarLabel(balance: coconutBalance)
+            }
+            .accessibilityLabel(localization.tr(
+                zh: "椰子余额 \(coconutBalance)",
+                en: "Coconut balance \(coconutBalance)",
+                de: "Kokosnussguthaben \(coconutBalance)"
+            ))
+            .accessibilityIdentifier("home-coconut-action")
+        }
+
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            if selectedTab == .home {
+                Menu {
+                    Button(action: onAccountSwitcher) {
+                        Label(
+                            localization.tr(zh: "切换人类账户", en: "Switch human account", de: "Menschenkonto wechseln"),
+                            systemImage: "arrow.triangle.2.circlepath"
+                        )
+                    }
+                } label: {
+                    Image(systemName: "person.2.fill") // a11y: allow parent Menu provides the localized label
+                        .accessibilityHidden(true)
+                } primaryAction: {
+                    onCrew()
+                }
+                .accessibilityLabel(localization.tr(
+                    zh: "Ohana 成员",
+                    en: "Ohana members",
+                    de: "Ohana-Mitglieder"
+                ))
+                .accessibilityHint(localization.tr(
+                    zh: "点击打开成员名册，长按切换人类账户",
+                    en: "Tap to open the roster. Long press to switch human account.",
+                    de: "Tippen öffnet die Mitgliederliste. Lange drücken wechselt das Menschenkonto."
+                ))
+                .accessibilityIdentifier("home-crew-roster-action")
+            }
+
+            if selectedTab == .plants {
+                Menu {
+                    Button {
+                        OhanaFeedback.light()
+                        onPrimaryAction()
+                    } label: {
+                        Label(
+                            localization.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"),
+                            systemImage: "plus"
+                        )
+                    }
+                    .accessibilityIdentifier("home-add-plant-action")
+
+                    Button {
+                        OhanaFeedback.light()
+                        onOpenPlantData()
+                    } label: {
+                        Label(
+                            localization.tr(zh: "植物数据", en: "Plant data", de: "Pflanzendaten"),
+                            systemImage: "chart.bar.xaxis"
+                        )
+                    }
+                    .accessibilityIdentifier("home-plant-data-action")
+                } label: {
+                    Label(primaryActionAccessibilityLabel, systemImage: primaryActionIcon)
+                        .labelStyle(.iconOnly)
+                }
+                .accessibilityLabel(primaryActionAccessibilityLabel)
+                .accessibilityIdentifier("home-primary-action")
+            } else if selectedTab != .oasis {
+                Button {
+                    OhanaFeedback.light()
+                    onPrimaryAction()
+                } label: {
+                    Label(primaryActionAccessibilityLabel, systemImage: primaryActionIcon)
+                        .labelStyle(.iconOnly)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .accessibilityLabel(primaryActionAccessibilityLabel)
+                .accessibilityIdentifier("home-primary-action")
+            }
+
+            Button {
+                OhanaFeedback.light()
+                onSettings()
+            } label: {
+                Image(systemName: "gearshape") // a11y: allow parent Button provides the localized label
+                    .accessibilityHidden(true)
+            }
+            .accessibilityLabel(localization.tr(
+                zh: "设置，当前用户 \(activeHumanDisplayName)",
+                en: "Settings, current user \(activeHumanDisplayName)",
+                de: "Einstellungen, aktueller Nutzer \(activeHumanDisplayName)"
+            ))
+            .accessibilityIdentifier("home-settings-action")
+        }
+    }
+}
+
+private struct FocusHomeCoconutToolbarLabel: View {
+    let balance: Int
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("🥥")
+                .accessibilityHidden(true)
+            Text("\(balance)")
+                .monospacedDigit()
+                .ohanaNumericMotion(balance)
+        }
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+        .animation(reduceMotion ? GoMotion.reduced : GoMotion.feedback, value: balance)
+    }
+}
+
 struct FocusHomeHeaderView: View {
     let safeTop: CGFloat
     let topGap: CGFloat
     let contentHeight: CGFloat
-    let streak: Int
     let coconutBalance: Int
     let coconutDeltaContext: String?
     let activeHumanDisplayName: String
     let activeHumanAvatarImage: UIImage?
     let activeHumanAvatarEmoji: String?
+    let primaryActionIcon: String
+    let primaryActionAccessibilityLabel: String
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
-    let onStreak: () -> Void
     let onCoconut: () -> Void
     let onCrew: () -> Void
     let onAccountSwitcher: () -> Void
     let onCalendar: () -> Void
     let onSettings: () -> Void
+    let onPrimaryAction: () -> Void
 
     init(
         safeTop: CGFloat,
         topGap: CGFloat = 12,
         contentHeight: CGFloat = 44,
-        streak: Int,
         coconutBalance: Int,
         coconutDeltaContext: String? = nil,
         activeHumanDisplayName: String,
         activeHumanAvatarImage: UIImage?,
         activeHumanAvatarEmoji: String?,
-        onStreak: @escaping () -> Void,
+        primaryActionIcon: String,
+        primaryActionAccessibilityLabel: String,
         onCoconut: @escaping () -> Void,
         onCrew: @escaping () -> Void,
         onAccountSwitcher: @escaping () -> Void,
         onCalendar: @escaping () -> Void,
-        onSettings: @escaping () -> Void
+        onSettings: @escaping () -> Void,
+        onPrimaryAction: @escaping () -> Void
     ) {
         self.safeTop = safeTop
         self.topGap = topGap
         self.contentHeight = contentHeight
-        self.streak = streak
         self.coconutBalance = coconutBalance
         self.coconutDeltaContext = coconutDeltaContext
         self.activeHumanDisplayName = activeHumanDisplayName
         self.activeHumanAvatarImage = activeHumanAvatarImage
         self.activeHumanAvatarEmoji = activeHumanAvatarEmoji
-        self.onStreak = onStreak
+        self.primaryActionIcon = primaryActionIcon
+        self.primaryActionAccessibilityLabel = primaryActionAccessibilityLabel
         self.onCoconut = onCoconut
         self.onCrew = onCrew
         self.onAccountSwitcher = onAccountSwitcher
         self.onCalendar = onCalendar
         self.onSettings = onSettings
+        self.onPrimaryAction = onPrimaryAction
     }
 
     private var l: L10n { L10n(appLanguage) }
@@ -65,21 +201,6 @@ struct FocusHomeHeaderView: View {
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
             HStack(spacing: 8) {
-                Button(action: onStreak) {
-                    limePill {
-                        Text("🔥")
-                            .font(OhanaFont.metric(size: 9, .medium))
-                        Text("\(streak)")
-                            .font(OhanaFont.caption2(.black))
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                            .animation(GoMotion.feedback, value: streak)
-                    }
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "连续打卡 \(streak) 天", en: "\(streak)-day streak", de: "\(streak)-Tage-Serie"))
-                .accessibilityIdentifier("home-streak-action")
-
                 CoconutBalanceCapsule(
                     balance: coconutBalance,
                     deltaAnimationContext: coconutDeltaContext,
@@ -90,6 +211,18 @@ struct FocusHomeHeaderView: View {
             Spacer()
 
             HStack(spacing: 8) {
+                Button {
+                    OhanaFeedback.medium()
+                    onPrimaryAction()
+                } label: {
+                    primaryActionButton
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .background(headerHitSlop)
+                .contentShape(Rectangle())
+                .accessibilityLabel(primaryActionAccessibilityLabel)
+                .accessibilityIdentifier("home-primary-action")
+
                 Button(action: onCrew) {
                     limePill {
                         Image(systemName: "person.2.fill").accessibilityHidden(true)
@@ -146,6 +279,17 @@ struct FocusHomeHeaderView: View {
         .frame(height: 26)
         .frame(maxWidth: 104)
         .background(Color.goPrimary, in: Capsule())
+    }
+
+    private var primaryActionButton: some View {
+        Image(systemName: primaryActionIcon) // a11y: allow decorative symbol inside the labeled 44pt toolbar button
+            .font(OhanaFont.adaptive(size: 12, weight: .black))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
+            .frame(width: 26, height: 26) // a11y: allow visual glyph frame; parent button owns the 44pt hit target
+            .background(Color.goPrimary, in: Circle())
+            .contentTransition(.symbolEffect(.replace))
+            .animation(GoMotion.selection, value: primaryActionIcon)
     }
 
     @ViewBuilder

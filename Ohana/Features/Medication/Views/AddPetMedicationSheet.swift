@@ -94,13 +94,7 @@ struct AddPetMedicationSheet: View {
     }
 
     var body: some View {
-        Group {
-            if isInlinePopup {
-                inlinePopupBody
-            } else {
-                navigationBody
-            }
-        }
+        navigationBody
         .onAppear(perform: loadExistingMedication)
         .onChange(of: frequency) { _, newValue in
             withAnimation(GoMotion.selection) {
@@ -115,31 +109,108 @@ struct AddPetMedicationSheet: View {
 
     private var navigationBody: some View {
         NavigationStack {
-            ZStack {
-                OhanaAppBackground()
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        medicationFields
-                        saveButton
-                        Spacer(minLength: 40)
+            Form {
+                Section {
+                    LabeledContent(l.tr(zh: "宠物", en: "Pet", de: "Tier"), value: pet.name)
+                    TextField(
+                        l.tr(zh: "药品名称", en: "Medication name", de: "Medikament"),
+                        text: $name
+                    )
+                    .textInputAutocapitalization(.words)
+                    Menu(l.tr(zh: "常用药品", en: "Common medications", de: "Häufige Medikamente")) {
+                        ForEach(commonMedicationNames, id: \.self) { option in
+                            Button(option) { name = option }
+                        }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
                 }
-                .scrollDismissesKeyboard(.interactively)
+
+                Section(l.tr(zh: "剂量与频次", en: "Dose and schedule", de: "Dosis und Rhythmus")) {
+                    TextField(l.tr(zh: "每次剂量", en: "Dose each time", de: "Dosis je Einnahme"), text: $doseAmount)
+                        .keyboardType(.decimalPad)
+                    Picker(l.tr(zh: "单位", en: "Unit", de: "Einheit"), selection: $doseUnit) {
+                        ForEach(doseUnits, id: \.self) { unit in
+                            Text(unit.title(l: l)).tag(unit.rawValue)
+                        }
+                    }
+                    Picker(l.tr(zh: "频次", en: "Frequency", de: "Häufigkeit"), selection: $frequency) {
+                        ForEach(frequencyOptions, id: \.0) { frequency, title in
+                            Text(title).tag(frequency)
+                        }
+                    }
+                    if scheduledDoseCount > 0 {
+                        ForEach(0 ..< doseMinutes.count, id: \.self) { index in
+                            doseTimeRow(index: index)
+                        }
+                    }
+                }
+
+                Section(l.tr(zh: "疗程", en: "Course", de: "Kur")) {
+                    Toggle(
+                        l.tr(zh: "设置结束日期", en: "Set an end date", de: "Enddatum festlegen"),
+                        isOn: $hasCourseEnd
+                    )
+                    if hasCourseEnd {
+                        DatePicker(
+                            l.tr(zh: "开始日期", en: "Start date", de: "Startdatum"),
+                            selection: $startDate,
+                            displayedComponents: .date
+                        )
+                        Stepper(
+                            l.tr(
+                                zh: "疗程 \(resolvedCourseDays) 天",
+                                en: "\(resolvedCourseDays)-day course",
+                                de: "Kur: \(resolvedCourseDays) Tage"
+                            ),
+                            value: Binding(
+                                get: { resolvedCourseDays },
+                                set: { setCourseDays($0, preset: [7, 14, 30].contains($0) ? $0 : nil) }
+                            ),
+                            in: 1 ... 365
+                        )
+                    }
+                }
+
+                Section(l.tr(zh: "详情", en: "Details", de: "Details")) {
+                    Picker(
+                        l.tr(zh: "喂药方式", en: "How to give it", de: "Gabeart"),
+                        selection: $administrationTag
+                    ) {
+                        Text(l.tr(zh: "未指定", en: "Not specified", de: "Nicht angegeben"))
+                            .tag(String?.none)
+                        ForEach(administrationOptions, id: \.self) { option in
+                            Text(option.title(l: l)).tag(Optional(option.rawValue))
+                        }
+                    }
+                    TextField(
+                        l.tr(zh: "剩余药量", en: "Remaining amount", de: "Restmenge"),
+                        text: $remainingText
+                    )
+                    .keyboardType(.decimalPad)
+                    Picker(l.tr(zh: "颜色标签", en: "Color tag", de: "Farbmarke"), selection: $colorHex) {
+                        ForEach(colorPresets, id: \.self) { hex in
+                            Text("●  \(hex)")
+                                .foregroundStyle(Color(hex: hex))
+                                .tag(hex)
+                        }
+                    }
+                    TextField(
+                        l.tr(zh: "兽医叮嘱、注意事项…", en: "Vet instructions or cautions…", de: "Tierarzt-Hinweise oder Vorsicht…"),
+                        text: $notes,
+                        axis: .vertical
+                    )
+                    .lineLimit(3 ... 6)
+                }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(existing == nil ? l.tr(zh: "添加用药记录", en: "Add medication record", de: "Medikationseintrag hinzufügen") : l.tr(zh: "编辑用药", en: "Edit medication", de: "Medikation bearbeiten"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(l.tr(zh: "返回", en: "Back", de: "Zurück")) { close() }
-                        .foregroundStyle(Color.ohanaSecondaryText)
+                    Button(l.cancel, role: .cancel) { close() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { saveAfterKeyboardDismiss() }
-                        .fontWeight(.bold)
                         .disabled(!canSave || isSaving)
-                        .foregroundStyle(canSave && !isSaving ? chromeAccent : Color.ohanaSecondaryText)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -573,24 +644,14 @@ struct AddPetMedicationSheet: View {
         )
 
         return HStack(spacing: 12) {
-            Text("\(index + 1)")
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(chromeAccent, in: Circle())
-            Text(index == 0
-                ? l.tr(zh: "第一次", en: "Dose 1", de: "Dosis 1")
-                : l.tr(zh: "第\(index + 1)次", en: "Dose \(index + 1)", de: "Dosis \(index + 1)"))
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Spacer()
-            DatePicker("", selection: timeBinding, displayedComponents: .hourAndMinute)
-                .labelsHidden()
-                .datePickerStyle(.compact)
-                .tint(chromeAccent)
+            DatePicker(
+                index == 0
+                    ? l.tr(zh: "第一次", en: "Dose 1", de: "Dosis 1")
+                    : l.tr(zh: "第\(index + 1)次", en: "Dose \(index + 1)", de: "Dosis \(index + 1)"),
+                selection: timeBinding,
+                displayedComponents: .hourAndMinute
+            )
         }
-        .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func parseDosage(_ raw: String) {

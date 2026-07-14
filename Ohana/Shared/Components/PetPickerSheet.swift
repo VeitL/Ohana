@@ -108,6 +108,5 @@ struct PetPickerSheet: View {
         }
         .background(OhanaAppBackground())
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.hidden)
     }
 }

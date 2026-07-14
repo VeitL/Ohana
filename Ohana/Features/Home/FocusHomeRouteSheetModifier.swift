@@ -61,8 +61,15 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 }
                 .globalCoconutRewardFeedbackOverlay()
             }
-            .overlay {
-                homeOverlayLayer()
+            .sheet(item: overlayRouteBinding) { route in
+                AppDeferredRouteContent(
+                    routeID: route.id.uuidString,
+                    policy: AppPresentationPolicyProvider.policy(for: route)
+                ) {
+                    homeOverlayDestination(for: route)
+                }
+                .appPresentationSheet(AppPresentationPolicyProvider.policy(for: route))
+                .globalCoconutRewardFeedbackOverlay()
             }
             .alert(antiRepeatTitleText, isPresented: antiRepeatAlertBinding) {
                 Button(l.homeConfirmCheckIn, role: .destructive) {
@@ -127,6 +134,13 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             set: { route in
                 routes.sheet = route
             }
+        )
+    }
+
+    private var overlayRouteBinding: Binding<HomeOverlayRoute?> {
+        Binding(
+            get: { routes.overlay },
+            set: { routes.overlay = $0 }
         )
     }
 
@@ -366,28 +380,14 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     }
 
     @ViewBuilder
-    private func homeOverlayLayer() -> some View {
-        homeOverlayDestination()
-    }
-
-    @ViewBuilder
-    private func homeOverlayDestination() -> some View {
-        if let route = routes.overlay {
-            AppDeferredRouteContent(
-                routeID: route.id.uuidString,
-                policy: AppPresentationPolicyProvider.policy(for: route)
-            ) {
-                switch route {
-                case let .quickMoment(routeID, petID):
-                    OhanaInlinePageRouteHost(routeID: routeID.uuidString, onClose: {
-                        routes.dismissOverlay(routeID: routeID)
-                    }) { requestClose in
-                        AppQuickMomentOverlayRouteContainer(
-                            id: petID,
-                            onSaved: onFirstSuccessMomentCompleted,
-                            onDismiss: requestClose
-                        )
-                    }
+    private func homeOverlayDestination(for route: HomeOverlayRoute) -> some View {
+        switch route {
+        case let .quickMoment(routeID, petID):
+            AppQuickMomentOverlayRouteContainer(
+                id: petID,
+                onSaved: onFirstSuccessMomentCompleted,
+                onDismiss: { routes.dismissOverlay(routeID: routeID) }
+            )
                 case let .petWeightQuick(routeID, petID):
                     AppPetWeightQuickSheetHost(
                         id: petID,
@@ -441,11 +441,6 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                         onMissing: { routes.dismissOverlay(routeID: routeID) },
                         onDismiss: { routes.dismissOverlay(routeID: routeID) }
                     )
-                }
-            }
-            .ignoresSafeArea()
-            .globalCoconutRewardFeedbackOverlay()
-            .zIndex(100)
         }
     }
 

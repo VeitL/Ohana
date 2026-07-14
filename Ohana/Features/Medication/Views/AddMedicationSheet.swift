@@ -120,10 +120,7 @@ struct AddMedicationSheet: View {
                         editingStateCard
                     }
 
-                    moreToggle
-                    if showMore {
-                        moreCard
-                    }
+                    moreDisclosure
 
                     Spacer(minLength: 110)
                 }
@@ -480,23 +477,14 @@ struct AddMedicationSheet: View {
         }
     }
 
-    private var moreToggle: some View {
-        Button {
-            withAnimation(GoMotion.feedback) { showMore.toggle() }
+    private var moreDisclosure: some View {
+        DisclosureGroup(isExpanded: $showMore) {
+            moreCard
         } label: {
-            HStack {
-                Label(l.tr(zh: "更多", en: "More", de: "Mehr"), systemImage: "ellipsis.circle")
-                    .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(primaryText)
-                Spacer()
-                Image(systemName: showMore ? "chevron.up" : "chevron.down")
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(secondaryText)
-            }
-            .padding(14)
-            .background(controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+            Label(l.tr(zh: "更多", en: "More", de: "Mehr"), systemImage: "ellipsis.circle")
+                .font(OhanaFont.callout(.bold))
+                .foregroundStyle(primaryText)
         }
-        .buttonStyle(ScaleButtonStyle())
     }
 
     private var moreCard: some View {

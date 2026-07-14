@@ -255,17 +255,10 @@ enum AppFeatureRouteGuard {
         }
     }
 
-    private static func allowsOnlineSheetRoute(_ route: AppSheetRoute) -> Bool {
-        !requiresOnlineCollaboration(route) || OnlineFeatureGate.allows(.onlineCollaboration)
-    }
-
-    private static func requiresOnlineCollaboration(_ route: AppSheetRoute) -> Bool {
-        switch route {
-        case .crewRoster(.collaboration):
-            true
-        default:
-            false
-        }
+    private static func allowsOnlineSheetRoute(_: AppSheetRoute) -> Bool {
+        // Members collaboration is an on-device Solo feature. Remote family
+        // destinations continue to use the function-menu gate above.
+        true
     }
 
     private static func allowsPlantDestination(_ destination: FMDest) -> Bool {

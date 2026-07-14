@@ -231,51 +231,27 @@ struct QuickPottyDetailSheet: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .scrollBounceBehavior(.basedOnSize)
-                .scrollDisabled(inlineOverlayBlocksBackground)
-                .allowsHitTesting(!inlineOverlayBlocksBackground)
             }
             .overlay(alignment: .top) {
                 if showSaveToast {
                     toastView
                 }
             }
-            .overlay {
-                if let sheet = activeSheet, sheet.usesInlineOverlay {
-                    inlinePoopSheetOverlay(sheet)
-                        .zIndex(40)
-                        .ignoresSafeArea(.container, edges: .bottom)
-                }
-            }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: systemSheetBinding) { sheet in
                 NavigationStack {
-                    ZStack {
-                        VStack(spacing: 0) {
-                            pottySheetTopChrome(sheet)
-                                .padding(.horizontal, 20)
-                                .padding(.top, 12)
-                                .padding(.bottom, 4)
-
-                            sheetContent(sheet)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                                .allowsHitTesting(nestedInlineSheet == nil)
-                                .petMemorialTone(isActive: pet.hasPassedAway)
+                    sheetContent(sheet)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .petMemorialTone(isActive: pet.hasPassedAway)
+                        .navigationTitle(pottySheetTitle(sheet))
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(l.cancel) {
+                                    closeActivePottySheet()
+                                }
+                            }
                         }
-
-                        if nestedInlineSheet != nil {
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .ignoresSafeArea()
-                                .zIndex(35)
-                        }
-
-                        if let nestedInlineSheet {
-                            inlinePoopSheetOverlay(nestedInlineSheet)
-                                .zIndex(40)
-                                .ignoresSafeArea(.container, edges: .bottom)
-                        }
-                    }
-                    .toolbar(.hidden, for: .navigationBar)
                 }
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
             }
@@ -343,7 +319,7 @@ struct QuickPottyDetailSheet: View {
     }
 
     // MARK: - Main UI
-    func inlinePoopSheetOverlay(_ sheet: ActiveSheet) -> some View {
+    func inlinePoopSheetOverlay(_ sheet: ActiveSheet) -> some View { // native-ui: allow retired compatibility renderer; runtime uses sheet(item:)
         GeometryReader { proxy in
             let bottomInset = CGFloat(8)
             let maxHeight = min(max(sheet.inlineHeight, adaptiveSheetHeight), proxy.size.height * 0.94)
@@ -431,6 +407,10 @@ struct QuickPottyDetailSheet: View {
     }
 
     func dismissInlinePoopSheet() {
+        guard activeInlineSheet != nil else {
+            closeActivePottySheet()
+            return
+        }
         let dismissingSheetID = activeInlineSheet?.id
         withAnimation(GoMotion.page) {
             inlineSheetVisible = false

@@ -3,67 +3,9 @@
 //  Ohana
 //
 
-import SwiftData
 import SwiftUI
-import UIKit
 
 extension HumanDetailView {
-    var showOnHomeCard: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle().fill(Color.goPrimary.opacity(0.2)).frame(width: 48, height: 48)
-                Image(systemName: "rectangle.stack.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.title3(.bold))
-                    .foregroundStyle(Color.goPrimary)
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "在首页显示", en: "Show on Home", de: "Auf Startseite anzeigen"))
-                    .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(Color(hex: "1E3A8A"))
-                Text(displayedHomeVisibility
-                    ? l.tr(zh: "已加入首页卡堆与岛屿统计", en: "Included in Home cards and island stats", de: "In Startkarten und Inselstatistiken enthalten")
-                    : l.tr(zh: "不在首页卡堆与岛屿体重中显示", en: "Hidden from Home cards and island weight stats", de: "Nicht in Startkarten und Insel-Gewichtsstatistiken enthalten"))
-                    .font(OhanaFont.caption())
-                    .foregroundStyle(Color(hex: "6B82C4"))
-            }
-            Spacer()
-            Toggle("", isOn: Binding(
-                get: { displayedHomeVisibility },
-                set: { visible in
-                    if visible, !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
-                        showingHomeStackFullAlert = true
-                        return
-                    }
-                    homeVisibilityOverride = visible
-                    commandQueue.enqueue(.memberHomeVisibility(
-                        entityID: human.id,
-                        kind: EntityKind.human.rawValue,
-                        visible: visible
-                    )) {
-                        let result = MemberCommandExecutor(context: modelContext, services: appServices).setHumanHomeVisibility(
-                            human,
-                            visible: visible,
-                            note: "human.detail.homeVisibility"
-                        )
-                        if !result.didPersist {
-                            UINotificationFeedbackGenerator().notificationOccurred(.error)
-                        }
-                        homeVisibilityOverride = nil
-                    }
-                }
-            ))
-            .tint(Color.goPrimary)
-            .labelsHidden()
-        }
-        .padding(.horizontal, 16).padding(.vertical, 14)
-        .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
-        .padding(.horizontal, 16)
-    }
-
-    var displayedHomeVisibility: Bool {
-        homeVisibilityOverride ?? human.shouldShowOnHome
-    }
-
     // MARK: - Asset Card
     var humanAssetCard: some View {
         Button { showingWishlist = true } label: {

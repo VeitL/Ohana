@@ -291,7 +291,7 @@ struct PetFeatureCollectionSummary: Equatable {
         let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: todayStart) ?? todayStart
         let monthStart = calendar.dateInterval(of: .month, for: now)?.start ?? todayStart
         let activePets = pets.filter { !$0.hasPassedAway }
-        let visibleHumans = humans.filter { $0.shouldShowOnHome && !$0.hasPassedAway }
+        let visibleHumans = humans.filter { !$0.hasPassedAway }
 
         var foodPetIDs = Set<UUID>()
         var todayFoodLogs = 0

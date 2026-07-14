@@ -35,17 +35,26 @@ struct HumanHealthKitManagerLoadingTests {
         #expect(rawContinuationCount == 1)
     }
 
-    @Test func workoutImportAndUnavailableGoalsHaveVisibleStatus() throws {
+    @Test func liveWorkoutRowsAndPerRingGoalStatesRemainVisible() throws {
+        let managerSource = try source("Ohana/Features/Workouts/HumanHealthKitManager.swift")
         let source = try source("Ohana/Features/Workouts/Views/HumanWorkoutSummaryView.swift")
 
-        #expect(source.contains("presentWorkoutImportResult(result)"))
-        #expect(source.contains("运动已导入"))
-        #expect(source.contains("Import failed. Try again."))
-        #expect(source.contains("appServices.islandToasts.show(message)"))
-        #expect(source.contains("UIAccessibility.post(notification: .announcement"))
-        #expect(source.contains(".islandToastOverlay()"))
-        #expect(source.contains("snapshot.hasCompleteActivityGoals"))
-        #expect(source.contains("human-workout-activity-goals-unavailable"))
+        #expect(managerSource.contains("case accessRequested"))
+        #expect(managerSource.contains("var activitySummaryStatus"))
+        #expect(managerSource.contains("var recentWorkoutsStatus"))
+        #expect(managerSource.contains("recentWorkoutsStatus = workouts.isEmpty ? .noData : .available"))
+        #expect(managerSource.contains("var recentWorkouts: [HumanHealthKitWorkoutSnapshot]"))
+        #expect(managerSource.contains("summary.activityMoveMode == .appleMoveTime"))
+        #expect(source.contains("healthManager.recentWorkouts"))
+        #expect(source.contains("Automatically combined with the matching Apple Health workout."))
+        #expect(source.contains("if let log = row.log, !row.isHealthKit, !row.isPetWalk"))
+        #expect(source.contains("let progress: Double?"))
+        #expect(source.contains("human-workout-activity-rings"))
+        #expect(source.contains("human-workout-activity-goal-status"))
+        #expect(source.contains("human-workout-recent-status"))
+        #expect(!source.contains("importCandidate("))
+        #expect(!source.contains("human-workout-import-"))
+        #expect(!source.contains("snapshot.hasCompleteActivityGoals"))
     }
 
     private func source(_ path: String) throws -> String {

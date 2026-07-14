@@ -149,7 +149,7 @@ struct HomeReadModelStoreTests {
         #expect(store.payload.signature.contains(photo.id.uuidString))
     }
 
-    @Test func activeHumanHeaderAvatarPreloadsWhenHumanIsNotAHomeCard() async throws {
+    @Test func activeHumanHeaderAvatarAndCardIgnoreLegacyHomeVisibility() async throws {
         let container = try makeContainer()
         let store = HomeReadModelStore()
         let human = Human(name: "Hidden Owner")
@@ -170,7 +170,7 @@ struct HomeReadModelStoreTests {
             force: true
         )
 
-        #expect(store.payload.snapshot.cards.isEmpty)
+        #expect(store.payload.snapshot.cards.map(\.id) == [human.id])
         #expect(store.payload.activeHumanAvatar.id == human.id)
         #expect(store.payload.activeHumanAvatar.signature == FocusWalletAvatarCache.signature(for: avatarData))
         #expect(store.payload.mediaPreloadRequests.map(\.id) == [human.id])

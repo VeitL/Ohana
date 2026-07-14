@@ -15,7 +15,6 @@ struct HumanBasicInfoDetailContentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
@@ -25,7 +24,6 @@ struct HumanBasicInfoDetailContentView: View {
 
     @State private var isEditing = false
     @State private var isDeleting = false
-    @State private var showingHomeStackFullAlert = false
 
     @State private var eName = ""
     @State private var eAvatarImageData: Data? = nil
@@ -40,7 +38,6 @@ struct HumanBasicInfoDetailContentView: View {
     @State private var eNationality = ""
     @State private var eCity = ""
     @State private var eThemeColorHex = ""
-    @State private var eShouldShowOnHome = true
     @State private var eNotes = ""
     @State private var ePrivateWeight = false
     @State private var ePrivateWorkout = false
@@ -113,15 +110,6 @@ struct HumanBasicInfoDetailContentView: View {
             if hasPassedAway {
                 isEditing = false
             }
-        }
-        .alert(l.tr(zh: "首页卡片堆已满", en: "Home card stack is full", de: "Startkartenstapel ist voll"), isPresented: $showingHomeStackFullAlert) {
-            Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {}
-        } message: {
-            Text(l.tr(
-                zh: "首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。",
-                en: "Home can show up to \(HomeCardVisibility.maxVisibleCards) cards. Remove a pet or human card from Home before adding \(human.name).",
-                de: "Auf der Startseite können bis zu \(HomeCardVisibility.maxVisibleCards) Karten angezeigt werden. Entferne zuerst eine Haustier- oder Menschenkarte, bevor du \(human.name) hinzufügst."
-            ))
         }
         .accessibilityIdentifier("human-basic-info-screen")
     }
@@ -228,9 +216,8 @@ struct HumanBasicInfoDetailContentView: View {
                 infoRow(label: l.tr(zh: "相处天数", en: "Days Together", de: "Gemeinsame Tage"), value: l.tr(zh: "\(daysTogether) 天", en: "\(daysTogether) days", de: "\(daysTogether) Tage"))
             }
 
-            infoSection(title: l.tr(zh: "显示", en: "Display", de: "Anzeige"), icon: "rectangle.grid.1x2.fill", iconColor: Color.goYellow) {
-                infoRow(label: l.tr(zh: "首页显示", en: "Home Display", de: "Startseite"), value: human.shouldShowOnHome ? l.tr(zh: "显示", en: "Shown", de: "Angezeigt") : l.tr(zh: "隐藏", en: "Hidden", de: "Ausgeblendet"))
-                if HumanLocalPrivacyPolicy.isEnabled {
+            if HumanLocalPrivacyPolicy.isEnabled {
+                infoSection(title: l.tr(zh: "隐私", en: "Privacy", de: "Datenschutz"), icon: "lock.shield.fill", iconColor: Color.goYellow) {
                     infoRow(label: l.tr(zh: "隐私项目", en: "Private Fields", de: "Private Felder"), value: privacySummary)
                 }
             }
@@ -313,20 +300,6 @@ struct HumanBasicInfoDetailContentView: View {
                 optionPickerRow(l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), selection: $eNationality, options: countryOptions)
                 Divider().opacity(0.1)
                 optionPickerRow(l.tr(zh: "现居地", en: "Residence", de: "Wohnort"), selection: $eCity, options: residenceCityOptions)
-                Divider().opacity(0.1)
-                Toggle(isOn: Binding(
-                    get: { eShouldShowOnHome },
-                    set: { visible in
-                        if visible, !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
-                            showingHomeStackFullAlert = true
-                            return
-                        }
-                        eShouldShowOnHome = visible
-                    }
-                )) {
-                    editLabel(l.tr(zh: "在首页显示", en: "Show on Home", de: "Auf Startseite anzeigen"))
-                }
-                .tint(Color.goPrimary)
             }
 
             if HumanLocalPrivacyPolicy.isEnabled {
@@ -594,7 +567,6 @@ struct HumanBasicInfoDetailContentView: View {
         eNationality = human.nationality
         eCity = human.city
         eThemeColorHex = human.safeThemeColorHex
-        eShouldShowOnHome = human.shouldShowOnHome
         eNotes = displayNotes
         ePrivateWeight = human.privateFields.contains(HumanPrivateField.weight.rawValue)
         ePrivateWorkout = human.privateFields.contains(HumanPrivateField.workout.rawValue)
@@ -605,11 +577,6 @@ struct HumanBasicInfoDetailContentView: View {
     }
 
     private func saveChanges() {
-        if eShouldShowOnHome, !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
-            showingHomeStackFullAlert = true
-            return
-        }
-
         let input = HumanProfileCommandInput(
             name: eName,
             avatarImageData: eAvatarImageData,
@@ -625,7 +592,7 @@ struct HumanBasicInfoDetailContentView: View {
             themeHex: eThemeColorHex,
             notes: eNotes,
             preservedNoteParts: preservedMetadataParts,
-            shouldShowOnHome: eShouldShowOnHome,
+            shouldShowOnHome: true,
             privateFieldsRaw: HumanLocalPrivacyPolicy.isEnabled ? editedPrivateFieldsRaw : nil
         )
         commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {

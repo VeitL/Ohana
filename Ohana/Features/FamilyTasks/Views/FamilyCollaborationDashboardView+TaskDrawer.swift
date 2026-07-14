@@ -154,23 +154,23 @@ extension FamilyCollaborationDashboardView {
                 .padding(.horizontal, 13)
                 .padding(.vertical, 9)
                 .background(Color.goPrimary, in: Capsule())
+                .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(assignTitle)
         }
         .padding(12)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-        .onTapGesture {
-            presentEditor(.assignReminder(reminder.id))
-        }
     }
 
     func familyTaskRow(_ task: FamilyCollaborationTask) -> some View {
         HStack(spacing: 12) {
-            Text(task.emoji)
-                .font(OhanaFont.title3(.black))
-                .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
+            Image(systemName: task.relatedPetId == nil ? "checklist" : "pawprint.fill")
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 44, height: 44)
+                .background(Color.goPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(task.title)
                     .font(OhanaFont.callout(.black))
@@ -200,15 +200,11 @@ extension FamilyCollaborationDashboardView {
         }
         .padding(12)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-        .onTapGesture {
-            presentEditor(.editTask(task.id))
-        }
     }
 
     @ViewBuilder
     func taskPrimaryAction(_ task: FamilyCollaborationTask) -> some View {
-        if task.status == .pendingReview, task.createdById == activeHumanId {
+        if task.status == .pendingReview, task.createdById == currentHumanRecordID {
             HStack(spacing: 6) {
                 smallAction(title: l.tr(zh: "退回", en: "Redo", de: "Zurück"), color: Color.goRed) {
                     runFamilyTaskCommand {
@@ -225,7 +221,7 @@ extension FamilyCollaborationDashboardView {
             Text(l.tr(zh: "待确认", en: "Review", de: "Prüfung"))
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.goYellow)
-        } else if task.assignedToId == activeHumanId || task.claimedById == activeHumanId {
+        } else if task.assignedToId == currentHumanRecordID || task.claimedById == currentHumanRecordID {
             smallAction(title: l.tr(zh: "完成", en: "Done", de: "Fertig"), color: Color.goPrimary) {
                 runFamilyTaskCommand {
                     commandExecutor.complete(task, by: currentHuman)
@@ -237,17 +233,20 @@ extension FamilyCollaborationDashboardView {
                     commandExecutor.claim(task, by: human)
                 }
             }
-        } else if task.createdById == activeHumanId {
-            Text(l.tr(zh: "编辑", en: "Edit", de: "Bearb."))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
+        } else if task.createdById == currentHumanRecordID {
+            smallAction(
+                title: l.tr(zh: "编辑", en: "Edit", de: "Bearb."),
+                color: Color.goPrimary
+            ) {
+                presentEditor(.editTask(task.id))
+            }
         }
     }
 
     func taskSubtitle(_ task: FamilyCollaborationTask) -> String {
         if task.status == .pendingReview {
             let performer = task.completedByName ?? l.tr(zh: "对方", en: "someone", de: "jemand")
-            if task.createdById == activeHumanId {
+            if task.createdById == currentHumanRecordID {
                 return l.tr(
                     zh: "\(performer) 已提交，等你确认",
                     en: "\(performer) submitted it, awaiting your confirmation",
@@ -265,10 +264,17 @@ extension FamilyCollaborationDashboardView {
         return "\(task.createdByName) → \(target)\(due)"
     }
 
-    func runFamilyTaskCommand(_ command: @escaping @MainActor () -> Void) {
+    func runFamilyTaskCommand(_ command: @escaping @MainActor () -> Bool) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         OhanaFrameScheduler.runAfterNextFrame {
-            command()
+            guard command() else {
+                commandFailureMessage = l.tr(
+                    zh: "任务状态没有更新。请确认当前档案、任务归属和发布者余额后重试。",
+                    en: "The task was not updated. Check the current profile, task ownership, and publisher balance, then try again.",
+                    de: "Die Aufgabe wurde nicht aktualisiert. Prüfe aktuelles Profil, Zuordnung und Guthaben und versuche es erneut."
+                )
+                return
+            }
         }
     }
 
@@ -276,9 +282,21 @@ extension FamilyCollaborationDashboardView {
         activeSheetRoute = .moreCollaboration
     }
 
-    func dismissMoreCollaboration() {
+    func dismissMoreCollaboration(then action: FamilyCollaborationPostSheetAction? = nil) {
+        pendingPostSheetAction = action
         if activeSheetRoute == .moreCollaboration {
             activeSheetRoute = nil
+        }
+    }
+
+    func performPendingPostSheetAction() {
+        guard let action = pendingPostSheetAction else { return }
+        pendingPostSheetAction = nil
+        switch action {
+        case let .presentEditor(route):
+            presentEditor(route)
+        case .openWeeklyReport:
+            onOpenWeeklyReport()
         }
     }
 
@@ -287,7 +305,7 @@ extension FamilyCollaborationDashboardView {
     }
 
     func assignedTasks(for pet: Pet) -> [FamilyCollaborationTask] {
-        familyTasks(for: pet).filter { $0.assignedToId == activeHumanId || $0.claimedById == activeHumanId }
+        familyTasks(for: pet).filter { $0.assignedToId == currentHumanRecordID || $0.claimedById == currentHumanRecordID }
     }
 
     func petTaskCount(_ pet: Pet?) -> Int {

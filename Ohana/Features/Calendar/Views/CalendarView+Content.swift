@@ -72,7 +72,9 @@ extension CalendarView {
                 calStickyHeader
             }
         }
-        .overlay { inlineAddEventLayer }
+        .sheet(isPresented: $showingAddEvent, onDismiss: completeAddEventDismissal) {
+            AddEventView(onClose: closeInlineAddEvent, plants: plants)
+        }
         .onChange(of: addEventTrigger) { _, _ in requestAddEventPresentation() }
         .onChange(of: viewModeRaw) { _, newValue in
             syncCalendarViewModeFromStorage(newValue)
@@ -120,8 +122,6 @@ extension CalendarView {
             listInitialPositionTask?.cancel()
             listInitialPositionTask = nil
             timelinePositionCoordinator.cancel()
-            addEventPresentationTask?.cancel()
-            addEventContentMountTask?.cancel()
             preparedCalendarSnapshotTask?.cancel()
             preparedCalendarSnapshotTask = nil
             cancelPendingCalendarMainContentMount(resetMountedState: true)
@@ -177,20 +177,6 @@ extension CalendarView {
         }
     }
 
-    @ViewBuilder
-    var inlineAddEventLayer: some View {
-        if showingAddEvent || addEventPresentationProgress > 0.001 {
-            OhanaDeferredInlinePageCover(
-                progress: addEventPresentationProgress,
-                isContentMounted: isAddEventContentMounted,
-                reservesSafeArea: false
-            ) {
-                AddEventView(onClose: closeInlineAddEvent, plants: plants)
-            }
-            .zIndex(90)
-        }
-    }
-
     var calendarDeferredContentPlaceholder: some View {
         VStack(spacing: 12) {
             ForEach(0 ..< 5, id: \.self) { index in
@@ -232,69 +218,37 @@ extension CalendarView {
             note: ["source": hideToolbar ? "embedded" : "standalone"]
         )
         addEventFlowStartedAt = startedAt
-        addEventPresentationTask?.cancel()
-        addEventContentMountTask?.cancel()
         showingAddEvent = true
-        addEventPresentationProgress = 0
-        isAddEventContentMounted = false
         AppFlowPerformance.mark(
             AppPerformanceFlows.calendarAddEventSheet,
             AppPerformancePhases.shellReady,
             startedAt: startedAt
         )
-        addEventPresentationTask = OhanaFrameScheduler.runAfterNextFrame {
-            guard showingAddEvent else {
-                addEventPresentationTask = nil
-                return
-            }
-            withAnimation(GoMotion.sheetEnter) {
-                addEventPresentationProgress = 1
-            }
-            addEventPresentationTask = nil
-        }
-        addEventContentMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
-            guard showingAddEvent else {
-                addEventContentMountTask = nil
-                return
-            }
-            withAnimation(GoMotion.quick) {
-                isAddEventContentMounted = true
-            }
+        OhanaFrameScheduler.runAfterNextFrame {
+            guard showingAddEvent else { return }
             AppFlowPerformance.mark(
                 AppPerformanceFlows.calendarAddEventSheet,
                 AppPerformancePhases.contentMounted,
                 startedAt: startedAt
             )
-            addEventContentMountTask = nil
         }
     }
 
     func closeInlineAddEvent() {
-        guard showingAddEvent || addEventPresentationProgress > 0.001 else { return }
-        addEventContentMountTask?.cancel()
-        isAddEventContentMounted = false
+        guard showingAddEvent else { return }
+        showingAddEvent = false
+    }
+
+    func completeAddEventDismissal() {
         schedulePreparedCalendarSnapshotRebuild(delayMilliseconds: 220, force: true)
-        withAnimation(GoMotion.sheetEnter) {
-            addEventPresentationProgress = 0
+        if let addEventFlowStartedAt {
+            AppFlowPerformance.mark(
+                AppPerformanceFlows.calendarAddEventSheet,
+                AppPerformancePhases.routeDismiss,
+                startedAt: addEventFlowStartedAt
+            )
         }
-        addEventPresentationTask?.cancel()
-        addEventPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 340) {
-            guard addEventPresentationProgress <= 0.02 else {
-                addEventPresentationTask = nil
-                return
-            }
-            if let addEventFlowStartedAt {
-                AppFlowPerformance.mark(
-                    AppPerformanceFlows.calendarAddEventSheet,
-                    AppPerformancePhases.routeDismiss,
-                    startedAt: addEventFlowStartedAt
-                )
-            }
-            showingAddEvent = false
-            isAddEventContentMounted = false
-            addEventFlowStartedAt = nil
-            addEventPresentationTask = nil
-        }
+        addEventFlowStartedAt = nil
     }
 
     func reconcileDefaultPlanOverrides() {

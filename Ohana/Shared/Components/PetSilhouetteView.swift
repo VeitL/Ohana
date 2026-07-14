@@ -2,7 +2,7 @@
 //  PetSilhouetteView.swift
 //  Ohana
 //
-//  添加宠物时的互动剪影组件 — 用 SwiftUI 几何绘制猫/狗，支持毛色/瞳色实时预览 + 动画 + 点击交互
+//  添加宠物时的互动剪影组件，支持毛色实时预览。
 //
 
 import SwiftUI
@@ -11,30 +11,27 @@ import SwiftUI
 /// species: "猫" / "狗"（其他物种 fallback 为通用圆形剪影）
 /// patternName: 图案毛色名（"奶牛色"/"三花"/"玳瑁"/"重点色"/"银渐层"/"蓝白双色"/"虎斑"），nil 时纯色
 /// onTapCoat: 点击身体时触发（显示毛色选择器）
-/// onTapEye: 点击眼睛时触发（显示瞳色选择器）
 struct PetSilhouetteView: View {
     let species: String
     var coatColor: Color = .init(hex: "E8C49A")
-    var eyeColor: Color = .init(hex: "6B3A2A")
     var patternName: String?
     var onTapCoat: (() -> Void)?
-    var onTapEye: (() -> Void)?
     /// 关闭偶发眨眼（用于小尺寸预览卡等，完全静态）
     var isAnimationEnabled: Bool = true
     var body: some View {
         switch Pet.canonicalSpeciesKey(species) {
-        case "cat": CatSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
-        case "dog": DogSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
-        case "rabbit": RabbitSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                         onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
-        case "hamster": HamsterSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                     onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
-        case "bird": BirdSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                 onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
-        default: GenericSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                   onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
+        case "cat": CatSilhouette(coatColor: coatColor, patternName: patternName,
+                                   onTapCoat: onTapCoat, isAnimationEnabled: isAnimationEnabled)
+        case "dog": DogSilhouette(coatColor: coatColor, patternName: patternName,
+                                   onTapCoat: onTapCoat, isAnimationEnabled: isAnimationEnabled)
+        case "rabbit": RabbitSilhouette(coatColor: coatColor, patternName: patternName,
+                                         onTapCoat: onTapCoat, isAnimationEnabled: isAnimationEnabled)
+        case "hamster": HamsterSilhouette(coatColor: coatColor, patternName: patternName,
+                                           onTapCoat: onTapCoat, isAnimationEnabled: isAnimationEnabled)
+        case "bird": BirdSilhouette(coatColor: coatColor, patternName: patternName,
+                                     onTapCoat: onTapCoat, isAnimationEnabled: isAnimationEnabled)
+        default: GenericSilhouette(coatColor: coatColor, patternName: patternName,
+                                   onTapCoat: onTapCoat, isAnimationEnabled: isAnimationEnabled)
         }
     }
 }
@@ -85,27 +82,13 @@ private extension View {
     }
 }
 
-/// 点击眼睛：短 easeOut，避免 spring + 多次主线程调度
-private enum SilhouetteEyeTapFeedback {
-    static func play(eyePulse: Binding<CGFloat>) {
-        withAnimation(GoMotion.quick) { eyePulse.wrappedValue = 1.07 }
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 110_000_000)
-            withAnimation(GoMotion.quick) { eyePulse.wrappedValue = 1.0 }
-        }
-    }
-}
-
 // MARK: - Cat Silhouette（Kawaii 插画风）
 private struct CatSilhouette: View {
     var coatColor: Color
-    var eyeColor: Color
     var patternName: String?
     var onTapCoat: (() -> Void)?
-    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
     @State private var blinkScale: CGFloat = 1.0
-    @State private var eyePulse: CGFloat = 1.0
     var body: some View {
         ZStack {
             // 地面阴影
@@ -174,16 +157,11 @@ private struct CatSilhouette: View {
                     .offset(x: 38, y: 22)
                 // 眼睛（kawaii 大眼，略低位置）
                 HStack(spacing: 28) {
-                    PetEyeView(eyeColor: eyeColor, size: 24)
-                    PetEyeView(eyeColor: eyeColor, size: 24)
+                    PetEyeView(size: 24)
+                    PetEyeView(size: 24)
                 }
                 .offset(y: 8)
                 .scaleEffect(y: blinkScale)
-                .scaleEffect(eyePulse)
-                .onTapGesture {
-                    SilhouetteEyeTapFeedback.play(eyePulse: $eyePulse)
-                    onTapEye?()
-                }
                 // 小鼻子（粉色圆点）
                 Circle()
                     .fill(Color(hex: "FF9BAB"))
@@ -214,13 +192,10 @@ private struct CatSilhouette: View {
 // MARK: - Dog Silhouette（Kawaii 插画风）
 private struct DogSilhouette: View {
     var coatColor: Color
-    var eyeColor: Color
     var patternName: String?
     var onTapCoat: (() -> Void)?
-    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
     @State private var blinkScale: CGFloat = 1.0
-    @State private var eyePulse: CGFloat = 1.0
     private var earColor: Color { coatColor.mix(with: .black, by: 0.18) }
     var body: some View {
         ZStack {
@@ -277,16 +252,11 @@ private struct DogSilhouette: View {
                     .clipShape(Circle().scale(1.0).offset(x: 0, y: 0))
                 // 眼睛
                 HStack(spacing: 30) {
-                    PetEyeView(eyeColor: eyeColor, size: 23)
-                    PetEyeView(eyeColor: eyeColor, size: 23)
+                    PetEyeView(size: 23)
+                    PetEyeView(size: 23)
                 }
                 .offset(y: 6)
                 .scaleEffect(y: blinkScale)
-                .scaleEffect(eyePulse)
-                .onTapGesture {
-                    SilhouetteEyeTapFeedback.play(eyePulse: $eyePulse)
-                    onTapEye?()
-                }
                 // 吻部浅色区
                 Ellipse()
                     .fill(coatColor.mix(with: .white, by: 0.35).opacity(0.6))
@@ -319,13 +289,10 @@ private struct DogSilhouette: View {
 // MARK: - Rabbit Silhouette（Kawaii 插画风）
 private struct RabbitSilhouette: View {
     var coatColor: Color
-    var eyeColor: Color
     var patternName: String?
     var onTapCoat: (() -> Void)?
-    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
     @State private var blinkScale: CGFloat = 1.0
-    @State private var eyePulse: CGFloat = 1.0
 
     var body: some View {
         ZStack {
@@ -399,16 +366,11 @@ private struct RabbitSilhouette: View {
 
                 // 眼睛（粉红色调）
                 HStack(spacing: 26) {
-                    PetEyeView(eyeColor: eyeColor, size: 22)
-                    PetEyeView(eyeColor: eyeColor, size: 22)
+                    PetEyeView(size: 22)
+                    PetEyeView(size: 22)
                 }
                 .offset(y: 6)
                 .scaleEffect(y: blinkScale)
-                .scaleEffect(eyePulse)
-                .onTapGesture {
-                    SilhouetteEyeTapFeedback.play(eyePulse: $eyePulse)
-                    onTapEye?()
-                }
 
                 // 小粉鼻
                 Circle()
@@ -443,13 +405,10 @@ private struct RabbitSilhouette: View {
 // MARK: - Hamster Silhouette（Kawaii 插画风）
 private struct HamsterSilhouette: View {
     var coatColor: Color
-    var eyeColor: Color
     var patternName: String?
     var onTapCoat: (() -> Void)?
-    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
     @State private var blinkScale: CGFloat = 1.0
-    @State private var eyePulse: CGFloat = 1.0
 
     // 仓鼠特征：橙/棕色顶部帽，奶白色圆脸
     private var capColor: Color { coatColor.mix(with: Color(hex: "E67E22"), by: 0.4) }
@@ -517,16 +476,11 @@ private struct HamsterSilhouette: View {
 
                 // 大眼睛（低位，kawaii）
                 HStack(spacing: 30) {
-                    PetEyeView(eyeColor: eyeColor, size: 24)
-                    PetEyeView(eyeColor: eyeColor, size: 24)
+                    PetEyeView(size: 24)
+                    PetEyeView(size: 24)
                 }
                 .offset(y: 10)
                 .scaleEffect(y: blinkScale)
-                .scaleEffect(eyePulse)
-                .onTapGesture {
-                    SilhouetteEyeTapFeedback.play(eyePulse: $eyePulse)
-                    onTapEye?()
-                }
 
                 // 小粉鼻
                 Circle()
@@ -549,14 +503,11 @@ private struct HamsterSilhouette: View {
 // MARK: - Bird Silhouette（Kawaii 插画风）
 private struct BirdSilhouette: View {
     var coatColor: Color
-    var eyeColor: Color
     var patternName: String?
     var onTapCoat: (() -> Void)?
-    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
 
     @State private var blinkScale: CGFloat = 1.0
-    @State private var eyePulse: CGFloat = 1.0
 
     var body: some View {
         ZStack {
@@ -616,16 +567,11 @@ private struct BirdSilhouette: View {
 
                 // 眼睛
                 HStack(spacing: 24) {
-                    PetEyeView(eyeColor: eyeColor, size: 22)
-                    PetEyeView(eyeColor: eyeColor, size: 22)
+                    PetEyeView(size: 22)
+                    PetEyeView(size: 22)
                 }
                 .offset(y: 6)
                 .scaleEffect(y: blinkScale)
-                .scaleEffect(eyePulse)
-                .onTapGesture {
-                    SilhouetteEyeTapFeedback.play(eyePulse: $eyePulse)
-                    onTapEye?()
-                }
 
                 // 三角喙（橙黄色）
                 BirdBeakShape()
@@ -651,14 +597,11 @@ private struct BirdSilhouette: View {
 // MARK: - Generic Silhouette（极简）
 private struct GenericSilhouette: View {
     var coatColor: Color
-    var eyeColor: Color
     var patternName: String?
     var onTapCoat: (() -> Void)?
-    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
 
     @State private var blinkScale: CGFloat = 1.0
-    @State private var eyePulse: CGFloat = 1.0
 
     var body: some View {
         ZStack {
@@ -691,16 +634,11 @@ private struct GenericSilhouette: View {
                     .overlay { if let p = patternName { BodyPatternDots(patternName: p).clipShape(Circle()) } }
 
                 HStack(spacing: 22) {
-                    PetEyeView(eyeColor: eyeColor, size: 20)
-                    PetEyeView(eyeColor: eyeColor, size: 20)
+                    PetEyeView(size: 20)
+                    PetEyeView(size: 20)
                 }
                 .offset(y: 6)
                 .scaleEffect(y: blinkScale)
-                .scaleEffect(eyePulse)
-                .onTapGesture {
-                    SilhouetteEyeTapFeedback.play(eyePulse: $eyePulse)
-                    onTapEye?()
-                }
             }
             .offset(y: -14)
             .onTapGesture { onTapCoat?() }
@@ -771,7 +709,6 @@ private struct BodyPatternDots: View {
 
 // MARK: - Eye Component
 struct PetEyeView: View {
-    var eyeColor: Color
     var size: CGFloat = 28
 
     var body: some View {
@@ -783,7 +720,7 @@ struct PetEyeView: View {
 
             // 虹膜
             Circle()
-                .fill(eyeColor)
+                .fill(Color(hex: "5C4033"))
                 .frame(width: size, height: size)
 
             // 瞳孔

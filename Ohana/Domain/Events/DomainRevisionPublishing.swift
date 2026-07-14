@@ -10,6 +10,7 @@ protocol DomainRevisionPublishing {
     var homeRevisionUpdates: AnyPublisher<HomeRevision, Never> { get }
     var homeSurfaceInvalidationUpdates: AnyPublisher<HomeSurfaceInvalidationToken, Never> { get }
     var walletProjectionUpdates: AnyPublisher<HomeRevision, Never> { get }
+    var domainMutationEvents: AnyPublisher<DomainMutationResult, Never> { get }
     var coconutRewardEvents: AnyPublisher<OhanaCoconutRewardEvent, Never> { get }
 
     func publish(_ result: DomainMutationResult)
@@ -66,6 +67,10 @@ final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
 
     var walletProjectionUpdates: AnyPublisher<HomeRevision, Never> {
         center.walletProjectionUpdates
+    }
+
+    var domainMutationEvents: AnyPublisher<DomainMutationResult, Never> {
+        center.domainMutationEvents
     }
 
     var coconutRewardEvents: AnyPublisher<OhanaCoconutRewardEvent, Never> {

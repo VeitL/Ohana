@@ -20,12 +20,6 @@ UI decisions follow the repository rule stack:
 6. Current source code, especially mature sibling modules.
 7. Historical plans, exports, external design skills, and inspiration.
 
-External UI advice, including `ui-ux-pro-max`, is advisory only. It may help
-with critique, accessibility, or product inspiration, but it must be translated
-into Ohana tokens, Ohana components, and existing app patterns. It must not
-import generated palettes, fonts, web landing-page structure, glass styles, or
-new visual language into the app.
-
 ## 2. Product Feel
 
 Ohana should feel compact, calm, tactile, and fast. It is a daily care app, not
@@ -36,8 +30,8 @@ Core qualities:
 
 - **Compact**: dense but breathable. Avoid oversized hero copy, deep card
   stacks, or ornamental sections on operational screens.
-- **Solid**: high-frequency surfaces use opaque token fills. Glass is reserved
-  for explicit sheet/popup/system surfaces and design previews.
+- **Solid**: high-frequency custom content surfaces use opaque token fills.
+  Semantic system surfaces own their material; custom content must not redraw it.
 - **Low noise**: one primary action, quiet secondary actions, sparse shadows,
   no decorative text shadows, no background clutter.
 - **Finger-first**: tap, drag, expand, or present feedback must happen on the
@@ -49,9 +43,11 @@ Core qualities:
 - **Mature sibling first**: when a new page resembles an existing mature page,
   the mature page is the default contract.
 
-## 3. Before Any UI Change
+## 3. Before New Or Substantial UI Work
 
-Every non-trivial UI task should begin with a contract declaration:
+New pages and substantial UI refactors should begin with a contract declaration.
+Small local edits should directly reuse the existing component or mature sibling
+without loading this full specification or producing a new contract:
 
 ```text
 UI contract: <canonical existing surface/path>
@@ -143,18 +139,26 @@ then the one with the same presentation style.
   information summaries should usually be inline metrics or rows.
 - Shadows are budgeted. Ordinary text, cards, chips, buttons, and list rows do
   not receive decorative shadows.
-- Material/glass is not a default card style. Use it only for system-aligned
-  sheets, popups, debug previews, or explicit Liquid Glass work.
+- Material/glass is not a default business-card style. Use real Liquid Glass
+  for system navigation chrome, toolbars, back/close/floating controls, sheet
+  control regions, popups, native system-control interaction surfaces, or an
+  explicitly documented exception.
+- Pet, Human, and Plant identity hero cards are the only standing content-layer
+  exception: one noninteractive regular-glass surface beneath a translucent
+  member-theme atmosphere. Reduce Transparency and reduced-effects modes use
+  the opaque five-stop fallback.
 
 ## 6. Core Components
 
 ### Buttons
 
 - One primary CTA per screen or popup.
-- Primary button: pill, solid `goPrimary`, `ohanaPrimaryActionText`, min 44pt.
+- Primary content button: pill, solid `goPrimary`, `ohanaPrimaryActionText`, min
+  44pt. Floating chrome actions use the system `glassProminent` style instead.
 - Secondary button: token control fill or quiet text treatment.
 - Destructive button: semantic danger color and explicit confirmation.
-- Icon-only button: SF Symbol, 44pt hit target, accessibility label.
+- Icon-only content button: SF Symbol, 44pt hit target, accessibility label.
+  Back, close, and toolbar controls use the system glass button style.
 - Tap feedback uses `ScaleButtonStyle()` or the local mature sibling's existing
   button style.
 
@@ -178,6 +182,9 @@ then the one with the same presentation style.
 ### Chips And Segmented Controls
 
 - Use chips for compact filters, modes, and status.
+- Toggle, Slider, segmented Picker, and DatePicker stay native so the system
+  owns rest, press, drag, selection, disabled state, refraction, and Reduce
+  Motion behavior. Do not rebuild their glass with opacity-only capsules.
 - Selected state uses solid `goPrimary` or the domain semantic color.
 - Unselected state uses solid elevated surface, not a barely visible tint.
 - State must not be color-only; include label, icon, position, or value.
@@ -229,7 +236,7 @@ Use for watering, feeding, medication, grooming, and similar detail flows.
 
 Required structure:
 
-1. Fixed sheet page chrome with one close/back affordance.
+1. Native `NavigationStack` sheet chrome with one system cancel/back affordance.
 2. Care target identity and current status.
 3. Primary quick record card high on the page.
 4. Habit/recommendation block.
@@ -258,11 +265,14 @@ Use for quick logging, confirmation, restock, or lightweight management.
 
 Required structure:
 
-- Inline overlay, bottom aligned.
-- Single popup surface, no nested heavy card.
-- Icon-only close, handle, and outside-tap dismissal where appropriate.
-- One primary CTA at the bottom.
-- Scrolling inside popup content must never dismiss the popup accidentally.
+- Use `Alert` or `confirmationDialog` for decisions, `Menu` for compact commands,
+  and native `sheet(item:)` for record, restock, or management content.
+- Let SwiftUI own the sheet surface, safe areas, keyboard avoidance, drag gesture,
+  transition, and dismissal.
+- Use `NavigationStack`, `Form`/`List`, native toolbar actions, and one
+  `borderedProminent` primary CTA where applicable.
+- Do not add an in-page scrim, replacement handle, fixed popup frame, or custom
+  close capsule.
 
 ### Long Overview Sheet
 
@@ -270,11 +280,11 @@ Use for history, settings, management, and diagnostics.
 
 Required structure:
 
-- Fixed in-page chrome.
-- Scrollable content below chrome.
-- Shared sheet presentation helper.
-- No duplicate close buttons.
-- Dense rows and quiet section headers.
+- Native `sheet(item:)` presentation with `NavigationStack` when hierarchy is
+  needed.
+- A real navigation title and native toolbar actions.
+- `List` or `Form` with quiet `Section` headers where row semantics fit.
+- No duplicate or hand-drawn close controls.
 
 ### Home Spatial Card
 

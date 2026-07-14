@@ -52,10 +52,6 @@ struct InsurancePolicyDetailSheet: View {
         return l.tr(zh: "\(d) 天", en: "\(d)d", de: "\(d) T.")
     }
 
-    private var hasPopup: Bool {
-        showEdit || showAddClaim
-    }
-
     var body: some View {
         ZStack {
             OhanaAppBackground().ignoresSafeArea()
@@ -72,21 +68,15 @@ struct InsurancePolicyDetailSheet: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
             }
-            .disabled(hasPopup)
-            .blur(radius: hasPopup ? 1.1 : 0)
-
-            if showEdit {
-                ProtectionInsurancePopup(pet: pet, existing: insurance) {
-                    withAnimation(GoMotion.page) { showEdit = false }
-                }
-                .zIndex(30)
+        }
+        .sheet(isPresented: $showEdit) {
+            ProtectionInsurancePopup(pet: pet, existing: insurance) {
+                showEdit = false
             }
-
-            if showAddClaim {
-                InsuranceClaimPopup(insurance: insurance, pet: pet) {
-                    withAnimation(GoMotion.page) { showAddClaim = false }
-                }
-                .zIndex(31)
+        }
+        .sheet(isPresented: $showAddClaim) {
+            InsuranceClaimPopup(insurance: insurance, pet: pet) {
+                showAddClaim = false
             }
         }
         .alert(l.tr(zh: "删除保单？", en: "Delete policy?", de: "Police löschen?"), isPresented: $showDeleteConfirm) {
@@ -432,8 +422,6 @@ private struct InsuranceClaimPopup: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
-    @State private var visible = false
-    @State private var dragOffset: CGFloat = 0
     @State private var incidentDate = Date()
     @State private var totalExpenseInput = ""
     @State private var claimedAmountInput = ""
@@ -442,8 +430,6 @@ private struct InsuranceClaimPopup: View {
     @State private var isSaving = false
 
     private var l: L10n { L10n(appLanguage) }
-    private var animation: Animation { GoMotion.page }
-    private var hiddenOffset: CGFloat { 740 }
     private var totalExpense: Double { CountryDecimalInput.parse(totalExpenseInput, countryCode: AppCountry.code) ?? 0 }
     private var claimedAmount: Double { CountryDecimalInput.parse(claimedAmountInput, countryCode: AppCountry.code) ?? 0 }
     private var canSave: Bool {
@@ -451,143 +437,53 @@ private struct InsuranceClaimPopup: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .bottom) {
-                LinearGradient(
-                    colors: [Color.black.opacity(0.08), Color.black.opacity(0.34)], // ui-v4: allow popup scrimGradient
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    OhanaPopupDragHandle(tint: Color.ohanaPrimaryText.opacity(0.24))
-                        .padding(.top, 8)
-                        .gesture(handleDrag)
-
-                    HStack(spacing: 12) {
-                        Image(systemName: "arrow.down.doc.fill").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 18, weight: .black))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(width: 48, height: 48)
-                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(l.tr(zh: "新增报销", en: "Add Claim", de: "Erstattung"))
-                                .font(OhanaFont.title3(.black))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                            Text(insurance.productName.isEmpty ? pet.name : insurance.productName)
-                                .font(OhanaFont.caption(.semibold))
-                                .foregroundStyle(Color.ohanaSecondaryText)
-                        }
-                        Spacer()
-                        OhanaPopupCloseButton(tint: Color.ohanaPrimaryText, action: close)
+        NavigationStack {
+            Form {
+                Section {
+                    DatePicker(
+                        l.tr(zh: "就诊日期", en: "Visit date", de: "Besuchsdatum"),
+                        selection: $incidentDate,
+                        in: ...Date(),
+                        displayedComponents: .date
+                    )
+                    TextField(l.tr(zh: "本次总花费", en: "Total expense", de: "Gesamtkosten"), text: $totalExpenseInput)
+                        .keyboardType(.decimalPad)
+                    TextField(l.tr(zh: "申请金额", en: "Claim amount", de: "Beantragter Betrag"), text: $claimedAmountInput)
+                        .keyboardType(.decimalPad)
+                    if claimedAmount > totalExpense, totalExpense > 0 {
+                        Label(
+                            l.tr(zh: "报销金额不能超过总花费", en: "Claim cannot exceed total", de: "Betrag darf Kosten nicht übersteigen"),
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .foregroundStyle(Color.goRed)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 4)
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 12) {
-                            popupBlock {
-                                DatePicker(l.tr(zh: "就诊日期", en: "Visit date", de: "Besuchsdatum"), selection: $incidentDate, in: ...Date(), displayedComponents: .date)
-                                    .font(OhanaFont.subheadline(.bold))
-                                    .tint(Color.goPrimary)
-                            }
-                            popupBlock {
-                                InlineNumericInput(
-                                    text: $totalExpenseInput,
-                                    placeholder: CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: AppCountry.code),
-                                    unit: AppCurrency.symbol,
-                                    countryCode: AppCountry.code,
-                                    maxFractionDigits: 2,
-                                    accent: Color.goPrimary,
-                                    step: 10,
-                                    valueFont: .system(size: 26, weight: .black, design: .rounded),
-                                    valueAlignment: .leading,
-                                    fill: Color.ohanaCardSurfaceElevated,
-                                    usesMiniKeypad: true
-                                )
-                                Text(l.tr(zh: "本次总花费", en: "Total expense", de: "Gesamtkosten"))
-                                    .font(OhanaFont.caption(.black))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                            }
-                            popupBlock {
-                                InlineNumericInput(
-                                    text: $claimedAmountInput,
-                                    placeholder: CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: AppCountry.code),
-                                    unit: AppCurrency.symbol,
-                                    countryCode: AppCountry.code,
-                                    maxFractionDigits: 2,
-                                    accent: Color.goPrimary,
-                                    step: 10,
-                                    valueFont: .system(size: 26, weight: .black, design: .rounded),
-                                    valueAlignment: .leading,
-                                    fill: Color.ohanaCardSurfaceElevated,
-                                    usesMiniKeypad: true
-                                )
-                                Text(l.tr(zh: "申请金额", en: "Claim amount", de: "Beantragter Betrag"))
-                                    .font(OhanaFont.caption(.black))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                                if claimedAmount > totalExpense, totalExpense > 0 {
-                                    Text(l.tr(zh: "报销金额不能超过总花费", en: "Claim cannot exceed total", de: "Betrag darf Kosten nicht übersteigen"))
-                                        .font(OhanaFont.caption2(.black))
-                                        .foregroundStyle(Color.goRed)
-                                }
-                            }
-                            statusBlock
-                            popupBlock {
-                                TextField(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)"), text: $noteInput, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                    .font(OhanaFont.subheadline(.bold))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                    .lineLimit(2 ... 4)
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .frame(maxHeight: min(proxy.size.height * 0.62, 590))
-
-                    Button(action: save) {
-                        Text(l.tr(zh: "保存", en: "Save", de: "Sichern"))
-                            .font(OhanaFont.subheadline(.black))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .disabled(!canSave)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 22)
+                } header: {
+                    Text(insurance.productName.isEmpty ? pet.name : insurance.productName)
                 }
-                .frame(maxWidth: .infinity)
-                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
-                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
-                .shadow(color: Color.black.opacity(0.54), radius: 46, x: 0, y: -16) // ui-v4: allow popup liftedAlert shadow
-                .shadow(color: Color(hex: "0B102C").opacity(0.38), radius: 26, x: 0, y: 12) // ui-v4: allow popup liftedAlert shadow
-                .padding(.horizontal, 6)
-                .padding(.bottom, max(8, proxy.safeAreaInsets.bottom + 2))
-                .offset(y: visible ? dragOffset : hiddenOffset)
-            }
-            .animation(animation, value: visible)
-            .animation(animation, value: dragOffset)
-        }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
-        .onAppear {
-            withAnimation(animation) { visible = true }
-        }
-    }
 
-    private var handleDrag: some Gesture {
-        DragGesture(minimumDistance: 10)
-            .onChanged { value in dragOffset = max(0, value.translation.height) }
-            .onEnded { value in
-                if value.translation.height > 54 {
-                    close()
-                } else {
-                    withAnimation(animation) { dragOffset = 0 }
+                Section {
+                    Picker(l.tr(zh: "状态", en: "Status", de: "Status"), selection: $initialStatus) {
+                        ForEach(ClaimStatus.allCases, id: \.rawValue) { status in
+                            Text(status.rawValue).tag(status)
+                        }
+                    }
+                    TextField(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)"), text: $noteInput, axis: .vertical)
+                        .lineLimit(2 ... 4)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle(l.tr(zh: "新增报销", en: "Add Claim", de: "Erstattung"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, role: .cancel, action: close)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern"), action: save)
+                        .disabled(!canSave)
+                }
+            }
+        }
     }
 
     private var statusBlock: some View {
@@ -630,13 +526,7 @@ private struct InsuranceClaimPopup: View {
 
     private func close() {
         GoKeyboard.dismiss()
-        withAnimation(animation) {
-            visible = false
-            dragOffset = 0
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            onClose()
-        }
+        onClose()
     }
 
     private func save() {

@@ -419,9 +419,6 @@ extension CoconutShopView {
     }
 
     func showsShopSwitch(for item: ShopItem) -> Bool {
-        if item.id == Avatar2DAccess.shopItemId {
-            return Avatar2DAccess.extraPassCount > 0
-        }
         if item.category == .title_ {
             return item.isPurchased
         }
@@ -468,20 +465,6 @@ extension CoconutShopView {
             equippedSceneID: equippedPlantDecorScene,
             equippedPotSkinID: equippedPlantPotSkin
         )
-    }
-
-    func shopTogglePill(isOn: Bool) -> some View {
-        Capsule()
-            .fill(isOn ? Color.goPrimary : Color.ohanaControlFill)
-            .frame(width: 46, height: 26)
-            .overlay(alignment: isOn ? .trailing : .leading) {
-                Circle()
-                    .fill(isOn ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.58))
-                    .frame(width: 18, height: 18) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .padding(.horizontal, 4)
-            }
-            .animation(GoMotion.selection, value: isOn)
-            .accessibilityLabel(isOn ? l.tr(zh: "已启用", en: "On", de: "Aktiv") : l.tr(zh: "未启用", en: "Off", de: "Aus"))
     }
 
     func activeConsumableStatus(for item: ShopItem) -> String? {

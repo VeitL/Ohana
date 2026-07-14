@@ -753,7 +753,7 @@ struct HumanAllFeaturesSheet: View {
     private var accountSubtitle: String {
         HumanLocalPrivacyPolicy.isEnabled
             ? l.tr(zh: "PIN、公开/隐私", en: "PIN, public/private", de: "PIN, öffentlich/privat")
-            : l.tr(zh: "资料、首页显示", en: "Profile and Home display", de: "Profil und Startseite")
+            : l.tr(zh: "资料与家庭角色", en: "Profile and household role", de: "Profil und Familienrolle")
     }
 
     private var accountIcon: String {

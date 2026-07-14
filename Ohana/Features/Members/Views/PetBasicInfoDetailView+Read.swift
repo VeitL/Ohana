@@ -20,6 +20,12 @@ extension PetBasicInfoDetailView {
                 infoRow(label: l.tr(zh: "名字", en: "Name", de: "Name"), value: pet.name)
                 infoRow(label: l.tr(zh: "物种", en: "Species", de: "Art"), value: pet.localizedSpeciesName(l: l))
                 infoRow(label: l.tr(zh: "品种", en: "Breed", de: "Rasse"), value: pet.breed.isEmpty ? petProfileEmptyValue : pet.breed)
+                infoRow(
+                    label: l.tr(zh: "主性格", en: "Primary vibe", de: "Hauptcharakter"),
+                    value: pet.personalityTagIdList.first
+                        .map { PetPersonalityTag.displayTitle(for: $0, l: l) }
+                        ?? petProfileEmptyValue
+                )
                 infoRow(label: l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), value: localizedPetGenderSummary)
                 if let birthday = pet.birthday {
                     infoRow(label: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), value: birthday.formatted(.dateTime.year().month().day()))
@@ -31,10 +37,9 @@ extension PetBasicInfoDetailView {
                 infoRow(label: l.tr(zh: "成长椰子", en: "Growth coconuts", de: "Wachstums-Kokosnuesse"), value: "\(pet.coconutBalance) 🥥")
                 infoRow(label: l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"), value: "#\(pet.safeThemeColorHex.uppercased())")
             }
-            if !pet.coatColor.isEmpty || !pet.eyeColor.isEmpty {
-                infoSection(title: l.tr(zh: "外貌特征", en: "Appearance", de: "Aussehen"), icon: "eye.fill", iconColor: Color.goCardCyan) {
+            if !pet.coatColor.isEmpty {
+                infoSection(title: l.tr(zh: "外貌特征", en: "Appearance", de: "Aussehen"), icon: "paintpalette.fill", iconColor: Color.goCardCyan) {
                     if !pet.coatColor.isEmpty { infoRow(label: l.tr(zh: "毛色", en: "Coat color", de: "Fellfarbe"), value: pet.coatColor) }
-                    if !pet.eyeColor.isEmpty { infoRow(label: l.tr(zh: "眼色", en: "Eye color", de: "Augenfarbe"), value: pet.eyeColor) }
                 }
             }
             infoSection(title: l.tr(zh: "健康与医疗", en: "Health & medical", de: "Gesundheit & Medizin"), icon: "cross.circle.fill", iconColor: Color.goRed) {
@@ -139,6 +144,9 @@ extension PetBasicInfoDetailView {
     }
 
     var localizedPetGenderSummary: String {
+        guard !pet.genderSymbol.isEmpty else {
+            return l.tr(zh: "请编辑选择", en: "Choose in edit", de: "Beim Bearbeiten wählen")
+        }
         let neuterStatus = pet.isNeutered
             ? l.tr(zh: "已绝育", en: "neutered", de: "kastriert")
             : l.tr(zh: "未绝育", en: "not neutered", de: "nicht kastriert")

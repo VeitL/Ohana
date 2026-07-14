@@ -32,6 +32,11 @@ private enum CoconutLogActorKind: Hashable {
     case human
 }
 
+private enum CoconutLogPage: Hashable {
+    case history
+    case wealth
+}
+
 private struct CoconutLogActorSnapshot: Identifiable, Hashable {
     let id: String
     let name: String
@@ -188,7 +193,7 @@ struct CoconutLogContentView: View {
 
     // N10: member filter
     @State private var selectedActorId: String? = nil
-    @State private var showingWealthDashboard = false
+    @State private var selectedPage = CoconutLogPage.history
     @State private var isHistoryContentReady = false
     @State private var memberSnapshot = CoconutLogMemberSnapshot.empty
     @State private var historyContentMountTask: Task<Void, Never>?
@@ -291,8 +296,17 @@ struct CoconutLogContentView: View {
                     .padding(.bottom, 16)
 
                 if isContentReady {
-                    historyContent
-                        .transition(.opacity)
+                    balanceHeader
+
+                    GoDashedDivider().padding(.horizontal, 20)
+
+                    if selectedPage == .history {
+                        historyContent
+                            .transition(.opacity)
+                    } else {
+                        IslandWealthDashboardView(presentation: .embedded)
+                            .transition(.opacity)
+                    }
                 } else {
                     historyOpeningPlaceholder
                         .transition(.opacity)
@@ -300,9 +314,6 @@ struct CoconutLogContentView: View {
             }
         }
         .navigationBarHidden(true)
-        .fullScreenCover(isPresented: $showingWealthDashboard) {
-            IslandWealthDashboardView()
-        }
         .onAppear {
             scheduleMemberSnapshotRefresh()
             scheduleHistoryContentMount()
@@ -326,10 +337,6 @@ struct CoconutLogContentView: View {
 
     @ViewBuilder
     private var historyContent: some View {
-        balanceHeader
-
-        GoDashedDivider().padding(.horizontal, 20)
-
         if subject == nil, !knownActors.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -461,16 +468,22 @@ struct CoconutLogContentView: View {
             }
             Spacer()
             Button {
-                showingWealthDashboard = true
+                withAnimation(GoMotion.page) {
+                    selectedPage = selectedPage == .history ? .wealth : .history
+                }
             } label: {
-                Image(systemName: "chart.pie.fill") // a11y: allow decorative icon covered by surrounding text or control
+                Image(systemName: selectedPage == .history ? "chart.pie.fill" : "clock.arrow.circlepath") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
+                    .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "打开财富分析", en: "Open wealth analysis", de: "Vermögensanalyse öffnen"))
+            .accessibilityLabel(selectedPage == .history
+                ? l.tr(zh: "打开财富分析", en: "Open wealth analysis", de: "Vermögensanalyse öffnen")
+                : l.tr(zh: "返回椰子历史", en: "Return to coconut history", de: "Zurück zum Kokosnuss-Verlauf"))
+            .accessibilityIdentifier("coconut-log-wealth-action")
 
             Button { closeLog() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control

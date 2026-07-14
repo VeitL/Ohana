@@ -3,7 +3,8 @@
 Ohana is a local-first iOS care app for pets, people, and plants. The first
 release is a single-device Solo experience built with SwiftUI, SwiftData, Swift
 Charts, HealthKit, Core Location, UserNotifications, and optional restricted
-iCloud Drive backup.
+iCloud Drive backup. The current product has no Ohana account, developer-hosted
+backend, or login requirement.
 
 ## Start Here
 
@@ -13,6 +14,7 @@ iCloud Drive backup.
 - Current release and validation status: [`docs/testing-progress.md`](docs/testing-progress.md)
 - Open work: [`docs/task-follow-ups.md`](docs/task-follow-ups.md)
 - Manual and physical-device acceptance: [`docs/release-true-device-test-plan.md`](docs/release-true-device-test-plan.md)
+- Deferred account/backend extension: [`docs/planning/account-backend-extension.md`](docs/planning/account-backend-extension.md)
 
 Do not use planning, reference, archive, design-export, or dated audit documents
 as current status sources. Their role and precedence are listed in

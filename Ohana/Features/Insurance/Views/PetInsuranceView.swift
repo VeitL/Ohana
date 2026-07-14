@@ -66,15 +66,15 @@ struct PetInsuranceContentView: View {
                     }
                 }
             }
-
-            if showingAdd || insuranceToEdit != nil {
-                ProtectionInsurancePopup(pet: pet, existing: insuranceToEdit) {
-                    withAnimation(GoMotion.page) {
-                        showingAdd = false
-                        insuranceToEdit = nil
-                    }
-                }
-                .zIndex(40)
+        }
+        .sheet(isPresented: $showingAdd) {
+            ProtectionInsurancePopup(pet: pet, existing: nil) {
+                showingAdd = false
+            }
+        }
+        .sheet(item: $insuranceToEdit) { insurance in
+            ProtectionInsurancePopup(pet: pet, existing: insurance) {
+                insuranceToEdit = nil
             }
         }
     }

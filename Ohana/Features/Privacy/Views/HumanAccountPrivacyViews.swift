@@ -74,7 +74,6 @@ struct HumanAccountSwitcherSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.hidden)
         .accessibilityIdentifier("human-account-switcher-sheet")
         .animation(GoMotion.feedback, value: pendingHuman?.id)
         .sheet(item: $securityHuman) { human in

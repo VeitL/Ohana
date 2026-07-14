@@ -20,12 +20,7 @@ enum QuickWaterActiveSheet: String, Identifiable {
     var id: String { rawValue }
 
     var usesInlineOverlay: Bool {
-        switch self {
-        case .waterSettings, .waterAmount, .waterPlan, .filterSettings:
-            true
-        case .history, .waterOverview, .waterChangeOverview, .filterOverview:
-            false
-        }
+        false
     }
 
     var inlineHeight: CGFloat {

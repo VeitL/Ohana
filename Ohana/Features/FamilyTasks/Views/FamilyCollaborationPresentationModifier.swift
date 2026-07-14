@@ -11,11 +11,12 @@ struct FamilyCollaborationPresentationModifier<MoreContent: View>: ViewModifier 
     @Binding var sheetRoute: FamilyCollaborationSheetRoute?
     let title: String
     let doneTitle: String
+    let onDismiss: () -> Void
     @ViewBuilder var moreContent: () -> MoreContent
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: $sheetRoute) { route in
+            .sheet(item: $sheetRoute, onDismiss: onDismiss) { route in
                 sheetDestination(for: route)
             }
     }
@@ -53,6 +54,7 @@ extension View {
         sheetRoute: Binding<FamilyCollaborationSheetRoute?>,
         title: String,
         doneTitle: String,
+        onDismiss: @escaping () -> Void = {},
         @ViewBuilder moreContent: @escaping () -> some View
     ) -> some View {
         modifier(
@@ -60,6 +62,7 @@ extension View {
                 sheetRoute: sheetRoute,
                 title: title,
                 doneTitle: doneTitle,
+                onDismiss: onDismiss,
                 moreContent: moreContent
             )
         )

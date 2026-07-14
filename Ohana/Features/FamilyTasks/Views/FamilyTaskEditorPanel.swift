@@ -2,7 +2,8 @@
 //  FamilyTaskEditorPanel.swift
 //  Ohana
 //
-//  Inline family task editor used by FamilyCollaborationDashboardView.
+//  Native household task editor. A published task always carries a positive
+//  coconut reward; the publisher transfers it after confirming completion.
 //
 
 import Foundation
@@ -14,10 +15,10 @@ struct FamilyTaskEditorPanel: View {
     let currentHuman: Human?
     let pets: [Pet]
     var onClose: () -> Void
-    var onAssignReminder: (Reminder, Human, Int, String) -> Void
-    var onCreateTask: (String, String, Human?, Int, Date?, String) -> Void
-    var onUpdateTask: (FamilyCollaborationTask, String, String, Human?, Int, Date?, String) -> Void
-    var onDeleteTask: (FamilyCollaborationTask) -> Void
+    var onAssignReminder: (Reminder, Human, Int, String) -> Bool
+    var onCreateTask: (String, String, Human?, Int, Date?, String) -> Bool
+    var onUpdateTask: (FamilyCollaborationTask, String, String, Human?, Int, Date?, String) -> Bool
+    var onDeleteTask: (FamilyCollaborationTask) -> Bool
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var title: String
@@ -27,10 +28,9 @@ struct FamilyTaskEditorPanel: View {
     @State private var hasDueDate: Bool
     @State private var dueAt: Date
     @State private var emoji: String
+    @State private var saveErrorMessage: String?
 
     private var l: L10n { L10n(appLanguage) }
-    private let rewardOptions = [0, 20, 50, 100, 200, 500]
-    private let emojiOptions = ["🎯", "🧹", "🌱", "🐾", "🛒", "💊", "🧺", "🔧"]
     private var route: FamilyCollaborationEditorRoute { context.route }
 
     init(
@@ -39,10 +39,10 @@ struct FamilyTaskEditorPanel: View {
         currentHuman: Human?,
         pets: [Pet],
         onClose: @escaping () -> Void,
-        onAssignReminder: @escaping (Reminder, Human, Int, String) -> Void,
-        onCreateTask: @escaping (String, String, Human?, Int, Date?, String) -> Void,
-        onUpdateTask: @escaping (FamilyCollaborationTask, String, String, Human?, Int, Date?, String) -> Void,
-        onDeleteTask: @escaping (FamilyCollaborationTask) -> Void
+        onAssignReminder: @escaping (Reminder, Human, Int, String) -> Bool,
+        onCreateTask: @escaping (String, String, Human?, Int, Date?, String) -> Bool,
+        onUpdateTask: @escaping (FamilyCollaborationTask, String, String, Human?, Int, Date?, String) -> Bool,
+        onDeleteTask: @escaping (FamilyCollaborationTask) -> Bool
     ) {
         self.context = context
         self.humans = humans
@@ -54,40 +54,44 @@ struct FamilyTaskEditorPanel: View {
         self.onUpdateTask = onUpdateTask
         self.onDeleteTask = onDeleteTask
 
+        let currentHumanId = currentHuman?.id.uuidString
+        let firstAssignableId = humans.first {
+            !$0.hasPassedAway && $0.id.uuidString != currentHumanId
+        }?.id.uuidString ?? ""
+        let suggestedReward = min(20, max(1, currentHuman?.coconutBalance ?? 1))
+
         switch context.route {
         case .assignReminder:
-            let reminder = context.reminder
-            let currentHumanId = currentHuman?.id.uuidString
-            let firstAssignableId = humans.first { $0.id.uuidString != currentHumanId }?.id.uuidString ?? ""
-            _title = State(initialValue: Self.reminderTitle(reminder, l: L10n()))
+            _title = State(initialValue: Self.reminderTitle(context.reminder, l: L10n()))
             _note = State(initialValue: "")
             _selectedHumanId = State(initialValue: firstAssignableId)
-            _reward = State(initialValue: 0)
+            _reward = State(initialValue: suggestedReward)
             _hasDueDate = State(initialValue: true)
-            _dueAt = State(initialValue: reminder?.scheduledAt ?? Date())
-            _emoji = State(initialValue: reminder?.event?.emoji ?? "🐾")
+            _dueAt = State(initialValue: context.reminder?.scheduledAt ?? Date())
+            _emoji = State(initialValue: context.reminder?.event?.emoji ?? "🐾")
         case .editTask:
             let task = context.task
-            let currentHumanId = currentHuman?.id.uuidString
-            let firstAssignableId = humans.first { $0.id.uuidString != currentHumanId }?.id.uuidString ?? ""
             let existingAssigneeId = task?.assignedToId ?? task?.claimedById ?? ""
             let isExistingAssignable = humans.contains { human in
-                human.id.uuidString == existingAssigneeId && human.id.uuidString != currentHumanId
+                !human.hasPassedAway
+                    && human.id.uuidString == existingAssigneeId
+                    && human.id.uuidString != currentHumanId
             }
             _title = State(initialValue: task?.title ?? "")
             _note = State(initialValue: task?.note ?? "")
             _selectedHumanId = State(initialValue: isExistingAssignable ? existingAssigneeId : firstAssignableId)
-            _reward = State(initialValue: task?.rewardCoconuts ?? 0)
+            _reward = State(initialValue: min(
+                FamilyTaskService.rewardCap,
+                max(1, task?.rewardCoconuts ?? suggestedReward)
+            ))
             _hasDueDate = State(initialValue: task?.dueAt != nil)
             _dueAt = State(initialValue: task?.dueAt ?? Date())
             _emoji = State(initialValue: task?.emoji ?? "🎯")
         case .create:
-            let currentHumanId = currentHuman?.id.uuidString
-            let firstAssignableId = humans.first { $0.id.uuidString != currentHumanId }?.id.uuidString ?? ""
             _title = State(initialValue: "")
             _note = State(initialValue: "")
             _selectedHumanId = State(initialValue: firstAssignableId)
-            _reward = State(initialValue: 20)
+            _reward = State(initialValue: suggestedReward)
             _hasDueDate = State(initialValue: false)
             _dueAt = State(initialValue: Date())
             _emoji = State(initialValue: "🎯")
@@ -95,79 +99,203 @@ struct FamilyTaskEditorPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header
+        Form {
+            publisherSection
+            taskSection
+            assignmentSection
+            scheduleSection
+            saveSection
+            deleteSection
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .alert(
+            l.tr(zh: "操作未完成", en: "Could not complete", de: "Aktion nicht abgeschlossen"),
+            isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { if !$0 { saveErrorMessage = nil } }
+            )
+        ) {
+            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {}
+        } message: {
+            Text(saveErrorMessage ?? "")
+        }
+    }
+
+    private var publisherSection: some View {
+        Section {
+            LabeledContent {
+                Text(currentHuman?.name ?? l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt"))
+            } label: {
+                Label(l.tr(zh: "发布者", en: "Publisher", de: "Ersteller"), systemImage: "person.crop.circle")
+            }
+
+            LabeledContent {
+                Text("\(availableBalance)🥥")
+                    .monospacedDigit()
+            } label: {
+                Label(l.tr(zh: "可用余额", en: "Available", de: "Verfügbar"), systemImage: "wallet.bifold.fill")
+            }
+        } header: {
+            Text(l.tr(zh: "当前记录归属", en: "Current attribution", de: "Aktuelle Zuordnung"))
+        } footer: {
+            Text(l.tr(
+                zh: "任务在本机记录。发布时需有足够余额；执行者提交后，由发布者确认并转账奖励。",
+                en: "Tasks are recorded on this device. Publishing requires enough balance; the reward transfers when the publisher confirms completion.",
+                de: "Aufgaben werden auf diesem Gerät gespeichert. Beim Erstellen ist genügend Guthaben nötig; die Prämie wird nach Bestätigung übertragen."
+            ))
+        }
+    }
+
+    @ViewBuilder
+    private var taskSection: some View {
+        Section(l.tr(zh: "任务内容", en: "Task", de: "Aufgabe")) {
             if case .assignReminder = route, let reminder = context.reminder {
-                reminderSummary(reminder)
+                LabeledContent {
+                    Text(Self.reminderTitle(reminder, l: l))
+                        .multilineTextAlignment(.trailing)
+                } label: {
+                    Label(l.tr(zh: "照护待办", en: "Care reminder", de: "Pflegeerinnerung"), systemImage: reminder.event?.silhouetteListSymbol ?? "checklist")
+                }
             } else {
-                textFieldBlock(
-                    title: l.tr(zh: "任务", en: "Task", de: "Aufgabe"),
-                    placeholder: l.tr(zh: "例如：周末拖地", en: "e.g. mop this weekend", de: "z. B. am Wochenende wischen"),
+                TextField(
+                    l.tr(zh: "例如：周末拖地", en: "e.g. mop this weekend", de: "z. B. am Wochenende wischen"),
                     text: $title
                 )
+                .accessibilityLabel(l.tr(zh: "任务名称", en: "Task name", de: "Aufgabenname"))
             }
-            textFieldBlock(
-                title: l.tr(zh: "说明", en: "Note", de: "Notiz"),
-                placeholder: l.tr(zh: "可选", en: "Optional", de: "Optional"),
-                text: $note
+
+            TextField(
+                l.tr(zh: "说明（可选）", en: "Note (optional)", de: "Notiz (optional)"),
+                text: $note,
+                axis: .vertical
             )
-            assigneePicker
-            rewardPicker
-            dueDateBlock
-            if case .create = route {
-                emojiPicker
-            } else if case .editTask = route {
-                emojiPicker
-            }
-            saveButton
-            if case .editTask = route, let task = context.task {
-                deleteButton(task)
-            }
-        }
-        .padding(20)
-    }
-
-    private var navigationTitle: String {
-        switch route {
-        case .assignReminder: l.tr(zh: "分配待办", en: "Assign task", de: "Aufgabe zuweisen")
-        case .editTask: l.tr(zh: "任务详情", en: "Task details", de: "Aufgabendetails")
-        case .create: l.tr(zh: "发布任务", en: "Post task", de: "Aufgabe erstellen")
+            .lineLimit(2 ... 5)
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(navigationTitle)
-                .font(OhanaFont.title2(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
+    private var assignmentSection: some View {
+        Section {
+            if assignableHumans.isEmpty {
+                Label(
+                    l.tr(zh: "还没有可指派的其他家人", en: "No other household member is available", de: "Kein weiteres Familienmitglied verfügbar"),
+                    systemImage: "person.2.slash"
+                )
+                .foregroundStyle(Color.ohanaSecondaryText)
+            } else {
+                Picker(l.tr(zh: "指派给", en: "Assign to", de: "Zuweisen an"), selection: $selectedHumanId) {
+                    ForEach(assignableHumans) { human in
+                        Text("\(human.avatarEmoji) \(human.name)")
+                            .tag(human.id.uuidString)
+                    }
+                }
+            }
+
+            LabeledContent {
+                TextField(
+                    "1–\(FamilyTaskService.rewardCap)",
+                    value: $reward,
+                    format: .number
+                )
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .frame(minWidth: 72)
+                .accessibilityLabel(l.tr(
+                    zh: "奖励椰子数量",
+                    en: "Coconut reward amount",
+                    de: "Höhe der Kokosprämie"
+                ))
+            } label: {
+                Label(
+                    l.tr(zh: "奖励椰子", en: "Coconut reward", de: "Kokosprämie"),
+                    systemImage: "circle.hexagongrid.fill"
+                )
+            }
+
+            if reward <= 0 || reward > FamilyTaskService.rewardCap {
+                Label(
+                    l.tr(
+                        zh: "奖励必须在 1 到 \(FamilyTaskService.rewardCap) 之间。",
+                        en: "The reward must be between 1 and \(FamilyTaskService.rewardCap).",
+                        de: "Die Prämie muss zwischen 1 und \(FamilyTaskService.rewardCap) liegen."
+                    ),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(Color.goRed)
+            }
+
+            if reward > availableBalance {
+                Label(
+                    l.tr(zh: "发布者椰子余额不足。", en: "The publisher does not have enough coconuts.", de: "Der Ersteller hat nicht genug Kokosnüsse."),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(Color.goRed)
+            }
+        } header: {
+            Text(l.tr(zh: "分工与奖励", en: "Assignment and reward", de: "Zuweisung und Prämie"))
+        } footer: {
             Text(l.tr(
-                zh: "选择其他家人，可选椰子悬赏。",
-                en: "Choose another family member and optional reward.",
-                de: "Anderes Familienmitglied wählen, Prämie optional."
+                zh: "每个家庭任务都必须设置正数椰子奖励。",
+                en: "Every household task requires a positive coconut reward.",
+                de: "Jede Familienaufgabe benötigt eine positive Kokosprämie."
             ))
-            .font(OhanaFont.caption(.bold))
-            .foregroundStyle(Color.ohanaSecondaryText)
         }
     }
 
-    private func reminderSummary(_ reminder: Reminder) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: reminder.event?.silhouetteListSymbol ?? "checklist")
-                .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.goYellow)
-                .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-            VStack(alignment: .leading, spacing: 3) {
-                Text(Self.reminderTitle(reminder, l: l))
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(reminder.scheduledAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+    private var scheduleSection: some View {
+        Section(l.tr(zh: "时间", en: "Schedule", de: "Zeitplan")) {
+            Toggle(l.tr(zh: "设置截止时间", en: "Set due time", de: "Fälligkeit festlegen"), isOn: $hasDueDate)
+                .tint(Color.goPrimary)
+            if hasDueDate {
+                DatePicker(
+                    l.tr(zh: "截止时间", en: "Due", de: "Fällig"),
+                    selection: $dueAt
+                )
             }
-            Spacer()
         }
-        .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+    }
+
+    private var saveSection: some View {
+        Section {
+            Button {
+                save()
+            } label: {
+                Label(saveActionTitle, systemImage: "paperplane.fill")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.goPrimary)
+            .disabled(!canSave)
+            .accessibilityIdentifier("family-task-save-action")
+        }
+    }
+
+    @ViewBuilder
+    private var deleteSection: some View {
+        if case .editTask = route,
+           let task = context.task,
+           task.createdById == currentHuman?.id.uuidString {
+            Section {
+                Button(role: .destructive) {
+                    delete(task)
+                } label: {
+                    Label(
+                        l.tr(zh: "删除任务", en: "Delete task", de: "Aufgabe löschen"),
+                        systemImage: "trash"
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+            }
+        }
+    }
+
+    private var saveActionTitle: String {
+        switch route {
+        case .assignReminder: l.tr(zh: "发布指派", en: "Post assignment", de: "Zuweisung erstellen")
+        case .editTask: l.tr(zh: "保存任务", en: "Save task", de: "Aufgabe speichern")
+        case .create: l.tr(zh: "发布奖励任务", en: "Post reward task", de: "Prämienaufgabe erstellen")
+        }
     }
 
     private static func reminderTitle(_ reminder: Reminder?, l: L10n) -> String {
@@ -177,197 +305,100 @@ struct FamilyTaskEditorPanel: View {
         return FeedRuleMetadata.localizedTitle(for: event, l: l)
     }
 
-    private func textFieldBlock(title: String, placeholder: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            TextField(placeholder, text: text, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                .font(OhanaFont.callout(.bold))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1 ... 3)
-                .padding(13)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-        }
-    }
-
-    private var assigneePicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(l.tr(zh: "分配给", en: "Assign to", de: "Zuweisen an"))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            if assignableHumans.isEmpty {
-                HStack(spacing: 8) {
-                    Image(systemName: "person.2.slash") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    Text(l.tr(
-                        zh: "还没有可分配的其他家人",
-                        en: "No other family member to assign",
-                        de: "Kein anderes Familienmitglied verfügbar"
-                    ))
-                    .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(assignableHumans) { human in
-                            assigneeChip(id: human.id.uuidString, title: human.name, emoji: human.avatarEmoji)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func assigneeChip(id: String, title: String, emoji: String) -> some View {
-        let selected = selectedHumanId == id
-        return Button {
-            withAnimation(GoMotion.feedback) { selectedHumanId = id }
-        } label: {
-            HStack(spacing: 6) {
-                Text(emoji)
-                Text(title)
-                    .lineLimit(1)
-            }
-            .font(OhanaFont.caption(.black))
-            .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background(selected ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-
-    private var rewardPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(l.tr(zh: "椰子悬赏", en: "Coconut reward", de: "Kokos-Prämie"))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            HStack(spacing: 8) {
-                ForEach(rewardOptions, id: \.self) { value in
-                    Button {
-                        withAnimation(GoMotion.feedback) { reward = value }
-                    } label: {
-                        Text(value == 0 ? l.tr(zh: "无", en: "None", de: "Keine") : "\(value)🥥")
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(reward == value ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 9)
-                            .background(reward == value ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
-        }
-    }
-
-    private var dueDateBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Toggle(isOn: $hasDueDate.animation(GoMotion.feedback)) {
-                Text(l.tr(zh: "截止时间", en: "Due time", de: "Fällig"))
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            .tint(Color.goPrimary)
-            if hasDueDate {
-                DatePicker("", selection: $dueAt)
-                    .datePickerStyle(.compact)
-                    .labelsHidden()
-            }
-        }
-        .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-    }
-
-    private var emojiPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(l.tr(zh: "图标", en: "Icon", de: "Icon"))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            HStack(spacing: 8) {
-                ForEach(emojiOptions, id: \.self) { item in
-                    Button {
-                        withAnimation(GoMotion.feedback) { emoji = item }
-                    } label: {
-                        Text(item)
-                            .font(OhanaFont.title3(.black))
-                            .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                            .background(emoji == item ? Color.goPrimary : Color.ohanaCardSurface, in: Circle())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
-        }
-    }
-
-    private var saveButton: some View {
-        Button {
-            save()
-        } label: {
-            Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-        }
-        .disabled(!canSave)
-        .buttonStyle(ScaleButtonStyle())
-    }
-
-    private func deleteButton(_ task: FamilyCollaborationTask) -> some View {
-        Button {
-            onDeleteTask(task)
-            onClose()
-        } label: {
-            Text(l.tr(zh: "删除任务", en: "Delete task", de: "Aufgabe löschen"))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.goRed)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-
     private var selectedHuman: Human? {
         assignableHumans.first { $0.id.uuidString == selectedHumanId }
     }
 
     private var assignableHumans: [Human] {
-        guard let currentHumanId = currentHuman?.id.uuidString else {
-            return humans
-        }
-        return humans.filter { $0.id.uuidString != currentHumanId }
+        guard let currentHumanId = currentHuman?.id.uuidString else { return [] }
+        return humans.filter { !$0.hasPassedAway && $0.id.uuidString != currentHumanId }
+    }
+
+    private var availableBalance: Int {
+        max(0, currentHuman?.coconutBalance ?? 0)
     }
 
     private var canSave: Bool {
+        guard currentHuman != nil,
+              selectedHuman != nil,
+              reward > 0,
+              reward <= FamilyTaskService.rewardCap,
+              reward <= availableBalance
+        else { return false }
+
         switch route {
         case .assignReminder:
-            selectedHuman != nil
-        case .create, .editTask:
-            !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedHuman != nil
+            return context.reminder != nil
+        case .create:
+            return !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .editTask:
+            guard let task = context.task else { return false }
+            return task.createdById == currentHuman?.id.uuidString
+                && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 
     private func save() {
+        guard canSave else {
+            saveErrorMessage = validationFailureMessage
+            return
+        }
+
         let due = hasDueDate ? dueAt : nil
+        let didSave: Bool
         switch route {
         case .assignReminder:
-            guard let reminder = context.reminder else { return }
-            guard let selectedHuman else { return }
-            onAssignReminder(reminder, selectedHuman, reward, note)
+            guard let reminder = context.reminder, let selectedHuman else { return }
+            didSave = onAssignReminder(reminder, selectedHuman, reward, note)
         case .create:
-            onCreateTask(title, note, selectedHuman, reward, due, emoji)
+            didSave = onCreateTask(title, note, selectedHuman, reward, due, emoji)
         case .editTask:
             guard let task = context.task else { return }
-            onUpdateTask(task, title, note, selectedHuman, reward, due, emoji)
+            didSave = onUpdateTask(task, title, note, selectedHuman, reward, due, emoji)
         }
+
+        guard didSave else {
+            saveErrorMessage = l.tr(
+                zh: "任务没有保存。请确认发布者余额、成员状态和任务归属后重试。",
+                en: "The task was not saved. Check the publisher balance, member status, and task ownership, then try again.",
+                de: "Die Aufgabe wurde nicht gespeichert. Prüfe Guthaben, Mitgliedsstatus und Zuordnung und versuche es erneut."
+            )
+            return
+        }
+
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         onClose()
+    }
+
+    private func delete(_ task: FamilyCollaborationTask) {
+        guard onDeleteTask(task) else {
+            saveErrorMessage = l.tr(
+                zh: "任务无法删除，请确认当前档案是发布者。",
+                en: "The task could not be deleted. Make sure the current profile is the publisher.",
+                de: "Die Aufgabe konnte nicht gelöscht werden. Das aktuelle Profil muss der Ersteller sein."
+            )
+            return
+        }
+        onClose()
+    }
+
+    private var validationFailureMessage: String {
+        if currentHuman == nil {
+            return l.tr(zh: "请先选择当前人类档案。", en: "Select a current human profile first.", de: "Wähle zuerst ein aktuelles Personenprofil.")
+        }
+        if selectedHuman == nil {
+            return l.tr(zh: "请选择其他家人。", en: "Choose another household member.", de: "Wähle ein anderes Familienmitglied.")
+        }
+        if reward <= 0 || reward > FamilyTaskService.rewardCap {
+            return l.tr(
+                zh: "奖励必须在 1 到 \(FamilyTaskService.rewardCap) 之间。",
+                en: "The reward must be between 1 and \(FamilyTaskService.rewardCap).",
+                de: "Die Prämie muss zwischen 1 und \(FamilyTaskService.rewardCap) liegen."
+            )
+        }
+        if reward > availableBalance {
+            return l.tr(zh: "发布者椰子余额不足。", en: "The publisher does not have enough coconuts.", de: "Der Ersteller hat nicht genug Kokosnüsse.")
+        }
+        return l.tr(zh: "请填写任务名称并设置奖励。", en: "Add a task name and reward.", de: "Füge Aufgabenname und Prämie hinzu.")
     }
 }

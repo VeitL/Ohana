@@ -70,69 +70,39 @@ struct QuickMomentSheet: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let minPanelHeight: CGFloat = 440
-            let availableHeight = max(proxy.size.height, ScreenCompat.height * 0.90)
-            let maxPanelHeight = max(minPanelHeight, availableHeight * 0.92)
-            let scrollMaxHeight = max(260, maxPanelHeight - 150)
-            let measuredHeight = contentHeight > 1 ? contentHeight : 380
-            let scrollHeight = min(measuredHeight, scrollMaxHeight)
-            let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, minPanelHeight))
-            let hiddenOffset = panelHeightEstimate + 72
-
-            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: popupVisible) {
-                popupBackdrop
-                    .opacity(popupVisible ? 1 : 0)
-
-                VStack(spacing: 0) {
-                    popupDragHandle
-                        .padding(.top, 4)
-
-                    header
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 14) {
-                            photoSection
-                            moodAndNoteSection
-                            locationCompactSection
-                        }
-                        .padding(.bottom, 10)
-                        .background {
-                            GeometryReader { contentProxy in
-                                Color.clear
-                                    .preference(
-                                        key: QuickMomentContentHeightKey.self,
-                                        value: contentProxy.size.height
-                                    )
-                            }
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 14) {
+                    photoSection
+                    moodAndNoteSection
+                    locationCompactSection
+                }
+                .padding(.vertical, 12)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle(l.tr(zh: "快速记录", en: "Quick Moment", de: "Schneller Moment"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, role: .cancel) { close() }
+                }
+                if onRemove != nil {
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button(role: .destructive) {
+                            onRemove?()
+                            close()
+                        } label: {
+                            Label(l.tr(zh: "删除", en: "Delete", de: "Löschen"), systemImage: "trash")
                         }
                     }
-                    .scrollDismissesKeyboard(.interactively)
-                    .frame(height: scrollHeight)
-
-                    saveButton
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
-                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
-                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow short popup liftedAlert shadow token
-                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow short popup liftedAlert shadow token
-                .padding(.horizontal, 6)
-                .padding(.bottom, 8)
-                .offset(y: popupVisible ? popupDragOffset : hiddenOffset)
-                .frame(maxHeight: maxPanelHeight, alignment: .bottom)
-                .ohanaAdaptiveSheetContentHeight(
-                    $adaptiveSheetHeight,
-                    minHeight: minPanelHeight,
-                    maxHeight: maxPanelHeight,
-                    chromePadding: 18
-                )
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { saveRecord() }
+                        .disabled(!canSave || isSaving)
+                }
             }
         }
-        .allowsHitTesting(popupVisible && !isClosing)
-        .animation(popupAnimation, value: popupVisible)
-        .presentationBackground(.clear)
-        .presentationDetents([.height(min(adaptiveSheetHeight, ScreenCompat.height * 0.94))])
-        .presentationDragIndicator(.hidden)
+        .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
         .onChange(of: selectedItems) { _, newItems in
             Task {
@@ -163,23 +133,6 @@ struct QuickMomentSheet: View {
         .overlay {
             if savedSuccess {
                 successOverlay
-            }
-        }
-        .onAppear {
-            popupVisible = false
-            isClosing = false
-            DispatchQueue.main.async {
-                withAnimation(popupAnimation) {
-                    popupVisible = true
-                }
-            }
-        }
-        .onPreferenceChange(QuickMomentContentHeightKey.self) { height in
-            guard height.isFinite, height > 0 else { return }
-            var transaction = Transaction()
-            transaction.animation = nil
-            withTransaction(transaction) {
-                contentHeight = height
             }
         }
         .onDisappear {
@@ -240,16 +193,10 @@ struct QuickMomentSheet: View {
     private func close() {
         guard !isClosing else { return }
         isClosing = true
-        withAnimation(popupAnimation) {
-            popupVisible = false
-            popupDragOffset = 0
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            if let onClose {
-                onClose()
-            } else {
-                dismiss()
-            }
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 

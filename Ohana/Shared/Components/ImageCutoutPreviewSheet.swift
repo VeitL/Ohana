@@ -109,7 +109,6 @@ struct ImageCutoutPreviewSheet: View {
             }
         }
         .presentationDetents(OhanaSheetDetents.overview)
-        .presentationDragIndicator(.hidden)
         .task { await runCutout() }
     }
 

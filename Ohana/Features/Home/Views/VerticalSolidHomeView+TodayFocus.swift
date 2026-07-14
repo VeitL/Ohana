@@ -7,20 +7,6 @@ import SwiftData
 import SwiftUI
 
 extension VerticalSolidHomeView {
-    func openHomeFabShortcut(_ shortcut: HomeFabFunctionShortcut) {
-        closeVerticalFabMenu(immediate: true)
-        switch shortcut.action {
-        case let .addEntity(type):
-            routeCoordinator.openAddEntity(type)
-        case let .destination(destination):
-            openFunctionMenu(destination: destination)
-        case .submenu:
-            OhanaFeedback.light()
-        case .unavailable:
-            break
-        }
-    }
-
     func handleNewHomeMemberSaved(id: UUID) {
         cancelGrowthOnboardingPrompt()
         arrivalClearTask?.cancel()
@@ -76,7 +62,7 @@ extension VerticalSolidHomeView {
         if card.isHuman {
             onOpenHuman(card.id)
         } else if card.isElectronicPet {
-            controller.select(.oasis)
+            selectTab(.oasis)
         } else {
             onOpenPet(card.id, .overview)
         }
@@ -260,11 +246,6 @@ extension VerticalSolidHomeView {
     }
 
     func openTodayFocusFamilyTask(_: TodayFocusFamilyTaskSnapshot) {
-        guard OnlineFeatureGate.allows(.onlineCollaboration) else {
-            AppFeatureRouteGuard.recordIntercept("todayFocusFamilyTask:onlineGate")
-            routeCoordinator.openCrewRoster()
-            return
-        }
         routeCoordinator.openCrewRoster(mode: .collaboration)
     }
 

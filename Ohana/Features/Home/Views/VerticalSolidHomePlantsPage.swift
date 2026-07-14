@@ -9,11 +9,18 @@ import Foundation
 import SwiftData
 import SwiftUI
 
+private enum VerticalSolidHomePlantRoomDialLayout {
+    static let width: CGFloat = 68
+    static let collapsedHeight: CGFloat = 44
+    static let expandedHeight: CGFloat = 220
+    static let viewSwitcherHeight: CGFloat = 44
+    static let controlGap: CGFloat = 10
+}
+
 struct VerticalSolidHomePlantsPage: View {
     let plants: [VerticalSolidHomePlantSnapshot]
     let localization: L10n
     @Binding var plantQuickActionItemsRaw: String
-    @Binding var hidesBottomChrome: Bool
     let pendingQuickCareKeys: Set<String>
     let completedQuickCareKeys: Set<String>
     let failedQuickCareKeys: Set<String>
@@ -28,9 +35,7 @@ struct VerticalSolidHomePlantsPage: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var selectedCardId: UUID?
     @State private var selectedRoomId: String?
     @State private var selectedViewStyle: VerticalSolidHomePlantViewStyle = .deck
@@ -44,10 +49,6 @@ struct VerticalSolidHomePlantsPage: View {
     @State private var collapseCleanupTask: Task<Void, Never>?
     @State private var deckScrollOffsetTracker = VerticalSolidHomePlantDeckScrollOffsetTracker()
     @State private var expandedDeckScrollOffsetY: CGFloat = 0
-
-    private var usesFullVisualEffects: Bool {
-        workloadPolicy.visualEffectsBudget(isVisible: true).usesFullEffects
-    }
 
     private var l: L10n { localization }
 
@@ -95,7 +96,6 @@ struct VerticalSolidHomePlantsPage: View {
                             } action: { _, offsetY in
                                 let normalizedOffsetY = max(0, offsetY)
                                 deckScrollOffsetTracker.offsetY = normalizedOffsetY
-                                updateBottomChromeVisibility(normalizedOffsetY)
                             }
                             .onChange(of: selectedRoomId) { _, _ in
                                 scrollToFirstPlantSection(using: scrollProxy)
@@ -165,9 +165,6 @@ struct VerticalSolidHomePlantsPage: View {
                 activeHeroSnapshot = nil
                 heroProgress = 0
                 heroDirection = 0
-            }
-            if hidesBottomChrome {
-                hidesBottomChrome = false
             }
         }
         .accessibilityIdentifier("home-plants-page")
@@ -338,26 +335,23 @@ struct VerticalSolidHomePlantsPage: View {
         !plants.isEmpty && selectedCardId == nil && heroDirection == 0
     }
 
-    private var roomRailButtonCount: Int {
-        min(plantRoomSummaries.count, 7) + 1
-    }
-
     private var roomRailHeight: CGFloat {
-        railHeight(buttonCount: roomRailButtonCount)
+        VerticalSolidHomePlantRoomDialLayout.expandedHeight
     }
 
     private var viewSwitcherRailHeight: CGFloat {
-        railHeight(buttonCount: VerticalSolidHomePlantViewStyle.allCases.count)
-    }
-
-    private func railHeight(buttonCount: Int) -> CGFloat {
-        guard buttonCount > 0 else { return 0 }
-        return 16 + CGFloat(buttonCount) * 44 + CGFloat(max(0, buttonCount - 1)) * 8
+        VerticalSolidHomePlantRoomDialLayout.viewSwitcherHeight
     }
 
     private func viewSwitcherCenterY(roomRailCenterY: CGFloat) -> CGFloat {
         guard showsRoomRail else { return roomRailCenterY }
-        return max(56, roomRailCenterY - roomRailHeight / 2 - 10 - viewSwitcherRailHeight / 2)
+        return max(
+            56,
+            roomRailCenterY
+                - roomRailHeight / 2
+                - VerticalSolidHomePlantRoomDialLayout.controlGap
+                - viewSwitcherRailHeight / 2
+        )
     }
 
     @ViewBuilder
@@ -374,6 +368,7 @@ struct VerticalSolidHomePlantsPage: View {
                 localization: localization,
                 quickActionItemsRaw: $plantQuickActionItemsRaw,
                 shouldReduceWork: reduceMotion,
+                accentColor: Color(hex: card.themeColorHex),
                 forcesSubmenusBelow: false,
                 onAction: { action in
                     performPlantDockAction(action, plant: plant)
@@ -394,167 +389,60 @@ struct VerticalSolidHomePlantsPage: View {
     }
 
     private var plantViewSwitcherRail: some View {
-        VStack(spacing: 8) {
+        Picker(
+            l.tr(zh: "植物视图", en: "Plant view", de: "Pflanzenansicht"),
+            selection: Binding(
+                get: { selectedViewStyle },
+                set: { selectPlantViewStyle($0) }
+            )
+        ) {
             ForEach(VerticalSolidHomePlantViewStyle.allCases) { style in
-                plantViewSwitcherButton(style)
+                Label(style.title(l), systemImage: style.icon)
+                    .labelStyle(.iconOnly)
+                    .tag(style)
+                    .accessibilityIdentifier("home-plants-view-\(style.rawValue)")
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 5)
-        .background(roomRailBackground)
-        .accessibilityElement(children: .contain)
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(
+            width: 88,
+            height: VerticalSolidHomePlantRoomDialLayout.viewSwitcherHeight
+        )
         .accessibilityIdentifier("home-plants-view-switcher-rail")
     }
 
-    private func plantViewSwitcherButton(_ style: VerticalSolidHomePlantViewStyle) -> some View {
-        let isSelected = selectedViewStyle == style
-        return Button {
-            selectPlantViewStyle(style)
-        } label: {
-            VStack(spacing: 2) {
-                Image(systemName: style.icon)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-                    .frame(height: 14)
-                    .accessibilityHidden(true)
-                Text(style.shortTitle(l))
-                    .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.arkInk.opacity(0.74) : Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-            }
-            .frame(width: 44, height: 44)
-            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62), in: Circle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(style.title(l))
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier("home-plants-view-\(style.rawValue)")
-    }
-
     private var plantRoomRail: some View {
-        VStack(spacing: 8) {
-            plantRoomRailButton(
-                id: "all",
-                title: l.tr(zh: "全部", en: "All", de: "Alle"),
-                shortTitle: l.tr(zh: "全", en: "All", de: "Alle"),
-                count: plants.count,
-                dueCount: plants.count(where: \.needsCare),
-                isSelected: selectedRoomId == nil
-            ) {
-                selectRoom(nil)
-            }
-
-            ForEach(plantRoomSummaries.prefix(7)) { summary in
-                plantRoomRailButton(
-                    id: summary.id,
-                    title: summary.title,
-                    shortTitle: roomRailShortTitle(summary.title),
-                    count: summary.plantCount,
-                    dueCount: summary.dueCount,
-                    isSelected: selectedRoomId == summary.id
-                ) {
-                    selectRoom(selectedRoomId == summary.id ? nil : summary.id)
-                }
-            }
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 5)
-        .background(roomRailBackground)
+        VerticalSolidHomePlantRoomDial(
+            options: plantRoomDialOptions,
+            selectedRoomID: selectedRoomId,
+            localization: l,
+            reduceMotion: reduceMotion,
+            onSelect: { selectRoom($0) }
+        )
         .opacity(showsRoomRail ? 1 : 0)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("home-plants-room-edge-rail")
     }
 
-    private func plantRoomRailButton(
-        id: String,
-        title: String,
-        shortTitle: String,
-        count: Int,
-        dueCount: Int,
-        isSelected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(spacing: 2) {
-                Text(shortTitle)
-                    .font(OhanaFont.adaptive(size: shortTitle.count > 2 ? 9 : 11, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-                Text("\(count)")
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.arkInk.opacity(0.72) : Color.ohanaSecondaryText)
-                    .lineLimit(1)
-            }
-            .frame(width: 44, height: 44)
-            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62), in: Circle())
-            .overlay(alignment: .topTrailing) {
-                if dueCount > 0 {
-                    Circle()
-                        .fill(Color.goYellow)
-                        .frame(width: 9, height: 9) // a11y: allow decorative due dot inside the 44pt home plant room rail button
-                        .overlay {
-                            Circle().strokeBorder(Color.ohanaCardSurface.opacity(0.8), lineWidth: 1)
-                        }
-                        .offset(x: -5, y: 5)
-                        .accessibilityHidden(true)
-                }
-            }
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(roomRailAccessibilityLabel(title: title, count: count, dueCount: dueCount, isSelected: isSelected))
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier("home-plants-room-edge-\(roomRailIdentifier(id))")
-    }
-
-    @ViewBuilder
-    private var roomRailBackground: some View {
-        if usesFullVisualEffects && !reduceTransparency {
-            Capsule()
-                .fill(Color.clear)
-                .glassEffect(.regular.tint(roomRailGlassTint).interactive(true), in: Capsule()) // ui-v4: allow Liquid Glass room rail above plant cards
-                .overlay(roomRailStroke)
-                .shadow( // ui-v4: allow floating glass room rail depth
-                    color: Color.arkInk.opacity(0.16),
-                    radius: 16,
-                    x: 0,
-                    y: 8
-                )
-        } else {
-            Capsule()
-                .fill(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.88 : 0.94))
-                .overlay(roomRailStroke)
-                .shadow( // ui-v4: allow reduced-mode room rail separation without Liquid Glass.
-                    color: Color.arkInk.opacity(colorScheme == .dark ? 0.08 : 0.04),
-                    radius: 6,
-                    x: 0,
-                    y: 3
-                )
-        }
-    }
-
-    private var roomRailStroke: some View {
-        Capsule()
-            .strokeBorder(
-                LinearGradient(
-                    colors: [
-                        Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
-                        Color.ohanaSecondaryText.opacity(colorScheme == .dark ? 0.18 : 0.10),
-                        Color.ohanaGlassStroke.opacity(usesFullVisualEffects ? 0.20 : 0.12)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
+    private var plantRoomDialOptions: [VerticalSolidHomePlantRoomDialOption] {
+        var options = [VerticalSolidHomePlantRoomDialOption(
+            id: "all",
+            roomID: nil,
+            title: l.tr(zh: "全部", en: "All", de: "Alle"),
+            shortTitle: l.tr(zh: "全部", en: "ALL", de: "ALLE"),
+            count: plants.count,
+            dueCount: plants.count(where: \.needsCare)
+        )]
+        options.append(contentsOf: plantRoomSummaries.map { summary in
+            VerticalSolidHomePlantRoomDialOption(
+                id: summary.id,
+                roomID: summary.id,
+                title: summary.title,
+                shortTitle: VerticalSolidHomePlantRoomDial.shortTitle(summary.title),
+                count: summary.plantCount,
+                dueCount: summary.dueCount
             )
-    }
-
-    private var roomRailGlassTint: Color {
-        if reduceTransparency {
-            return Color.ohanaCardSurface.opacity(0.94)
-        }
-        return Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.34 : 0.42)
+        })
+        return options
     }
 
     private func plantRoomListView(bottomChromeHeight: CGFloat) -> some View {
@@ -571,11 +459,6 @@ struct VerticalSolidHomePlantsPage: View {
             .accessibilityIdentifier("home-plants-view-list")
         }
         .scrollBounceBehavior(.basedOnSize)
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            geometry.contentOffset.y
-        } action: { _, offsetY in
-            updateBottomChromeVisibility(offsetY)
-        }
         .transition(.opacity.combined(with: .move(edge: .trailing)))
         .accessibilityIdentifier("home-plants-room-list-view")
     }
@@ -1032,17 +915,6 @@ struct VerticalSolidHomePlantsPage: View {
         }
     }
 
-    private func updateBottomChromeVisibility(_ scrollOffset: CGFloat) {
-        let next = VerticalSolidHomePlantScrollChromePolicy.hidesBottomChrome(
-            scrollOffset: scrollOffset,
-            currentHidden: hidesBottomChrome
-        )
-        guard next != hidesBottomChrome else { return }
-        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
-            hidesBottomChrome = next
-        }
-    }
-
     private func reconcileRoomSelection() {
         guard let selectedRoomId,
               !plantRoomSummaries.contains(where: { $0.id == selectedRoomId }) else { return }
@@ -1115,11 +987,313 @@ struct VerticalSolidHomePlantsPage: View {
         return trimmed.isEmpty ? l.tr(zh: "未设置", en: "Unassigned", de: "Ohne Ort") : trimmed
     }
 
-    private func roomRailShortTitle(_ value: String) -> String {
+    private func roomRailIdentifier(_ value: String) -> String {
+        value
+            .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+            .filter { $0.isLetter || $0.isNumber || $0 == "-" }
+    }
+}
+
+private struct VerticalSolidHomePlantRoomDialOption: Identifiable, Equatable {
+    let id: String
+    let roomID: String?
+    let title: String
+    let shortTitle: String
+    let count: Int
+    let dueCount: Int
+}
+
+private struct VerticalSolidHomePlantRoomDialWheelItem: Identifiable {
+    let id: Int
+    let cycle: Int
+    let option: VerticalSolidHomePlantRoomDialOption
+}
+
+private struct VerticalSolidHomePlantRoomDial: View {
+    let options: [VerticalSolidHomePlantRoomDialOption]
+    let selectedRoomID: String?
+    let localization: L10n
+    let reduceMotion: Bool
+    let onSelect: (String?) -> Void
+
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var isExpanded = false
+    @State private var scrollID: Int?
+
+    private var l: L10n { localization }
+
+    private var currentOption: VerticalSolidHomePlantRoomDialOption {
+        options.first(where: { $0.roomID == selectedRoomID }) ?? options[0]
+    }
+
+    private var usesDialMotion: Bool {
+        workloadPolicy.visualEffectsBudget(isVisible: true).usesFullEffects && !reduceMotion
+    }
+
+    var body: some View {
+        Group {
+            if isExpanded {
+                wheel
+            } else {
+                collapsedButton
+            }
+        }
+        .frame(
+            width: VerticalSolidHomePlantRoomDialLayout.width,
+            height: isExpanded
+                ? VerticalSolidHomePlantRoomDialLayout.expandedHeight
+                : VerticalSolidHomePlantRoomDialLayout.collapsedHeight
+        )
+        .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .trailing)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home-plants-room-edge-rail")
+        .onChange(of: selectedRoomID) { _, roomID in
+            guard isExpanded else { return }
+            recenter(roomID: roomID)
+        }
+        .onChange(of: options) { _, _ in
+            guard isExpanded else { return }
+            recenter(roomID: selectedRoomID)
+        }
+        .onDisappear {
+            isExpanded = false
+            scrollID = nil
+        }
+    }
+
+    private var collapsedButton: some View {
+        let option = currentOption
+        return Button {
+            expand()
+        } label: {
+            label(option, isFocused: true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel(option, isSelected: true))
+        .accessibilityHint(l.tr(
+            zh: "轻点展开房间滚轮，上下轻扫切换",
+            en: "Tap to expand the room dial, then swipe vertically",
+            de: "Tippen, um das Raumrad zu öffnen, dann vertikal streichen"
+        ))
+        .accessibilityAdjustableAction { direction in
+            adjustSelection(direction)
+        }
+        .accessibilityIdentifier("home-plants-room-edge-collapsed")
+    }
+
+    private var wheel: some View {
+        let items = wheelItems
+        return ScrollView(.vertical) {
+            LazyVStack(spacing: 0) {
+                ForEach(items) { item in
+                    wheelButton(item, isFocused: item.id == scrollID)
+                        .id(item.id)
+                        .scrollTransition(.interactive(timingCurve: .easeInOut), axis: .vertical) { content, phase in
+                            let distance = min(CGFloat(abs(phase.value)), 1)
+                            let scale: CGFloat = usesDialMotion ? 1 - distance * 0.14 : 1
+                            let opacity: Double = max(0.38, 1 - Double(distance) * 0.62)
+                            let horizontalOffset: CGFloat = usesDialMotion ? distance * 7 : 0
+                            return content
+                                .scaleEffect(scale)
+                                .opacity(opacity)
+                                .offset(x: horizontalOffset)
+                        }
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollIndicators(.hidden)
+        .contentMargins(.vertical, 88, for: .scrollContent)
+        .scrollPosition(id: $scrollID, anchor: .center)
+        .scrollTargetBehavior(.viewAligned(anchor: .center))
+        .frame(
+            width: VerticalSolidHomePlantRoomDialLayout.width,
+            height: VerticalSolidHomePlantRoomDialLayout.expandedHeight
+        )
+        .mask {
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .black, location: 0.14),
+                    .init(color: .black, location: 0.86),
+                    .init(color: .clear, location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .onAppear {
+            if scrollID == nil {
+                scrollID = middleID(for: selectedRoomID)
+            }
+        }
+        .onScrollPhaseChange { _, newPhase in
+            guard newPhase == .idle else { return }
+            settle(items: items)
+        }
+        .accessibilityLabel(l.tr(
+            zh: "房间滚轮",
+            en: "Room dial",
+            de: "Raumrad"
+        ))
+        .accessibilityAction(.escape) {
+            collapse()
+        }
+    }
+
+    private var wheelItems: [VerticalSolidHomePlantRoomDialWheelItem] {
+        guard !options.isEmpty else { return [] }
+        return (0 ..< 13).flatMap { cycle in
+            options.indices.map { optionIndex in
+                VerticalSolidHomePlantRoomDialWheelItem(
+                    id: cycle * options.count + optionIndex,
+                    cycle: cycle,
+                    option: options[optionIndex]
+                )
+            }
+        }
+    }
+
+    private func wheelButton(
+        _ item: VerticalSolidHomePlantRoomDialWheelItem,
+        isFocused: Bool
+    ) -> some View {
+        Button {
+            commit(item.option)
+            collapse()
+        } label: {
+            label(item.option, isFocused: isFocused)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel(item.option, isSelected: isFocused))
+        .accessibilityAddTraits(isFocused ? .isSelected : [])
+        .accessibilityIdentifier("home-plants-room-edge-\(identifier(item.option.id))-\(item.cycle)")
+        .accessibilityHidden(item.cycle != 6)
+    }
+
+    private func label(
+        _ option: VerticalSolidHomePlantRoomDialOption,
+        isFocused: Bool
+    ) -> some View {
+        VStack(spacing: 1) {
+            Text(option.shortTitle)
+                .font(OhanaFont.adaptive(size: option.shortTitle.count > 2 ? 9 : 12, weight: .black, design: .rounded))
+                .foregroundStyle(isFocused ? Color.goPrimary : Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+            Text("\(option.count)")
+                .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                .foregroundStyle(isFocused ? Color.goPrimary.opacity(0.72) : Color.ohanaSecondaryText)
+                .lineLimit(1)
+        }
+        .frame(width: 64, height: 44)
+        .contentShape(Rectangle())
+        .overlay(alignment: .trailing) {
+            Capsule()
+                .fill(Color.goPrimary)
+                .frame(width: 2, height: 24) // a11y: allow decorative selected-room indicator inside the 44pt dial target.
+                .opacity(isFocused ? 1 : 0)
+                .accessibilityHidden(true)
+        }
+        .overlay(alignment: .topTrailing) {
+            if option.dueCount > 0 {
+                Circle()
+                    .fill(Color.goYellow)
+                    .frame(width: 7, height: 7) // a11y: allow decorative due dot inside the 44pt dial target.
+                    .offset(x: -7, y: 6)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private func expand() {
+        scrollID = middleID(for: selectedRoomID)
+        withAnimation(reduceMotion ? nil : GoMotion.quick) {
+            isExpanded = true
+        }
+        OhanaFeedback.light()
+    }
+
+    private func collapse() {
+        withAnimation(reduceMotion ? nil : GoMotion.quick) {
+            isExpanded = false
+        }
+    }
+
+    private func settle(items: [VerticalSolidHomePlantRoomDialWheelItem]) {
+        guard
+            let scrollID,
+            let item = items.first(where: { $0.id == scrollID })
+        else { return }
+
+        commit(item.option)
+        recenter(roomID: item.option.roomID)
+    }
+
+    private func commit(_ option: VerticalSolidHomePlantRoomDialOption) {
+        guard selectedRoomID != option.roomID else { return }
+        onSelect(option.roomID)
+    }
+
+    private func recenter(roomID: String?) {
+        let centeredID = middleID(for: roomID)
+        guard scrollID != centeredID else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            scrollID = centeredID
+        }
+    }
+
+    private func middleID(for roomID: String?) -> Int {
+        let optionIndex = options.firstIndex(where: { $0.roomID == roomID }) ?? 0
+        return 6 * options.count + optionIndex
+    }
+
+    private func adjustSelection(_ direction: AccessibilityAdjustmentDirection) {
+        guard
+            !options.isEmpty,
+            let currentIndex = options.firstIndex(where: { $0.roomID == selectedRoomID })
+        else { return }
+
+        let delta: Int
+        switch direction {
+        case .increment:
+            delta = 1
+        case .decrement:
+            delta = -1
+        @unknown default:
+            return
+        }
+
+        let nextIndex = (currentIndex + delta + options.count) % options.count
+        commit(options[nextIndex])
+    }
+
+    private func accessibilityLabel(
+        _ option: VerticalSolidHomePlantRoomDialOption,
+        isSelected: Bool
+    ) -> String {
+        let state = isSelected
+            ? l.tr(zh: "已选择", en: "selected", de: "ausgewählt")
+            : l.tr(zh: "未选择", en: "not selected", de: "nicht ausgewählt")
+        let due = option.dueCount == 0
+            ? l.tr(zh: "无到期任务", en: "no due tasks", de: "keine fälligen Aufgaben")
+            : l.tr(zh: "\(option.dueCount) 项到期", en: "\(option.dueCount) due", de: "\(option.dueCount) fällig")
+        return l.tr(
+            zh: "\(option.title)，\(option.count) 株植物，\(due)，\(state)",
+            en: "\(option.title), \(option.count) plants, \(due), \(state)",
+            de: "\(option.title), \(option.count) Pflanzen, \(due), \(state)"
+        )
+    }
+
+    static func shortTitle(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "?" }
         if trimmed.unicodeScalars.contains(where: { (0x4E00 ... 0x9FFF).contains(Int($0.value)) }) {
-            return String(trimmed.prefix(1))
+            return String(trimmed.prefix(2))
         }
         let words = trimmed
             .split(whereSeparator: { $0.isWhitespace || $0 == "-" || $0 == "_" })
@@ -1130,29 +1304,12 @@ struct VerticalSolidHomePlantsPage: View {
         return String(trimmed.prefix(3)).uppercased()
     }
 
-    private func roomRailIdentifier(_ value: String) -> String {
+    private func identifier(_ value: String) -> String {
         value
             .folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
             .lowercased()
             .replacingOccurrences(of: " ", with: "-")
             .filter { $0.isLetter || $0.isNumber || $0 == "-" }
-    }
-
-    private func roomRailAccessibilityLabel(
-        title: String,
-        count: Int,
-        dueCount: Int,
-        isSelected: Bool
-    ) -> String {
-        let state = isSelected ? l.tr(zh: "已选择", en: "selected", de: "ausgewählt") : l.tr(zh: "未选择", en: "not selected", de: "nicht ausgewählt")
-        let due = dueCount == 0
-            ? l.tr(zh: "无到期任务", en: "no due tasks", de: "keine fälligen Aufgaben")
-            : l.tr(zh: "\(dueCount) 项到期", en: "\(dueCount) due", de: "\(dueCount) fällig")
-        return l.tr(
-            zh: "\(title)，\(count) 株植物，\(due)，\(state)",
-            en: "\(title), \(count) plants, \(due), \(state)",
-            de: "\(title), \(count) Pflanzen, \(due), \(state)"
-        )
     }
 }
 

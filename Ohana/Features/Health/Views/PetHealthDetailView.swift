@@ -671,20 +671,23 @@ struct PetHealthDetailContentView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .navigationBar)
         .accessibilityIdentifier("pet-health-detail-screen")
-        .overlay {
-            if let dest = healthPlusDestination, dest.usesInlineRecordPopup {
-                healthRecordInlineOverlay(dest)
-            }
-            if showingMedicationPopup {
-                medicationInlineOverlay
-            }
-        }
         .sheet(item: sheetHealthPlusDestination) { dest in
             switch dest {
-            case .guided:
-                EmptyView()
-            case .direct:
-                EmptyView()
+            case .guided, .direct:
+                PetHealthRecordInlinePopup(
+                    pet: pet,
+                    initialType: healthRecordInitialType(for: dest),
+                    entryMode: healthRecordEntryMode(for: dest),
+                    onClose: { closeHealthRecordPopup() },
+                    onSaved: {
+                        onHealthDataChanged?()
+                        refreshHealthAlerts()
+                        OhanaFeedback.success()
+                        closeHealthRecordPopup(feedback: false)
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationContentInteraction(.scrolls)
             case .medications:
                 PetMedicationView(pet: pet, onDataChanged: onMedicationDataChanged)
             case .symptom:
@@ -692,6 +695,22 @@ struct PetHealthDetailContentView: View {
             case .heatCycle:
                 AddHeatCycleSheet(pet: pet, onSaved: onHealthDataChanged)
             }
+        }
+        .sheet(isPresented: $showingMedicationPopup) {
+            AddPetMedicationSheet(
+                pet: pet,
+                isInlinePopup: false,
+                onClose: { closeMedicationPopup() },
+                onSaved: {
+                    medicationDoseRefreshToken = UUID()
+                    appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
+                    onMedicationDataChanged?()
+                    OhanaFeedback.success()
+                    closeMedicationPopup(feedback: false)
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.scrolls)
         }
         .sheet(isPresented: $showingPDFPreview) {
             if let url = pdfURL {

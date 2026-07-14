@@ -35,6 +35,11 @@ enum FamilyCollaborationEditorRoute: Identifiable, Equatable {
     }
 }
 
+enum FamilyCollaborationPostSheetAction: Equatable {
+    case presentEditor(FamilyCollaborationEditorRoute)
+    case openWeeklyReport
+}
+
 struct FamilyCollaborationEditorContext {
     let route: FamilyCollaborationEditorRoute
     let reminder: Reminder?

@@ -528,20 +528,6 @@ struct QuickFeedDetailContent: View {
             rootScrollContent
 
             QuickFeedOverlayHost(route: activeOverlay)
-
-            if let sheet = activeSheet, sheet.usesInlineOverlay {
-                inlineFeedSheetOverlay(sheet)
-                    .zIndex(40)
-                    .ignoresSafeArea(.container, edges: .bottom)
-            }
-
-            if inlineSheetDismissGestureShield, activeSheet?.usesInlineOverlay != true {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .highPriorityGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global))
-                    .zIndex(39)
-                    .ignoresSafeArea()
-            }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .petMemorialTone(isActive: pet.hasPassedAway)
@@ -562,8 +548,6 @@ struct QuickFeedDetailContent: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .scrollBounceBehavior(.basedOnSize)
-        .scrollDisabled(inlineOverlayBlocksBackground)
-        .allowsHitTesting(!inlineOverlayBlocksBackground)
     }
 
     var systemSheetHost: QuickFeedSystemSheetHost {
@@ -595,6 +579,10 @@ struct QuickFeedDetailContent: View {
 
     func dismissInlineFeedSheet() {
         dismissFeedKeyboard()
+        guard activeInlineSheet != nil else {
+            closeActiveFeedSheet()
+            return
+        }
         let dismissingSheetID = sheetCoordinator.beginInlineDismiss()
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 420_000_000)

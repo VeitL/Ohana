@@ -2,7 +2,7 @@
 //  GachaView.swift
 //  Ohana
 //
-//  Series blind-box gacha presented as an inline V4 glass popup.
+//  Series blind-box gacha presented with native navigation and sheets.
 //
 
 import SwiftData
@@ -148,38 +148,92 @@ struct GachaView: View {
         guard let selectedCollectionItemId else { return nil }
         return series.items.first { $0.id == selectedCollectionItemId }
     }
+}
 
+extension GachaView {
     var body: some View {
-        GeometryReader { proxy in
-            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: true) {
+        NavigationStack {
+            ZStack {
                 if drawsBackground {
                     OhanaAppBackground()
                         .ignoresSafeArea()
                 }
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(colorScheme == .dark ? 0.34 : 0.16), // ui-v4: allow modal scrim ink
-                        Color.black.opacity(colorScheme == .dark ? 0.10 : 0.05) // ui-v4: allow modal scrim ink
-                    ],
-                    startPoint: .bottom,
-                    endPoint: .top
-                )
-                .ignoresSafeArea()
-                .onTapGesture { close() }
-                VStack {
-                    Spacer(minLength: 0)
-                    popupPanel(maxHeight: proxy.size.height * 0.94)
-                        .padding(.horizontal, 6)
-                        .padding(.bottom, 4)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        seriesSelector
+                        gachaStage
+                        drawButton
+                        if let feedbackText {
+                            Text(feedbackText)
+                                .font(OhanaFont.caption(.bold))
+                                .foregroundStyle(Color.goOrange)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                        collectionSection
+                        recentSection
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 22)
                 }
-                if let selectedCollectionItem {
-                    collectionItemDetailOverlay(selectedCollectionItem)
-                        .zIndex(4)
+                .scrollDismissesKeyboard(.immediately)
+            }
+            .navigationTitle(l.tr(zh: "Ohana 盲盒", en: "Ohana Blind Box", de: "Ohana Blindbox"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel) { close() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    balancePill
                 }
             }
         }
-        .ignoresSafeArea(.container, edges: .bottom)
-        .statusBarHidden(false)
+        .sheet(item: selectedCollectionItemBinding) { item in
+            collectionItemDetailSheet(item)
+        }
+    }
+
+    private var selectedCollectionItemBinding: Binding<GachaItemEntry?> {
+        Binding(
+            get: { selectedCollectionItem },
+            set: { selectedCollectionItemId = $0?.id }
+        )
+    }
+
+    private func collectionItemDetailSheet(_ item: GachaItemEntry) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 14) {
+                    collectionDetailImage(item)
+                        .frame(width: 230, height: 292)
+                        .padding(.vertical, 2)
+                        .ohanaShine(trigger: item.id, cornerRadius: OhanaRadius.sheetMini, isEnabled: shouldAnimateReveal)
+
+                    LabeledContent(l.tr(zh: "已拥有", en: "Owned", de: "Im Besitz")) {
+                        Label("x\(ownedCount(for: item))", systemImage: "square.stack.3d.up.fill")
+                    }
+
+                    LabeledContent(l.tr(zh: "个性", en: "Personality", de: "Persönlichkeit")) {
+                        Text(item.localizedPersonality(l))
+                    }
+
+                    Text("“\(item.localizedMotto(l))”")
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 8)
+                }
+                .padding(20)
+            }
+            .navigationTitle(collectionDisplayName(for: item))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel) { dismissCollectionDetail() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationContentInteraction(.scrolls)
     }
 
     private func popupPanel(maxHeight: CGFloat) -> some View {

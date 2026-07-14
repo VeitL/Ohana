@@ -81,6 +81,7 @@ struct AppRoutePresentationHost: ViewModifier {
                         onPetSavedFromAddEntity: onPetSavedFromAddEntity,
                         onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
                         onCalendarEventDestination: handleCalendarEventDestination,
+                        onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
                         onHumanDoseTaken: onHumanDoseTaken
                     )
                 }
@@ -91,29 +92,26 @@ struct AppRoutePresentationHost: ViewModifier {
                     lastSheetRoute = route
                 }
             }
-            .overlay {
-                if let route = coordinator.overlay {
-                    AppDeferredRouteContent(
-                        routeID: route.id,
-                        policy: AppPresentationPolicyProvider.policy(for: route)
-                    ) {
-                        AppOverlayRouteDestination(
-                            route: route,
-                            onDismiss: { coordinator.dismissOverlay(route) },
-                            onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
-                            onOpenPet: { id, tab in coordinator.openPet(id, initialTab: tab) },
-                            onOpenHuman: { id in coordinator.openHuman(id) },
-                            onPresentSheet: { route in coordinator.presentSheet(route) },
-                            onPresentCoconutLog: { subject in
-                                coordinator.presentCoconutLog(subject)
-                            }
-                        )
-                    }
-                    .ohanaLocalizedEnvironment(routeLanguageCode)
-                    .ignoresSafeArea()
-                    .globalCoconutRewardFeedbackOverlay()
-                    .zIndex(140)
+            .sheet(item: $coordinator.overlay) { route in
+                AppDeferredRouteContent(
+                    routeID: route.id,
+                    policy: AppPresentationPolicyProvider.policy(for: route)
+                ) {
+                    AppOverlayRouteDestination(
+                        route: route,
+                        onDismiss: { coordinator.dismissOverlay(route) },
+                        onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
+                        onOpenPet: { id, tab in coordinator.openPet(id, initialTab: tab) },
+                        onOpenHuman: { id in coordinator.openHuman(id) },
+                        onPresentSheet: { route in coordinator.presentSheet(route) },
+                        onPresentCoconutLog: { subject in
+                            coordinator.presentCoconutLog(subject)
+                        }
+                    )
                 }
+                .ohanaLocalizedEnvironment(routeLanguageCode)
+                .appPresentationSheet(AppPresentationPolicyProvider.policy(for: route))
+                .globalCoconutRewardFeedbackOverlay()
             }
     }
 
@@ -291,6 +289,7 @@ private struct AppSheetRouteDestination: View {
     let onPetSavedFromAddEntity: (Pet) -> Void
     let onHumanSavedFromAddEntity: (Human) -> Void
     let onCalendarEventDestination: (FocusHomeReminderDestination) -> Void
+    let onFirstSuccessMomentCompleted: (Pet) -> Void
     let onHumanDoseTaken: (UUID) -> Void
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
@@ -322,6 +321,17 @@ private struct AppSheetRouteDestination: View {
                 onPresentCoconutLog: { subject in
                     coordinator.presentCoconutLog(subject)
                 }
+            )
+            .ohanaSheetPagePresentation()
+        case .taskCenter:
+            TaskCenterRouteContainer(
+                presentation: .sheet,
+                initialSurface: .tasks,
+                onOpenEventDestination: onCalendarEventDestination,
+                onPresentCoconutLog: { subject in
+                    coordinator.presentCoconutLog(subject)
+                },
+                onDismiss: onDismiss
             )
             .ohanaSheetPagePresentation()
         case let .coconutLog(subject):
@@ -497,6 +507,12 @@ private struct AppSheetRouteDestination: View {
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
+        case let .petMomentQuick(id):
+            AppQuickMomentOverlayRouteContainer(
+                id: id,
+                onSaved: onFirstSuccessMomentCompleted,
+                onDismiss: onDismiss
+            )
         case let .petMomentHistory(id):
             AppPetDetailSheetRouteContainer(
                 id: id,
@@ -792,13 +808,11 @@ private struct AppOverlayRouteDestination: View {
     var body: some View {
         switch route {
         case let .quickMoment(_, petID):
-            OhanaInlinePageRouteHost(routeID: route.id, onClose: onDismiss) { requestClose in
-                AppQuickMomentOverlayRouteContainer(
-                    id: petID,
-                    onSaved: onFirstSuccessMomentCompleted,
-                    onDismiss: requestClose
-                )
-            }
+            AppQuickMomentOverlayRouteContainer(
+                id: petID,
+                onSaved: onFirstSuccessMomentCompleted,
+                onDismiss: onDismiss
+            )
         case let .petWeightQuick(_, petID):
             AppPetWeightQuickSheetHost(
                 id: petID,

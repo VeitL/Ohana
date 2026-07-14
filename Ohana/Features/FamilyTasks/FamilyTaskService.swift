@@ -157,27 +157,6 @@ enum FamilyTaskService {
         )
     }
 
-    static func cappedReward(_ value: Int) -> Int {
-        min(rewardCap, max(0, value))
-    }
-
-    @MainActor
-    static func fetchOrLog<T: PersistentModel>(
-        _ descriptor: FetchDescriptor<T>,
-        context: ModelContext,
-        operation: String
-    ) -> [T] {
-        do {
-            return try context.fetch(descriptor)
-        } catch {
-            OhanaLog.warning(
-                "FamilyTaskService failed to \(operation): \(error.localizedDescription)",
-                category: "FamilyTasks"
-            )
-            return []
-        }
-    }
-
     private static func canWriteCollaboration(for human: Human?) -> Bool {
         guard let human else { return true }
         return MemberLifecycleGate.disposition(human: human, writeKind: .collaboration).allowsDerivedEffects
@@ -308,11 +287,12 @@ enum FamilyTaskService {
         note: String = "",
         context: ModelContext
     ) -> FamilyCollaborationTask? {
-        if let creator, creator.id == human.id {
-            return nil
-        }
-        guard canWriteCollaboration(for: human),
-              canWriteCollaboration(for: creator),
+        guard let funding = FamilyTaskFundingPolicy.resolve(
+            createdById: creator?.id.uuidString,
+            assignedTo: human,
+            rewardCoconuts: rewardCoconuts,
+            context: context
+        ),
               reminderTargetsWritableMember(reminder, context: context) else {
             return nil
         }
@@ -336,11 +316,11 @@ enum FamilyTaskService {
                 assigneeId: human.id.uuidString,
                 context: context
             ),
-            actor: creator ?? human,
+            actor: funding.creator,
             context: context
         ) else { return nil }
         let taskTitle = reminderTaskTitle(for: reminder)
-        let reward = cappedReward(rewardCoconuts)
+        let reward = funding.reward
         let task: FamilyCollaborationTask
         if let existing {
             task = existing
@@ -352,6 +332,8 @@ enum FamilyTaskService {
                 task.relatedPetId = subject.relatedPetId
                 task.relatedEventId = reminder.event?.id.uuidString
                 task.relatedReminderId = reminder.id.uuidString
+                task.createdById = funding.creator.id.uuidString
+                task.createdByName = funding.creator.name
                 task.assignedToId = human.id.uuidString
                 task.assignedToName = human.name
                 task.rewardCoconuts = reward
@@ -370,8 +352,8 @@ enum FamilyTaskService {
                 relatedPetId: subject.relatedPetId,
                 relatedEventId: reminder.event?.id.uuidString,
                 relatedReminderId: reminder.id.uuidString,
-                createdById: creator?.id.uuidString ?? human.id.uuidString,
-                createdByName: creator?.name ?? human.name,
+                createdById: funding.creator.id.uuidString,
+                createdByName: funding.creator.name,
                 assignedToId: human.id.uuidString,
                 assignedToName: human.name,
                 rewardCoconuts: reward,
@@ -438,30 +420,31 @@ enum FamilyTaskService {
         emoji: String,
         context: ModelContext
     ) -> FamilyCollaborationTask? {
-        guard let human else { return nil }
-        if let creator, creator.id == human.id {
-            return nil
-        }
-        guard canWriteCollaboration(for: human),
-              canWriteCollaboration(for: creator) else {
-            return nil
-        }
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty,
+              let human,
+              let funding = FamilyTaskFundingPolicy.resolve(
+                  createdById: creator?.id.uuidString,
+                  assignedTo: human,
+                  rewardCoconuts: rewardCoconuts,
+                  context: context
+              ) else { return nil }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: householdTaskSubjectRequest(assigneeId: human.id.uuidString),
-            actor: creator ?? human,
+            actor: funding.creator,
             context: context
         ) else { return nil }
 
         let task = DomainMemberFactWriter.createFamilyTask(
             plan: write,
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: normalizedTitle,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines),
-            kind: cappedReward(rewardCoconuts) > 0 ? .bounty : .householdTask,
-            createdById: creator?.id.uuidString ?? "",
-            createdByName: creator?.name ?? "Ohana",
+            kind: .bounty,
+            createdById: funding.creator.id.uuidString,
+            createdByName: funding.creator.name,
             assignedToId: human.id.uuidString,
             assignedToName: human.name,
-            rewardCoconuts: cappedReward(rewardCoconuts),
+            rewardCoconuts: funding.reward,
             dueAt: dueAt,
             emoji: emoji,
             context: context
@@ -479,9 +462,20 @@ enum FamilyTaskService {
         rewardCoconuts: Int,
         dueAt: Date?,
         emoji: String,
+        by editor: Human?,
         context: ModelContext
     ) -> Bool {
-        guard canWriteCollaboration(for: human),
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let reward = cappedReward(rewardCoconuts)
+        guard !normalizedTitle.isEmpty,
+              editor?.id.uuidString == task.createdById,
+              FamilyTaskFundingPolicy.resolve(
+                  createdById: task.createdById,
+                  assignedTo: human,
+                  rewardCoconuts: reward,
+                  context: context
+              ) != nil,
+              canWriteCollaboration(for: human),
               canWriteRelatedPet(for: task, context: context),
               canWriteCollaboration(forHumanId: task.createdById, context: context),
               canWriteCollaboration(forHumanId: task.claimedById, context: context) else {
@@ -489,15 +483,14 @@ enum FamilyTaskService {
         }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, assigneeId: human?.id.uuidString, context: context),
-            actor: human,
+            actor: editor,
             context: context
         ) else { return false }
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
-            task.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            task.title = normalizedTitle
             task.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
             task.assignedToId = human?.id.uuidString
             task.assignedToName = human?.name
-            let reward = cappedReward(rewardCoconuts)
             task.rewardCoconuts = reward
             task.kind = task.relatedReminderId == nil
                 ? (reward > 0 ? .bounty : .householdTask)
@@ -518,7 +511,7 @@ enum FamilyTaskService {
     @MainActor
     @discardableResult
     static func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) -> Bool {
-        guard !task.isFinished,
+        guard task.isOpen,
               canWriteCollaboration(for: human),
               canWriteRelatedPet(for: task, context: context) else { return false }
         guard let write = authorizedCollaborationWrite(
@@ -558,6 +551,7 @@ enum FamilyTaskService {
         projectionManager _: QuestManager? = nil
     ) -> Bool {
         guard !task.isFinished,
+              canPerform(task, human: human),
               canWriteCollaboration(for: human),
               canWriteRelatedPet(for: task, context: context) else { return false }
         if task.hasReward {
@@ -613,6 +607,7 @@ enum FamilyTaskService {
         careLedger: CareLedgerRecording
     ) -> Bool {
         guard !task.isFinished,
+              canPerform(task, human: human),
               canWriteCollaboration(for: human),
               canWriteRelatedPet(for: task, context: context) else { return false }
         guard let write = authorizedCollaborationWrite(
@@ -858,10 +853,12 @@ enum FamilyTaskService {
 
     @MainActor
     @discardableResult
-    static func delete(_ task: FamilyCollaborationTask, context: ModelContext) -> Bool {
+    static func delete(_ task: FamilyCollaborationTask, by editor: Human?, context: ModelContext) -> Bool {
+        guard editor?.id.uuidString == task.createdById,
+              canWriteCollaboration(for: editor) else { return false }
         guard let write = authorizedCollaborationWrite(
             subjectRequest: taskSubjectRequest(for: task, context: context),
-            actor: nil,
+            actor: editor,
             context: context
         ) else { return false }
         DomainMemberFactWriter.deleteFamilyTask(plan: write, task: task, context: context)

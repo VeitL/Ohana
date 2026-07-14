@@ -159,8 +159,10 @@ ui_shard_manifest_fixture=""
 
 assert_bad scripts/audit-ui-v4.sh "$fixtures/UiV4Bad.swift" \
   background system-text-color hardcoded-white-black material shadow \
-  direct-go-lime hardcoded-motion plain-button regular-sheet \
-  raw-textfield hardcoded-detent-height hardcoded-corner-radius
+  direct-go-lime hardcoded-motion hardcoded-detent-height hardcoded-corner-radius \
+  native-sheet-chrome native-custom-sheet-scene native-inline-presentation native-settings-card \
+  native-custom-search native-manual-toggle native-custom-segment \
+  native-legacy-overlay-call native-inline-popup-mode
 assert_good scripts/audit-ui-v4.sh "$fixtures/UiV4Good.swift"
 
 assert_bad scripts/audit-accessibility.sh "$fixtures/A11yBad.swift" \

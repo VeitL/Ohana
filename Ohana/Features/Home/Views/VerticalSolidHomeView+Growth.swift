@@ -9,53 +9,17 @@ import SwiftUI
 extension VerticalSolidHomeView {
     func openCalendarAddEvent(plants: [Plant] = []) {
         guard !isCalendarAddEventPresented else { return }
-        closeVerticalFabMenu(immediate: true)
-        calendarAddEventPresentationTask?.cancel()
-        calendarAddEventContentMountTask?.cancel()
         calendarAddEventPlants = plants
         isCalendarAddEventPresented = true
-        calendarAddEventProgress = 0
-        isCalendarAddEventContentMounted = false
-        calendarAddEventPresentationTask = OhanaFrameScheduler.runAfterNextFrame {
-            guard isCalendarAddEventPresented else {
-                calendarAddEventPresentationTask = nil
-                return
-            }
-            withAnimation(GoMotion.sheetEnter) {
-                calendarAddEventProgress = 1
-            }
-            calendarAddEventPresentationTask = nil
-        }
-        calendarAddEventContentMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
-            guard isCalendarAddEventPresented else {
-                calendarAddEventContentMountTask = nil
-                return
-            }
-            withAnimation(GoMotion.quick) {
-                isCalendarAddEventContentMounted = true
-            }
-            calendarAddEventContentMountTask = nil
-        }
     }
 
     func closeCalendarAddEvent() {
-        guard isCalendarAddEventPresented || calendarAddEventProgress > 0.001 else { return }
-        calendarAddEventContentMountTask?.cancel()
-        isCalendarAddEventContentMounted = false
-        withAnimation(GoMotion.sheetEnter) {
-            calendarAddEventProgress = 0
-        }
-        calendarAddEventPresentationTask?.cancel()
-        calendarAddEventPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 340) {
-            guard calendarAddEventProgress <= 0.02 else {
-                calendarAddEventPresentationTask = nil
-                return
-            }
-            isCalendarAddEventPresented = false
-            isCalendarAddEventContentMounted = false
-            calendarAddEventPlants = []
-            calendarAddEventPresentationTask = nil
-        }
+        guard isCalendarAddEventPresented else { return }
+        isCalendarAddEventPresented = false
+    }
+
+    func completeCalendarAddEventDismissal() {
+        calendarAddEventPlants = []
     }
 
     func scheduleGrowthOnboardingIfNeeded() {

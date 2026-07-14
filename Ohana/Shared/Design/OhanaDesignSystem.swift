@@ -322,17 +322,8 @@ struct OhanaSheetPageScaffold<Leading: View, Trailing: View, Content: View, Floa
     @ViewBuilder let floating: () -> Floating
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            OhanaAppBackground()
-                .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                fixedHeader
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .padding(.bottom, 10)
-                    .zIndex(2)
-
+        NavigationStack {
+            ZStack(alignment: .bottomTrailing) {
                 ScrollView(showsIndicators: false) {
                     content()
                         .padding(.horizontal, 16)
@@ -341,52 +332,37 @@ struct OhanaSheetPageScaffold<Leading: View, Trailing: View, Content: View, Floa
                 }
                 .scrollBounceBehavior(.always, axes: .vertical)
                 .scrollDismissesKeyboard(.interactively)
+
+                floating()
+                    .padding(.trailing, 18)
+                    .padding(.bottom, 24)
             }
-
-            floating()
-                .padding(.trailing, 18)
-                .padding(.bottom, 24)
-        }
-        .toolbar(.hidden, for: .navigationBar)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var fixedHeader: some View {
-        HStack(spacing: 12) {
-            leading()
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-
-                if let subtitle, !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+            .background(OhanaAppBackground())
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .cancellationAction) {
+                    if showsCloseButton {
+                        Button(role: .cancel, action: onClose) {
+                            Label(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
+                        }
+                        .accessibilityIdentifier("ohana-sheet-close-action")
+                    }
+                    leading()
                 }
-            }
-
-            Spacer(minLength: 8)
-            trailing()
-
-            if showsCloseButton {
-                Button(action: onClose) {
-                    Image(systemName: "xmark") // a11y: allow parent Button owns the localized close label and stable identifier.
-                        .font(OhanaFont.body(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                ToolbarItem(placement: .principal) {
+                    if let subtitle, !subtitle.isEmpty {
+                        VStack(spacing: 1) {
+                            Text(title)
+                            Text(subtitle)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary) // native-ui: allow system toolbar subtitle follows platform contrast
+                        }
+                    }
                 }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
-                .accessibilityIdentifier("ohana-sheet-close-action")
+                ToolbarItemGroup(placement: .primaryAction) {
+                    trailing()
+                }
             }
         }
     }
@@ -408,9 +384,6 @@ struct OhanaSheetWrapper<Content: View>: View {
             },
             floating: { EmptyView() }
         )
-        .presentationBackground {
-            Color.clear
-        }
     }
 }
 
@@ -422,13 +395,10 @@ extension View {
     /// the host sheet behavior consistent across entry points.
     func ohanaSheetPagePresentation(
         detents: Set<PresentationDetent> = OhanaSheetDetents.full,
-        cornerRadius: CGFloat = OhanaRadius.sheetPage
+        cornerRadius _: CGFloat = OhanaRadius.sheetPage
     ) -> some View {
         self
             .presentationDetents(detents)
-            .presentationDragIndicator(.hidden)
-            .presentationCornerRadius(cornerRadius)
-            .presentationBackground(Color.clear)
             .presentationContentInteraction(.scrolls)
     }
 
@@ -436,13 +406,10 @@ extension View {
     /// still system sheets rather than inline popups.
     func ohanaCompactSheetPresentation(
         detents: Set<PresentationDetent>,
-        cornerRadius: CGFloat = OhanaRadius.sheetCompact
+        cornerRadius _: CGFloat = OhanaRadius.sheetCompact
     ) -> some View {
         self
             .presentationDetents(detents)
-            .presentationDragIndicator(.hidden)
-            .presentationCornerRadius(cornerRadius)
-            .presentationBackground(Color.clear)
     }
 }
 

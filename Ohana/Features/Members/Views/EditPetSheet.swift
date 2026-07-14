@@ -26,7 +26,7 @@ struct EditPetContentSheet: View {
     @State private var avatarEmoji = ""
     @State private var birthday = Date()
     @State private var hasBirthday = false
-    @State private var gender = "unknown"
+    @State private var gender = ""
     @State private var isNeutered = false
     @State private var microchipID = ""
     @State private var vetContact = ""
@@ -37,6 +37,7 @@ struct EditPetContentSheet: View {
     @State private var dailyPortionGrams: Double = 0
     @State private var notes = ""
     @State private var themeColorHex = ""
+    @State private var primaryPersonalityTagID = ""
     private var l: L10n { L10n(appLanguage) }
 
     /// 全岛重名检查（忽略大小写/空格，排除自身原名）
@@ -60,10 +61,21 @@ struct EditPetContentSheet: View {
                         formField(l.tr(zh: "品种", en: "Breed", de: "Rasse"), text: $breed)
                         formField(l.tr(zh: "头像 Emoji", en: "Avatar emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
 
+                        Picker(l.tr(zh: "主性格", en: "Primary vibe", de: "Hauptcharakter"), selection: $primaryPersonalityTagID) {
+                            if primaryPersonalityTagID.isEmpty {
+                                Text(l.tr(zh: "请选择", en: "Choose", de: "Auswählen")).tag("")
+                            }
+                            ForEach(primaryPersonalityOptionIDs, id: \.self) { id in
+                                Text(PetPersonalityTag.displayTitle(for: id, l: l)).tag(id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(Color.goPrimary)
+                        .accessibilityIdentifier("edit-pet-primary-personality-picker")
+
                         Picker(l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), selection: $gender) {
-                            Text(l.tr(zh: "♂ 男孩", en: "♂ Boy", de: "♂ Junge")).tag("male")
-                            Text(l.tr(zh: "♀ 女孩", en: "♀ Girl", de: "♀ Mädchen")).tag("female")
-                            Text(l.tr(zh: "未知", en: "Unknown", de: "Unbekannt")).tag("unknown")
+                            Text(l.tr(zh: "♂ 男孩", en: "♂ Boy", de: "♂ Junge")).tag("boy")
+                            Text(l.tr(zh: "♀ 女孩", en: "♀ Girl", de: "♀ Mädchen")).tag("girl")
                         }
                         .pickerStyle(.segmented)
 
@@ -173,6 +185,7 @@ struct EditPetContentSheet: View {
                         .background(Color.goPrimary, in: Capsule())
                 }
                 .padding(.top, 8)
+                .disabled(Pet.canonicalSex(gender) == nil)
             }
             .padding(.vertical, 16)
         }
@@ -250,7 +263,7 @@ struct EditPetContentSheet: View {
         avatarEmoji = pet.avatarEmoji
         birthday = pet.birthday ?? Date()
         hasBirthday = pet.birthday != nil
-        gender = pet.gender
+        gender = Pet.canonicalSex(pet.gender) ?? ""
         isNeutered = pet.isNeutered
         microchipID = pet.microchipID
         vetContact = pet.vetContact
@@ -261,6 +274,7 @@ struct EditPetContentSheet: View {
         dailyPortionGrams = pet.dailyPortionGrams
         notes = pet.notes
         themeColorHex = pet.themeColorHex
+        primaryPersonalityTagID = pet.personalityTagIdList.first ?? ""
     }
 
     private func save() {
@@ -282,7 +296,13 @@ struct EditPetContentSheet: View {
             birthCountry: birthCountry,
             birthCity: birthCity,
             foodBrand: foodBrand,
-            dailyPortionGrams: dailyPortionGrams
+            dailyPortionGrams: dailyPortionGrams,
+            personalityTagIDs: primaryPersonalityTagID.isEmpty
+                ? nil
+                : PetPrimaryPersonalitySelection.replacingPrimary(
+                    in: pet.personalityTagIdList,
+                    with: primaryPersonalityTagID
+                )
         )
         commandQueue.enqueue(.memberProfile(entityID: pet.id, kind: EntityKind.pet.rawValue)) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).updatePetProfile(
@@ -297,5 +317,14 @@ struct EditPetContentSheet: View {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
         }
+    }
+
+    private var primaryPersonalityOptionIDs: [String] {
+        var ids = PetPersonalityTag.primaryChoices.map(\.id)
+        if !primaryPersonalityTagID.isEmpty,
+           !ids.contains(primaryPersonalityTagID) {
+            ids.insert(primaryPersonalityTagID, at: 0)
+        }
+        return ids
     }
 }

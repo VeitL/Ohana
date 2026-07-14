@@ -127,9 +127,8 @@ struct IslandWeightDashboardContentView: View {
         return isHuman ? humanColor : petColorFallback
     }
 
-    // 只显示 shouldShowOnHome 的人类
     private var visibleHumans: [Human] {
-        humans.filter(\.shouldShowOnHome)
+        humans.filter { !$0.hasPassedAway }
     }
 
     private var visiblePets: [Pet] {

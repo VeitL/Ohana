@@ -153,11 +153,7 @@ struct PlantCareLogSheet: View {
                 plantCareSheetHero
                 careTypePicker
                 compactSaveNotice
-                advancedOptionsToggle
-                if showsAdvancedOptions {
-                    advancedOptionsSection
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
+                advancedOptionsDisclosure
                 saveButton
             }
             .padding(.top, 18)
@@ -276,19 +272,11 @@ struct PlantCareLogSheet: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private var advancedOptionsToggle: some View {
-        Button {
-            withAnimation(GoMotion.feedback) {
-                showsAdvancedOptions.toggle()
-            }
-            UISelectionFeedbackGenerator().selectionChanged()
+    private var advancedOptionsDisclosure: some View {
+        DisclosureGroup(isExpanded: $showsAdvancedOptions) {
+            advancedOptionsSection
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: "slider.horizontal.3") // a11y: allow decorative options glyph; button text names the action.
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
-                    .foregroundStyle(tint)
-                    .frame(width: 28, height: 28) // a11y: allow visual glyph frame; button text names the action.
-                    .accessibilityHidden(true)
                 Text(l.tr(zh: "更多记录选项", en: "More log options", de: "Mehr Eintragsoptionen"))
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -298,17 +286,11 @@ struct PlantCareLogSheet: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
-                Image(systemName: "chevron.down") // a11y: allow decorative disclosure glyph; button value exposes expanded state.
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-                    .rotationEffect(.degrees(showsAdvancedOptions ? 180 : 0))
-                    .accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity, minHeight: 48)
             .padding(.horizontal, 12)
             .plantCareLogFlatBlockSurface(cornerRadius: OhanaRadius.control)
         }
-        .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(l.tr(zh: showsAdvancedOptions ? "收起更多记录选项" : "展开更多记录选项", en: showsAdvancedOptions ? "Collapse more log options" : "Expand more log options", de: showsAdvancedOptions ? "Mehr Optionen einklappen" : "Mehr Optionen ausklappen"))
         .accessibilityValue(showsAdvancedOptions ? l.tr(zh: "已展开", en: "Expanded", de: "Geöffnet") : l.tr(zh: "已收起", en: "Collapsed", de: "Geschlossen"))
         .accessibilityIdentifier("plant-care-log-advanced-toggle")

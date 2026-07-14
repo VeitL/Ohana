@@ -13,7 +13,6 @@ enum PetAvatarAssetCatalog {
         let coatSlug: String
         let coatHex: String
         let coatAliases: Set<String>
-        let eyeName: String = "黑色"
 
         init(coatName: String, coatSlug: String, coatHex: String, coatAliases: [String] = []) {
             self.coatName = coatName
@@ -1047,22 +1046,13 @@ enum PetAvatarAssetCatalog {
         }
     }
 
-    static func eyeColors(species: String, breed: String, coatColor: String) -> [EyeColor]? {
-        guard let appearances = breedAppearances(
-            speciesSlug: normalizedSpecies(species),
-            breedSlug: normalizedBreed(breed)
-        ),
-            coatColor == "自定义" || appearances.contains(where: { $0.matches(coatColor: coatColor) }) else { return nil }
-        return [EyeColor(name: "黑色", hex: "111111")]
-    }
-
     static func defaultAppearance(species: String, breed: String) -> Appearance? {
         breedAppearances(speciesSlug: normalizedSpecies(species), breedSlug: normalizedBreed(breed))?.first
     }
 
-    static func avatarFilename(species: String, breed: String, gender: String, coatColor: String, eyeColor _: String) -> String? {
+    static func avatarFilename(species: String, breed: String, gender: String, coatColor: String) -> String? {
         let speciesSlug = normalizedSpecies(species)
-        let genderSlug = normalizedGender(gender)
+        guard let genderSlug = normalizedGender(gender) else { return nil }
 
         guard speciesStandardSlugs.contains(speciesSlug) else { return nil }
         let breedSlug = normalizedBreed(breed)
@@ -1086,15 +1076,15 @@ enum PetAvatarAssetCatalog {
         }
     }
 
-    static func avatarData(species: String, breed: String, gender: String, coatColor: String, eyeColor: String) -> Data? {
-        guard let filename = avatarFilename(species: species, breed: breed, gender: gender, coatColor: coatColor, eyeColor: eyeColor) else {
+    static func avatarData(species: String, breed: String, gender: String, coatColor: String) -> Data? {
+        guard let filename = avatarFilename(species: species, breed: breed, gender: gender, coatColor: coatColor) else {
             return nil
         }
         return avatarData(filename: filename)
     }
 
-    static func avatarURL(species: String, breed: String, gender: String, coatColor: String, eyeColor: String, bundle: Bundle = .main) -> URL? {
-        guard let filename = avatarFilename(species: species, breed: breed, gender: gender, coatColor: coatColor, eyeColor: eyeColor) else {
+    static func avatarURL(species: String, breed: String, gender: String, coatColor: String, bundle: Bundle = .main) -> URL? {
+        guard let filename = avatarFilename(species: species, breed: breed, gender: gender, coatColor: coatColor) else {
             return nil
         }
         return avatarURL(filename: filename, bundle: bundle)
@@ -1322,10 +1312,11 @@ enum PetAvatarAssetCatalog {
             .replacingOccurrences(of: " ", with: "_")
     }
 
-    private static func normalizedGender(_ value: String) -> String {
+    private static func normalizedGender(_ value: String) -> String? {
         switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "female", "girl", "女", "女孩", "母": "girl"
-        default: "boy"
+        case "male", "boy", "男", "男孩", "公": "boy"
+        default: nil
         }
     }
 }

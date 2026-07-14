@@ -74,6 +74,8 @@ struct FamilyCollaborationDashboardView: View {
     @ObservedObject var avatarPipeline = AvatarPipelineRegistry.current
     @State var petAvatarSignatures: [UUID: String] = [:]
     @State var petAvatarCacheKey = "family-collaboration-pet-avatar-empty"
+    @State var commandFailureMessage: String?
+    @State var pendingPostSheetAction: FamilyCollaborationPostSheetAction?
 
     enum TaskScope: String {
         case mine
@@ -90,6 +92,10 @@ struct FamilyCollaborationDashboardView: View {
         humans.first { $0.id.uuidString == activeHumanId } ?? humans.first
     }
 
+    var currentHumanRecordID: String {
+        currentHuman?.id.uuidString ?? ""
+    }
+
     var activeFamilyTasks: [FamilyCollaborationTask] {
         familyTasks
             .filter { !$0.isFinished }
@@ -97,12 +103,12 @@ struct FamilyCollaborationDashboardView: View {
     }
 
     var assignedFamilyTasks: [FamilyCollaborationTask] {
-        guard !activeHumanId.isEmpty else { return [] }
+        guard !currentHumanRecordID.isEmpty else { return [] }
         return activeFamilyTasks.filter { task in
             if task.status == .pendingReview {
-                return task.createdById == activeHumanId
+                return task.createdById == currentHumanRecordID
             }
-            return task.assignedToId == activeHumanId || task.claimedById == activeHumanId
+            return task.assignedToId == currentHumanRecordID || task.claimedById == currentHumanRecordID
         }
     }
 
@@ -138,11 +144,11 @@ struct FamilyCollaborationDashboardView: View {
     }
 
     var todayAssignedReminders: [Reminder] {
-        guard !activeHumanId.isEmpty else { return [] }
+        guard !currentHumanRecordID.isEmpty else { return [] }
         let endOfToday = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())) ?? Date()
         return pendingReminders.filter { reminder in
             guard let event = reminder.event,
-                  MemberLifecycleActiveScheduleResolver.eventAssignedToHuman(event, humanId: activeHumanId),
+                  MemberLifecycleActiveScheduleResolver.eventAssignedToHuman(event, humanId: currentHumanRecordID),
                   reminder.scheduledAt < endOfToday else { return false }
             return isActivePetEvent(event)
         }
@@ -186,21 +192,21 @@ struct FamilyCollaborationDashboardView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 14) {
-                    mapHeader
-                    petMapSurface
-                    taskDrawer
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 88)
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 14) {
+                householdCollaborationHeader
+                householdTaskSummary
+                householdUnassignedCare
+                householdTaskList
+                householdSecondaryActions
             }
-
-            if let activeEditor {
-                inlineTaskEditorOverlay(activeEditor)
-                    .zIndex(20)
-            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 88)
+        }
+        .sheet(item: $activeEditor, onDismiss: {
+            onEditorVisibilityChanged(false)
+        }) { route in
+            nativeTaskEditorSheet(route)
         }
         .onAppear {
             scheduleLegacyBountySync()
@@ -213,11 +219,7 @@ struct FamilyCollaborationDashboardView: View {
         }
         .onDisappear {
             legacyBountySyncTask?.cancel()
-            avatarPipeline.cancel(key: petAvatarCacheKey)
             onEditorVisibilityChanged(false)
-        }
-        .task(id: petAvatarSourceKey) {
-            await preparePetAvatars()
         }
         .onChange(of: legacyBountySyncToken) { _, _ in
             scheduleLegacyBountySync()
@@ -229,9 +231,21 @@ struct FamilyCollaborationDashboardView: View {
         .familyCollaborationPresentations(
             sheetRoute: $activeSheetRoute,
             title: l.tr(zh: "更多协作", en: "More collaboration", de: "Mehr Zusammenarbeit"),
-            doneTitle: l.tr(zh: "完成", en: "Done", de: "Fertig")
+            doneTitle: l.tr(zh: "完成", en: "Done", de: "Fertig"),
+            onDismiss: performPendingPostSheetAction
         ) {
             moreCollaborationContent
+        }
+        .alert(
+            l.tr(zh: "操作未完成", en: "Could not complete", de: "Aktion nicht abgeschlossen"),
+            isPresented: Binding(
+                get: { commandFailureMessage != nil },
+                set: { if !$0 { commandFailureMessage = nil } }
+            )
+        ) {
+            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {}
+        } message: {
+            Text(commandFailureMessage ?? "")
         }
         .interactiveDismissDisabled(activeEditor != nil)
     }

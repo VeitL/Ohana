@@ -16,14 +16,13 @@ struct CrewRosterOverlayRouteContainer: View {
     var onClose: (() -> Void)?
     var hideToolbar: Bool = false
     var searchTrigger: Bool = false
-    var addMemberTrigger: Bool = false
     var safeTopInset: CGFloat = 0
     var safeBottomInset: CGFloat = 0
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     var body: some View {
         CrewRosterOverlay(
-            initialMode: OnlineFeatureGate.allows(.onlineCollaboration) ? initialMode : .members,
+            initialMode: initialMode,
             pets: routeData.pets,
             humans: routeData.humans,
             plants: [],
@@ -39,7 +38,6 @@ struct CrewRosterOverlayRouteContainer: View {
             onClose: onClose,
             hideToolbar: hideToolbar,
             searchTrigger: searchTrigger,
-            addMemberTrigger: addMemberTrigger,
             safeTopInset: safeTopInset,
             safeBottomInset: safeBottomInset,
             onPresentCoconutLog: onPresentCoconutLog
@@ -67,6 +65,9 @@ struct CrewRosterOverlayRouteContainer: View {
 }
 
 private struct CrewRosterRouteData {
+    private static let pendingReminderFetchLimit = 80
+    private static let activeFamilyTaskFetchLimit = 120
+
     var pets: [Pet] = []
     var humans: [Human] = []
     var pendingReminders: [Reminder] = []
@@ -76,7 +77,6 @@ private struct CrewRosterRouteData {
     var hasLoaded = false
 
     static func load(from context: ModelContext) -> CrewRosterRouteData {
-        let isCollaborationEnabled = OnlineFeatureGate.allows(.onlineCollaboration)
         let pets = fetch(
             FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
             context: context,
@@ -89,28 +89,58 @@ private struct CrewRosterRouteData {
                 context: context,
                 name: "Human"
             ),
-            pendingReminders: isCollaborationEnabled ? fetch(
-                FetchDescriptor<Reminder>(
-                    predicate: #Predicate<Reminder> { $0.status == "pending" },
-                    sortBy: [SortDescriptor(\.scheduledAt)]
-                ),
+            // Same-device reward tasks are local Solo records, not online collaboration.
+            pendingReminders: fetch(
+                pendingReminderDescriptor(),
                 context: context,
                 name: "Reminder"
-            ) : [],
-            familyTasks: isCollaborationEnabled ? fetch(
-                FetchDescriptor<FamilyCollaborationTask>(
-                    sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
-                ),
+            ),
+            familyTasks: fetch(
+                activeFamilyTaskDescriptor(),
                 context: context,
                 name: "FamilyCollaborationTask"
-            ) : [],
-            careLedgerEntries: isCollaborationEnabled ? FamilyCareLedgerEntry.fetchPetEntries(
+            ),
+            careLedgerEntries: FamilyCareLedgerEntry.fetchPetEntries(
                 since: FamilyCareLedgerEntry.weekStart(),
                 context: context
-            ) : [],
+            ),
             petSummaries: CrewRosterPetSummary.load(pets: pets, context: context),
             hasLoaded: true
         )
+    }
+
+    private static func pendingReminderDescriptor() -> FetchDescriptor<Reminder> {
+        let pendingStatus = "pending"
+        var descriptor = FetchDescriptor<Reminder>(
+            predicate: #Predicate<Reminder> { reminder in
+                reminder.status == pendingStatus
+            },
+            sortBy: [
+                SortDescriptor(\.scheduledAt),
+                SortDescriptor(\.id)
+            ]
+        )
+        descriptor.fetchLimit = pendingReminderFetchLimit
+        return descriptor
+    }
+
+    private static func activeFamilyTaskDescriptor() -> FetchDescriptor<FamilyCollaborationTask> {
+        let activeStatus = FamilyCollaborationTaskStatus.active.rawValue
+        let claimedStatus = FamilyCollaborationTaskStatus.claimed.rawValue
+        let pendingReviewStatus = FamilyCollaborationTaskStatus.pendingReview.rawValue
+        var descriptor = FetchDescriptor<FamilyCollaborationTask>(
+            predicate: #Predicate<FamilyCollaborationTask> { task in
+                task.statusRaw == activeStatus ||
+                    task.statusRaw == claimedStatus ||
+                    task.statusRaw == pendingReviewStatus
+            },
+            sortBy: [
+                SortDescriptor(\.updatedAt, order: .reverse),
+                SortDescriptor(\.id)
+            ]
+        )
+        descriptor.fetchLimit = activeFamilyTaskFetchLimit
+        return descriptor
     }
 
     private static func fetch<T: PersistentModel>(

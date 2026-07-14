@@ -46,8 +46,8 @@ struct AppRouteCoordinatorTests {
         let fullScreenPolicy = AppPresentationPolicyProvider.policy(
             for: AppFullScreenRoute.walk(petID: petID)
         )
-        let overlayPolicy = AppPresentationPolicyProvider.policy(
-            for: AppOverlayRoute.quickMoment(petID: petID)
+        let quickEntryPolicy = AppPresentationPolicyProvider.policy(
+            for: AppSheetRoute.petMomentQuick(petID)
         )
 
         #expect(pushPolicy.surface == .navigationPush)
@@ -58,8 +58,8 @@ struct AppRouteCoordinatorTests {
         #expect(accountPolicy.loading == .shellFirst(delayMS: 64))
         #expect(fullScreenPolicy.surface == .fullScreen)
         #expect(fullScreenPolicy.loading == .shellFirst(delayMS: 64))
-        #expect(overlayPolicy.surface == .inlineOverlay)
-        #expect(overlayPolicy.loading == .immediate)
+        #expect(quickEntryPolicy.surface == .compactSheet)
+        #expect(quickEntryPolicy.loading == .immediate)
     }
 
     @Test func accountSwitcherUsesGlobalSheetRoute() {
@@ -128,6 +128,18 @@ struct AppRouteCoordinatorTests {
         coordinator.presentCalendar(plantID: plantID)
 
         #expect(coordinator.sheet == .calendar(entityID: nil, humanID: nil, plantID: nil))
+    }
+
+    @Test func taskCenterUsesDedicatedGlobalSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.presentSettings()
+        coordinator.presentTaskCenter()
+
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == .taskCenter)
+        #expect(coordinator.sheet?.id == "task-center")
     }
 
     @Test func coconutShopUsesGlobalSheetRoute() {
@@ -359,15 +371,12 @@ struct AppRouteCoordinatorTests {
         coordinator.presentRequiredAccountSwitch()
         coordinator.presentCrewRoster(mode: .collaboration)
 
-        #expect(coordinator.sheet == .crewRoster(.members))
+        #expect(coordinator.sheet == .crewRoster(.collaboration))
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.overlay == nil)
         #expect(!coordinator.suppressesGlobalWalkBanner)
 
         coordinator.dismissSheet(.crewRoster(.collaboration))
-        #expect(coordinator.sheet == .crewRoster(.members))
-
-        coordinator.dismissSheet(.crewRoster(.members))
         #expect(coordinator.sheet == nil)
     }
 
@@ -399,24 +408,20 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.overlay == nil)
     }
 
-    @Test func quickMomentUsesGlobalOverlayRoute() {
+    @Test func quickMomentUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
         let petID = UUID()
 
         coordinator.presentFunctionMenu(destination: .plantsDashboard)
         coordinator.presentQuickMoment(petID: petID)
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .petMomentQuick(petID))
         #expect(coordinator.fullScreen == nil)
-        guard case let .quickMoment(_, routedPetID) = coordinator.overlay else {
-            Issue.record("Expected quick moment overlay route")
-            return
-        }
-        #expect(routedPetID == petID)
+        #expect(coordinator.overlay == nil)
         #expect(coordinator.suppressesGlobalWalkBanner)
     }
 
-    @Test func quickEntryPopupsUseGlobalOverlayRoute() {
+    @Test func quickEntriesUseGlobalSheetRoutes() {
         let coordinator = AppRouteCoordinator()
         let petID = UUID()
         let humanID = UUID()
@@ -424,79 +429,51 @@ struct AppRouteCoordinatorTests {
         coordinator.presentFunctionMenu(destination: .plantsDashboard)
         coordinator.presentPetWeightQuick(petID: petID)
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .petWeightQuick(petID))
         #expect(coordinator.fullScreen == nil)
-        guard case let .petWeightQuick(_, routedPetID) = coordinator.overlay else {
-            Issue.record("Expected pet weight quick overlay route")
-            return
-        }
-        #expect(routedPetID == petID)
+        #expect(coordinator.overlay == nil)
 
         coordinator.presentSettings()
         coordinator.presentSheet(.petExpenseQuick(petID))
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .petExpenseQuick(petID))
         #expect(coordinator.fullScreen == nil)
-        guard case let .petExpenseQuick(_, routedExpensePetID) = coordinator.overlay else {
-            Issue.record("Expected pet expense quick overlay route")
-            return
-        }
-        #expect(routedExpensePetID == petID)
+        #expect(coordinator.overlay == nil)
 
         coordinator.presentSettings()
         coordinator.presentSheet(.humanMedicationQuick(humanID))
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .humanMedicationQuick(humanID))
         #expect(coordinator.fullScreen == nil)
-        guard case let .humanMedicationQuick(_, routedMedicationHumanID) = coordinator.overlay else {
-            Issue.record("Expected human medication quick overlay route")
-            return
-        }
-        #expect(routedMedicationHumanID == humanID)
+        #expect(coordinator.overlay == nil)
 
         coordinator.presentSettings()
         coordinator.presentHumanWeightQuick(humanID: humanID)
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .humanWeightQuick(humanID))
         #expect(coordinator.fullScreen == nil)
-        guard case let .humanWeightQuick(_, routedHumanID) = coordinator.overlay else {
-            Issue.record("Expected human weight quick overlay route")
-            return
-        }
-        #expect(routedHumanID == humanID)
+        #expect(coordinator.overlay == nil)
 
         coordinator.presentSettings()
         coordinator.presentSheet(.humanWorkoutQuick(humanID))
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .humanWorkoutQuick(humanID))
         #expect(coordinator.fullScreen == nil)
-        guard case let .humanWorkoutQuick(_, routedWorkoutHumanID) = coordinator.overlay else {
-            Issue.record("Expected human workout quick overlay route")
-            return
-        }
-        #expect(routedWorkoutHumanID == humanID)
+        #expect(coordinator.overlay == nil)
 
         coordinator.presentSettings()
         coordinator.presentSheet(.humanExpenseQuick(humanID))
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .humanExpenseQuick(humanID))
         #expect(coordinator.fullScreen == nil)
-        guard case let .humanExpenseQuick(_, routedExpenseHumanID) = coordinator.overlay else {
-            Issue.record("Expected human expense quick overlay route")
-            return
-        }
-        #expect(routedExpenseHumanID == humanID)
+        #expect(coordinator.overlay == nil)
 
         coordinator.presentSettings()
         coordinator.presentSheet(.humanNoteQuick(humanID))
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .humanNoteQuick(humanID))
         #expect(coordinator.fullScreen == nil)
-        guard case let .humanNoteQuick(_, routedNoteHumanID) = coordinator.overlay else {
-            Issue.record("Expected human note quick overlay route")
-            return
-        }
-        #expect(routedNoteHumanID == humanID)
+        #expect(coordinator.overlay == nil)
         #expect(coordinator.suppressesGlobalWalkBanner)
     }
 

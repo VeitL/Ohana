@@ -41,9 +41,9 @@ in-app member-privacy/PIN rules in `docs/app-architecture-governance.md`.
   they override the localized strings. Draft review copy and in-app rationale
   live in `docs/permission-rationale-draft.md`.
 - **No unused permissions/capabilities:** Do not declare a permission, entitlement,
-  or background mode that the code does not actually use (e.g., HealthKit strings
-  with no HealthKit integration). The Solo profile keeps CloudDocuments for the
-  restricted iCloud Drive backup, and declares no APNs entitlement,
+  or background mode that the code does not actually use. The Solo profile keeps
+  CloudDocuments for the restricted iCloud Drive backup and HealthKit for the
+  read-only Human Workout view. It declares no Sign in with Apple, APNs,
   `remote-notification` background mode, CloudKit sharing service, or App Group.
   Remove or implement any future mismatch.
 - **Encryption export compliance:** Set `ITSAppUsesNonExemptEncryption`
@@ -58,8 +58,8 @@ Even though data is local, the user has rights over it:
   `DataBackupManager.exportJSON` (atomic, file-protected) satisfies portability;
   surface it as a clear user-facing "export my data" action.
 - **Right to erasure:** Provide a clear, complete "delete all my data" path that
-  removes the SwiftData primary store, any legacy `ohana_disk_fallback` files, local
-  attachment/cache directories, app-managed iCloud backups, and relevant
+  removes the SwiftData primary store, any legacy `ohana_disk_fallback` files,
+  local attachment/cache directories, app-managed iCloud backups, and relevant
   `UserDefaults`. Verify nothing sensitive survives a reset
   (see `AppResetService` and `scripts/audit-release-data-safety.sh`).
 - **OS backup exclusion:** `LocalBackupExclusionPolicy` marks the local
@@ -76,12 +76,15 @@ Even though data is local, the user has rights over it:
   health data, keep the age rating and data-handling claims consistent with the
   store listing.
 
-## Memorial / Account Edge Cases
+## Memorial / Local Member Edge Cases
 
 - Deceased pet/human enters read-only memorial mode; future reminders and daily
   tasks must stop (enforced in services, not just UI).
 - Member privacy (`PrivacyService`) cannot be bypassed via quick actions, all-
   features, stats, collaboration, or Today Focus.
+- Human profiles are local content records, not authenticated operators. A
+  member name is required when explicitly creating a Human; gender and birthday
+  remain optional and are never inferred from the device's Apple account.
 
 ## Release Checklist (privacy slice)
 
@@ -98,3 +101,6 @@ Before shipping a change that touches data, permissions, or background work:
   pass, followed by a real-device encrypted-backup/restore check before release.
 - Diagnostics still privacy-safe.
 - Background location only during a running walk.
+- Any future account/backend work first satisfies
+  `docs/planning/account-backend-extension.md`; that planning document does not
+  authorize a capability or data-collection change.

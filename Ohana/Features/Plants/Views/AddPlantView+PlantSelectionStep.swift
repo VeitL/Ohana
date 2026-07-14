@@ -24,7 +24,6 @@ extension AddPlantView {
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                     plantSelectionCatalogList
-                    catalogSearchField
                 }
             }
 
@@ -49,6 +48,15 @@ extension AddPlantView {
         .overlay(alignment: .topLeading) {
             PlantCreationAccessibilityMarker(identifier: "add-plant-step-plant-room")
         }
+        .searchable(
+            text: $catalogQuery,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: Text(l.tr(
+                zh: "搜索绿萝、Monstera、吊兰…",
+                en: "Search pothos, Monstera, spider plant...",
+                de: "Efeutute, Monstera, Grünlilie suchen..."
+            ))
+        )
     }
 
     func selectedPlantSummaryCard(_ entry: PlantCatalogEntry) -> some View {

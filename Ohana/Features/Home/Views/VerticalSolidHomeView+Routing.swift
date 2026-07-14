@@ -8,7 +8,6 @@ import SwiftUI
 
 extension VerticalSolidHomeView {
     func bindHomeAppRouteSink() {
-        routeCoordinator.preferLocalHumanQuickOverlays()
         routeCoordinator.bindAppRouteSink { route in
             switch route {
             case let .petProfile(id, initialTab):
@@ -42,21 +41,21 @@ extension VerticalSolidHomeView {
         routeCoordinator.bindAppOverlayRouteSink { route in
             switch route {
             case let .quickMoment(petID):
-                onPresentQuickMoment(petID)
+                onPresentAppSheet(.petMomentQuick(petID))
             case let .petWeightQuick(petID):
-                onPresentPetWeightQuick(petID)
+                onPresentAppSheet(.petWeightQuick(petID))
             case let .petExpenseQuick(petID):
                 onPresentAppSheet(.petExpenseQuick(petID))
             case let .humanMedicationQuick(humanID):
-                routeCoordinator.overlay = .humanMedicationQuick(humanID: humanID)
+                onPresentAppSheet(.humanMedicationQuick(humanID))
             case let .humanWeightQuick(humanID):
-                routeCoordinator.overlay = .humanWeightQuick(humanID: humanID)
+                onPresentAppSheet(.humanWeightQuick(humanID))
             case let .humanWorkoutQuick(humanID):
-                routeCoordinator.overlay = .humanWorkoutQuick(humanID: humanID)
+                onPresentAppSheet(.humanWorkoutQuick(humanID))
             case let .humanExpenseQuick(humanID):
-                routeCoordinator.overlay = .humanExpenseQuick(humanID: humanID)
+                onPresentAppSheet(.humanExpenseQuick(humanID))
             case let .humanNoteQuick(humanID):
-                routeCoordinator.overlay = .humanNoteQuick(humanID: humanID)
+                onPresentAppSheet(.humanNoteQuick(humanID))
             }
         }
     }
@@ -109,24 +108,13 @@ extension VerticalSolidHomeView {
         }
         guard controller.selectedTab != tab else { return }
         OhanaFeedback.selection()
-        closeVerticalFabMenu(immediate: true)
         if tab == .oasis {
             starterOasisTabPromptPending = false
         }
         if tab == .calendar {
             prepareEmbeddedCalendarFilterForCurrentContext()
-            resetCalendarBottomChromeForTabSelection()
         }
         controller.select(tab)
-    }
-
-    func resetCalendarBottomChromeForTabSelection() {
-        guard calendarBottomChromeHidden else { return }
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            calendarBottomChromeHidden = false
-        }
     }
 
     func prepareEmbeddedCalendarFilterForCurrentContext() {
@@ -152,11 +140,10 @@ extension VerticalSolidHomeView {
         )
     }
 
-    func centerAction() {
-        OhanaFeedback.light()
+    func performHomeToolbarPrimaryAction() {
         switch controller.selectedTab {
         case .home:
-            openFunctionMenu(destination: nil)
+            openFunctionMenu(destination: .petFeatureCollection)
         case .calendar:
             openCalendarAddEvent(plants: embeddedCalendarPlants)
         case .oasis:
@@ -166,16 +153,29 @@ extension VerticalSolidHomeView {
         }
     }
 
-    func updateCalendarBottomChromeVisibility(_ scrollOffset: CGFloat) {
-        guard controller.selectedTab == .calendar else { return }
-        guard controller.outgoingTab == nil else { return }
-        let next = VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome(
-            scrollOffset: scrollOffset,
-            currentHidden: calendarBottomChromeHidden
-        )
-        guard next != calendarBottomChromeHidden else { return }
-        withAnimation(canAnimate ? GoMotion.quick : GoMotion.reduced) {
-            calendarBottomChromeHidden = next
+    var homeToolbarPrimaryActionIcon: String {
+        switch controller.selectedTab {
+        case .home:
+            "chart.bar.xaxis"
+        case .calendar:
+            "plus"
+        case .oasis:
+            "bolt.fill"
+        case .plants:
+            "ellipsis.circle"
+        }
+    }
+
+    var homeToolbarPrimaryActionAccessibilityLabel: String {
+        switch controller.selectedTab {
+        case .home:
+            return l.tr(zh: "查看家庭数据", en: "View family data", de: "Familiendaten anzeigen")
+        case .calendar:
+            return l.tr(zh: "添加待办", en: "Add task", de: "Aufgabe hinzufügen")
+        case .oasis:
+            return l.tr(zh: "注入能量", en: "Inject energy", de: "Energie einspeisen")
+        case .plants:
+            return l.tr(zh: "植物操作", en: "Plant actions", de: "Pflanzenaktionen")
         }
     }
 }

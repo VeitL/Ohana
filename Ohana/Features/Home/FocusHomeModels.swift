@@ -46,7 +46,6 @@ nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
     var humanGender: String?
     var petSpecies: String?
     var coatColor: Color = .init(hex: "E8C49A")
-    var eyeColor: Color = .init(hex: "6B3A2A")
     var patternName: String?
     var themeColorHex: String = ""
     var daysTogether: Int = 0
@@ -332,7 +331,6 @@ extension FocusCard {
             cardPopoutSourceRaw: pet.cardPopoutSourceRaw ?? "",
             petSpecies: pet.species,
             coatColor: WalletPetCardTheme.silhouetteCoatColor(for: pet),
-            eyeColor: WalletPetCardTheme.silhouetteEyeColor(for: pet),
             patternName: WalletPetCardTheme.coatPatternName(for: pet),
             themeColorHex: hex,
             daysTogether: pet.homeDate == nil ? 0 : togetherDays,
@@ -437,7 +435,7 @@ extension FocusCard {
     nonisolated static let dummies: [FocusCard] = [
         FocusCard(id: UUID(), name: "Mochi", kind: "DOG", emoji: "🐶",
                   color: Color(hex: "F4A7B9"), streak: 7, coconutBalance: 42,
-                  petSpecies: "狗", coatColor: Color(hex: "D7A76D"), eyeColor: Color(hex: "57341E"),
+                  petSpecies: "狗", coatColor: Color(hex: "D7A76D"),
                   isDummy: true,
                   actions: [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44"),
                             .init(label: "WALK", icon: "figure.walk", colorHex: "14B8A6"),
@@ -446,7 +444,7 @@ extension FocusCard {
 
         FocusCard(id: UUID(), name: "Luna", kind: "CAT", emoji: "🐱",
                   color: Color(hex: "C9B6E4"), streak: 12, coconutBalance: 66,
-                  petSpecies: "猫", coatColor: Color(hex: "9CA7B2"), eyeColor: Color(hex: "7A4E20"),
+                  petSpecies: "猫", coatColor: Color(hex: "9CA7B2"),
                   isDummy: true,
                   actions: [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44"),
                             .init(label: "WATER", icon: "drop", colorHex: "00D4AA"),

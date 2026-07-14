@@ -129,8 +129,6 @@ struct PetRetentionHubView: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $pdfShare) { share in
                 PetVetPDFShareSheet(pdfURL: share.url, pet: pet)
-                    // ui-v4: allow PDF share uses document preview sheet
-                    .presentationBackground(.clear)
             }
         }
         .petMemorialTone(isActive: pet.hasPassedAway)

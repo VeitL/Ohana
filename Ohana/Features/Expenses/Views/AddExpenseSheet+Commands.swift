@@ -106,13 +106,7 @@ extension AddExpenseSheetContent {
         if let onDismiss {
             guard !isClosing else { return }
             isClosing = true
-            withAnimation(popupAnimation) {
-                popupVisible = false
-                popupDragOffset = 0
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
-                onDismiss()
-            }
+            onDismiss()
         } else {
             dismiss()
         }

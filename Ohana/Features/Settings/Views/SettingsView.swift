@@ -20,8 +20,6 @@ struct SettingsView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.colorScheme) var colorScheme
     @Environment(AppServices.self) var appServices
-    @Environment(\.ohanaInlinePageSafeAreaInsets) var inlinePageSafeAreaInsets
-    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     @AppStorage("appLanguage") var appLanguage = "zh"
     @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) var appMeasurementSystem = AppMeasurementSystem.fallbackCode
@@ -137,23 +135,18 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                OhanaStaticAppBackground()
-
-                ScrollView {
-                    VStack(spacing: 14) {
-                        settingsBodySections
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, max(10, inlinePageSafeAreaInsets.top + 10))
-                    .padding(.bottom, inlinePageSafeAreaInsets.bottom)
-                }
-                .accessibilityIdentifier("settings-main-scroll")
+            Form {
+                settingsBodySections
             }
-            .navigationTitle("")
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .background(OhanaStaticAppBackground())
+            .accessibilityIdentifier("settings-main-scroll")
+            .navigationTitle(l.tr(zh: "设置", en: "Settings", de: "Einstellungen"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar(.hidden, for: .navigationBar)
+            .toolbar {
+                settingsToolbarContent
+            }
         }
         .preferredColorScheme(preferredScheme)
         .accessibilityIdentifier("settings-screen")

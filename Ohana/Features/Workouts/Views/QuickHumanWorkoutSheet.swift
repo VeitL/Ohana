@@ -22,6 +22,7 @@ struct QuickHumanWorkoutSheet: View {
     var onDismiss: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
@@ -45,98 +46,49 @@ struct QuickHumanWorkoutSheet: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let minPanelHeight: CGFloat = 430
-            let maxPanelHeight = max(minPanelHeight, proxy.size.height * 0.86)
-            let scrollMaxHeight = max(250, maxPanelHeight - 142)
-            let measuredHeight = contentHeight > 1 ? contentHeight : 320
-            let scrollHeight = min(measuredHeight, scrollMaxHeight)
-            let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, minPanelHeight))
-            let hiddenOffset = panelHeightEstimate + 72
-
-            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: popupVisible) {
-                popupBackdrop
-                    .opacity(popupVisible ? 1 : 0)
-
-                VStack(spacing: 0) {
-                    popupDragHandle
-                        .padding(.top, 4)
-                    header
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 14) {
-                            typeGrid
-                            durationBlock
-                            EmbeddedDecimalKeypad(
-                                text: $durationText,
-                                countryCode: appCountry,
-                                maxFractionDigits: 0,
-                                accent: accent,
-                                isMini: true,
-                                showsSubmitButton: false,
-                                onSubmit: {
-                                    if canSave { save() }
-                                }
-                            )
-                            .padding(.horizontal, 22)
-                            quickDurationStrip
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 14) {
+                    Text(human.name)
+                        .font(OhanaFont.subheadline(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                    typeGrid
+                    durationBlock
+                    EmbeddedDecimalKeypad(
+                        text: $durationText,
+                        countryCode: appCountry,
+                        maxFractionDigits: 0,
+                        accent: accent,
+                        isMini: true,
+                        showsSubmitButton: false,
+                        onSubmit: {
+                            if canSave { save() }
                         }
-                        .padding(.bottom, 10)
-                        .background {
-                            GeometryReader { contentProxy in
-                                Color.clear
-                                    .preference(key: QuickHumanWorkoutHeightKey.self, value: contentProxy.size.height)
-                            }
-                        }
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .frame(height: scrollHeight)
-
-                    saveBar
+                    )
+                    .padding(.horizontal, 22)
+                    quickDurationStrip
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
-                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
-                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow short popup liftedAlert shadow token
-                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow short popup liftedAlert shadow token
-                .padding(.horizontal, 6)
-                .padding(.bottom, 8)
-                .offset(y: popupVisible ? popupDragOffset : hiddenOffset)
-                .frame(maxHeight: maxPanelHeight, alignment: .bottom)
-                .ohanaAdaptiveSheetContentHeight(
-                    $adaptiveSheetHeight,
-                    minHeight: minPanelHeight,
-                    maxHeight: maxPanelHeight,
-                    chromePadding: 18
-                )
+                .padding(.vertical, 12)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle(l.tr(zh: "快速运动", en: "Quick Workout", de: "Schnelles Training"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, role: .cancel) { close() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
+                        .disabled(!canSave || isSaving)
+                }
             }
         }
-        .allowsHitTesting(popupVisible && !isClosing)
-        .animation(popupAnimation, value: popupVisible)
-        .presentationBackground(.clear)
-        .presentationDetents([.height(adaptiveSheetHeight)])
-        .presentationDragIndicator(.hidden)
+        .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
-        .onAppear {
-            popupVisible = false
-            isClosing = false
-            DispatchQueue.main.async {
-                withAnimation(popupAnimation) {
-                    popupVisible = true
-                }
-            }
-        }
         .onChange(of: durationText) { _, newValue in
             let sanitized = CountryDecimalInput.sanitize(newValue, countryCode: appCountry, maxFractionDigits: 0)
             if sanitized != newValue {
                 durationText = sanitized
-            }
-        }
-        .onPreferenceChange(QuickHumanWorkoutHeightKey.self) { height in
-            guard height.isFinite, height > 0 else { return }
-            var transaction = Transaction()
-            transaction.animation = nil
-            withTransaction(transaction) {
-                contentHeight = height
             }
         }
         .onDisappear {
@@ -298,12 +250,10 @@ struct QuickHumanWorkoutSheet: View {
     private func close() {
         guard !isClosing else { return }
         isClosing = true
-        withAnimation(popupAnimation) {
-            popupVisible = false
-            popupDragOffset = 0
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            onDismiss?()
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
         }
     }
 

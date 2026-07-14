@@ -223,6 +223,4 @@ extension HumanDetailView {
         .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
     }
-
-    // MARK: - Show On Home Card
 }

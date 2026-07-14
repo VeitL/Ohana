@@ -136,7 +136,7 @@ struct OhanaInlinePageRouteHost<Content: View>: View {
     @State private var closeTask: Task<Void, Never>?
 
     var body: some View {
-        OhanaDeferredInlinePageCover(
+        OhanaDeferredInlinePageCover( // native-ui: allow compatibility shim implementation; production routes must not call this host
             progress: presentationProgress,
             isContentMounted: isContentMounted,
             reservesSafeArea: reservesSafeArea,

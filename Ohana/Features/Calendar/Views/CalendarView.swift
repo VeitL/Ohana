@@ -40,8 +40,6 @@ struct CalendarView: View {
     @AppStorage("calendar_filterHumanId") var calendarFilterHumanId: String = ""
     @AppStorage("calendar_filterPlantId") var calendarFilterPlantId: String = ""
     @State var showingAddEvent = false
-    @State var addEventPresentationProgress: CGFloat = 0
-    @State var isAddEventContentMounted = false
     @AppStorage("currentActiveHumanId") var activeHumanIdStr = ""
     @AppStorage("calendar_viewMode") var viewModeRaw: String = CalendarViewMode.list.rawValue
     @State var displayedViewModeRaw: String?
@@ -66,8 +64,6 @@ struct CalendarView: View {
     @State var filterStorageCommitTask: Task<Void, Never>?
     @State var calendarMaintenanceTask: Task<Void, Never>?
     @State var listInitialPositionTask: Task<Void, Never>?
-    @State var addEventPresentationTask: Task<Void, Never>?
-    @State var addEventContentMountTask: Task<Void, Never>?
     @State var isCalendarMainContentMounted = false
     @State var calendarMainContentMountTask: Task<Void, Never>?
     @State var preparedCalendarSnapshot = CalendarPreparedSnapshot.empty

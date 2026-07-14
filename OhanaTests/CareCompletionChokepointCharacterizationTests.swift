@@ -164,10 +164,12 @@ struct CareCompletionChokepointCharacterizationTests {
         defer { state.restore() }
         resetEconomy(activeHumanID: human.id.uuidString, humans: [human], pets: [pet])
         let wallet = WalkFactOrderAssertingWallet()
-        let questManager = QuestManager(wallet: wallet, revisions: SharedDomainRevisionPublisher())
+        let revisionCenter = ReadModelRevisionCenter()
+        let revisions = SharedDomainRevisionPublisher(center: revisionCenter)
+        let questManager = QuestManager(wallet: wallet, revisions: revisions)
         let location = FakeWalkLocationManager()
         location.totalDistance = 900
-        let manager = PetWalkingManager(locationManager: location, questManager: questManager)
+        let manager = PetWalkingManager(locationManager: location, questManager: questManager, revisions: revisions)
 
         manager.start(pet: pet)
         manager.addPoop(type: .perfectPoop)
@@ -190,6 +192,8 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(ledgers.contains { $0.eventKind == CareLedgerEventKind.potty.rawValue && $0.legacyModelId == pottyLog.id.uuidString })
         #expect(budgetEvents.contains { $0.actionKey == "walk" })
         #expect(budgetEvents.contains { $0.actionKey == "potty" })
+        #expect(revisionCenter.lastMutation?.command == .petWalkCompletion(petID: pet.id))
+        #expect(PetCareCompletionTrigger.resolve(try #require(revisionCenter.lastMutation)) == .init(petID: pet.id, kind: .walk))
     }
 
     @Test func singleWalkWritesFactsForDeceasedExecutorThroughFallbackOwner() throws {

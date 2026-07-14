@@ -28,21 +28,21 @@ extension PetBasicInfoDetailView {
                             let firstBreed = PetBreedDatabase.breeds(for: eSpecies).first
                             eBreed = firstBreed?.name ?? ""
                             eCoatColor = firstBreed?.coatColors.first?.name ?? ""
-                            eEyeColor = firstBreed?.eyeColors.first?.name ?? ""
                             if let hex = firstBreed?.suggestedThemeHex { eThemeColorHex = hex }
                         }
                 }
                 Divider().opacity(0.1)
                 optionPickerRow(l.tr(zh: "品种", en: "Breed", de: "Rasse"), selection: $eBreed, options: breedOptions)
                 Divider().opacity(0.1)
+                primaryPersonalityPickerRow
+                Divider().opacity(0.1)
                 // 性别
                 HStack {
                     editLabel(l.tr(zh: "性别", en: "Gender", de: "Geschlecht"))
                     Spacer()
                     Picker("", selection: $eGender) {
-                        Text(l.tr(zh: "♂ 男孩", en: "♂ Boy", de: "♂ Junge")).tag("male")
-                        Text(l.tr(zh: "♀ 女孩", en: "♀ Girl", de: "♀ Maedchen")).tag("female")
-                        Text(l.tr(zh: "未知", en: "Unknown", de: "Unbekannt")).tag("unknown")
+                        Text(l.tr(zh: "♂ 男孩", en: "♂ Boy", de: "♂ Junge")).tag("boy")
+                        Text(l.tr(zh: "♀ 女孩", en: "♀ Girl", de: "♀ Maedchen")).tag("girl")
                     }.pickerStyle(.segmented).frame(maxWidth: 160)
                 }
                 Divider().opacity(0.1)
@@ -67,10 +67,8 @@ extension PetBasicInfoDetailView {
                 }
             }
             // 外貌
-            editSection(title: l.tr(zh: "外貌特征", en: "Appearance", de: "Aussehen"), icon: "eye.fill", iconColor: Color.goCardCyan) {
+            editSection(title: l.tr(zh: "外貌特征", en: "Appearance", de: "Aussehen"), icon: "paintpalette.fill", iconColor: Color.goCardCyan) {
                 colorOptionGrid(title: l.tr(zh: "毛色", en: "Coat color", de: "Fellfarbe"), selection: $eCoatColor, items: coatOptions)
-                Divider().opacity(0.1)
-                colorOptionGrid(title: l.tr(zh: "眼色", en: "Eye color", de: "Augenfarbe"), selection: $eEyeColor, items: eyeOptions)
             }
             // 健康
             editSection(title: l.tr(zh: "健康与医疗", en: "Health & medical", de: "Gesundheit & Medizin"), icon: "cross.circle.fill", iconColor: Color.goRed) {
@@ -345,11 +343,6 @@ extension PetBasicInfoDetailView {
         return uniqueColorOptions(options.map { ($0.name, $0.hex) }, current: eCoatColor)
     }
 
-    var eyeOptions: [(name: String, hex: String)] {
-        let options = PetBreedDatabase.refinedEyeColors(breed: selectedBreedInfo, coatColor: eCoatColor)
-        return uniqueColorOptions(options.map { ($0.name, $0.hex) }, current: eEyeColor)
-    }
-
     var countryOptions: [String] {
         var options = [""] + PetBreedDatabase.countries
         if !eBirthCountry.isEmpty, !options.contains(eBirthCountry) {
@@ -397,6 +390,38 @@ extension PetBasicInfoDetailView {
             .pickerStyle(.menu)
             .tint(Color.goPrimary)
         }
+    }
+
+    var primaryPersonalityPickerRow: some View {
+        petProfileEditableRow(l.tr(zh: "主性格", en: "Primary vibe", de: "Hauptcharakter")) {
+            primaryPersonalityPicker
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        } stackedContent: {
+            primaryPersonalityPicker
+        }
+    }
+
+    var primaryPersonalityPicker: some View {
+        Picker("", selection: $ePrimaryPersonalityTagID) {
+            if ePrimaryPersonalityTagID.isEmpty {
+                Text(l.tr(zh: "请选择", en: "Choose", de: "Auswählen")).tag("")
+            }
+            ForEach(primaryPersonalityOptionIDs, id: \.self) { id in
+                Text(PetPersonalityTag.displayTitle(for: id, l: l)).tag(id)
+            }
+        }
+        .pickerStyle(.menu)
+        .tint(Color.goPrimary)
+        .accessibilityIdentifier("pet-basic-info-primary-personality-picker")
+    }
+
+    var primaryPersonalityOptionIDs: [String] {
+        var ids = PetPersonalityTag.primaryChoices.map(\.id)
+        if !ePrimaryPersonalityTagID.isEmpty,
+           !ids.contains(ePrimaryPersonalityTagID) {
+            ids.insert(ePrimaryPersonalityTagID, at: 0)
+        }
+        return ids
     }
 
     func localizedBreedSummary(_ breed: String) -> String {

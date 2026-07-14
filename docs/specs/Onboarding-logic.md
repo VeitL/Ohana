@@ -2,7 +2,7 @@
 
 - Status: active product behavior specification.
 - Owner: `docs/specs/product-foundation.md` D17.
-- Last verified: 2026-07-11 against the Pet-first implementation and targeted tests.
+- Last verified: 2026-07-12 against the Pet-first flow and local-only/no-account boundary.
 
 ## First-Release Promise
 
@@ -75,19 +75,21 @@ a Pet, care record, or reward transaction.
 - Repeated evaluation, relaunch, or revision events must not duplicate the Pet,
   care fact, gift ledger entry, or wallet credit.
 
-## Future Apple Or Google Sign-In
+## Deferred Account Or Cross-Platform Identity
 
-Authentication is outside the Solo first-release path. A future provider login
-must remain separate from the Human domain model:
+The current product has no Ohana login or account. Its optional iCloud Drive
+backup uses the system iCloud identity and is not app authentication. A Human
+remains a local care-content profile: name is required when explicitly creating
+one, while gender and birthday are optional.
 
-- Use the provider's stable subject identifier, never email, as account identity.
-- Provider data may prefill a proposed display name or avatar only when supplied.
-- Gender and birthday are never inferred from login and remain optional.
-- The user confirms before creating or claiming a Human profile.
-- Login must not silently merge, overwrite, or auto-claim an existing Human.
-- Account-to-Human claim and conflict rules require a separate Online/Family
-  specification before implementation. This rule does not authorize adding an
-  account schema, CloudKit capability, Google SDK, or server dependency now.
+Any future Apple/Google login or provider-neutral account must first be approved
+under `docs/planning/account-backend-extension.md`. It must not silently create,
+merge, claim, or upload a Human. That planning document preserves the future
+boundary but does not authorize an onboarding or Settings account surface now.
+If activated later, the first-run page may emphasize Apple login only while a
+clear local continuation remains available. A signed-in user explicitly confirms
+one-tap Human-card creation; optional profile decisions may earn an idempotent
+island reward, including when the user chooses Later or Prefer not to say.
 
 ## Required Proof
 
@@ -99,4 +101,5 @@ must remain separate from the Human domain model:
 - Stability: repeat the clean-install UI path ten times with relaunch isolation;
   record duration and require median <= 90 seconds.
 - Physical device remains required for final touch latency, Reduce Motion,
-  VoiceOver traversal, energy, and permission-dialog acceptance.
+  VoiceOver traversal, energy, permission-dialog acceptance, and iCloud Drive
+  backup failure/recovery behavior.

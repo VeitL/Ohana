@@ -15,6 +15,18 @@ struct FeatureHubMetric: Identifiable, Hashable {
     let value: String
 }
 
+enum FeatureHubTileAppearance: Hashable {
+    case standard
+    case orangeLight
+}
+
+struct FeatureHubSupportingMetric: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let value: String
+    let icon: String
+}
+
 struct FeatureHubTileData: Identifiable, Hashable {
     let id: String
     let title: String
@@ -23,6 +35,9 @@ struct FeatureHubTileData: Identifiable, Hashable {
     let icon: String
     let tint: Color
     var chart: FeatureHubMiniChartData?
+    var appearance: FeatureHubTileAppearance = .standard
+    var supportingMetrics: [FeatureHubSupportingMetric] = []
+    var progress: Double?
     var showsNewFeature: Bool = false
 }
 
@@ -169,7 +184,7 @@ struct FeatureHubHeader<Avatar: View>: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
             }
-            .buttonStyle(ScaleButtonStyle())
+            .ohanaGlassIconButton()
             .contentShape(Circle())
         }
     }
@@ -546,6 +561,14 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
         return [GridItem(.adaptive(minimum: 156), spacing: 10, alignment: .top)]
     }
 
+    private var prominentItems: [FeatureHubDestinationItem<Destination>] {
+        section.items.filter { $0.data.appearance != .standard }
+    }
+
+    private var regularItems: [FeatureHubDestinationItem<Destination>] {
+        section.items.filter { $0.data.appearance == .standard }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
@@ -562,26 +585,39 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
-                ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        onSelect(item.destination)
-                    } label: {
-                        if item.data.chart != nil {
-                            FeatureSummaryChartCard(data: item.data)
-                        } else {
-                            FeatureHubTile(data: item.data)
-                        }
+            ForEach(Array(prominentItems.enumerated()), id: \.element.id) { index, item in
+                destinationButton(item, index: index)
+            }
+
+            if !regularItems.isEmpty {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+                    ForEach(Array(regularItems.enumerated()), id: \.element.id) { index, item in
+                        destinationButton(item, index: prominentItems.count + index)
                     }
-                    .buttonStyle(ScaleButtonStyle())
-                    .ohanaSmoothAppear(index: index)
-                    .accessibilityIdentifier("feature-hub-\(section.id)-\(item.id)")
                 }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("feature-hub-section-\(section.id)")
+    }
+
+    private func destinationButton(
+        _ item: FeatureHubDestinationItem<Destination>,
+        index: Int
+    ) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onSelect(item.destination)
+        } label: {
+            if item.data.chart != nil {
+                FeatureSummaryChartCard(data: item.data)
+            } else {
+                FeatureHubTile(data: item.data)
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .ohanaSmoothAppear(index: index)
+        .accessibilityIdentifier("feature-hub-\(section.id)-\(item.id)")
     }
 }
 
@@ -590,7 +626,16 @@ struct FeatureSummaryChartCard: View {
 
     private var chart: FeatureHubMiniChartData? { data.chart }
 
+    @ViewBuilder
     var body: some View {
+        if data.appearance == .orangeLight {
+            OrangeLightFeatureSummaryCard(data: data)
+        } else {
+            standardCard
+        }
+    }
+
+    private var standardCard: some View {
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 11) {
                 HStack(alignment: .top, spacing: 8) {
@@ -682,6 +727,224 @@ struct FeatureSummaryChartCard: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.ohanaControlFill.opacity(0.58), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         }
+    }
+}
+
+private struct OrangeLightFeatureSummaryCard: View {
+    let data: FeatureHubTileData
+
+    private let orange = Color(hex: "FF7300")
+    private let amber = Color(hex: "FFCF64")
+    private let warmBorder = Color(hex: "FD9A31")
+
+    private var clampedProgress: CGFloat {
+        guard let progress = data.progress, progress.isFinite else { return 0 }
+        return CGFloat(min(1, max(0, progress)))
+    }
+
+    private var distanceParts: (value: String, unit: String) {
+        let raw = data.value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard raw.lowercased().hasSuffix("km") else { return (raw, "") }
+        return (String(raw.dropLast(2)), "km")
+    }
+
+    var body: some View {
+        ZStack {
+            orangeLightSurface
+
+            VStack(alignment: .leading, spacing: 14) {
+                header
+                metricRow
+                progressStrip
+                footer
+            }
+            .padding(18)
+        }
+        .frame(maxWidth: .infinity, minHeight: 272, alignment: .topLeading)
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(data.title), \(data.value), \(data.subtitle)")
+        .ohanaStateMotion(data)
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: data.icon)
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .foregroundStyle(Color.goCardWhite)
+                .frame(width: 44, height: 44)
+                .background(Color.goCardWhite.opacity(0.14), in: Circle())
+                .overlay {
+                    Circle().strokeBorder(Color.goCardWhite.opacity(0.12), lineWidth: 1)
+                }
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(data.title)
+                    .font(OhanaFont.title3(.black))
+                    .fontWidth(.condensed)
+                    .foregroundStyle(Color.goCardWhite)
+                    .lineLimit(1)
+
+                Text(data.subtitle)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.58))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .foregroundStyle(Color.goCardWhite.opacity(0.52))
+        }
+    }
+
+    private var metricRow: some View {
+        HStack(alignment: .top, spacing: 8) {
+            ForEach(Array(data.supportingMetrics.prefix(3).enumerated()), id: \.element.id) { index, metric in
+                supportingMetric(metric)
+                if index < min(data.supportingMetrics.count, 3) - 1 {
+                    Spacer(minLength: 4)
+                }
+            }
+        }
+    }
+
+    private func supportingMetric(_ metric: FeatureHubSupportingMetric) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Image(systemName: metric.icon)
+                .font(OhanaFont.adaptive(size: 11, weight: .bold))
+                .foregroundStyle(Color.goCardWhite.opacity(0.46))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(metric.value)
+                    .font(OhanaFont.adaptive(size: 19, weight: .black, design: .rounded))
+                    .fontWidth(.condensed)
+                    .foregroundStyle(Color.goCardWhite)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .monospacedDigit()
+
+                Text(metric.title)
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.48))
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var progressStrip: some View {
+        GeometryReader { proxy in
+            let fillWidth = clampedProgress <= 0
+                ? 0
+                : max(18, proxy.size.width * clampedProgress)
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
+                    .fill(Color.arkInk.opacity(0.58))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
+                            .strokeBorder(Color.goCardWhite.opacity(0.08), lineWidth: 1)
+                    }
+
+                RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [orange, Color(hex: "FFC338"), amber],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: fillWidth)
+                    .overlay {
+                        diagonalSheen
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
+                    .shadow( // ui-v4: allow Figma orange-light progress glow on this explicitly referenced hero card.
+                        color: amber.opacity(0.20),
+                        radius: 10,
+                        x: 3,
+                        y: 2
+                    )
+            }
+        }
+        .frame(height: 44)
+        .allowsHitTesting(false)
+    }
+
+    private var diagonalSheen: some View {
+        HStack(spacing: 11) {
+            ForEach(0 ..< 14, id: \.self) { _ in
+                Rectangle()
+                    .fill(Color(hex: "A34D04").opacity(0.10))
+                    .frame(width: 10, height: 72)
+                    .rotationEffect(.degrees(18))
+            }
+        }
+    }
+
+    private var footer: some View {
+        HStack(alignment: .lastTextBaseline, spacing: 6) {
+            Text(distanceParts.value)
+                .font(OhanaFont.adaptive(size: 44, weight: .black, design: .rounded))
+                .fontWidth(.condensed)
+                .foregroundStyle(Color.goCardWhite)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .monospacedDigit()
+                .ohanaNumericMotion(data.value)
+
+            if !distanceParts.unit.isEmpty {
+                Text(distanceParts.unit)
+                    .font(OhanaFont.callout(.semibold))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.55))
+            }
+
+            Spacer(minLength: 8)
+
+            ZStack {
+                Image(systemName: "heart.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 48, weight: .black))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.13))
+
+                Text("\(Int((clampedProgress * 100).rounded()))")
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.goCardWhite)
+                    .monospacedDigit()
+            }
+            .frame(width: 52, height: 46)
+        }
+    }
+
+    private var orangeLightSurface: some View {
+        let shape = RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
+        return shape
+            .fill(Color(hex: "050300"))
+            .overlay {
+                RadialGradient(
+                    colors: [
+                        amber.opacity(0.92),
+                        orange.opacity(0.72),
+                        Color.clear
+                    ],
+                    center: .bottomTrailing,
+                    startRadius: 4,
+                    endRadius: 230
+                )
+                .clipShape(shape)
+                .allowsHitTesting(false)
+            }
+            .overlay {
+                shape.strokeBorder(warmBorder.opacity(0.50), lineWidth: 0.75)
+            }
+            .shadow( // ui-v4: allow Figma orange-light hero depth on the prominent Walks destination.
+                color: orange.opacity(0.18),
+                radius: 18,
+                x: 0,
+                y: 10
+            )
+            .allowsHitTesting(false)
     }
 }
 

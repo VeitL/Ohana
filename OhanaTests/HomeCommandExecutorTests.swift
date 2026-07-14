@@ -3736,6 +3736,7 @@ struct HomeCommandExecutorTests {
         let pet = Pet(name: "Old", species: "狗")
         pet.avatarEmoji = "🐕"
         pet.dailyPortionGrams = 80
+        pet.personalityTagsRaw = "curious,clingy,smart"
         context.insert(pet)
         try context.save()
 
@@ -3757,7 +3758,6 @@ struct HomeCommandExecutorTests {
                 themeHex: "ffcc00",
                 notes: "  calm friend  ",
                 coatColor: "  black  ",
-                eyeColor: "  green  ",
                 microchipID: "  chip-1  ",
                 vetContact: "  vet phone  ",
                 vetClinicName: "  Island Vet  ",
@@ -3772,7 +3772,11 @@ struct HomeCommandExecutorTests {
                 birthCity: "  Shanghai  ",
                 lineageInfo: "  rescue  ",
                 foodBrand: "  Royal  ",
-                dailyPortionGrams: -5
+                dailyPortionGrams: -5,
+                personalityTagIDs: PetPrimaryPersonalitySelection.replacingPrimary(
+                    in: pet.personalityTagIdList,
+                    with: "foodie"
+                )
             ),
             context: context
         )
@@ -3781,18 +3785,19 @@ struct HomeCommandExecutorTests {
         #expect(result.kind == EntityKind.pet.rawValue)
         #expect(result.changedFields.contains("microchipID"))
         #expect(result.changedFields.contains("dailyPortionGrams"))
+        #expect(result.changedFields.contains("personalityTagsRaw"))
         #expect(pet.name == "Coco")
         #expect(pet.avatarEmoji == "🐾")
         #expect(pet.species == "cat")
         #expect(pet.breed == "Siamese")
-        #expect(pet.gender == "female")
+        #expect(pet.gender == "girl")
         #expect(pet.isNeutered)
         #expect(pet.birthday == birthday)
         #expect(pet.homeDate == homeDate)
         #expect(pet.notes == "calm friend")
         #expect(pet.coatColor == "black")
-        #expect(pet.eyeColor == "green")
         #expect(pet.microchipID == "chip-1")
+        #expect(pet.personalityTagIdList == ["foodie", "clingy", "smart"])
         #expect(pet.vetContact == "vet phone")
         #expect(pet.vetClinicName == "Island Vet")
         #expect(pet.vetDoctorName == "Dr Chen")

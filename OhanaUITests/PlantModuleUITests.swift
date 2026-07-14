@@ -582,23 +582,19 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(tapWhenFrameReady(plantsTab, timeout: 8), "Plants tab did not become frame-ready before opening the plant module.")
         XCTAssertTrue(
             app.descendants(matching: .any)["home-plants-page"].waitForExistence(timeout: 12),
-            "Home plants page did not open before using the plant FAB menu."
+            "Home plants page did not open before using the plant toolbar menu."
         )
 
         let primaryAction = app.buttons["home-primary-action"]
         XCTAssertTrue(primaryAction.waitForExistence(timeout: 12), "Plant primary action did not appear before opening the plant module.")
         tapWhenHittable(primaryAction, timeout: 8)
 
-        let allShortcut = app.buttons["home-fab-shortcut-plant-feature-collection"]
-        if !allShortcut.waitForExistence(timeout: 4) {
-            tapWhenHittable(primaryAction, timeout: 8)
-            tapWhenHittable(primaryAction, timeout: 8)
-        }
-        XCTAssertTrue(allShortcut.waitForExistence(timeout: 8), "Plant FAB did not expose All before opening the plant module.")
-        XCTAssertTrue(tapWhenFrameReady(allShortcut, timeout: 8), "Plant FAB All shortcut did not become frame-ready.")
+        let allShortcut = app.buttons["home-plant-data-action"]
+        XCTAssertTrue(allShortcut.waitForExistence(timeout: 8), "Plant toolbar menu did not expose Plant Data.")
+        XCTAssertTrue(tapWhenFrameReady(allShortcut, timeout: 8), "Plant Data action did not become frame-ready.")
         XCTAssertTrue(
             app.descendants(matching: .any)["plant-feature-collection"].waitForExistence(timeout: 12),
-            "Plant FAB All did not open the Plant Feature Collection."
+            "Plant Data did not open the Plant Feature Collection."
         )
     }
 
@@ -645,9 +641,9 @@ final class PlantModuleUITests: XCTestCase {
     private func addPlantFromHomePlantsTab(in app: XCUIApplication) -> String {
         let addEntry = app.buttons["home-primary-action"]
         tapWhenHittable(addEntry, timeout: 8)
-        let addPlantShortcut = app.buttons["home-fab-shortcut-add-plant"]
-        XCTAssertTrue(addPlantShortcut.waitForExistence(timeout: 8), "Plant FAB did not expose the add-plant shortcut.")
-        XCTAssertTrue(tapWhenFrameReady(addPlantShortcut, timeout: 8), "Add-plant shortcut did not become frame-ready.")
+        let addPlantShortcut = app.buttons["home-add-plant-action"]
+        XCTAssertTrue(addPlantShortcut.waitForExistence(timeout: 8), "Plant toolbar menu did not expose Add Plant.")
+        XCTAssertTrue(tapWhenFrameReady(addPlantShortcut, timeout: 8), "Add Plant did not become frame-ready.")
 
         let addPlantStep = app.descendants(matching: .any)["add-plant-step-plant-room"]
         XCTAssertTrue(addPlantStep.waitForExistence(timeout: 8), "Add Plant did not open on the plant-and-room step.")
@@ -1433,9 +1429,6 @@ final class PlantModuleUITests: XCTestCase {
         nameField.typeText("\n")
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
 
-        // 品种现为必选:宠物创建需选品种才能推进(人类无品种菜单,此步优雅跳过)。
-        selectFirstPetBreedIfPresent(in: app)
-
         tapThroughMemberCreationSteps(in: app, starterPetWeight: starterPetWeight)
 
         let handoffTitle = app.staticTexts[flowTitle]
@@ -1464,6 +1457,9 @@ final class PlantModuleUITests: XCTestCase {
             if let starterPetWeight {
                 fillStarterPetWeightIfNeeded(in: app, value: starterPetWeight, waitForInput: !creationPrimary.isEnabled)
             }
+            selectFirstPetSpeciesIfPresent(in: app)
+            selectFirstPetBreedIfPresent(in: app)
+            selectFirstPetAppearanceIfPresent(in: app)
             let actionLabel = creationPrimary.label
             tapWhenHittable(creationPrimary, timeout: 8)
             if actionLabel.contains("Join Island") || actionLabel.contains("加入岛屿") || actionLabel.contains("Insel beitreten") {
@@ -1493,6 +1489,7 @@ final class PlantModuleUITests: XCTestCase {
         guard breedMenu.waitForExistence(timeout: 4) else { return } // 人类创建无品种菜单
         let placeholderLabel = breedMenu.label
         let creationPrimary = app.buttons["member-creation-primary-action"]
+        if creationPrimary.isEnabled { return }
         let selectionWasRequired = creationPrimary.exists && !creationPrimary.isEnabled
 
         for _ in 0 ..< 3 {
@@ -1512,6 +1509,55 @@ final class PlantModuleUITests: XCTestCase {
         }
 
         XCTFail("Pet creation breed selection did not apply. Current menu label: \(breedMenu.label)")
+    }
+
+    @MainActor
+    private func selectFirstPetSpeciesIfPresent(in app: XCUIApplication) {
+        let speciesMenu = app.buttons["member-pet-species-picker"]
+        guard speciesMenu.exists else { return }
+        let creationPrimary = app.buttons["member-creation-primary-action"]
+        if creationPrimary.isEnabled { return }
+
+        for _ in 0 ..< 3 {
+            guard tapWhenFrameReady(speciesMenu, timeout: 8) else { continue }
+            let options = ["Dog", "狗", "Hund"]
+            guard let option = options
+                .map({ app.buttons[$0].firstMatch })
+                .first(where: { $0.waitForExistence(timeout: 2) }) else { continue }
+            guard tapWhenFrameReady(option, timeout: 8) else { continue }
+            if waitUntil(timeout: 4, condition: {
+                app.buttons["member-pet-breed-picker"].exists
+            }) {
+                return
+            }
+        }
+        XCTFail("Pet creation species selection did not apply.")
+    }
+
+    @MainActor
+    private func selectFirstPetAppearanceIfPresent(in app: XCUIApplication) {
+        let coatMenu = app.buttons["member-pet-coat-picker"]
+        guard coatMenu.exists else { return }
+        let creationPrimary = app.buttons["member-creation-primary-action"]
+        if creationPrimary.isEnabled { return }
+
+        let boy = app.buttons["member-gender-boy"]
+        if boy.waitForExistence(timeout: 3) {
+            tapWhenFrameReady(boy, timeout: 4)
+        }
+
+        for _ in 0 ..< 3 {
+            guard tapWhenFrameReady(coatMenu, timeout: 8) else { continue }
+            let menu = app.collectionViews.firstMatch
+            guard menu.waitForExistence(timeout: 6) else { continue }
+            let option = menu.cells.element(boundBy: 0).buttons.firstMatch
+            guard option.waitForExistence(timeout: 6) else { continue }
+            guard tapWhenFrameReady(option, timeout: 8) else { continue }
+            if waitUntil(timeout: 4, condition: { creationPrimary.isEnabled }) {
+                return
+            }
+        }
+        XCTFail("Pet creation appearance selection did not apply.")
     }
 
     @MainActor

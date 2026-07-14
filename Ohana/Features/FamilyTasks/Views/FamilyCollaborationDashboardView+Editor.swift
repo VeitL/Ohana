@@ -15,25 +15,101 @@ extension FamilyCollaborationDashboardView {
     }
 
     func presentEditor(_ route: FamilyCollaborationEditorRoute) {
-        inlineEditorVisible = false
-        inlineEditorDragOffset = 0
         activeEditor = route
         onEditorVisibilityChanged(true)
     }
 
     func dismissEditor() {
-        withAnimation(GoMotion.page) {
-            inlineEditorVisible = false
-            inlineEditorDragOffset = 0
+        activeEditor = nil
+        onEditorVisibilityChanged(false)
+    }
+
+    @ViewBuilder
+    func nativeTaskEditorSheet(_ route: FamilyCollaborationEditorRoute) -> some View {
+        let editorContext = FamilyCollaborationEditorContext.resolve(
+            route: route,
+            reminders: pendingReminders,
+            tasks: familyTasks
+        )
+
+        NavigationStack {
+            Group {
+                if let editorContext {
+                    FamilyTaskEditorPanel(
+                    context: editorContext,
+                    humans: humans,
+                    currentHuman: currentHuman,
+                    pets: pets,
+                    onClose: dismissEditor,
+                    onAssignReminder: { reminder, human, reward, note in
+                        commandExecutor.assignReminder(
+                            reminder,
+                            to: human,
+                            by: currentHuman,
+                            rewardCoconuts: reward,
+                            note: note
+                        )
+                    },
+                    onCreateTask: { title, note, human, reward, dueAt, emoji in
+                        commandExecutor.createTask(
+                            title: title,
+                            note: note,
+                            assignedTo: human,
+                            by: currentHuman,
+                            rewardCoconuts: reward,
+                            dueAt: dueAt,
+                            emoji: emoji
+                        )
+                    },
+                    onUpdateTask: { task, title, note, human, reward, dueAt, emoji in
+                        commandExecutor.updateTask(
+                            task,
+                            title: title,
+                            note: note,
+                            assignedTo: human,
+                            rewardCoconuts: reward,
+                            dueAt: dueAt,
+                            emoji: emoji,
+                            by: currentHuman
+                        )
+                    },
+                    onDeleteTask: { task in
+                        commandExecutor.deleteTask(task, by: currentHuman)
+                    }
+                    )
+                } else {
+                    ContentUnavailableView(
+                        l.tr(zh: "任务不可用", en: "Task unavailable", de: "Aufgabe nicht verfügbar"),
+                        systemImage: "exclamationmark.triangle"
+                    )
+                }
+            }
+            .navigationTitle(editorTitle(for: route))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel) {
+                        dismissEditor()
+                    }
+                }
+            }
         }
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 340_000_000)
-            activeEditor = nil
-            onEditorVisibilityChanged(false)
+        .presentationDetents([.medium, .large])
+        .presentationContentInteraction(.scrolls)
+    }
+
+    func editorTitle(for route: FamilyCollaborationEditorRoute) -> String {
+        switch route {
+        case .assignReminder:
+            l.tr(zh: "分配提醒", en: "Assign reminder", de: "Erinnerung zuweisen")
+        case .editTask:
+            l.tr(zh: "编辑任务", en: "Edit task", de: "Aufgabe bearbeiten")
+        case .create:
+            l.tr(zh: "新建任务", en: "New task", de: "Neue Aufgabe")
         }
     }
 
-    func inlineTaskEditorOverlay(_ route: FamilyCollaborationEditorRoute) -> some View {
+    func inlineTaskEditorOverlay(_ route: FamilyCollaborationEditorRoute) -> some View { // native-ui: allow retired compatibility renderer; runtime uses sheet(item:)
         GeometryReader { proxy in
             let horizontalInset: CGFloat = 6
             let bottomInset = max(proxy.safeAreaInsets.bottom, CGFloat(8))
@@ -89,11 +165,12 @@ extension FamilyCollaborationDashboardView {
                                         assignedTo: human,
                                         rewardCoconuts: reward,
                                         dueAt: dueAt,
-                                        emoji: emoji
+                                        emoji: emoji,
+                                        by: currentHuman
                                     )
                                 },
                                 onDeleteTask: { task in
-                                    commandExecutor.deleteTask(task)
+                                    commandExecutor.deleteTask(task, by: currentHuman)
                                 }
                             )
                             .padding(.top, 32)

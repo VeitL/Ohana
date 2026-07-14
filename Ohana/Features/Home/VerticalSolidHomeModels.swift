@@ -33,7 +33,7 @@ enum VerticalSolidHomeTab: String, CaseIterable, Identifiable, Hashable {
     var icon: String {
         switch self {
         case .home: "house.fill"
-        case .calendar: "calendar"
+        case .calendar: "checklist"
         case .oasis: "tree.fill"
         case .plants: "leaf.fill"
         }
@@ -42,7 +42,7 @@ enum VerticalSolidHomeTab: String, CaseIterable, Identifiable, Hashable {
     func title(_ l: L10n) -> String {
         switch self {
         case .home: l.tr(zh: "首页", en: "Home", de: "Home")
-        case .calendar: l.tr(zh: "日历", en: "Calendar", de: "Kalender")
+        case .calendar: l.tr(zh: "待办", en: "Tasks", de: "Aufgaben")
         case .oasis: l.tr(zh: "Oasis", en: "Oasis", de: "Oasis")
         case .plants: l.tr(zh: "植物", en: "Plants", de: "Pflanzen")
         }

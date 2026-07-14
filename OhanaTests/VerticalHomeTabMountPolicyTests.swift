@@ -548,23 +548,23 @@ struct VerticalHomeTabMountPolicyTests {
         ))
     }
 
-    @Test func bottomNavigationUsesIconOnlyDensityForFourTabs() {
+    @Test func bottomNavigationRemainsIconOnlyForFourTabs() {
         let metrics = HomeBottomNavigationLayoutPolicy.metrics(tabCount: 4)
 
         #expect(!metrics.showsSelectedLabel)
-        #expect(metrics.actionHitSize >= 52)
-        #expect(metrics.barHeight >= metrics.actionHitSize)
+        #expect(metrics.barHeight >= 64)
+        #expect(metrics.tabSpacing <= 2)
     }
 
-    @Test func bottomNavigationSwitchesFiveTabsToIconOnlyDensity() {
+    @Test func bottomNavigationRemainsIconOnlyForFiveTabs() {
         let metrics = HomeBottomNavigationLayoutPolicy.metrics(tabCount: 5)
 
         #expect(!metrics.showsSelectedLabel)
-        #expect(metrics.actionHitSize >= 52)
-        #expect(metrics.tabSpacing <= 4)
+        #expect(metrics.barHeight >= 64)
+        #expect(metrics.tabSpacing == 0)
     }
 
-    @Test func bottomNavigationReservesRoomForPrimaryAction() {
+    @Test func bottomNavigationUsesEqualFullWidthSlots() {
         let threeTabWidth = HomeBottomNavigationLayoutPolicy.estimatedTabSlotWidth(
             containerWidth: 390,
             tabCount: 3
@@ -576,22 +576,27 @@ struct VerticalHomeTabMountPolicyTests {
 
         #expect(threeTabWidth > 70)
         #expect(fiveTabWidth >= 44)
+        #expect(threeTabWidth > fiveTabWidth)
     }
 
-    @Test func bottomNavigationPlantsPrimaryActionUsesAddIcon() {
-        #expect(HomeBottomNavigationPrimaryActionPresentation.icon(
-            selectedTab: .plants,
-            isFabExpanded: false,
-            usesFabMenu: false
-        ) == "plus")
-        #expect(HomeBottomNavigationPrimaryActionPresentation.icon(
-            selectedTab: .plants,
-            isFabExpanded: true,
-            usesFabMenu: false
-        ) == "xmark")
+    @Test func nativeToolbarUsesContextualPrimaryActions() throws {
+        let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Routing.swift")
+        let toolbarSource = try source("Ohana/Features/Home/Views/FocusHomeHeaderView.swift")
+        let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
+        let oasisHostSource = try source("Ohana/Features/Oasis/Views/OasisHomeTabHost.swift")
+
+        #expect(routingSource.contains("openFunctionMenu(destination: .petFeatureCollection)"))
+        #expect(routingSource.contains("case .home:\n            \"chart.bar.xaxis\""))
+        #expect(routingSource.contains("case .calendar:\n            \"plus\""))
+        #expect(routingSource.contains("case .plants:\n            \"ellipsis.circle\""))
+        #expect(toolbarSource.contains("if selectedTab == .home"))
+        #expect(toolbarSource.contains("} else if selectedTab != .oasis {"))
+        #expect(componentsSource.contains(".accessibilityIdentifier(\"oasis-inject-energy-action\")"))
+        #expect(componentsSource.contains(".buttonStyle(.borderedProminent)"))
+        #expect(oasisHostSource.contains("onInjectEnergy: onInjectEnergy"))
     }
 
-    @Test func plantsTabContentExtendsBehindFloatingBottomChrome() {
+    @Test func nativeTabPagesUseTheFullHeightAboveTopChrome() {
         let containerHeight: CGFloat = 844
         let topChromeHeight: CGFloat = 46
         let bottomChromeHeight: CGFloat = 104
@@ -601,7 +606,7 @@ struct VerticalHomeTabMountPolicyTests {
             containerHeight: containerHeight,
             topChromeHeight: topChromeHeight,
             bottomChromeHeight: bottomChromeHeight
-        ) == 694)
+        ) == 798)
         #expect(VerticalSolidHomePageContentHeightPolicy.height(
             selectedTab: .plants,
             containerHeight: containerHeight,
@@ -634,23 +639,59 @@ struct VerticalHomeTabMountPolicyTests {
         )
     }
 
-    @Test func calendarTabUsesPlantLikeBottomChromeHandoff() throws {
+    @Test func rootNavigationUsesNativeTabViewAndSystemScrollMinimization() throws {
+        let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
         let homeSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift")
+        let backgroundSource = try source("Ohana/Shared/Design/ArkBackgroundView.swift")
+        let staticBackgroundSource = backgroundSource
+            .components(separatedBy: "struct OhanaStaticAppBackground")
+            .last ?? ""
+        let toolbarSource = try source("Ohana/Features/Home/Views/FocusHomeHeaderView.swift")
+        let nativeToolbarSource = toolbarSource.components(separatedBy: "struct FocusHomeHeaderView").first ?? toolbarSource
         let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Routing.swift")
-        let routeSource = try source("Ohana/Features/Calendar/CalendarRouteContainer.swift")
-        let calendarSource = try source("Ohana/Features/Calendar/Views/CalendarView.swift")
-        let calendarListSource = try source("Ohana/Features/Calendar/Views/CalendarView+List.swift")
-        let calendarMonthSource = try source("Ohana/Features/Calendar/Views/CalendarView+Month.swift")
+        let plantSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift")
+        let taskCenterSource = try source("Ohana/Features/Tasks/TaskCenterRouteContainer.swift")
+        let taskCenterViewSource = try source("Ohana/Features/Tasks/TaskCenterView.swift")
 
-        #expect(homeSource.contains("@State var calendarBottomChromeHidden = false"))
-        #expect(homeSource.contains("onEmbeddedScrollOffsetChange: updateCalendarBottomChromeVisibility"))
-        #expect(routingSource.contains("VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome"))
-        #expect(routingSource.contains("resetCalendarBottomChromeForTabSelection()"))
-        #expect(routingSource.contains("guard controller.outgoingTab == nil else { return }"))
-        #expect(routeSource.contains("var onEmbeddedScrollOffsetChange: ((CGFloat) -> Void)?"))
-        #expect(calendarSource.contains("@State var embeddedBottomChromeBaselineOffset: CGFloat?"))
-        #expect(calendarListSource.contains("reportEmbeddedBottomChromeScrollOffset(offsetY, canEstablishBaseline: didScrollListToToday)"))
-        #expect(calendarMonthSource.contains("reportEmbeddedBottomChromeScrollOffset(offsetY)"))
+        #expect(componentsSource.contains("TabView(selection: selection)"))
+        #expect(componentsSource.contains(".tabItem"))
+        #expect(componentsSource.contains(".tabBarMinimizeBehavior(.onScrollDown)"))
+        #expect(componentsSource.contains(".badge(tab == .calendar ? taskCenterBadge.overdueCount : 0)"))
+        #expect(componentsSource.contains(".accessibilityIdentifier(\"home-native-tab-view\")"))
+        #expect(!componentsSource.contains("Text(tab.title(localization))"))
+        #expect(componentsSource.contains("viewportAlignedPageBackground(for: tab)"))
+        #expect(componentsSource.contains("if lifecycle(for: tab).isVisible"))
+        #expect(componentsSource.contains("OhanaStaticBackgroundCanvas()"))
+        #expect(componentsSource.contains(".offset(y: -backgroundViewportTopOffset)"))
+        #expect(homeSource.contains("backgroundViewportTopOffset: backgroundViewportTopOffset"))
+        #expect(homeSource.contains("ZStack(alignment: .top) {\n                OhanaStaticAppBackground()"))
+        #expect(staticBackgroundSource.contains("if let assetName = style.imageAssetName"))
+        #expect(staticBackgroundSource.contains("OfficialImageBackground(assetName: assetName)"))
+        #expect(taskCenterSource.contains("if presentation == .sheet"))
+        #expect(!taskCenterViewSource.contains(".background(Color.ohanaCardSurfaceElevated.opacity(0.96))"))
+        #expect(nativeToolbarSource.contains("if selectedTab == .plants"))
+        #expect(nativeToolbarSource.contains("if selectedTab == .home"))
+        #expect(nativeToolbarSource.contains("} else if selectedTab != .oasis {"))
+        #expect(nativeToolbarSource.contains(".accessibilityIdentifier(\"home-primary-action\")"))
+        #expect(nativeToolbarSource.contains(".accessibilityIdentifier(\"home-crew-roster-action\")"))
+        #expect(nativeToolbarSource.contains(".accessibilityIdentifier(\"home-add-plant-action\")"))
+        #expect(nativeToolbarSource.contains(".accessibilityIdentifier(\"home-plant-data-action\")"))
+        let crewActionPosition = nativeToolbarSource.range(of: ".accessibilityIdentifier(\"home-crew-roster-action\")")
+        let primaryActionPosition = nativeToolbarSource.range(of: ".accessibilityIdentifier(\"home-primary-action\")")
+        #expect(crewActionPosition != nil)
+        #expect(primaryActionPosition != nil)
+        if let crewActionPosition, let primaryActionPosition {
+            #expect(crewActionPosition.lowerBound < primaryActionPosition.lowerBound)
+        }
+        #expect(homeSource.contains("primaryActionIcon: homeToolbarPrimaryActionIcon"))
+        #expect(homeSource.contains("onPrimaryAction: performHomeToolbarPrimaryAction"))
+        #expect(homeSource.contains("onInjectEnergy: injectEmbeddedOasisEnergy"))
+        #expect(homeSource.contains(".toolbarBackground(.hidden, for: .navigationBar)"))
+        #expect(!homeSource.contains("VerticalSolidHomeQuickActionMenu("))
+        #expect(!homeSource.contains("VerticalSolidHomeBottomBar("))
+        #expect(!homeSource.contains("calendarBottomChromeHidden"))
+        #expect(!routingSource.contains("VerticalSolidHomeBottomChromeScrollPolicy"))
+        #expect(!plantSource.contains("updateBottomChromeVisibility"))
     }
 
     @Test func plantWalletQuickActionsUseSharedEditablePolicy() throws {
@@ -1159,41 +1200,6 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!deckSource.contains("plantFrozenInactiveGeometry = snapshot.inactiveCollapsedGeometry"))
     }
 
-    @Test func plantScrollChromeHidesOnlyAfterLeavingTopAndRestoresAtTop() {
-        #expect(!VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome(
-            scrollOffset: 0,
-            currentHidden: false
-        ))
-        #expect(VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome(
-            scrollOffset: 30,
-            currentHidden: false
-        ))
-        #expect(VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome(
-            scrollOffset: 12,
-            currentHidden: true
-        ))
-        #expect(!VerticalSolidHomeBottomChromeScrollPolicy.hidesBottomChrome(
-            scrollOffset: 2,
-            currentHidden: true
-        ))
-        #expect(!VerticalSolidHomePlantScrollChromePolicy.hidesBottomChrome(
-            scrollOffset: 0,
-            currentHidden: false
-        ))
-        #expect(VerticalSolidHomePlantScrollChromePolicy.hidesBottomChrome(
-            scrollOffset: 30,
-            currentHidden: false
-        ))
-        #expect(VerticalSolidHomePlantScrollChromePolicy.hidesBottomChrome(
-            scrollOffset: 12,
-            currentHidden: true
-        ))
-        #expect(!VerticalSolidHomePlantScrollChromePolicy.hidesBottomChrome(
-            scrollOffset: 2,
-            currentHidden: true
-        ))
-    }
-
     @Test func plantRoomRailShowsWhenPlantPageHasPlants() {
         #expect(!VerticalSolidHomePlantRoomRailPolicy.shouldShow(plantCount: 0, selectedCardId: nil, heroDirection: 0))
         #expect(VerticalSolidHomePlantRoomRailPolicy.shouldShow(plantCount: 1, selectedCardId: nil, heroDirection: 0))
@@ -1244,7 +1250,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(uiTestSource.contains("testHomePlantViewSwitcherRailSwitchesToListMode"))
     }
 
-    @Test func homeQuickActionsAndFabShortcutsExposeMinimumHitAreas() {
+    @Test func homeQuickActionsExposeMinimumHitAreas() {
         let minimumHitSize = VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize
 
         #expect(minimumHitSize >= 44)
@@ -1252,39 +1258,22 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(VerticalHomeEmbeddedQuickActionHitAreaPolicy.addOptionCellHeight >= minimumHitSize)
         #expect(VerticalHomeEmbeddedQuickActionHitAreaPolicy.inlineMenuButtonWidth(buttonCount: 1) >= minimumHitSize)
         #expect(VerticalHomeEmbeddedQuickActionHitAreaPolicy.inlineMenuButtonWidth(buttonCount: 6) >= minimumHitSize)
-        #expect(HomeFabShortcutHitAreaPolicy.minimumHitSize >= 44)
     }
 
-    @Test func homeFabUsesAddMemberAndAllFeatureRoots() throws {
-        let sharedSource = try source("Ohana/Features/Home/Views/HomeFabSharedControls.swift")
-        let modelsSource = try source("Ohana/Features/Home/FocusHomeModels.swift")
-        let bottomBarSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeBottomBar.swift")
-        let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+TodayFocus.swift")
+    @Test func homeToolbarSeparatesFamilyDataFromMemberManagement() throws {
+        let homeSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift")
+        let toolbarSource = try source("Ohana/Features/Home/Views/FocusHomeHeaderView.swift")
+        let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Routing.swift")
+        let rosterSource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift")
 
-        #expect(modelsSource.contains("enum HomeFabFunctionShortcutAction"))
-        #expect(modelsSource.contains("case addEntity(EntityType)"))
-        #expect(modelsSource.contains("case destination(FMDest)"))
-        #expect(modelsSource.contains("case submenu(HomeFabShortcutSubmenu)"))
-        #expect(sharedSource.contains("primaryShortcuts(l:"))
-        #expect(sharedSource.contains("action: .submenu(.addMember)"))
-        #expect(sharedSource.contains("destination: .petFeatureCollection"))
-        #expect(sharedSource.contains("addMemberShortcuts(l:"))
-        #expect(sharedSource.contains("entityToAdd: .pet"))
-        #expect(sharedSource.contains("entityToAdd: .human"))
-        #expect(!sharedSource.contains("destination: .featureAggregate(.food)"))
-        #expect(!sharedSource.contains("destination: .featureAggregate(.hygiene)"))
-        #expect(!sharedSource.contains("destination: .featureAggregate(.health)"))
-        #expect(bottomBarSource.contains("@State private var activeHomeSubmenu: HomeFabShortcutSubmenu?"))
-        #expect(bottomBarSource.contains("@State private var submenuItemsVisible = false"))
-        #expect(bottomBarSource.contains("HomeFabShortcutCatalog.addMemberShortcuts(l: l)"))
-        #expect(bottomBarSource.contains("submenuItemsVisible && itemsVisible"))
-        #expect(bottomBarSource.contains("case .submenu(.addMember):"))
-        #expect(bottomBarSource.contains("isDimmed: activeHomeSubmenu == .addMember"))
-        #expect(bottomBarSource.contains("isDimmed ? 0.42 : 1"))
-        #expect(bottomBarSource.contains("return \"add-\\(type.rawValue)\""))
-        #expect(bottomBarSource.contains("return \"pet-feature-collection\""))
-        #expect(routingSource.contains("case let .addEntity(type):"))
-        #expect(routingSource.contains("case let .destination(destination):"))
+        #expect(routingSource.contains("openFunctionMenu(destination: .petFeatureCollection)"))
+        #expect(routingSource.contains("return l.tr(zh: \"查看家庭数据\""))
+        #expect(toolbarSource.contains("systemImage: primaryActionIcon"))
+        #expect(toolbarSource.contains(".accessibilityIdentifier(\"home-primary-action\")"))
+        #expect(rosterSource.contains("Menu {"))
+        #expect(rosterSource.contains("private func addRosterEntity(_ type: EntityType)"))
+        #expect(rosterSource.contains("crew-roster-add-\\(type.rawValue)-action"))
+        #expect(!homeSource.contains("VerticalSolidHomeQuickActionMenu("))
     }
 
     @Test func petFeatureCollectionRoutesToAggregateCards() throws {
@@ -1363,28 +1352,29 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(sheetSource.contains("Alle Pflanzenfunktionen"))
     }
 
-    @Test func plantsTabFabOwnsPlantModuleShortcuts() throws {
-        let sharedSource = try source("Ohana/Features/Home/Views/HomeFabSharedControls.swift")
-        let bottomBarSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeBottomBar.swift")
-        let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+TodayFocus.swift")
+    @Test func plantsTabToolbarOwnsPlantModuleShortcuts() throws {
+        let homeSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift")
+        let toolbarSource = try source("Ohana/Features/Home/Views/FocusHomeHeaderView.swift")
+        let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Routing.swift")
         let functionRootSource = try source("Ohana/Features/FunctionMenu/Views/FunctionMenuRootView.swift")
 
-        #expect(sharedSource.contains("plantShortcuts(l:"))
-        #expect(sharedSource.contains("entityToAdd: .plant"))
-        #expect(sharedSource.contains("destination: .plantFeatureCollection"))
-        #expect(!sharedSource.contains("destination: .featureGroup(.plants)"))
-        #expect(bottomBarSource.contains("plantShortcuts: [HomeFabFunctionShortcut]"))
-        #expect(bottomBarSource.contains("selectedTab == .plants"))
-        #expect(bottomBarSource.contains("return \"add-\\(type.rawValue)\""))
-        #expect(bottomBarSource.contains("return \"plant-feature-collection\""))
-        #expect(routingSource.contains("case let .addEntity(type):"))
+        #expect(toolbarSource.contains("if selectedTab == .plants"))
+        #expect(toolbarSource.contains(".accessibilityIdentifier(\"home-add-plant-action\")"))
+        #expect(toolbarSource.contains(".accessibilityIdentifier(\"home-plant-data-action\")"))
+        #expect(routingSource.contains("routeCoordinator.openAddEntity(.plant)"))
+        #expect(homeSource.contains("onOpenPlantData: { openFunctionMenu(destination: .plantFeatureCollection) }"))
+        #expect(!homeSource.contains("plantShortcuts: HomeFabShortcutCatalog.plantShortcuts"))
         #expect(functionRootSource.contains("from: [.dailyCare, .healthBody, .archiveMemory, .householdHub]"))
         #expect(!functionRootSource.contains(".householdHub, .plants"))
     }
 
-    @Test func bottomNavigationOasisUsesLevelText() {
-        #expect(HomeBottomNavigationTreePresentation.levelText(8) == "Lv.8")
-        #expect(HomeBottomNavigationTreePresentation.levelText(-1) == "Lv.0")
+    @Test func nativeTabsUseIconOnlySymbolsWithLocalizedAccessibilityLabels() throws {
+        let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
+
+        #expect(!componentsSource.contains("Text(tab.title(localization))"))
+        #expect(componentsSource.contains("Image(systemName: tab.icon)"))
+        #expect(componentsSource.contains(".accessibilityLabel(tabAccessibilityLabel(for: tab))"))
+        #expect(componentsSource.contains(".accessibilityIdentifier(\"home-tab-\\(tab.rawValue)\")"))
     }
 
     @Test func oasisTabIsHiddenUntilStarterGiftUnlocksTree() {
@@ -1405,14 +1395,6 @@ struct VerticalHomeTabMountPolicyTests {
         defaults.set(true, forKey: StarterGiftStorageKey.oasisTabPromptPending)
         #expect(AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
         #expect(AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults).contains(.oasis))
-    }
-
-    @Test func bottomNavigationTreeProgressIsClamped() {
-        #expect(HomeBottomNavigationTreePresentation.progressFill(-0.4) == CGFloat(0))
-        #expect(HomeBottomNavigationTreePresentation.progressFill(0.42) == CGFloat(0.42))
-        #expect(HomeBottomNavigationTreePresentation.progressFill(1.4) == CGFloat(1))
-        #expect(HomeBottomNavigationTreePresentation.progressFill(.nan) == CGFloat(0))
-        #expect(HomeBottomNavigationTreePresentation.progressFill(.infinity) == CGFloat(0))
     }
 
     @Test @MainActor func treeInjectionPackageStaysAvailableAfterUseWhenCoconutsRemain() {

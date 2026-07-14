@@ -8,16 +8,34 @@
 import SwiftUI
 
 extension PlantDashboardView {
+    private struct RoomEdgeRailOption {
+        let id: String
+        let roomID: String?
+        let title: String
+        let shortTitle: String
+        let count: Int
+        let dueCount: Int
+    }
+
+    private struct RoomEdgeRailWheelItem: Identifiable {
+        let id: Int
+        let cycle: Int
+        let optionIndex: Int
+        let option: RoomEdgeRailOption
+    }
+
     @ViewBuilder
     var plantFloatingEdgeControls: some View {
         if showsPlantViewSwitcherRail || showsRoomEdgeRail {
-            VStack(spacing: 10) {
+            ZStack(alignment: .trailing) {
                 if showsPlantViewSwitcherRail {
                     plantViewSwitcherRail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 }
 
                 if showsRoomEdgeRail {
                     roomEdgeRail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                 }
             }
             .padding(.trailing, 4)
@@ -30,196 +48,339 @@ extension PlantDashboardView {
     }
 
     var plantViewSwitcherRail: some View {
-        VStack(spacing: 8) {
+        Picker(
+            l.tr(zh: "植物视图", en: "Plant view", de: "Pflanzenansicht"),
+            selection: Binding(
+                get: { selectedPlantsViewStyle },
+                set: { selectPlantViewStyle($0) }
+            )
+        ) {
             ForEach(PlantDashboardPlantsViewStyle.allCases) { style in
-                plantViewSwitcherButton(style)
+                Label(style.title(l), systemImage: style.icon)
+                    .labelStyle(.iconOnly)
+                    .tag(style)
+                    .accessibilityIdentifier("plant-dashboard-view-\(style.rawValue)")
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 5)
-        .background(roomEdgeRailBackground)
-        .accessibilityElement(children: .contain)
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 88, height: 44)
         .accessibilityIdentifier("plant-dashboard-view-switcher-rail")
     }
 
-    func plantViewSwitcherButton(_ style: PlantDashboardPlantsViewStyle) -> some View {
-        let isSelected = selectedPlantsViewStyle == style
-        return Button {
-            selectPlantViewStyle(style)
-        } label: {
-            VStack(spacing: 2) {
-                Image(systemName: style.icon)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-                    .frame(height: 14)
-                    .accessibilityHidden(true)
-                Text(style.shortTitle(l))
-                    .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.arkInk.opacity(0.74) : Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-            }
-            .frame(width: 44, height: 44)
-            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62), in: Circle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(style.title(l))
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier("plant-dashboard-view-\(style.rawValue)")
-    }
-
     var roomEdgeRail: some View {
-        VStack(spacing: 8) {
-            roomEdgeRailButton(
-                id: "all",
-                title: l.tr(zh: "全部", en: "All", de: "Alle"),
-                shortTitle: l.tr(zh: "全", en: "All", de: "Alle"),
-                count: plants.count,
-                isSelected: selectedLocation == nil,
-                dueCount: dueTasks.count
-            ) {
-                selectRoomFromEdgeRail(nil)
-            } batchCareAction: {
-                openBatchCareSheet()
-            }
-
-            ForEach(roomCareSummaries.prefix(7)) { summary in
-                roomEdgeRailButton(
-                    id: summary.id,
-                    title: summary.title,
-                    shortTitle: roomEdgeRailShortTitle(summary.title),
-                    count: summary.plantCount,
-                    isSelected: selectedLocation == summary.id,
-                    dueCount: summary.dueTaskCount
-                ) {
-                    selectRoomFromEdgeRail(selectedLocation == summary.id ? nil : summary.id)
-                } batchCareAction: {
-                    openBatchCareSheet(roomID: summary.id)
-                }
+        Group {
+            if isRoomEdgeRailExpanded {
+                roomEdgeRailWheel
+            } else {
+                roomEdgeRailCollapsedButton
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 5)
-        .background(roomEdgeRailBackground)
+        .frame(width: 68)
+        .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .trailing)))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("plant-dashboard-room-edge-rail")
-    }
-
-    @ViewBuilder
-    var roomEdgeRailBackground: some View {
-        if usesFullVisualEffects && !reduceTransparency {
-            Capsule()
-                .fill(Color.clear)
-                .glassEffect(.regular.tint(roomEdgeRailGlassTint).interactive(true), in: Capsule()) // ui-v4: allow Liquid Glass room rail matching home navigation
-                .overlay(roomEdgeRailStroke)
-                .shadow( // ui-v4: allow floating glass room rail depth above plant wallet cards
-                    color: Color.arkInk.opacity(colorScheme == .dark ? 0.22 : 0.10),
-                    radius: 18,
-                    x: 0,
-                    y: 10
-                )
-        } else {
-            Capsule()
-                .fill(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.88 : 0.94))
-                .overlay(roomEdgeRailStroke)
-                .shadow( // ui-v4: allow reduced-mode plant room rail separation without Liquid Glass.
-                    color: Color.arkInk.opacity(colorScheme == .dark ? 0.08 : 0.04),
-                    radius: 6,
-                    x: 0,
-                    y: 3
-                )
+        .onDisappear {
+            isRoomEdgeRailExpanded = false
+            roomEdgeRailScrollID = nil
         }
     }
 
-    var roomEdgeRailStroke: some View {
-        Capsule()
-            .strokeBorder(
-                LinearGradient(
-                    colors: [
-                        Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
-                        Color.ohanaSecondaryText.opacity(colorScheme == .dark ? 0.18 : 0.10),
-                        Color.ohanaGlassStroke.opacity(usesFullVisualEffects ? 0.20 : 0.12)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
+    private var roomEdgeRailCollapsedButton: some View {
+        let option = roomEdgeRailCurrentOption
+        return Button {
+            expandRoomEdgeRail()
+        } label: {
+            roomEdgeRailLabel(option, isFocused: true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(roomEdgeRailAccessibilityLabel(
+            title: option.title,
+            count: option.count,
+            dueCount: option.dueCount,
+            isSelected: true
+        ))
+        .accessibilityHint(l.tr(
+            zh: "轻点展开房间滚轮，上下轻扫切换",
+            en: "Tap to expand the room dial, then swipe vertically",
+            de: "Tippen, um das Raumrad zu öffnen, dann vertikal streichen"
+        ))
+        .accessibilityAdjustableAction { direction in
+            adjustRoomEdgeRailSelection(direction)
+        }
+        .accessibilityIdentifier("plant-dashboard-room-edge-collapsed")
+        .contextMenu {
+            roomEdgeRailBatchCareAction(option)
+        }
+    }
+
+    private var roomEdgeRailWheel: some View {
+        let options = roomEdgeRailOptions
+        let items = roomEdgeRailWheelItems(options: options)
+        let usesDialMotion = usesFullVisualEffects && !reduceMotion
+
+        return ScrollView(.vertical) {
+            LazyVStack(spacing: 0) {
+                ForEach(items) { item in
+                    roomEdgeRailButton(item, isFocused: item.id == roomEdgeRailScrollID)
+                        .id(item.id)
+                        .scrollTransition(.interactive(timingCurve: .easeInOut), axis: .vertical) { content, phase in
+                            let distance = CGFloat(abs(phase.value))
+                            let scale: CGFloat = usesDialMotion ? 1 - distance * 0.14 : 1
+                            let opacity: Double = 1 - Double(distance) * 0.62
+                            let horizontalOffset: CGFloat = usesDialMotion ? distance * 7 : 0
+                            return content
+                                .scaleEffect(scale)
+                                .opacity(opacity)
+                                .offset(x: horizontalOffset)
+                        }
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollIndicators(.hidden)
+        .contentMargins(.vertical, 88, for: .scrollContent)
+        .scrollPosition(id: $roomEdgeRailScrollID, anchor: .center)
+        .scrollTargetBehavior(.viewAligned(anchor: .center))
+        .frame(width: 68, height: 220)
+        .mask {
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .black, location: 0.14),
+                    .init(color: .black, location: 0.86),
+                    .init(color: .clear, location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
             )
+        }
+        .onAppear {
+            if roomEdgeRailScrollID == nil {
+                roomEdgeRailScrollID = roomEdgeRailMiddleID(for: selectedLocation, options: options)
+            }
+        }
+        .onScrollPhaseChange { _, newPhase in
+            guard newPhase == .idle else { return }
+            settleRoomEdgeRail(items: items, options: options)
+        }
+        .accessibilityLabel(l.tr(
+            zh: "房间滚轮",
+            en: "Room dial",
+            de: "Raumrad"
+        ))
+        .accessibilityAction(.escape) {
+            collapseRoomEdgeRail()
+        }
     }
 
     var usesFullVisualEffects: Bool {
         workloadPolicy.visualEffectsBudget(isVisible: true).usesFullEffects
     }
 
-    var roomEdgeRailGlassTint: Color {
-        if reduceTransparency {
-            return Color.ohanaCardSurface.opacity(0.94)
-        }
-        return Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.34 : 0.42)
+    private var roomEdgeRailOptions: [RoomEdgeRailOption] {
+        var options = [RoomEdgeRailOption(
+            id: "all",
+            roomID: nil,
+            title: l.tr(zh: "全部", en: "All", de: "Alle"),
+            shortTitle: l.tr(zh: "全部", en: "ALL", de: "ALLE"),
+            count: plants.count,
+            dueCount: dueTasks.count
+        )]
+        options.append(contentsOf: roomCareSummaries.map { summary in
+            RoomEdgeRailOption(
+                id: summary.id,
+                roomID: summary.id,
+                title: summary.title,
+                shortTitle: roomEdgeRailShortTitle(summary.title),
+                count: summary.plantCount,
+                dueCount: summary.dueTaskCount
+            )
+        })
+        return options
     }
 
-    func roomEdgeRailButton(
-        id: String,
-        title: String,
-        shortTitle: String,
-        count: Int,
-        isSelected: Bool,
-        dueCount: Int,
-        action: @escaping () -> Void,
-        batchCareAction: (() -> Void)? = nil
-    ) -> some View {
-        Button(action: action) {
-            VStack(spacing: 2) {
-                Text(shortTitle)
-                    .font(OhanaFont.adaptive(size: shortTitle.count > 2 ? 9 : 11, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-                Text("\(count)")
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.arkInk.opacity(0.72) : Color.ohanaSecondaryText)
-                    .lineLimit(1)
-            }
-            .frame(width: 44, height: 44)
-            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62), in: Circle())
-            .overlay(alignment: .topTrailing) {
-                if dueCount > 0 {
-                    Circle()
-                        .fill(Color.goYellow)
-                        .frame(width: 9, height: 9) // a11y: allow decorative due dot inside the 44pt room rail button
-                        .overlay {
-                            Circle().strokeBorder(Color.ohanaCardSurface.opacity(0.8), lineWidth: 1)
-                        }
-                        .offset(x: -5, y: 5)
-                        .accessibilityHidden(true)
-                }
+    private var roomEdgeRailCurrentOption: RoomEdgeRailOption {
+        roomEdgeRailOptions.first(where: { $0.roomID == selectedLocation }) ?? roomEdgeRailOptions[0]
+    }
+
+    private func roomEdgeRailWheelItems(options: [RoomEdgeRailOption]) -> [RoomEdgeRailWheelItem] {
+        guard !options.isEmpty else { return [] }
+        return (0 ..< 13).flatMap { cycle in
+            options.indices.map { optionIndex in
+                RoomEdgeRailWheelItem(
+                    id: cycle * options.count + optionIndex,
+                    cycle: cycle,
+                    optionIndex: optionIndex,
+                    option: options[optionIndex]
+                )
             }
         }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(roomEdgeRailAccessibilityLabel(title: title, count: count, dueCount: dueCount, isSelected: isSelected))
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier("plant-dashboard-room-edge-\(roomEdgeRailIdentifier(id))")
+    }
+
+    private func roomEdgeRailButton(_ item: RoomEdgeRailWheelItem, isFocused: Bool) -> some View {
+        Button {
+            commitRoomEdgeRailOption(item.option)
+            collapseRoomEdgeRail()
+        } label: {
+            roomEdgeRailLabel(item.option, isFocused: isFocused)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(roomEdgeRailAccessibilityLabel(
+            title: item.option.title,
+            count: item.option.count,
+            dueCount: item.option.dueCount,
+            isSelected: isFocused
+        ))
+        .accessibilityAddTraits(isFocused ? .isSelected : [])
+        .accessibilityIdentifier("plant-dashboard-room-edge-\(roomEdgeRailIdentifier(item.option.id))-\(item.cycle)")
+        .accessibilityHidden(item.cycle != 6)
         .contextMenu {
-            if dueCount > 0, let batchCareAction {
-                Button {
-                    batchCareAction()
-                } label: {
-                    Label(
-                        id == "all"
-                            ? l.tr(zh: "完成全部待照护", en: "Complete all due care", de: "Alle fällige Pflege erledigen")
-                            : l.tr(zh: "照护这间", en: "Care for this room", de: "Diesen Raum pflegen"),
-                        systemImage: "checkmark.circle.fill"
-                    )
-                }
+            roomEdgeRailBatchCareAction(item.option)
+        }
+    }
+
+    private func roomEdgeRailLabel(_ option: RoomEdgeRailOption, isFocused: Bool) -> some View {
+        VStack(spacing: 1) {
+            Text(option.shortTitle)
+                .font(OhanaFont.adaptive(size: option.shortTitle.count > 2 ? 9 : 12, weight: .black, design: .rounded))
+                .foregroundStyle(isFocused ? Color.goPrimary : Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+            Text("\(option.count)")
+                .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                .foregroundStyle(isFocused ? Color.goPrimary.opacity(0.72) : Color.ohanaSecondaryText)
+                .lineLimit(1)
+        }
+        .frame(width: 64, height: 44)
+        .contentShape(Rectangle())
+        .overlay(alignment: .trailing) {
+            Capsule()
+                .fill(Color.goPrimary)
+                .frame(width: 2, height: 24) // a11y: allow decorative selected-room indicator inside the 44pt dial target.
+                .opacity(isFocused ? 1 : 0)
+                .accessibilityHidden(true)
+        }
+        .overlay(alignment: .topTrailing) {
+            if option.dueCount > 0 {
+                Circle()
+                    .fill(Color.goYellow)
+                    .frame(width: 7, height: 7) // a11y: allow decorative due dot inside the 44pt room dial target.
+                    .offset(x: -7, y: 6)
+                    .accessibilityHidden(true)
             }
         }
+    }
+
+    @ViewBuilder
+    private func roomEdgeRailBatchCareAction(_ option: RoomEdgeRailOption) -> some View {
+        if option.dueCount > 0 {
+            Button {
+                if let roomID = option.roomID {
+                    openBatchCareSheet(roomID: roomID)
+                } else {
+                    openBatchCareSheet()
+                }
+            } label: {
+                Label(
+                    option.roomID == nil
+                        ? l.tr(zh: "完成全部待照护", en: "Complete all due care", de: "Alle fällige Pflege erledigen")
+                        : l.tr(zh: "照护这间", en: "Care for this room", de: "Diesen Raum pflegen"),
+                    systemImage: "checkmark.circle.fill"
+                )
+            }
+        }
+    }
+
+    private func expandRoomEdgeRail() {
+        let options = roomEdgeRailOptions
+        roomEdgeRailScrollID = roomEdgeRailMiddleID(for: selectedLocation, options: options)
+        withAnimation(reduceMotion ? nil : GoMotion.quick) {
+            isRoomEdgeRailExpanded = true
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    private func collapseRoomEdgeRail() {
+        withAnimation(reduceMotion ? nil : GoMotion.quick) {
+            isRoomEdgeRailExpanded = false
+        }
+    }
+
+    private func settleRoomEdgeRail(
+        items: [RoomEdgeRailWheelItem],
+        options: [RoomEdgeRailOption]
+    ) {
+        guard
+            let scrollID = roomEdgeRailScrollID,
+            let item = items.first(where: { $0.id == scrollID })
+        else { return }
+
+        commitRoomEdgeRailOption(item.option)
+        let centeredID = roomEdgeRailMiddleID(for: item.option.roomID, options: options)
+        if scrollID != centeredID {
+            roomEdgeRailScrollID = centeredID
+        }
+    }
+
+    private func commitRoomEdgeRailOption(_ option: RoomEdgeRailOption) {
+        guard selectedLocation != option.roomID else { return }
+        selectRoomFromEdgeRail(option.roomID)
+    }
+
+    private func roomEdgeRailMiddleID(
+        for roomID: String?,
+        options: [RoomEdgeRailOption]
+    ) -> Int {
+        let optionIndex = options.firstIndex(where: { $0.roomID == roomID }) ?? 0
+        return 6 * options.count + optionIndex
+    }
+
+    private func adjustRoomEdgeRailSelection(_ direction: AccessibilityAdjustmentDirection) {
+        let options = roomEdgeRailOptions
+        guard
+            !options.isEmpty,
+            let currentIndex = options.firstIndex(where: { $0.roomID == selectedLocation })
+        else { return }
+
+        let delta: Int
+        switch direction {
+        case .increment:
+            delta = 1
+        case .decrement:
+            delta = -1
+        @unknown default:
+            return
+        }
+
+        let nextIndex = (currentIndex + delta + options.count) % options.count
+        commitRoomEdgeRailOption(options[nextIndex])
+    }
+
+    func selectRoomFromEdgeRail(_ location: String?) {
+        withAnimation(GoMotion.quick) {
+            selectedLocation = location
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    func selectPlantViewStyle(_ style: PlantDashboardPlantsViewStyle) {
+        guard selectedPlantsViewStyle != style else { return }
+        collapseExpandedPlantIfNeeded()
+        withAnimation(GoMotion.quick) {
+            selectedPlantsViewStyle = style
+            if style == .list {
+                selectedLocation = nil
+            }
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
     }
 
     func roomEdgeRailShortTitle(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "?" }
         if roomEdgeRailContainsCJK(trimmed) {
-            return String(trimmed.prefix(1))
+            return String(trimmed.prefix(2))
         }
         let words = trimmed
             .split(whereSeparator: { $0.isWhitespace || $0 == "-" || $0 == "_" })

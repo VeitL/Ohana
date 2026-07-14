@@ -26,7 +26,7 @@ extension MemberCardCreationContentView {
         switch gender {
         case "boy", "male", "男": l.tr(zh: "男孩", en: "Boy", de: "Junge")
         case "girl", "female", "女": l.tr(zh: "女孩", en: "Girl", de: "Mädchen")
-        default: l.tr(zh: "未知", en: "Unknown", de: "Unbekannt")
+        default: l.tr(zh: "请选择", en: "Choose", de: "Auswählen")
         }
     }
 

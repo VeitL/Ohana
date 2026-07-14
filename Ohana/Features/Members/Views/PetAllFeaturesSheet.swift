@@ -576,8 +576,11 @@ struct PetAllFeaturesSheet: View {
                     value: weekWalkText,
                     subtitle: walkSub,
                     icon: "figure.walk",
-                    tint: Color(hex: "14B8A6"),
+                    tint: Color(hex: "FF8A0F"),
                     chart: FeatureHubMiniChartData(style: .bar, points: activitySummary.walkChartPoints),
+                    appearance: .orangeLight,
+                    supportingMetrics: walkSupportingMetrics,
+                    progress: walkProgress,
                     destination: .walks
                 ),
                 at: 2
@@ -714,6 +717,9 @@ struct PetAllFeaturesSheet: View {
         icon: String,
         tint: Color,
         chart: FeatureHubMiniChartData? = nil,
+        appearance: FeatureHubTileAppearance = .standard,
+        supportingMetrics: [FeatureHubSupportingMetric] = [],
+        progress: Double? = nil,
         destination: PetAllFeatureDestination
     ) -> FeatureHubDestinationItem<PetAllFeatureDestination> {
         let showsNewFeature: Bool = {
@@ -730,6 +736,9 @@ struct PetAllFeaturesSheet: View {
                 icon: icon,
                 tint: tint,
                 chart: chart,
+                appearance: appearance,
+                supportingMetrics: supportingMetrics,
+                progress: progress,
                 showsNewFeature: showsNewFeature
             ),
             destination: destination
@@ -887,6 +896,40 @@ struct PetAllFeaturesSheet: View {
     private var weekWalkText: String {
         let km = activitySummary.weekWalkDistanceMeters / 1000
         return km >= 10 ? String(format: "%.0fkm", km) : String(format: "%.1fkm", km)
+    }
+
+    private var walkSupportingMetrics: [FeatureHubSupportingMetric] {
+        [
+            FeatureHubSupportingMetric(
+                id: "week-distance",
+                title: l.tr(zh: "本周", en: "Week", de: "Woche"),
+                value: weekWalkText,
+                icon: "point.bottomleft.forward.to.arrow.triangle.scurvepath.fill"
+            ),
+            FeatureHubSupportingMetric(
+                id: "today-count",
+                title: l.tr(zh: "今日", en: "Today", de: "Heute"),
+                value: "\(activitySummary.todayWalkCount)",
+                icon: "calendar"
+            ),
+            FeatureHubSupportingMetric(
+                id: "total-count",
+                title: l.tr(zh: "总计", en: "Total", de: "Gesamt"),
+                value: "\(activitySummary.totalWalkCount)",
+                icon: "figure.walk"
+            )
+        ]
+    }
+
+    private var walkProgress: Double {
+        let weekKilometers = max(0, activitySummary.weekWalkDistanceMeters / 1000)
+        if pet.weeklyWalkGoalKm > 0 {
+            return min(1, weekKilometers / pet.weeklyWalkGoalKm)
+        }
+
+        let points = activitySummary.walkChartPoints
+        guard !points.isEmpty else { return 0 }
+        return Double(points.count { $0.value > 0 }) / Double(points.count)
     }
 
     private var expenseMetric: String {

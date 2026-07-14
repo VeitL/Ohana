@@ -14,7 +14,6 @@ extension VerticalSolidHomeView {
             bindHomeAppRouteSink()
             controller.applySnapshot(makeSnapshot(), signature: dataSignature, force: !controller.snapshot.isReady)
             AppPerformanceMonitor.shared.record("home_first_render", valueMS: 0)
-            refreshHeaderStreak()
             controller.startWarmup()
             scheduleGrowthOnboardingIfNeeded()
             scheduleGrowthUnlockFeedbackIfNeeded()
@@ -35,59 +34,6 @@ extension VerticalSolidHomeView {
             }
             memberMediaAttachmentIndexRepairTask = nil
         }
-    }
-
-    func closeVerticalFabMenu(immediate: Bool) {
-        guard fabExpanded || fabMenuItemsVisible else { return }
-        if immediate || !canAnimate {
-            var transaction = Transaction(animation: nil)
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                fabMenuItemsVisible = false
-                fabExpanded = false
-            }
-            return
-        }
-
-        withAnimation(HeroAnim.fabSpring) {
-            fabMenuItemsVisible = false
-        }
-        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 160) {
-            guard !fabMenuItemsVisible else { return }
-            withAnimation(HeroAnim.fabSpring) {
-                fabExpanded = false
-            }
-        }
-    }
-
-    func openVerticalFabMenu(immediate: Bool) {
-        guard !fabExpanded || !fabMenuItemsVisible else { return }
-        if immediate || !canAnimate {
-            var transaction = Transaction(animation: nil)
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                fabExpanded = true
-                fabMenuItemsVisible = true
-            }
-            return
-        }
-
-        fabMenuItemsVisible = false
-        withAnimation(HeroAnim.fabSpring) {
-            fabExpanded = true
-        }
-        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 16) {
-            withAnimation(HeroAnim.fabSpring) {
-                fabMenuItemsVisible = true
-            }
-        }
-    }
-
-    func dismissExpandedFabBeforeCardCollapse() -> Bool {
-        guard expandedBottomBarCard != nil,
-              fabExpanded || fabMenuItemsVisible else { return false }
-        closeVerticalFabMenu(immediate: true)
-        return true
     }
 
     func injectEmbeddedOasisEnergy() {
@@ -141,10 +87,6 @@ extension VerticalSolidHomeView {
                 scheduleGrowthUnlockFeedbackIfNeeded()
             }
         }
-    }
-
-    func refreshHeaderStreak() {
-        headerStreak = appServices.todayFocus.currentStreak(activeHumanId: activeHumanIdRaw)
     }
 
     static func todayFocusVisualProgress(cardHeroProgress: CGFloat) -> CGFloat {

@@ -1,23 +1,83 @@
+import Foundation
 import Testing
 @testable import Ohana
 
-struct PetPersonalityBehaviorTests {
-    @Test func energeticPlayfulPetsPreferPlayAndWalkActions() {
-        let pet = Pet(name: "Mochi", species: "狗")
-        pet.personalityTagsRaw = "energetic,playful"
+struct PetPersonalityPresentationTests {
+    @Test func replacingPrimaryPreservesOnlySecondaryTags() {
+        let updated = PetPrimaryPersonalitySelection.replacingPrimary(
+            in: ["curious", "clingy", "smart"],
+            with: "foodie"
+        )
 
-        #expect(PetPersonalityBehavior.priorityBonus(for: "play", pet: pet) > 0)
-        #expect(PetPersonalityBehavior.priorityBonus(for: "walk", pet: pet) > 0)
-        #expect(PetPersonalityBehavior.priorityBonus(for: "play", pet: pet) > PetPersonalityBehavior.priorityBonus(for: "weight", pet: pet))
+        #expect(updated == ["foodie", "clingy", "smart"])
     }
 
-    @Test func preferredPetUsesPersonalityBeforeOriginalOrder() {
+    @Test func personalitySelectionIsOptionalAndCappedAtThreeUniqueValues() {
+        #expect(PetPrimaryPersonalitySelection.normalized([]).isEmpty)
+        #expect(
+            PetPrimaryPersonalitySelection.normalized(["curious", "lazy", "curious", "smart", "foodie"])
+                == ["curious", "lazy", "smart"]
+        )
+    }
+
+    @Test func todayFocusUsesStablePetOrderInsteadOfPersonality() {
         let quiet = Pet(name: "Quiet", species: "猫")
         quiet.personalityTagsRaw = "quiet"
         let playful = Pet(name: "Playful", species: "猫")
-        playful.personalityTagsRaw = "toy,playful"
+        playful.personalityTagsRaw = "energetic,playful"
 
-        let selected = PetPersonalityBehavior.preferredPet(from: [quiet, playful], actionType: "play", isAlreadyDone: { _ in false })
-        #expect(selected?.id == playful.id)
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [quiet, playful],
+            reminders: [],
+            includesPlants: false,
+            questProgress: TodayFocusQuestProgress(
+                isPetWizardCompleted: true,
+                isFirstMealRecorded: true,
+                isThemeColorSet: true
+            )
+        )
+
+        #expect(quests.first { $0.id.hasPrefix("q_play_") }?.targetPetId == quiet.id)
+    }
+
+    @Test func primaryPersonalityChangesCareReactionCopy() {
+        let energetic = PetPersonalityCareReaction.line(
+            petName: "Mochi",
+            primaryTagID: "energetic",
+            l: L10n("en")
+        )
+        let lazy = PetPersonalityCareReaction.line(
+            petName: "Mochi",
+            primaryTagID: "lazy",
+            l: L10n("en")
+        )
+
+        #expect(energetic != lazy)
+        #expect(energetic.contains("battery"))
+        #expect(lazy.contains("lounging"))
+    }
+
+    @Test func completionTriggerAcceptsWritesAndRejectsSettingsOrDeletes() throws {
+        let petID = UUID()
+        let feed = PetCareCompletionTrigger.resolve(
+            DomainMutationResult(command: .feedLog(petID: petID, source: "manual"))
+        )
+        let settings = PetCareCompletionTrigger.resolve(
+            DomainMutationResult(command: .feedSettings(petID: petID))
+        )
+        let deletion = PetCareCompletionTrigger.resolve(
+            DomainMutationResult(command: .waterLog(petID: petID, source: "delete"))
+        )
+        let noOp = PetCareCompletionTrigger.resolve(
+            DomainMutationResult(
+                command: .quickCare(entityID: petID, action: "play"),
+                wroteBusinessFact: false
+            )
+        )
+
+        #expect(feed == PetCareCompletionTrigger(petID: petID, kind: .feed))
+        #expect(settings == nil)
+        #expect(deletion == nil)
+        #expect(noOp == nil)
     }
 }

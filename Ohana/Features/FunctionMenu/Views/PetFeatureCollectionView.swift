@@ -8,6 +8,15 @@
 import Foundation
 import SwiftUI
 
+enum PetSharedCareVisibilityPolicy {
+    static func shouldShow(forSpecies species: [String]) -> Bool {
+        let counts = species.reduce(into: [String: Int]()) { result, rawSpecies in
+            result[Pet.canonicalSpeciesKey(rawSpecies), default: 0] += 1
+        }
+        return counts.values.contains { $0 > 1 }
+    }
+}
+
 struct PetFeatureCollectionView: View {
     @Binding var parentPath: NavigationPath
     let pets: [Pet]
@@ -23,6 +32,9 @@ struct PetFeatureCollectionView: View {
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var hasDogs: Bool {
         activePets.contains { Pet.isDogSpecies($0.species) }
+    }
+    private var showsSharedCareActions: Bool {
+        PetSharedCareVisibilityPolicy.shouldShow(forSpecies: activePets.map(\.species))
     }
     private var columns: [GridItem] {
         if dynamicTypeSize.isAccessibilitySize {
@@ -53,8 +65,10 @@ struct PetFeatureCollectionView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         summaryPanel
 
-                        FeatureHubSectionActionView(section: sharedCareActionSection) { destination in
-                            parentPath.append(destination)
+                        if showsSharedCareActions {
+                            FeatureHubSectionActionView(section: sharedCareActionSection) { destination in
+                                parentPath.append(destination)
+                            }
                         }
 
                         VStack(alignment: .leading, spacing: 10) {

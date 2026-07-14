@@ -108,6 +108,7 @@ extension PlantDashboardView {
                 localization: l,
                 quickActionItemsRaw: $plantQuickActionItemsRaw,
                 shouldReduceWork: reduceMotion,
+                accentColor: Color(hex: card.themeColorHex),
                 forcesSubmenusBelow: false,
                 onAction: { action in
                     performPlantDockQuickAction(action, plant: plant)

@@ -6,10 +6,11 @@ Before using the code shape below, read `docs/design/ohana-ui-spec.md` and decla
 
 ## Before Creating Local UI
 
-Before adding a page-local button, card, row, popup, metric, chart, avatar treatment, close control, or motion helper, check whether an existing shared component or V4 pattern already exists.
+Before adding a page-local control, card, row, presentation, metric, chart, avatar treatment, or motion helper, first check whether SwiftUI has a semantic native component, then check whether an existing shared component or V4 pattern already exists.
 
 Create local UI only when:
 
+- SwiftUI has no semantic equivalent for the interaction or presentation.
 - The behavior is truly feature-specific.
 - No shared component matches the role.
 - The local variant does not weaken accessibility, hit testing, density, motion, or token semantics.
@@ -56,18 +57,14 @@ struct ExampleV4Page: View {
                 .scrollDismissesKeyboard(.interactively)
                 .scrollBounceBehavior(.basedOnSize)
             }
-            .navigationTitle("")
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .navigationTitle("Page Title")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 38, height: 34)
-                            .background(Color.ohanaControlFill, in: Capsule())
                     }
-                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel("Close")
                 }
             }
         }
@@ -106,13 +103,11 @@ struct ExampleV4Page: View {
                 }
             } label: {
                 Label("Primary Action", systemImage: "checkmark")
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: 44)
-                    .background(Color.goPrimary, in: Capsule())
             }
-            .buttonStyle(ScaleButtonStyle())
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(Color.goPrimary)
         }
         .padding(14)
         .goSolidCardSurface(cornerRadius: 22)
@@ -136,53 +131,35 @@ struct ExampleV4Page: View {
 
 ## Default Sheet Shape
 
-Short record, confirm, restock, and lightweight management popups should be implemented as an in-page overlay inside the current `ZStack` so the glass samples the real screen behind it. Reserve system `.sheet` for overview pages, history, long lists, and complex editors.
+Use the narrowest native SwiftUI presentation that matches the intent:
 
-Inline overlays are not free-form full-screen views. If an overlay or custom sheet ignores the container safe area, the host must pass explicit top and bottom safe-area insets into the presented content. Header chrome, close buttons, and drag affordances must start below the status bar/Dynamic Island region; bottom actions and floating controls must clear the home indicator. Entry and exit should be driven by a lightweight shell or frozen snapshot first, with heavy content mounted after the visual handoff and route clearing delayed until the exit animation has started.
+- `Alert` or `confirmationDialog` for confirmation and destructive decisions.
+- `Menu` for compact command choices.
+- `sheet(item:)` for quick records, restock, lightweight management, overview, history, lists, and editors.
+- `fullScreenCover(item:)` only when the task truly requires an immersive full-screen mode.
 
-Before marking an inline overlay or custom sheet complete, verify the actual route for entry motion, exit motion, close-button hit testing, top safe-area clearance, and bottom safe-area clearance. Use a simulator screenshot or manual-device run when the route is reachable; if onboarding or missing seed data blocks the route, report that explicitly.
-
-Use the authoritative `sheet*` tokens from `ui规范.selection.json`. The example below mirrors the current token values; if the JSON changes, update the example from the JSON instead of treating this file as a second source of truth.
+Let the system own safe areas, keyboard avoidance, drag-to-dismiss, material, transition, and presentation chrome. A sheet with hierarchy owns a `NavigationStack`, a real navigation title, and native toolbar buttons. Do not add an in-page scrim, replacement drag handle, fixed popup geometry, or hand-drawn close capsule.
 
 ```swift
-@State private var activePopup: PopupKind?
-@State private var popupHeight: CGFloat = 360
-@State private var popupVisible = false
+@State private var presentedEditor: EditorRoute?
 
-ZStack(alignment: .bottom) {
-    pageContent
-
-    if let activePopup {
-        GeometryReader { proxy in
-            let horizontalInset: CGFloat = 6
-            let cornerRadius: CGFloat = 52
-            let bottomInset: CGFloat = 8
-            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-
-            ZStack(alignment: .bottom) {
-                Color.black.opacity(popupVisible ? 0.16 : 0)
-                    .ignoresSafeArea()
-                    .onTapGesture { dismissPopupOrKeyboard() }
-
-                popupContent(activePopup)
-                    .frame(width: proxy.size.width - horizontalInset * 2)
-                    .frame(height: popupHeight)
-                    .background {
-                        shape
-                            .fill(.clear)
-                            .glassEffect(.regular.interactive(false), in: shape)
+pageContent
+    .sheet(item: $presentedEditor) { route in
+        NavigationStack {
+            Form {
+                editorContent(route)
+            }
+            .navigationTitle(route.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) {
+                        presentedEditor = nil
                     }
-                    .clipShape(shape)
-                    .shadow(color: Color.black.opacity(popupVisible ? 0.56 : 0), radius: 48, y: -18) // ui-v4: allow liftedAlert popup shadow
-                    .shadow(color: Color.black.opacity(popupVisible ? 0.46 : 0), radius: 28, y: 12) // ui-v4: allow grounding popup shadow
-                    .offset(y: popupVisible ? 0 : popupHeight + 72)
-                    .scaleEffect(popupVisible ? 1 : 0.982, anchor: .bottom)
-                    .animation(GoMotion.page, value: popupVisible)
-                    .padding(.bottom, bottomInset)
+                }
             }
         }
     }
-}
 ```
 
 ## Stable ZStack Motion Scene
@@ -230,9 +207,9 @@ Rules:
 - Do not wrap pure information summaries in card chrome; reserve card surfaces for tappable, navigable, expandable, or editable grouped surfaces.
 - Use `Color.foodDry` for dry food and `Color.foodWet` for wet food; stock, remaining food, and treats follow the current JSON token policy, with warning/error colors only for local low-stock or abnormal states.
 - Keep compact density, but preserve a 44pt hit target for buttons, toggles, rows, chips, and icon actions.
-- Use `ScaleButtonStyle()` for tappable controls unless there is a specific reason not to.
+- Use native `Button`, `Toggle`, `Picker`, `Slider`, `Stepper`, `DatePicker`, `TextField`, `DisclosureGroup`, `Menu`, `List`, and `Form` whenever their semantics fit. Prefer built-in styles and use `Color.goPrimary` only as tint.
 - Use `GoMotion.page`, `GoMotion.feedback`, `GoMotion.fab`, `GoMotion.quick`, or `GoMotion.reduced`; do not invent one-off spring values.
-- Apply Ohana premium micro-motion by default: visible numbers use `.ohanaNumericMotion(value)` or `contentTransition(.numericText())`; member/filter/segmented/calendar-owner switches use selected-state-first snapshot handoff with `GoMotion.selection` or `GoMotion.stateChange`; related visible changes begin in the same interaction frame.
+- Apply Ohana premium micro-motion to custom content only: visible numbers use `.ohanaNumericMotion(value)` or `contentTransition(.numericText())`. Native controls and presentations keep system-owned motion.
 - Keep micro scale restrained: roughly 1.01-1.05 for selection/context feedback and up to about 1.08-1.12 only for reward or success pulses. Avoid hard content replacement, delayed two-step transitions, large bounce, repeated wobble, and fake delta animations during context switches.
 - For key animated interactions, use `OhanaMotionScene` or an equivalent stable `ZStack + single progress` scene; avoid independent delayed animations for the same action.
 - Prefer dedicated subview `View` types over large computed `some View` helpers
@@ -241,7 +218,7 @@ Rules:
   visibility flags, or user input after debounce. Do not use full content
   signatures, localized labels, image data, relationship scans, or `Date()`
   buckets as task ids on high-frequency surfaces.
-- Use `sheet(item:)` or typed sheet/popup routes when presentation state carries
+- Use `sheet(item:)` or typed sheet routes when presentation state carries
   a selected model. Avoid parallel booleans for mutually exclusive sheets and
   avoid `if let` inside a sheet body when the route already carries the data.
 - If an action can enter from App Intents, widgets, notifications, deep links, or
@@ -251,8 +228,8 @@ Rules:
   with availability fallback, consistent shapes, and `.interactive()` only on
   interactive elements. Ordinary business cards still follow V4 solid surfaces
   unless the task explicitly asks for Liquid Glass migration.
-- Settings rows must follow `settingIcon`; non-sheet pages must follow `pageBackButton` and `pageCloseButton`; sheet close controls must follow `sheetChrome`.
-- New sheets must follow independent sheet tokens from `ui规范.selection.json`: compact layout, nativeRegular background, flat card/input, pill button, iconOnly chrome, and an adaptive content-height detent for short record/confirm sheets.
+- Settings use `Form` or `List` with `Section`, native controls, SF Symbols, and system row behavior. Navigation and sheet close actions live in native toolbars.
+- New modal flows use native `Sheet`, `Alert`, `confirmationDialog`, or `Menu`. Do not recreate their background, scrim, drag handle, safe-area handling, or transition.
 - Charts use area trends and quiet axes.
 - Private/locked states show a lock placeholder and never leak values.
 - Run `scripts/audit-ui-v4.sh --changed` before reporting UI work complete.
@@ -262,7 +239,7 @@ Rules:
 Use an inline comment only when the exception is intentional:
 
 ```swift
-Color.black.opacity(0.22) // ui-v4: allow scrim behind modal overlay
+Color.black // ui-v4: allow full-screen media preview background
 ```
 
 Do not use allowlist comments to bypass ordinary card, text, button, or page styling.

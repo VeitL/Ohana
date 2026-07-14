@@ -16,7 +16,6 @@ final class UIContractDocumentationTests: XCTestCase {
         XCTAssertTrue(specSource.contains("### Control Rows"))
         XCTAssertTrue(specSource.contains("DatePicker(selection:displayedComponents:)"))
         XCTAssertTrue(specSource.contains("OhanaMinimalBarChart"))
-        XCTAssertTrue(specSource.contains("ui-ux-pro-max"))
         XCTAssertTrue(specSource.contains("Smoothness compliance before calling a strict task complete"))
         XCTAssertTrue(specSource.contains("First-render data"))
         XCTAssertTrue(templateSource.contains("docs/design/ohana-ui-spec.md"))
@@ -41,6 +40,38 @@ final class UIContractDocumentationTests: XCTestCase {
         XCTAssertFalse(showcaseSource.contains("SwiftData"))
         XCTAssertFalse(showcaseSource.contains("ModelContext"))
         XCTAssertFalse(showcaseSource.contains("@Query"))
+    }
+
+    func testFigmaGapComponentsHaveCanonicalSwiftUIOwners() throws {
+        let rootURL = repositoryRootURL()
+        let formSource = try source("Ohana/Shared/Components/OhanaFormControls.swift", rootURL: rootURL)
+        let stateSource = try source("Ohana/Shared/Components/OhanaStateComponents.swift", rootURL: rootURL)
+        let showcaseSource = try source("Ohana/Features/Settings/DesignLab/OhanaUISpecShowcaseView.swift", rootURL: rootURL)
+
+        XCTAssertTrue(formSource.contains("struct OhanaPickerRow: View"))
+        XCTAssertTrue(formSource.contains(".frame(minHeight: 64)"))
+        XCTAssertTrue(formSource.contains("Color.ohanaCardSurfaceElevated"))
+        XCTAssertTrue(formSource.contains(".accessibilityValue(valueText)"))
+
+        XCTAssertTrue(stateSource.contains("struct OhanaPermissionCard: View"))
+        XCTAssertTrue(stateSource.contains("struct OhanaFeedbackState: View"))
+        XCTAssertTrue(stateSource.contains("enum OhanaPermissionState: Equatable, Sendable"))
+        XCTAssertTrue(stateSource.contains("enum OhanaFeedbackStateKind: Equatable, Sendable"))
+        XCTAssertTrue(stateSource.contains(".frame(minHeight: 44)"))
+        XCTAssertTrue(stateSource.contains("background: .alertInfoBg"))
+        XCTAssertTrue(stateSource.contains("background: .alertWarningBg"))
+        XCTAssertTrue(stateSource.contains("background: .alertErrorBg"))
+        XCTAssertTrue(stateSource.contains("background: .alertSuccessBg"))
+        XCTAssertFalse(stateSource.contains("SwiftData"))
+        XCTAssertFalse(stateSource.contains("@Query"))
+        XCTAssertFalse(stateSource.contains("ModelContext"))
+
+        XCTAssertTrue(showcaseSource.contains("OhanaPickerRow("))
+        XCTAssertTrue(showcaseSource.contains("OhanaPermissionCard("))
+        XCTAssertTrue(showcaseSource.contains("OhanaFeedbackState("))
+        XCTAssertTrue(showcaseSource.contains("ui-spec-showcase-picker-row"))
+        XCTAssertTrue(showcaseSource.contains("ui-spec-showcase-permission-card"))
+        XCTAssertTrue(showcaseSource.contains("ui-spec-showcase-feedback-state"))
     }
 
     private func repositoryRootURL() -> URL {

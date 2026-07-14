@@ -291,51 +291,6 @@ extension CoconutShopView {
         }
     }
 
-    func inlinePopup(@ViewBuilder content: @escaping () -> some View) -> some View {
-        GeometryReader { proxy in
-            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: pendingPurchaseItem != nil || activePicker != nil) {
-                LinearGradient(
-                    colors: [Color.black.opacity(colorScheme == .dark ? 0.22 : 0.12), Color.black.opacity(colorScheme == .dark ? 0.46 : 0.24)], // ui-v4: allow modal scrim
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                .onTapGesture {
-                    pendingPurchaseItem = nil
-                    activePicker = nil
-                }
-
-                VStack(spacing: 0) {
-                    OhanaPopupDragHandle(tint: primaryText.opacity(0.24))
-                        .padding(.top, 8)
-                        .gesture(
-                            DragGesture(minimumDistance: 12).onEnded { value in
-                                if value.translation.height > 32 {
-                                    withAnimation(GoMotion.page) {
-                                        pendingPurchaseItem = nil
-                                        activePicker = nil
-                                    }
-                                }
-                            }
-                        )
-                    VStack(spacing: 0) {
-                        content()
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 8)
-                    .padding(.bottom, 22)
-                }
-                .frame(maxWidth: .infinity)
-                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.42 : 0.22), radius: 34, x: 0, y: -10) // ui-v4: allow lifted overlay shadow
-                .padding(.horizontal, 6)
-                .padding(.bottom, max(8, proxy.safeAreaInsets.bottom + 2))
-            }
-            .animation(GoMotion.page, value: pendingPurchaseItem?.id)
-            .animation(GoMotion.page, value: activePicker?.id)
-        }
-    }
-
     func toastView(_ toast: ShopToast) -> some View {
         VStack {
             HStack(spacing: 8) {

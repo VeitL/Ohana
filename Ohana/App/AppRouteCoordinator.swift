@@ -40,6 +40,7 @@ enum AppSheetRoute: Hashable, Identifiable {
     case accountSwitcher
     case addEntity(EntityType)
     case calendar(entityID: String?, humanID: String?, plantID: String?)
+    case taskCenter
     case coconutLog(CoconutLogSubject?)
     case coconutShop(ShopItem.ShopCategory)
     case crewRoster(CrewRosterMode)
@@ -60,6 +61,7 @@ enum AppSheetRoute: Hashable, Identifiable {
     case petWalkSummary(UUID)
     case petHealth(UUID, initialSection: PetHealthInitialSection?)
     case petMedication(UUID)
+    case petMomentQuick(UUID)
     case petMomentHistory(UUID)
     case petDocuments(UUID)
     case petAchievements(UUID)
@@ -93,6 +95,8 @@ enum AppSheetRoute: Hashable, Identifiable {
             "add-entity-\(type.id)"
         case let .calendar(entityID, humanID, plantID):
             "calendar-\(entityID ?? "all")-\(humanID ?? "all")-\(plantID ?? "all")"
+        case .taskCenter:
+            "task-center"
         case let .coconutLog(subject):
             "coconut-log-\(subject?.id ?? "all")"
         case let .coconutShop(category):
@@ -133,6 +137,8 @@ enum AppSheetRoute: Hashable, Identifiable {
             "pet-health-\(id.uuidString)-\(section?.appRouteIDValue ?? "default")"
         case let .petMedication(id):
             "pet-medication-\(id.uuidString)"
+        case let .petMomentQuick(id):
+            "pet-moment-quick-\(id.uuidString)"
         case let .petMomentHistory(id):
             "pet-moment-history-\(id.uuidString)"
         case let .petDocuments(id):
@@ -276,7 +282,7 @@ final class AppRouteCoordinator: ObservableObject {
     @Published private(set) var rootIdentity = UUID()
 
     var suppressesGlobalWalkBanner: Bool {
-        fullScreen != nil || overlay != nil
+        fullScreen != nil || overlay != nil || sheet?.suppressesGlobalWalkBanner == true
     }
 
     func openPet(_ id: UUID, initialTab: PetDetailTab = .overview) {
@@ -358,6 +364,10 @@ final class AppRouteCoordinator: ObservableObject {
         presentSheet(.calendar(entityID: entityID, humanID: humanID, plantID: nil))
     }
 
+    func presentTaskCenter() {
+        presentSheet(.taskCenter)
+    }
+
     func presentCoconutShop(category: ShopItem.ShopCategory = .appIcon) {
         applySheetDecision(sheetPresentationDecision(for: .coconutShop(category)))
     }
@@ -371,14 +381,7 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentCrewRoster(mode: CrewRosterMode = .members) {
-        let resolvedMode: CrewRosterMode
-        if mode == .collaboration, !OnlineFeatureGate.allows(.onlineCollaboration) {
-            AppFeatureRouteGuard.recordIntercept("appCrewRoster:onlineGate")
-            resolvedMode = .members
-        } else {
-            resolvedMode = mode
-        }
-        presentSheet(.crewRoster(resolvedMode))
+        presentSheet(.crewRoster(mode))
     }
 
     func presentCoconutLog(_ subject: CoconutLogSubject?) {
@@ -386,15 +389,15 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentQuickMoment(petID: UUID) {
-        setOverlay(.quickMoment(petID: petID))
+        presentSheet(.petMomentQuick(petID))
     }
 
     func presentPetWeightQuick(petID: UUID) {
-        setOverlay(.petWeightQuick(petID: petID))
+        presentSheet(.petWeightQuick(petID))
     }
 
     func presentHumanWeightQuick(humanID: UUID) {
-        setOverlay(.humanWeightQuick(humanID: humanID))
+        presentSheet(.humanWeightQuick(humanID))
     }
 
     func presentSettings() {
@@ -516,10 +519,6 @@ private extension AppRouteCoordinator {
     }
 
     func setSheet(_ route: AppSheetRoute) {
-        if let overlayRoute = route.quickEntryOverlayRoute {
-            setOverlay(overlayRoute)
-            return
-        }
         guard sheet != route || fullScreen != nil || overlay != nil else { return }
         if fullScreen != nil {
             fullScreen = nil
@@ -564,63 +563,19 @@ private extension AppRouteCoordinator {
 }
 
 private extension AppSheetRoute {
-    var quickEntryOverlayRoute: AppOverlayRoute? {
+    var suppressesGlobalWalkBanner: Bool {
         switch self {
-        case let .petWeightQuick(id):
-            .petWeightQuick(petID: id)
-        case let .petExpenseQuick(id):
-            .petExpenseQuick(petID: id)
-        case let .humanMedicationQuick(id):
-            .humanMedicationQuick(humanID: id)
-        case let .humanWeightQuick(id):
-            .humanWeightQuick(humanID: id)
-        case let .humanWorkoutQuick(id):
-            .humanWorkoutQuick(humanID: id)
-        case let .humanExpenseQuick(id):
-            .humanExpenseQuick(humanID: id)
-        case let .humanNoteQuick(id):
-            .humanNoteQuick(humanID: id)
-        case .accountSwitcher,
-             .addEntity,
-             .calendar,
-             .coconutLog,
-             .coconutShop,
-             .crewRoster,
-             .functionMenu,
-             .petAllFeatures,
-             .petBasicInfo,
-             .petFood,
-             .petWeight,
-             .petExpense,
-             .petFeed,
-             .petWater,
-             .petPotty,
-             .petLitter,
-             .petPlay,
-             .petHygiene,
-             .petWalkSummary,
-             .petHealth,
-             .petMedication,
-             .petMomentHistory,
-             .petDocuments,
-             .petAchievements,
-             .petRetention,
-             .petBondVault,
-             .humanAllFeatures,
-             .humanBasicInfo,
-             .humanMedication,
-             .humanWeight,
-             .humanWorkout,
-             .humanWorkoutDashboard,
-             .humanMetrics,
-             .humanReport,
-             .humanExpense,
-             .humanWishlist,
-             .humanNote,
-             .requiredAccountSwitch,
-             .settings,
-             .streakDetail:
-            nil
+        case .petMomentQuick,
+             .petWeightQuick,
+             .petExpenseQuick,
+             .humanMedicationQuick,
+             .humanWeightQuick,
+             .humanWorkoutQuick,
+             .humanExpenseQuick,
+             .humanNoteQuick:
+            true
+        default:
+            false
         }
     }
 }

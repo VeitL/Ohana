@@ -8,18 +8,30 @@
 import SwiftData
 import SwiftUI
 
+enum IslandWealthDashboardPresentation: Equatable {
+    case standalone
+    case embedded
+}
+
 struct IslandWealthDashboardView: View {
+    let presentation: IslandWealthDashboardPresentation
+
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @State private var routeData = IslandWealthDashboardRouteData()
     @State private var dataLoadTask: Task<Void, Never>?
+
+    init(presentation: IslandWealthDashboardPresentation = .standalone) {
+        self.presentation = presentation
+    }
 
     var body: some View {
         IslandWealthDashboardContentView(
             pets: routeData.pets,
             humans: routeData.humans,
             walletAccounts: routeData.walletAccounts,
-            walletLedgerEntries: routeData.walletLedgerEntries
+            walletLedgerEntries: routeData.walletLedgerEntries,
+            presentation: presentation
         )
         .onAppear {
             scheduleRouteDataLoad()

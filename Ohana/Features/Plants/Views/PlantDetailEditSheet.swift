@@ -397,15 +397,8 @@ struct EditPlantSheet: View {
     }
 
     private var editFocusSwitcher: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "slider.horizontal.3") // a11y: allow decorative edit-focus glyph; section heading names the control.
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(Color.goPrimary.opacity(0.14), in: Circle())
-                    .accessibilityHidden(true)
-
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "编辑重点", en: "Edit focus", de: "Bearbeitungsfokus"))
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
@@ -418,61 +411,19 @@ struct EditPlantSheet: View {
                 }
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(PlantEditFocusSection.allCases) { section in
-                        editFocusButton(section)
-                    }
+            Picker(
+                l.tr(zh: "编辑重点", en: "Edit focus", de: "Bearbeitungsfokus"),
+                selection: $selectedEditFocus
+            ) {
+                ForEach(PlantEditFocusSection.allCases) { section in
+                    Label(section.title(l), systemImage: section.icon)
+                        .tag(section)
+                        .accessibilityIdentifier("plant-edit-focus-\(section.rawValue)")
                 }
-                .padding(.vertical, 1)
             }
-            .scrollClipDisabled()
-            .accessibilityElement(children: .contain)
+            .pickerStyle(.menu)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
         .accessibilityIdentifier("plant-edit-focus-switcher")
-    }
-
-    private func editFocusButton(_ section: PlantEditFocusSection) -> some View {
-        let isSelected = selectedEditFocus == section
-        let tint = editFocusTint(for: section)
-        return Button {
-            withAnimation(GoMotion.selection) {
-                selectedEditFocus = section
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 7) {
-                Image(systemName: section.icon) // a11y: allow decorative focus glyph; button text names the section.
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
-                    .foregroundStyle(isSelected ? Color.arkInk : tint)
-                    .accessibilityHidden(true)
-                Text(section.title(l))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Text(editFocusStatus(for: section))
-                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.arkInk.opacity(0.76) : Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            .frame(minWidth: 104, idealWidth: 132, maxWidth: 176, alignment: .leading)
-            .frame(minHeight: 82, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(isSelected ? tint : Color.ohanaControlFill.opacity(0.52), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
-                    .strokeBorder(isSelected ? Color.clear : tint.opacity(0.28), lineWidth: 1)
-            )
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel("\(section.title(l)), \(editFocusStatus(for: section))")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier("plant-edit-focus-\(section.rawValue)")
     }
 
     private func editFocusTint(for section: PlantEditFocusSection) -> Color {

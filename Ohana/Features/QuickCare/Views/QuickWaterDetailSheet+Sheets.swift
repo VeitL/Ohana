@@ -7,6 +7,19 @@ import SwiftUI
 
 extension QuickWaterDetailSheet {
     // MARK: - Sheets
+    func waterSheetTitle(_ sheet: ActiveSheet) -> String {
+        switch sheet {
+        case .waterSettings: l.tr(zh: "换水计划", en: "Water change plan", de: "Wasserwechselplan")
+        case .waterAmount: l.tr(zh: "默认水量", en: "Default amount", de: "Standardmenge")
+        case .waterPlan: l.tr(zh: "喂水计划", en: "Water plan", de: "Trinkplan")
+        case .filterSettings: l.tr(zh: "滤芯计划", en: "Filter plan", de: "Filterplan")
+        case .history: l.tr(zh: "喂水记录", en: "Water history", de: "Trinkhistorie")
+        case .waterOverview: l.tr(zh: "喂水总览", en: "Water overview", de: "Trinkübersicht")
+        case .waterChangeOverview: l.tr(zh: "换水总览", en: "Water change overview", de: "Wasserwechsel-Übersicht")
+        case .filterOverview: l.tr(zh: "滤芯总览", en: "Filter overview", de: "Filterübersicht")
+        }
+    }
+
     @ViewBuilder
     func sheetContent(_ sheet: ActiveSheet) -> some View {
         switch sheet {

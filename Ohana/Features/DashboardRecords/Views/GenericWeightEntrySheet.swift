@@ -113,80 +113,46 @@ struct GenericWeightEntrySheet: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let minPanelHeight: CGFloat = 340
-            let maxPanelHeight = max(minPanelHeight, proxy.size.height * 0.92)
-            let scrollMaxHeight = max(190, maxPanelHeight - 152)
-            let measuredScrollHeight = scrollContentHeight > 1 ? scrollContentHeight : min(330, scrollMaxHeight)
-            let scrollHeight = min(measuredScrollHeight, scrollMaxHeight)
-            let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, minPanelHeight))
-            let hiddenOffset = panelHeightEstimate + 72
-
-            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: popupVisible) {
-                popupBackdrop
-                    .opacity(popupVisible ? 1 : 0)
-
-                VStack(spacing: 0) {
-                    popupDragHandle
-                        .padding(.top, 4)
-                    header
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 14) {
-                            weightEntryBlock
-                            EmbeddedDecimalKeypad(
-                                text: $weightText,
-                                countryCode: appCountry,
-                                maxFractionDigits: weightUnit == "g" ? 0 : 2,
-                                accent: accentColor,
-                                isMini: true,
-                                showsSubmitButton: false,
-                                onSubmit: {
-                                    if isValid { save() }
-                                }
-                            )
-                            .padding(.horizontal, 20)
-                            quickWeightStrip
-                            dateAndTargetBlock
-                            bcsBlock
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 14) {
+                    Text(entityName)
+                        .font(OhanaFont.subheadline(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                    weightEntryBlock
+                    EmbeddedDecimalKeypad(
+                        text: $weightText,
+                        countryCode: appCountry,
+                        maxFractionDigits: weightUnit == "g" ? 0 : 2,
+                        accent: accentColor,
+                        isMini: true,
+                        showsSubmitButton: false,
+                        onSubmit: {
+                            if isValid { save() }
                         }
-                        .padding(.bottom, 10)
-                        .background {
-                            GeometryReader { contentProxy in
-                                Color.clear
-                                    .preference(
-                                        key: WeightEntryScrollHeightKey.self,
-                                        value: contentProxy.size.height
-                                    )
-                            }
-                        }
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .frame(height: scrollHeight)
-
-                    saveBar
+                    )
+                    .padding(.horizontal, 20)
+                    quickWeightStrip
+                    dateAndTargetBlock
+                    bcsBlock
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
-                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
-                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow confirmed inline popup lifted shadow
-                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow confirmed inline popup lifted shadow
-                .padding(.horizontal, 6)
-                .padding(.bottom, 8)
-                .offset(y: popupVisible ? popupDragOffset : hiddenOffset)
-                .frame(maxHeight: maxPanelHeight, alignment: .bottom)
-                .ohanaAdaptiveSheetContentHeight(
-                    $adaptiveSheetHeight,
-                    minHeight: minPanelHeight,
-                    maxHeight: maxPanelHeight,
-                    chromePadding: 18
-                )
+                .padding(.vertical, 12)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle(l.tr(zh: "记录体重", en: "Record weight", de: "Gewicht erfassen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, role: .cancel) { closeSheet() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
+                        .disabled(!isValid || isSaving)
+                        .accessibilityIdentifier("generic-weight-entry-save-action")
+                }
             }
         }
-        .allowsHitTesting(popupVisible && !isClosing)
-        .animation(popupAnimation, value: popupVisible)
-        .presentationBackground(.clear)
-        .presentationDetents([.height(adaptiveSheetHeight)])
-        .presentationDragIndicator(.hidden)
+        .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
         .onAppear {
             isClosing = false
@@ -208,14 +174,6 @@ struct GenericWeightEntrySheet: View {
                 countryCode: appCountry,
                 maxFractionDigits: weightUnit == "g" ? 0 : 2
             )
-        }
-        .onPreferenceChange(WeightEntryScrollHeightKey.self) { height in
-            guard height.isFinite, height > 0 else { return }
-            var transaction = Transaction()
-            transaction.animation = nil
-            withTransaction(transaction) {
-                scrollContentHeight = height
-            }
         }
         .onDisappear {
             latestPetWeightLoadTask?.cancel()
@@ -667,13 +625,7 @@ struct GenericWeightEntrySheet: View {
         if let onDismiss {
             guard !isClosing else { return }
             isClosing = true
-            withAnimation(popupAnimation) {
-                popupVisible = false
-                popupDragOffset = 0
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
-                onDismiss()
-            }
+            onDismiss()
         } else {
             dismiss()
         }

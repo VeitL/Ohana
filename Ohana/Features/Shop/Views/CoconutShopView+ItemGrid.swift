@@ -36,36 +36,7 @@ extension CoconutShopView {
 
             Spacer(minLength: 0)
 
-            Button {
-                guard !state.isDisabled else { return }
-                handleItemTap(item)
-            } label: {
-                HStack(spacing: 8) {
-                    Text(state.label)
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(state.tint)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    Spacer()
-                    if showsShopSwitch(for: item) {
-                        shopTogglePill(isOn: state.isEquipped)
-                    } else if state.showCost {
-                        Text("🥥 \(item.cost)")
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(canAfford(item) ? Color.goYellow : tertiaryText)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 9)
-                .background(
-                    state.tint.opacity(colorScheme == .dark ? 0.18 : 0.12),
-                    in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
-                )
-                .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .disabled(state.isDisabled)
-            .accessibilityIdentifier("coconut-shop-item-\(item.id)")
+            shopItemAction(item, state: state)
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: item.category == .appIcon ? 214 : 198, alignment: .topLeading)
@@ -112,6 +83,52 @@ extension CoconutShopView {
         var showCost: Bool = false
         var isEquipped: Bool = false
         var isDisabled: Bool = false
+    }
+
+    @ViewBuilder
+    func shopItemAction(_ item: ShopItem, state: ItemState) -> some View {
+        if showsShopSwitch(for: item) {
+            Toggle(
+                isOn: Binding(
+                    get: { state.isEquipped },
+                    set: { nextValue in
+                        guard nextValue != state.isEquipped, !state.isDisabled else { return }
+                        handleItemTap(item)
+                    }
+                )
+            ) {
+                Text(state.label)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(state.tint)
+                    .lineLimit(1)
+            }
+            .toggleStyle(.switch)
+            .tint(Color.goPrimary)
+            .disabled(state.isDisabled)
+            .accessibilityIdentifier("coconut-shop-item-\(item.id)")
+        } else {
+            Button {
+                guard !state.isDisabled else { return }
+                handleItemTap(item)
+            } label: {
+                HStack(spacing: 8) {
+                    Text(state.label)
+                        .font(OhanaFont.caption(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    Spacer()
+                    if state.showCost {
+                        Text("🥥 \(item.cost)")
+                            .font(OhanaFont.caption(.semibold))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(state.tint)
+            .disabled(state.isDisabled)
+            .accessibilityIdentifier("coconut-shop-item-\(item.id)")
+        }
     }
 
     func itemState(_ item: ShopItem) -> ItemState {

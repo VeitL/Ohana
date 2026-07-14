@@ -65,16 +65,16 @@ struct PetBondVaultContentView: View {
                     .background(Color.goPrimary, in: Capsule())
                     .padding(.bottom, 22)
             }
-
-            if let activePreviewItem {
-                PetBondVaultPreviewOverlay(
-                    item: activePreviewItem,
-                    pet: pet,
-                    appLanguage: appLanguage,
-                    close: { closePreview() }
-                )
-                .zIndex(20)
-            }
+        }
+        .sheet(item: $activePreviewItem) { item in
+            PetBondVaultPreviewOverlay(
+                item: item,
+                pet: pet,
+                appLanguage: appLanguage,
+                close: { closePreview() }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.scrolls)
         }
         .petMemorialTone(isActive: pet.hasPassedAway)
         .accessibilityIdentifier("pet-bond-vault-screen")
@@ -392,77 +392,34 @@ private struct PetBondVaultPreviewOverlay: View {
     let appLanguage: String
     let close: () -> Void
 
-    @State private var dragOffset: CGFloat = 0
-
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: true) {
-            Color.black.opacity(0.28) // ui-v4: allow modal scrim
-                .ignoresSafeArea()
-                .onTapGesture(perform: close)
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    PetBondVaultAppliedPreview(item: item, pet: pet, appLanguage: appLanguage, compact: false)
+                        .frame(height: item.previewKind == .storyStyleAnimation ? 230 : 210)
 
-            VStack(spacing: 0) {
-                OhanaPopupDragHandle(tint: Color.ohanaPrimaryText.opacity(0.24))
-                    .padding(.top, 4)
-                    .gesture(dragGesture)
+                    Text(previewCaption)
+                        .font(OhanaFont.body())
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                HStack(spacing: 12) {
-                    Image(systemName: item.icon)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color(hex: item.tintHex))
-                        .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(l.text(item.title))
-                            .font(OhanaFont.title3(.black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(l.tr(zh: "购买前先看看真实效果", en: "Preview the applied look before buying", de: "Vorschau vor dem Freischalten"))
-                            .font(OhanaFont.caption(.semibold))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                    }
-
-                    Spacer()
-                    OhanaPopupCloseButton(tint: Color.ohanaPrimaryText, action: close)
+                    Button(l.tr(zh: "看好了", en: "Looks good", de: "Sieht gut aus"), action: close)
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.goPrimary)
+                        .controlSize(.large)
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 2)
-                .padding(.bottom, 14)
-
-                PetBondVaultAppliedPreview(item: item, pet: pet, appLanguage: appLanguage, compact: false)
-                    .frame(height: item.previewKind == .storyStyleAnimation ? 230 : 210)
-                    .padding(.horizontal, 18)
-
-                Text(previewCaption)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 18)
-                    .padding(.top, 14)
-
-                Button(action: close) {
-                    Text(l.tr(zh: "看好了", en: "Looks good", de: "Sieht gut aus"))
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color.goPrimary, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .padding(.horizontal, 18)
-                .padding(.top, 16)
-                .padding(.bottom, 18)
+                .padding(20)
             }
-            .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
-            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
-            .shadow(color: Color.black.opacity(0.54), radius: 46, x: 0, y: -16) // ui-v4: allow liftedAlert inline popup shadow
-            .shadow(color: Color(hex: "0B102C").opacity(0.38), radius: 26, x: 0, y: 12) // ui-v4: allow liftedAlert inline popup shadow
-            .padding(.horizontal, 6)
-            .padding(.bottom, 8)
-            .offset(y: dragOffset)
+            .navigationTitle(l.text(item.title))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, action: close)
+                }
+            }
         }
     }
 
@@ -481,22 +438,6 @@ private struct PetBondVaultPreviewOverlay: View {
         case .bondTreat:
             l.tr(zh: "点心可以重复投喂，每次都会消耗椰子加深羁绊。", en: "Treats are repeatable; each one spends coconuts to deepen the bond.", de: "Snacks sind wiederholbar und vertiefen die Bindung gegen Kokosnüsse.")
         }
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 8)
-            .onChanged { value in
-                dragOffset = max(0, value.translation.height)
-            }
-            .onEnded { value in
-                if value.translation.height > 78 || value.predictedEndTranslation.height > 130 {
-                    close()
-                } else {
-                    withAnimation(GoMotion.page) {
-                        dragOffset = 0
-                    }
-                }
-            }
     }
 }
 

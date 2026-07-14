@@ -63,6 +63,9 @@ struct ContentView: View {
                                     appRoutes.presentCoconutLog(subject)
                                 }
                             )
+                            .globalTaskCenterToolbar {
+                                appRoutes.presentTaskCenter()
+                            }
                         }
                         .navigationTransition(.zoom(sourceID: route.sourceID, in: heroNS))
                     }

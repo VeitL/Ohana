@@ -338,20 +338,13 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openCrewRoster(mode: CrewRosterMode = .members) {
-        let resolvedMode: CrewRosterMode
-        if mode == .collaboration, !OnlineFeatureGate.allows(.onlineCollaboration) {
-            AppFeatureRouteGuard.recordIntercept("homeCrewRoster:onlineGate")
-            resolvedMode = .members
-        } else {
-            resolvedMode = mode
-        }
         if let appSheetRouteSink {
-            appSheetRouteSink(.appSheet(.crewRoster(resolvedMode)))
+            appSheetRouteSink(.appSheet(.crewRoster(mode)))
             modal = nil
             fullScreen = nil
             return
         }
-        modal = .crewRoster(resolvedMode)
+        modal = .crewRoster(mode)
     }
 
     func openAccountSwitcher() {
@@ -451,6 +444,11 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openQuickMoment(_ petID: UUID) {
+        if let appSheetRouteSink {
+            appSheetRouteSink(.appSheet(.petMomentQuick(petID)))
+            overlay = nil
+            return
+        }
         if let appOverlayRouteSink {
             appOverlayRouteSink(.quickMoment(petID: petID))
             overlay = nil
@@ -464,6 +462,11 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openPetWeightQuick(_ petID: UUID) {
+        if let appSheetRouteSink {
+            appSheetRouteSink(.appSheet(.petWeightQuick(petID)))
+            overlay = nil
+            return
+        }
         if let appOverlayRouteSink {
             appOverlayRouteSink(.petWeightQuick(petID: petID))
             overlay = nil
@@ -473,8 +476,9 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openHumanWeightQuick(_ humanID: UUID) {
-        if keepsHumanQuickOverlaysLocal {
-            overlay = .humanWeightQuick(humanID: humanID)
+        if let appSheetRouteSink {
+            appSheetRouteSink(.appSheet(.humanWeightQuick(humanID)))
+            overlay = nil
             return
         }
         if let appOverlayRouteSink {
@@ -529,6 +533,13 @@ final class HomeRouteCoordinator: ObservableObject {
                 return
             }
         }
+        if let appSheetRoute = route.appSheetRoute,
+           let appSheetRouteSink {
+            appSheetRouteSink(.appSheet(appSheetRoute))
+            overlay = nil
+            sheet = nil
+            return
+        }
         if let appOverlayRoute = route.appOverlayRoute,
            let homeOverlayRoute = route.homeOverlayRoute {
             if keepsHumanQuickOverlaysLocal, route.isHumanQuickOverlayRoute {
@@ -543,12 +554,6 @@ final class HomeRouteCoordinator: ObservableObject {
                 return
             }
             overlay = homeOverlayRoute
-            sheet = nil
-            return
-        }
-        if let appSheetRoute = route.appSheetRoute,
-           let appSheetRouteSink {
-            appSheetRouteSink(.appSheet(appSheetRoute))
             sheet = nil
             return
         }
@@ -821,12 +826,12 @@ private extension HomeSheetRoute {
             .petAllFeatures(id)
         case let .petFood(id):
             .petFood(id)
-        case .petWeightQuick:
-            nil
+        case let .petWeightQuick(id):
+            .petWeightQuick(id)
         case let .petWeight(id):
             .petWeight(id)
-        case .petExpenseQuick:
-            nil
+        case let .petExpenseQuick(id):
+            .petExpenseQuick(id)
         case let .petExpense(id):
             .petExpense(id)
         case let .petFeed(id, opensManualSheet):
@@ -863,8 +868,8 @@ private extension HomeSheetRoute {
             .humanMedicationQuick(id)
         case let .humanMedication(id):
             .humanMedication(id)
-        case .humanWeightQuick:
-            nil
+        case let .humanWeightQuick(id):
+            .humanWeightQuick(id)
         case let .humanWeight(id):
             .humanWeight(id)
         case let .humanWorkoutQuick(id):
@@ -877,8 +882,8 @@ private extension HomeSheetRoute {
             .humanMetrics(id)
         case let .humanReport(id):
             .humanReport(id)
-        case .humanExpenseQuick:
-            nil
+        case let .humanExpenseQuick(id):
+            .humanExpenseQuick(id)
         case let .humanExpense(id):
             .humanExpense(id)
         case let .humanWishlist(id):

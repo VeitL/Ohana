@@ -28,7 +28,7 @@ struct OnlineFeatureGateTests {
             Issue.record("Expected the bounty board to be hidden while online collaboration is gated")
         }
 
-        #expect(!AppFeatureRouteGuard.allowsSheetRoute(.crewRoster(.collaboration), currentLevel: launchLevel))
+        #expect(AppFeatureRouteGuard.allowsSheetRoute(.crewRoster(.collaboration), currentLevel: launchLevel))
         #expect(AppFeatureRouteGuard.allowsSheetRoute(.crewRoster(.members), currentLevel: launchLevel))
         #expect(AppFeatureRouteGuard.isVisibleFunctionDestination(.familyWeeklyReport, currentLevel: launchLevel))
     }
@@ -51,14 +51,14 @@ struct OnlineFeatureGateTests {
         #expect(!service.isEnabled)
     }
 
-    @Test @MainActor func onlineCollaborationPresentationFallsBackThroughRoutePolicy() {
+    @Test @MainActor func onDeviceCollaborationPresentationRemainsAvailableInSolo() {
         let coordinator = AppRouteCoordinator()
 
         coordinator.presentRequiredAccountSwitch()
         coordinator.presentCrewRoster(mode: .collaboration)
 
-        #expect(coordinator.sheet == .crewRoster(.members))
-        #expect(!AppFeatureRouteGuard.allowsSheetRoute(.crewRoster(.collaboration), currentLevel: 10))
+        #expect(coordinator.sheet == .crewRoster(.collaboration))
+        #expect(AppFeatureRouteGuard.allowsSheetRoute(.crewRoster(.collaboration), currentLevel: 10))
         #expect(AppFeatureRouteGuard.allowsSheetRoute(.crewRoster(.members), currentLevel: 10))
     }
 

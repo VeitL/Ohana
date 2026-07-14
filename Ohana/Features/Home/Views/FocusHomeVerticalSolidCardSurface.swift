@@ -17,10 +17,6 @@ struct FocusHomeVerticalSolidCardSurface: View {
     var allowsLiveAvatarFallback: Bool = true
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
-    private var accent: Color {
-        card.themeColorHex.isEmpty ? card.color : Color(hex: card.themeColorHex)
-    }
-
     private var visualProgress: CGFloat {
         min(max(progress, 0), 1)
     }
@@ -48,11 +44,31 @@ struct FocusHomeVerticalSolidCardSurface: View {
             let usesFullWidthPhoto = avatarSource.image != nil && !avatarSource.isTransparent
 
             ZStack(alignment: .topLeading) {
-                shape
-                    .fill(cardGradient)
+                Group {
+                    if card.isPlant {
+                        WalletPlantLightBlueGlassBackground(reducesEffects: !usesFullVisualEffects)
+                    } else {
+                        WalletMemberHeroBackground(
+                            themeColorHex: card.themeColorHex,
+                            fallbackColor: card.color,
+                            reducesEffects: !usesFullVisualEffects
+                        )
+                    }
+                }
+                    .clipShape(shape)
                     .overlay {
                         shape
-                            .strokeBorder(borderGradient, lineWidth: lerp(1, 1.25, p))
+                            .strokeBorder(
+                                card.isPlant
+                                    ? WalletPlantLightBlueGlassBackground.rimColor
+                                    : WalletMemberHeroPalette(
+                                        themeColorHex: card.themeColorHex,
+                                        fallbackColor: card.color
+                                    ).border,
+                                lineWidth: card.isPlant
+                                    ? WalletPlantLightBlueGlassBackground.rimWidth
+                                    : lerp(1, 1.25, p)
+                            )
                     }
 
                 if let image = avatarSource.image, usesFullWidthPhoto {
@@ -70,7 +86,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .zIndex(2)
 
                 VStack(alignment: .leading, spacing: 0) {
-                    header(progress: p)
+                    header(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
                         .padding(.top, lerp(16, 24, p))
                         .padding(.horizontal, lerp(15, 22, p))
 
@@ -83,72 +99,49 @@ struct FocusHomeVerticalSolidCardSurface: View {
                         .padding(.leading, lerp(10, 18, p))
                         .padding(.trailing, lerp(10, 18, p))
 
-                    bottomInfo(progress: p)
+                    bottomInfo(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
                         .padding(.horizontal, lerp(15, 18, p))
                         .padding(.bottom, lerp(16, 236, p))
                 }
                 .zIndex(4)
 
-                rightInfoColumn(width: w, height: h, progress: p)
+                rightInfoColumn(
+                    width: w,
+                    height: h,
+                    progress: p,
+                    usesFullWidthPhoto: usesFullWidthPhoto
+                )
                     .zIndex(5)
             }
             .compositingGroup() // smoothness: collapse internal text/avatar shadows into one card surface before hero scaling.
             .clipShape(shape)
             .saturation(card.hasPassedAway ? 0 : 1)
-            .shadow( // ui-v4: allow stable home card depth without animating shadow rasterization; reduced visual mode lowers raster cost.
-                color: Color.arkInk.opacity(usesFullVisualEffects ? (card.hasPassedAway ? 0.14 : 0.22) : 0.08),
-                radius: usesFullVisualEffects ? 16 : 6,
-                x: 0,
-                y: usesFullVisualEffects ? 11 : 3
-            )
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(card.name), \(card.kind)")
         }
     }
 
-    private var cardGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                accent.mix(with: .white, by: lerp(0.10, 0.12, visualProgress)),
-                accent,
-                accent.mix(with: .black, by: lerp(0.30, 0.34, visualProgress))
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private var borderGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color.goCardWhite.opacity(lerp(0.20, 0.28, visualProgress)),
-                accent.mix(with: .white, by: 0.12).opacity(lerp(0.42, 0.58, visualProgress)),
-                Color.arkInk.opacity(lerp(0.12, 0.18, visualProgress))
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
     @ViewBuilder
-    private func header(progress p: CGFloat) -> some View {
+    private func header(progress p: CGFloat, usesFullWidthPhoto: Bool) -> some View {
         let reveal = expandedContentProgress(p)
         let compactHeaderOpacity = Double(1 - reveal)
+        let primary = usesFullWidthPhoto ? Color.goCardWhite : Color.arkInk
+        let secondary = primary.opacity(0.68)
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: lerp(3, 4, p)) {
                 Text(card.name)
                     .font(.system(size: lerp(17, 28, p), weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .foregroundStyle(primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.70)
-                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on card text
 
                 Text(card.kind)
                     .font(.system(size: lerp(9, 12, p), weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .foregroundStyle(secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.70)
-                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.46, radius: 4, y: 1) // ui-v4: allow requested legibility shadow on card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.46, radius: 4, y: 1) // ui-v4: allow requested legibility shadow on card text
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .opacity(compactHeaderOpacity)
@@ -161,7 +154,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 .padding(.horizontal, lerp(9, 12, p))
                 .padding(.vertical, lerp(5, 7, p))
                 .background(statusBadgeBackground, in: Capsule())
-                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects && card.statusBadgeTone == .urgent, opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on urgent card status text
+                .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto) && card.statusBadgeTone == .urgent, opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on urgent card status text
                 .opacity(compactHeaderOpacity)
         }
     }
@@ -195,7 +188,11 @@ struct FocusHomeVerticalSolidCardSurface: View {
             Image(systemName: avatarSymbol)
                 .font(.system(size: width * lerp(0.43, 0.47, visualProgress), weight: .regular))
                 .symbolRenderingMode(.monochrome)
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.92))
+                .foregroundStyle(
+                    card.isPlant
+                        ? Color(hex: card.themeColorHex).mix(with: .black, by: 0.22).opacity(0.88)
+                        : Color.goCardWhite.opacity(0.92)
+                )
                 .frame(width: width * 0.78, height: height * 0.36)
         }
     }
@@ -208,17 +205,22 @@ struct FocusHomeVerticalSolidCardSurface: View {
         return baseCenterOffset + lerp(0, expandedShift, p)
     }
 
-    private func rightInfoColumn(width: CGFloat, height: CGFloat, progress p: CGFloat) -> some View {
+    private func rightInfoColumn(
+        width: CGFloat,
+        height: CGFloat,
+        progress p: CGFloat,
+        usesFullWidthPhoto: Bool
+    ) -> some View {
         let reveal = smooth(p, 0.30, 0.64)
         let sideWidth = max(128, width * 0.46)
         return VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
             Spacer(minLength: 0)
             if card.isHuman {
-                humanInfoStack(progress: p)
+                humanInfoStack(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
             } else if card.isElectronicPet {
-                electronicPetInfoStack(progress: p)
+                electronicPetInfoStack(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
             } else {
-                petInfoStack(progress: p)
+                petInfoStack(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
             }
         }
         .padding(.trailing, 18)
@@ -231,68 +233,68 @@ struct FocusHomeVerticalSolidCardSurface: View {
         .allowsHitTesting(false)
     }
 
-    private func humanInfoStack(progress p: CGFloat) -> some View {
+    private func humanInfoStack(progress p: CGFloat, usesFullWidthPhoto: Bool) -> some View {
         let details = [card.zodiacText, card.mbtiText]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
             Text(details.first ?? "OHANA MEMBER")
                 .font(.system(size: lerp(15, 20, p), weight: .black, design: .rounded))
-                .foregroundStyle(cardPrimaryText)
+                .foregroundStyle(cardPrimaryText(usesFullWidthPhoto: usesFullWidthPhoto))
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
-                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
+                .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
 
             if details.count > 1 {
                 Text(details.dropFirst().joined(separator: " · "))
                     .font(.system(size: lerp(9, 11, p), weight: .bold, design: .rounded))
-                    .foregroundStyle(cardSecondaryText(opacity: 0.78))
+                    .foregroundStyle(cardSecondaryText(usesFullWidthPhoto: usesFullWidthPhoto, opacity: 0.78))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
             }
         }
     }
 
-    private func petInfoStack(progress p: CGFloat) -> some View {
+    private func petInfoStack(progress p: CGFloat, usesFullWidthPhoto: Bool) -> some View {
         let meta = [card.humanEquivalentAgeText, card.zodiacText]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && $0 != "未知" }
         return VStack(alignment: .trailing, spacing: lerp(4, 7, p)) {
-            petAgeMetric(progress: p)
+            petAgeMetric(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
 
             Text(petTogetherHeadline)
                 .font(.system(size: lerp(15, 20, p), weight: .black, design: .rounded))
-                .foregroundStyle(cardPrimaryText)
+                .foregroundStyle(cardPrimaryText(usesFullWidthPhoto: usesFullWidthPhoto))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
-                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
+                .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
 
             if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
                !hint.isEmpty {
                 Text(hint)
                     .font(.system(size: lerp(8.5, 10.5, p), weight: .bold, design: .rounded))
-                    .foregroundStyle(cardSecondaryText(opacity: 0.82))
+                    .foregroundStyle(cardSecondaryText(usesFullWidthPhoto: usesFullWidthPhoto, opacity: 0.82))
                     .lineLimit(p > 0.72 ? 2 : 1)
                     .multilineTextAlignment(.trailing)
                     .minimumScaleFactor(0.62)
-                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
             }
 
             if !meta.isEmpty {
                 Text(meta.joined(separator: " · "))
                     .font(.system(size: lerp(8.5, 10, p), weight: .bold, design: .rounded))
-                    .foregroundStyle(cardSecondaryText(opacity: 0.76))
+                    .foregroundStyle(cardSecondaryText(usesFullWidthPhoto: usesFullWidthPhoto, opacity: 0.76))
                     .lineLimit(p > 0.72 ? 2 : 1)
                     .multilineTextAlignment(.trailing)
                     .minimumScaleFactor(0.62)
-                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
             }
         }
     }
 
     @ViewBuilder
-    private func petAgeMetric(progress p: CGFloat) -> some View {
+    private func petAgeMetric(progress p: CGFloat, usesFullWidthPhoto: Bool) -> some View {
         if let age = expandedAgeParts {
             HStack(alignment: .firstTextBaseline, spacing: lerp(3, 5, p)) {
                 Text(age.number)
@@ -306,8 +308,8 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .foregroundStyle(cardPrimaryText)
-            .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
+            .foregroundStyle(cardPrimaryText(usesFullWidthPhoto: usesFullWidthPhoto))
+            .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
         }
     }
 
@@ -332,55 +334,56 @@ struct FocusHomeVerticalSolidCardSurface: View {
         )
     }
 
-    private func electronicPetInfoStack(progress p: CGFloat) -> some View {
+    private func electronicPetInfoStack(progress p: CGFloat, usesFullWidthPhoto: Bool) -> some View {
         VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
             Text(l.tr(zh: "电子宠物", en: "Critter", de: "Critter"))
                 .font(.system(size: lerp(15, 20, p), weight: .black, design: .rounded))
-                .foregroundStyle(cardPrimaryText)
+                .foregroundStyle(cardPrimaryText(usesFullWidthPhoto: usesFullWidthPhoto))
                 .lineLimit(1)
-                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
+                .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.55, radius: 5, y: 2) // ui-v4: allow readability shadow on image card text
 
             if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
                !hint.isEmpty {
                 Text(hint)
                     .font(.system(size: lerp(8.5, 10.5, p), weight: .bold, design: .rounded))
-                    .foregroundStyle(cardSecondaryText(opacity: 0.82))
+                    .foregroundStyle(cardSecondaryText(usesFullWidthPhoto: usesFullWidthPhoto, opacity: 0.82))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
-                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
             }
 
             if let ageText = card.ageText {
                 Text(ageText)
                     .font(.system(size: lerp(8.5, 10, p), weight: .bold, design: .rounded))
-                    .foregroundStyle(cardSecondaryText(opacity: 0.76))
+                    .foregroundStyle(cardSecondaryText(usesFullWidthPhoto: usesFullWidthPhoto, opacity: 0.76))
                     .lineLimit(1)
-                    .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
+                    .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.42, radius: 4, y: 1) // ui-v4: allow readability shadow on image card text
             }
         }
     }
 
     @ViewBuilder
-    private func bottomInfo(progress p: CGFloat) -> some View {
+    private func bottomInfo(progress p: CGFloat, usesFullWidthPhoto: Bool) -> some View {
         let reveal = expandedContentProgress(p)
-        compactFooter(progress: p)
+        compactFooter(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
             .opacity(Double(1 - reveal))
     }
 
-    private func compactFooter(progress p: CGFloat) -> some View {
-        HStack(alignment: .lastTextBaseline, spacing: 5) {
+    private func compactFooter(progress p: CGFloat, usesFullWidthPhoto: Bool) -> some View {
+        let primary = cardPrimaryText(usesFullWidthPhoto: usesFullWidthPhoto)
+        return HStack(alignment: .lastTextBaseline, spacing: 5) {
             Text(primaryMetric)
                 .font(.system(size: lerp(31, 36, p), weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
+                .foregroundStyle(primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
                 .contentTransition(.numericText())
-                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.60, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on card text
+                .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.60, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on card text
             Text(metricUnit)
                 .font(.system(size: lerp(11, 15, p), weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
+                .foregroundStyle(primary.opacity(0.72))
                 .lineLimit(1)
-                .homeCardTextShadow(usesFullVisualEffects: usesFullVisualEffects, opacity: 0.46, radius: 4, y: 1) // ui-v4: allow requested legibility shadow on card text
+                .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.46, radius: 4, y: 1) // ui-v4: allow requested legibility shadow on card text
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -421,12 +424,16 @@ struct FocusHomeVerticalSolidCardSurface: View {
         return l.tr(zh: "相伴 \(card.daysTogether) 天", en: "\(card.daysTogether) Days Together", de: "\(card.daysTogether) Tage zusammen")
     }
 
-    private var cardPrimaryText: Color {
-        WalletPetCardTheme.prefersDarkForeground(for: card.themeColorHex) ? Color.arkInk : Color.goCardWhite
+    private func cardPrimaryText(usesFullWidthPhoto: Bool) -> Color {
+        card.isPlant && !usesFullWidthPhoto ? Color.arkInk : Color.goCardWhite
     }
 
-    private func cardSecondaryText(opacity: Double) -> Color {
-        cardPrimaryText.opacity(opacity)
+    private func cardSecondaryText(usesFullWidthPhoto: Bool, opacity: Double) -> Color {
+        cardPrimaryText(usesFullWidthPhoto: usesFullWidthPhoto).opacity(opacity)
+    }
+
+    private func usesTextShadows(usesFullWidthPhoto: Bool) -> Bool {
+        usesFullVisualEffects && (!card.isPlant || usesFullWidthPhoto)
     }
 
     private var statusBadge: String {

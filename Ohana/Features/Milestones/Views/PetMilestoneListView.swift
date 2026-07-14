@@ -492,113 +492,54 @@ struct MapLocationPickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                OhanaAppBackground().ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    // 搜索框
-                    HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                        GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                            l.tr(zh: "搜索地点、医院、公园…", en: "Search places, clinics, parks...", de: "Orte, Kliniken, Parks suchen..."),
-                            text: $searchText,
-                            commitDelayNanoseconds: 220_000_000,
-                            submitLabel: .search,
-                            capitalization: .never
-                        )
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .tint(Color.goYellow)
-                        if !searchText.isEmpty {
-                            Button {
-                                searchTask?.cancel()
-                                searchText = ""
-                                results = []
-                                isSearching = false
-                            } label: {
-                                Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                        }
-                    }
-                    .padding(.horizontal, 14).padding(.vertical, 12)
-                    .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-                    .padding(.horizontal, 16).padding(.vertical, 12)
-
-                    if isSearching {
-                        ProgressView()
-                            .tint(Color.goYellow)
-                            .padding(.top, 40)
-                        Spacer()
-                    } else if results.isEmpty, !searchText.isEmpty {
-                        VStack(spacing: 10) {
-                            Image(systemName: "mappin.slash").font(OhanaFont.adaptive(size: 36)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            Text(l.tr(zh: "没有找到匹配地点", en: "No matching places found", de: "Keine passenden Orte gefunden"))
-                                .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                        }.padding(.top, 60)
-                        Spacer()
-                    } else if results.isEmpty {
-                        VStack(spacing: 10) {
-                            Image(systemName: "mappin.and.ellipse").font(OhanaFont.adaptive(size: 36)).foregroundStyle(Color.goYellow.opacity(0.4)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            Text(l.tr(zh: "输入地名开始搜索", en: "Enter a place name to search", de: "Ortsnamen eingeben, um zu suchen"))
-                                .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                        }.padding(.top, 60)
-                        Spacer()
-                    } else {
-                        List(results, id: \.self) { item in
-                            Button {
-                                selectedLocation = mapItemTitle(item)
-                                dismiss()
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(item.name ?? l.tr(zh: "未知地点", en: "Unknown place", de: "Unbekannter Ort"))
-                                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(Color.ohanaPrimaryText)
-                                    if let addr = mapItemAddress(item), addr != item.name {
-                                        Text(addr)
-                                            .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                                            .lineLimit(1)
-                                    }
+            Group {
+                if isSearching {
+                    ProgressView(l.tr(zh: "正在搜索", en: "Searching", de: "Suche läuft"))
+                } else if results.isEmpty, !searchText.isEmpty {
+                    ContentUnavailableView(
+                        l.tr(zh: "没有找到匹配地点", en: "No matching places found", de: "Keine passenden Orte gefunden"),
+                        systemImage: "mappin.slash",
+                        description: Text(l.tr(zh: "请尝试其他地名。", en: "Try another place name.", de: "Versuche einen anderen Ortsnamen."))
+                    )
+                } else if results.isEmpty {
+                    ContentUnavailableView(
+                        l.tr(zh: "搜索地点", en: "Search places", de: "Orte suchen"),
+                        systemImage: "mappin.and.ellipse",
+                        description: Text(l.tr(zh: "输入地点、医院或公园名称。", en: "Enter a place, clinic, or park name.", de: "Gib einen Ort, eine Klinik oder einen Park ein."))
+                    )
+                } else {
+                    List(results, id: \.self) { item in
+                        Button {
+                            selectedLocation = mapItemTitle(item)
+                            dismiss()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.name ?? l.tr(zh: "未知地点", en: "Unknown place", de: "Unbekannter Ort"))
+                                    .font(OhanaFont.body(.semibold))
+                                if let addr = mapItemAddress(item), addr != item.name {
+                                    Text(addr)
+                                        .font(OhanaFont.footnote())
+                                        .foregroundStyle(Color.ohanaSecondaryText)
+                                        .lineLimit(1)
                                 }
-                                .padding(.vertical, 4)
                             }
-                            .buttonStyle(ScaleButtonStyle())
-                            .listRowBackground(Color.clear)
-                            .listRowSeparatorTint(.primary.opacity(0.1))
                         }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
                     }
                 }
             }
             .navigationTitle(l.tr(zh: "选择地点", en: "Choose location", de: "Ort auswählen"))
             .navigationBarTitleDisplayMode(.inline)
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: Text(l.tr(zh: "搜索地点、医院、公园…", en: "Search places, clinics, parks...", de: "Orte, Kliniken, Parks suchen..."))
+            )
+            .onSubmit(of: .search) {
+                performSearch()
+            }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    if !searchText.isEmpty {
-                        Button(l.tr(zh: "搜索", en: "Search", de: "Suchen")) {
-                            GoKeyboard.dismiss()
-                            performSearch()
-                        }
-                        .foregroundStyle(Color.goYellow)
-                        .fontWeight(.bold)
-                    }
-                }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
-                        GoKeyboard.dismiss()
-                    }
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goPrimary)
                 }
             }
             .onChange(of: searchText) { _, new in

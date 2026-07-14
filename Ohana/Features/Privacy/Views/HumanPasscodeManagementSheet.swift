@@ -56,7 +56,6 @@ struct HumanPasscodeManagementSheet: View {
             .padding(20)
         }
         .presentationDetents(OhanaSheetDetents.overview)
-        .presentationDragIndicator(.hidden)
         .onChange(of: currentPin) { _, value in currentPin = sanitized(value) }
         .onChange(of: newPin) { _, value in newPin = sanitized(value) }
         .onChange(of: confirmPin) { _, value in confirmPin = sanitized(value) }

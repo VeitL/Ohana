@@ -46,9 +46,93 @@ public extension View {
     }
 }
 
+// MARK: - Controlled Liquid Glass Chrome
+
+private struct OhanaGlassIconButtonModifier: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *), !reduceTransparency {
+            content
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+        } else {
+            content
+                .buttonStyle(ScaleButtonStyle())
+                .background(Color.ohanaCardSurfaceElevated, in: Circle())
+                .overlay {
+                    Circle().strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                }
+        }
+    }
+}
+
+private struct OhanaGlassProminentButtonModifier: ViewModifier {
+    let tint: Color
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *), !reduceTransparency {
+            content
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.capsule)
+                .tint(tint)
+        } else {
+            content
+                .buttonStyle(ScaleButtonStyle())
+                .background(tint, in: Capsule())
+        }
+    }
+}
+
+private struct OhanaGlassToolbarSurfaceModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        content
+            .background {
+                if #available(iOS 26.0, *), !reduceTransparency {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(
+                            .regular
+                                .tint(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.30 : 0.22))
+                                .interactive(false),
+                            in: shape
+                        )
+                } else {
+                    shape.fill(Color.ohanaCardSurfaceElevated)
+                }
+            }
+            .overlay {
+                shape.strokeBorder(Color.ohanaGlassStroke.opacity(reduceTransparency ? 0.42 : 0.24), lineWidth: 1)
+            }
+    }
+}
+
+extension View {
+    func ohanaGlassIconButton() -> some View {
+        modifier(OhanaGlassIconButtonModifier())
+    }
+
+    func ohanaGlassProminentButton(tint: Color = Color.goPrimary) -> some View {
+        modifier(OhanaGlassProminentButtonModifier(tint: tint))
+    }
+
+    func ohanaGlassToolbarSurface(cornerRadius: CGFloat = 28) -> some View {
+        modifier(OhanaGlassToolbarSurfaceModifier(cornerRadius: cornerRadius))
+    }
+}
+
 public struct OhanaPopupGlassSurface: View {
     var cornerRadius: CGFloat = 34
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     public init(cornerRadius: CGFloat = 34) {
         self.cornerRadius = cornerRadius
@@ -57,9 +141,13 @@ public struct OhanaPopupGlassSurface: View {
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         ZStack {
-            shape
-                .fill(.clear)
-                .glassEffect(.regular.interactive(false), in: shape)
+            if reduceTransparency {
+                shape.fill(Color.ohanaCardSurfaceElevated)
+            } else {
+                shape
+                    .fill(.clear)
+                    .glassEffect(.regular.interactive(false), in: shape)
+            }
 
             shape
                 .fill(Color.ohanaPopupSurfaceFill)
@@ -133,7 +221,7 @@ struct OhanaPopupCloseButton: View {
                 .contentShape(Rectangle())
                 .accessibilityHidden(true)
         }
-        .buttonStyle(ScaleButtonStyle())
+        .ohanaGlassIconButton()
         .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
     }
 }

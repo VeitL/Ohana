@@ -14,47 +14,21 @@ struct QuickFeedFoodKindSegmentedControl: View {
     let setSelection: (FeedFoodKind) -> Void
 
     var body: some View {
-        GeometryReader { proxy in
-            let spacing = CGFloat(10)
-            let options = FeedFoodKind.allCases
-            let selectedIndex = options.firstIndex(of: selection) ?? 0
-            let segmentWidth = max(0, (proxy.size.width - spacing) / 2)
-            let selectedTint = tintForKind(selection)
-
-            ZStack(alignment: .leading) {
-                HStack(spacing: spacing) {
-                    ForEach(options) { _ in
-                        Capsule()
-                            .fill(Color.ohanaControlFill.opacity(0.82))
-                            .frame(width: segmentWidth, height: 46)
-                    }
-                }
-
-                Capsule()
-                    .fill(selectedTint)
-                    .frame(width: segmentWidth, height: 46)
-                    .offset(x: CGFloat(selectedIndex) * (segmentWidth + spacing))
-                    .shadow(color: selectedTint.opacity(0.20), radius: 10, y: 5) // ui-v4: allow stable local segmented-control lift
-                    .animation(GoMotion.page, value: selection)
-
-                HStack(spacing: spacing) {
-                    ForEach(options) { foodKind in
-                        Button {
-                            setSelection(foodKind)
-                        } label: {
-                            Text(title(foodKind))
-                                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                                .foregroundStyle(selection == foodKind ? Color.arkInk : tintForKind(foodKind))
-                                .contentTransition(.opacity)
-                                .frame(width: segmentWidth, height: 46)
-                                .contentShape(Capsule())
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                    }
-                }
+        Picker(
+            "",
+            selection: Binding(
+                get: { selection },
+                set: { setSelection($0) }
+            )
+        ) {
+            ForEach(FeedFoodKind.allCases) { foodKind in
+                Text(title(foodKind))
+                    .tag(foodKind)
             }
         }
-        .frame(height: 46)
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .tint(tintForKind(selection))
     }
 }
 

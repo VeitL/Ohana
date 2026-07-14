@@ -14,12 +14,7 @@ extension CalendarView {
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 2) {
-                iconModeBtn(systemName: "calendar", mode: .month)
-                iconModeBtn(systemName: "list.bullet.rectangle.fill", mode: .list)
-            }
-            .padding(3)
-            .background(Color.ohanaControlFill, in: Capsule())
+            calendarViewModePicker
         }
         .padding(.horizontal, 18)
         .padding(.top, 6)
@@ -33,13 +28,7 @@ extension CalendarView {
 
             Spacer()
 
-            // 视图切换胶囊
-            HStack(spacing: 2) {
-                iconModeBtn(systemName: "calendar", mode: .month)
-                iconModeBtn(systemName: "list.bullet.rectangle.fill", mode: .list)
-            }
-            .padding(3)
-            .goGlassBackground(Capsule())
+            calendarViewModePicker
 
             // 添加事件按钮
             Button { requestAddEventPresentation() } label: {
@@ -99,14 +88,7 @@ extension CalendarView {
             .accessibilityLabel(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"))
             .accessibilityIdentifier("calendar-add-event-action")
 
-            // View toggle pill
-            HStack(spacing: 2) {
-                iconModeBtn(systemName: "calendar", mode: .month)
-                iconModeBtn(systemName: "list.bullet.rectangle.fill", mode: .list)
-            }
-            .padding(4)
-            .goGlassBackground(Capsule())
-            .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2) // ui-v4: allow legacy material calendar segmented depth
+            calendarViewModePicker
 
             Spacer()
 
@@ -216,44 +198,40 @@ extension CalendarView {
         }
     }
 
-    // MARK: - Go View Mode Toggle（图标版）
+    // MARK: - View Mode
     var goViewModeToggle: some View {
-        HStack(spacing: 2) {
-            iconModeBtn(systemName: "calendar", mode: .month)
-            iconModeBtn(systemName: "list.bullet.rectangle.fill", mode: .list)
-        }
-        .padding(3)
-        .goGlassBackground(Capsule())
-        .padding(.horizontal, 16)
-        .padding(.bottom, 6)
+        calendarViewModePicker
+            .padding(.horizontal, 16)
+            .padding(.bottom, 6)
     }
 
-    func iconModeBtn(systemName: String, mode: CalendarViewMode) -> some View {
-        let unselectedTint: Color = {
-            if isMaterial { return Color(hex: "8E8E93") }
-            return Color.ohanaSecondaryText
-        }()
-        let l = L10n(AppLanguage.code)
-        let label = mode == .month
-            ? l.tr(zh: "月视图", en: "Month view", de: "Monatsansicht")
-            : l.tr(zh: "列表视图", en: "List view", de: "Listenansicht")
-        return Button {
-            selectCalendarViewMode(mode)
-        } label: {
-            Label(label, systemImage: systemName)
-                .labelStyle(.iconOnly)
-                .font(OhanaFont.callout(.bold))
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(viewMode == mode ? chipSelFg : unselectedTint)
-                .frame(width: 44, height: 44)
-                .background { if viewMode == mode { Capsule().fill(chipAccent) } }
+    var calendarViewModePicker: some View {
+        Picker(
+            "",
+            selection: Binding(
+                get: { viewMode },
+                set: { selectCalendarViewMode($0) }
+            )
+        ) {
+            Label(
+                L10n(AppLanguage.code).tr(zh: "月视图", en: "Month view", de: "Monatsansicht"),
+                systemImage: "calendar"
+            )
+            .labelStyle(.iconOnly)
+            .tag(CalendarViewMode.month)
+            .accessibilityIdentifier("calendar-view-mode-month")
+
+            Label(
+                L10n(AppLanguage.code).tr(zh: "列表视图", en: "List view", de: "Listenansicht"),
+                systemImage: "list.bullet.rectangle.fill"
+            )
+            .labelStyle(.iconOnly)
+            .tag(CalendarViewMode.list)
+            .accessibilityIdentifier("calendar-view-mode-list")
         }
-        .buttonStyle(ScaleButtonStyle())
-        .ohanaSelectionMotion(isSelected: viewMode == mode, scale: 1.018)
-        .accessibilityLabel(label)
-        .accessibilityValue(viewMode == mode
-            ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
-            : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
-        .accessibilityIdentifier("calendar-view-mode-\(mode == .month ? "month" : "list")")
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .tint(chipAccent)
+        .frame(width: 112)
     }
 }

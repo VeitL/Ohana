@@ -190,6 +190,8 @@ struct PlantDashboardView: View {
     @State var selectedFilter: PlantDashboardFilter = .all
     @State var selectedPlantsViewStyle: PlantDashboardPlantsViewStyle = .deck
     @State var selectedLocation: String?
+    @State var isRoomEdgeRailExpanded = false
+    @State var roomEdgeRailScrollID: Int?
     @State var selectedSiteSummary: PlantDashboardRoomSummary?
     @State var selectedDashboardPhoto: PlantDashboardPhotoItem?
     @State var showingCarePlanSheet = false
@@ -207,7 +209,7 @@ struct PlantDashboardView: View {
     @State var careLogDraft: PlantDashboardCareLogDraft?
     @State var careAggregateDraft: PlantDashboardCareAggregateDraft?
     @State var searchText = ""
-    @FocusState var searchFocused: Bool
+    @State var searchFocused = false
     @State var expandedPlantCardID: UUID?
     @State var plantHeroSnapshot: FocusHomeVerticalSolidHeroSnapshot?
     @State var plantHeroProgress: CGFloat = 0
@@ -1071,25 +1073,6 @@ struct PlantDashboardView: View {
         if !visiblePlants.contains(where: { $0.id == expandedPlantCardID }) {
             collapseExpandedPlantCard()
         }
-    }
-
-    func selectRoomFromEdgeRail(_ location: String?) {
-        withAnimation(GoMotion.quick) {
-            selectedLocation = location
-        }
-        UISelectionFeedbackGenerator().selectionChanged()
-    }
-
-    func selectPlantViewStyle(_ style: PlantDashboardPlantsViewStyle) {
-        guard selectedPlantsViewStyle != style else { return }
-        collapseExpandedPlantIfNeeded()
-        withAnimation(GoMotion.quick) {
-            selectedPlantsViewStyle = style
-            if style == .list {
-                selectedLocation = nil
-            }
-        }
-        UISelectionFeedbackGenerator().selectionChanged()
     }
 
     func scheduleMediaAttachmentIndexRepair() {

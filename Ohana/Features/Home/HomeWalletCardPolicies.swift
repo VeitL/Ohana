@@ -61,17 +61,6 @@ enum WalletPetCardTheme {
         return Color(hex: "E8C49A")
     }
 
-    nonisolated static func silhouetteEyeColor(for pet: Pet) -> Color {
-        let name = pet.eyeColor.trimmingCharacters(in: .whitespacesAndNewlines)
-        if name.isEmpty { return Color(hex: "6B3A2A") }
-        if name == "自定义" { return Color(hex: "6B3A2A") }
-        let bi = PetBreedDatabase.breeds(for: pet.species).first { $0.name == pet.breed }
-        let eyeItems = bi?.eyeColors ?? PetBreedDatabase.genericEyeColors
-        if let found = eyeItems.first(where: { $0.name == name }) { return found.color }
-        if name.count == 6, name.allSatisfy(\.isHexDigit) { return Color(hex: name) }
-        return Color(hex: "6B3A2A")
-    }
-
     nonisolated static func coatPatternName(for pet: Pet) -> String? {
         PetCoatPattern.allCases.first { $0.displayName == pet.coatColor }?.displayName
     }
@@ -121,7 +110,9 @@ enum WalletPetCardTheme {
 
 enum HomeCardVisibility {
     static let hiddenPetIDsKey = "hiddenHomePetIDs.v1"
-    static let maxVisibleCards = FocusHomeCardDataSource.maxCardsPerPage
+    /// Compatibility sentinel for legacy visibility controls. Home is no longer
+    /// capacity-limited; all non-memorial people and pets are rendered.
+    static let maxVisibleCards = Int.max
 
     static func storedHiddenPetIDsRaw(defaults: UserDefaults = .standard) -> String {
         defaults.string(forKey: hiddenPetIDsKey) ?? ""

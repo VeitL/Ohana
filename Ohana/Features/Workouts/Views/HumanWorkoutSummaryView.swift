@@ -27,47 +27,39 @@ struct HumanWorkoutSummaryView: View {
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isPrivacyLocked: Bool { human.isPrivate(.workout, viewedBy: activeHumanId) }
     private var sortedLogs: [HumanWorkoutLog] { human.workoutLogs.sorted { $0.date > $1.date } }
-    private var importedHealthKitUUIDs: Set<String> {
-        Set(human.workoutLogs.map(\.healthKitWorkoutUUID).filter { !$0.isEmpty })
-    }
-    private var importedPetWalkLogIDs: Set<String> {
-        Set(human.workoutLogs.map(\.sourcePetWalkLogID).filter { !$0.isEmpty })
-    }
-    private var importablePetWalkSnapshots: [HumanWorkoutPetWalkSnapshot] {
-        petWalkSnapshots.filter { !importedPetWalkLogIDs.contains($0.sourcePetWalkLogID) }
-    }
-    private var importableCandidates: [HealthKitWorkoutImportCandidate] {
-        healthManager.recentWorkoutCandidates.filter { !importedHealthKitUUIDs.contains($0.healthKitWorkoutUUID) }
-    }
     @MainActor private var summaryRows: [WorkoutSummaryRow] {
-        let localRows = sortedLogs.map(localWorkoutRow)
-        let petWalkRows = importablePetWalkSnapshots.map { walk in
-            let matchedCandidate = overlappingHealthKitCandidate(for: walk)
-            return WorkoutSummaryRow.petWalkCandidate(
+        let liveHealthKitIDs = Set(healthManager.recentWorkouts.map(\.healthKitWorkoutUUID))
+        let livePetWalkIDs = Set(petWalkSnapshots.map(\.sourcePetWalkLogID))
+        let localRows = sortedLogs
+            .filter { log in
+                HumanWorkoutSourceMergePolicy.shouldShowLocalLog(
+                    healthKitWorkoutUUID: log.healthKitWorkoutUUID,
+                    sourcePetWalkLogID: log.sourcePetWalkLogID,
+                    liveHealthKitIDs: liveHealthKitIDs,
+                    livePetWalkIDs: livePetWalkIDs
+                )
+            }
+            .map(localWorkoutRow)
+        let petWalkRows = petWalkSnapshots.map { walk in
+            let matchedWorkout = overlappingHealthKitWorkout(for: walk)
+            return WorkoutSummaryRow.petWalk(
                 walk,
                 title: petWalkTitle(for: walk),
                 sourceName: petWalkSourceName(for: walk),
-                overlapText: matchedCandidate == nil ? nil : l.tr(
-                    zh: "已匹配 Apple Health，加入时会合并为一条记录。",
-                    en: "Matched with Apple Health; adding will merge into one log.",
-                    de: "Mit Apple Health abgeglichen; wird als ein Eintrag zusammengeführt."
+                overlapText: matchedWorkout == nil ? nil : l.tr(
+                    zh: "与 Apple Health 中的同一次运动自动合并显示。",
+                    en: "Automatically combined with the matching Apple Health workout.",
+                    de: "Automatisch mit dem passenden Apple-Health-Training zusammengeführt."
                 ),
-                matchedHealthKitCandidate: matchedCandidate
+                matchedHealthKitWorkout: matchedWorkout
             )
         }
-        let healthRows = importableCandidates
-            .filter { overlappingImportablePetWalk(for: $0) == nil }
-            .map { candidate in
-                let matchedPetWalk = overlappingPetWalk(for: candidate, includeImported: true)
-                return WorkoutSummaryRow.healthKitCandidate(
-                    candidate,
-                    title: candidate.type.localizedTitle(l),
-                    overlapText: matchedPetWalk == nil ? nil : l.tr(
-                        zh: "疑似同一次遛狗，导入会合并来源。",
-                        en: "Looks like the same dog walk; import will merge sources.",
-                        de: "Vermutlich derselbe Hundegang; der Import führt Quellen zusammen."
-                    ),
-                    matchedPetWalk: matchedPetWalk
+        let healthRows = healthManager.recentWorkouts
+            .filter { overlappingPetWalk(for: $0) == nil }
+            .map { workout in
+                WorkoutSummaryRow.healthKit(
+                    workout,
+                    title: workout.type.localizedTitle(l)
                 )
             }
         return (localRows + petWalkRows + healthRows).sorted { $0.date > $1.date }
@@ -130,13 +122,12 @@ struct HumanWorkoutSummaryView: View {
             .task { await prepareHealthSnapshot() }
             .sheet(isPresented: $showAddSheet) {
                 AddWorkoutSheet(human: human) {
-                    Task { await refreshHealthDataIfConnected() }
+                    Task { await refreshHealthDataIfAvailable() }
                 }
                 .ohanaSheetPagePresentation() // ui-v4: allow complex workout editor uses full-height system sheet
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .islandToastOverlay()
     }
 
     private var healthConnectionCard: some View {
@@ -168,22 +159,24 @@ struct HumanWorkoutSummaryView: View {
             }
 
             HStack(spacing: 10) {
-                Button {
-                    Task { await requestHealthAccess() }
-                } label: {
-                    Text(connectionButtonTitle)
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(Color.goPrimary, in: Capsule())
+                if showsHealthSetupAction {
+                    Button {
+                        Task { await requestHealthAccess() }
+                    } label: {
+                        Text(connectionButtonTitle)
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background(Color.goPrimary, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .disabled(healthManager.isLoading || healthManager.authorizationStatus == .notAvailable)
+                    .accessibilityIdentifier("human-workout-health-connect-action")
                 }
-                .buttonStyle(ScaleButtonStyle())
-                .disabled(healthManager.isLoading || healthManager.authorizationStatus == .notAvailable)
-                .accessibilityIdentifier("human-workout-health-connect-action")
 
                 Button {
-                    Task { await refreshHealthDataIfConnected() }
+                    Task { await refreshHealthDataIfAvailable() }
                 } label: {
                     Image(systemName: "arrow.clockwise").accessibilityHidden(true)
                         .font(OhanaFont.callout(.black))
@@ -192,6 +185,7 @@ struct HumanWorkoutSummaryView: View {
                         .background(Color.ohanaControlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .disabled(healthManager.isLoading || healthManager.authorizationStatus == .notAvailable)
                 .accessibilityLabel(l.tr(zh: "刷新运动数据", en: "Refresh workout data", de: "Trainingsdaten aktualisieren"))
                 .accessibilityIdentifier("human-workout-health-refresh-action")
             }
@@ -228,6 +222,20 @@ struct HumanWorkoutSummaryView: View {
                     )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let activityGoalStatusText {
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "info.circle").accessibilityHidden(true)
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                    Text(activityGoalStatusText)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("human-workout-activity-goal-status")
             }
         }
         .padding(16)
@@ -267,12 +275,33 @@ struct HumanWorkoutSummaryView: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
+            if let recentWorkoutsStatusText {
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "exclamationmark.circle").accessibilityHidden(true)
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                    Text(recentWorkoutsStatusText)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("human-workout-recent-status")
+            }
+
             if summaryRows.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: "figure.run.circle").accessibilityHidden(true)
-                        .font(OhanaFont.metric(size: 34))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                    Text(l.tr(zh: "还没有运动记录", en: "No workouts yet", de: "Noch keine Trainings"))
+                    if healthManager.isLoading, healthManager.recentWorkoutsStatus == .notLoaded {
+                        ProgressView()
+                            .tint(Color.goPrimary)
+                            .frame(width: 44, height: 44)
+                            .accessibilityHidden(true)
+                    } else {
+                        Image(systemName: "figure.run.circle").accessibilityHidden(true)
+                            .font(OhanaFont.metric(size: 34))
+                            .foregroundStyle(Color.ohanaTertiaryText)
+                    }
+                    Text(recentWorkoutsEmptyText)
                         .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -361,31 +390,7 @@ struct HumanWorkoutSummaryView: View {
 
     @ViewBuilder
     private func rowAction(_ row: WorkoutSummaryRow) -> some View {
-        if let petWalk = row.petWalk {
-            Button {
-                importPetWalk(petWalk, matchedCandidate: row.matchedHealthKitCandidate)
-            } label: {
-                Image(systemName: "plus.circle").accessibilityHidden(true)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "加入遛狗运动", en: "Add dog walk workout", de: "Hundegang als Training hinzufügen"))
-            .accessibilityIdentifier("human-workout-import-pet-walk-\(petWalk.sourcePetWalkLogID)")
-        } else if let candidate = row.candidate {
-            Button {
-                importCandidate(candidate)
-            } label: {
-                Image(systemName: "square.and.arrow.down").accessibilityHidden(true)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "导入运动", en: "Import workout", de: "Training importieren"))
-            .accessibilityIdentifier("human-workout-import-\(candidate.healthKitWorkoutUUID)")
-        } else if let log = row.log {
+        if let log = row.log, !row.isHealthKit, !row.isPetWalk {
             Button {
                 deleteLog(log)
             } label: {
@@ -406,8 +411,8 @@ struct HumanWorkoutSummaryView: View {
             l.tr(zh: "Apple Health 不可用", en: "Apple Health Unavailable", de: "Apple Health nicht verfügbar")
         case .notDetermined:
             l.tr(zh: "连接 Apple Health", en: "Connect Apple Health", de: "Apple Health verbinden")
-        case .connected:
-            l.tr(zh: "Apple Health 已连接", en: "Apple Health Connected", de: "Apple Health verbunden")
+        case .accessRequested:
+            l.tr(zh: "Apple Health 已设置", en: "Apple Health Set Up", de: "Apple Health eingerichtet")
         case .unknown:
             l.tr(zh: "检查 Apple Health", en: "Check Apple Health", de: "Apple Health prüfen")
         case .failed:
@@ -420,9 +425,9 @@ struct HumanWorkoutSummaryView: View {
         case .notAvailable:
             l.tr(zh: "当前设备不支持读取 HealthKit 数据。", en: "This device cannot read HealthKit data.", de: "Dieses Gerät kann keine HealthKit-Daten lesen.")
         case .notDetermined:
-            l.tr(zh: "读取步数、距离、活动能量和运动记录，只用于此成员的本地摘要。", en: "Read steps, distance, active energy, and workouts for this member’s local summary.", de: "Liest Schritte, Distanz, Aktivenergie und Trainings für diese lokale Übersicht.")
-        case .connected:
-            l.tr(zh: "今日活动已同步到页面摘要，运动记录可按需导入。", en: "Today’s activity is shown here, and workouts can be imported when needed.", de: "Die heutige Aktivität wird hier gezeigt; Trainings können bei Bedarf importiert werden.")
+            l.tr(zh: "读取步数、距离、活动能量、活动目标和运动记录，只用于此成员的本地页面。", en: "Read steps, distance, active energy, activity goals, and workouts for this member’s local screen.", de: "Liest Schritte, Distanz, Aktivenergie, Aktivitätsziele und Trainings für diese lokale Ansicht.")
+        case .accessRequested:
+            l.tr(zh: "页面直接显示 Apple Health 当前允许读取的数据；拒绝的单项会显示为无数据。", en: "This screen shows data Apple Health currently allows; denied types appear as no data.", de: "Diese Ansicht zeigt aktuell erlaubte Apple-Health-Daten; verweigerte Typen erscheinen ohne Daten.")
         case .unknown:
             l.tr(zh: "点按刷新，Ohana 会重新检查可读取的数据。", en: "Refresh to check readable data again.", de: "Aktualisiere, um lesbare Daten erneut zu prüfen.")
         case let .failed(message):
@@ -432,8 +437,6 @@ struct HumanWorkoutSummaryView: View {
 
     private var connectionButtonTitle: String {
         switch healthManager.authorizationStatus {
-        case .connected:
-            l.tr(zh: "重新连接", en: "Reconnect", de: "Neu verbinden")
         case .notAvailable:
             l.tr(zh: "不可用", en: "Unavailable", de: "Nicht verfügbar")
         default:
@@ -441,22 +444,97 @@ struct HumanWorkoutSummaryView: View {
         }
     }
 
-    private var recentWorkoutsCountText: String {
-        if importablePetWalkSnapshots.isEmpty {
-            return l.tr(zh: "\(sortedLogs.count) 条记录", en: "\(sortedLogs.count) logs", de: "\(sortedLogs.count) Einträge")
+    private var showsHealthSetupAction: Bool {
+        switch healthManager.authorizationStatus {
+        case .notDetermined, .unknown, .failed:
+            true
+        case .notAvailable, .accessRequested:
+            false
         }
-        return l.tr(
-            zh: "\(sortedLogs.count) 条记录 · \(importablePetWalkSnapshots.count) 次遛狗可加入",
-            en: "\(sortedLogs.count) logs · \(importablePetWalkSnapshots.count) dog walks",
-            de: "\(sortedLogs.count) Einträge · \(importablePetWalkSnapshots.count) Hundegänge"
+    }
+
+    @MainActor private var recentWorkoutsCountText: String {
+        l.tr(
+            zh: "\(summaryRows.count) 项活动",
+            en: "\(summaryRows.count) activities",
+            de: "\(summaryRows.count) Aktivitäten"
         )
     }
 
+    private var recentWorkoutsStatusText: String? {
+        guard case .failed = healthManager.recentWorkoutsStatus else { return nil }
+        return l.tr(
+            zh: "Apple Health 最近运动读取失败。请刷新重试；Ohana 手动记录不受影响。",
+            en: "Recent Apple Health workouts could not be read. Refresh to retry; Ohana manual records are unaffected.",
+            de: "Letzte Apple-Health-Trainings konnten nicht gelesen werden. Aktualisiere erneut; manuelle Ohana-Einträge bleiben erhalten."
+        )
+    }
+
+    private var recentWorkoutsEmptyText: String {
+        if healthManager.isLoading, healthManager.recentWorkoutsStatus == .notLoaded {
+            return l.tr(zh: "正在读取运动记录…", en: "Loading workouts…", de: "Trainings werden geladen…")
+        }
+        switch healthManager.recentWorkoutsStatus {
+        case .noData:
+            return l.tr(
+                zh: "最近没有可读取的运动记录",
+                en: "No readable recent workouts",
+                de: "Keine lesbaren letzten Trainings"
+            )
+        case .failed:
+            return l.tr(zh: "还没有 Ohana 手动运动记录", en: "No manual Ohana workouts yet", de: "Noch keine manuellen Ohana-Trainings")
+        case .notLoaded, .available:
+            return l.tr(zh: "还没有运动记录", en: "No workouts yet", de: "Noch keine Trainings")
+        }
+    }
+
     private var moveMetricText: String {
-        if healthManager.snapshot.moveGoalKcal > 0 {
-            "\(healthManager.snapshot.activeEnergyKcal)/\(healthManager.snapshot.moveGoalKcal) kcal"
-        } else {
-            "\(healthManager.snapshot.activeEnergyKcal) kcal"
+        let snapshot = healthManager.snapshot
+        if snapshot.moveMode == .moveTime {
+            if snapshot.moveGoal > 0 {
+                return "\(snapshot.moveValue)/\(snapshot.moveGoal) min"
+            }
+            return "\(snapshot.moveValue) min"
+        }
+        if snapshot.moveGoal > 0 {
+            return "\(snapshot.moveValue)/\(snapshot.moveGoal) kcal"
+        }
+        return "\(snapshot.moveValue) kcal"
+    }
+
+    private var activityGoalStatusText: String? {
+        switch healthManager.activitySummaryStatus {
+        case .notLoaded:
+            nil
+        case .noData:
+            l.tr(
+                zh: "今天没有可读取的活动目标。请在 Apple Health 中检查 Ohana 的“活动”读取权限。",
+                en: "No activity goals are readable today. Check Ohana’s Activity access in Apple Health.",
+                de: "Heute sind keine Aktivitätsziele lesbar. Prüfe Ohanas Aktivitätszugriff in Apple Health."
+            )
+        case .failed:
+            l.tr(
+                zh: "活动目标读取失败；今日数值仍会显示，请点按刷新重试。",
+                en: "Activity goals could not be read. Today’s values remain visible; refresh to retry.",
+                de: "Aktivitätsziele konnten nicht gelesen werden. Heutige Werte bleiben sichtbar; aktualisiere erneut."
+            )
+        case .available:
+            switch healthManager.snapshot.activityGoalAvailability {
+            case .complete:
+                nil
+            case .partial:
+                l.tr(
+                    zh: "Apple Health 只提供了部分目标；已有目标的圆环仍按真实进度显示。",
+                    en: "Apple Health provided only some goals; available rings still show real progress.",
+                    de: "Apple Health lieferte nur einige Ziele; verfügbare Ringe zeigen den echten Fortschritt."
+                )
+            case .unavailable:
+                l.tr(
+                    zh: "Apple Health 未提供活动目标；今日数值仍会显示。",
+                    en: "Apple Health did not provide activity goals; today’s values remain visible.",
+                    de: "Apple Health lieferte keine Aktivitätsziele; heutige Werte bleiben sichtbar."
+                )
+            }
         }
     }
 
@@ -491,7 +569,7 @@ struct HumanWorkoutSummaryView: View {
     private func prepareHealthSnapshot() async {
         loadPetWalkSnapshots()
         await healthManager.refreshAuthorizationStatus()
-        await refreshHealthDataIfConnected()
+        await refreshHealthDataIfAvailable()
     }
 
     private func loadPetWalkSnapshots() {
@@ -502,77 +580,16 @@ struct HumanWorkoutSummaryView: View {
         await healthManager.requestReadAuthorization()
     }
 
-    private func refreshHealthDataIfConnected() async {
+    private func refreshHealthDataIfAvailable() async {
         switch healthManager.authorizationStatus {
-        case .connected, .unknown:
+        case .accessRequested, .unknown:
             await healthManager.loadTodaySummary()
-            _ = await healthManager.loadRecentWorkoutCandidates()
+            _ = await healthManager.loadRecentWorkouts()
         case .failed:
             await healthManager.refreshAuthorizationStatus()
         case .notAvailable, .notDetermined:
             break
         }
-    }
-
-    private func importCandidate(_ candidate: HealthKitWorkoutImportCandidate) {
-        let matchedPetWalk = overlappingPetWalk(for: candidate, includeImported: true)
-        let command = DomainCommand.humanWorkoutEntry(humanID: human.id)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        commandQueue.enqueue(command) {
-            let result = HumanCareCommandExecutor(context: modelContext, services: appServices).recordWorkout(
-                human: human,
-                type: candidate.type,
-                durationMinutes: candidate.durationMinutes,
-                date: candidate.startDate,
-                distanceKm: candidate.distanceKm,
-                calories: candidate.calories,
-                steps: candidate.steps,
-                sourceHealthKit: true,
-                healthKitWorkoutUUID: candidate.healthKitWorkoutUUID,
-                healthKitSourceBundleID: candidate.sourceBundleID,
-                healthKitSourceName: candidate.sourceName,
-                sourcePetWalkLogID: matchedPetWalk?.sourcePetWalkLogID ?? "",
-                source: .importData,
-                command: command,
-                note: "human.workout.healthkit.import"
-            )
-            presentWorkoutImportResult(result)
-        }
-    }
-
-    private func importPetWalk(_ petWalk: HumanWorkoutPetWalkSnapshot, matchedCandidate: HealthKitWorkoutImportCandidate?) {
-        let command = DomainCommand.humanWorkoutEntry(humanID: human.id)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        commandQueue.enqueue(command) {
-            let result = HumanCareCommandExecutor(context: modelContext, services: appServices).recordWorkout(
-                human: human,
-                type: matchedCandidate?.type ?? .walking,
-                durationMinutes: petWalk.durationMinutes,
-                date: petWalk.startDate,
-                distanceKm: petWalk.distanceKm,
-                calories: matchedCandidate?.calories ?? 0,
-                steps: matchedCandidate?.steps ?? 0,
-                notes: "Ohana dog walk",
-                sourceHealthKit: matchedCandidate != nil,
-                healthKitWorkoutUUID: matchedCandidate?.healthKitWorkoutUUID ?? "",
-                healthKitSourceBundleID: matchedCandidate?.sourceBundleID ?? "",
-                healthKitSourceName: matchedCandidate?.sourceName ?? "",
-                sourcePetWalkLogID: petWalk.sourcePetWalkLogID,
-                source: .importData,
-                command: command,
-                note: "human.workout.petwalk.import"
-            )
-            presentWorkoutImportResult(result)
-        }
-    }
-
-    private func presentWorkoutImportResult(_ result: WorkoutCommandResult) {
-        let message = result.didPersist
-            ? l.tr(zh: "运动已导入", en: "Workout imported", de: "Training importiert")
-            : l.tr(zh: "导入失败，请重试", en: "Import failed. Try again.", de: "Import fehlgeschlagen. Erneut versuchen.")
-        UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
-        appServices.islandToasts.show(message)
-        UIAccessibility.post(notification: .announcement, argument: message)
     }
 
     private func deleteLog(_ log: HumanWorkoutLog) {
@@ -619,39 +636,29 @@ struct HumanWorkoutSummaryView: View {
         return l.tr(zh: "Ohana 遛狗", en: "Ohana Dog Walk", de: "Ohana Hundegang")
     }
 
-    private func overlappingHealthKitCandidate(for walk: HumanWorkoutPetWalkSnapshot) -> HealthKitWorkoutImportCandidate? {
-        importableCandidates.first { candidate in
-            isLikelySameWorkout(candidate: candidate, petWalk: walk)
+    private func overlappingHealthKitWorkout(for walk: HumanWorkoutPetWalkSnapshot) -> HumanHealthKitWorkoutSnapshot? {
+        healthManager.recentWorkouts.first { workout in
+            isLikelySameWorkout(workout: workout, petWalk: walk)
         }
     }
 
-    private func overlappingImportablePetWalk(for candidate: HealthKitWorkoutImportCandidate) -> HumanWorkoutPetWalkSnapshot? {
-        importablePetWalkSnapshots.first { walk in
-            isLikelySameWorkout(candidate: candidate, petWalk: walk)
-        }
-    }
-
-    private func overlappingPetWalk(
-        for candidate: HealthKitWorkoutImportCandidate,
-        includeImported: Bool
-    ) -> HumanWorkoutPetWalkSnapshot? {
-        let walks = includeImported ? petWalkSnapshots : importablePetWalkSnapshots
-        return walks.first { walk in
-            isLikelySameWorkout(candidate: candidate, petWalk: walk)
+    private func overlappingPetWalk(for workout: HumanHealthKitWorkoutSnapshot) -> HumanWorkoutPetWalkSnapshot? {
+        petWalkSnapshots.first { walk in
+            isLikelySameWorkout(workout: workout, petWalk: walk)
         }
     }
 
     private func isLikelySameWorkout(
-        candidate: HealthKitWorkoutImportCandidate,
+        workout: HumanHealthKitWorkoutSnapshot,
         petWalk: HumanWorkoutPetWalkSnapshot
     ) -> Bool {
-        guard candidate.type.isWalkingLikeForPetWalkMatch else { return false }
+        guard workout.type.isWalkingLikeForPetWalkMatch else { return false }
         let walkDurationMinutes = petWalk.durationMinutes
-        let durationDelta = abs(candidate.durationMinutes - walkDurationMinutes)
-        let durationThreshold = max(10, Int(Double(max(candidate.durationMinutes, walkDurationMinutes)) * 0.2))
-        let distanceDelta = abs(candidate.distanceKm - petWalk.distanceKm)
-        let distanceThreshold = max(0.3, max(candidate.distanceKm, petWalk.distanceKm) * 0.18)
-        let startsClose = abs(candidate.startDate.timeIntervalSince(petWalk.startDate)) <= 10 * 60
+        let durationDelta = abs(workout.durationMinutes - walkDurationMinutes)
+        let durationThreshold = max(10, Int(Double(max(workout.durationMinutes, walkDurationMinutes)) * 0.2))
+        let distanceDelta = abs(workout.distanceKm - petWalk.distanceKm)
+        let distanceThreshold = max(0.3, max(workout.distanceKm, petWalk.distanceKm) * 0.18)
+        let startsClose = abs(workout.startDate.timeIntervalSince(petWalk.startDate)) <= 10 * 60
         return startsClose && durationDelta <= durationThreshold && distanceDelta <= distanceThreshold
     }
 
@@ -670,9 +677,6 @@ struct HumanWorkoutSummaryView: View {
         let sourceName: String
         let overlapText: String?
         let log: HumanWorkoutLog?
-        let candidate: HealthKitWorkoutImportCandidate?
-        let petWalk: HumanWorkoutPetWalkSnapshot?
-        let matchedHealthKitCandidate: HealthKitWorkoutImportCandidate?
 
         var secondaryMetric: String {
             if distanceKm > 0.01 {
@@ -708,46 +712,35 @@ struct HumanWorkoutSummaryView: View {
                 isMatched: isMatched,
                 sourceName: sourceName,
                 overlapText: nil,
-                log: log,
-                candidate: nil,
-                petWalk: nil,
-                matchedHealthKitCandidate: nil
+                log: log
             )
         }
 
-        static func healthKitCandidate(
-            _ candidate: HealthKitWorkoutImportCandidate,
-            title: String,
-            overlapText: String?,
-            matchedPetWalk: HumanWorkoutPetWalkSnapshot?
-        ) -> WorkoutSummaryRow {
+        static func healthKit(_ workout: HumanHealthKitWorkoutSnapshot, title: String) -> WorkoutSummaryRow {
             WorkoutSummaryRow(
-                id: "candidate-\(candidate.healthKitWorkoutUUID)",
+                id: "healthkit-\(workout.healthKitWorkoutUUID)",
                 title: title,
-                type: candidate.type,
-                date: candidate.startDate,
-                durationMinutes: candidate.durationMinutes,
-                distanceKm: candidate.distanceKm,
-                calories: candidate.calories,
-                steps: candidate.steps,
+                type: workout.type,
+                date: workout.startDate,
+                durationMinutes: workout.durationMinutes,
+                distanceKm: workout.distanceKm,
+                calories: workout.calories,
+                steps: workout.steps,
                 isHealthKit: true,
-                isPetWalk: matchedPetWalk != nil,
-                isMatched: matchedPetWalk != nil,
-                sourceName: candidate.sourceName,
-                overlapText: overlapText,
-                log: nil,
-                candidate: candidate,
-                petWalk: nil,
-                matchedHealthKitCandidate: nil
+                isPetWalk: false,
+                isMatched: false,
+                sourceName: workout.sourceName,
+                overlapText: nil,
+                log: nil
             )
         }
 
-        static func petWalkCandidate(
+        static func petWalk(
             _ walk: HumanWorkoutPetWalkSnapshot,
             title: String,
             sourceName: String,
             overlapText: String?,
-            matchedHealthKitCandidate: HealthKitWorkoutImportCandidate?
+            matchedHealthKitWorkout: HumanHealthKitWorkoutSnapshot?
         ) -> WorkoutSummaryRow {
             WorkoutSummaryRow(
                 id: "pet-walk-\(walk.sourcePetWalkLogID)",
@@ -756,17 +749,14 @@ struct HumanWorkoutSummaryView: View {
                 date: walk.startDate,
                 durationMinutes: walk.durationMinutes,
                 distanceKm: walk.distanceKm,
-                calories: matchedHealthKitCandidate?.calories ?? 0,
-                steps: matchedHealthKitCandidate?.steps ?? 0,
-                isHealthKit: matchedHealthKitCandidate != nil,
+                calories: matchedHealthKitWorkout?.calories ?? 0,
+                steps: matchedHealthKitWorkout?.steps ?? 0,
+                isHealthKit: matchedHealthKitWorkout != nil,
                 isPetWalk: true,
-                isMatched: matchedHealthKitCandidate != nil,
-                sourceName: matchedHealthKitCandidate?.sourceName ?? sourceName,
+                isMatched: matchedHealthKitWorkout != nil,
+                sourceName: matchedHealthKitWorkout?.sourceName ?? sourceName,
                 overlapText: overlapText,
-                log: nil,
-                candidate: nil,
-                petWalk: walk,
-                matchedHealthKitCandidate: matchedHealthKitCandidate
+                log: nil
             )
         }
     }
@@ -776,63 +766,80 @@ private struct HumanWorkoutActivityRings: View {
     let snapshot: HumanWorkoutHealthSnapshot
     let l: L10n
 
-    @ViewBuilder
     var body: some View {
-        if snapshot.hasCompleteActivityGoals {
-            ZStack {
-                ActivityRing(
-                    progress: progress(value: snapshot.activeEnergyKcal, goal: snapshot.moveGoalKcal),
-                    color: .goRed,
-                    lineWidth: 18,
-                    inset: 0
-                )
-                ActivityRing(
-                    progress: progress(value: snapshot.exerciseMinutes, goal: snapshot.exerciseGoalMinutes),
-                    color: .goPrimary,
-                    lineWidth: 18,
-                    inset: 25
-                )
-                ActivityRing(
-                    progress: progress(value: snapshot.standHours, goal: snapshot.standGoalHours),
-                    color: .goCardCyan,
-                    lineWidth: 18,
-                    inset: 50
-                )
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(l.tr(zh: "活动环", en: "Activity rings", de: "Aktivitätsringe"))
-        } else {
-            VStack(spacing: 7) {
-                Image(systemName: "circle.dotted") // a11y: allow decorative unavailable-state glyph; adjacent text carries the status.
-                    .font(OhanaFont.metric(size: 30))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-                    .accessibilityHidden(true)
-                Text(l.tr(zh: "活动目标暂不可读取", en: "Activity goals unavailable", de: "Aktivitätsziele nicht verfügbar"))
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.78)
-                Text(l.tr(zh: "数值仍从 Apple Health 同步", en: "Values still sync from Apple Health", de: "Werte werden weiter synchronisiert"))
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.74)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("human-workout-activity-goals-unavailable")
+        ZStack {
+            ActivityRing(
+                progress: progress(value: snapshot.moveValue, goal: snapshot.moveGoal),
+                color: .goRed,
+                lineWidth: 18,
+                inset: 0
+            )
+            ActivityRing(
+                progress: progress(value: snapshot.exerciseMinutes, goal: snapshot.exerciseGoalMinutes),
+                color: .goPrimary,
+                lineWidth: 18,
+                inset: 25
+            )
+            ActivityRing(
+                progress: progress(value: snapshot.standHours, goal: snapshot.standGoalHours),
+                color: .goCardCyan,
+                lineWidth: 18,
+                inset: 50
+            )
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(l.tr(zh: "活动环", en: "Activity rings", de: "Aktivitätsringe"))
+        .accessibilityValue(accessibilityValue)
+        .accessibilityIdentifier("human-workout-activity-rings")
     }
 
-    private func progress(value: Int, goal: Int) -> Double {
-        guard goal > 0 else { return 0 }
+    private func progress(value: Int, goal: Int) -> Double? {
+        guard goal > 0 else { return nil }
         return min(max(Double(value) / Double(goal), 0), 1.25)
+    }
+
+    private var accessibilityValue: String {
+        let moveUnit = snapshot.moveMode == .moveTime ? minuteUnit : kilocalorieUnit
+        let move = metricAccessibilityValue(value: snapshot.moveValue, goal: snapshot.moveGoal, unit: moveUnit)
+        let exercise = metricAccessibilityValue(
+            value: snapshot.exerciseMinutes,
+            goal: snapshot.exerciseGoalMinutes,
+            unit: minuteUnit
+        )
+        let stand = metricAccessibilityValue(value: snapshot.standHours, goal: snapshot.standGoalHours, unit: hourUnit)
+        return l.tr(
+            zh: "活动 \(move)，锻炼 \(exercise)，站立 \(stand)",
+            en: "Move \(move), exercise \(exercise), stand \(stand)",
+            de: "Bewegen \(move), Training \(exercise), Stehen \(stand)"
+        )
+    }
+
+    private func metricAccessibilityValue(value: Int, goal: Int, unit: String) -> String {
+        guard goal > 0 else {
+            return l.tr(
+                zh: "\(value) \(unit)，目标不可用",
+                en: "\(value) \(unit), goal unavailable",
+                de: "\(value) \(unit), Ziel nicht verfügbar"
+            )
+        }
+        return "\(value)/\(goal) \(unit)"
+    }
+
+    private var minuteUnit: String {
+        l.tr(zh: "分钟", en: "minutes", de: "Minuten")
+    }
+
+    private var hourUnit: String {
+        l.tr(zh: "小时", en: "hours", de: "Stunden")
+    }
+
+    private var kilocalorieUnit: String {
+        l.tr(zh: "千卡", en: "kilocalories", de: "Kilokalorien")
     }
 }
 
 private struct ActivityRing: View {
-    let progress: Double
+    let progress: Double?
     let color: Color
     let lineWidth: CGFloat
     let inset: CGFloat
@@ -840,16 +847,24 @@ private struct ActivityRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(color.opacity(0.16), lineWidth: lineWidth)
-            Circle()
-                .trim(from: 0, to: min(progress, 1))
-                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            if progress > 1 {
+                .stroke(color.opacity(progress == nil ? 0.09 : 0.16), lineWidth: lineWidth)
+            if let progress {
                 Circle()
-                    .trim(from: 0, to: min(progress - 1, 0.25))
-                    .stroke(color.opacity(0.72), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .trim(from: 0, to: min(progress, 1))
+                    .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                     .rotationEffect(.degrees(-90))
+                if progress > 1 {
+                    Circle()
+                        .trim(from: 0, to: min(progress - 1, 0.25))
+                        .stroke(color.opacity(0.72), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
+            } else {
+                Circle()
+                    .stroke(
+                        color.opacity(0.34),
+                        style: StrokeStyle(lineWidth: max(2, lineWidth * 0.22), lineCap: .round, dash: [1, 7])
+                    )
             }
         }
         .padding(inset)

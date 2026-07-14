@@ -6,6 +6,23 @@
 import SwiftUI
 
 extension QuickPottyDetailSheet {
+    func pottySheetTitle(_ sheet: ActiveSheet) -> String {
+        switch sheet {
+        case .pottyType: l.tr(zh: "记录排便", en: "Log potty", de: "Häufchen eintragen")
+        case .scoopCheckIn: l.tr(zh: "记录铲砂", en: "Log scoop", de: "Schaufeln eintragen")
+        case .litterChangeCheckIn: l.tr(zh: "记录换砂", en: "Log litter change", de: "Streuwechsel eintragen")
+        case .scoopSettings: l.tr(zh: "铲砂计划", en: "Scoop plan", de: "Schaufelplan")
+        case .litterSettings: l.tr(zh: "换砂计划", en: "Litter plan", de: "Streuplan")
+        case .pottyOverview: l.tr(zh: "排便总览", en: "Potty overview", de: "Häufchen-Überblick")
+        case .scoopOverview: l.tr(zh: "铲砂总览", en: "Scoop overview", de: "Klo-Überblick")
+        case .litterOverview: l.tr(zh: "猫砂总览", en: "Litter overview", de: "Streu-Überblick")
+        case .pottyHistory: l.tr(zh: "排便历史", en: "Potty history", de: "Häufchen-Verlauf")
+        case .scoopHistory: l.tr(zh: "铲砂历史", en: "Scoop history", de: "Schaufel-Verlauf")
+        case .litterHistory: l.tr(zh: "换砂历史", en: "Litter history", de: "Streu-Verlauf")
+        case .history: l.tr(zh: "全部记录", en: "All records", de: "Alle Einträge")
+        }
+    }
+
     // MARK: - Sheets
     @ViewBuilder
     func sheetContent(_ sheet: ActiveSheet) -> some View {

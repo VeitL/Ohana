@@ -21,7 +21,6 @@ struct PetProfileCommandInput: Equatable {
     let themeHex: String
     let notes: String
     let coatColor: String?
-    let eyeColor: String?
     let microchipID: String?
     let vetContact: String?
     let vetClinicName: String?
@@ -37,6 +36,7 @@ struct PetProfileCommandInput: Equatable {
     let lineageInfo: String?
     let foodBrand: String?
     let dailyPortionGrams: Double?
+    let personalityTagIDs: [String]?
 
     init(
         name: String,
@@ -51,7 +51,6 @@ struct PetProfileCommandInput: Equatable {
         themeHex: String,
         notes: String,
         coatColor: String? = nil,
-        eyeColor: String? = nil,
         microchipID: String? = nil,
         vetContact: String? = nil,
         vetClinicName: String? = nil,
@@ -66,7 +65,8 @@ struct PetProfileCommandInput: Equatable {
         birthCity: String? = nil,
         lineageInfo: String? = nil,
         foodBrand: String? = nil,
-        dailyPortionGrams: Double? = nil
+        dailyPortionGrams: Double? = nil,
+        personalityTagIDs: [String]? = nil
     ) {
         self.name = name
         self.avatarImageData = avatarImageData
@@ -80,7 +80,6 @@ struct PetProfileCommandInput: Equatable {
         self.themeHex = themeHex
         self.notes = notes
         self.coatColor = coatColor
-        self.eyeColor = eyeColor
         self.microchipID = microchipID
         self.vetContact = vetContact
         self.vetClinicName = vetClinicName
@@ -96,6 +95,7 @@ struct PetProfileCommandInput: Equatable {
         self.lineageInfo = lineageInfo
         self.foodBrand = foodBrand
         self.dailyPortionGrams = dailyPortionGrams
+        self.personalityTagIDs = personalityTagIDs
     }
 }
 
@@ -469,7 +469,9 @@ enum MemberProfileCommandService {
         }
         pet.species = Pet.canonicalSpeciesKey(input.species)
         pet.breed = input.breed.trimmingCharacters(in: .whitespacesAndNewlines)
-        pet.gender = input.gender
+        if let sex = Pet.canonicalSex(input.gender) {
+            pet.gender = sex
+        }
         pet.isNeutered = input.isNeutered
         pet.birthday = input.birthday
         pet.homeDate = input.homeDate
@@ -480,9 +482,6 @@ enum MemberProfileCommandService {
         pet.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         if let coatColor = input.coatColor {
             pet.coatColor = coatColor.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        if let eyeColor = input.eyeColor {
-            pet.eyeColor = eyeColor.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         if let microchipID = input.microchipID {
             pet.microchipID = microchipID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -526,6 +525,7 @@ enum MemberProfileCommandService {
         if let dailyPortionGrams = input.dailyPortionGrams {
             pet.dailyPortionGrams = max(0, dailyPortionGrams)
         }
+        let personalityChangedFields = applyPersonalityTags(input.personalityTagIDs, to: pet)
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context)
 
@@ -535,7 +535,6 @@ enum MemberProfileCommandService {
         ]
         if input.avatarEmoji != nil { changedFields.insert("avatarEmoji") }
         if input.coatColor != nil { changedFields.insert("coatColor") }
-        if input.eyeColor != nil { changedFields.insert("eyeColor") }
         if input.microchipID != nil { changedFields.insert("microchipID") }
         if input.vetContact != nil { changedFields.insert("vetContact") }
         if input.vetClinicName != nil { changedFields.insert("vetClinicName") }
@@ -550,6 +549,7 @@ enum MemberProfileCommandService {
         if input.lineageInfo != nil { changedFields.insert("lineageInfo") }
         if input.foodBrand != nil { changedFields.insert("foodBrand") }
         if input.dailyPortionGrams != nil { changedFields.insert("dailyPortionGrams") }
+        changedFields.formUnion(personalityChangedFields)
 
         return persistProfileMutation(
             entityID: pet.id,
@@ -558,6 +558,14 @@ enum MemberProfileCommandService {
             persistedAvatarImageData: persistedAvatarImageData,
             context: context
         )
+    }
+
+    private static func applyPersonalityTags(_ personalityTagIDs: [String]?, to pet: Pet) -> Set<String> {
+        guard let personalityTagIDs else { return [] }
+        pet.personalityTagsRaw = PetPrimaryPersonalitySelection
+            .normalized(personalityTagIDs)
+            .joined(separator: ",")
+        return ["personalityTagsRaw"]
     }
 
     @discardableResult

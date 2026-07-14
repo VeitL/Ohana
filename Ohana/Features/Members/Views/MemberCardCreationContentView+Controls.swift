@@ -23,23 +23,22 @@ extension MemberCardCreationContentView {
         .accessibilityIdentifier("member-name-input")
     }
 
-    func compactNameInput(width: CGFloat) -> some View {
+    func petNameInput() -> some View {
         MemberNameInputField(
             text: $draft.name,
-            placeholder: kind == .pet
-                ? l.tr(zh: "名字", en: "Name", de: "Name")
-                : l.tr(zh: "名字", en: "Name", de: "Name"),
+            placeholder: l.tr(zh: "宠物名字", en: "Pet name", de: "Tiername"),
             foreground: cardForeground,
             placeholderForeground: cardSecondaryForeground
         )
         .padding(.horizontal, 12)
-        .frame(width: width, height: 44)
+        .frame(maxWidth: .infinity, minHeight: 52)
         .background(cardControlFill, in: Capsule())
         .overlay {
             Capsule()
                 .strokeBorder(cardControlStroke, lineWidth: 1)
         }
         .shadow(color: Color.goCardWhite.opacity(0.08), radius: 10, y: 4) // ui-v4: allow member creation glass input depth
+        .accessibilityIdentifier("member-name-input")
     }
 
     func compactOptionRow(options: [String], selection: Binding<String>, label: @escaping (String) -> String) -> some View {
@@ -100,6 +99,7 @@ extension MemberCardCreationContentView {
                         .shadow(color: isSelected ? cardAccent.opacity(0.30) : Color.clear, radius: 12, y: 4) // ui-v4: allow selected glass control glow
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("member-gender-\(option)")
                 .accessibilityLabel(label(option))
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
@@ -111,7 +111,7 @@ extension MemberCardCreationContentView {
         switch gender {
         case "boy", "male", "男": "♂"
         case "girl", "female", "女": "♀"
-        default: "?"
+        default: ""
         }
     }
 
@@ -202,12 +202,8 @@ extension MemberCardCreationContentView {
     func clampPetAppearance() {
         guard kind == .pet else { return }
         let coats = petCoatOptions
-        if !coats.isEmpty, !coats.contains(draft.coatColor) {
-            draft.coatColor = coats[0]
-        }
-        let eyes = petEyeOptions
-        if !eyes.isEmpty, !eyes.contains(draft.eyeColor) {
-            draft.eyeColor = eyes[0]
+        if !draft.coatColor.isEmpty, !coats.contains(draft.coatColor) {
+            draft.coatColor = ""
         }
     }
 
@@ -217,7 +213,7 @@ extension MemberCardCreationContentView {
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(cardForeground)
                 .frame(maxWidth: .infinity)
-                .frame(height: 40)
+                .frame(height: 44)
                 .background(cardControlFill, in: Capsule())
                 .overlay {
                     Capsule()
@@ -229,27 +225,16 @@ extension MemberCardCreationContentView {
     }
 
     func compactTogglePill(title: String, icon: String, isOn: Binding<Bool>) -> some View {
-        Button {
-            withAnimation(GoMotion.selection) {
-                isOn.wrappedValue.toggle()
-            }
-            UISelectionFeedbackGenerator().selectionChanged()
-        } label: {
+        Toggle(isOn: isOn) {
             Label(title, systemImage: icon)
                 .font(OhanaFont.caption(.black))
-                .foregroundStyle(isOn.wrappedValue ? cardSelectedForeground : cardForeground)
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
-                .frame(maxWidth: .infinity)
-                .frame(height: 36)
-                .background(isOn.wrappedValue ? cardSelectedFill : cardControlFill, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(isOn.wrappedValue ? cardAccent.opacity(0.58) : cardControlStroke, lineWidth: 1)
-                }
-                .shadow(color: isOn.wrappedValue ? cardAccent.opacity(0.26) : Color.clear, radius: 10, y: 4) // ui-v4: allow selected glass control glow
+                .frame(maxWidth: .infinity, minHeight: 36)
         }
-        .buttonStyle(ScaleButtonStyle())
+        .toggleStyle(.button)
+        .buttonStyle(.bordered)
+        .tint(Color.goPrimary)
     }
 
     func statusPill(text: String, icon: String, tint: Color) -> some View {
@@ -267,7 +252,7 @@ extension MemberCardCreationContentView {
             .font(OhanaFont.caption(.bold))
             .foregroundStyle(cardForeground)
             .padding(.horizontal, 12)
-            .frame(height: 42)
+            .frame(height: 44)
             .background(cardControlFill, in: Capsule())
             .overlay {
                 Capsule()
@@ -293,7 +278,7 @@ extension MemberCardCreationContentView {
                     .font(OhanaFont.adaptive(size: 10, weight: .black))
                     .foregroundStyle(cardSecondaryForeground)
             }
-            .frame(height: 42)
+            .frame(height: 44)
             .padding(.horizontal, 12)
             .background(cardControlFill, in: Capsule())
             .overlay {
@@ -325,7 +310,7 @@ extension MemberCardCreationContentView {
                     .foregroundStyle(cardSecondaryForeground)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 42)
+            .frame(height: 44)
             .padding(.horizontal, 12)
             .background(cardControlFill, in: Capsule())
             .overlay {

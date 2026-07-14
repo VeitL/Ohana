@@ -75,7 +75,7 @@ final class FocusHomeSnapshotController: ObservableObject {
         guard !isExpanded, walletTransitionCardId == nil else { return }
 
         let sourceCards = source ?? cards(fallback: [])
-        let targetCards = Array(sourceCards.prefix(FocusHomeCardDataSource.maxCardsPerPage))
+        let targetCards = Array(sourceCards.prefix(FocusHomeCardDataSource.firstScreenMediaBudget))
         let targetIds = targetCards.map(\.id)
         let targetIdSet = Set(targetIds)
         if !targetIdSet.isEmpty {
@@ -224,7 +224,7 @@ final class FocusHomeSnapshotController: ObservableObject {
         )
         avatarDataById = seeded.avatarData
         popoutDataById = seeded.popoutData
-        let visibleCount = min(source.count, FocusHomeCardDataSource.maxCardsPerPage)
-        AppPerformanceMonitor.shared.record("home.avatarPreviewReady", valueMS: 0, note: "\(visibleCount) visible")
+        let visibleCount = min(source.count, FocusHomeCardDataSource.firstScreenMediaBudget)
+        AppPerformanceMonitor.shared.record("home.avatarPreviewReady", valueMS: 0, note: "\(visibleCount) first-screen")
     }
 }

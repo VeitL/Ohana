@@ -451,6 +451,16 @@ extension PlantDashboardView {
                 taskSummarySection
             }
         }
+        .searchable(
+            text: $searchText,
+            isPresented: $searchFocused,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: Text(l.tr(
+                zh: "搜索植物、品种、房间",
+                en: "Search plants, species, rooms",
+                de: "Pflanzen, Arten, Räume suchen"
+            ))
+        )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("plant-dashboard-plants-view")
     }
@@ -817,65 +827,7 @@ extension PlantDashboardView {
     }
 
     var searchAndFilterSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            searchField
-            filterBar
-        }
+        filterBar
         .accessibilityIdentifier("plant-dashboard-search-filter")
-    }
-
-    var searchField: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass") // a11y: allow decorative search glyph; the text field carries the accessible label.
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
-                .foregroundStyle(searchFocused ? Color.goTeal : Color.ohanaSecondaryText)
-                .frame(width: 44, height: 44)
-                .accessibilityHidden(true)
-
-            TextField( // ui-v4: allow dashboard search input; it is locally styled and covered by input responsiveness tests.
-                l.tr(
-                    zh: "搜索植物、品种、房间",
-                    en: "Search plants, species, rooms",
-                    de: "Pflanzen, Arten, Räume suchen"
-                ),
-                text: $searchText
-            )
-            .focused($searchFocused)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled(true)
-            .submitLabel(.search)
-            .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
-            .foregroundStyle(Color.ohanaPrimaryText)
-            .accessibilityLabel(l.tr(zh: "搜索植物", en: "Search plants", de: "Pflanzen suchen"))
-
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                    searchFocused = false
-                } label: {
-                    Image(systemName: "xmark.circle.fill") // a11y: allow decorative clear glyph; button label names the action.
-                        .font(OhanaFont.adaptive(size: 16, weight: .black))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .frame(width: 44, height: 44)
-                        .accessibilityHidden(true)
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "清空植物搜索", en: "Clear plant search", de: "Pflanzensuche leeren"))
-                .accessibilityIdentifier("plant-dashboard-search-clear")
-            }
-        }
-        .padding(.leading, 14)
-        .padding(.trailing, searchText.isEmpty ? 14 : 2)
-        .frame(minHeight: 52)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
-                .strokeBorder(searchFocused ? Color.goTeal.opacity(0.52) : Color.ohanaCardStroke, lineWidth: searchFocused ? 1.5 : 1)
-        }
-        .transaction { transaction in
-            transaction.animation = nil
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-dashboard-search-field")
     }
 }

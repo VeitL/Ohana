@@ -2,7 +2,7 @@
 //  AddDocumentSheet.swift
 //  Ohana
 //
-//  R10: 添加/编辑证件 — ArkBackgroundView + glassEffect 字段卡；导航栏磨砂；Sheet presentationBackground(.bar)
+//  R10: 添加/编辑证件 — 系统 Sheet + NavigationStack；字段内容使用 Ohana 品牌 token。
 //
 
 import PhotosUI

@@ -84,6 +84,7 @@ struct QuickHumanMedicationSheet: View {
     var onDismiss: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
@@ -118,86 +119,94 @@ struct QuickHumanMedicationSheet: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let minPanelHeight: CGFloat = 470
-            let maxPanelHeight = max(minPanelHeight, proxy.size.height * 0.90)
-            let scrollMaxHeight = max(290, maxPanelHeight - 142)
-            let measuredHeight = contentHeight > 1 ? contentHeight : 380
-            let scrollHeight = min(measuredHeight, scrollMaxHeight)
-            let panelHeightEstimate = min(maxPanelHeight, max(adaptiveSheetHeight, minPanelHeight))
-            let hiddenOffset = panelHeightEstimate + 72
-
-            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: popupVisible) {
-                popupBackdrop
-                    .opacity(popupVisible ? 1 : 0)
-
-                VStack(spacing: 0) {
-                    popupDragHandle
-                        .padding(.top, 4)
-                    header
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 14) {
-                            nameBlock
-                            formAndDoseBlock
-                            reminderBlock
-                            noteBlock
-                        }
-                        .padding(.bottom, 10)
-                        .background {
-                            GeometryReader { contentProxy in
-                                Color.clear
-                                    .preference(key: QuickHumanMedicationHeightKey.self, value: contentProxy.size.height)
-                            }
+        NavigationStack {
+            Form {
+                Section {
+                    LabeledContent(l.tr(zh: "成员", en: "Member", de: "Mitglied"), value: human.name)
+                    TextField(
+                        l.tr(zh: "药品名称", en: "Medication name", de: "Medikamentenname"),
+                        text: $medicationName
+                    )
+                    .textInputAutocapitalization(.words)
+                    .accessibilityIdentifier("quick-human-medication-name-input")
+                    Menu(l.tr(zh: "常用药品", en: "Common medications", de: "Häufige Medikamente")) {
+                        ForEach(Array(HumanMedicationQuickCatalog.names(for: appCountry).enumerated()), id: \.element) { index, option in
+                            Button(option) { medicationName = option }
+                                .accessibilityIdentifier("quick-human-medication-preset-\(index)")
                         }
                     }
-                    .scrollDismissesKeyboard(.interactively)
-                    .frame(height: scrollHeight)
+                }
 
-                    saveBar
+                Section(l.tr(zh: "剂型与剂量", en: "Form and dose", de: "Form und Dosis")) {
+                    Picker(l.tr(zh: "剂型", en: "Form", de: "Form"), selection: $form) {
+                        ForEach(QuickHumanMedicationForm.allCases) { item in
+                            Label(item.title(l), systemImage: item.icon).tag(item)
+                        }
+                    }
+                    TextField(l.tr(zh: "剂量", en: "Dose", de: "Dosis"), text: $doseAmount)
+                        .keyboardType(.decimalPad)
+                    Picker(l.tr(zh: "单位", en: "Unit", de: "Einheit"), selection: $doseUnit) {
+                        ForEach(form.units, id: \.self) { unit in
+                            Text(unit).tag(unit)
+                        }
+                    }
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
-                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
-                .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow short popup liftedAlert shadow token
-                .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow short popup liftedAlert shadow token
-                .padding(.horizontal, 6)
-                .padding(.bottom, 8)
-                .offset(y: popupVisible ? popupDragOffset : hiddenOffset)
-                .frame(maxHeight: maxPanelHeight, alignment: .bottom)
-                .ohanaAdaptiveSheetContentHeight(
-                    $adaptiveSheetHeight,
-                    minHeight: minPanelHeight,
-                    maxHeight: maxPanelHeight,
-                    chromePadding: 18
-                )
+
+                Section(l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung")) {
+                    Toggle(l.tr(zh: "添加提醒", en: "Add reminder", de: "Erinnerung hinzufügen"), isOn: $reminderEnabled)
+                    if reminderEnabled {
+                        Picker(l.tr(zh: "频率", en: "Frequency", de: "Häufigkeit"), selection: $frequency) {
+                            ForEach([MedicationFrequency.daily, .twiceDaily, .threeTimesDaily, .weekly], id: \.self) { option in
+                                Text(option.displayTitle(l: l)).tag(option)
+                            }
+                        }
+                        DatePicker(
+                            l.tr(zh: "首次时间", en: "First dose", de: "Erste Einnahme"),
+                            selection: $firstDoseTime,
+                            displayedComponents: .hourAndMinute
+                        )
+                        DatePicker(
+                            l.tr(zh: "开始日期", en: "Start date", de: "Startdatum"),
+                            selection: $startDate,
+                            displayedComponents: .date
+                        )
+                    }
+                }
+
+                Section(l.tr(zh: "备注", en: "Notes", de: "Notizen")) {
+                    TextField(
+                        l.tr(zh: "例如：饭后、睡前", en: "After meal, before bed", de: "Nach dem Essen, vor dem Schlafen"),
+                        text: $notes,
+                        axis: .vertical
+                    )
+                }
+            }
+            .navigationTitle(l.tr(zh: "添加药物", en: "Add Medication", de: "Medikament hinzufügen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, role: .cancel) { close() }
+                }
+                if onManage != nil {
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button(l.tr(zh: "管理药物", en: "Manage medications", de: "Medikamente verwalten")) {
+                            onManage?()
+                            close()
+                        }
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
+                        .disabled(!canSave || isSaving)
+                        .accessibilityIdentifier("quick-human-medication-save-action")
+                }
             }
         }
-        .allowsHitTesting(popupVisible && !isClosing)
-        .animation(popupAnimation, value: popupVisible)
-        .presentationBackground(.clear)
-        .presentationDetents([.height(adaptiveSheetHeight)])
-        .presentationDragIndicator(.hidden)
+        .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
-        .onAppear {
-            popupVisible = false
-            isClosing = false
-            DispatchQueue.main.async {
-                withAnimation(popupAnimation) {
-                    popupVisible = true
-                }
-            }
-        }
         .onChange(of: form) { _, newValue in
             if !newValue.units.contains(doseUnit) {
                 doseUnit = newValue.units[0]
-            }
-        }
-        .onPreferenceChange(QuickHumanMedicationHeightKey.self) { height in
-            guard height.isFinite, height > 0 else { return }
-            var transaction = Transaction()
-            transaction.animation = nil
-            withTransaction(transaction) {
-                contentHeight = height
             }
         }
         .onDisappear {
@@ -509,12 +518,10 @@ struct QuickHumanMedicationSheet: View {
     private func close() {
         guard !isClosing else { return }
         isClosing = true
-        withAnimation(popupAnimation) {
-            popupVisible = false
-            popupDragOffset = 0
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            onDismiss?()
+        if let onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
         }
     }
 }

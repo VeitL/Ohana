@@ -218,26 +218,32 @@ struct CoconutShopView: View {
                     .transition(.ohanaPop)
                     .zIndex(20)
             }
-
-            if let pendingPurchaseItem {
-                inlinePopup {
-                    purchaseConfirmation(item: pendingPurchaseItem)
-                }
-                .zIndex(40)
-            }
-
-            if let activePicker {
-                inlinePopup {
-                    pickerContent(activePicker)
-                }
-                .zIndex(40)
-            }
         }
         .tint(Color.goPrimary)
         .sheet(item: $equipPopoutPet) { pet in
             EquipPopoutCardSheet(pet: pet)
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.hidden)
+        }
+        .sheet(item: $pendingPurchaseItem) { item in
+            NavigationStack {
+                purchaseConfirmation(item: item)
+                    .navigationTitle(l.tr(zh: "确认购买", en: "Confirm purchase", de: "Kauf bestätigen"))
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .presentationDetents([.medium])
+        }
+        .sheet(item: $activePicker) { picker in
+            NavigationStack {
+                pickerContent(picker)
+                    .navigationTitle(l.tr(zh: "选择", en: "Choose", de: "Auswählen"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(l.cancel) { activePicker = nil }
+                        }
+                    }
+            }
+            .presentationDetents([.medium, .large])
         }
         .onAppear {
             if !selectedCategory.isVisibleInFirstRelease {

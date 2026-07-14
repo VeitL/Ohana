@@ -257,6 +257,7 @@ final class ReadModelRevisionCenter: ObservableObject {
     @Published private(set) var lastMutation: DomainMutationResult?
     private(set) var lastCoconutRewardEvent: OhanaCoconutRewardEvent?
 
+    private let domainMutationSubject = PassthroughSubject<DomainMutationResult, Never>()
     private let coconutRewardSubject = PassthroughSubject<OhanaCoconutRewardEvent, Never>()
     private var nextHomeSurfaceInvalidationValue = 0
     private var homeDomainInvalidationValues: [HomeInvalidationDomain: Int] = [:]
@@ -275,12 +276,17 @@ final class ReadModelRevisionCenter: ObservableObject {
         $walletProjectionRevision.eraseToAnyPublisher()
     }
 
+    var domainMutationEvents: AnyPublisher<DomainMutationResult, Never> {
+        domainMutationSubject.eraseToAnyPublisher()
+    }
+
     var coconutRewardEvents: AnyPublisher<OhanaCoconutRewardEvent, Never> {
         coconutRewardSubject.eraseToAnyPublisher()
     }
 
     func publish(_ result: DomainMutationResult) {
         lastMutation = result
+        domainMutationSubject.send(result)
         homeRevision.advance(for: result.command)
         if let scope = HomeSurfaceInvalidationRouting.scope(for: result) {
             nextHomeSurfaceInvalidationValue &+= 1

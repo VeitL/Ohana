@@ -24,6 +24,10 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
     case mintFrost = "mint_frost"
     case peachCloud = "peach_cloud"
     case graphitePulse = "graphite_pulse"
+    case ohanaWarmth = "ohana_warmth"
+    case botanicalMoon = "botanical_moon"
+    case pawLeafWhisper = "paw_leaf_whisper"
+    case silverSymbiosis = "silver_symbiosis"
     case customPhoto = "custom_photo"
 
     var id: String { rawValue }
@@ -34,6 +38,10 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
 
     static var officialPairOptions: [AppBackgroundStyle] {
         [
+            .ohanaWarmth,
+            .botanicalMoon,
+            .pawLeafWhisper,
+            .silverSymbiosis,
             .goIsland,
             .cleanBlueGray,
             .paperCream,
@@ -68,6 +76,10 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
         case .mintFrost: "薄荷霜"
         case .peachCloud: "桃云"
         case .graphitePulse: "石墨微光"
+        case .ohanaWarmth: "柔沙暖光"
+        case .botanicalMoon: "植物月影"
+        case .pawLeafWhisper: "爪印与叶影"
+        case .silverSymbiosis: "银雾共生"
         case .customPhoto: "自定义照片"
         }
     }
@@ -100,6 +112,14 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
             L10n(lang).tr(zh: "桃云", en: "Peach Cloud", de: "Pfirsichwolke")
         case .graphitePulse:
             L10n(lang).tr(zh: "石墨微光", en: "Graphite Pulse", de: "Graphitglanz")
+        case .ohanaWarmth:
+            L10n(lang).tr(zh: "柔沙暖光", en: "Soft Sand Glow", de: "Sanftes Sandlicht")
+        case .botanicalMoon:
+            L10n(lang).tr(zh: "植物月影", en: "Botanical Moon", de: "Botanischer Mond")
+        case .pawLeafWhisper:
+            L10n(lang).tr(zh: "爪印与叶影", en: "Paw & Leaf", de: "Pfote & Blatt")
+        case .silverSymbiosis:
+            L10n(lang).tr(zh: "银雾共生", en: "Silver Symbiosis", de: "Silberne Symbiose")
         case .customPhoto:
             L10n(lang).tr(zh: "自定义照片", en: "Custom photo", de: "Eigenes Foto")
         default:
@@ -135,6 +155,14 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
             L10n(lang).tr(zh: "温暖柔亮，适合家庭和奖励感", en: "Warm and bright for family and rewards", de: "Warm und hell für Familie und Belohnungen")
         case .graphitePulse:
             L10n(lang).tr(zh: "中性灰蓝，最克制耐看", en: "Neutral blue-gray, the most restrained option", de: "Neutrales Blaugrau, sehr zurückhaltend")
+        case .ohanaWarmth:
+            L10n(lang).tr(zh: "柔沙与珊瑚微光，温暖而克制", en: "Soft sand and coral light, warm yet restrained", de: "Sanftes Sand- und Korallenlicht")
+        case .botanicalMoon:
+            L10n(lang).tr(zh: "冷静月光与植物弧影", en: "Quiet moonlight with botanical arcs", de: "Ruhiges Mondlicht mit Pflanzenbögen")
+        case .pawLeafWhisper:
+            L10n(lang).tr(zh: "若隐若现的叶影与陪伴印记", en: "Subtle leaf shadows and a trace of companionship", de: "Sanfte Blattschatten und Nähe")
+        case .silverSymbiosis:
+            L10n(lang).tr(zh: "黑白银雾，映衬玻璃内容", en: "Monochrome silver mist for glass content", de: "Monochromer Silbernebel für Glas")
         case .customPhoto:
             L10n(lang).tr(zh: "上传一张全局背景", en: "Use your own app background", de: "Eigenes App-Hintergrundbild")
         default:
@@ -208,6 +236,22 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
             colorScheme == .dark
                 ? [Color(hex: "111827"), Color(hex: "374151"), Color(hex: "020617")]
                 : [Color(hex: "D8DEE8"), Color(hex: "C8D1DD"), Color(hex: "B7C1CF")]
+        case .ohanaWarmth:
+            colorScheme == .dark
+                ? [Color(hex: "241C23"), Color(hex: "513033"), Color(hex: "211C1C")]
+                : [Color(hex: "F7F1EA"), Color(hex: "F3DED0"), Color(hex: "E8E1D1")]
+        case .botanicalMoon:
+            colorScheme == .dark
+                ? [Color(hex: "111626"), Color(hex: "20263B"), Color(hex: "0A0F1D")]
+                : [Color(hex: "E8E6EE"), Color(hex: "D9DCE8"), Color(hex: "CBD5DD")]
+        case .pawLeafWhisper:
+            colorScheme == .dark
+                ? [Color(hex: "0D1720"), Color(hex: "173047"), Color(hex: "09111A")]
+                : [Color(hex: "F6F0E8"), Color(hex: "EDE8DF"), Color(hex: "E1D7CA")]
+        case .silverSymbiosis:
+            colorScheme == .dark
+                ? [Color(hex: "171719"), Color(hex: "252528"), Color(hex: "101012")]
+                : [Color(hex: "F2F1F0"), Color(hex: "E5E3E2"), Color(hex: "D6D4D3")]
         case .customPhoto:
             colorScheme == .dark
                 ? [Color(hex: "111312"), Color(hex: "20211D"), Color(hex: "4B4B43")]
@@ -217,5 +261,15 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
 
     var previewColors: [Color] {
         gradientColors(for: .dark)
+    }
+
+    var imageAssetName: String? {
+        switch self {
+        case .ohanaWarmth: "OhanaBackgroundWarmth"
+        case .botanicalMoon: "OhanaBackgroundBotanicalMoon"
+        case .pawLeafWhisper: "OhanaBackgroundPawLeaf"
+        case .silverSymbiosis: "OhanaBackgroundSilverSymbiosis"
+        default: nil
+        }
     }
 }

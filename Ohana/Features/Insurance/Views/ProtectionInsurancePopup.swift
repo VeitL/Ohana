@@ -2,7 +2,7 @@
 //  ProtectionInsurancePopup.swift
 //  Ohana
 //
-//  Inline V4 popup for creating and editing pet insurance policies.
+//  Native sheet form for creating and editing pet insurance policies.
 //
 
 import SwiftData
@@ -16,8 +16,6 @@ struct ProtectionInsurancePopup: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
-    @State private var visible = false
-    @State private var dragOffset: CGFloat = 0
     @State private var productName = ""
     @State private var companyName = ""
     @State private var policyNumber = ""
@@ -38,8 +36,6 @@ struct ProtectionInsurancePopup: View {
 
     private var isEdit: Bool { existing != nil }
     private var l: L10n { L10n(appLanguage) }
-    private var animation: Animation { GoMotion.page }
-    private var hiddenOffset: CGFloat { 780 }
     private var canSave: Bool { !productName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var annualPremium: Double {
         let raw = CountryDecimalInput.parse(premiumInput, countryCode: AppCountry.code) ?? 0
@@ -60,101 +56,87 @@ struct ProtectionInsurancePopup: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: visible) {
-                LinearGradient(
-                    colors: [Color.black.opacity(0.08), Color.black.opacity(0.34)], // ui-v4: allow popup scrimGradient
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    OhanaPopupDragHandle(tint: Color.ohanaPrimaryText.opacity(0.24))
-                        .padding(.top, 8)
-                        .gesture(handleDrag)
-
-                    HStack(spacing: 12) {
-                        Image(systemName: "shield.lefthalf.filled").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 18, weight: .black))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(width: 48, height: 48)
-                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(isEdit ? l.tr(zh: "编辑保险", en: "Edit insurance", de: "Versicherung bearbeiten") : l.tr(zh: "添加保险", en: "Add insurance", de: "Versicherung hinzufuegen"))
-                                .font(OhanaFont.title3(.black))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                            Text(pet.name)
-                                .font(OhanaFont.caption(.semibold))
-                                .foregroundStyle(Color.ohanaSecondaryText)
-                        }
-                        Spacer()
-                        OhanaPopupCloseButton(tint: Color.ohanaPrimaryText, action: close)
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(l.tr(zh: "产品名称", en: "Product name", de: "Produktname"), text: $productName)
+                    TextField(l.tr(zh: "保险公司", en: "Insurance company", de: "Versicherer"), text: $companyName)
+                    Toggle(l.tr(zh: "保单号", en: "Policy number", de: "Policennummer"), isOn: $hasPolicyNumber)
+                        .tint(Color.goPrimary)
+                    if hasPolicyNumber {
+                        TextField(l.tr(zh: "保单号", en: "Policy number", de: "Policennummer"), text: $policyNumber)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 4)
-
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 12) {
-                            basicBlock
-                            premiumBlock
-                            frequencyBlock
-                            dateBlock
-                            optionsBlock
-                            popupBlock {
-                                TextField(l.tr(zh: "备注", en: "Notes", de: "Notizen"), text: $notes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                    .font(OhanaFont.subheadline(.bold))
-                                    .lineLimit(2 ... 4)
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .frame(maxHeight: min(proxy.size.height * 0.62, 590))
-
-                    Button(action: save) {
-                        Text(primaryButtonTitle)
-                            .font(OhanaFont.subheadline(.black))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .disabled(!canSave || isSaving)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 22)
+                } header: {
+                    Text(pet.name)
                 }
-                .frame(maxWidth: .infinity)
-                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
-                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
-                .shadow(color: Color.black.opacity(0.54), radius: 46, x: 0, y: -16) // ui-v4: allow popup liftedAlert shadow
-                .shadow(color: Color(hex: "0B102C").opacity(0.38), radius: 26, x: 0, y: 12) // ui-v4: allow popup liftedAlert shadow
-                .padding(.horizontal, 6)
-                .padding(.bottom, max(8, proxy.safeAreaInsets.bottom + 2))
-                .offset(y: visible ? dragOffset : hiddenOffset)
-            }
-            .animation(animation, value: dragOffset)
-        }
-        .onAppear {
-            prefill()
-            withAnimation(animation) { visible = true }
-        }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
-    }
 
-    private var handleDrag: some Gesture {
-        DragGesture(minimumDistance: 10)
-            .onChanged { value in dragOffset = max(0, value.translation.height) }
-            .onEnded { value in
-                if value.translation.height > 54 {
-                    close()
-                } else {
-                    withAnimation(animation) { dragOffset = 0 }
+                Section {
+                    Picker(l.tr(zh: "保费模式", en: "Premium mode", de: "Prämienmodus"), selection: $premiumMode) {
+                        Text(l.tr(zh: "年费", en: "Annual", de: "Jährlich")).tag(ProtectionPremiumMode.annual)
+                        Text(l.tr(zh: "月费", en: "Monthly", de: "Monatlich")).tag(ProtectionPremiumMode.monthly)
+                    }
+                    .pickerStyle(.segmented)
+                    TextField(l.tr(zh: "保费", en: "Premium", de: "Prämie"), text: $premiumInput)
+                        .keyboardType(.decimalPad)
+                    Toggle(l.tr(zh: "保额", en: "Coverage amount", de: "Deckungssumme"), isOn: $hasCoverage)
+                        .tint(Color.goPrimary)
+                    if hasCoverage {
+                        TextField(l.tr(zh: "保额", en: "Coverage amount", de: "Deckungssumme"), text: $coverageInput)
+                            .keyboardType(.decimalPad)
+                    }
+                } header: {
+                    Text(l.tr(zh: "保障", en: "Coverage", de: "Deckung"))
+                }
+
+                Section {
+                    Picker(l.tr(zh: "缴费频率", en: "Payment frequency", de: "Zahlungsintervall"), selection: $paymentFrequency) {
+                        ForEach(InsurancePaymentFrequency.allCases, id: \.rawValue) { frequency in
+                            Text(frequency.localizedLabel(l)).tag(frequency)
+                        }
+                    }
+                    if paymentFrequency == .monthly || paymentFrequency == .quarterly {
+                        Stepper(
+                            l.tr(zh: "付款日 \(paymentDay)", en: "Payment day \(paymentDay)", de: "Zahlungstag \(paymentDay)"),
+                            value: $paymentDay,
+                            in: 1 ... 28
+                        )
+                    }
+                }
+
+                Section {
+                    DatePicker(l.tr(zh: "生效日期", en: "Start date", de: "Startdatum"), selection: $startDate, displayedComponents: .date)
+                    DatePicker(l.tr(zh: "续期日期", en: "Renewal date", de: "Verlängerungsdatum"), selection: $renewalDate, in: startDate..., displayedComponents: .date)
+                }
+
+                Section {
+                    Toggle(l.tr(zh: "写入保费记录", en: "Create premium record", de: "Prämienausgabe erfassen"), isOn: $autoGenExpenses)
+                        .tint(Color.goPrimary)
+                        .disabled(isEdit)
+                    Toggle(l.tr(zh: "日历提醒", en: "Calendar reminder", de: "Kalendererinnerung"), isOn: $showInCalendar)
+                        .tint(Color.goPrimary)
+                }
+
+                Section {
+                    TextField(l.tr(zh: "备注", en: "Notes", de: "Notizen"), text: $notes, axis: .vertical)
+                        .lineLimit(2 ... 4)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle(isEdit
+                ? l.tr(zh: "编辑保险", en: "Edit insurance", de: "Versicherung bearbeiten")
+                : l.tr(zh: "添加保险", en: "Add insurance", de: "Versicherung hinzufügen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel, role: .cancel, action: close)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(primaryButtonTitle, action: save)
+                        .disabled(!canSave || isSaving)
+                }
+            }
+        }
+        .onAppear(perform: prefill)
     }
 
     private var basicBlock: some View {
@@ -327,13 +309,7 @@ struct ProtectionInsurancePopup: View {
 
     private func close() {
         GoKeyboard.dismiss()
-        withAnimation(animation) {
-            visible = false
-            dragOffset = 0
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            onClose()
-        }
+        onClose()
     }
 
     private func save() {
@@ -382,7 +358,7 @@ struct ProtectionInsurancePopup: View {
     }
 }
 
-private enum ProtectionPremiumMode {
+private enum ProtectionPremiumMode: Hashable {
     case annual
     case monthly
 }

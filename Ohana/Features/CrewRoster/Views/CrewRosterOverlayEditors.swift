@@ -9,67 +9,6 @@ import SwiftData
 import SwiftUI
 import UIKit
 
-struct RosterHomeVisibilityToggle: View {
-    let isOn: Bool
-    let label: String
-    var identifier: String?
-    let onChange: (Bool) -> Bool
-
-    @Environment(\.ohanaAppLanguageCode) private var appLanguage
-    @State private var visualOverride: Bool?
-
-    private var visualIsOn: Bool {
-        visualOverride ?? isOn
-    }
-
-    private var l: L10n { L10n(appLanguage) }
-
-    var body: some View {
-        Button {
-            let nextValue = !visualIsOn
-            withAnimation(GoMotion.feedback) {
-                visualOverride = nextValue
-            }
-            guard onChange(nextValue) else {
-                withAnimation(GoMotion.feedback) {
-                    visualOverride = isOn
-                }
-                return
-            }
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: visualIsOn ? "house.fill" : "house")
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(visualIsOn ? Color.goPrimary : Color.goCardWhite.opacity(0.78))
-                    .symbolEffect(.bounce, value: visualIsOn)
-
-                ZStack(alignment: visualIsOn ? .trailing : .leading) {
-                    Capsule()
-                        .fill(visualIsOn ? Color.goPrimary.opacity(0.92) : Color.goCardWhite.opacity(0.18))
-                        .frame(width: 28, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    Circle()
-                        .fill(visualIsOn ? Color.arkInk : Color.goCardWhite.opacity(0.92))
-                        .frame(width: 12, height: 12) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .padding(.horizontal, 2)
-                }
-            }
-            .frame(width: 58, height: 32)
-            .contentShape(Rectangle())
-            .animation(GoMotion.feedback, value: visualIsOn)
-            .frame(width: 66, height: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(label)
-        .accessibilityValue(visualIsOn ? l.tr(zh: "开启", en: "On", de: "Ein") : l.tr(zh: "关闭", en: "Off", de: "Aus"))
-        .accessibilityIdentifier(identifier ?? "")
-        .onChange(of: isOn) { _, newValue in
-            guard visualOverride == newValue else { return }
-            visualOverride = nil
-        }
-    }
-}
-
 struct CrewRosterProfilePanel: View {
     let card: FocusCard
     let pet: Pet?
@@ -392,10 +331,9 @@ struct CrewRosterProfilePanel: View {
                 infoRow(l.tr(zh: "身高", en: "Height", de: "Groesse"), human.heightCm > 0 ? "\(Int(human.heightCm)) cm" : localizedEmptyValue)
                 infoRow("MBTI", human.mbti.isEmpty ? localizedEmptyValue : human.mbti.uppercased())
             }
-            profileSection(l.tr(zh: "家庭与显示", en: "Family & display", de: "Familie & Anzeige"), icon: "house.fill") {
+            profileSection(l.tr(zh: "家庭", en: "Family", de: "Familie"), icon: "house.fill") {
                 infoRow(l.tr(zh: "国籍", en: "Nationality", de: "Nationalitaet"), emptyText(human.nationality))
                 infoRow(l.tr(zh: "现居地", en: "Current city", de: "Aktueller Ort"), emptyText(human.city))
-                infoRow(l.tr(zh: "首页显示", en: "Home visibility", de: "Startseitenanzeige"), human.shouldShowOnHome ? l.tr(zh: "显示", en: "Shown", de: "Angezeigt") : l.tr(zh: "隐藏", en: "Hidden", de: "Ausgeblendet"))
                 if HumanLocalPrivacyPolicy.isEnabled {
                     infoRow(l.tr(zh: "隐私项目", en: "Private fields", de: "Private Felder"), privacySummary(for: human))
                 }
@@ -863,7 +801,8 @@ struct CrewRosterProfilePanel: View {
                 city: city,
                 themeHex: themeHex,
                 notes: notes,
-                preservedNoteParts: preservedNoteParts
+                preservedNoteParts: preservedNoteParts,
+                shouldShowOnHome: true
             )
             commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
                 let result = MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(

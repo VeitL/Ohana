@@ -9,6 +9,7 @@ nonisolated struct AppIconShopDescriptor: Identifiable, Equatable {
 
     var id: String { itemId }
     var isDefault: Bool { alternateIconName == nil }
+    var assetName: String { "\(alternateIconName ?? "AppIcon")Preview" }
 }
 
 struct ShopItem: Identifiable, Equatable {
