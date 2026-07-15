@@ -4,19 +4,19 @@ import Testing
 
 @MainActor
 struct QuickFeedSheetCoordinatorTests {
-    @Test func inlineSheetOpenedFromSystemSheetBecomesNestedRoute() {
+    @Test func systemSheetOpenedFromSystemSheetUsesOneReturnStack() {
         let coordinator = QuickFeedSheetCoordinator()
 
         coordinator.openRoot(.feedingOverview)
         coordinator.open(.manual)
 
-        #expect(coordinator.activeSheet == .feedingOverview)
-        #expect(coordinator.nestedInlineSheet == .manual)
-        #expect(coordinator.activeInlineSheet == .manual)
-        #expect(coordinator.inlineOverlayBlocksBackground)
+        #expect(coordinator.activeSheet == .manual)
+        #expect(coordinator.nestedInlineSheet == nil)
+        #expect(coordinator.activeInlineSheet == nil)
+        #expect(!coordinator.inlineOverlayBlocksBackground)
     }
 
-    @Test func closeActiveReturnsThroughNestedAndRootStacks() {
+    @Test func closeActiveReturnsThroughSystemSheetStack() {
         let coordinator = QuickFeedSheetCoordinator()
 
         coordinator.openRoot(.feedingOverview)
@@ -24,14 +24,13 @@ struct QuickFeedSheetCoordinatorTests {
         coordinator.open(.manual)
         coordinator.open(.stock)
 
-        #expect(coordinator.activeSheet == .stockOverview)
-        #expect(coordinator.nestedInlineSheet == .stock)
-
-        coordinator.closeActive()
-        #expect(coordinator.nestedInlineSheet == .manual)
-
-        coordinator.closeActive()
+        #expect(coordinator.activeSheet == .stock)
         #expect(coordinator.nestedInlineSheet == nil)
+
+        coordinator.closeActive()
+        #expect(coordinator.activeSheet == .manual)
+
+        coordinator.closeActive()
         #expect(coordinator.activeSheet == .stockOverview)
 
         coordinator.closeActive()
@@ -56,20 +55,20 @@ struct QuickFeedSheetCoordinatorTests {
         #expect(coordinator.adaptiveSheetHeight == ActiveFeedSheet.history.defaultAdaptiveHeight)
     }
 
-    @Test func inlineDismissFinishesMatchingRouteAndReleasesShieldWhenIdle() {
+    @Test func inlineDismissIsNoOpForSystemSheet() {
         let coordinator = QuickFeedSheetCoordinator()
 
         coordinator.openRoot(.manual)
         let dismissingSheetID = coordinator.beginInlineDismiss()
 
-        #expect(dismissingSheetID == ActiveFeedSheet.manual.id)
-        #expect(coordinator.inlineSheetDismissGestureShield)
+        #expect(dismissingSheetID == nil)
+        #expect(!coordinator.inlineSheetDismissGestureShield)
         #expect(coordinator.inlineSheetVisible == false)
 
         coordinator.finishInlineDismiss(dismissingSheetID: dismissingSheetID)
         coordinator.clearInlineDismissShieldIfIdle()
 
-        #expect(coordinator.activeSheet == nil)
-        #expect(coordinator.inlineSheetDismissGestureShield == false)
+        #expect(coordinator.activeSheet == .manual)
+        #expect(!coordinator.inlineSheetDismissGestureShield)
     }
 }

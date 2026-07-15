@@ -153,10 +153,12 @@ dense-data fixture for snapshot builder and read-model tests is:
 - At least one memorial-mode member and one privacy-locked member.
 
 Aggregation-path tests (snapshot builders, read models, dashboard stores) must
-include at least one in-memory test on a dense fixture with an explicit upper
-bound on wall-clock build time. Treat the bound as a budget, not a benchmark:
-generous enough to be CI-stable (for example 500 ms for a full home snapshot on
-a CI runner), tight enough to catch accidental O(n²) regressions.
+include at least one in-memory test on a dense fixture with an explicit
+wall-clock target and hard regression ceiling. The target remains visible as
+an advisory when a shared runner is noisy; the hard ceiling should be generous
+enough to absorb runner variance while still catching accidental O(n²)
+regressions. A stable benchmark or ETTrace comparison, not one shared-runner
+sample, is the authority for tighter performance claims.
 
 ## Off-Main Aggregation
 

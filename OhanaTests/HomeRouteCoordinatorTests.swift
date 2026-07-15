@@ -506,59 +506,6 @@ struct HomeRouteCoordinatorTests {
         #expect(coordinator.sheet == nil)
     }
 
-    @Test func localHumanQuickPreferenceKeepsHumanQuickPopupsInHomeOverlay() {
-        let pet = Pet(name: "Momo", species: "猫")
-        let human = Human(name: "Guan")
-        let coordinator = HomeRouteCoordinator()
-        var appOverlays: [HomeAppOverlayRoute] = []
-
-        coordinator.bindAppOverlayRouteSink { route in
-            appOverlays.append(route)
-        }
-        coordinator.preferLocalHumanQuickOverlays()
-
-        coordinator.openPetWeightQuick(pet.id)
-        #expect(appOverlays == [.petWeightQuick(petID: pet.id)])
-        #expect(coordinator.overlay == nil)
-
-        coordinator.openSheet(.humanMedicationQuick(human.id))
-        guard case let .humanMedicationQuick(_, medicationHumanID) = coordinator.overlay else {
-            Issue.record("Expected human medication quick to stay in the Home overlay")
-            return
-        }
-        #expect(medicationHumanID == human.id)
-
-        coordinator.openHumanWeightQuick(human.id)
-        guard case let .humanWeightQuick(_, weightHumanID) = coordinator.overlay else {
-            Issue.record("Expected human weight quick to stay in the Home overlay")
-            return
-        }
-        #expect(weightHumanID == human.id)
-
-        coordinator.openSheet(.humanWorkoutQuick(human.id))
-        guard case let .humanWorkoutQuick(_, workoutHumanID) = coordinator.overlay else {
-            Issue.record("Expected human workout quick to stay in the Home overlay")
-            return
-        }
-        #expect(workoutHumanID == human.id)
-
-        coordinator.openSheet(.humanExpenseQuick(human.id))
-        guard case let .humanExpenseQuick(_, expenseHumanID) = coordinator.overlay else {
-            Issue.record("Expected human expense quick to stay in the Home overlay")
-            return
-        }
-        #expect(expenseHumanID == human.id)
-
-        coordinator.openSheet(.humanNoteQuick(human.id))
-        guard case let .humanNoteQuick(_, noteHumanID) = coordinator.overlay else {
-            Issue.record("Expected human note quick to stay in the Home overlay")
-            return
-        }
-        #expect(noteHumanID == human.id)
-        #expect(appOverlays == [.petWeightQuick(petID: pet.id)])
-        #expect(coordinator.sheet == nil)
-    }
-
     @Test func appSheetSinkInterceptsSettings() {
         let coordinator = HomeRouteCoordinator()
         var appSheets: [HomeAppSheetRoute] = []

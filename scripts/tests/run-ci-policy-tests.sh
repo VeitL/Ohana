@@ -143,12 +143,7 @@ else
 fi
 
 unit_repo="$temp_root/unit-repo"
-mkdir -p "$unit_repo/OhanaTests"
-printf '%s\n' \
-  'final class AppResetServiceTests {' \
-  '  func testFirstResetPath() {}' \
-  '  func testSecondResetPath() {}' \
-  '}' > "$unit_repo/OhanaTests/AppResetServiceTests.swift"
+mkdir -p "$unit_repo"
 fake_xcodebuild="$temp_root/fake-xcodebuild"
 fake_xcodebuild_log="$temp_root/fake-xcodebuild.log"
 printf '%s\n' \
@@ -165,13 +160,14 @@ OHANA_REPO_ROOT="$unit_repo" \
   OHANA_CI_TEST_RESULT_ROOT="$temp_root/unit-results" \
   "$repo_root/scripts/ci-run-unit-tests.sh" >/dev/null
 
-if [[ "$(wc -l < "$fake_xcodebuild_log" | tr -d ' ')" == "4" ]] \
-  && grep -q -- '-skip-testing:OhanaTests/AppResetServiceTests' "$fake_xcodebuild_log" \
-  && grep -q -- '-only-testing:OhanaTests/AppResetServiceTests/testFirstResetPath' "$fake_xcodebuild_log" \
-  && grep -q -- '-only-testing:OhanaTests/AppResetServiceTests/testSecondResetPath' "$fake_xcodebuild_log"; then
-  pass "Unit CI builds once and isolates every discovered AppReset test"
+if [[ "$(wc -l < "$fake_xcodebuild_log" | tr -d ' ')" == "2" ]] \
+  && grep -q -- '^call.*build-for-testing' "$fake_xcodebuild_log" \
+  && grep -q -- '^call.*test-without-building' "$fake_xcodebuild_log" \
+  && grep -q -- '-only-testing:OhanaTests' "$fake_xcodebuild_log" \
+  && ! grep -q -- '-skip-testing:' "$fake_xcodebuild_log"; then
+  pass "Unit CI builds once and runs the complete suite once"
 else
-  fail "Unit CI reset isolation lost coverage: $(tr '\n' ' ' < "$fake_xcodebuild_log")"
+  fail "Unit CI should not add permanent test-process isolation: $(tr '\n' ' ' < "$fake_xcodebuild_log")"
 fi
 
 if [[ "$failures" -ne 0 ]]; then

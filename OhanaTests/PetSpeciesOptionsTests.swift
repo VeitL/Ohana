@@ -86,8 +86,8 @@ struct PetSpeciesOptionsTests {
         #expect(PetBreedDatabase.breeds(for: "rabbit").contains { $0.name == "荷兰兔" })
     }
 
-    @Test func memberCreationDraftDefaultsToCanonicalPetSpeciesKey() {
-        #expect(MemberCreationDraft(kind: .pet).species == "dog")
+    @Test func memberCreationDraftDoesNotInferPetSpecies() {
+        #expect(MemberCreationDraft(kind: .pet).species == "")
         #expect(Pet().species == "dog")
     }
 }

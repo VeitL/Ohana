@@ -163,9 +163,9 @@ jobs:
   #     is expected; restore-keys give the latest partial cache for incremental.
   #   - xcbeautify (a brew install ~1min) is dropped in favor of `-quiet`;
   #     errors still print, and the raw xcresult is uploaded as an artifact.
-  #   - AppResetServiceTests run one method per fresh test process after the main
-  #     suite. A hosted-runtime teardown crash cannot erase every other test's
-  #     result, and every newly added reset test is discovered from source.
+  #   - The complete unit target runs once from those built products. Temporary
+  #     crash isolation is a diagnostic tool, not a permanent source of extra
+  #     simulator launches after the underlying defect is fixed.
   # ----------------------------------------------------------------------------
   build-test:
     runs-on: macos-15
@@ -189,7 +189,7 @@ jobs:
             echo "::error::No healthy 'iPhone 17' simulator available on this runner. See docs/os-support-matrix.md."
             exit 1
           }
-      - name: Build and run unit tests with reset-process isolation
+      - name: Build and run complete unit suite once
         run: scripts/ci-run-unit-tests.sh
       - name: Print test failure summary
         if: failure()

@@ -22,9 +22,13 @@ Ohana changes must be safe to ship, diagnose, and recover.
   until the signed Release archive provides the authoritative result.
 - A temporary baseline or waiver must be reviewed and bounded. Updating a
   baseline is not evidence that the underlying issue was fixed.
-- A test-host crash must be isolated from the rest of the portfolio rather than
-  repeatedly rerunning the whole suite. CI builds once, retains the main-suite
-  result, and runs each known crash-prone reset test in a fresh process.
+- A test-host crash is a defect, not a permanent CI topology. During diagnosis,
+  isolate the smallest crashing selector so the rest of the portfolio remains
+  observable; after the root cause is fixed, restore one complete unit run and
+  remove the extra simulator launches.
+- Wall-clock performance checks use a review target plus a hard regression
+  ceiling. Crossing the target is diagnostic evidence; only a clearly bounded
+  runaway (currently 2x the target for dense snapshots) blocks unrelated work.
 
 ## Test Portfolio Contract
 

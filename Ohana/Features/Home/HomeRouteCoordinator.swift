@@ -255,7 +255,6 @@ final class HomeRouteCoordinator: ObservableObject {
     private var appSheetRouteSink: ((HomeAppSheetRoute) -> Void)?
     private var appFullScreenRouteSink: ((HomeAppFullScreenRoute) -> Void)?
     private var appOverlayRouteSink: ((HomeAppOverlayRoute) -> Void)?
-    private var keepsHumanQuickOverlaysLocal = false
 
     func bindAppRouteSink(_ sink: @escaping (HomeAppRoute) -> Void) {
         appRouteSink = sink
@@ -271,10 +270,6 @@ final class HomeRouteCoordinator: ObservableObject {
 
     func bindAppOverlayRouteSink(_ sink: @escaping (HomeAppOverlayRoute) -> Void) {
         appOverlayRouteSink = sink
-    }
-
-    func preferLocalHumanQuickOverlays(_ enabled: Bool = true) {
-        keepsHumanQuickOverlaysLocal = enabled
     }
 
     func openModal(_ route: HomeModalRoute) {
@@ -552,11 +547,6 @@ final class HomeRouteCoordinator: ObservableObject {
         }
         if let appOverlayRoute = route.appOverlayRoute,
            let homeOverlayRoute = route.homeOverlayRoute {
-            if keepsHumanQuickOverlaysLocal, route.isHumanQuickOverlayRoute {
-                overlay = homeOverlayRoute
-                sheet = nil
-                return
-            }
             if let appOverlayRouteSink {
                 appOverlayRouteSink(appOverlayRoute)
                 overlay = nil
@@ -691,51 +681,6 @@ private extension HomeSheetRoute {
              .humanNote,
              .plantCareLog:
             nil
-        }
-    }
-
-    var isHumanQuickOverlayRoute: Bool {
-        switch self {
-        case .humanMedicationQuick,
-             .humanWeightQuick,
-             .humanWorkoutQuick,
-             .humanExpenseQuick,
-             .humanNoteQuick:
-            true
-        case .petAllFeatures,
-             .humanAllFeatures,
-             .petBasicInfo,
-             .humanBasicInfo,
-             .petFood,
-             .petWeightQuick,
-             .petWeight,
-             .petExpenseQuick,
-             .petExpense,
-             .petFeed,
-             .petWater,
-             .petPotty,
-             .petLitter,
-             .petPlay,
-             .petHygiene,
-             .petWalkSummary,
-             .petHealth,
-             .petMedication,
-             .petMomentHistory,
-             .petDocuments,
-             .petAchievements,
-             .petRetention,
-             .petBondVault,
-             .humanMedication,
-             .humanWeight,
-             .humanWorkout,
-             .humanWorkoutDashboard,
-             .humanMetrics,
-             .humanReport,
-             .humanExpense,
-             .humanWishlist,
-             .humanNote,
-             .plantCareLog:
-            false
         }
     }
 

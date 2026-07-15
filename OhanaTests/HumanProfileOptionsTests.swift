@@ -36,7 +36,7 @@ struct HumanProfileOptionsTests {
     }
 
     @Test func storesGenderIdentityAsCanonicalKeys() {
-        #expect(HumanProfileOptions.genderOptions.map(\.key) == ["female", "male", "nonbinary", "private"])
+        #expect(HumanProfileOptions.genderOptions.map(\.key) == ["", "female", "male", "nonbinary", "private"])
         #expect(HumanProfileOptions.storedGenderIdentity("女") == "female")
         #expect(HumanProfileOptions.storedGenderIdentity("male") == "male")
         #expect(HumanProfileOptions.storedGenderIdentity("非二元") == "nonbinary")
@@ -62,8 +62,8 @@ struct HumanProfileOptionsTests {
         #expect(HumanProfileOptions.storedGenderIdentity(raw: "", notes: "memo") == nil)
     }
 
-    @Test func memberCreationDraftDefaultsToCanonicalHumanGenderKey() {
-        #expect(MemberCreationDraft(kind: .human).humanGender == "nonbinary")
+    @Test func memberCreationDraftDoesNotInferHumanGender() {
+        #expect(MemberCreationDraft(kind: .human).humanGender == "")
     }
 
     @Test func visibleNotesHideLegacyRelationshipMetadata() {

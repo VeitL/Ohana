@@ -115,7 +115,10 @@ final class QuickFeedSheetCoordinator: ObservableObject {
     }
 
     func beginInlineDismiss() -> String? {
-        let dismissingSheetID = activeInlineSheet?.id
+        guard let dismissingSheetID = activeInlineSheet?.id else {
+            inlineSheetDismissGestureShield = false
+            return nil
+        }
         inlineSheetDismissGestureShield = true
         withAnimation(GoMotion.page) {
             inlineSheetVisible = false

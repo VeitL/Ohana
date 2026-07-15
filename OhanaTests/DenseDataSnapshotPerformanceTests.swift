@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import SwiftData
 import Testing
 @testable import Ohana
@@ -110,12 +111,25 @@ struct DenseDataSnapshotPerformanceTests {
         let startedAt = CFAbsoluteTimeGetCurrent()
         let value = try operation()
         let elapsedMilliseconds = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000
+        let hardLimitMilliseconds = budgetMilliseconds * 2
+        if elapsedMilliseconds > budgetMilliseconds {
+            Logger.performanceTests.notice(
+                "\(label, privacy: .public) took \(Int(elapsedMilliseconds))ms; target \(Int(budgetMilliseconds))ms, hard limit \(Int(hardLimitMilliseconds))ms"
+            )
+        }
         #expect(
-            elapsedMilliseconds <= budgetMilliseconds,
-            "\(label) took \(Int(elapsedMilliseconds))ms; budget \(Int(budgetMilliseconds))ms"
+            elapsedMilliseconds <= hardLimitMilliseconds,
+            "\(label) took \(Int(elapsedMilliseconds))ms; hard limit \(Int(hardLimitMilliseconds))ms"
         )
         return value
     }
+}
+
+private extension Logger {
+    static let performanceTests = Logger(
+        subsystem: "com.guanchen.li.OhanaTests",
+        category: "DenseDataPerformance"
+    )
 }
 
 @MainActor

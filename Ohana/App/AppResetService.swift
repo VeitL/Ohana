@@ -132,11 +132,17 @@ enum AppResetService {
     }
 
     private static func deleteAllPersistentModels(in context: ModelContext) throws {
-        try delete(CloudSyncRecordState.self, in: context)
-        try delete(PetDocumentAttachment.self, in: context)
-        try delete(InsuranceClaim.self, in: context)
-        try delete(Reminder.self, in: context)
+        // SwiftData batch deletes must remove cascade roots before their
+        // dependants. Deleting a child batch first can make Core Data nullify a
+        // mandatory inverse and fail before the later parent delete runs.
         try delete(Event.self, in: context)
+        try delete(Pet.self, in: context)
+        try delete(Plant.self, in: context)
+        try delete(Human.self, in: context)
+        try delete(Household.self, in: context)
+
+        try delete(CloudSyncRecordState.self, in: context)
+        try delete(Reminder.self, in: context)
         try delete(CareLedgerEvent.self, in: context)
         try delete(CoconutLedgerEntry.self, in: context)
         try delete(CoconutAccount.self, in: context)
@@ -163,6 +169,7 @@ enum AppResetService {
         try delete(WishlistItem.self, in: context)
         try delete(PetPhotoLog.self, in: context)
         try delete(PetInsurance.self, in: context)
+        try delete(InsuranceClaim.self, in: context)
         try delete(PetMedication.self, in: context)
         try delete(SymptomLog.self, in: context)
         try delete(HeatCycleLog.self, in: context)
@@ -172,6 +179,7 @@ enum AppResetService {
         try delete(PetFoodRecord.self, in: context)
         try delete(PetExpenseLog.self, in: context)
         try delete(PetDocument.self, in: context)
+        try delete(PetDocumentAttachment.self, in: context)
         try delete(PetHealthLog.self, in: context)
         try delete(PetWeightLog.self, in: context)
         try delete(PetHygieneLog.self, in: context)
@@ -179,17 +187,13 @@ enum AppResetService {
         try delete(PetPottyLog.self, in: context)
         try delete(PetCareLog.self, in: context)
         try delete(PetRelationship.self, in: context)
-        try delete(Household.self, in: context)
-        try delete(Plant.self, in: context)
-        try delete(Pet.self, in: context)
-        try delete(Human.self, in: context)
     }
 
     private static func delete<T: PersistentModel>(_: T.Type, in context: ModelContext) throws {
-        let values = try context.fetch(FetchDescriptor<T>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        for value in values {
-            context.delete(value) // derived-state: allow privacy reset local wipe intentionally bypasses sync tombstones
-        }
+        // Reset is a whole-store operation. A batch delete avoids materializing
+        // every live object graph only to tear it down again, which is both
+        // slower and has triggered a SwiftData allocator crash on iOS 26.2.
+        try context.delete(model: T.self) // derived-state: allow intentional local reset without sync tombstones
     }
 
     private static func preservedDefaultValues(
