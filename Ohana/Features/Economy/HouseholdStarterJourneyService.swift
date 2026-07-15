@@ -386,6 +386,8 @@ private extension HouseholdStarterJourneyService {
             amountUnit: "coconut",
             note: title,
             source: .economy,
+            sourceEventId: nil,
+            sourceReminderId: nil,
             legacyModelName: rewardSourceModelName,
             legacyModelId: task.id,
             coconutDelta: task.rewardCoconuts,
