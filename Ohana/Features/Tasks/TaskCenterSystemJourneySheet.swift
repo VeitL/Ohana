@@ -61,7 +61,7 @@ struct TaskCenterSystemJourneySheet: View {
                 .padding(.top, 10)
                 .padding(.bottom, 34)
             }
-            .background(Color.ohanaPageBackground.ignoresSafeArea())
+            .background(OhanaAppBackground().ignoresSafeArea())
             .navigationTitle(l.tr(zh: "新手成长计划", en: "Starter journey", de: "Starter-Reise"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
