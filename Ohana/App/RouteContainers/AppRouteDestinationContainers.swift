@@ -59,6 +59,7 @@ struct AppRoutePresentationHost: ViewModifier {
     let onAddEntityDismissed: () -> Void
     let onPetSavedFromAddEntity: (Pet) -> Void
     let onHumanSavedFromAddEntity: (Human) -> Void
+    let onRequestStarterGiftClaim: () -> Void
     let onFirstSuccessMomentCompleted: (Pet) -> Void
     let onHumanDoseTaken: (UUID) -> Void
     let routeLanguageCode: String
@@ -95,6 +96,7 @@ struct AppRoutePresentationHost: ViewModifier {
                         onDismiss: { coordinator.dismissSheet(route) },
                         onPetSavedFromAddEntity: onPetSavedFromAddEntity,
                         onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
+                        onRequestStarterGiftClaim: onRequestStarterGiftClaim,
                         onCalendarEventDestination: handleCalendarEventDestination,
                         onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
                         onHumanDoseTaken: onHumanDoseTaken
@@ -256,6 +258,7 @@ extension View {
         onAddEntityDismissed: @escaping () -> Void = {},
         onPetSavedFromAddEntity: @escaping (Pet) -> Void = { _ in },
         onHumanSavedFromAddEntity: @escaping (Human) -> Void = { _ in },
+        onRequestStarterGiftClaim: @escaping () -> Void = {},
         onFirstSuccessMomentCompleted: @escaping (Pet) -> Void = { _ in },
         onHumanDoseTaken: @escaping (UUID) -> Void = { _ in },
         routeLanguageCode: String = AppLanguage.code
@@ -267,6 +270,7 @@ extension View {
                 onAddEntityDismissed: onAddEntityDismissed,
                 onPetSavedFromAddEntity: onPetSavedFromAddEntity,
                 onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
+                onRequestStarterGiftClaim: onRequestStarterGiftClaim,
                 onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
                 onHumanDoseTaken: onHumanDoseTaken,
                 routeLanguageCode: routeLanguageCode
@@ -303,6 +307,7 @@ private struct AppSheetRouteDestination: View {
     let onDismiss: () -> Void
     let onPetSavedFromAddEntity: (Pet) -> Void
     let onHumanSavedFromAddEntity: (Human) -> Void
+    let onRequestStarterGiftClaim: () -> Void
     let onCalendarEventDestination: (FocusHomeReminderDestination) -> Void
     let onFirstSuccessMomentCompleted: (Pet) -> Void
     let onHumanDoseTaken: (UUID) -> Void
@@ -344,6 +349,35 @@ private struct AppSheetRouteDestination: View {
                 initialSurface: .tasks,
                 routeContext: context,
                 onOpenEventDestination: onCalendarEventDestination,
+                onOpenSystemDestination: { item in
+                    switch item.systemDestination {
+                    case .createFirstPet:
+                        coordinator.presentAddEntity(.pet)
+                    case .claimStarterGift:
+                        onDismiss()
+                        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
+                            onRequestStarterGiftClaim()
+                        }
+                    case .completeHumanProfile:
+                        if let id = item.subject.id { coordinator.presentSheet(.humanBasicInfo(id)) }
+                    case .completeFirstPetProfile:
+                        if let id = item.subject.id { coordinator.presentSheet(.petBasicInfo(id)) }
+                    case .confirmPetIdentityProtection:
+                        if let id = item.subject.id { coordinator.presentSheet(.petDocuments(id)) }
+                    case .confirmPetPreventiveCare:
+                        if let id = item.subject.id {
+                            coordinator.presentSheet(.petHealth(id, initialSection: .preventive))
+                        }
+                    case .configureFirstCarePlan:
+                        if let id = item.subject.id { coordinator.presentSheet(.petFood(id)) }
+                    case .recordFirstCare:
+                        if let id = item.subject.id {
+                            coordinator.presentSheet(.petFeed(id, opensManualSheet: true))
+                        }
+                    case nil:
+                        break
+                    }
+                },
                 onPresentCoconutLog: { subject in
                     coordinator.presentCoconutLog(subject)
                 },

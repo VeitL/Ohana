@@ -71,35 +71,25 @@ extension QuestManager {
         )
     }
 
-    /// 完成喂食任务时调用（第一次记录喂食）
-    func recordFirstMeal(actorId: String? = nil, actorName: String? = nil, context: ModelContext? = nil) {
+    /// 旧调用兼容：仅记录首次喂食里程碑；奖励已统一由新手旅程发放。
+    func recordFirstMeal(
+        actorId _: String? = nil,
+        actorName _: String? = nil,
+        context _: ModelContext? = nil
+    ) {
         guard !isFirstMealRecorded else { return }
-        guard recordSpecialCoconutReward(
-            15,
-            emoji: "🍖",
-            title: DomainCareRewardGeneralTitle.questFirstMeal,
-            actorId: actorId,
-            actorName: actorName,
-            rewardKey: "welcome:firstMeal",
-            context: context
-        ) else { return }
         isFirstMealRecorded = true
         persistQuestFlags()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
-    /// 完成主题颜色设置任务时调用
-    func recordThemeColorSet(actorId: String? = nil, actorName: String? = nil, context: ModelContext? = nil) {
+    /// 旧调用兼容：仅记录主题色里程碑；奖励已统一由新手旅程发放。
+    func recordThemeColorSet(
+        actorId _: String? = nil,
+        actorName _: String? = nil,
+        context _: ModelContext? = nil
+    ) {
         guard !isThemeColorSet else { return }
-        guard recordSpecialCoconutReward(
-            10,
-            emoji: "🎨",
-            title: DomainCareRewardGeneralTitle.questThemeColor,
-            actorId: actorId,
-            actorName: actorName,
-            rewardKey: "welcome:themeColor",
-            context: context
-        ) else { return }
         isThemeColorSet = true
         persistQuestFlags()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()

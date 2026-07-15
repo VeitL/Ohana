@@ -81,7 +81,7 @@ Even though data is local, the user has rights over it:
 - Deceased pet/human enters read-only memorial mode; future reminders and daily
   tasks must stop (enforced in services, not just UI).
 - Member privacy (`PrivacyService`) cannot be bypassed via quick actions, all-
-  features, stats, collaboration, or Today Focus.
+  features, stats, collaboration, or Task Center.
 - Human profiles are local content records, not authenticated operators. A
   member name is required when explicitly creating a Human; gender and birthday
   remain optional and are never inferred from the device's Apple account.

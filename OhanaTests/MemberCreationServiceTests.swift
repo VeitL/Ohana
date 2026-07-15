@@ -51,11 +51,34 @@ struct MemberCreationServiceTests {
         #expect(try context.fetch(FetchDescriptor<Pet>()).count == 1)
     }
 
-    @Test func petCreationRequiresBoyOrGirl() throws {
+    @Test func petCreationRequiresNameSpeciesAndBreedWhileOtherProfileFieldsRemainOptional() throws {
         resetGlobalState()
         let container = try makeContainer()
-        var draft = petDraft(name: "Momo", source: .placeholder)
-        draft.petGender = "unknown"
+        var draft = MemberCreationDraft(kind: .pet)
+        draft.name = "Momo"
+        draft.species = "dog"
+        draft.breed = "柴犬"
+
+        let pet = try #require(saveMember(
+            draft: draft,
+            existingPets: [],
+            existingHumans: [],
+            context: container.mainContext,
+            countryCode: "CN"
+        ).pet)
+
+        #expect(pet.name == "Momo")
+        #expect(pet.species == "dog")
+        #expect(pet.breed == "柴犬")
+        #expect(pet.gender == "unknown")
+        #expect(pet.coatColor.isEmpty)
+    }
+
+    @Test func petCreationStillRejectsMissingSpecies() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        var draft = MemberCreationDraft(kind: .pet)
+        draft.name = "Momo"
 
         do {
             _ = try saveMember(
@@ -65,15 +88,56 @@ struct MemberCreationServiceTests {
                 context: container.mainContext,
                 countryCode: "CN"
             )
-            Issue.record("Expected incomplete pet profile rejection")
+            Issue.record("Expected missing species to be rejected")
         } catch let error as MemberCreationService.ServiceError {
             guard case .incompletePetProfile = error else {
-                Issue.record("Expected the binary sex requirement")
+                Issue.record("Expected incomplete pet profile error")
+                return
+            }
+        }
+        #expect(try container.mainContext.fetch(FetchDescriptor<Pet>()).isEmpty)
+    }
+
+    @Test func petCreationRejectsMissingBreedAndPersistsCustomSpeciesAndBreed() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        var missingBreed = MemberCreationDraft(kind: .pet)
+        missingBreed.name = "Momo"
+        missingBreed.species = "dog"
+
+        do {
+            _ = try saveMember(
+                draft: missingBreed,
+                existingPets: [],
+                existingHumans: [],
+                context: container.mainContext,
+                countryCode: "CN"
+            )
+            Issue.record("Expected missing breed to be rejected")
+        } catch let error as MemberCreationService.ServiceError {
+            guard case .incompletePetProfile = error else {
+                Issue.record("Expected incomplete pet profile error")
                 return
             }
         }
 
-        #expect(try container.mainContext.fetch(FetchDescriptor<Pet>()).isEmpty)
+        var custom = MemberCreationDraft(kind: .pet)
+        custom.name = "Pip"
+        custom.species = "other"
+        custom.isCustomSpecies = true
+        custom.customSpecies = "Capybara"
+        custom.isCustomBreed = true
+        custom.customBreed = "Short-haired"
+
+        let pet = try #require(saveMember(
+            draft: custom,
+            existingPets: [],
+            existingHumans: [],
+            context: container.mainContext,
+            countryCode: "CN"
+        ).pet)
+        #expect(pet.species == "Capybara")
+        #expect(pet.breed == "Short-haired")
     }
 
     @Test func petCreationAllowsNoPersonalityAndLimitsPersistedSelectionToThree() throws {
@@ -187,7 +251,7 @@ struct MemberCreationServiceTests {
         #expect(human.avatarImageSignature == MediaPayloadSignature.signature(for: avatarData))
     }
 
-    @Test func firstPetDoesNotAwardStarterGiftBeforeFirstCare() throws {
+    @Test func firstPetCreationDoesNotAwardStarterGiftBeforeConfirmation() throws {
         resetGlobalState()
         let container = try makeContainer()
         let context = container.mainContext
@@ -675,6 +739,7 @@ struct MemberCreationServiceTests {
         draft.hasHomeDate = true
         draft.homeDate = homeDate
         draft.themeColorHex = "00AAFF"
+        draft.hasExplicitThemeColor = true
 
         let result = try saveMember(
             draft: draft,

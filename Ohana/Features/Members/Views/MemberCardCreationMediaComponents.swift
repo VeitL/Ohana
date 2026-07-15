@@ -11,9 +11,25 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+enum MemberPortraitDraftCardLayoutMode: Equatable {
+    case standard
+    case compactPersonalization
+}
+
 struct MemberPortraitDraftCardSurface<Controls: View>: View {
     let snapshot: MemberCardRenderSnapshot
+    let layoutMode: MemberPortraitDraftCardLayoutMode
     @ViewBuilder var controls: () -> Controls
+
+    init(
+        snapshot: MemberCardRenderSnapshot,
+        layoutMode: MemberPortraitDraftCardLayoutMode = .standard,
+        @ViewBuilder controls: @escaping () -> Controls
+    ) {
+        self.snapshot = snapshot
+        self.layoutMode = layoutMode
+        self.controls = controls
+    }
 
     private var palette: WalletMemberHeroPalette {
         WalletMemberHeroPalette(
@@ -45,18 +61,24 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
-            let heroHeight = min(max(width * 0.78, 240), min(height * 0.45, 320))
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    hero(width: width, height: heroHeight)
-                        .frame(height: heroHeight)
-                    Spacer(minLength: 0)
-                    controls()
+            let heroHeight = resolvedHeroHeight(width: width, height: height)
+            let controlsHeight = max(0, height - heroHeight)
+            VStack(spacing: 0) {
+                hero(width: width, height: heroHeight)
+                    .frame(height: heroHeight)
+                    .clipped()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        controls()
+                    }
+                    .frame(minHeight: controlsHeight, alignment: .bottom)
                 }
-                .frame(minHeight: height, alignment: .bottom)
+                .scrollDismissesKeyboard(.interactively)
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(height: controlsHeight)
             }
-            .scrollDismissesKeyboard(.interactively)
-            .scrollBounceBehavior(.basedOnSize)
             .background {
                 cardBackground(width: width, height: height)
             }
@@ -66,6 +88,15 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
                     .strokeBorder(palette.border, lineWidth: 1)
                     .allowsHitTesting(false)
             }
+        }
+    }
+
+    private func resolvedHeroHeight(width: CGFloat, height: CGFloat) -> CGFloat {
+        switch layoutMode {
+        case .standard:
+            min(max(width * 0.78, 240), min(height * 0.45, 320))
+        case .compactPersonalization:
+            min(max(width * 0.42, 150), min(height * 0.29, 180))
         }
     }
 
@@ -91,6 +122,8 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
 
     private func hero(width: CGFloat, height: CGFloat) -> some View {
         let readableText = usesWidePhoto ? Color.goCardWhite : Color.arkInk
+        let isCompact = layoutMode == .compactPersonalization
+        let avatarHeight = max(72, height - 90 - (isCompact ? 8 : 22))
         return ZStack(alignment: .topLeading) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
@@ -121,37 +154,40 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
                     }
                 }
                 .frame(height: 50, alignment: .top)
-                Spacer(minLength: 18)
-                avatar(width: width)
+                Spacer(minLength: isCompact ? 2 : 10)
+                avatar(width: width, height: avatarHeight, isCompact: isCompact)
                     .frame(maxWidth: .infinity, alignment: .center)
-                Spacer(minLength: 12)
+                Spacer(minLength: isCompact ? 6 : 10)
             }
             .padding(.top, 22)
             .padding(.horizontal, 22)
-            .padding(.bottom, 18)
+            .padding(.bottom, isCompact ? 8 : 14)
 
             if !usesWidePhoto, snapshot.avatarImage == nil {
-                watermarkSymbol(width: width * 0.74)
+                watermarkSymbol(width: width * (isCompact ? 0.42 : 0.64))
                     .opacity(0.22)
-                    .position(x: width * 0.55, y: height * 0.56)
+                    .position(x: width * 0.55, y: height * (isCompact ? 0.70 : 0.63))
             }
         }
     }
 
     @ViewBuilder
-    private func avatar(width: CGFloat) -> some View {
+    private func avatar(width: CGFloat, height: CGFloat, isCompact: Bool) -> some View {
         if usesWidePhoto {
             Color.clear
-                .frame(width: width * 0.72, height: width * 0.58)
+                .frame(width: width * 0.72, height: height)
         } else if let image = snapshot.avatarImage {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFit()
-                .frame(width: width * (snapshot.kind == .pet ? 0.72 : 0.58), height: width * 0.58)
+                .frame(
+                    width: width * (isCompact ? 0.34 : (snapshot.kind == .pet ? 0.62 : 0.52)),
+                    height: height
+                )
                 .shadow(color: Color.arkInk.opacity(snapshot.avatarIsTransparent ? 0.30 : 0.18), radius: 16, y: 10) // ui-v4: allow intentional avatar depth
         } else {
             Color.clear
-                .frame(width: width * 0.72, height: width * 0.50)
+                .frame(width: width * (isCompact ? 0.34 : 0.62), height: height)
         }
     }
 

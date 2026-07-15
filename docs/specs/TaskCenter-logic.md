@@ -1,7 +1,7 @@
 # Task Center 业务规则书
 
-> 状态：当前首发实现。
-> 最近核对：2026-07-15，依据 `TaskCenterRouteContainer`、`TaskCenterSnapshotBuilder`、`TaskActionCommandExecutor`、`TaskCareAssignmentCommandExecutor`、`FamilyTaskService` 与 Home / Members / Plant 路由符号。
+> 状态：当前工作区首发实现；测试与运行验收状态由 `docs/testing-progress.md` 单独记录。
+> 最近核对：2026-07-15，依据 `TaskCenterRouteContainer`、`TaskCenterSnapshotBuilder`、`TaskCenterStarterJourneyProjection`、`HouseholdStarterJourneyService`、`TaskActionCommandExecutor`、`TaskCareAssignmentCommandExecutor`、`FamilyTaskService` 与 Home / Members / Plant 路由符号。
 > 所有者：`TaskCenterRouteContainer`（入口与加载）、`TaskCenterSnapshotBuilder`（投影）、`TaskActionCommandExecutor`（动作编排）、`TaskCareAssignmentCommandExecutor`（类型化照顾待办创建）。
 
 ## 1. 职责与入口
@@ -14,7 +14,7 @@
 - 日历由 `CalendarRouteContainer` 保留完整时间视图；非行动型 Event 只需要在
   日历出现。带日期的本机 FamilyTask 由 `TaskCenterCalendarWorkflowStrip` 补充
   工作流操作；无日期 FamilyTask 只进入清单的“未排期”。
-- 成员名册、Human 详情、Today Focus 和普通详情页都回到这个入口，不再各自维护
+- 成员名册、Human 详情和普通详情页都回到这个入口，不再各自维护
   一套任务中心。
 - Pet / Plant 详情发起照顾待办时，路由携带值类型 `TaskCreationPreset`，创建页锁定
   当前对象和照顾类型；普通日历事项仍使用可编辑的对象选择器。
@@ -75,9 +75,6 @@ Task Center 的 actionable row 和日历 FamilyTask strip 都把用户意图交�
 Event / FamilyTask 由 executor 返回 `alreadyApplied`，底层 Calendar、Reminder、
 FamilyTask 和钱包命令继续拥有各自的持久化幂等与事务边界。
 
-Today Focus 只把值命令交给 executor；executor 自己有界读取所需 Event、FamilyTask、
-当前 Human 和关联 Pet，View 不直接执行 SwiftData fetch。
-
 ### TC-005 家庭分工状态机
 
 本机 FamilyTask 使用以下主流程：
@@ -131,18 +128,23 @@ Human 时任务仍可作为家庭事项存在，但不伪造执行人，也不�
 这项本机能力不读取 `OnlineFeatureGate`；跨设备身份、邀请、同步和远端协作仍由
 [`OnlineFeatureGate-logic.md`](OnlineFeatureGate-logic.md) 约束。
 
-## 4. Today Focus 与成员路由
+## 4. 系统旅程与成员路由
 
-### TC-007 Today Focus 是统一快照的高优先级投影
+### TC-007 首宠建立与奖励领取是连续的系统旅程事项
 
-`HomeReadModelStore` 读取 Task Center 所需的 Event、Reminder、FamilyTask 与对象值，
-再由同一个 `TaskCenterSnapshotBuilder` 生成项目。Today Focus 只保留逾期、今天和
-待审核项目，并继续按本机当前 Human 的执行 / 审核责任过滤；它不再把 care Event
-包装为另一套 Oasis quest。
+延后建立宠物时，`TaskCenterSnapshotBuilder` 派生稳定 ID
+`system-journey-create-first-pet`。它使用 `.systemJourney` 来源和类型化
+`.createFirstPet` 目的地，显示 `+50` 奖励提示，但不写 Event、Reminder 或
+FamilyTask，不进入日历，也不提供手动完成动作。
 
-点击项目会按同一个 `TaskCenterItemSnapshot.id` 聚焦待办；卡片上的直接动作也调用
-`TaskActionCommandExecutor`。因此 Today Focus 的每个任务都必须能在待办页按稳定
-ID 找到。“查看全部待办”会清除具体焦点，不得跳回旧协作 dashboard。
+该事项不受默认 Human 筛选隐藏；点击整行或“建立”动作打开统一 Pet 创建流程。
+取消后事项保留；第一只有效 Pet 保存后，该事项由稳定 ID
+`system-journey-claim-starter-gift` 的 `.claimStarterGift` 事项替代。保存宠物本身不弹
+奖励层；用户点击“领取”后才请求展示 50 椰子领取弹窗。领取成功后该事项消失并解锁
+Oasis。两个事项都只进入清单、不进入日历，也不受默认 Human 筛选隐藏。
+
+用户后来删除或归档宠物不会重新生成已经完成的旅程。待办 Tab 注意数按去重后的逾期、
+今天、待审核和系统旅程事项计算。
 
 ### TC-008 成员页不拥有任务数据
 
@@ -176,6 +178,31 @@ V89 将 `Reminder.scheduledAt` 定义为通知投递时间，将可选 `occurren
 对象归档、离世或删除时，创建先整体拒绝；物理删除还必须清理以 Human、Pet 或
 Plant 为 subject 的 FamilyTask，避免留下不可操作的孤儿分工。
 
+### TC-010 新手成长计划是待办顶部的一组家庭旅程
+
+首宠启动赠礼领取后，待办顶部显示“新手成长计划”。它由六个稳定的
+`.systemJourney` 事项组成：完善 Human 成员卡、完善首只 Pet 档案、确认证件与保障
+状态、确认疫苗与保健状态、建立首个照护计划、完成首次真实照护。奖励分别为
+100 / 100 / 60 / 80 / 40 / 20 椰子；家庭总额为 400。
+
+同一时刻最多投影顺序最靠前的三个未领取事项。每一行在资格未满足时使用
+`actionRequired` 并路由到现有 Human / Pet 资料、证件、健康、喂养计划或手动照护页面；
+资格满足后同一稳定 ID 切换为 `rewardReady`。用户必须点击该行，在 item-driven sheet
+中确认领取；保存资料或照护事实本身不弹奖励层，也不自动发奖。该组只进入清单，
+不进入日历，不受默认成员筛选隐藏，也不显示发布者、执行者或审核人控件。
+
+可选资料允许用户以“暂无 / 不适用 / 不清楚 / 不愿透露”等明确选择完成确认。
+这些选择只写家庭旅程 checkpoint 与目标 ID，不复制护照号、血型等敏感值。计划资格
+必须来自用户通过照护入口明确建立、且带照护类型或计划标记的非默认 Event / Reminder，
+或明确确认采用系统推荐计划；普通日历提醒和宠物创建时自动生成的默认计划不能自行
+满足资格。首次真实照护只接受正式照护账本中的
+喂食、饮水、如厕、遛狗、陪玩或卫生等照护事实，不能由体重、健康、花费或资料编辑
+替代。
+
+领取命令在保存前重新验证资格，并使用家庭级稳定交易键；同一任务重复点击、重启或
+崩溃恢复只能留下一个正式奖励。默认领取人为本机当前 active Human；仅有一位有效
+Human 时自动使用该成员，多位且没有可解析绑定成员时要求先选择，不伪造领取人。
+
 ## 6. 边界与验证
 
 - Task Center 使用有界 Event window、pending Reminder 上限和 active FamilyTask
@@ -184,7 +211,7 @@ Plant 为 subject 的 FamilyTask，避免留下不可操作的孤儿分工。
   生命周期门继续由 `MemberLifecycleActiveScheduleResolver` 与 `MemberLifecycleGate`
   裁决。
 - `TaskCenterSnapshotBuilderTests` 当前覆盖关联去重、独立 / 未排期 FamilyTask、
-  四类 subject、单 / 多 Human 动作和 Human scope 指标。
+  四类 subject、系统旅程清单分流、单 / 多 Human 动作和 Human scope 指标。
 - `TaskActionCommandExecutorTests` 当前覆盖关联宠物 / 植物照护先写事实再进入审核、
   事实失败不推进投影、独立任务幂等、单 Human 无悬赏直接完成与悬赏自审拒绝；
   完整 FamilyTask 状态与悬赏失败边界继续由 `MemberLifecycleGateTests` 和 Economy
@@ -194,5 +221,5 @@ Plant 为 subject 的 FamilyTask，避免留下不可操作的孤儿分工。
   occurrence；`DataBackupCoverageTests` 与 `SharedModelContainerRecoveryTests` 覆盖
   V89 codec、旧备份默认值与轻量迁移。
 - `AppRouteCoordinatorTests` 当前覆盖 profile scope 与 focused FamilyTask context；
-  成员 handoff、Today Focus 聚焦及普通进入清空焦点应继续由 Home route / source
+  成员 handoff、系统旅程建宠路由及普通进入清空焦点应继续由 Home route / source
   policy tests 守护。

@@ -169,7 +169,7 @@ final class Pet {
     ) {
         self.id = UUID()
         self.name = name
-        self.species = Self.canonicalSpeciesKey(species)
+        self.species = Self.normalizedSpeciesStorageValue(species)
         self.breed = breed
         self.birthday = birthday
         self.gender = gender
@@ -443,6 +443,16 @@ final class Pet {
         default:
             return trimmed.lowercased()
         }
+    }
+
+    /// Known species use stable canonical keys; a user-entered "Other" value
+    /// keeps its display spelling while capability checks still normalize it
+    /// through `canonicalSpeciesKey`.
+    static func normalizedSpeciesStorageValue(_ rawSpecies: String) -> String {
+        let trimmed = rawSpecies.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "other" }
+        let canonical = canonicalSpeciesKey(trimmed)
+        return canonicalSpeciesOptions.contains(canonical) ? canonical : trimmed
     }
 
     static func isDogSpecies(_ species: String) -> Bool {

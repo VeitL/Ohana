@@ -4,7 +4,7 @@ Status: Active release policy
 
 Owner: Product owner
 
-Last reviewed: 2026-07-11
+Last reviewed: 2026-07-15
 
 ## Approved First-Release Policy
 
@@ -43,7 +43,9 @@ iPhone 11 through the current iPhone generation:
 
 | Lane | Required evidence |
 | --- | --- |
-| Latest simulator | Debug and Release simulator builds on the repository-pinned `iPhone 17`. |
+| Automated tests | Unit, Integration, and UI tests use only the disposable `iPhone 17 Tests` device and `.build/DerivedData/tests`. |
+| Persistent Dogfood | Non-destructive long-lived journeys use the pinned `iPhone 17` through `scripts/run-dogfood-simulator.sh` and preserve its app/data container. |
+| Release compiler lane | Optimized compiler validation uses a generic iOS Simulator destination and `.build/DerivedData/release`; signed-device proof still requires an Archive. |
 | Hardware floor | Signed Release smoke on iPhone SE (2nd generation), or the smallest supported iPhone actually used for launch, running iOS 26.2 or later. |
 | Current hardware | Signed Release smoke on a current iPhone and current supported iOS. |
 | Archive / App Store Connect | The shipped app reports iPhone-only device family, requires no iPad screenshots, exposes no watchOS app, and records the selected storefronts. |

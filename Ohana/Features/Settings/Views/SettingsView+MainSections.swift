@@ -47,7 +47,6 @@ extension SettingsView {
             settingsBackgroundRow
             performanceToggleRow
             reducedVisualEffectsToggleRow
-            settingsReplayOnboardingRow
         }
     }
 
@@ -223,12 +222,6 @@ extension SettingsView {
             iconColor: Color.goBlue
         ) {
             showingBackgroundPicker = true
-        }
-    }
-
-    var settingsReplayOnboardingRow: some View {
-        settingsRow(icon: "sparkles.tv", title: l.replayOnboarding, subtitle: l.replayOnboardingSubtitle) {
-            showingOnboardingReplay = true
         }
     }
 

@@ -282,6 +282,17 @@ struct TaskCenterView: View {
                     } else if displayedSnapshot.pendingCount == 0 {
                         emptyState
                     } else {
+                        taskSection(
+                            title: l.tr(
+                                zh: "新手成长计划",
+                                en: "Starter journey",
+                                de: "Starter-Reise"
+                            ),
+                            items: visible(systemJourneyItems),
+                            tint: .goYellow,
+                            identifier: "starter-journey",
+                            badgeText: starterJourneyRewardProgressText
+                        )
                         if showsDailyProgress, resolvedMemberFilter == .all {
                             dailyProgress
                         }
@@ -311,7 +322,7 @@ struct TaskCenterView: View {
                         )
                         taskSection(
                             title: l.tr(zh: "未排期", en: "Unscheduled", de: "Ohne Termin"),
-                            items: visible(nonReview(displayedSnapshot.unscheduled)),
+                            items: visible(ordinaryUnscheduledItems),
                             tint: .goPurple,
                             identifier: "unscheduled"
                         )
@@ -502,7 +513,8 @@ struct TaskCenterView: View {
         title: String,
         items: [TaskCenterItemSnapshot],
         tint: Color,
-        identifier: String
+        identifier: String,
+        badgeText: String? = nil
     ) -> some View {
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 9) {
@@ -510,7 +522,7 @@ struct TaskCenterView: View {
                     Text(title)
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("\(items.count)")
+                    Text(badgeText ?? "\(items.count)")
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(tint)
                         .padding(.horizontal, 8)
@@ -585,7 +597,7 @@ struct TaskCenterView: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel("\(item.title). \(itemSubtitle(item)). \(dueText(item))")
-            .accessibilityHint(l.tr(zh: "打开事项", en: "Open task", de: "Aufgabe öffnen"))
+            .accessibilityHint(systemAccessibilityHint(for: item))
 
             actionButtons(for: item)
         }
@@ -598,7 +610,23 @@ struct TaskCenterView: View {
 
     @ViewBuilder
     private func actionButtons(for item: TaskCenterItemSnapshot) -> some View {
-        if item.availableActions.isEmpty {
+        if let destination = item.systemDestination {
+            Button {
+                OhanaFeedback.light()
+                onOpen(item)
+            } label: {
+                Text(systemActionTitle(for: item))
+                    .font(OhanaFont.caption2(.black))
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 32)
+                    .background(Color.goPrimary.opacity(0.14), in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .foregroundStyle(Color.goPrimary)
+            .frame(minWidth: 44, minHeight: 44)
+            .accessibilityLabel("\(systemActionTitle(for: item)) \(item.title)")
+            .accessibilityIdentifier("task-center-system-action-\(destination.rawValue)-\(item.id)")
+        } else if item.availableActions.isEmpty {
             EmptyView()
         } else {
             HStack(spacing: 4) {
@@ -697,6 +725,20 @@ struct TaskCenterView: View {
             .filter { $0.workflowStatus == .pendingReview }
     }
 
+    private var systemJourneyItems: [TaskCenterItemSnapshot] {
+        displayedSnapshot.systemJourneyItems
+            .sorted { systemJourneyOrder($0) < systemJourneyOrder($1) }
+    }
+
+    private var ordinaryUnscheduledItems: [TaskCenterItemSnapshot] {
+        nonReview(displayedSnapshot.ordinaryUnscheduledItems)
+    }
+
+    private var starterJourneyRewardProgressText: String? {
+        guard let journey = displayedSnapshot.starterJourney, journey.isEnabled else { return nil }
+        return "\(journey.claimedRewardCoconuts) / \(journey.totalRewardCoconuts) 🥥"
+    }
+
     private func nonReview(_ items: [TaskCenterItemSnapshot]) -> [TaskCenterItemSnapshot] {
         items.filter { $0.workflowStatus != .pendingReview }
     }
@@ -728,6 +770,73 @@ struct TaskCenterView: View {
             l.tr(zh: "通过", en: "Approve", de: "Bestätigen")
         case .reject:
             l.tr(zh: "驳回", en: "Reject", de: "Ablehnen")
+        }
+    }
+
+    private func systemActionTitle(for item: TaskCenterItemSnapshot) -> String {
+        if item.systemJourneyPresentationState == .rewardReady {
+            return l.tr(zh: "领取", en: "Claim", de: "Abholen")
+        }
+        guard let destination = item.systemDestination else {
+            return l.tr(zh: "打开", en: "Open", de: "Öffnen")
+        }
+        switch destination {
+        case .createFirstPet:
+            l.tr(zh: "建立", en: "Create", de: "Erstellen")
+        case .claimStarterGift:
+            l.tr(zh: "领取", en: "Claim", de: "Abholen")
+        case .completeHumanProfile, .completeFirstPetProfile:
+            l.tr(zh: "完善", en: "Complete", de: "Ergänzen")
+        case .confirmPetIdentityProtection, .confirmPetPreventiveCare:
+            l.tr(zh: "确认", en: "Review", de: "Prüfen")
+        case .configureFirstCarePlan:
+            l.tr(zh: "设置", en: "Set up", de: "Einrichten")
+        case .recordFirstCare:
+            l.tr(zh: "记录", en: "Record", de: "Erfassen")
+        }
+    }
+
+    private func systemAccessibilityHint(for item: TaskCenterItemSnapshot) -> String {
+        if item.systemJourneyPresentationState == .rewardReady {
+            return l.tr(
+                zh: "打开奖励领取说明",
+                en: "Open reward claim details",
+                de: "Details zur Belohnung öffnen"
+            )
+        }
+        switch item.systemDestination {
+        case .createFirstPet:
+            l.tr(zh: "开始建立宠物", en: "Start creating a pet", de: "Haustier erstellen")
+        case .claimStarterGift:
+            l.tr(zh: "打开首宠奖励领取弹窗", en: "Open the first-pet gift", de: "Belohnung für das erste Tier öffnen")
+        case .completeHumanProfile:
+            l.tr(zh: "查看并完善人类资料", en: "Review and complete the human profile", de: "Menschenprofil ergänzen")
+        case .completeFirstPetProfile:
+            l.tr(zh: "查看并完善宠物资料", en: "Review and complete the pet profile", de: "Haustierprofil ergänzen")
+        case .confirmPetIdentityProtection:
+            l.tr(zh: "确认宠物证件与保障状态", en: "Review identity and protection details", de: "Dokumente und Schutz prüfen")
+        case .confirmPetPreventiveCare:
+            l.tr(zh: "确认疫苗与保健状态", en: "Review preventive care status", de: "Vorsorge prüfen")
+        case .configureFirstCarePlan:
+            l.tr(zh: "设置一个适用的照护计划", en: "Set up a suitable care plan", de: "Pflegeplan einrichten")
+        case .recordFirstCare:
+            l.tr(zh: "记录一次真实照护", en: "Record a real care action", de: "Eine echte Pflege erfassen")
+        case nil:
+            l.tr(zh: "打开事项", en: "Open task", de: "Aufgabe öffnen")
+        }
+    }
+
+    private func systemJourneyOrder(_ item: TaskCenterItemSnapshot) -> Int {
+        switch item.systemDestination {
+        case .createFirstPet: 0
+        case .claimStarterGift: 1
+        case .completeHumanProfile: 10
+        case .completeFirstPetProfile: 20
+        case .confirmPetIdentityProtection: 30
+        case .confirmPetPreventiveCare: 40
+        case .configureFirstCarePlan: 50
+        case .recordFirstCare: 60
+        case nil: .max
         }
     }
 
@@ -809,6 +918,12 @@ struct TaskCenterView: View {
     }
 
     private func dueText(_ item: TaskCenterItemSnapshot) -> String {
+        if item.source == .systemJourney {
+            if item.systemJourneyPresentationState == .rewardReady {
+                return l.tr(zh: "可领取", en: "Ready", de: "Bereit")
+            }
+            return l.tr(zh: "随时", en: "Anytime", de: "Jederzeit")
+        }
         if item.dueAt == nil, item.source == .familyTask {
             return l.tr(zh: "未排期", en: "Unscheduled", de: "Ohne Termin")
         }

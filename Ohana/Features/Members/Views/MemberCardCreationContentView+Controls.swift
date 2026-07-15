@@ -30,8 +30,9 @@ extension MemberCardCreationContentView {
             foreground: cardForeground,
             placeholderForeground: cardSecondaryForeground
         )
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, minHeight: 52)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: 270)
+        .frame(height: 44)
         .background(cardControlFill, in: Capsule())
         .overlay {
             Capsule()

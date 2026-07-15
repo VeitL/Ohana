@@ -96,7 +96,8 @@ enum AppPresentationPolicyProvider {
                 detents: [.medium, .large],
                 cornerRadius: OhanaRadius.sheetCompact
             )
-        case .streakDetail:
+        case .settings,
+             .streakDetail:
             AppPresentationPolicy(
                 surface: .sheetPage,
                 loading: .immediate,

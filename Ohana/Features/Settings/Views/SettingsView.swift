@@ -57,7 +57,6 @@ struct SettingsView: View {
     @State var importError: String? = nil
     @State var showingImportSuccess = false
     @State var showingImportErrorAlert = false
-    @State var showingOnboardingReplay = false
     @State var showingBackgroundPicker = false
     @State var showingPetManagement = false
     @State var quickSwitchHuman: SettingsHumanSnapshot? = nil
@@ -241,26 +240,6 @@ struct SettingsView: View {
     private var settingsPrimaryPresentationContent: AnyView {
         AnyView(
             settingsLifecycleContent
-        .fullScreenCover(isPresented: $showingOnboardingReplay) {
-            ZStack(alignment: .topTrailing) {
-                OnboardingView(isReplay: true, onReplayFinished: {
-                    showingOnboardingReplay = false
-                })
-                .preferredColorScheme(.dark)
-
-                Button {
-                    showingOnboardingReplay = false
-                } label: {
-                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .background(Color.ohanaControlFill, in: Capsule())
-                        .padding(20)
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-        }
         .sheet(isPresented: $showingBackgroundPicker) {
             AppBackgroundPickerSheet()
                 .ohanaSheetPagePresentation() // ui-v4: allow background picker is a long visual chooser

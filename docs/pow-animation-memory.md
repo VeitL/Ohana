@@ -20,7 +20,7 @@ This is an implementation memory note, not a vendored dependency. Pow is useful 
 - Use `GoMotion` tokens and `OhanaMotionEffects.swift` helpers first.
 - Effects must have a semantic purpose: reward, attention, success, error, or state transition.
 - Respect Reduce Motion. Decorative shine, ping, and shake must become static or very subtle.
-- Avoid long-running particle systems in scrolling pages, Today Focus, home cards, and settings.
+- Avoid long-running particle systems in scrolling pages, Task Center, home cards, and settings.
 - Keep the UI V4 rule: smooth continuity, no hard cuts, but no noisy motion on dense views.
 
 ## Project Helpers
@@ -44,4 +44,4 @@ Use these app-native helpers instead of rewriting page-local variants:
 - Pending family task review: ping on the reward chip.
 - Wrong PIN or insufficient balance: shake the action area and show a compact toast.
 - New reward item equipped: marching border + shine.
-- Today Focus attention card: breathing glow only when actionable.
+- Task Center system-journey item: breathing glow only when action or reward is ready.

@@ -24,6 +24,7 @@ struct VerticalSolidHomeView: View {
     let onPresentOasisReward: () -> Void
     let onPresentPetWeightQuick: (UUID) -> Void
     let onPresentQuickMoment: (UUID) -> Void
+    let onRequestStarterGiftClaim: () -> Void
     let onPresentSettings: () -> Void
     let onPresentStreakDetail: () -> Void
     let onPresentWalk: (UUID) -> Void
@@ -52,8 +53,6 @@ struct VerticalSolidHomeView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    @Environment(\.dynamicTypeSize) var dynamicTypeSize
-    @Environment(\.scenePhase) var scenePhase
     @ObservedObject var workloadPolicy = AppWorkloadPolicy.shared
 
     @State var headerContextCardId: UUID?
@@ -91,7 +90,6 @@ struct VerticalSolidHomeView: View {
     @State var growthLoopPulseStatus: GrowthLoopPulseStatus?
     @State var growthLoopSyncTask: Task<Void, Never>?
     @State var growthLoopPulseDismissTask: Task<Void, Never>?
-    @State var todayFocusDailyCompletionTask: Task<Void, Never>?
     @State var pendingActionHumanConfirmation: ActionHumanConfirmationDraft?
     @State var snapshotRefreshGate = HomeSnapshotRefreshGate()
     @State var homeAppearHandoffTask: Task<Void, Never>?
@@ -115,6 +113,7 @@ struct VerticalSolidHomeView: View {
         onPresentOasisReward: @escaping () -> Void,
         onPresentPetWeightQuick: @escaping (UUID) -> Void,
         onPresentQuickMoment: @escaping (UUID) -> Void,
+        onRequestStarterGiftClaim: @escaping () -> Void,
         onPresentSettings: @escaping () -> Void,
         onPresentStreakDetail: @escaping () -> Void,
         onPresentWalk: @escaping (UUID) -> Void,
@@ -136,6 +135,7 @@ struct VerticalSolidHomeView: View {
         self.onPresentOasisReward = onPresentOasisReward
         self.onPresentPetWeightQuick = onPresentPetWeightQuick
         self.onPresentQuickMoment = onPresentQuickMoment
+        self.onRequestStarterGiftClaim = onRequestStarterGiftClaim
         self.onPresentSettings = onPresentSettings
         self.onPresentStreakDetail = onPresentStreakDetail
         self.onPresentWalk = onPresentWalk
@@ -169,7 +169,7 @@ struct VerticalSolidHomeView: View {
     }
 
     var dataSignature: String {
-        "\(payload.signature)#revision:\(payload.revision.value)#today:\(payload.snapshot.todayFocus.dayToken)"
+        "\(payload.signature)#revision:\(payload.revision.value)"
     }
 
     var interaction: HomeInteractionSnapshot {
@@ -238,33 +238,9 @@ struct VerticalSolidHomeView: View {
             let safeBottom = safeAreaController.resolvedBottom(in: proxy)
             let headerTopGap: CGFloat = 0
             let headerContentHeight: CGFloat = 0
-            let focusTopGap: CGFloat = 2
-            let todayFocusHeight = dynamicTypeSize.isAccessibilitySize
-                ? min(220, max(196, proxy.size.height * 0.24))
-                : min(
-                    TodayFocusCardLayout.homeChromeMaxHeight,
-                    max(TodayFocusCardLayout.homeChromeMinHeight, proxy.size.height * TodayFocusCardLayout.homeChromeHeightRatio)
-                )
-            let focusHeight = todayFocusHeight
-            let contentTopGap: CGFloat = 4
             let compactContentGap: CGFloat = 8
-            let isHomeTabVisible = controller.selectedTab == .home
-            let cardHeroProgress = min(max(homeCardHeroProgress, 0), 1)
-            let todayFocusVisualProgress = Self.todayFocusVisualProgress(cardHeroProgress: cardHeroProgress)
-            let isWaitingForArrivingCardSnapshot = isWaitingForArrivingHomeCardSnapshot()
-            let shouldSuppressTodayFocusDuringArrival = isWaitingForArrivingCardSnapshot &&
-                controller.snapshot.firstPetEmptyState != nil
-            let shouldMountTodayFocusChrome = isHomeTabVisible &&
-                !shouldSuppressTodayFocusDuringArrival &&
-                todayFocusVisualProgress > 0.001
-            let isTodayFocusInteractive = isHomeTabVisible &&
-                !shouldSuppressTodayFocusDuringArrival &&
-                !isHomeCardExpandedOrTransitioning &&
-                !isHomeCardHeroAnimating &&
-                todayFocusVisualProgress > 0.98
-            let todayFocusHorizontalOffset = -CGFloat(controller.selectedTab.index) * proxy.size.width
             let compactTopChromeHeight = safeTop + headerTopGap + headerContentHeight + compactContentGap
-            let homeCollapsedTopInset = max(0, focusTopGap + focusHeight + contentTopGap - compactContentGap)
+            let homeCollapsedTopInset: CGFloat = 0
             let topChromeHeight = compactTopChromeHeight
             let bottomHeight = max(84, safeBottom + 70)
             let contentHeight = VerticalSolidHomePageContentHeightPolicy.height(
@@ -331,38 +307,6 @@ struct VerticalSolidHomeView: View {
                         .frame(width: proxy.size.width, height: contentHeight)
                         .position(x: proxy.size.width / 2, y: topChromeHeight + contentHeight / 2)
                         .zIndex(20)
-                }
-
-                if controller.preparedTabs.contains(.home), shouldMountTodayFocusChrome {
-                    VerticalSolidHomeTodayFocusChrome(
-                        snapshot: controller.snapshot.todayFocus,
-                        isLive: isTodayFocusInteractive,
-                        onOpenOasis: { selectTab(.oasis) },
-                        onOpenQuest: openTodayFocusQuest,
-                        onCompleteQuest: completeTodayFocusQuest,
-                        onTapNegativeSignal: openTodayFocusNegativeSignal,
-                        onTapFamilyTask: openTodayFocusFamilyTask,
-                        onPerformFamilyTask: performTodayFocusTask,
-                        onOpenExchange: openTodayFocusExchange,
-                        onConfirmExchange: confirmTodayFocusExchange,
-                        onViewAllTasks: {
-                            taskCenterFocusedItemID = nil
-                            taskCenterFocusedFamilyTaskID = nil
-                            taskCenterFocusRequestID = nil
-                            selectTab(.calendar)
-                        }
-                    )
-                    .padding(.horizontal, 8)
-                    .frame(width: proxy.size.width, height: todayFocusHeight, alignment: .top)
-                    .position(
-                        x: proxy.size.width / 2 + todayFocusHorizontalOffset,
-                        y: safeTop + headerTopGap + headerContentHeight + focusTopGap + todayFocusHeight / 2
-                    )
-                    .opacity(Double(todayFocusVisualProgress))
-                    .allowsHitTesting(isTodayFocusInteractive)
-                    .accessibilityHidden(!isHomeTabVisible || todayFocusVisualProgress < 0.5)
-                    .animation(canAnimate ? GoMotion.page : GoMotion.reduced, value: controller.selectedTab)
-                    .zIndex(8)
                 }
 
                 if shouldShowStarterOasisTabPrompt {
@@ -451,9 +395,6 @@ struct VerticalSolidHomeView: View {
             }
             requestHomeSnapshotRefresh()
         }
-        .onChange(of: controller.snapshot.todayFocus.refreshedQuests) { previous, current in
-            scheduleTodayFocusDailyCompletionIfCleared(previousQuests: previous, currentQuests: current)
-        }
         .onChange(of: isHomeCardHeroAnimating) { _, isAnimating in
             flushDeferredHomeSnapshotRefreshIfNeeded(isAnimating: isAnimating)
         }
@@ -469,7 +410,6 @@ struct VerticalSolidHomeView: View {
             growthUnlockToastDismissTask?.cancel()
             growthLoopSyncTask?.cancel()
             growthLoopPulseDismissTask?.cancel()
-            todayFocusDailyCompletionTask?.cancel()
             memberMediaAttachmentIndexRepairTask?.cancel()
             oasisEnergyInjectionTask?.cancel()
             plantQuickCareFeedbackClearTasks.values.forEach { $0.cancel() }
@@ -478,19 +418,11 @@ struct VerticalSolidHomeView: View {
             completedPlantQuickCareKeys.removeAll()
             failedPlantQuickCareKeys.removeAll()
             plantQuickCareFeedbackClearTasks.removeAll()
-            todayFocusDailyCompletionTask = nil
             memberMediaAttachmentIndexRepairTask = nil
             growthLoopPulseStatus = nil
             commandQueue.cancelAll()
             snapshotRefreshGate.cancel()
             controller.cancel()
-        }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                requestTodayFocusRefreshIfDayChanged()
-            } else {
-                clearArrivalState()
-            }
         }
         .onChange(of: createdEntitySignal) { _, signal in
             handleCreatedEntitySignalIfNeeded(signal)

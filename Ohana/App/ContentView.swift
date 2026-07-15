@@ -13,6 +13,8 @@ struct ContentView: View {
     var showsEmbeddedOnboarding = true
     var onboardingFirstPetID: String?
     var routeLanguageCode: String = AppLanguage.code
+    var requiredPetHomeSnapshotRefreshRequest = 0
+    var onRequiredPetHomeSnapshotReady: ((UUID) -> Void)?
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
@@ -36,17 +38,43 @@ struct ContentView: View {
     @State private var homeSurfaceLanguageThawTask: Task<Void, Never>?
     @State private var routeSurfaceLanguage = AppLanguage.code
     @State private var routeSurfaceLanguageThawTask: Task<Void, Never>?
-    @State private var autoPresentedFirstCarePetID: UUID?
+    @State private var pendingStarterGiftHomeEntityID: UUID?
+    @State private var isStarterGiftHomeSnapshotReady = false
+    @State private var homeSnapshotCoconutBalance: Int?
+    @State private var pendingStarterGiftExpectedCoconutBalance: Int?
+    @State private var isClaimingStarterGift = false
+    @State private var starterGiftClaimErrorMessage: String?
+    @State private var homeProjectionRefreshGeneration = 0
+    @State private var starterGiftHomePreparationRecoveryTask: Task<Void, Never>?
+    @State private var starterGiftHomePreparationErrorMessage: String?
+    @State private var starterGiftProjectionRecoveryTask: Task<Void, Never>?
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
+    @AppStorage(StarterGiftStorageKey.ceremonyRequested) private var starterGiftCeremonyRequested = false
     @Namespace private var heroNS
 
     var body: some View {
         ZStack {
             if showsEmbeddedOnboarding, !hasOnboarded {
-                OnboardingView(onFirstPetSaved: { pet in
-                    onboardingFirstPetDidPersist(pet.id)
-                })
+                OnboardingView(
+                    onFirstHumanSaved: { humanID in
+                        currentActiveHumanId = humanID.uuidString
+                        appServices.onboardingJourney.markFirstHumanCreated(humanID)
+                        scheduleCreatedEntitySignalAfterHomeHandoff(humanID)
+                    },
+                    onPetDeferred: {
+                        appServices.onboardingJourney.markPetDeferred()
+                    },
+                    onPetCreationStarted: {
+                        appServices.onboardingJourney.markPetCreationStarted()
+                    },
+                    onFirstPetRecovered: { petID in
+                        onboardingFirstPetDidPersist(petID)
+                    },
+                    onFirstPetSaved: { pet in
+                        onboardingFirstPetDidPersist(pet.id)
+                    }
+                )
                     .transition(.opacity)
                     .zIndex(100)
             }
@@ -75,22 +103,51 @@ struct ContentView: View {
             }
             .id(appRoutes.rootIdentity)
             .homeSurfaceLanguage(homeSurfaceLanguage)
-            .accessibilityHidden(appRoutes.sheet != nil || appRoutes.fullScreen != nil || appRoutes.overlay != nil)
+            .accessibilityHidden(
+                appRoutes.sheet != nil ||
+                    appRoutes.fullScreen != nil ||
+                    appRoutes.overlay != nil ||
+                    starterGiftHomePreparationErrorMessage != nil ||
+                    starterGiftAmount != nil
+            )
 
             if hasOnboarded, !appRoutes.suppressesGlobalWalkBanner {
                 GlobalWalkBanner()
                     .homeSurfaceLanguage(homeSurfaceLanguage)
-                    .accessibilityHidden(appRoutes.sheet != nil || appRoutes.fullScreen != nil || appRoutes.overlay != nil)
+                    .accessibilityHidden(
+                        appRoutes.sheet != nil ||
+                        appRoutes.fullScreen != nil ||
+                        appRoutes.overlay != nil ||
+                        starterGiftHomePreparationErrorMessage != nil ||
+                        starterGiftAmount != nil
+                    )
                     .zIndex(80)
             }
 
             GlobalCoconutRewardFeedbackLayer()
+                .accessibilityHidden(
+                    starterGiftHomePreparationErrorMessage != nil || starterGiftAmount != nil
+                )
                 .zIndex(120)
+
+            if let starterGiftHomePreparationErrorMessage,
+               pendingStarterGiftHomeEntityID != nil {
+                StarterGiftHomePreparationRecoveryOverlay(
+                    appLanguage: routeLanguageCode,
+                    message: starterGiftHomePreparationErrorMessage,
+                    onRetry: retryStarterGiftHomePreparation
+                )
+                .zIndex(135)
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
 
             if let starterGiftAmount {
                 StarterGiftCeremonyOverlay(
                     appLanguage: routeLanguageCode,
                     amount: starterGiftAmount,
+                    isClaiming: isClaimingStarterGift,
+                    isClaimCommitted: pendingStarterGiftExpectedCoconutBalance != nil,
+                    errorMessage: starterGiftClaimErrorMessage,
                     onFinish: completeStarterGiftCeremony
                 )
                 .zIndex(140)
@@ -99,11 +156,13 @@ struct ContentView: View {
         }
         .animation(GoMotion.sheetEnter, value: onboardingJourneyPhase)
         .onAppear {
+            restoreLegacyStarterGiftCeremonyRequestIfNeeded()
             synchronizeHomeSurfaceLanguageIfAllowed(routeLanguageCode)
             synchronizeRouteSurfaceLanguageIfAllowed(routeLanguageCode)
             scheduleRootAppearHandoff()
             applyOnboardingFirstPetIDIfNeeded()
             scheduleUITestHumanProfileRouteIfNeeded()
+            resumeStarterGiftHomePreparationRecoveryIfNeeded()
         }
         .onDisappear {
             rootAppearHandoffTask?.cancel()
@@ -122,6 +181,14 @@ struct ContentView: View {
             homeSurfaceLanguageThawTask = nil
             routeSurfaceLanguageThawTask?.cancel()
             routeSurfaceLanguageThawTask = nil
+            starterGiftProjectionRecoveryTask?.cancel()
+            starterGiftProjectionRecoveryTask = nil
+            starterGiftHomePreparationRecoveryTask?.cancel()
+            starterGiftHomePreparationRecoveryTask = nil
+            if isClaimingStarterGift, pendingStarterGiftExpectedCoconutBalance != nil {
+                isClaimingStarterGift = false
+                starterGiftClaimErrorMessage = starterGiftProjectionRefreshErrorMessage
+            }
         }
         .onChange(of: routeLanguageCode) { _, newValue in
             synchronizeHomeSurfaceLanguageIfAllowed(newValue)
@@ -138,7 +205,6 @@ struct ContentView: View {
             thawHomeSurfaceLanguageAfterSheetDismissal()
             thawRouteSurfaceLanguageAfterSheetDismissal()
             if newValue == nil {
-                advanceFirstDayFunnelIfNeeded(phase: onboardingJourneyPhase)
                 scheduleOnboardingJourneyEvaluation(delayMilliseconds: 180)
             }
         }
@@ -151,6 +217,10 @@ struct ContentView: View {
         }
         .onChange(of: onboardingFirstPetID) { _, _ in
             applyOnboardingFirstPetIDIfNeeded()
+        }
+        .onChange(of: requiredPetHomeSnapshotRefreshRequest) { previous, current in
+            guard previous != current else { return }
+            requestStarterGiftHomeProjectionRefresh()
         }
         .onChange(of: embeddedOnboardingFirstPetID) { _, _ in
             applyOnboardingFirstPetIDIfNeeded()
@@ -169,7 +239,11 @@ struct ContentView: View {
             coordinator: appRoutes,
             onRequiredHumanSaved: { activateRequiredHuman($0) },
             onPetSavedFromAddEntity: { pet in
-                scheduleCreatedEntitySignalAfterHomeHandoff(pet.id)
+                let isStarterGiftHandoff = prepareStarterGiftHomeHandoffIfNeeded(pet.id)
+                scheduleCreatedEntitySignalAfterHomeHandoff(
+                    pet.id,
+                    destinationTab: isStarterGiftHandoff ? .calendar : nil
+                )
                 scheduleUITestEconomyStateSeedIfNeeded()
                 scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
             },
@@ -182,12 +256,9 @@ struct ContentView: View {
                 scheduleUITestEconomyStateSeedIfNeeded()
                 scheduleOnboardingJourneyEvaluationAfterHomeHandoff(activeHumanIDOverride: human.id.uuidString)
             },
-            onFirstSuccessMomentCompleted: { _ in
-                completeFirstCareAfterHomeHandoff()
-            },
-            onHumanDoseTaken: { _ in
-                completeFirstCareAfterHomeHandoff()
-            },
+            onRequestStarterGiftClaim: requestStarterGiftClaimFromTaskCenter,
+            onFirstSuccessMomentCompleted: { _ in },
+            onHumanDoseTaken: { _ in },
             routeLanguageCode: routeSurfaceLanguage
         )
         .onChange(of: currentActiveHumanId) { _, newValue in
@@ -263,6 +334,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var selectedHomeView: some View {
+        let requiredReadyEntityID = pendingStarterGiftHomeEntityID
         VerticalSolidHomeDataContainer(
             onOpenPet: { id, tab in
                 appRoutes.openPet(id, initialTab: tab)
@@ -308,6 +380,7 @@ struct ContentView: View {
             onPresentQuickMoment: { petID in
                 appRoutes.presentQuickMoment(petID: petID)
             },
+            onRequestStarterGiftClaim: requestStarterGiftClaimFromTaskCenter,
             onPresentSettings: {
                 appRoutes.presentSettings()
             },
@@ -318,7 +391,26 @@ struct ContentView: View {
                 appRoutes.presentWalk(petID: petID)
             },
             cardStateResetToken: homeCardStateResetToken,
-            isHomeSurfaceVisible: isHomeSurfaceVisible
+            isHomeSurfaceVisible: isHomeSurfaceVisible,
+            requiredReadyEntityID: requiredReadyEntityID,
+            forcedRefreshGeneration: homeProjectionRefreshGeneration,
+            onHomeSnapshotReadinessChange: { isReady in
+                if pendingStarterGiftHomeEntityID == requiredReadyEntityID {
+                    isStarterGiftHomeSnapshotReady = isReady
+                    if isReady {
+                        starterGiftHomePreparationRecoveryTask?.cancel()
+                        starterGiftHomePreparationRecoveryTask = nil
+                        starterGiftHomePreparationErrorMessage = nil
+                    }
+                }
+                if isReady, let requiredReadyEntityID {
+                    onRequiredPetHomeSnapshotReady?(requiredReadyEntityID)
+                }
+            },
+            onHomeCoconutBalanceChange: { balance in
+                homeSnapshotCoconutBalance = balance
+                finishStarterGiftCeremonyIfProjectionIsReady()
+            }
         )
     }
 
@@ -335,7 +427,9 @@ struct ContentView: View {
 
     private var starterGiftAmount: Int? {
         guard hasOnboarded,
-              case let .starterGiftReadyForCeremony(amount) = onboardingJourneyPhase else {
+              starterGiftCeremonyRequested,
+              isStarterGiftHomeSnapshotReady,
+              case let .starterGiftReady(amount) = onboardingJourneyPhase else {
             return nil
         }
         return amount
@@ -431,44 +525,12 @@ struct ContentView: View {
 
     private func applyOnboardingJourneyEvaluation(_ evaluation: OnboardingJourneyEvaluation) {
         onboardingJourneyPhase = evaluation.phase
-        advanceFirstDayFunnelIfNeeded(phase: evaluation.phase)
-    }
-
-    private func advanceFirstDayFunnelIfNeeded(phase: OnboardingJourneyPhase) {
-        guard hasOnboarded,
-              appRoutes.sheet == nil,
-              appRoutes.fullScreen == nil,
-              appRoutes.overlay == nil
-        else { return }
-
-        switch phase {
-        case .needsFirstPet:
-            break
-        case .firstCarePending:
-            guard let petID = firstActivePetNeedingStarterWeightID(),
-                  autoPresentedFirstCarePetID != petID else { return }
-            autoPresentedFirstCarePetID = petID
-            appRoutes.presentSheet(.petWeightQuick(petID))
-        case .preOnboarding,
-             .starterGiftPending,
-             .starterGiftReadyForCeremony,
-             .roadmapPromptPending,
-             .complete,
-             .existingUser:
-            break
+        if case .starterGiftReady = evaluation.phase,
+           pendingStarterGiftHomeEntityID == nil,
+           let firstPetIDRaw = appServices.onboardingJourney.interruptedOnboardingFirstPetID(context: modelContext),
+           let firstPetID = UUID(uuidString: firstPetIDRaw) {
+            prepareRequiredHomeSnapshot(for: firstPetID)
         }
-    }
-
-    private func firstActivePetNeedingStarterWeightID() -> UUID? {
-        var descriptor = FetchDescriptor<Pet>(
-            predicate: #Predicate<Pet> { pet in
-                pet.passedAwayDate == nil
-            },
-            sortBy: [SortDescriptor(\Pet.createdAt, order: .forward)]
-        )
-        descriptor.fetchLimit = 8
-        let pets = fetchModelsOrLog(descriptor, operation: "fetch first-day pet needing weight")
-        return pets.first { $0.weightLogs.isEmpty }?.id ?? pets.first?.id
     }
 
     private func resolvedOnboardingEvaluationActiveHumanID(override: String?) -> String? {
@@ -515,7 +577,9 @@ struct ContentView: View {
         if let id = UUID(uuidString: petID),
            signaledOnboardingFirstPetID != petID {
             signaledOnboardingFirstPetID = petID
-            scheduleOnboardingCreatedEntitySignal(id)
+            prepareRequiredHomeSnapshot(for: id)
+            _ = prepareStarterGiftHomeHandoffIfNeeded(id)
+            scheduleOnboardingCreatedEntitySignal(id, destinationTab: .calendar)
         }
         guard hasOnboarded, handledOnboardingFirstPetID != petID else { return }
         handledOnboardingFirstPetID = petID
@@ -532,9 +596,9 @@ struct ContentView: View {
 
     private var onboardingJourneyNeedsObservation: Bool {
         switch onboardingJourneyPhase {
-        case .preOnboarding, .needsFirstPet, .firstCarePending, .starterGiftPending:
+        case .preOnboarding, .needsHumanName, .petChoice, .petCreation, .awaitingPet:
             true
-        case .starterGiftReadyForCeremony, .roadmapPromptPending, .complete, .existingUser:
+        case .starterGiftReady, .complete, .existingUser:
             false
         }
     }
@@ -546,14 +610,9 @@ struct ContentView: View {
         scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay, activeHumanIDOverride: activeHumanIDOverride)
     }
 
-    private func completeFirstCareAfterHomeHandoff() {
-        OnboardingHomeJoinHandoffGate.markCompleted()
-        appServices.onboardingJourney.markFirstCareCompleted()
-        scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
-    }
-
     private func scheduleCreatedEntitySignalAfterHomeHandoff(
         _ id: UUID,
+        destinationTab: VerticalSolidHomeTab? = nil,
         defaultDelayMilliseconds: UInt64 = 0
     ) {
         onboardingCreatedEntitySignalTask?.cancel()
@@ -564,14 +623,24 @@ struct ContentView: View {
             var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                createdEntitySignal = HomeCreatedEntitySignal(entityID: id)
+                createdEntitySignal = HomeCreatedEntitySignal(
+                    entityID: id,
+                    destinationTab: destinationTab
+                )
             }
             onboardingCreatedEntitySignalTask = nil
         }
     }
 
-    private func scheduleOnboardingCreatedEntitySignal(_ id: UUID) {
-        scheduleCreatedEntitySignalAfterHomeHandoff(id, defaultDelayMilliseconds: 240)
+    private func scheduleOnboardingCreatedEntitySignal(
+        _ id: UUID,
+        destinationTab: VerticalSolidHomeTab? = nil
+    ) {
+        scheduleCreatedEntitySignalAfterHomeHandoff(
+            id,
+            destinationTab: destinationTab,
+            defaultDelayMilliseconds: 240
+        )
     }
 
     private func scheduleUITestEconomyStateSeedIfNeeded(delayMilliseconds: UInt64 = 180) {
@@ -596,13 +665,215 @@ struct ContentView: View {
             }
         #endif
     }
+}
+
+private extension ContentView {
+    private func restoreLegacyStarterGiftCeremonyRequestIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: StarterGiftStorageKey.ceremonyRequested) == nil,
+              defaults.bool(forKey: StarterGiftStorageKey.claimed),
+              !defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen) else { return }
+        starterGiftCeremonyRequested = true
+    }
+
+    private func requestStarterGiftClaimFromTaskCenter() {
+        let evaluation = appServices.onboardingJourney.evaluate(
+            hasOnboarded: hasOnboarded,
+            activeHumanID: resolvedOnboardingEvaluationActiveHumanID(override: nil),
+            context: modelContext,
+            projectionManager: appServices.questManager
+        )
+        guard case .starterGiftReady = evaluation.phase else { return }
+
+        starterGiftClaimErrorMessage = nil
+        starterGiftCeremonyRequested = true
+        applyOnboardingJourneyEvaluation(evaluation)
+
+        if pendingStarterGiftHomeEntityID == nil,
+           let petIDRaw = appServices.onboardingJourney.interruptedOnboardingFirstPetID(context: modelContext),
+           let petID = UUID(uuidString: petIDRaw) {
+            prepareRequiredHomeSnapshot(for: petID)
+        }
+    }
 
     private func completeStarterGiftCeremony() {
+        guard !isClaimingStarterGift else { return }
+        isClaimingStarterGift = true
+        starterGiftClaimErrorMessage = nil
+
+        if pendingStarterGiftExpectedCoconutBalance != nil {
+            requestStarterGiftHomeProjectionRefresh()
+            finishStarterGiftCeremonyIfProjectionIsReady()
+            if isClaimingStarterGift {
+                scheduleStarterGiftProjectionRecovery()
+            }
+            return
+        }
+
+        let visibleBalanceBeforeRequest = homeSnapshotCoconutBalance ?? 0
+        let result = appServices.onboardingJourney.claimStarterGift(
+            activeHumanID: resolvedOnboardingEvaluationActiveHumanID(override: nil),
+            context: modelContext,
+            projectionManager: appServices.questManager
+        )
+
+        guard result.completesClaimRequest else {
+            isClaimingStarterGift = false
+            starterGiftClaimErrorMessage = L10n(routeLanguageCode).tr(
+                zh: "领取失败，请重试。你的宠物和进度都已保存。",
+                en: "Couldn’t claim the gift. Try again; your pet and progress are saved.",
+                de: "Geschenk konnte nicht abgeholt werden. Versuche es erneut; Tier und Fortschritt sind gespeichert."
+            )
+            return
+        }
+
+        pendingStarterGiftExpectedCoconutBalance = StarterGiftHomeProjectionPolicy.expectedVisibleBalance(
+            after: result,
+            visibleBalanceBeforeRequest: visibleBalanceBeforeRequest,
+            existingExpectation: pendingStarterGiftExpectedCoconutBalance
+        )
+        requestStarterGiftHomeProjectionRefresh()
+        finishStarterGiftCeremonyIfProjectionIsReady()
+        if isClaimingStarterGift {
+            scheduleStarterGiftProjectionRecovery()
+        }
+    }
+
+    private func finishStarterGiftCeremonyIfProjectionIsReady() {
+        guard isClaimingStarterGift,
+              let expectedBalance = pendingStarterGiftExpectedCoconutBalance,
+              let homeSnapshotCoconutBalance,
+              homeSnapshotCoconutBalance >= expectedBalance else { return }
+
+        starterGiftProjectionRecoveryTask?.cancel()
+        starterGiftProjectionRecoveryTask = nil
         appServices.onboardingJourney.markStarterCeremonySeen()
+        starterGiftCeremonyRequested = false
+        pendingStarterGiftHomeEntityID = nil
+        pendingStarterGiftExpectedCoconutBalance = nil
+        isClaimingStarterGift = false
+        starterGiftClaimErrorMessage = nil
         withAnimation(GoMotion.sheetEnter) {
             onboardingJourneyPhase = .complete
         }
         scheduleOnboardingJourneyEvaluation()
+    }
+
+    private func requestStarterGiftHomeProjectionRefresh() {
+        homeProjectionRefreshGeneration &+= 1
+    }
+
+    private func scheduleStarterGiftProjectionRecovery() {
+        starterGiftProjectionRecoveryTask?.cancel()
+        starterGiftProjectionRecoveryTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1200) {
+            guard isClaimingStarterGift else {
+                starterGiftProjectionRecoveryTask = nil
+                return
+            }
+            requestStarterGiftHomeProjectionRefresh()
+            starterGiftProjectionRecoveryTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 2400) {
+                guard isClaimingStarterGift else {
+                    starterGiftProjectionRecoveryTask = nil
+                    return
+                }
+                isClaimingStarterGift = false
+                starterGiftClaimErrorMessage = starterGiftProjectionRefreshErrorMessage
+                starterGiftProjectionRecoveryTask = nil
+            }
+        }
+    }
+
+    private var starterGiftProjectionRefreshErrorMessage: String {
+        L10n(routeLanguageCode).tr(
+            zh: "奖励已领取，但首页暂未刷新。请点按重试。",
+            en: "The gift was claimed, but Home hasn’t refreshed yet. Try again.",
+            de: "Das Geschenk wurde abgeholt, aber Home ist noch nicht aktualisiert. Versuche es erneut."
+        )
+    }
+
+    @discardableResult
+    private func prepareStarterGiftHomeHandoffIfNeeded(_ entityID: UUID) -> Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: StarterGiftStorageKey.pending),
+              !defaults.bool(forKey: StarterGiftStorageKey.claimed) else { return false }
+        prepareRequiredHomeSnapshot(for: entityID)
+        pendingStarterGiftExpectedCoconutBalance = nil
+        return true
+    }
+
+    private func prepareRequiredHomeSnapshot(for entityID: UUID) {
+        guard pendingStarterGiftHomeEntityID != entityID else {
+            scheduleStarterGiftHomePreparationRecoveryIfNeeded(for: entityID)
+            return
+        }
+        pendingStarterGiftHomeEntityID = entityID
+        isStarterGiftHomeSnapshotReady = false
+        starterGiftHomePreparationErrorMessage = nil
+        // The new entity is not part of the currently visible-ID invalidation
+        // set yet, so a scoped domain revision can be intentionally ignored by
+        // the existing Home snapshot. Force the join read instead of waiting
+        // for an unrelated future refresh.
+        requestStarterGiftHomeProjectionRefresh()
+        scheduleStarterGiftHomePreparationRecoveryIfNeeded(for: entityID)
+    }
+
+    private func resumeStarterGiftHomePreparationRecoveryIfNeeded() {
+        guard let entityID = pendingStarterGiftHomeEntityID else { return }
+        scheduleStarterGiftHomePreparationRecoveryIfNeeded(for: entityID)
+    }
+
+    private func scheduleStarterGiftHomePreparationRecoveryIfNeeded(for entityID: UUID) {
+        starterGiftHomePreparationRecoveryTask?.cancel()
+        guard hasOnboarded,
+              isStarterGiftHomePreparationPending(for: entityID) else {
+            starterGiftHomePreparationRecoveryTask = nil
+            return
+        }
+        starterGiftHomePreparationErrorMessage = nil
+        starterGiftHomePreparationRecoveryTask = OhanaFrameScheduler.runAfterNextFrame(
+            milliseconds: OnboardingHomeJoinHandoffGate.homeSnapshotRecoveryInitialDelayMilliseconds
+        ) {
+            guard isStarterGiftHomePreparationPending(for: entityID) else {
+                starterGiftHomePreparationRecoveryTask = nil
+                return
+            }
+            requestStarterGiftHomeProjectionRefresh()
+            starterGiftHomePreparationRecoveryTask = OhanaFrameScheduler.runAfterNextFrame(
+                milliseconds: OnboardingHomeJoinHandoffGate.homeSnapshotRecoveryRetryDelayMilliseconds
+            ) {
+                guard isStarterGiftHomePreparationPending(for: entityID) else {
+                    starterGiftHomePreparationRecoveryTask = nil
+                    return
+                }
+                requestStarterGiftHomeProjectionRefresh()
+                starterGiftHomePreparationRecoveryTask = OhanaFrameScheduler.runAfterNextFrame(
+                    milliseconds: OnboardingHomeJoinHandoffGate.homeSnapshotRecoveryFailureDelayMilliseconds
+                ) {
+                    guard isStarterGiftHomePreparationPending(for: entityID) else {
+                        starterGiftHomePreparationRecoveryTask = nil
+                        return
+                    }
+                    starterGiftHomePreparationErrorMessage = L10n(routeLanguageCode).tr(
+                        zh: "宠物已经保存，但首页暂未刷新。请重试。",
+                        en: "Your pet is saved, but Home hasn’t refreshed yet. Try again.",
+                        de: "Dein Tier ist gespeichert, aber Home wurde noch nicht aktualisiert. Versuche es erneut."
+                    )
+                    starterGiftHomePreparationRecoveryTask = nil
+                }
+            }
+        }
+    }
+
+    private func retryStarterGiftHomePreparation() {
+        guard let entityID = pendingStarterGiftHomeEntityID,
+              isStarterGiftHomePreparationPending(for: entityID) else { return }
+        starterGiftHomePreparationErrorMessage = nil
+        requestStarterGiftHomeProjectionRefresh()
+        scheduleStarterGiftHomePreparationRecoveryIfNeeded(for: entityID)
+    }
+
+    private func isStarterGiftHomePreparationPending(for entityID: UUID) -> Bool {
+        pendingStarterGiftHomeEntityID == entityID && !isStarterGiftHomeSnapshotReady
     }
 
     private func handleRouteNotificationOutcome(_ outcome: AppRouteNotificationOutcome) {

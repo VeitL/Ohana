@@ -55,9 +55,15 @@ final class AppResetServiceTests: XCTestCase {
         defaults.set(AppBackgroundStyle.customPhoto.rawValue, forKey: "appBackgroundStyle")
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
+        defaults.set(true, forKey: StarterGiftStorageKey.ceremonyRequested)
         defaults.set(true, forKey: StarterGiftStorageKey.oasisTabPromptPending)
         defaults.set(Date().timeIntervalSince1970, forKey: OnboardingJourneyCoordinator.Key.journeyStartedAt)
-        defaults.set(true, forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted)
+        defaults.set(UUID().uuidString, forKey: OnboardingJourneyCoordinator.Key.firstHumanID)
+        defaults.set(
+            OnboardingJourneyCoordinator.InitialPetChoice.deferred.rawValue,
+            forKey: OnboardingJourneyCoordinator.Key.initialPetChoice
+        )
+        defaults.set(true, forKey: "ohanaStarterFirstCareCompletedV1")
         defaults.set(true, forKey: "ohanaGrowthOnboardingCompletedV1")
         defaults.set(1, forKey: "economyV2.dailyBudget.household.local.2026-07-10")
 
@@ -84,9 +90,12 @@ final class AppResetServiceTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: "appBackgroundStyle"))
         XCTAssertNil(defaults.object(forKey: StarterGiftStorageKey.claimed))
         XCTAssertNil(defaults.object(forKey: StarterGiftStorageKey.ceremonySeen))
+        XCTAssertNil(defaults.object(forKey: StarterGiftStorageKey.ceremonyRequested))
         XCTAssertNil(defaults.object(forKey: StarterGiftStorageKey.oasisTabPromptPending))
         XCTAssertNil(defaults.object(forKey: OnboardingJourneyCoordinator.Key.journeyStartedAt))
-        XCTAssertNil(defaults.object(forKey: OnboardingJourneyCoordinator.Key.firstCareCompleted))
+        XCTAssertNil(defaults.object(forKey: OnboardingJourneyCoordinator.Key.firstHumanID))
+        XCTAssertNil(defaults.object(forKey: OnboardingJourneyCoordinator.Key.initialPetChoice))
+        XCTAssertNil(defaults.object(forKey: "ohanaStarterFirstCareCompletedV1"))
         XCTAssertNil(defaults.object(forKey: "ohanaGrowthOnboardingCompletedV1"))
         XCTAssertNil(defaults.object(forKey: "economyV2.dailyBudget.household.local.2026-07-10"))
         let automaticBackupStatusStore = AutomaticBackupStatusStore(defaults: defaults)

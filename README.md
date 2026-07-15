@@ -20,6 +20,18 @@ Do not use planning, reference, archive, design-export, or dated audit documents
 as current status sources. Their role and precedence are listed in
 `docs/README.md`.
 
+## Current Product Shape
+
+- A clean install creates one local Human from a name, then lets the user create
+  the first Pet immediately or defer it to Task Center.
+- Home holds family and member cards. Task Center is the single list/calendar
+  surface for Event, Reminder, local FamilyTask, and small system-journey items.
+- The first active Pet makes the one-time island starter gift claimable. Oasis
+  stays hidden until the user explicitly claims that gift; later starter-plan
+  rewards are separate, optional, and member-owned.
+- The first release remains local-only Solo. Local Human profiles are content
+  records, not authenticated accounts or remote collaborators.
+
 ## Local Commands
 
 ```bash
@@ -30,12 +42,17 @@ scripts/release-hardening-check.sh --static-only
 scripts/build-debug-fast.sh
 scripts/build-release-fast.sh
 scripts/test-simulator.sh
+scripts/run-dogfood-simulator.sh --status
 scripts/archive-release-local.sh
 ```
 
-Local command-line validation uses the `iPhone 17` simulator by name with the
-`iphonesimulator` SDK. `build-release-fast.sh` keeps `-O` but uses incremental
-Swift compilation and an external stable cache for repeated optimized checks.
+Automated Unit, Integration, and UI validation uses only the disposable
+`iPhone 17 Tests` simulator and `.build/DerivedData/tests`. Persistent manual
+journeys use the pinned `iPhone 17` Dogfood simulator through
+`scripts/run-dogfood-simulator.sh`; that lane overlays builds and preserves the
+installed app and data. `build-release-fast.sh` uses a generic iOS Simulator
+destination, keeps `-O`, and reuses `.build/DerivedData/release` for optimized
+compiler checks.
 `archive-release-local.sh` is the slower signed WMO lane for RC/signing gates;
 it writes outside the File Provider-managed repository and never uploads.
 `dev-check-changed.sh` is read-only unless `--fix-format` and explicit targets

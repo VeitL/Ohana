@@ -20,6 +20,16 @@ struct PetPersonalityPresentationTests {
         )
     }
 
+    @Test func creationCatalogUsesTheCuratedTwentyChoicesWithoutChangingEditorCatalog() {
+        #expect(PetPersonalityTag.creationChoices.map(\.id) == [
+            "curious", "lazy", "energetic", "clingy", "smart",
+            "toy", "foodie", "drama", "clean", "shy",
+            "brave", "social", "gentle", "quiet", "stubborn",
+            "vocal", "guardian", "independent", "loyal", "chill"
+        ])
+        #expect(PetPersonalityTag.primaryChoices.count == 8)
+    }
+
     @Test func todayFocusUsesStablePetOrderInsteadOfPersonality() {
         let quiet = Pet(name: "Quiet", species: "猫")
         quiet.personalityTagsRaw = "quiet"

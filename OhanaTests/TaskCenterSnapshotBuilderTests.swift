@@ -768,6 +768,348 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(snapshot.todayCompletedCount == 1)
     }
 
+    @Test func createFirstPetSystemJourneyIsStableUnscheduledAndVisibleToCurrentMember() throws {
+        let calendar = utcCalendar()
+        let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
+        let current = Human(name: "Ava")
+        let other = Human(name: "Kai")
+
+        let snapshot = TaskCenterSnapshotBuilder.make(
+            events: [],
+            allEvents: [],
+            pets: [],
+            humans: [current, other],
+            plants: [],
+            systemDestinations: [.createFirstPet],
+            activeHumanId: current.id.uuidString,
+            now: now,
+            calendar: calendar
+        )
+
+        let item = try #require(snapshot.unscheduled.first)
+        #expect(snapshot.allItems.count == 1)
+        #expect(item.id == "system-journey-create-first-pet")
+        #expect(item.source == .systemJourney)
+        #expect(item.systemDestination == .createFirstPet)
+        #expect(item.subject == .household)
+        #expect(item.eventID == nil)
+        #expect(item.reminderID == nil)
+        #expect(item.familyTaskID == nil)
+        #expect(item.dueAt == nil)
+        #expect(item.availableActions.isEmpty)
+        #expect(item.rewardCoconuts == 50)
+        #expect(snapshot.filtered(for: .currentMember).allItems.map(\.id) == [item.id])
+        #expect(snapshot.filtered(for: .waitingForOthers).allItems.isEmpty)
+        #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == 1)
+    }
+
+    @Test func createFirstPetSystemJourneyRequiresAnActiveHumanAndNoActivePet() {
+        let calendar = utcCalendar()
+        let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
+        let human = Human(name: "Ava")
+        let activePet = Pet(name: "Momo", species: "cat")
+        let memorialPet = Pet(name: "Luna", species: "cat")
+        memorialPet.passedAwayDate = now
+
+        func snapshot(humans: [Human], pets: [Pet]) -> TaskCenterSnapshot {
+            TaskCenterSnapshotBuilder.make(
+                events: [],
+                allEvents: [],
+                pets: pets,
+                humans: humans,
+                plants: [],
+                systemDestinations: [.createFirstPet],
+                now: now,
+                calendar: calendar
+            )
+        }
+
+        #expect(snapshot(humans: [], pets: []).allItems.isEmpty)
+        #expect(snapshot(humans: [human], pets: [activePet]).allItems.isEmpty)
+        #expect(snapshot(humans: [human], pets: [memorialPet]).allItems.map(\.source) == [.systemJourney])
+    }
+
+    @Test func firstPetReplacesCreationJourneyWithUnscheduledGiftClaim() throws {
+        let calendar = utcCalendar()
+        let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "cat", breed: "布偶猫")
+
+        let snapshot = TaskCenterSnapshotBuilder.make(
+            events: [],
+            allEvents: [],
+            pets: [pet],
+            humans: [human],
+            plants: [],
+            systemDestinations: [.createFirstPet, .claimStarterGift],
+            activeHumanId: human.id.uuidString,
+            now: now,
+            calendar: calendar
+        )
+
+        let item = try #require(snapshot.unscheduled.first)
+        #expect(snapshot.allItems.count == 1)
+        #expect(item.id == "system-journey-claim-starter-gift")
+        #expect(item.systemDestination == .claimStarterGift)
+        #expect(item.rewardCoconuts == 50)
+        #expect(item.dueAt == nil)
+        #expect(snapshot.filtered(for: .currentMember).allItems.map(\.id) == [item.id])
+        #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == 1)
+    }
+
+    @Test func badgeAttentionCountDeduplicatesTodayReviewAndIncludesSystemJourney() {
+        let calendar = utcCalendar()
+        let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
+        let current = Human(name: "Ava")
+        let other = Human(name: "Kai")
+        let overdue = Event(
+            title: "Overdue task",
+            startDate: makeDate(calendar, year: 2026, month: 7, day: 12, hour: 10),
+            eventType: EventType.task.rawValue
+        )
+        let review = FamilyCollaborationTask(
+            title: "Review task",
+            kind: .bounty,
+            status: .pendingReview,
+            createdById: current.id.uuidString,
+            createdByName: current.name,
+            assignedToId: other.id.uuidString,
+            assignedToName: other.name,
+            rewardCoconuts: 5,
+            dueAt: makeDate(calendar, year: 2026, month: 7, day: 13, hour: 15)
+        )
+
+        let snapshot = TaskCenterSnapshotBuilder.make(
+            events: [overdue],
+            allEvents: [overdue],
+            pets: [],
+            humans: [current, other],
+            plants: [],
+            familyTasks: [review],
+            systemDestinations: [.createFirstPet],
+            activeHumanId: current.id.uuidString,
+            now: now,
+            calendar: calendar
+        )
+        let badge = TaskCenterBadgeSnapshot(snapshot: snapshot)
+
+        #expect(snapshot.overdueCount == 1)
+        #expect(snapshot.today.count == 1)
+        #expect(snapshot.today.first?.workflowStatus == .pendingReview)
+        #expect(snapshot.unscheduled.first?.source == .systemJourney)
+        #expect(badge.overdueCount == 1)
+        #expect(badge.attentionCount == 3)
+    }
+
+    @Test func starterJourneyProjectsAtMostThreeStableTypedItemsWithSummary() throws {
+        let calendar = utcCalendar()
+        let now = makeDate(calendar, year: 2026, month: 7, day: 15, hour: 12)
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "cat", breed: "Ragdoll")
+        let states = HouseholdStarterJourneyTask.allCases.map { task in
+            HouseholdStarterJourneyTaskState(
+                task: task,
+                status: task == .petProfile ? .claimable : .actionRequired,
+                rewardCoconuts: task.rewardCoconuts,
+                completedCheckpointCount: task == .petProfile ? 3 : 0,
+                requiredCheckpointCount: HouseholdStarterJourneyPolicy.requiredCheckpointCount(for: task),
+                targetID: task == .humanProfile ? human.id : pet.id,
+                completedCheckpoints: [],
+                checkpointResolutions: [:]
+            )
+        }
+        let journey = HouseholdStarterJourneySnapshot(
+            isEnabled: true,
+            activeHumanID: human.id,
+            taskStates: states,
+            // The Task Center remains defensive even if a future producer
+            // accidentally hands it a wider presentation frontier.
+            visibleTaskStates: states
+        )
+
+        let snapshot = TaskCenterSnapshotBuilder.make(
+            events: [],
+            allEvents: [],
+            pets: [pet],
+            humans: [human],
+            plants: [],
+            starterJourney: journey,
+            activeHumanId: human.id.uuidString,
+            now: now,
+            calendar: calendar
+        )
+
+        #expect(snapshot.starterJourney == journey)
+        #expect(snapshot.systemJourneyItems.count == 3)
+        #expect(snapshot.ordinaryUnscheduledItems.isEmpty)
+        #expect(Set(snapshot.systemJourneyItems.map(\.id)) == Set([
+            HouseholdStarterJourneyTask.humanProfile.id,
+            HouseholdStarterJourneyTask.petProfile.id,
+            HouseholdStarterJourneyTask.identityProtection.id
+        ]))
+        let humanItem = try #require(snapshot.systemJourneyItems.first {
+            $0.systemDestination == .completeHumanProfile
+        })
+        #expect(humanItem.subject.kind == .human)
+        #expect(humanItem.subject.id == human.id)
+        #expect(humanItem.rewardCoconuts == 100)
+        #expect(humanItem.systemJourneyPresentationState == .actionRequired)
+        let petItem = try #require(snapshot.systemJourneyItems.first {
+            $0.systemDestination == .completeFirstPetProfile
+        })
+        #expect(petItem.subject.kind == .pet)
+        #expect(petItem.subject.id == pet.id)
+        #expect(petItem.rewardCoconuts == 100)
+        #expect(petItem.systemJourneyPresentationState == .rewardReady)
+        #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == 3)
+    }
+
+    @Test func pendingStarterGiftSuppressesFourHundredCoconutJourneyFrontier() throws {
+        let calendar = utcCalendar()
+        let now = makeDate(calendar, year: 2026, month: 7, day: 15, hour: 12)
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "dog", breed: "Mixed")
+        let state = HouseholdStarterJourneyTaskState(
+            task: .humanProfile,
+            status: .actionRequired,
+            rewardCoconuts: HouseholdStarterJourneyTask.humanProfile.rewardCoconuts,
+            completedCheckpointCount: 0,
+            requiredCheckpointCount: HouseholdStarterJourneyPolicy.requiredCheckpointCount(for: .humanProfile),
+            targetID: human.id,
+            completedCheckpoints: [],
+            checkpointResolutions: [:]
+        )
+        let journey = HouseholdStarterJourneySnapshot(
+            isEnabled: true,
+            activeHumanID: human.id,
+            taskStates: [state],
+            visibleTaskStates: [state]
+        )
+
+        let snapshot = TaskCenterSnapshotBuilder.make(
+            events: [],
+            allEvents: [],
+            pets: [pet],
+            humans: [human],
+            plants: [],
+            systemDestinations: [.createFirstPet, .claimStarterGift],
+            starterJourney: journey,
+            now: now,
+            calendar: calendar
+        )
+
+        #expect(snapshot.systemJourneyItems.count == 1)
+        let item = try #require(snapshot.systemJourneyItems.first)
+        #expect(item.id == "system-journey-claim-starter-gift")
+        #expect(item.systemDestination == .claimStarterGift)
+        #expect(item.systemJourneyPresentationState == .rewardReady)
+    }
+
+    @Test func recurringBirthdayReminderDoesNotQualifyAsCarePlan() {
+        let pet = Pet(name: "Momo", species: "cat", breed: "Ragdoll")
+        let birthday = Event(
+            title: "Momo birthday",
+            eventType: EventType.birthday.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        birthday.recurrenceDays = 365
+
+        let qualification = HouseholdStarterJourneyService.carePlanEvidence(
+            targetPet: pet,
+            events: [birthday],
+            reminderEventIDs: [birthday.id]
+        )
+
+        #expect(!qualification.hasExplicitCarePlan)
+        #expect(!qualification.hasDefaultRecommendedCarePlan)
+    }
+
+    @Test func typedReminderBackedRecurringPetCareEventQualifiesAsExplicitPlan() {
+        let pet = Pet(name: "Momo", species: "cat", breed: "Ragdoll")
+        let care = Event(
+            title: "Momo evening care",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString,
+            taskCareKindRaw: TaskCareKind.petFeeding.rawValue
+        )
+        care.recurrenceDays = 1
+
+        let qualification = HouseholdStarterJourneyService.carePlanEvidence(
+            targetPet: pet,
+            events: [care],
+            reminderEventIDs: [care.id]
+        )
+
+        #expect(qualification.hasExplicitCarePlan)
+        #expect(!qualification.hasDefaultRecommendedCarePlan)
+    }
+
+    @Test func genericDailyReminderDoesNotQualifyAsCarePlan() {
+        let pet = Pet(name: "Momo", species: "cat", breed: "Ragdoll")
+        let generic = Event(
+            title: "Momo generic reminder",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        generic.recurrenceDays = 1
+
+        let qualification = HouseholdStarterJourneyService.carePlanEvidence(
+            targetPet: pet,
+            events: [generic],
+            reminderEventIDs: [generic.id]
+        )
+
+        #expect(!qualification.hasExplicitCarePlan)
+        #expect(!qualification.hasDefaultRecommendedCarePlan)
+    }
+
+    @Test func carePlanResolutionIsOfferedOnlyForAnExistingDefaultPlan() throws {
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "cat", breed: "Ragdoll")
+        let noPlan = HouseholdStarterJourneyService.buildSnapshot(
+            enabled: true,
+            activeHumanID: human.id.uuidString,
+            humans: [human],
+            pets: [pet],
+            qualificationFacts: HouseholdStarterJourneyQualificationFacts(
+                targetPetID: pet.id,
+                hasProtectionDocument: false,
+                hasInsurance: false,
+                hasPreventiveHealthRecord: false,
+                hasExplicitCarePlan: false,
+                hasDefaultRecommendedCarePlan: false
+            ),
+            careLedgerEvents: [],
+            coconutLedgerEntries: []
+        )
+        let noPlanState = try #require(noPlan.state(for: .carePlan))
+        #expect(noPlanState.availableResolutionCheckpoints.isEmpty)
+        #expect(noPlan.state(for: .firstCare)?.targetID == pet.id)
+
+        let recommendedPlan = HouseholdStarterJourneyService.buildSnapshot(
+            enabled: true,
+            activeHumanID: human.id.uuidString,
+            humans: [human],
+            pets: [pet],
+            qualificationFacts: HouseholdStarterJourneyQualificationFacts(
+                targetPetID: pet.id,
+                hasProtectionDocument: false,
+                hasInsurance: false,
+                hasPreventiveHealthRecord: false,
+                hasExplicitCarePlan: false,
+                hasDefaultRecommendedCarePlan: true
+            ),
+            careLedgerEvents: [],
+            coconutLedgerEntries: []
+        )
+        let recommendedState = try #require(recommendedPlan.state(for: .carePlan))
+        #expect(recommendedState.availableResolutionCheckpoints == [.acceptedRecommendedCarePlan])
+        #expect(recommendedState.status == .actionRequired)
+    }
+
     private func allItems(_ snapshot: TaskCenterSnapshot) -> [TaskCenterItemSnapshot] {
         snapshot.overdue + snapshot.today + snapshot.upcoming + snapshot.unscheduled
     }

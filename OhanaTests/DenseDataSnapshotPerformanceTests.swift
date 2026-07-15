@@ -13,7 +13,7 @@ struct DenseDataSnapshotPerformanceTests {
 
         let homeSnapshot = buildHomeSnapshot(fixture)
         #expect(homeSnapshot.cards.count >= 6)
-        #expect(!homeSnapshot.todayFocus.refreshedQuests.isEmpty)
+        #expect(homeSnapshot.todayFocus.refreshedQuests.isEmpty)
 
         let todayFocusSnapshot = buildTodayFocusSnapshot(fixture)
         #expect(todayFocusSnapshot.pets.count == 3)

@@ -30,6 +30,7 @@ struct MemberCardCreationContentView: View {
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.memberCreationCardFlipProgress) var memberCreationCardFlipProgress
     @Environment(AppServices.self) var appServices
     @Environment(\.ohanaAppLanguageCode) var appLanguage
@@ -130,10 +131,7 @@ struct MemberCardCreationContentView: View {
     }
 
     var hasRequiredPetProfile: Bool {
-        !draft.species.isEmpty
-            && !draft.resolvedBreed.isEmpty
-            && ["boy", "girl"].contains(draft.petGender)
-            && !draft.coatColor.isEmpty
+        !draft.resolvedSpecies.isEmpty && !draft.resolvedBreed.isEmpty
     }
 
     var creationSteps: [MemberCreationStep] { MemberCreationStep.steps(for: kind) }
@@ -145,7 +143,7 @@ struct MemberCardCreationContentView: View {
         case .basicInfo, .petName:
             return !draft.trimmedName.isEmpty && !duplicateName
         case .petIdentity:
-            return !draft.species.isEmpty && !draft.resolvedBreed.isEmpty
+            return !draft.resolvedSpecies.isEmpty && !draft.resolvedBreed.isEmpty
         case .petAppearance:
             return ["boy", "girl"].contains(draft.petGender) && !draft.coatColor.isEmpty
         case .avatar, .petPersonality, .theme:

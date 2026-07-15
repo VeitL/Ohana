@@ -107,7 +107,7 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
                             .accessibilityLabel(tabAccessibilityLabel(for: tab))
                     }
                     .tag(tab)
-                    .badge(tab == .calendar ? taskCenterBadge.overdueCount : 0)
+                    .badge(tab == .calendar ? taskCenterBadge.attentionCount : 0)
             }
         }
         .tint(Color.goPrimary)
@@ -126,11 +126,11 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     }
 
     private func tabAccessibilityLabel(for tab: VerticalSolidHomeTab) -> String {
-        if tab == .calendar, taskCenterBadge.overdueCount > 0 {
+        if tab == .calendar, taskCenterBadge.attentionCount > 0 {
             return localization.tr(
-                zh: "\(tab.title(localization))，\(taskCenterBadge.overdueCount) 项逾期",
-                en: "\(tab.title(localization)), \(taskCenterBadge.overdueCount) overdue",
-                de: "\(tab.title(localization)), \(taskCenterBadge.overdueCount) überfällig"
+                zh: "\(tab.title(localization))，\(taskCenterBadge.attentionCount) 项待处理",
+                en: "\(tab.title(localization)), \(taskCenterBadge.attentionCount) need attention",
+                de: "\(tab.title(localization)), \(taskCenterBadge.attentionCount) offen"
             )
         }
         return tab.title(localization)

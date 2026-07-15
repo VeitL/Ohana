@@ -103,9 +103,9 @@ struct GrowthUnlockRulesSheet: View {
             ruleLine(
                 icon: "checklist",
                 text: localized(
-                    zh: "完成每日照护、Today Focus 和提醒任务，稳定获得成长能量。",
-                    en: "Complete daily care, Today Focus, and reminders to earn steady growth energy.",
-                    de: "Erledige Pflege, Today Focus und Erinnerungen fuer stetige Energie."
+                    zh: "完成待办中的每日照护和提醒，稳定获得成长能量。",
+                    en: "Complete daily care and reminders in Tasks to earn steady growth energy.",
+                    de: "Erledige Pflege und Erinnerungen in Aufgaben fuer stetige Energie."
                 )
             )
             ruleLine(

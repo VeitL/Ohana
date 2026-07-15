@@ -2,78 +2,94 @@
 
 - Status: active product behavior specification.
 - Owner: `docs/specs/product-foundation.md` D17.
-- Last verified: 2026-07-12 against the Pet-first flow and local-only/no-account boundary.
+- Last verified: 2026-07-15 against the Human-first, optional-Pet and local-only boundary.
+- Validation status: owned by `docs/testing-progress.md`; source review is not a
+  substitute for the required targeted tests and clean-Simulator journeys below.
 
 ## First-Release Promise
 
-Ohana Solo must reach its first useful care loop without an account or a Human
-profile:
+Ohana Solo starts without an account or an up-front permission request:
 
-1. Introduce the local island.
-2. Create the first active Pet.
-3. Save one real care fact for that Pet.
-4. Grant the one-time starter coconut gift.
-5. Show the Lv0 Oasis seed/sprout surface.
+1. Create the first local Human by entering only a name.
+2. Choose whether to create a Pet now or later.
+3. If creating now, enter Pet name, species and breed; then optionally choose
+   personality and a theme color before the final avatar step.
+4. Return Home only after its read model contains the newly saved cards.
+5. Open Task Center, tap the first-Pet reward item, then claim the one-time
+   50-coconut island gift and unlock Oasis.
 
-The median completion time across ten clean-install runs must be 90 seconds or
-less. Permission and household-preference choices may be skipped and must not
-block this path.
+After that blocking journey completes, Task Center may surface the separate
+six-item household starter growth plan from D28. Its 400 coconuts are optional,
+claimed into the current Human wallet, and never delay Home or Oasis entry.
+
+Choosing Later completes the blocking onboarding immediately. Home then contains
+the Human card, Oasis remains hidden, and Task Center exposes one system journey
+item for creating the first Pet. The first-Pet path must still complete within
+90 seconds on a clean install.
 
 ## Required And Optional Data
 
-- The first Pet is required to complete onboarding. Its creation rules remain
-  owned by the member-creation domain service.
-- A Human profile is optional during and after onboarding. Absence of a Human
-  must not present a blocking replacement-profile route.
-- If a user later creates a Human, display name/nickname is required. Gender
-  identity and birthday are optional and default to absent, not to a guessed
-  value or “prefer not to say.”
-- “Not set” and “prefer not to say” are different states. The former means no
-  value was supplied; the latter is an explicit user choice.
+- A clean install requires one Human name. The first Human becomes the local
+  owner, is visible on Home, and becomes `currentActiveHumanId`.
+- Pet creation is optional during onboarding. Name, species and breed are
+  required. Species and breed both offer an Other choice whose custom text is
+  persisted. Sex, coat and other profile fields remain unset/defaulted for later editing.
+- Personality is optional, limited to three creation choices. The same compact
+  page exposes an optional native color picker as a clearly separate choice. If
+  the user does not pick a color, a stable color is derived from the Pet profile.
+  Avatar is the final step and always has a usable default.
+- Initial onboarding never requests location or notification permission. Camera
+  or photo access is requested only after the user explicitly chooses that source.
+- Existing installations are not forced back into Human creation solely because
+  an older local dataset has no Human.
 
 ## State Machine
 
 ```text
-pre-onboarding
-  -> needs first Pet
-  -> needs first care fact
-  -> starter gift transaction pending
-  -> starter gift ceremony
-  -> Oasis Lv0 visible
+needs Human name
+  -> Pet choice
+  -> Pet creation -> starter gift task ready
+  -> awaiting Pet -> create-Pet task -> Pet creation -> starter gift task ready
+  -> tap claim task -> reward presentation -> explicit idempotent claim
+  -> Oasis visible
   -> complete
 ```
 
-The state machine derives Pet and care progress from persisted facts. UserDefaults
-may retain presentation/checkpoint state, but a Boolean alone must not fabricate
-a Pet, care record, or reward transaction.
+SwiftData Human/Pet facts remain authoritative. Lightweight defaults may persist
+the journey choice and presentation checkpoint, but cannot fabricate a member or
+reward transaction.
 
 ## Starter Gift Invariants
 
-- The gift is claimed only after an active Pet and a persisted care fact exist.
-- The one-time 50-coconut gift is a system-created island grant. It is credited
-  to the `system:island` reserve and is never owned by a Human or Pet.
-- The formal island total is the island reserve plus all active member wallets.
-  Oasis tree injection may atomically spend that whole pool, using the island
-  reserve first and then active member wallets. `system:legacy` is excluded.
-- The gift ledger event and wallet mutation save in one SwiftData transaction.
-- The wallet transaction key is deterministic. A persisted `starterGift` event
-  recovers presentation defaults after interruption and prevents a second mint.
-- A legacy v2 gift already credited to a Human or Pet is reclassified once with
-  paired wallet transfer facts plus an idempotent marker. The migration preserves
-  the total balance and never mints a second gift.
-- Existing users without a pending first-run journey are marked handled and do
-  not receive a retroactive gift.
+- The first active Pet makes the gift ready; a care or weight record is not required.
+- Pet creation itself never opens the reward presentation. Task Center replaces
+  the create-Pet journey with a dedicated claim item, and only tapping that item
+  requests the presentation.
+- The user-facing claim button performs the transaction. Eligibility evaluation
+  must never mint the reward by itself.
+- The one-time 50-coconut gift is credited to `system:island`, never to a Human or Pet.
+- The ledger event and wallet mutation share one atomic SwiftData transaction and
+  a deterministic transaction key. Double taps, repeated evaluation and relaunch
+  can produce only one credit.
+- If the ledger commits before the ceremony checkpoint, relaunch reconstructs the
+  claimed state from the persisted ledger and does not mint again.
+- Oasis stays hidden while awaiting a Pet and while the gift is ready but unclaimed.
+- Existing handled users receive no retroactive gift. An older pending journey
+  with an active Pet proceeds to the Task Center claim item; it does not interrupt
+  the user with an unsolicited presentation.
+- The later 400-coconut household growth plan is not part of the starter-gift
+  transaction. Its six member-owned rewards have independent household-stable
+  keys and are claimed only from their own Task Center rows.
 
 ## Interruption And Recovery
 
-- The first-run checkpoint starts before member creation.
-- If the App is terminated after the first Pet commits but before the onboarding
-  presentation completes, the earliest active Pet resumes the journey.
-- If the first care fact commits while its sheet is visible, the Home coordinator
-  may evaluate in the background; the ceremony is shown only when presentation
-  state permits it.
-- Repeated evaluation, relaunch, or revision events must not duplicate the Pet,
-  care fact, gift ledger entry, or wallet credit.
+- No Human fact: resume the name step.
+- Human exists but Pet choice is unfinished: resume the choice step.
+- Pet creation was abandoned: persist the deferred state and show the system task.
+- Pet commit succeeds: complete Home snapshot handoff, navigate to Task Center
+  and show the claim item without opening the reward presentation.
+- Claim fails: keep the reward presentation open with retry; never unlock Oasis early.
+- Repeated relaunch or revision events must not duplicate Human, Pet, reward or task state.
 
 ## Deferred Account Or Cross-Platform Identity
 
@@ -89,17 +105,18 @@ boundary but does not authorize an onboarding or Settings account surface now.
 If activated later, the first-run page may emphasize Apple login only while a
 clear local continuation remains available. A signed-in user explicitly confirms
 one-tap Human-card creation; optional profile decisions may earn an idempotent
-island reward, including when the user chooses Later or Prefer not to say.
+member-owned reward, including when the user chooses Later or Prefer not to say.
 
 ## Required Proof
 
-- Unit: clean state transitions, island-reserve claim, legacy member-gift
-  reclassification, interruption recovery, and idempotent reward recovery.
-- Unit: Human draft defaults and last-Human deletion remain non-blocking.
-- UI smoke: a clean install reaches first Pet, first care, reward ceremony, and
-  Oasis Lv0 without creating a Human, then five 10-coconut injections reach Lv1.
-- Stability: repeat the clean-install UI path ten times with relaunch isolation;
-  record duration and require median <= 90 seconds.
-- Physical device remains required for final touch latency, Reduce Motion,
-  VoiceOver traversal, energy, permission-dialog acceptance, and iCloud Drive
-  backup failure/recovery behavior.
+- Unit: Human-first state transitions, immediate/deferred Pet routes, island-reserve
+  claim, legacy recovery, Oasis locking and idempotent reward recovery.
+- Unit: the create-Pet and claim-gift system items are list-only, ignore the
+  default member filter, replace one another at the Pet boundary, and never enter Calendar.
+- UI smoke: verify both `Human -> Later` and
+  `Human -> Pet -> Task Center -> reward presentation -> claim` on iPhone 17;
+  confirm required/custom species and breed, compact personality/theme layout,
+  Home card counts, task visibility, reward amount and progressive tabs.
+- Accessibility: Chinese/English, Dynamic Type, VoiceOver, dark mode and RTL remain usable.
+- Physical device remains required for final camera/photo permission, touch latency,
+  energy and iCloud Drive backup behavior.

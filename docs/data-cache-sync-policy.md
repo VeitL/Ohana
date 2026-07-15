@@ -72,7 +72,7 @@ The framework moves aggregation cost out of the finger frame; this section caps
 the cost itself. A three-year-old family dataset must not make snapshots
 noticeably slower than a three-week-old one.
 
-- High-frequency read paths (home cards, Today Focus, calendar agenda,
+- High-frequency read paths (home cards, Task Center list/calendar agenda,
   dashboards) must use bounded fetches: `fetchLimit`, date-windowed predicates
   (for example "last 90 days"), or precomputed running aggregates. Never scan a
   member's full event history to render a current-state card.

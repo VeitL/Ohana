@@ -16,7 +16,10 @@ extension MemberCardCreationContentView {
     var creationCardArea: some View {
         ZStack {
             if !isJoinHandoffRunning {
-                MemberPortraitDraftCardSurface(snapshot: snapshot) {
+                MemberPortraitDraftCardSurface(
+                    snapshot: snapshot,
+                    layoutMode: memberPortraitCardLayoutMode
+                ) {
                     cardControls
                 }
                 .allowsHitTesting(true)
@@ -34,6 +37,13 @@ extension MemberCardCreationContentView {
             }
         }
         .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
+    }
+
+    var memberPortraitCardLayoutMode: MemberPortraitDraftCardLayoutMode {
+        if currentStep == .petPersonality, !dynamicTypeSize.isAccessibilitySize {
+            return .compactPersonalization
+        }
+        return .standard
     }
 
     var permissionAlertBinding: Binding<Bool> {

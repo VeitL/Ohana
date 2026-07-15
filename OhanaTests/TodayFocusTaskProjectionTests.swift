@@ -186,7 +186,7 @@ struct TodayFocusTaskProjectionTests {
         #expect(focusItem.primaryAction == .approve)
     }
 
-    @Test func homeReadModelKeepsFutureLinkedReviewIdentityAlignedWithTaskCenter() async throws {
+    @Test func homeReadModelDoesNotProjectTasksIntoRetiredTodayFocus() async throws {
         let container = try makeContainer()
         let context = container.mainContext
         let now = Date()
@@ -228,37 +228,21 @@ struct TodayFocusTaskProjectionTests {
             force: true
         )
 
-        let matchingProjectedItem = store.payload.snapshot.todayFocus.assignedFamilyTasks.first {
-            $0.taskCenterItem.familyTaskID == reviewTask.id
-        }
-        let projectedItem = try #require(matchingProjectedItem)
-        let unified = TaskCenterSnapshotBuilder.make(
-            events: [futureEvent],
-            allEvents: [futureEvent],
-            pets: [],
-            humans: [reviewer, worker],
-            plants: [],
-            familyTasks: [reviewTask],
-            activeHumanId: reviewer.id.uuidString,
-            now: now
-        )
-        let unifiedItem = try #require(unified.allItems.first { $0.familyTaskID == reviewTask.id })
-
-        #expect(projectedItem.id == unifiedItem.id)
-        #expect(projectedItem.taskCenterItem == unifiedItem)
-        #expect(projectedItem.primaryAction == .approve)
+        #expect(store.payload.snapshot.todayFocus.refreshedQuests.isEmpty)
+        #expect(store.payload.snapshot.todayFocus.assignedFamilyTasks.isEmpty)
+        #expect(store.payload.snapshot.todayFocus.negativeSignals.isEmpty)
     }
 
-    @Test func todayFocusAndHumanDetailUseTheUnifiedTaskEntryPoints() throws {
+    @Test func homeRetiresTodayFocusWhileHumanDetailKeepsUnifiedTaskEntry() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let homeActionSource = try String(
-            contentsOf: root.appendingPathComponent("Ohana/Features/Home/Views/VerticalSolidHomeView+TodayFocus.swift"),
+        let homeSource = try String(
+            contentsOf: root.appendingPathComponent("Ohana/Features/Home/Views/VerticalSolidHomeView.swift"),
             encoding: .utf8
         )
-        let routeSource = try String(
-            contentsOf: root.appendingPathComponent("Ohana/Features/Tasks/TaskCenterRouteContainer.swift"),
+        let snapshotBuilderSource = try String(
+            contentsOf: root.appendingPathComponent("Ohana/Features/Home/VerticalSolidHomeSnapshotBuilder.swift"),
             encoding: .utf8
         )
         let humanDetailSource = try String(
@@ -269,16 +253,14 @@ struct TodayFocusTaskProjectionTests {
             contentsOf: root.appendingPathComponent("Ohana/App/RouteContainers/AppRouteDestinationContainers.swift"),
             encoding: .utf8
         )
-        let deckSource = try String(
-            contentsOf: root.appendingPathComponent("Ohana/Features/TodayFocus/Views/TodayFocusCard+Deck.swift"),
+        let quickActionsSource = try String(
+            contentsOf: root.appendingPathComponent("Ohana/Features/Home/Views/VerticalSolidHomeView+QuickActions.swift"),
             encoding: .utf8
         )
 
-        #expect(homeActionSource.contains("taskCenterFocusedItemID = task.id"))
-        #expect(homeActionSource.contains("TaskActionCommandExecutor("))
-        #expect(homeActionSource.contains("TaskActionCommand(item: item, action: action)"))
-        #expect(routeSource.contains("routeContext.focusedItemID"))
-        #expect(deckSource.contains("IslandQuestEngine.isOasisBuildQuest($0.id)"))
+        #expect(!homeSource.contains("VerticalSolidHomeTodayFocusChrome("))
+        #expect(snapshotBuilderSource.contains("todayFocus: .empty"))
+        #expect(!quickActionsSource.contains("scheduleTodayFocusDailyCompletion"))
         #expect(humanDetailSource.contains("Button(action: onOpenTasks)"))
         #expect(humanDetailSource.contains("human-detail-open-tasks"))
         #expect(appRouteSource.contains("onPresentTaskCenter?(.human(id))"))

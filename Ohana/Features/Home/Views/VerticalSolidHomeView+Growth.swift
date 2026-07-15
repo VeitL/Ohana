@@ -134,7 +134,6 @@ extension VerticalSolidHomeView {
         growthLoopSyncTask?.cancel()
         growthLoopSyncTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 720) {
             let startedAt = CFAbsoluteTimeGetCurrent()
-            appServices.onboardingJourney.markFirstCareCompleted()
             treeManager.refreshLedgerEnergy(modelContext: modelContext)
             let currentLevel = treeManager.treeLevel.rawValue
             let currentEnergy = treeManager.totalEnergy

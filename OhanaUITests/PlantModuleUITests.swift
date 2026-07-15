@@ -487,20 +487,22 @@ final class PlantModuleUITests: XCTestCase {
     @MainActor
     private func createFirstHuman(from app: XCUIApplication) {
         let name = "Codex Human \(Int(Date().timeIntervalSince1970))"
-        advanceOnboardingIntroToMemberCreation(in: app)
-        createMember(
-            in: app,
-            name: name,
-            flowTitle: "Create Member Card",
-            missingFieldMessage: "Human creation name field did not appear.",
-            completionMessage: "Creating the first human did not leave the creation flow in time.",
-            postSaveMarkerIdentifiers: ["home-add-first-pet-card"]
+        let nameField = app.textFields["onboarding-human-name-input"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 25), "Human-first name field did not appear.")
+        nameField.tap()
+        nameField.typeText(name)
+        let continueAction = app.buttons["onboarding-human-continue"]
+        XCTAssertTrue(waitUntil(timeout: 8) { continueAction.exists && continueAction.isEnabled })
+        tapWhenHittable(continueAction, timeout: 8)
+        XCTAssertTrue(
+            app.buttons["onboarding-create-pet-now"].waitForExistence(timeout: 12),
+            "Creating the first Human did not reach the Pet choice."
         )
     }
 
     @MainActor
     private func completeFirstDayStarterFunnel(in app: XCUIApplication) {
-        openFirstPetCreationFromTodayFocus(in: app)
+        openFirstPetCreationFromJourney(in: app)
         createMember(
             in: app,
             name: "Codex Pet \(Int(Date().timeIntervalSince1970))",
@@ -1359,44 +1361,13 @@ final class PlantModuleUITests: XCTestCase {
     }
 
     @MainActor
-    private func advanceOnboardingIntroToMemberCreation(in app: XCUIApplication) {
-        let introPrimary = app.buttons["onboarding-intro-primary-action"]
+    private func openFirstPetCreationFromJourney(in app: XCUIApplication) {
         let nameField = app.textFields["member-name-input"]
-        XCTAssertTrue(waitUntil(timeout: 25) { introPrimary.exists || nameField.exists }, "Onboarding intro did not become available.")
-
-        for _ in 0 ..< 6 where !(nameField.exists && nameField.isHittable) {
-            guard introPrimary.exists else { break }
-            tapWhenHittable(introPrimary, timeout: 8)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.45))
-        }
-
-        XCTAssertTrue(waitUntil(timeout: 12) { nameField.exists && nameField.isHittable }, "Onboarding intro did not advance to member creation.")
-    }
-
-    @MainActor
-    private func openFirstPetCreationFromTodayFocus(in app: XCUIApplication) {
-        let nameField = app.textFields["member-name-input"]
-        let addPetCard = app.buttons["home-add-first-pet-card"]
-        XCTAssertTrue(
-            waitUntil(timeout: 20) {
-                guard !nameField.exists else { return true }
-                guard addPetCard.exists, addPetCard.isEnabled else { return false }
-                let frame = addPetCard.frame
-                return frame.width > 1 && frame.height > 1 && isFiniteFrame(frame)
-            },
-            "Today Focus first-pet action did not appear."
-        )
+        let createPetNow = app.buttons["onboarding-create-pet-now"]
+        XCTAssertTrue(waitUntil(timeout: 20) { createPetNow.exists || nameField.exists }, "First-Pet choice did not appear.")
         if nameField.exists { return }
-        XCTAssertTrue(
-            addPetCard.label.hasPrefix("Add your first pet") &&
-                addPetCard.label.count > "Add your first pet".count,
-            "Today Focus first-pet action did not expose its complete English accessibility label: \(addPetCard.label)"
-        )
-        XCTAssertTrue(
-            tapWhenFrameReady(addPetCard, timeout: 4),
-            "Today Focus first-pet action did not expose a stable touch frame."
-        )
-        XCTAssertTrue(nameField.waitForExistence(timeout: 12), "Pet creation did not open from Today Focus.")
+        tapWhenHittable(createPetNow, timeout: 8)
+        XCTAssertTrue(nameField.waitForExistence(timeout: 12), "Pet creation did not open from the Pet choice.")
     }
 
     @MainActor
@@ -1459,7 +1430,6 @@ final class PlantModuleUITests: XCTestCase {
             }
             selectFirstPetSpeciesIfPresent(in: app)
             selectFirstPetBreedIfPresent(in: app)
-            selectFirstPetAppearanceIfPresent(in: app)
             let actionLabel = creationPrimary.label
             tapWhenHittable(creationPrimary, timeout: 8)
             if actionLabel.contains("Join Island") || actionLabel.contains("加入岛屿") || actionLabel.contains("Insel beitreten") {

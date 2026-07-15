@@ -16,25 +16,35 @@ nonisolated enum StarterGiftStorageKey {
     static let claimed = "ohanaStarterGiftClaimedV1"
     static let pending = "ohanaStarterGiftPendingV1"
     static let ceremonySeen = "ohanaStarterLv0CeremonySeenV1"
+    static let ceremonyRequested = "ohanaStarterCeremonyRequestedV1"
     static let oasisTabPromptPending = "ohanaStarterOasisTabPromptPendingV1"
 }
 
 enum StarterGiftService {
     static let giftAmount = StarterGiftPolicy.giftAmount
 
-    enum Recipient: Equatable {
+    enum Recipient: Equatable, Sendable {
         case island
         case human(UUID)
         case pet(UUID)
     }
 
-    enum Result: Equatable {
+    enum Result: Equatable, Sendable {
         case alreadyHandled
         case markedExistingUser
         case pendingFirstPet
-        case pendingFirstCare(recipient: Recipient)
+        case readyToClaim(recipient: Recipient, amount: Int)
         case claimed(recipient: Recipient, amount: Int)
         case persistenceFailed
+
+        var completesClaimRequest: Bool {
+            switch self {
+            case .alreadyHandled, .claimed:
+                true
+            case .markedExistingUser, .pendingFirstPet, .readyToClaim, .persistenceFailed:
+                false
+            }
+        }
     }
 
     private enum LegacyGiftTransferSource {
@@ -104,55 +114,55 @@ enum StarterGiftService {
             return false
         }
         defaults.set(true, forKey: StarterGiftStorageKey.pending)
+        defaults.set(false, forKey: StarterGiftStorageKey.ceremonyRequested)
         AppPerformanceMonitor.shared.record("starter_gift_pending", valueMS: 0)
         return true
     }
 
     @MainActor
-    static func prepareOrClaim(
+    static func evaluateEligibility(
         activeHumanID: String?,
         context: ModelContext,
         defaults: UserDefaults = .standard,
-        careLedger providedCareLedger: CareLedgerRecording? = nil,
         wallet providedWallet: CoconutWalletManaging? = nil,
         projectionManager: QuestManager? = nil
     ) -> Result {
         _ = activeHumanID
-        let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
-        do {
-            try migrateLegacyRecipientGiftIfNeeded(
-                context: context,
-                wallet: wallet,
-                projectionManager: projectionManager
-            )
-        } catch {
-            context.rollback()
-            wallet.refreshQuestProjection(context: context, manager: projectionManager)
-            OhanaLog.error(
-                "[StarterGiftService] legacy gift ownership migration failed: \(error.localizedDescription)",
-                category: "Economy"
-            )
+        guard prepareEligibilityState(
+            context: context,
+            defaults: defaults,
+            wallet: wallet,
+            projectionManager: projectionManager
+        ) else {
             return .persistenceFailed
         }
         if defaults.bool(forKey: StarterGiftStorageKey.claimed) {
             return .alreadyHandled
         }
 
-        if hasPersistedStarterGift(context: context) {
-            // The SwiftData save contains both the gift event and wallet write.
-            // Recovering the defaults after a termination must reveal that
-            // committed transaction, never mint the gift a second time.
-            defaults.set(true, forKey: StarterGiftStorageKey.claimed)
-            defaults.set(false, forKey: StarterGiftStorageKey.pending)
-            return .alreadyHandled
+        do {
+            if try hasPersistedStarterGift(context: context) {
+                // The SwiftData save contains both the gift event and wallet write.
+                // Recovering the defaults after a termination must reveal that
+                // committed transaction, never mint the gift a second time.
+                defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+                defaults.set(false, forKey: StarterGiftStorageKey.pending)
+                return .alreadyHandled
+            }
+        } catch {
+            OhanaLog.warning(
+                "StarterGiftService failed to recover persisted starter gift: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return .persistenceFailed
         }
 
-        var hasPendingGift = defaults.bool(forKey: StarterGiftStorageKey.pending)
-        if !hasPendingGift {
-            hasPendingGift = beginFreshJourney(context: context, defaults: defaults)
-        }
-        guard hasPendingGift else {
+        // Only the first-run onboarding surface may begin a fresh journey.
+        // Eligibility can also run for users who completed an older onboarding
+        // version, including users whose local household is currently empty;
+        // treating that read as a new install would incorrectly backfill a gift.
+        guard defaults.bool(forKey: StarterGiftStorageKey.pending) else {
             markExistingUser(defaults: defaults)
             return .markedExistingUser
         }
@@ -162,15 +172,35 @@ enum StarterGiftService {
             return .pendingFirstPet
         }
 
-        guard hasRecordedFirstCare(context: context) else {
-            AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_care", valueMS: 0)
-            return .pendingFirstCare(recipient: .island)
-        }
+        return .readyToClaim(recipient: .island, amount: giftAmount)
+    }
+
+    /// The only new-journey starter-gift write path. Eligibility evaluation is
+    /// intentionally read-mostly so presenting the reward cannot mint coconuts
+    /// before the person confirms the action.
+    @MainActor
+    static func claimStarterGift(
+        activeHumanID: String?,
+        context: ModelContext,
+        defaults: UserDefaults = .standard,
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        wallet providedWallet: CoconutWalletManaging? = nil,
+        projectionManager: QuestManager? = nil
+    ) -> Result {
+        let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
+        let eligibility = evaluateEligibility(
+            activeHumanID: activeHumanID,
+            context: context,
+            defaults: defaults,
+            wallet: wallet,
+            projectionManager: projectionManager
+        )
+        guard case .readyToClaim = eligibility else { return eligibility }
 
         return claim(
             context: context,
             defaults: defaults,
-            careLedger: careLedger,
+            careLedger: providedCareLedger ?? CareLedgerService(),
             wallet: wallet,
             projectionManager: projectionManager
         )
@@ -178,7 +208,9 @@ enum StarterGiftService {
 
     @MainActor
     static func markCeremonySeen(defaults: UserDefaults = .standard) {
+        guard defaults.bool(forKey: StarterGiftStorageKey.claimed) else { return }
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
+        defaults.set(false, forKey: StarterGiftStorageKey.ceremonyRequested)
         defaults.set(true, forKey: StarterGiftStorageKey.oasisTabPromptPending)
         AppPerformanceMonitor.shared.record("starter_ceremony_seen", valueMS: 0)
     }
@@ -189,7 +221,15 @@ enum StarterGiftService {
     }
 
     static func isOasisHomeTabUnlocked(defaults: UserDefaults = .standard) -> Bool {
-        !(defaults.bool(forKey: StarterGiftStorageKey.claimed) && !defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
+        if defaults.bool(forKey: StarterGiftStorageKey.pending) {
+            return false
+        }
+        if defaults.bool(forKey: StarterGiftStorageKey.claimed) {
+            return defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen)
+        }
+        // Users from before the starter journey have neither flag. Preserve
+        // their already-visible Oasis instead of treating them as a new install.
+        return true
     }
 
     @MainActor
@@ -197,6 +237,7 @@ enum StarterGiftService {
         defaults.removeObject(forKey: StarterGiftStorageKey.claimed)
         defaults.removeObject(forKey: StarterGiftStorageKey.pending)
         defaults.removeObject(forKey: StarterGiftStorageKey.ceremonySeen)
+        defaults.removeObject(forKey: StarterGiftStorageKey.ceremonyRequested)
         defaults.removeObject(forKey: StarterGiftStorageKey.oasisTabPromptPending)
     }
 
@@ -391,10 +432,36 @@ enum StarterGiftService {
     }
 
     @MainActor
+    private static func prepareEligibilityState(
+        context: ModelContext,
+        defaults: UserDefaults,
+        wallet: CoconutWalletManaging,
+        projectionManager: QuestManager?
+    ) -> Bool {
+        do {
+            try migrateLegacyRecipientGiftIfNeeded(
+                context: context,
+                wallet: wallet,
+                projectionManager: projectionManager
+            )
+            return true
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: projectionManager)
+            OhanaLog.error(
+                "[StarterGiftService] legacy gift ownership migration failed: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return false
+        }
+    }
+
+    @MainActor
     private static func markExistingUser(defaults: UserDefaults) {
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
         defaults.set(false, forKey: StarterGiftStorageKey.pending)
+        defaults.set(false, forKey: StarterGiftStorageKey.ceremonyRequested)
         defaults.set(false, forKey: StarterGiftStorageKey.oasisTabPromptPending)
     }
 
@@ -403,8 +470,7 @@ enum StarterGiftService {
         let humans = fetchCountOrLog(FetchDescriptor<Human>(), context: context, operation: "fetch human count")
         let pets = fetchCountOrLog(FetchDescriptor<Pet>(), context: context, operation: "fetch pet count")
         let ledger = fetchCountOrLog(FetchDescriptor<CareLedgerEvent>(), context: context, operation: "fetch care ledger count")
-        let petWeights = fetchCountOrLog(FetchDescriptor<PetWeightLog>(), context: context, operation: "fetch pet weight count")
-        return StarterGiftDataCounts(humans: humans, pets: pets, ledger: ledger, petWeights: petWeights)
+        return StarterGiftDataCounts(humans: humans, pets: pets, ledger: ledger)
     }
 
     @MainActor
@@ -420,32 +486,14 @@ enum StarterGiftService {
     }
 
     @MainActor
-    private static func hasRecordedFirstCare(context: ModelContext) -> Bool {
-        if fetchCountOrLog(
-            FetchDescriptor<PetWeightLog>(),
-            context: context,
-            operation: "fetch starter pet weight count"
-        ) > 0 {
-            return true
-        }
-        var descriptor = FetchDescriptor<CareLedgerEvent>(
-            predicate: #Predicate<CareLedgerEvent> { event in
-                event.actionType != "starterGift" && event.eventKind != "coconut"
-            }
-        )
-        descriptor.fetchLimit = 1
-        return !fetchModelsOrLog(descriptor, context: context, operation: "fetch starter care facts").isEmpty
-    }
-
-    @MainActor
-    private static func hasPersistedStarterGift(context: ModelContext) -> Bool {
+    private static func hasPersistedStarterGift(context: ModelContext) throws -> Bool {
         var descriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.actionType == "starterGift"
             }
         )
         descriptor.fetchLimit = 1
-        return !fetchModelsOrLog(descriptor, context: context, operation: "recover persisted starter gift").isEmpty
+        return try !context.fetch(descriptor).isEmpty
     }
 
     @MainActor
@@ -495,10 +543,9 @@ private struct StarterGiftDataCounts {
     let humans: Int
     let pets: Int
     let ledger: Int
-    let petWeights: Int
 
     var isPristine: Bool {
-        humans == 0 && pets == 0 && ledger == 0 && petWeights == 0
+        humans == 0 && pets == 0 && ledger == 0
     }
 }
 

@@ -24,35 +24,55 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testHumanCanBeAddedAfterPetFirstOnboarding() throws {
+    func testSkippedPetCreationMovesToTasksAndCompletesFromSystemJourney() throws {
         let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
-        completePetFirstD17Flow(in: app)
-        closeOasisToHome(in: app)
-        let humanName = addFirstHumanAfterOnboarding(in: app)
+        let humanName = "Codex Deferred Human"
+        createOnboardingHuman(named: humanName, in: app)
+        tapWhenHittable(app.buttons["onboarding-defer-pet"], timeout: 8)
+
         XCTAssertTrue(
             app.buttons["home-card-human-\(humanName)"].waitForExistence(timeout: 15),
-            "A Human profile could not be added after the Pet-first value loop."
+            "Skipping Pet creation did not preserve the newly created Human card."
         )
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-pet-")).firstMatch.exists)
+        XCTAssertFalse(app.buttons["home-tab-oasis"].exists, "Oasis must stay locked while the first-Pet journey is pending.")
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        let systemAction = app.buttons["task-center-system-action-createFirstPet-system-journey-create-first-pet"]
+        XCTAssertTrue(systemAction.waitForExistence(timeout: 15), "The deferred first-Pet system journey was not visible in Tasks.")
+        tapWhenHittable(systemAction, timeout: 8)
+
+        let petName = "Codex Deferred Pet"
+        createMember(
+            in: app,
+            name: petName,
+            flowTitle: "Create Pet Card",
+            missingFieldMessage: "The first-Pet system journey did not open Pet creation.",
+            petSpeciesLabel: "Dog",
+            postSaveMarkerIdentifiers: ["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
+        )
+        finishRequiredStarterGift(in: app)
+        XCTAssertTrue(app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 12))
     }
 
     @MainActor
-    func testPetFirstOnboardingCompletesCareRewardAndOasisWithoutHuman() throws {
+    func testHumanFirstOnboardingCreatesPetClaimsGiftAndUnlocksOasis() throws {
         let app = launchEnglishApp(seedHumanBaseline: false)
         completePetFirstD17Flow(in: app)
         injectStarterEnergyToLevelOne(in: app)
     }
 
     @MainActor
-    func testPetFirstOnboardingWithProductionOverlaysCompletesWithoutHuman() throws {
+    func testHumanFirstOnboardingWithProductionOverlaysCompletes() throws {
         let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
         completePetFirstD17Flow(
             in: app,
-            completionMessage: "Pet-first onboarding with production overlays did not reach the starter reward in time."
+            completionMessage: "Human-first onboarding with production overlays did not reach the starter reward in time."
         )
     }
 
     @MainActor
-    func testReduceMotionKeepsPetFirstValueLoopInteractive() throws {
+    func testReduceMotionKeepsHumanFirstValueLoopInteractive() throws {
         let app = launchEnglishApp(
             seedHumanBaseline: false,
             enableProductionOverlays: true,
@@ -63,18 +83,19 @@ final class OhanaUITests: XCTestCase {
         )
         completePetFirstD17Flow(
             in: app,
-            completionMessage: "Reduce Motion prevented the Pet-first care, reward, or Oasis value loop from completing."
+            completionMessage: "Reduce Motion prevented the Human-first Pet, reward, or Oasis value loop from completing."
         )
     }
 
     @MainActor
-    func testPetFirstOnboardingAccessibilityContract() throws {
+    func testHumanFirstOnboardingAccessibilityContract() throws {
         let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        createOnboardingHuman(named: "Codex Accessibility Human", in: app)
         advanceOnboardingIntroToMemberCreation(in: app)
 
         let nameField = app.textFields["member-name-input"]
-        XCTAssertTrue(nameField.waitForExistence(timeout: 12), "Pet-first name field did not appear.")
-        XCTAssertEqual(nameField.elementType, .textField, "Pet-first name entry lost its text-field role.")
+        XCTAssertTrue(nameField.waitForExistence(timeout: 12), "Pet name field did not appear.")
+        XCTAssertEqual(nameField.elementType, .textField, "Pet name entry lost its text-field role.")
         XCTAssertFalse(
             app.buttons["member-pet-species-picker"].exists,
             "The name page should contain only the name task."
@@ -104,28 +125,16 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(waitUntil(timeout: 8) { creationPrimary.isEnabled })
         tapWhenHittable(creationPrimary, timeout: 8)
 
-        let boy = app.buttons["member-gender-boy"]
-        let girl = app.buttons["member-gender-girl"]
-        XCTAssertTrue(boy.waitForExistence(timeout: 8) && girl.exists, "Pet sex must expose Boy and Girl.")
-        XCTAssertFalse(app.buttons["member-gender-unknown"].exists, "Pet sex must not expose Unknown.")
-        keepScreenshot(of: app, named: "Pet creation - appearance")
-        XCTAssertFalse(creationPrimary.isEnabled, "Pet appearance must require a binary sex and coat.")
-        tapWhenHittable(boy, timeout: 4)
-        XCTAssertFalse(creationPrimary.isEnabled, "Selecting sex alone must not bypass the required coat.")
-        selectMemberCreationPetAppearance(in: app)
-        XCTAssertTrue(waitUntil(timeout: 8) { creationPrimary.isEnabled })
-        tapWhenHittable(creationPrimary, timeout: 8)
-
-        XCTAssertTrue(waitUntil(timeout: 8) { creationPrimary.isEnabled })
-        tapWhenHittable(creationPrimary, timeout: 8)
-
         XCTAssertTrue(
             app.buttons["member-pet-personality-curious"].waitForExistence(timeout: 8),
             "The optional personality page did not appear."
         )
         XCTAssertTrue(creationPrimary.isEnabled, "Personality must be skippable without a selection.")
 
-        let personalityIds = ["curious", "lazy", "energetic", "clingy", "smart", "toy", "foodie", "drama"]
+        let personalityIds = [
+            "curious", "lazy", "energetic", "clingy", "smart", "toy", "foodie", "drama", "clean", "shy",
+            "brave", "social", "gentle", "quiet", "stubborn", "vocal", "guardian", "independent", "loyal", "chill"
+        ]
         let selectedIds = Array(personalityIds.prefix(3))
         for id in selectedIds {
             let choice = app.buttons["member-pet-personality-\(id)"]
@@ -158,6 +167,10 @@ final class OhanaUITests: XCTestCase {
                 "Personality \(id) was not available as a direct-tap choice."
             )
         }
+
+        tapWhenHittable(creationPrimary, timeout: 8)
+        XCTAssertTrue(creationPrimary.waitForExistence(timeout: 8), "Avatar was not the final Pet creation step.")
+        XCTAssertTrue(creationPrimary.isEnabled, "The preselected default avatar should allow immediate save.")
     }
 
     @MainActor
@@ -184,13 +197,13 @@ final class OhanaUITests: XCTestCase {
             "The fail-closed recovery surface did not expose support."
         )
         XCTAssertFalse(
-            app.buttons["onboarding-intro-primary-action"].exists,
+            app.textFields["onboarding-human-name-input"].exists,
             "The writable app surface appeared while the primary store was unavailable."
         )
 
         tapWhenHittable(retryButton, timeout: 8)
         XCTAssertTrue(
-            app.buttons["onboarding-intro-primary-action"].waitForExistence(timeout: 20),
+            app.textFields["onboarding-human-name-input"].waitForExistence(timeout: 20),
             "Retry did not reopen the same primary store and resume onboarding."
         )
     }
@@ -2928,10 +2941,30 @@ final class OhanaUITests: XCTestCase {
             return "Codex Human Baseline"
         }
         XCTAssertTrue(
-            app.buttons["onboarding-intro-primary-action"].waitForExistence(timeout: 25),
-            "Pet-first onboarding did not appear after the Human test baseline was seeded."
+            waitUntil(timeout: 25) {
+                app.buttons["onboarding-create-pet-now"].exists ||
+                    app.textFields["member-name-input"].exists ||
+                    app.buttons["home-tab-home"].exists
+            },
+            "The Human-first Pet choice did not appear after the Human test baseline was seeded."
         )
         return seededHumanBaselineName
+    }
+
+    @MainActor
+    private func createOnboardingHuman(named name: String, in app: XCUIApplication) {
+        let nameField = app.textFields["onboarding-human-name-input"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 25), "The Human-first name field did not appear.")
+        XCTAssertEqual(nameField.elementType, .textField)
+        nameField.tap()
+        nameField.typeText(name)
+        let continueAction = app.buttons["onboarding-human-continue"]
+        XCTAssertTrue(waitUntil(timeout: 8) { continueAction.exists && continueAction.isEnabled })
+        tapWhenHittable(continueAction, timeout: 8)
+        XCTAssertTrue(
+            app.buttons["onboarding-create-pet-now"].waitForExistence(timeout: 12),
+            "Saving the first Human did not reach the Pet choice."
+        )
     }
 
     @MainActor
@@ -2949,56 +2982,64 @@ final class OhanaUITests: XCTestCase {
             flowTitle: "Create Pet Card",
             missingFieldMessage: "Pet-first onboarding name field did not appear.",
             completionMessage: completionMessage,
-            starterPetWeight: "7",
             petSpeciesLabel: "Dog",
-            postSaveMarkerIdentifiers: [
-                "generic-weight-entry-sheet-pet",
-                "starter-gift-finish-action"
-            ]
+            postSaveMarkerIdentifiers: ["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
+        )
+        XCTAssertGreaterThanOrEqual(
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-")).count,
+            1,
+            "The first Human card was missing before the starter gift appeared."
+        )
+        XCTAssertTrue(
+            app.buttons["home-card-pet-\(petName)"].exists,
+            "The first Pet card was missing before the starter gift appeared."
         )
         finishRequiredStarterGift(in: app)
 
         let oasisTab = app.buttons["home-tab-oasis"]
-        XCTAssertTrue(oasisTab.waitForExistence(timeout: 8), "Oasis did not unlock after the first saved care fact.")
+        XCTAssertTrue(oasisTab.waitForExistence(timeout: 8), "Oasis did not unlock after the starter gift was claimed.")
         XCTAssertTrue(tapWhenFrameReady(oasisTab, timeout: 8), "Oasis tab was not frame-ready after the starter reward.")
         XCTAssertTrue(app.otherElements["oasis-screen"].waitForExistence(timeout: 20), "The D17 flow did not show the Oasis seed surface.")
         let level = app.descendants(matching: .any)["oasis-tree-level-control"]
         XCTAssertTrue(level.waitForExistence(timeout: 12), "The Oasis seed level was not visible.")
         XCTAssertTrue(level.label.contains("level 0"), "The first Oasis surface was not the Lv0 seed state: \(level.label)")
-        XCTAssertEqual(
+        XCTAssertGreaterThanOrEqual(
             app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-")).count,
-            0,
-            "D17 silently created or required a Human profile."
+            1,
+            "Human-first onboarding did not retain its Human profile."
         )
         XCTAssertLessThanOrEqual(
             Date().timeIntervalSince(startedAt),
             90,
-            "The first Pet + care + reward + Oasis value loop exceeded 90 seconds."
+            "The Human + Pet + reward + Oasis value loop exceeded 90 seconds."
         )
         return petName
     }
 
     @MainActor
     private func advanceOnboardingIntroToMemberCreation(in app: XCUIApplication) {
-        let introPrimary = app.buttons["onboarding-intro-primary-action"]
+        let humanNameField = app.textFields["onboarding-human-name-input"]
+        let createPetNow = app.buttons["onboarding-create-pet-now"]
         let nameField = app.textFields["member-name-input"]
         let didShowStartingSurface = waitUntil(timeout: 25) {
-            introPrimary.exists || nameField.exists
+            humanNameField.exists || createPetNow.exists || nameField.exists
         }
-        XCTAssertTrue(didShowStartingSurface, "Onboarding intro did not become available.")
+        XCTAssertTrue(didShowStartingSurface, "Human-first onboarding did not become available.")
 
-        for _ in 0 ..< 6 where !(nameField.exists && nameField.isHittable) {
-            guard introPrimary.exists else {
-                break
-            }
-            tapWhenHittable(introPrimary, timeout: 8)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.45))
+        if humanNameField.exists {
+            createOnboardingHuman(
+                named: "Codex Human \(Int(Date().timeIntervalSince1970))",
+                in: app
+            )
+        }
+        if createPetNow.exists {
+            tapWhenHittable(createPetNow, timeout: 8)
         }
 
         let didReachMemberCreation = waitUntil(timeout: 12) {
             nameField.exists && nameField.isHittable
         }
-        XCTAssertTrue(didReachMemberCreation, "Onboarding intro did not advance to member creation.")
+        XCTAssertTrue(didReachMemberCreation, "The Pet choice did not advance to Pet creation.")
     }
 
     @MainActor
@@ -3009,19 +3050,15 @@ final class OhanaUITests: XCTestCase {
         petSpeciesLabel: String? = "Dog",
         completionMessage: String = "Creating the first pet did not leave the pet creation handoff in time."
     ) -> String {
-        openFirstPetCreationFromTodayFocus(in: app)
+        openFirstPetCreationFromJourney(in: app)
         createMember(
             in: app,
             name: petName,
             flowTitle: "Create Pet Card",
             missingFieldMessage: "Pet creation name field did not appear.",
             completionMessage: completionMessage,
-            starterPetWeight: "7",
             petSpeciesLabel: petSpeciesLabel,
-            postSaveMarkerIdentifiers: [
-                "generic-weight-entry-sheet-pet",
-                "starter-gift-finish-action"
-            ]
+            postSaveMarkerIdentifiers: ["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
         )
         finishRequiredStarterGift(in: app)
         return petName
@@ -3029,12 +3066,22 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func finishRequiredStarterGift(in app: XCUIApplication) {
-        recordRequiredFirstPetCareIfNeeded(in: app)
+        let taskClaim = app.buttons["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
+        XCTAssertTrue(taskClaim.waitForExistence(timeout: 20), "First-pet reward task did not appear after the Pet was saved.")
+        XCTAssertFalse(app.buttons["starter-gift-finish-action"].exists, "Starter gift appeared before the reward task was opened.")
+        tapWhenHittable(taskClaim, timeout: 8)
+
         let finish = app.buttons["starter-gift-finish-action"]
-        XCTAssertTrue(finish.waitForExistence(timeout: 20), "Starter coconut gift unlock action did not appear after the first saved care fact.")
+        XCTAssertTrue(finish.waitForExistence(timeout: 20), "Starter coconut gift action did not appear after the reward task was opened.")
         XCTAssertFalse(app.buttons["home-tab-oasis"].exists, "Oasis tab should stay hidden until the starter gift unlock action is tapped.")
         tapWhenHittable(finish, timeout: 8)
         XCTAssertTrue(app.buttons["home-tab-oasis"].waitForExistence(timeout: 8), "Oasis tab did not appear after unlocking the Coconut Tree.")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                app.buttons["home-coconut-action"].label.localizedCaseInsensitiveContains("50")
+            },
+            "The Home coconut balance did not refresh to include the starter gift before the ceremony closed."
+        )
         XCTAssertTrue(
             app.descendants(matching: .any)["starter-oasis-tab-prompt"].waitForExistence(timeout: 8),
             "Oasis tab prompt did not appear after starter gift."
@@ -3042,74 +3089,31 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func recordRequiredFirstPetCareIfNeeded(in app: XCUIApplication) {
-        let sheet = app.descendants(matching: .any)["generic-weight-entry-sheet-pet"]
-        guard sheet.waitForExistence(timeout: 8) else {
-            return
-        }
-
-        let quickWeight = app.buttons["generic-weight-entry-quick-weight-0"]
-        XCTAssertTrue(
-            quickWeight.waitForExistence(timeout: 8),
-            "Pet-first onboarding did not expose a quick value for its required care fact."
-        )
-        XCTAssertTrue(
-            tapWhenFrameReady(quickWeight, timeout: 8),
-            "The first Pet care value was not frame-ready."
-        )
-
-        let save = app.buttons["generic-weight-entry-save-action"]
-        XCTAssertTrue(
-            waitUntil(timeout: 8) { save.exists && save.isEnabled },
-            "The first Pet care save action did not enable after selecting a weight."
-        )
-        XCTAssertTrue(
-            tapWhenFrameReady(save, timeout: 8),
-            "The first Pet care save action was not frame-ready."
-        )
-        XCTAssertTrue(
-            waitUntil(timeout: 12) { !sheet.exists },
-            "The first Pet care sheet did not dismiss after its fact was saved."
-        )
-    }
-
-    @MainActor
-    private func openFirstPetCreationFromTodayFocus(in app: XCUIApplication) {
-        let introPrimary = app.buttons["onboarding-intro-primary-action"]
+    private func openFirstPetCreationFromJourney(in app: XCUIApplication) {
+        let humanNameField = app.textFields["onboarding-human-name-input"]
+        let createPetNow = app.buttons["onboarding-create-pet-now"]
         let nameField = app.textFields["member-name-input"]
-        let addPetCard = app.buttons["home-add-first-pet-card"]
+        let tasksTab = app.buttons["home-tab-calendar"]
         let didReachStartingSurface = waitUntil(timeout: 20) {
-            introPrimary.exists || nameField.exists || addPetCard.exists
+            humanNameField.exists || createPetNow.exists || nameField.exists || tasksTab.exists
         }
-        XCTAssertTrue(didReachStartingSurface, "Pet-first creation entry did not appear.")
+        XCTAssertTrue(didReachStartingSurface, "First-Pet creation entry did not appear.")
 
-        if introPrimary.exists || (!nameField.exists && !addPetCard.exists) {
+        if humanNameField.exists || createPetNow.exists {
             advanceOnboardingIntroToMemberCreation(in: app)
             return
         }
-
-        let didReachPetEntry = waitUntil(timeout: 20) {
-            guard !nameField.exists else { return true }
-            guard addPetCard.exists, addPetCard.isEnabled else { return false }
-            let frame = addPetCard.frame
-            return frame.width > 1 && frame.height > 1 && isFiniteFrame(frame)
-        }
-        XCTAssertTrue(didReachPetEntry, "Today Focus first-pet action did not appear.")
         if nameField.exists {
             return
         }
-        XCTAssertTrue(
-            addPetCard.label.hasPrefix("Add your first pet") &&
-                addPetCard.label.count > "Add your first pet".count,
-            "Today Focus first-pet action did not expose its complete English accessibility label: \(addPetCard.label)"
-        )
-        XCTAssertTrue(
-            tapWhenFrameReady(addPetCard, timeout: 4),
-            "Today Focus first-pet action did not expose a stable touch frame."
-        )
+
+        tapWhenHittable(tasksTab, timeout: 8)
+        let systemAction = app.buttons["task-center-system-action-createFirstPet-system-journey-create-first-pet"]
+        XCTAssertTrue(systemAction.waitForExistence(timeout: 15), "Tasks did not expose the first-Pet system journey.")
+        tapWhenHittable(systemAction, timeout: 8)
         XCTAssertTrue(
             nameField.waitForExistence(timeout: 12),
-            "Pet creation did not open from the Today Focus first-pet action."
+            "Pet creation did not open from the Tasks system journey."
         )
     }
 
@@ -4124,7 +4128,8 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func isOnboardingEntryAvailable(in app: XCUIApplication, timeout: TimeInterval) -> Bool {
         waitUntil(timeout: timeout) {
-            app.buttons["onboarding-intro-primary-action"].exists ||
+            app.textFields["onboarding-human-name-input"].exists ||
+                app.buttons["onboarding-create-pet-now"].exists ||
                 app.textFields["member-name-input"].exists
         }
     }

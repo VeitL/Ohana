@@ -249,7 +249,6 @@ extension VerticalSolidHomeView {
         if feedback.coconutDelta > 0 {
             OhanaFeedback.success()
         }
-        scheduleTodayFocusDailyCompletion(afterCompleting: feedback.cardId)
     }
 
     func openPlantCareFeature(_ destination: PlantCareFeatureDestination, plant: VerticalSolidHomePlantSnapshot) {

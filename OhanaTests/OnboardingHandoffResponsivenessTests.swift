@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+@testable import Ohana
 
 struct OnboardingHandoffResponsivenessTests {
     @Test func freshFirstPetTriggersDeferredStarterJourneyEvaluation() throws {
@@ -13,7 +14,10 @@ struct OnboardingHandoffResponsivenessTests {
         #expect(source.contains("onboardingJourneyNeedsObservation"))
         #expect(source.contains("OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds"))
         #expect(source.contains("scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay)"))
-        #expect(source.contains("appRoutes.presentSheet(.petWeightQuick(petID))"))
+        #expect(source.contains("prepareStarterGiftHomeHandoffIfNeeded(id)"))
+        #expect(source.contains("scheduleOnboardingCreatedEntitySignal(id, destinationTab: .home)"))
+        #expect(source.contains("finishStarterGiftCeremonyIfProjectionIsReady()"))
+        #expect(!source.contains("appRoutes.presentSheet(.petWeightQuick(petID))"))
         #expect(!source.contains("appRoutes.presentSheet(.petWeight(petID))"))
         #expect(!source.contains("onboardingPrimaryHumanID"))
     }
@@ -28,6 +32,8 @@ struct OnboardingHandoffResponsivenessTests {
         #expect(source.contains("guard observedHomeInvalidation != invalidation else { return }"))
         #expect(source.contains("pendingHomeInvalidation"))
         #expect(source.contains("pendingDayTokenRefresh"))
+        #expect(source.contains("pendingForcedRefresh"))
+        #expect(source.contains("consumePendingForcedRefreshIfPossible"))
         #expect(source.contains("homeSurfaceInvalidationUpdates"))
         #expect(source.contains("readModelStore.cancel()"))
         #expect(source.contains("scheduleRefreshKeyStateSync"))
@@ -67,18 +73,69 @@ struct OnboardingHandoffResponsivenessTests {
         #expect(source.contains("guard sheet != nil else { return }"))
     }
 
-    @Test func onboardingHomePreflightDoesNotMountFullHomeBeforeCommit() throws {
+    @Test func onboardingHomePreflightMountsHomeBehindTheBlockingOnboardingLayer() throws {
         let source = try source(
             "Ohana/App/RootView.swift",
             rootURL: repositoryRootURL()
         )
 
         #expect(source.contains("private func beginOnboardingHomePreflight()"))
-        #expect(source.contains("if hasOnboarded {"))
-        #expect(source.contains("Mounting the full Home stack before"))
-        #expect(!source.contains("hasOnboarded || isOnboardingHomePreflightActive"))
-        #expect(!source.contains("isOnboardingHomePreflightActive"))
-        #expect(!source.contains("onboardingHomePreflightTask"))
+        #expect(source.contains("if hasOnboarded || isOnboardingHomePreflightMounted"))
+        #expect(source.contains(".allowsHitTesting(hasOnboarded)"))
+        #expect(source.contains(".accessibilityHidden(!hasOnboarded)"))
+        #expect(source.contains("onCompletionRequested: requestOnboardingCompletion"))
+        #expect(source.contains("onRequiredPetHomeSnapshotReady: markOnboardingPetHomeSnapshotReady"))
+        #expect(source.contains("scheduleOnboardingHomeSnapshotRecovery"))
+        #expect(source.contains("onRetryHomePreparation: retryOnboardingHomePreparation"))
+        #expect(source.contains("resumeOnboardingHomeSnapshotRecoveryIfNeeded()"))
+    }
+
+    @Test func petSnapshotHandoffIsOrderIndependentAndIDScoped() {
+        let petID = UUID()
+        var requestFirst = OnboardingPetSnapshotHandoffState()
+        requestFirst.requestCompletion(for: petID)
+        #expect(requestFirst.completedPetID == nil)
+        requestFirst.markHomeSnapshotReady(for: petID)
+        #expect(requestFirst.completedPetID == petID)
+
+        var snapshotFirst = OnboardingPetSnapshotHandoffState()
+        snapshotFirst.stage(petID)
+        snapshotFirst.markHomeSnapshotReady(for: petID)
+        #expect(snapshotFirst.completedPetID == nil)
+        snapshotFirst.requestCompletion(for: petID)
+        #expect(snapshotFirst.completedPetID == petID)
+
+        var mismatched = OnboardingPetSnapshotHandoffState()
+        mismatched.requestCompletion(for: petID)
+        mismatched.markHomeSnapshotReady(for: UUID())
+        #expect(mismatched.completedPetID == nil)
+    }
+
+    @Test func onboardingCompletionFallsBackOnlyWhenNoExternalGateExists() throws {
+        let onboardingSource = try source(
+            "Ohana/Features/Onboarding/Views/OnboardingView.swift",
+            rootURL: repositoryRootURL()
+        )
+        let contentSource = try source(
+            "Ohana/App/ContentView.swift",
+            rootURL: repositoryRootURL()
+        )
+        let feedbackSource = try source(
+            "Ohana/Features/GrowthUnlock/Views/GrowthUnlockFeedbackViews.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(onboardingSource.contains("var onCompletionRequested: ((UUID) -> Void)?"))
+        #expect(onboardingSource.contains("requestPetOnboardingCompletion()"))
+        #expect(onboardingSource.contains("guard let onCompletionRequested else"))
+        #expect(onboardingSource.contains(".accessibilityHidden(externallyRequestedCompletionPetID != nil)"))
+        #expect(contentSource.contains("onRequiredPetHomeSnapshotReady?(requiredReadyEntityID)"))
+        #expect(contentSource.contains("prepareRequiredHomeSnapshot(for: id)"))
+        #expect(contentSource.contains("requestStarterGiftHomeProjectionRefresh()"))
+        #expect(contentSource.contains("if case .starterGiftReady = evaluation.phase"))
+        #expect(contentSource.contains("scheduleStarterGiftHomePreparationRecoveryIfNeeded"))
+        #expect(feedbackSource.contains("starter-gift-home-preparation-retry"))
+        #expect(onboardingSource.contains("onboarding-home-preparation-retry"))
     }
 
     @Test func onboardingHomeWorkloadHasPostJoinBreathingRoom() throws {

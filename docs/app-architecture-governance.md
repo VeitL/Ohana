@@ -121,7 +121,7 @@ Never protect prefetch, decoration, or dashboard freshness at the cost of curren
 ## 数据与任务一致性
 
 - 用户动作只写一次业务事实，再由服务同步相关状态。例：快捷打卡写照护记录后，由 `FamilyTaskService` 同步协作任务/reminder 状态。
-- 家庭任务、悬赏、Today Focus 和提醒都要围绕统一 task/reminder 状态，不允许同一事项在不同入口显示不同状态。
+- 家庭任务、悬赏、Task Center 清单 / 日历和提醒都要围绕统一 task/reminder 状态，不允许同一事项在不同入口显示不同状态。
 - SwiftData schema 增长必须追加版本，迁移保持 lightweight；新增模型同步考虑备份/恢复。
 - 删除/离世/隐私这类边界状态必须从服务层过滤，不能只在 UI 隐藏。
 
@@ -132,7 +132,7 @@ Never protect prefetch, decoration, or dashboard freshness at the cost of curren
 高频用户流至少包括：
 
 - 快捷照护记录。
-- 今日重点查看与完成。
+- Task Center 清单 / 日历查看、完成与系统旅程领取。
 - 喂食与库存变化。
 - 遛狗开始、暂停、恢复、结束。
 - 家庭任务创建、接受、完成、确认、奖励。
@@ -158,7 +158,7 @@ Never protect prefetch, decoration, or dashboard freshness at the cost of curren
 
 ## 隐私与账户
 
-- 人类隐私统一走 `PrivacyService`；非本人不能通过快捷操作、全部功能、统计页、协作页或 Today Focus 绕过。
+- 人类隐私统一走 `PrivacyService`；非本人不能通过快捷操作、全部功能、统计页、协作页或 Task Center 绕过。
 - PIN 是本地家庭成员软隐私，不能作为强安全保险箱宣传。
 - 备份不得包含 PIN hash/salt 或可用于恢复 PIN 的字段。
 - 人类/宠物离世后进入只读纪念模式；未来提醒和日常任务不应继续出现。

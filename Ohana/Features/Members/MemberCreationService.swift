@@ -43,7 +43,7 @@ enum MemberCreationError: LocalizedError {
         case .duplicateName:
             "Name already exists."
         case .incompletePetProfile:
-            "Species, breed, sex, and coat are required."
+            "Species and breed are required."
         case .avatarPassRequired:
             "A 2.5D avatar pass is required."
         case let .insufficientCoconuts(missing):
@@ -150,10 +150,8 @@ final class MemberCreationService: MemberCreating {
 
         switch draft.kind {
         case .pet:
-            guard !draft.species.isEmpty,
-                  !draft.resolvedBreed.isEmpty,
-                  ["boy", "girl"].contains(draft.petGender),
-                  !draft.coatColor.isEmpty else {
+            guard !draft.resolvedSpecies.isEmpty,
+                  !draft.resolvedBreed.isEmpty else {
                 throw ServiceError.incompletePetProfile
             }
             return try savePet(
@@ -222,13 +220,14 @@ final class MemberCreationService: MemberCreating {
         if shouldUse2D, !Avatar2DAccess.hasAccess(kind: .pet, existingCount: existingCount) {
             throw ServiceError.avatarPassRequired
         }
-        let speciesKey = Pet.canonicalSpeciesKey(draft.species)
+        let speciesValue = Pet.normalizedSpeciesStorageValue(draft.resolvedSpecies)
+        let speciesKey = Pet.canonicalSpeciesKey(speciesValue)
         let pet = Pet(
             name: draft.trimmedName,
-            species: speciesKey,
+            species: speciesValue,
             breed: draft.resolvedBreed,
             birthday: draft.hasBirthday ? draft.birthday : nil,
-            gender: draft.petGender,
+            gender: ["boy", "girl"].contains(draft.petGender) ? draft.petGender : "unknown",
             isNeutered: draft.isNeutered,
             avatarEmoji: speciesEmoji(speciesKey),
             themeColorHex: draft.normalizedThemeHex,
@@ -536,7 +535,8 @@ final class MemberCreationService: MemberCreating {
         actorName: String?,
         context: ModelContext
     ) {
-        guard draft.normalizedThemeHex != draft.kind.fallbackThemeHex else { return }
+        guard draft.hasExplicitThemeColor,
+              draft.normalizedThemeHex != draft.kind.fallbackThemeHex else { return }
         questManager.recordThemeColorSet(actorId: actorId, actorName: actorName, context: context)
     }
 

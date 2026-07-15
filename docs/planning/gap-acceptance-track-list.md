@@ -1,6 +1,6 @@
 # 人工验收总 Track List
 
-更新日期：2026-06-30
+更新日期：2026-07-15
 
 本文件是 GAP 建设阶段与模块门禁阶段唯一的人工验收 track list。后续不再新增 `gap-*-acceptance-track-list.md` 或模块单独 track list；需要人工目检、真机、真实 iCloud、真实通知或真实数据确认的项目，都追加到本文对应小节。
 
@@ -21,16 +21,16 @@
 | GAP-5 触顶感知 | 🟢 | `1a775bc7c` | `recordOnly` 九语言文案、反馈中心、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 长语言抽查 |
 | GAP-6 通知分级 | 🟢 | `6bb766cc3` | 通知预算、夜间免打扰、合并、关键提醒豁免、周报语义、`scripts/module-exit-gate.sh` 均通过 | 待真机通知抽查 |
 | GAP-7 补记结算 | 🟢 | `528cf2cdd` | 补记历史日期与操作日奖励结算测试、changed gate、`scripts/module-exit-gate.sh` 均通过；2026-06-30 补上手动喂食补记 UI 日期入口、执行器 backdate 传参测试、以及模拟器 UI 自动化两条历史日期保存/回读预检 | 待真实 UI 手选历史日期补记路径抽查 |
-| GAP-8 单成员形态 | 🟢 | `6c4a98db2` | 单成员展示红绿测试、负面文案扫描、route 首帧硬门、changed gate、`scripts/module-exit-gate.sh` 均通过 | 首建人类、首宠、Home Oasis 五次注入 Lv0 -> Lv1、Settings 真机自动 smoke 已过；剩余为普通人工文案/菜单抽查 |
+| GAP-8 单成员形态 | 🟡 | `6c4a98db2` + 2026-07-15 D17/D28 worktree | 旧单成员展示与菜单证据仍有效；当前 Human-first、可延后首宠、Task Center 显式领取和新手成长计划已有源码/测试定义，但尚未完成 TFU-20260715-002 的当前运行证据 | 旧 Pet-first smoke 仅作历史；新流程本地前置关闭后再做签名真机抽查 |
 | GAP-9 离世退场 | 🟢 | `e6a45e72c` | 纪念模式规则书、未来计划可逆退场、离世成员活跃入口过滤、奖励冻结定向测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 真机通知抽查 |
-| GAP-12 植物功能门 | 🟢 | `a1e0e0376` / `8f6c792dc` recheck | `PlantFeatureGate` 不变量、添加/路由/FunctionMenu、quest 引擎、心情信号、Oasis 植物历史隔离、`scripts/module-exit-gate.sh --full` 与 CI 均通过 | 待真实 UI 抽查 |
+| GAP-12 植物功能门 | 🟢 | `a1e0e0376` + D19 current policy | 当前 build 支持本地基础植物；Lv.1–3 由 `PlantUnlockPolicy` 隐藏并把入口导向 Growth Roadmap，Lv.4 解锁，已有植物数据 grandfather；植物行动事项进入统一待办 | 待 Lv.1–3、Lv.4 与 grandfather 三态真实 UI 抽查 |
 | Phase 6 Members | 🟢 | `ead1e5fe4` / `8f6c792dc` recheck | 创建派生日历事实 sync metadata；成员删除进入不可恢复物理删除 + sync tombstone；RequiredHumanProfileView a11y；全仓 gate / CI 复验通过 | 待真实 UI 抽查 |
-| Phase 6 Oasis | 🟢 | `87423afd8` + 2026-07-11 repair | 生命树使用正式岛屿总额且支持无 Human；其他成员型 Oasis 消费保留当前主人钱包门；预算 / 冷却、休眠态救援、UI/a11y/smoothness/runtime 审计与窄测试通过 | 新签名 Release 覆盖安装后的旧 59🥥 样本注入待真机确认 |
+| Phase 6 Oasis | 🟡 | `87423afd8` + 2026-07-11 repair + 2026-07-15 D17 worktree | 生命树使用正式岛屿总额并兼容 legacy 无 Human 数据；旧 59🥥 样本注入已由用户真机确认。当前新装在明确领取 50 椰子前隐藏 Oasis | 待 TFU-20260715-002 关闭后，用新签名包复测领取门与首次注入 |
 | Phase 6 Settings + Health | 🟢 | `5d4e71928` / `8f6c792dc` recheck | Debug-only 设置开发工具、真实通知开关策略、Health 物理删除 + tombstone/read-only 不变量、目标测试与全仓 gate / CI 复验通过 | 待 Release 真机 / 真实 UI 抽查 |
 | Phase 6 Economy | 🏁 | `92133da2a` / `8f6c792dc` recheck | 兑换入口首发门禁、冻结钱包写入拒绝、特殊奖励 active human 归属、隐私 / 冻结财富口径；最终纯复审 P0/P1/P2=0；全仓 gate / CI 复验通过 | 待真实 UI 抽查 |
 | Phase 7 Walks | 🟢* | `e0c1d69d3` / `8f6c792dc` recheck | `WalkFeaturePolicy` active dog 硬门、删除/离世过滤、遛狗中便便事实+ledger、共享遛狗服务适配器、全仓 gate / CI 复验通过 | 待真机定位 / 真实 UI 抽查 |
 | Phase 7 Gacha + Shop | 🟢* | `92763c164` / `8f6c792dc` recheck | 扭蛋概率/区间、合资抽取、冻结钱包、Shop 定价/汇率、购买合资、SwiftData 所有权迁移、备份恢复、Gacha/Shop CloudSync serializer/applier 与 schema 迁移目标测试均通过 | 待真机 App Icon / 真实 UI 抽查 |
-| Phase 7 其余中小模块 smoke | 🟢* | `8f6c792dc` | Medication、FamilyTasks、Expenses、Calendar、CrewRoster、Documents、Insurance、Privacy、Security、CareLedger 等模块已过全仓 gate / CI；人工债集中到本文合并 smoke 小节 | Onboarding 首发核心链路真机自动 smoke 已过；CrewRoster / FunctionMenu / 其余真实 UI 抽查继续推进 |
+| Phase 7 其余中小模块 smoke | 🟡* | `8f6c792dc` + current worktree | Medication、FamilyTasks、Expenses、Calendar、CrewRoster、Documents、Insurance、Privacy、Security、CareLedger 的旧边界证据保留；当前 Onboarding/Task Center/D28 变更尚待 TFU-20260715-002 | 新 Human-first 核心链路未签收；CrewRoster / FunctionMenu / 其余真实 UI 抽查继续推进 |
 
 ## GAP-1 联机功能门
 
@@ -244,6 +244,19 @@ Xcode preflight 停在 `Unlock Guanchen's iPhone to Continue`，等待后取消�
 
 人工验收目标：一人一宠就是完整 Ohana；周报、财富页、成员胶囊没有“多人类才完整”的暗示。
 
+- [ ] 从全新安装或 App reset 完成 Human-first 首启的两条分支。
+  - 预期：只要求 Human 名字；可立即建立名字/物种/品种完整的首宠，也可选择稍后。
+    首启不请求位置、通知、相机或相册权限。立即建宠保存后进入待办领取项；稍后建宠
+    直接进入有 Human 卡片的首页，并在待办保留“建立第一只宠物”。
+  - 记录：当前由 TFU-20260715-002 等待本地编译、定向测试与 disposable-Simulator
+    前置；旧 Pet-first/no-Human smoke 不计为当前通过。
+
+- [ ] 完成首宠建立、显式领取启动赠礼，并抽查 D28 新手成长计划。
+  - 预期：Pet 保存或首次照护不自动发 50 椰子；领取成功前 Oasis 隐藏，失败可重试，
+    重复点击不重复入账。领取后待办最多显示三个未领取的新手事项；六项总额 400，
+    分别进入有效 Human 钱包，明确“不适用 / 不清楚 / 不愿透露”等选择与填写等价。
+  - 记录：待 TFU-20260715-002 本地证据完成后进入新签名真机验收。
+
 - [ ] 准备一人一宠本地数据，进入首页和全功能菜单。
   - 预期：没有“添加更多人类成员才完整 / 解锁家庭感 / 一个人不够”等暗示。
   - 记录：2026-06-16 真机首测新增 P1：覆盖安装后不卸载、只重新 build 时，App 可能停在白屏或 icon + Ohana 启动画面；卸载后重装才正常。当前判断这不是 GAP-8 文案问题，而是首发一人一宠 smoke 的启动 / 保留数据恢复阻塞：旧本地 SwiftData / UserDefaults / onboarding handoff 状态在覆盖安装后仍存在，启动路径不能依赖干净安装。处理：启动前确保 Application Support 目录存在、保存首个人类后持久化 active human、恢复中断 onboarding 状态、首页 created-entity signal 改为一次性消费、避免 onboarding 完成时重复触发 navigation update；本轮进一步把 SwiftData `ModelContainer` 和 `AppServices` 从 `OhanaApp.init` 的同步启动路径移到 `OhanaBootstrapShell` 首帧之后创建，旧数据 / migration 打开慢时不再让用户停在系统启动图，并新增 `OnboardingHandoffResponsivenessTests.appBootstrapDefersSwiftDataContainerUntilAfterFirstShell` 防止回退。关闭条件：真机覆盖安装不卸载后可稳定启动；若仍停在 bootstrap shell，则继续查 SwiftData migration / store 恢复。
@@ -325,8 +338,8 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
   - 预期：确认文案表达“未来照护安排退出活跃提醒、数据保留、可撤销”，不出现“删除未来提醒 / 事件”。
   - 记录：2026-06-30 simulator/source preflight 已通过 `OhanaUITests.testPetMemorialMarkCancelConfirmAndUndoFlow()` 覆盖取消/确认标记与结果读回，并通过 `MemberLifecycleGateTests.petMemorialConfirmationExplainsActiveReminderExitWithoutDeletionCopy()` 锁定确认文案为“未来照护安排退出活跃提醒、原有数据保留、可撤销”，且不出现“删除未来提醒 / 事件”语义；真机仍需确认物理设备上的 alert 展示与触控表现。
 
-- [ ] 标记宠物离世后遍历首页、FAB、全功能菜单、QuickCare、Feeding、Today Focus。
-  - 预期：离世宠物不再作为活跃照护目标、任务目标、Today Focus 委托目标或快捷打卡目标出现。
+- [ ] 标记宠物离世后遍历首页、FAB、全功能菜单、QuickCare、Feeding、Task Center。
+  - 预期：离世宠物不再作为活跃照护目标、Task Center 目标或快捷打卡目标出现。
   - 记录：2026-06-30 simulator/source preflight 已通过 `OhanaUITests.testPetMemorialHidesHomeLiveCareEntrypoints()` 证明离世宠物重启后不再显示 Home 主卡和 Home quick actions，并在 Oasis Lv1 解锁后走 Home FAB -> More -> Function Menu -> daily care，证明 food aggregate 不再把该宠物作为活跃目标且不会打开 live pet route；同时通过 `MemberLifecycleGateTests.functionMenuSurfacesDoNotExposeDeceasedMembersAsActiveTargets()` 锁定全功能菜单聚合/分组/根视图只使用 active pets 与 visible active humans。真机仍需做一轮完整视觉遍历确认 FAB、QuickCare、Feeding、Today Focus 无设备展示遗漏。
 
 - [ ] 标记宠物离世后打开日历 / 提醒相关页面。
@@ -342,7 +355,7 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
   - 记录：2026-06-30 simulator preflight 已证明宠物 / 人类进入纪念模式时，未来 active schedule 删除会把对应 notification id 分发到 app 的通知取消边界；真机仍需证明 iOS 实际取消已注册通知，以及撤销后真实 pending 通知能恢复或由维护任务重排。
 
 - [ ] 标记一位人类成员进入纪念模式。
-  - 预期：该成员不再出现在首页主卡、功能菜单人类目标、Today Focus 体重委托、周报活跃贡献统计或奖励账户写入路径。
+  - 预期：该成员不再出现在首页主卡、功能菜单人类目标、Task Center 活跃目标、周报活跃贡献统计或奖励账户写入路径。
   - 记录：2026-06-30 simulator/source preflight 已通过 `OhanaUITests.testHumanMemorialMarkCancelConfirmAndUndoFlow()` 覆盖人类纪念标记/撤销 UI，并通过 `MemberLifecycleGateTests.functionMenuSurfacesDoNotExposeDeceasedMembersAsActiveTargets()`、`MemberLifecycleGateTests.familyWeeklyReportActiveContributionExcludesDeceasedMembers()` 与 `MemberLifecycleGateTests.deceasedMembersRejectPresentationSecurityEconomyAndSettingsWrites()` 证明功能菜单目标、周报活跃贡献和奖励账户写入会排除离世人类；真机仍需确认首页/Today Focus 等物理设备展示。
 
 - [ ] 打开离世宠物 / 人类的资料、档案、历史记录和钱包历史。
@@ -355,28 +368,28 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
 
 ## GAP-12 植物功能门
 
-人工验收目标：首发版本无任何可达植物功能面；历史植物数据不影响今日焦点、心情、Oasis；植物代码与数据仍保留给未来解锁。
+人工验收目标：首发支持本地免费基础植物，但只在 Lv.4「家庭树冠」解锁；已有植物数据在低等级 grandfather。Lv.1–3 不抢占宠物核心习惯，联机、订阅、CloudKit、AI 或天气能力都不是基础植物前置。
 
-自动验收已完成并在 2026-06-16 全仓复验（门禁 commit `a1e0e0376`，recheck `8f6c792dc`）：`PlantFeatureGate` 首发恒关；添加植物、植物路由、首页植物 tab、FunctionMenu 植物集合全部不可达；quest 引擎不产植物任务；心情信号不读取植物状态；历史植物照护不喂给 Oasis 当前成长；`scripts/module-exit-gate.sh --full` 与 CI run `27607807044` 均通过。
+当前自动边界见 `docs/specs/PlantFeatureGate-logic.md`：`PlantFeatureGate` 表示 build 支持，`PlantUnlockPolicy` 独占可见性；Lv.1–3 隐藏入口并 redirect Growth Roadmap，Lv.4 开放基础植物，已有数据 grandfather。旧 2026-06-16 “首发恒关”证据已被 D19 后续产品决定取代，不再作为当前验收标准。
 
-- [ ] 真实 UI 遍历首页底部 tab、首页卡片、Today Focus 与心情提示。
-  - 预期：不出现植物 tab、植物卡、浇水 / 施肥 quest、植物缺水或植物心情信号；有历史植物数据时也不出现。
+- [ ] 使用无植物数据的 Lv.1–3 样本遍历底部 tab、首页、待办、添加入口和全功能菜单。
+  - 预期：不显示植物 tab、添加植物或植物行动事项；任何深层植物入口都导向 Growth Roadmap，而不是空白、越权进入或声称需要账号/付费。
   - 记录：
 
-- [ ] 真实 UI 遍历添加入口、首页 FAB / 中央添加、全功能菜单与功能分组页。
-  - 预期：不出现“添加植物”、植物集合、植物看板、植物详情、植物护理等入口。
+- [ ] 将同一家庭推进到 Lv.4 后遍历 Plants、添加、详情、照护计划、本地提醒、资料库和待办。
+  - 预期：基础植物入口出现且本地免费可用；植物 Event / Reminder / FamilyTask 进入统一待办清单 / 日历，不复制首页 Today Focus；不要求登录、CloudKit、订阅或外部 AI。
   - 记录：
 
-- [ ] 真实 UI 打开 Onboarding 与必填主人资料页。
-  - 预期：首发引导文案只表达主人、宠物、提醒 / 本地照护，不出现植物 badge、植物承诺或植物作为首发能力的暗示。
+- [ ] 使用低于 Lv.4、但已有植物数据的本地/恢复样本重新启动。
+  - 预期：Plants 列表和既有详情继续可达，不隐藏或丢失用户数据；grandfather 不依赖联机状态，也不为没有植物数据的新用户提前解锁。
   - 记录：
 
-- [ ] 真实 UI 打开成长解锁 / 等级提示相关页面。
-  - 预期：不出现“植物暂不开放 / Plants hidden”之类负面隐藏文案；若有成长提示，应保持中性未来节奏表达。
+- [ ] 真实 UI 打开 Onboarding、成长路线和 Lv.4 解锁反馈。
+  - 预期：Onboarding 不采集城市、通知意向、植物经验或家庭偏好，也不预先请求权限；成长路线明确 Lv.4 节奏，不把基础植物描述为付费或联网能力。
   - 记录：
 
-- [ ] 使用带历史植物数据的本地样本打开 Oasis。
-  - 预期：Oasis 当前生命树 / 情绪 / 奖励不因历史植物照护记录改变；植物历史不会作为当前首发成长信号露出。
+- [ ] 在无供应商/天气配置下遍历植物识别、诊断和高级建议相关入口。
+  - 预期：基础手动搜索和本地资料可用；未来 AI/天气能力诚实隐藏或降级，不伪造识别结果、置信度、诊断或天气数据。
   - 记录：
 
 ## Phase 6 Members
@@ -408,9 +421,15 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
 
 人工验收目标：Oasis 生命树是全岛共同消费出口，可使用 `system:island` 与所有活跃正式成员钱包；成员型互动仍由当前主人钱包承担。重复产出受预算 / 冷却约束，电子宠物休眠可唤回，`system:legacy` 永远不可用。
 
+- [ ] 在当前 Human-first 新装流程中检查 Oasis 领取门。
+  - 预期：没有首宠或 50 椰子尚未明确领取时不显示 Oasis；Pet 保存和首次照护都不
+    自动解锁。领取成功后 Oasis 出现并显示岛屿储备，失败/重启/重复点击不会提前解锁
+    或重复发放。
+  - 记录：待 TFU-20260715-002 本地前置和新签名 build。
+
 - [ ] 无当前主人或当前主人已进入纪念模式时打开 Oasis。
   - 预期：生命树显示正式岛屿总额并可使用岛屿储备与活跃 Pet 钱包注入；需要当前主人的电子宠物消费 / 奖励保持禁用或提示选择主人；任何路径不读写 `system:legacy`，页面不崩溃。
-  - 记录：2026-07-11 iPhone 17 Pro Max 的 clean-run 样本只有 Pet、没有 Human，总额显示 59🥥，点击生命树注入只震动不写能量。根因是 D17 的旧 50🥥 赠礼被写入 Pet，而 Oasis 注入及 action snapshot 硬依赖 current Human。当前工作区已把新赠礼改写入 `system:island`，旧 v2 成员赠礼以幂等成对转账重分类；生命树按岛屿储备、current Human、其余活跃成员的稳定顺序聚合扣款。无 Human 的 Unit/Integration 路径与 Pet-first 五次注入 Lv0 -> Lv1 UI 路径已通过。新签名 Release 已在不卸载的前提下覆盖安装；只读设备 store 证明旧样本已迁移为岛屿储备 50 + Pet 奖励 9、legacy 0 且总额仍为 59。最终点击后的 59→49 与能量 +10 仍待用户真机确认。
+  - 记录：2026-07-11 iPhone 17 Pro Max 的 legacy 样本只有 Pet、没有 Human，总额显示 59🥥，最初点击生命树只震动不写能量。修复把旧赠礼幂等重分类到 `system:island`，生命树按岛屿储备、current Human、其余活跃成员稳定聚合扣款；32 条定向测试和 Pet-first 五次注入 UI 路径通过。新签名 Release 覆盖安装后，只读 store 证明 island 50 + Pet 9、legacy 0、总额仍为 59；用户随后真机确认一次注入使总额 59→49、树能量 +10。该 legacy 资金/注入回归已关闭，但不证明 2026-07-15 新装显式领取门。
 
 - [ ] 正式岛屿总额足够时连续注入生命树能量。
   - 预期：注入可重复执行，只受正式岛屿总额限制；生命树 XP 增加；每个实际出资账户各有可重放流水，岛屿储备流水不得伪装成成员贡献。
@@ -449,7 +468,7 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
   - 预期：不出现“货币兑换 / 家庭线下兑现 / Cash Exchange”分类、卡片、表单或待处理兑换区块；普通外观 / 头像 / 特效 / 称号 / 加成道具仍可浏览。
   - 记录：
 
-- [ ] 在首页 Today Focus、首页 FAB、全功能菜单中遍历 Economy / Shop 相关入口。
+- [ ] 在 Task Center、首页 FAB、全功能菜单中遍历 Economy / Shop 相关入口。
   - 预期：不出现“确认线下收款”“待确认兑换”“已收到”等兑换卡片或动作；普通椰子历史、财富页、商店入口仍可打开。
   - 记录：
 
@@ -560,8 +579,8 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
   - 预期：同一设备内切换成员只改变后续记录归属，不遮挡本地成员资料；Settings 不暴露成员隐私 / PIN 设置入口；已存 privateFields 与 passcode 命令边界保留但不作为首发 UI / 遮挡策略；多设备 / 多真人账户下的跨查看者隐藏验收延后到对应同步身份阶段。
   - 记录：2026-06-30 旧模拟器预检曾证明成员级 PIN / privateFields 命令边界、backup passcode 排除、inactive/deceased 写入拒绝，以及 Settings all-private/all-open UI 回读；该 UI 证据已被首发本地产品策略取代，不再作为 launch acceptance。保留有效部分：`HomeCommandExecutorTests`、`OhanaTests.humanPasscodeValidatesHashesAndLocksAfterFailures`、`OhanaTests.humanPasscodeIsNotIncludedInBackupAndRestore`、`MemberLifecycleGateTests.deceasedMembersRejectPresentationSecurityEconomyAndSettingsWrites` 仍覆盖未来命令边界与备份安全。当前首发验收改为：Settings check-in identity 可切换，成员隐私 / PIN 控件不可达，同设备 viewer 切换后成员资料仍可见。最新验证：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-human-local-privacy-1782913600 scripts/test-simulator.sh '-only-testing:OhanaTests/OhanaTests/privacyServiceMapsHumanQuickActions()' '-only-testing:OhanaTests/OhanaTests/backupRestoresHumanFieldsAndLogRelationships()' '-only-testing:OhanaTests/OhanaTests/privacyServiceCoversHumanSensitiveActions()' '-only-testing:OhanaTests/DenseDataSnapshotPerformanceTests'` PASS（4 Swift Testing tests，xcresult `/tmp/OhanaDerivedData-human-local-privacy-1782913600/Logs/Test/Test-Ohana-2026.06.30_22-11-35-+0200.xcresult`）；`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-human-local-privacy-1782913600 scripts/test-simulator.sh '-only-testing:OhanaUITests/OhanaUITests/testHumanSettingsAccountSwitcherHidesLocalPrivacyControls' '-only-testing:OhanaUITests/OhanaUITests/testHumanProfileStaysVisibleWhenViewedByOtherLocalMember'` PASS（2 UI tests，xcresult `/tmp/OhanaDerivedData-human-local-privacy-1782913600/Logs/Test/Test-Ohana-2026.06.30_22-17-19-+0200.xcresult`）。
 
-- [ ] Onboarding / CrewRoster / FunctionMenu：从全新安装或 App reset 后走首启、建主人、建宠物、切换成员并遍历全功能菜单。
-  - 预期：首启没有空白或死路；单人单宠可完成核心路径；功能菜单只显示首发可达功能；联机和植物入口仍被门禁收起。
+- [ ] Onboarding / CrewRoster / FunctionMenu：从全新安装或 App reset 后分别走 Human -> 立即建宠与 Human -> 稍后建宠，再切换成员并遍历全功能菜单。
+  - 预期：首启没有空白或死路；Human 名字必填，Pet 可延后；建宠后从 Task Center 明确领取 50 椰子才解锁 Oasis，D28 事项随后出现。功能菜单只显示当前等级首发可达功能；联机入口保持关闭，植物入口按 Lv.4 / grandfather 门控制。
   - 记录：2026-06-16 真机首测发现首次安装后添加人类，Home 先停在“Add your first pet / 0/1 setup”和 0 椰子一段时间，稍后才出现 starter coconut gift 弹层。根因：人类保存后 Home 预挂载成功，但 starter gift 的 onboarding 评估仍可能被普通 active-human 变化的 480ms 延迟、以及 root handoff 维护延迟遮住，导致用户看到半完成首页等待。处理：`ContentView` 对 fresh onboarding primary human 改为 hasOnboarded 后下一帧 immediate evaluation；普通 active-human 变化仍走原延迟，避免影响常规切换。新增 `OnboardingHandoffResponsivenessTests` 防止回退。验证：`scripts/test-simulator.sh -only-testing:OhanaTests/OnboardingHandoffResponsivenessTests` 在 iPhone 17 simulator 通过；过程中有连接实体机锁屏 warning，但测试目标仍为 simulator。注意：下一轮真机需复测“添加人类后 starter gift 弹层应几乎紧接出现，不再长时间停在 0/1 setup”。
   - 记录：2026-06-16 真机继续测试发现两个 P1 阻塞：第一，覆盖安装 / 重新 build 且不卸载旧 App 时，App 可停在白屏或 icon + Ohana 启动画面；只有卸载重装才恢复。解决方案逻辑：启动恢复不能依赖“干净安装”，必须把保留数据、旧 onboarding 标记、旧 active human、旧 SwiftData store 目录和中断 handoff 当成首发支持路径；本轮已把 SwiftData `ModelContainer` 和 `AppServices` 从 `OhanaApp.init` 同步启动路径移到首帧 `OhanaBootstrapShell` 之后创建，使旧数据 / migration 慢开不再卡在系统启动图，并保留启动耗时指标。第二，添加首个人类和首个宠物后都会长时间卡住。解决方案逻辑：首建保存的手指帧只应做最小 route / snapshot handoff，starter gift、钱包初始化、首页 read model、卡片堆刷新、提醒 / 账本 / 派生效果要延后、可取消、分帧；本轮已将首个人类 ID 直接 handoff 到 `ContentView` 并提前触发 starter gift，同时把 Home join 保存等待从 820ms 前移到 140ms，把标准保存成功关闭等待从 780ms 缩短到 280ms，并把 active-human route/reconcile/evaluation 与 Home refresh 状态写入分帧 / 去重。新增 `OnboardingHandoffResponsivenessTests` 覆盖 bootstrap 延迟创建容器、成员保存等待不回退、Home refresh state 去重。关闭条件：真机覆盖安装不卸载后可稳定启动；首建人/宠保存后首页不长卡，礼包和卡片在可接受时间内出现；再继续 FunctionMenu 首发入口扫描。
   - 记录：2026-06-16 真机复测追加日志：首建 / 首页停顿期间出现 SwiftUI Invalid Configuration：`HomeReadModelRefreshKey` 与 `NavigationRequestObserver` 同帧多次更新。方案补强：把“分帧”从调用约定下沉到 `OhanaFrameScheduler`，确保延迟任务离开当前 main-queue turn；Home read model 从多 `@Published` 改为 `payload` 单发布；Home revision/day token watcher 用 pending 合并；AppRouteCoordinator 对重复 sheet/fullScreen/path 更新做 no-op guard。关闭条件同步升级为：除不白屏 / 不长卡外，真机 console 不再出现这两条 SwiftUI same-frame fault。
@@ -582,7 +601,7 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
   - 记录：2026-06-19 真机继续复测：删除人类后 App 会停在首个人类的放大卡片页面，关闭并重开 App 后恢复正常。根因补充：破坏性删除虽然会发 `humanDeleted` route event 并 reset navigation root，但 Home 卡片栈缺少“外部删除事件强制归零 expanded/hero/header 状态”的显式输入；之前只靠 `onDisappear` 或卡片集合变化间接 reconciliation，真机时序下仍可能把旧 expanded 状态留在 Home。处理：`ContentView` 收到 `humanDeleted` 时刷新 `homeCardStateResetToken`，一路传入 `VerticalSolidHomeDashboardPage`，卡片栈收到 token 后无动画清理 `selectedCardId`、`activeHeroSnapshot`、hero progress、header context、expanded/animating flags；同时补 `cardIdentityKey` 变化时触发 selection reconciliation。关闭条件：真机删除任意人类后不能停在任何放大卡片页；返回 Home 时卡片栈应处于普通折叠态，剩余人类 / 宠物卡即时可见且可点击。
 
 - [ ] PetCare / CatCare / Hygiene / Moments：执行快捷照护、猫砂、护理和 quick moment。
-  - 预期：事实保存、奖励反馈、账本、Today Focus 状态和历史记录一致；重复点击不会重复奖励；已故对象只读或 no-op。
+  - 预期：事实保存、奖励反馈、账本、Task Center 状态和历史记录一致；重复点击不会重复奖励；已故对象只读或 no-op。
   - 记录：2026-06-30 已补一轮模拟器 / 业务层预检：`HomeCommandExecutorTests` 在 pinned `iPhone 17` simulator 上整套通过（191 tests），覆盖 Home 快捷照护、喂食计划 / 手动喂食、Water、Potty / litter、Hygiene、Health、Play、quick moment、Pet Photo Album、CareLedger / reward / cooldown / duplicate guard、已故 / 冻结钱包 fallback，以及 CatCare litter record / undo / revision 等命令边界；其中 `quickMomentServiceWritesPhotoFactAndLedger()`、`momentCommandExecutorPublishesQuickMomentRevision()`、`repeatableMomentRewardUsesBudgetAndCooldownPipeline()` 证明 quick moment 会写入照片事实 / ledger、发布 revision，并走预算与冷却奖励管线。验证：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-moments-petcare-preflight-1782829200 scripts/test-simulator.sh '-only-testing:OhanaTests/HomeCommandExecutorTests'` PASS（191 tests，xcresult `/tmp/OhanaDerivedData-moments-petcare-preflight-1782829200/Logs/Test/Test-Ohana-2026.06.30_14-04-57-+0200.xcresult`）。更早一次只筛 3 个 Swift Testing 方法的命令实际执行 0 tests，已丢弃不计证据。本项仍不勾选：现有 Pet GUI 长会话和本轮业务层已覆盖大部分模拟器可验证内容，但最终真机视觉手感、长时间连续点击、历史记录跨页读回和低性能设备手感仍需人工签收。
 
 - [ ] Achievements / Milestones / GrowthUnlock / Wishlist：完成一次成就领取、里程碑创建、成长解锁查看和心愿单兑换。
@@ -600,8 +619,8 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
   - 记录：2026-06-30 已完成家庭周报中可由模拟器覆盖的语义预检：周报贡献文案改为照护摘要 / 照护者语义并用 `SingleMemberFamilyShapePresentationTests` 阻止“排行 / 最多 / 本周之星 / ranking / Most care / Star of the week”等竞赛文案回流；`FamilyWeeklyReportDashboardView` 补稳定 UI 标识；`ManualFeedCommandTests.quickFeedManualRecordAppearsInWeeklyReportEntries()` 证明 QuickFeed 手动喂食写出的 `CareLedgerEvent` 会进入周报统计条目；`OhanaUITests.testFamilyWeeklyReportOpensFromDebugSettingsWithoutCompetitionCopy` 通过 Settings UI-test shortcut 在 iPhone 17 simulator 打开家庭周报并验证 screen、成员贡献卡、最近活动卡和无竞赛文案。验证：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-family-weekly-report-semantics-1782824400 scripts/test-simulator.sh '-only-testing:OhanaTests/ManualFeedCommandTests'` PASS（23 tests，xcresult `/tmp/OhanaDerivedData-family-weekly-report-semantics-1782824400/Logs/Test/Test-Ohana-2026.06.30_13-57-54-+0200.xcresult`）；`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-family-weekly-report-semantics-1782824400 scripts/test-simulator.sh '-only-testing:OhanaUITests/OhanaUITests/testFamilyWeeklyReportOpensFromDebugSettingsWithoutCompetitionCopy'` PASS（1 UI test，xcresult `/tmp/OhanaDerivedData-family-weekly-report-semantics-1782824400/Logs/Test/Test-Ohana-2026.06.30_13-58-30-+0200.xcresult`）。本项仍不勾选：相册大图、批量照片样本、隐私附件泄漏检查、以及最终真机视觉 / 性能手感签收还未完成。
   - 记录：2026-06-30 已补相册侧模拟器预检与一个真实隐私缺口修复：`PetPhotoAlbumCommandService.createPhotos` 与 `MomentCommandService.recordMoment` 入库 `PetPhotoLog.imageData` 前复用 `AttachmentPrivacySanitizer` 清洗图片 bytes，防止 EXIF GPS 等源图片元数据进入 SwiftData，同时保留 quick moment 显式位置字段。`PrivacyHardeningTests` 新增 `petPhotoAlbumSanitizesImageBytesBeforeSave()` 与 `quickMomentSanitizesPhotoBytesBeforeSave()`，连同既有附件隐私测试在 pinned `iPhone 17` simulator 通过（8 tests，xcresult `/tmp/OhanaDerivedData-photoalbum-privacy-1782861600/Logs/Test/Test-Ohana-2026.06.30_15-13-42-+0200.xcresult`）。相册业务边界同批预检通过：`HomeCommandExecutorTests` 覆盖相册批量 create / note update / delete、revision 发布和 tombstone；`CareCompletionChokepointCharacterizationTests` 覆盖 quick moment 照片事实不混入 care facts / ledger / reward 以及离世宠物 memorial moment 只写照片；`PhysicalDeletionServiceTests` 覆盖永久删除宠物级联移除 `PetPhotoLog`；`DenseDataSnapshotPerformanceTests` 覆盖 dense fixture 至少 50 条照片样本；`MemberLifecycleGateTests` 覆盖相册 / moments timeline 使用 route-scoped photo rows 而非 `pet.photoLogs` 广读，以及离世宠物 memorial photo 无照护派生。验证命令：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-photoalbum-privacy-1782861600 scripts/test-simulator.sh '-only-testing:OhanaTests/HomeCommandExecutorTests' '-only-testing:OhanaTests/CareCompletionChokepointCharacterizationTests' '-only-testing:OhanaTests/PhysicalDeletionServiceTests' '-only-testing:OhanaTests/DenseDataSnapshotPerformanceTests' '-only-testing:OhanaTests/MemberLifecycleGateTests'` PASS（330 tests，xcresult `/tmp/OhanaDerivedData-photoalbum-privacy-1782861600/Logs/Test/Test-Ohana-2026.06.30_15-16-30-+0200.xcresult`）。本项仍不勾选：真实 PhotosPicker 权限 / picker 行为、相册大图 viewer、真实批量照片样本的视觉与性能、以及最终真机视觉 / 隐私 / 手感签收还未完成。
 
-- [ ] Memorial / Plants：打开纪念对象历史资料，并用带历史植物数据的样本遍历首页、Today Focus、Oasis、FunctionMenu。
-  - 预期：纪念对象历史可读但无活跃写入；首发植物功能不可达，历史植物数据不影响当前可见状态或奖励。
+- [ ] Memorial / Plants：打开纪念对象历史资料，并用 Lv.1–3、Lv.4 和 grandfather 植物样本遍历 Home、Task Center、Oasis、FunctionMenu。
+  - 预期：纪念对象历史可读但无活跃写入；植物入口只按 Lv.4 / grandfather 可见，基础本地照护不依赖账号或联网，植物行动事项只进入统一待办。
   - 记录：2026-06-30 模拟器预检通过：植物 / route 侧 `PlantFeatureGateXCTests`、`PlantLaunchTests`、`HomeRouteCoordinatorTests` 在 pinned `iPhone 17` simulator 通过，覆盖 Plant entry surface 需 Lv4 或 existing plant data grandfather、locked preview / catalog favorite 不解锁入口、植物任务只在 includesPlants 时生成、Plant FunctionMenu / AddEntity 在 Lv4 前导向 growth roadmap、Lv4 后才允许进入、历史植物 care logs / photos / reminder preferences backup round-trip、植物 reminder materialization / mute / defer / deep-link、植物 Calendar completion / reminder completion 写 care log + ledger、聚合植物任务完成条件、植物照护奖励 / 冷却 / member daily budget / Oasis care echo / shop free boundary。纪念生命周期侧完整 `MemberLifecycleGateTests` 通过，覆盖 memorial content 允许历史/档案内容但不允许 care fact / derived effects / economy、离世对象 Feature Hub 只暴露 memorial-safe destinations、纪念文案不使用回收站 / 待删除 / 30-day 语义、冻结钱包历史 ledger 仍可读但 active total 排除、FunctionMenu / 周报活跃贡献排除离世成员、离世对象不能写 walk goal / summary / care facts / family tasks / privacy/security/economy/settings，且 memorial photo 可写但无照护派生。命令：`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-memorial-plants-1782852600 scripts/test-simulator.sh '-only-testing:OhanaTests/PlantFeatureGateXCTests' '-only-testing:OhanaTests/PlantLaunchTests' '-only-testing:OhanaTests/HomeRouteCoordinatorTests'`，结果 84 tests passed，xcresult `/tmp/OhanaDerivedData-memorial-plants-1782852600/Logs/Test/Test-Ohana-2026.06.30_15-08-34-+0200.xcresult`；`DERIVED_DATA_PATH=/tmp/OhanaDerivedData-memorial-plants-1782852600 scripts/test-simulator.sh '-only-testing:OhanaTests/MemberLifecycleGateTests'`，结果 102 tests passed，xcresult `/tmp/OhanaDerivedData-memorial-plants-1782852600/Logs/Test/Test-Ohana-2026.06.30_15-07-40-+0200.xcresult`。本项不关闭：真机仍需用实际纪念对象历史资料和带历史植物数据样本遍历 Home / Today Focus / Oasis / FunctionMenu，确认视觉入口、长列表/长文案、历史资料语气和手感；本轮没有跑植物完整 GUI create/care/delete 长链，也没有替代真实历史样本目检。
 
 ## 验收后记录规则

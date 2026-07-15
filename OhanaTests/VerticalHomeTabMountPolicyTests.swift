@@ -585,8 +585,8 @@ struct VerticalHomeTabMountPolicyTests {
         let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
         let oasisHostSource = try source("Ohana/Features/Oasis/Views/OasisHomeTabHost.swift")
 
-        #expect(routingSource.contains("openFunctionMenu(destination: .featureGroup(.householdHub))"))
-        #expect(routingSource.contains("case .home:\n            \"chart.bar.xaxis\""))
+        #expect(routingSource.contains("openFunctionMenu(destination: HomeToolbarPrimaryActionPolicy.homeDestination("))
+        #expect(routingSource.contains("HomeToolbarPrimaryActionPolicy.homeIcon("))
         #expect(routingSource.contains("case .calendar:\n            \"plus\""))
         #expect(routingSource.contains("case .plants:\n            \"ellipsis.circle\""))
         #expect(toolbarSource.contains("if selectedTab == .home"))
@@ -657,7 +657,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(componentsSource.contains("TabView(selection: selection)"))
         #expect(componentsSource.contains(".tabItem"))
         #expect(componentsSource.contains(".tabBarMinimizeBehavior(.onScrollDown)"))
-        #expect(componentsSource.contains(".badge(tab == .calendar ? taskCenterBadge.overdueCount : 0)"))
+        #expect(componentsSource.contains(".badge(tab == .calendar ? taskCenterBadge.attentionCount : 0)"))
         #expect(componentsSource.contains(".accessibilityIdentifier(\"home-native-tab-view\")"))
         #expect(componentsSource.contains("Label(tab.title(localization), systemImage: tab.icon)"))
         #expect(componentsSource.contains("viewportAlignedPageBackground(for: tab)"))
@@ -1287,7 +1287,7 @@ struct VerticalHomeTabMountPolicyTests {
         let functionRootSource = try source("Ohana/Features/FunctionMenu/Views/FunctionMenuRootView.swift")
         let rosterSource = try source("Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift")
 
-        #expect(routingSource.contains("openFunctionMenu(destination: .featureGroup(.householdHub))"))
+        #expect(routingSource.contains("HomeToolbarPrimaryActionPolicy.homeDestination("))
         #expect(routingSource.contains("l.tr(zh: \"查看家庭洞察\""))
         #expect(!functionRootSource.contains("id: \"insights\""))
         #expect(!functionRootSource.contains("id: \"report\""))
@@ -1420,6 +1420,15 @@ struct VerticalHomeTabMountPolicyTests {
         }
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
+        // Pre-journey users from older builds have no flags and keep the
+        // already-visible Oasis tab.
+        #expect(AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
+
+        defaults.set(true, forKey: StarterGiftStorageKey.pending)
+        #expect(!AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
+        #expect(!AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults).contains(.oasis))
+
+        defaults.set(false, forKey: StarterGiftStorageKey.pending)
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
         defaults.set(false, forKey: StarterGiftStorageKey.ceremonySeen)
         defaults.set(false, forKey: StarterGiftStorageKey.oasisTabPromptPending)

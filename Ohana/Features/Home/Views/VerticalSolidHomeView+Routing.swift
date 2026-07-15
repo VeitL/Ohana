@@ -6,6 +6,27 @@
 import SwiftData
 import SwiftUI
 
+enum HomeToolbarPrimaryActionPolicy {
+    static func homeDestination(currentLevel: Int) -> FMDest {
+        isHouseholdInsightsAvailable(currentLevel: currentLevel)
+            ? .featureGroup(.householdHub)
+            : .growthRoadmap
+    }
+
+    static func homeIcon(currentLevel: Int) -> String {
+        isHouseholdInsightsAvailable(currentLevel: currentLevel)
+            ? "chart.bar.xaxis"
+            : "tree.fill"
+    }
+
+    static func isHouseholdInsightsAvailable(currentLevel: Int) -> Bool {
+        AppFeatureRouteGuard.isVisibleFunctionDestination(
+            .featureGroup(.householdHub),
+            currentLevel: currentLevel
+        )
+    }
+}
+
 extension VerticalSolidHomeView {
     func embeddedTaskCenterPage(lifecycle: VerticalSolidHomePageLifecycle) -> some View {
         TaskCenterRouteContainer(
@@ -28,6 +49,32 @@ extension VerticalSolidHomeView {
                 embeddedCalendarPlants = plants
             },
             onOpenEventDestination: openCalendarEventDestination,
+            onOpenSystemDestination: { item in
+                switch item.systemDestination {
+                case .createFirstPet:
+                    routeCoordinator.openAddEntity(.pet)
+                case .claimStarterGift:
+                    onRequestStarterGiftClaim()
+                case .completeHumanProfile:
+                    if let id = item.subject.id { routeCoordinator.presentSheet(.humanBasicInfo(id)) }
+                case .completeFirstPetProfile:
+                    if let id = item.subject.id { routeCoordinator.presentSheet(.petBasicInfo(id)) }
+                case .confirmPetIdentityProtection:
+                    if let id = item.subject.id { routeCoordinator.presentSheet(.petDocuments(id)) }
+                case .confirmPetPreventiveCare:
+                    if let id = item.subject.id {
+                        routeCoordinator.presentSheet(.petHealth(id, initialSection: .preventive))
+                    }
+                case .configureFirstCarePlan:
+                    if let id = item.subject.id { routeCoordinator.presentSheet(.petFood(id)) }
+                case .recordFirstCare:
+                    if let id = item.subject.id {
+                        routeCoordinator.presentSheet(.petFeed(id, opensManualSheet: true))
+                    }
+                case nil:
+                    break
+                }
+            },
             onPresentCoconutLog: onPresentCoconutLog,
             onBadgeChange: { badge in
                 guard taskCenterBadge != badge else { return }
@@ -181,7 +228,9 @@ extension VerticalSolidHomeView {
     func performHomeToolbarPrimaryAction() {
         switch controller.selectedTab {
         case .home:
-            openFunctionMenu(destination: .featureGroup(.householdHub))
+            openFunctionMenu(destination: HomeToolbarPrimaryActionPolicy.homeDestination(
+                currentLevel: appServices.oasisTree.treeLevel.rawValue
+            ))
         case .calendar:
             calendarAddEventTrigger += 1
         case .oasis:
@@ -194,7 +243,9 @@ extension VerticalSolidHomeView {
     var homeToolbarPrimaryActionIcon: String {
         switch controller.selectedTab {
         case .home:
-            "chart.bar.xaxis"
+            HomeToolbarPrimaryActionPolicy.homeIcon(
+                currentLevel: appServices.oasisTree.treeLevel.rawValue
+            )
         case .calendar:
             "plus"
         case .oasis:
@@ -207,7 +258,13 @@ extension VerticalSolidHomeView {
     var homeToolbarPrimaryActionAccessibilityLabel: String {
         switch controller.selectedTab {
         case .home:
-            l.tr(zh: "查看家庭洞察", en: "View household insights", de: "Haushaltseinblicke anzeigen")
+            if HomeToolbarPrimaryActionPolicy.isHouseholdInsightsAvailable(
+                currentLevel: appServices.oasisTree.treeLevel.rawValue
+            ) {
+                l.tr(zh: "查看家庭洞察", en: "View household insights", de: "Haushaltseinblicke anzeigen")
+            } else {
+                l.tr(zh: "查看成长路线", en: "View growth roadmap", de: "Wachstumsweg anzeigen")
+            }
         case .calendar:
             l.tr(zh: "添加待办", en: "Add task", de: "Aufgabe hinzufügen")
         case .oasis:

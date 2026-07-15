@@ -149,39 +149,6 @@ enum CarePlanCalendarSync {
         }
     }
 
-    /// Calendar display boundary:
-    /// default recommendation events are implementation scaffolding, not user-created calendar items.
-    /// Explicit plans created from feature settings use non-default keys or reminder-backed events and remain visible.
-    nonisolated static func isDefaultGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
-        guard let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return false }
-        let petKey = pet.id.uuidString
-        if knownDefaultPlanKinds.contains(where: { kind in
-            UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey)) == event.id.uuidString
-        }) {
-            return true
-        }
-
-        guard
-            event.recurrenceDays > 0,
-            event.feedRuleKindRaw.isEmpty,
-            event.reminders.isEmpty
-        else {
-            return false
-        }
-
-        let generatedTitles = Set(defaultPlanItems(for: pet).map { eventTitle(pet: pet, title: $0.title) })
-        return generatedTitles.contains(event.title)
-    }
-
-    static func isGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
-        if isDefaultGeneratedCalendarPlan(event, pets: pets) { return true }
-        guard let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return false }
-        let petKey = pet.id.uuidString
-        return storedGeneratedPlanKinds.contains { kind in
-            UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey)) == event.id.uuidString
-        }
-    }
-
     static func shouldShowModeScopedPlanOccurrence(
         _ event: Event,
         occurrenceDate: Date,
@@ -1050,5 +1017,47 @@ enum CarePlanCalendarSync {
             recurrenceDays: intervalDays,
             context: context
         )
+    }
+}
+
+extension CarePlanCalendarSync {
+    /// Calendar display boundary: default recommendation events are implementation
+    /// scaffolding, while explicit feature plans remain user-visible.
+    nonisolated static func isDefaultGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
+        isDefaultGeneratedCalendarPlan(event, pets: pets, hasReminder: !event.reminders.isEmpty)
+    }
+
+    nonisolated static func isDefaultGeneratedCalendarPlan(
+        _ event: Event,
+        pets: [Pet],
+        hasReminder: Bool
+    ) -> Bool {
+        guard let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return false }
+        let petKey = pet.id.uuidString
+        if knownDefaultPlanKinds.contains(where: { kind in
+            UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey)) == event.id.uuidString
+        }) {
+            return true
+        }
+        guard event.recurrenceDays > 0, event.feedRuleKindRaw.isEmpty, !hasReminder else { return false }
+        let generatedTitles = Set(defaultPlanItems(for: pet).map { eventTitle(pet: pet, title: $0.title) })
+        return generatedTitles.contains(event.title)
+    }
+
+    nonisolated static func isGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
+        isGeneratedCalendarPlan(event, pets: pets, hasReminder: !event.reminders.isEmpty)
+    }
+
+    nonisolated static func isGeneratedCalendarPlan(
+        _ event: Event,
+        pets: [Pet],
+        hasReminder: Bool
+    ) -> Bool {
+        if isDefaultGeneratedCalendarPlan(event, pets: pets, hasReminder: hasReminder) { return true }
+        guard let pet = MemberLifecycleActiveScheduleResolver.petTarget(for: event, pets: pets) else { return false }
+        let petKey = pet.id.uuidString
+        return storedGeneratedPlanKinds.contains { kind in
+            UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey)) == event.id.uuidString
+        }
     }
 }

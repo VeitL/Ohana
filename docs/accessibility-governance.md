@@ -49,9 +49,13 @@ safety before it ships.
 - Run `scripts/audit-accessibility.sh --changed` (or pass files) before reporting
   focused UI work complete; CI and release hardening run
   `scripts/audit-accessibility.sh --all` as a whole-repo strict gate.
-- For high-traffic flows (Home cards, Today Focus, quick actions, calendar,
-  sheets, Oasis), do a manual VoiceOver + largest-Dynamic-Type pass on the fixed
-  iPhone 17 simulator and report what you checked.
+- For high-traffic flows (Home cards, Task Center, quick actions, sheets, and
+  Oasis), use path-scoped accessibility checks by default. When an explicit
+  visual/flow or release request needs Simulator interaction, use the disposable
+  `iPhone 17 Tests` environment for clean/destructive journeys and the pinned
+  Dogfood phone through `scripts/run-dogfood-simulator.sh` for non-destructive
+  existing-data journeys. Physical-device acceptance still owns final VoiceOver,
+  Voice Control, Switch Control, touch, and largest-Dynamic-Type evidence.
 - Use `// a11y: allow <reason>` only for genuinely decorative or non-interactive
   exceptions.
 

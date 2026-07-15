@@ -1,8 +1,78 @@
 import SwiftUI
 
+struct StarterGiftHomePreparationRecoveryOverlay: View {
+    let appLanguage: String
+    let message: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Color.ohanaPrimaryText.opacity(0.34)
+                    .ignoresSafeArea()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        Image(systemName: "arrow.clockwise.circle.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 30, weight: .black))
+                            .foregroundStyle(Color.goPrimary)
+
+                        Text(localized(
+                            zh: "重新准备首页",
+                            en: "Refresh Home",
+                            de: "Home aktualisieren"
+                        ))
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+
+                        Text(message)
+                            .font(OhanaFont.callout(.semibold))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Button(action: onRetry) {
+                            Text(localized(zh: "重试", en: "Try again", de: "Erneut versuchen"))
+                                .font(OhanaFont.callout(.black))
+                                .foregroundStyle(Color.arkInk)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(Color.goPrimary, in: Capsule())
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        .accessibilityIdentifier("starter-gift-home-preparation-retry")
+                    }
+                    .padding(20)
+                    .frame(maxWidth: 340)
+                    .background(
+                        Color.ohanaCardSurface,
+                        in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous)
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.top, max(16, proxy.safeAreaInsets.top))
+                    .padding(.bottom, max(16, proxy.safeAreaInsets.bottom))
+                    .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+        }
+        .accessibilityAddTraits(.isModal)
+    }
+
+    private func localized(zh: String, en: String, de: String) -> String {
+        switch appLanguage {
+        case "en": en
+        case "de": de
+        default: zh
+        }
+    }
+}
+
 struct StarterGiftCeremonyOverlay: View {
     let appLanguage: String
     let amount: Int
+    var isClaiming = false
+    var isClaimCommitted = false
+    var errorMessage: String?
     let onFinish: () -> Void
 
     var body: some View {
@@ -41,9 +111,9 @@ struct StarterGiftCeremonyOverlay: View {
                     .frame(maxWidth: .infinity)
 
                     Text(localized(
-                        zh: "新人礼包已到账。先解锁底部的椰子树入口；每次注入 \(OasisTreeEnergyInjectionPolicy.starterPackageXP) 能量，注入 5 次会升到 Lv1。",
-                        en: "Your starter gift is ready. Unlock the Coconut Tree tab first; each injection adds \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energy, and 5 injections reach Lv1.",
-                        de: "Dein Startergeschenk ist bereit. Schalte zuerst den Kokosbaum-Tab frei; jede Einspeisung gibt \(OasisTreeEnergyInjectionPolicy.starterPackageXP) Energie, 5 Einspeisungen erreichen Lv1."
+                        zh: "首宠奖励已经准备好。领取后会解锁底部的 Oasis；每次注入 \(OasisTreeEnergyInjectionPolicy.starterPackageXP) 能量，注入 5 次会升到 Lv1。",
+                        en: "Your first-pet reward is ready. Claim it to unlock Oasis; each injection adds \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energy, and 5 injections reach Lv1.",
+                        de: "Deine Belohnung für das erste Haustier ist bereit. Hole sie ab, um Oasis freizuschalten; jede Einspeisung gibt \(OasisTreeEnergyInjectionPolicy.starterPackageXP) Energie, 5 Einspeisungen erreichen Lv1."
                     ))
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -51,15 +121,32 @@ struct StarterGiftCeremonyOverlay: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                     Button(action: onFinish) {
-                        Text(localized(zh: "解锁椰子树", en: "Unlock Coconut Tree", de: "Kokosbaum freischalten"))
-                            .font(OhanaFont.callout(.black))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(Color.goPrimary, in: Capsule())
+                        HStack(spacing: 8) {
+                            if isClaiming {
+                                ProgressView()
+                                    .tint(Color.arkInk)
+                                    .controlSize(.small)
+                            }
+                            Text(actionTitle)
+                                .font(OhanaFont.callout(.black))
+                        }
+                        .foregroundStyle(Color.arkInk)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Color.goPrimary, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .disabled(isClaiming)
                     .accessibilityIdentifier("starter-gift-finish-action")
-                    .accessibilityLabel(localized(zh: "解锁椰子树入口", en: "Unlock the Coconut Tree tab", de: "Kokosbaum-Tab freischalten"))
+                    .accessibilityLabel(actionAccessibilityLabel)
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(OhanaFont.caption(.semibold))
+                            .foregroundStyle(Color.goRed)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("starter-gift-claim-error")
+                    }
                 }
                 .padding(18)
                 .frame(maxWidth: 340)
@@ -70,6 +157,7 @@ struct StarterGiftCeremonyOverlay: View {
                 .transition(.scale(scale: 0.96).combined(with: .opacity))
             }
         }
+        .accessibilityAddTraits(.isModal)
     }
 
     private func levelBadge(_ text: String, isActive: Bool) -> some View {
@@ -86,6 +174,32 @@ struct StarterGiftCeremonyOverlay: View {
         case "de": de
         default: zh
         }
+    }
+
+    private var actionTitle: String {
+        if isClaiming {
+            return isClaimCommitted
+                ? localized(zh: "正在刷新首页", en: "Refreshing Home", de: "Home wird aktualisiert")
+                : localized(zh: "正在领取", en: "Claiming", de: "Wird abgeholt")
+        }
+        return isClaimCommitted
+            ? localized(zh: "刷新并继续", en: "Refresh and continue", de: "Aktualisieren und fortfahren")
+            : localized(zh: "领取 \(amount) 椰子", en: "Claim \(amount) coconuts", de: "\(amount) Kokosnüsse abholen")
+    }
+
+    private var actionAccessibilityLabel: String {
+        if isClaimCommitted {
+            return localized(
+                zh: "刷新首页并解锁 Oasis",
+                en: "Refresh Home and unlock Oasis",
+                de: "Home aktualisieren und Oasis freischalten"
+            )
+        }
+        return localized(
+            zh: "领取 \(amount) 椰子并解锁 Oasis",
+            en: "Claim \(amount) coconuts and unlock Oasis",
+            de: "\(amount) Kokosnüsse abholen und Oasis freischalten"
+        )
     }
 }
 

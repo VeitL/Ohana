@@ -223,30 +223,19 @@ struct OnboardingPreferenceCoordinatorTests {
         #expect(coordinator.notificationIntent)
     }
 
-    @Test func onboardingSourceStaysMinimalAndRequiresHumanProfileCreation() throws {
+    @Test func onboardingSourceUsesHumanFirstSetupWithoutPermissionPrompts() throws {
         let source = try projectSource("Ohana/Features/Onboarding/Views/OnboardingView.swift")
 
-        #expect(!source.contains("植物经验"))
-        #expect(!source.contains("主要场景"))
-        #expect(!source.contains("Detect location"))
-        #expect(!source.contains("Plants at home"))
-        #expect(!source.contains("Care setup"))
-        #expect(!source.contains("照护设置"))
-        #expect(!source.contains("Location, reminders, home safety."))
-        #expect(!source.contains("For local weather risk."))
-        #expect(!source.contains("For care reminders."))
-        #expect(!source.contains("For ingestion and placement risk."))
-        #expect(!source.contains("Flags pet ingestion risk."))
-        #expect(!source.contains("Flags child safety risk."))
-        #expect(source.contains("Allow location"))
-        #expect(source.contains("Allow notifications"))
-        #expect(source.contains("onboarding-notification-off-row"))
-        #expect(!source.contains("Skip identity"))
-        #expect(!source.contains("暂时跳过"))
-        #expect(!source.contains("Skip for now"))
-        #expect(!source.contains("skipProfileSetup"))
-        #expect(!source.contains("MemberCreationDraft(kind: .human)"))
-        #expect(source.contains("startProfileSetup()"))
+        #expect(!source.contains("Allow location"))
+        #expect(!source.contains("Allow notifications"))
+        #expect(!source.contains("OnboardingPreferenceCoordinator"))
+        #expect(source.contains("MemberCreationDraft(kind: .human)"))
+        #expect(source.contains("onFirstHumanSaved: ((UUID) -> Void)?"))
+        #expect(source.contains("onPetDeferred: (() -> Void)?"))
+        #expect(source.contains("onPetCreationStarted: (() -> Void)?"))
+        #expect(source.contains("onboarding-human-name-input"))
+        #expect(source.contains("onboarding-create-pet-now"))
+        #expect(source.contains("onboarding-defer-pet"))
     }
 
     @Test func humanCreationUsesSharedInputAndOnboardingBackdrop() throws {

@@ -40,6 +40,9 @@ extension VerticalSolidHomeView {
         guard let signal,
               handledCreatedEntityToken != signal.token else { return }
         handledCreatedEntityToken = signal.token
+        if let destinationTab = signal.destinationTab {
+            selectTab(destinationTab)
+        }
         handleNewHomeMemberSaved(id: signal.entityID)
         onCreatedEntitySignalHandled(signal)
     }
@@ -460,42 +463,5 @@ extension VerticalSolidHomeView {
                 label: nil
             )
         )
-    }
-
-    func scheduleTodayFocusDailyCompletion(afterCompleting entityId: UUID) {
-        let visibleQuests = controller.snapshot.todayFocus.refreshedQuests
-        let pending = visibleQuests.filter { !$0.isCompleted }
-        if pending.count == 1,
-           let finalQuest = pending.first,
-           appServices.todayFocus.quest(finalQuest, matchesCompletedEntity: entityId) {
-            scheduleTodayFocusDailyCompletion(visibleQuests: visibleQuests, visibleSnapshot: controller.snapshot.todayFocus)
-        }
-    }
-
-    func scheduleTodayFocusDailyCompletionIfCleared(previousQuests: [IslandQuest], currentQuests: [IslandQuest]) {
-        let pending = previousQuests.filter { !$0.isCompleted }
-        guard pending.count == 1 else { return }
-
-        let previousIds = Set(previousQuests.map(\.id))
-        let hasSamePendingQuest = currentQuests.contains {
-            previousIds.contains($0.id) && !$0.isCompleted
-        }
-        guard !hasSamePendingQuest else { return }
-
-        scheduleTodayFocusDailyCompletion(visibleQuests: previousQuests, visibleSnapshot: controller.snapshot.todayFocus)
-    }
-
-    func scheduleTodayFocusDailyCompletion(visibleQuests: [IslandQuest], visibleSnapshot: TodayFocusSnapshot) {
-        guard !visibleQuests.isEmpty else { return }
-        todayFocusDailyCompletionTask?.cancel()
-        todayFocusDailyCompletionTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 420) {
-            _ = appServices.todayFocus.awardDailyCompletionIfNeeded(
-                context: modelContext,
-                executorId: currentExecutorId(),
-                visibleQuests: visibleQuests,
-                visibleSnapshot: visibleSnapshot
-            )
-            todayFocusDailyCompletionTask = nil
-        }
     }
 }

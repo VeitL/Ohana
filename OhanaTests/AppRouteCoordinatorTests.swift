@@ -49,6 +49,9 @@ struct AppRouteCoordinatorTests {
         let quickEntryPolicy = AppPresentationPolicyProvider.policy(
             for: AppSheetRoute.petMomentQuick(petID)
         )
+        let settingsPolicy = AppPresentationPolicyProvider.policy(
+            for: AppSheetRoute.settings
+        )
 
         #expect(pushPolicy.surface == .navigationPush)
         #expect(pushPolicy.loading == .shellFirst(delayMS: 48))
@@ -60,6 +63,8 @@ struct AppRouteCoordinatorTests {
         #expect(fullScreenPolicy.loading == .shellFirst(delayMS: 64))
         #expect(quickEntryPolicy.surface == .compactSheet)
         #expect(quickEntryPolicy.loading == .immediate)
+        #expect(settingsPolicy.surface == .sheetPage)
+        #expect(settingsPolicy.loading == .immediate)
     }
 
     @Test func accountSwitcherUsesGlobalSheetRoute() {

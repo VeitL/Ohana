@@ -51,6 +51,23 @@ nonisolated enum TaskCenterItemSource: String, Equatable, Sendable {
     case event
     case familyTask
     case linked
+    case systemJourney
+}
+
+nonisolated enum TaskCenterSystemDestination: String, Equatable, Hashable, Sendable {
+    case createFirstPet
+    case claimStarterGift
+    case completeHumanProfile
+    case completeFirstPetProfile
+    case confirmPetIdentityProtection
+    case confirmPetPreventiveCare
+    case configureFirstCarePlan
+    case recordFirstCare
+}
+
+nonisolated enum TaskCenterSystemJourneyPresentationState: String, Equatable, Sendable {
+    case actionRequired
+    case rewardReady
 }
 
 nonisolated enum TaskCenterWorkflowStatus: String, Equatable, Sendable {
@@ -114,6 +131,8 @@ nonisolated struct TaskCenterItemSnapshot: Identifiable, Equatable, Sendable {
     let reminderID: UUID?
     let familyTaskID: UUID?
     let source: TaskCenterItemSource
+    let systemDestination: TaskCenterSystemDestination?
+    let systemJourneyPresentationState: TaskCenterSystemJourneyPresentationState?
     let title: String
     let subject: TaskSubjectSnapshot
     let eventType: EventType?
@@ -139,6 +158,8 @@ nonisolated struct TaskCenterItemSnapshot: Identifiable, Equatable, Sendable {
         reminderID: UUID?,
         familyTaskID: UUID?,
         source: TaskCenterItemSource,
+        systemDestination: TaskCenterSystemDestination? = nil,
+        systemJourneyPresentationState: TaskCenterSystemJourneyPresentationState? = nil,
         title: String,
         subject: TaskSubjectSnapshot,
         eventType: EventType?,
@@ -163,6 +184,8 @@ nonisolated struct TaskCenterItemSnapshot: Identifiable, Equatable, Sendable {
         self.reminderID = reminderID
         self.familyTaskID = familyTaskID
         self.source = source
+        self.systemDestination = systemDestination
+        self.systemJourneyPresentationState = systemJourneyPresentationState
         self.title = title
         self.subject = subject
         self.eventType = eventType
@@ -195,6 +218,7 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
     let todayCompletedCount: Int
     let todayTotalCount: Int
     let memberFilterContext: TaskCenterMemberFilterContext
+    let starterJourney: HouseholdStarterJourneySnapshot?
 
     static let empty = TaskCenterSnapshot(
         overdue: [],
@@ -203,7 +227,8 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
         unscheduled: [],
         todayCompletedCount: 0,
         todayTotalCount: 0,
-        memberFilterContext: .hidden
+        memberFilterContext: .hidden,
+        starterJourney: nil
     )
 
     var pendingCount: Int {
@@ -212,6 +237,14 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
 
     var allItems: [TaskCenterItemSnapshot] {
         overdue + today + upcoming + unscheduled
+    }
+
+    var systemJourneyItems: [TaskCenterItemSnapshot] {
+        unscheduled.filter { $0.source == .systemJourney }
+    }
+
+    var ordinaryUnscheduledItems: [TaskCenterItemSnapshot] {
+        unscheduled.filter { $0.source != .systemJourney }
     }
 
     var showsMemberFilters: Bool {
@@ -250,7 +283,8 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
                 unscheduled: unscheduled.filter(includes),
                 todayCompletedCount: 0,
                 todayTotalCount: scopedToday.count,
-                memberFilterContext: memberFilterContext
+                memberFilterContext: memberFilterContext,
+                starterJourney: starterJourney
             )
         }
         return self
@@ -270,7 +304,8 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
             unscheduled: unscheduled.filter(includes),
             todayCompletedCount: 0,
             todayTotalCount: filteredToday.count,
-            memberFilterContext: memberFilterContext
+            memberFilterContext: memberFilterContext,
+            starterJourney: starterJourney
         )
     }
 
@@ -295,16 +330,106 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
 nonisolated struct TaskCenterBadgeSnapshot: Equatable, Sendable {
     let overdueCount: Int
     let criticalCount: Int
+    let attentionCount: Int
 
-    static let empty = TaskCenterBadgeSnapshot(overdueCount: 0, criticalCount: 0)
+    static let empty = TaskCenterBadgeSnapshot(overdueCount: 0, criticalCount: 0, attentionCount: 0)
 
-    init(overdueCount: Int, criticalCount: Int) {
+    init(overdueCount: Int, criticalCount: Int, attentionCount: Int? = nil) {
         self.overdueCount = max(0, overdueCount)
         self.criticalCount = max(0, criticalCount)
+        self.attentionCount = max(0, attentionCount ?? overdueCount)
     }
 
     init(snapshot: TaskCenterSnapshot) {
-        self.init(overdueCount: snapshot.overdueCount, criticalCount: snapshot.criticalCount)
+        let attentionItemIDs = Set(
+            (snapshot.overdue + snapshot.today + snapshot.allItems.filter {
+                $0.workflowStatus == .pendingReview || $0.source == .systemJourney
+            }).map(\.id)
+        )
+        self.init(
+            overdueCount: snapshot.overdueCount,
+            criticalCount: snapshot.criticalCount,
+            attentionCount: attentionItemIDs.count
+        )
+    }
+}
+
+nonisolated enum TaskCenterSystemJourneyProjection {
+    static let createFirstPetItemID = "system-journey-create-first-pet"
+    static let claimStarterGiftItemID = "system-journey-claim-starter-gift"
+    static let createFirstPetRewardCoconuts = 50
+
+    static func makeItems(
+        destinations: Set<TaskCenterSystemDestination>,
+        pets: [Pet],
+        humans: [Human],
+        now: Date
+    ) -> [TaskCenterItemSnapshot] {
+        guard humans.contains(where: { !$0.hasPassedAway }) else { return [] }
+        let hasActivePet = pets.contains(where: { !$0.hasPassedAway })
+
+        if hasActivePet, destinations.contains(.claimStarterGift) {
+            return [
+                TaskCenterItemSnapshot(
+                    id: claimStarterGiftItemID,
+                    eventID: nil,
+                    reminderID: nil,
+                    familyTaskID: nil,
+                    source: .systemJourney,
+                    systemDestination: .claimStarterGift,
+                    systemJourneyPresentationState: .rewardReady,
+                    title: L10n.current.tr(
+                        zh: "领取首宠奖励",
+                        en: "Claim your first-pet gift",
+                        de: "Belohnung für das erste Tier abholen"
+                    ),
+                    subject: .household,
+                    eventType: nil,
+                    symbol: "gift.fill",
+                    occurrenceDate: now,
+                    scheduledAt: now,
+                    dueAt: nil,
+                    isAllDay: true,
+                    isRecurring: false,
+                    urgency: .standard,
+                    workflowStatus: .active,
+                    availableActions: [],
+                    participantHumanIDs: [],
+                    rewardCoconuts: createFirstPetRewardCoconuts
+                )
+            ]
+        }
+
+        guard !hasActivePet, destinations.contains(.createFirstPet) else { return [] }
+        return [
+            TaskCenterItemSnapshot(
+                id: createFirstPetItemID,
+                eventID: nil,
+                reminderID: nil,
+                familyTaskID: nil,
+                source: .systemJourney,
+                systemDestination: .createFirstPet,
+                systemJourneyPresentationState: .actionRequired,
+                title: L10n.current.tr(
+                    zh: "建立第一只宠物",
+                    en: "Create your first pet",
+                    de: "Erstes Haustier erstellen"
+                ),
+                subject: .household,
+                eventType: nil,
+                symbol: "pawprint.fill",
+                occurrenceDate: now,
+                scheduledAt: now,
+                dueAt: nil,
+                isAllDay: true,
+                isRecurring: false,
+                urgency: .standard,
+                workflowStatus: .active,
+                availableActions: [],
+                participantHumanIDs: [],
+                rewardCoconuts: createFirstPetRewardCoconuts
+            )
+        ]
     }
 }
 
@@ -380,6 +505,8 @@ nonisolated enum TaskCenterSnapshotBuilder {
         humanMedications: [HumanMedication] = [],
         reminders: [Reminder] = [],
         familyTasks: [FamilyCollaborationTask] = [],
+        systemDestinations: Set<TaskCenterSystemDestination> = [],
+        starterJourney: HouseholdStarterJourneySnapshot? = nil,
         activeHumanId: String? = nil,
         now: Date = Date(),
         calendar: Calendar = .current
@@ -438,6 +565,16 @@ nonisolated enum TaskCenterSnapshotBuilder {
             context: context,
             buckets: &projection.buckets
         )
+        let visibleSystemItems = TaskCenterSystemJourneyProjection.makeVisibleItems(
+            destinations: systemDestinations,
+            starterJourney: starterJourney,
+            pets: pets,
+            humans: humans,
+            now: now
+        )
+        for item in visibleSystemItems {
+            projection.buckets.append(item, dueAt: nil, today: today, calendar: calendar)
+        }
         applyFamilyTaskMetrics(
             familyTasks,
             today: today,
@@ -462,7 +599,8 @@ nonisolated enum TaskCenterSnapshotBuilder {
             unscheduled: projection.buckets.unscheduled.sorted(by: taskSort),
             todayCompletedCount: pendingState.completedTodayTaskKeys.count,
             todayTotalCount: pendingState.todayTaskKeys.count,
-            memberFilterContext: memberFilterContext
+            memberFilterContext: memberFilterContext,
+            starterJourney: starterJourney
         )
     }
 
@@ -959,6 +1097,10 @@ nonisolated enum TaskCenterSnapshotBuilder {
         var pendingReviewItemIDs: Set<String> = []
 
         for item in items {
+            if item.source == .systemJourney {
+                currentMemberItemIDs.insert(item.id)
+                continue
+            }
             if item.workflowStatus == .pendingReview {
                 pendingReviewItemIDs.insert(item.id)
                 if item.createdByMember?.id == selectedHuman.id,

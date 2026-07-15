@@ -133,12 +133,15 @@ struct MemberCreationDraft: Equatable {
     var kind: MemberCreationKind
     var name = ""
     var themeColorHex: String
+    var hasExplicitThemeColor = false
     var avatarSource: MemberAvatarSource = .placeholder
     var selectedAvatarCandidateId: String?
     var avatarImageData: Data?
     var usesPurchasedOrInventoryPass = false
 
     var species = ""
+    var customSpecies = ""
+    var isCustomSpecies = false
     var breed = ""
     var customBreed = ""
     var isCustomBreed = false
@@ -184,12 +187,77 @@ struct MemberCreationDraft: Equatable {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    var resolvedSpecies: String {
+        isCustomSpecies ? customSpecies.trimmingCharacters(in: .whitespacesAndNewlines) : species
+    }
+
     var resolvedBreed: String {
         isCustomBreed ? customBreed.trimmingCharacters(in: .whitespacesAndNewlines) : breed
     }
 
     var normalizedThemeHex: String {
-        OhanaThemeColorPolicy.normalizedMemberThemeHex(themeColorHex, fallback: kind.fallbackThemeHex)
+        if kind == .pet, !hasExplicitThemeColor {
+            return PetCreationThemePolicy.automaticThemeHex(
+                name: trimmedName,
+                species: resolvedSpecies,
+                breed: resolvedBreed,
+                coatColor: coatColor
+            )
+        }
+        return OhanaThemeColorPolicy.normalizedMemberThemeHex(themeColorHex, fallback: kind.fallbackThemeHex)
+    }
+}
+
+/// Keeps automatic pet colors stable across previews, restarts, and retries.
+/// The selection varies with the pet profile without relying on Swift's
+/// process-randomized `hashValue`.
+nonisolated enum PetCreationThemePolicy {
+    private static let palettes: [String: [String]] = [
+        "dog": ["E15F41", "E67E22", "8D6E63", "833471"],
+        "cat": ["E84393", "8A2BE2", "475569", "D35400"],
+        "fish": ["3C40C6", "4834D4", "C71585", "F39C12"],
+        "bird": ["C71585", "F39C12", "4834D4", "D35400"],
+        "rabbit": ["E84393", "8D6E63", "8A2BE2", "E15F41"],
+        "reptile": ["D35400", "8D6E63", "3C40C6", "833471"],
+        "hamster": ["E67E22", "F39C12", "8D6E63", "E84393"],
+        "other": ["E15F41", "F39C12", "833471", "3C40C6", "E84393"]
+    ]
+
+    static func automaticThemeHex(
+        name: String,
+        species: String,
+        breed: String,
+        coatColor: String
+    ) -> String {
+        let speciesKey = Pet.canonicalSpeciesKey(species)
+        if let suggested = PetBreedDatabase.breeds(for: speciesKey)
+            .first(where: { $0.name == breed })?
+            .suggestedThemeHex {
+            return OhanaThemeColorPolicy.normalizedMemberThemeHex(
+                suggested,
+                fallback: OhanaThemeColorPolicy.petFallbackHex
+            )
+        }
+
+        let options = palettes[speciesKey] ?? palettes["other"] ?? [OhanaThemeColorPolicy.petFallbackHex]
+        let seed = [name, speciesKey, breed, coatColor]
+            .joined(separator: "|")
+            .lowercased()
+        let index = stableIndex(seed, count: options.count)
+        return OhanaThemeColorPolicy.normalizedMemberThemeHex(
+            options[index],
+            fallback: OhanaThemeColorPolicy.petFallbackHex
+        )
+    }
+
+    private static func stableIndex(_ value: String, count: Int) -> Int {
+        guard count > 1 else { return 0 }
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in value.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return Int(hash % UInt64(count))
     }
 }
 
@@ -198,7 +266,10 @@ struct MemberCreationMediaRecoverySnapshot: Codable {
     var capturedAt: Date
     var name: String
     var themeColorHex: String
+    var hasExplicitThemeColor: Bool?
     var species: String
+    var customSpecies: String?
+    var isCustomSpecies: Bool?
     var breed: String
     var customBreed: String
     var isCustomBreed: Bool
@@ -231,7 +302,10 @@ struct MemberCreationMediaRecoverySnapshot: Codable {
         self.capturedAt = capturedAt
         name = draft.name
         themeColorHex = draft.themeColorHex
+        hasExplicitThemeColor = draft.hasExplicitThemeColor
         species = draft.species
+        customSpecies = draft.customSpecies
+        isCustomSpecies = draft.isCustomSpecies
         breed = draft.breed
         customBreed = draft.customBreed
         isCustomBreed = draft.isCustomBreed
@@ -263,7 +337,10 @@ struct MemberCreationMediaRecoverySnapshot: Codable {
     func apply(to draft: inout MemberCreationDraft) {
         draft.name = name
         draft.themeColorHex = themeColorHex
+        draft.hasExplicitThemeColor = hasExplicitThemeColor ?? false
         draft.species = species
+        draft.customSpecies = customSpecies ?? ""
+        draft.isCustomSpecies = isCustomSpecies ?? false
         draft.breed = breed
         draft.customBreed = customBreed
         draft.isCustomBreed = isCustomBreed
@@ -325,7 +402,7 @@ enum MemberCreationStep: String, Identifiable, Hashable {
         case .human:
             [.basicInfo, .avatar, .theme]
         case .pet:
-            [.petName, .petIdentity, .petAppearance, .avatar, .petPersonality]
+            [.petName, .petIdentity, .petPersonality, .avatar]
         }
     }
 

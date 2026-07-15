@@ -14,10 +14,19 @@ struct GrowthUnlockPolicyTests {
     }
 
     @Test func householdAndRewardLayersRespectTreeLevel() {
-        #expect(!GrowthUnlockPolicy.status(for: FMDest.featureGroup(.householdHub), currentLevel: 3).isUnlocked)
-        #expect(GrowthUnlockPolicy.status(for: FMDest.featureGroup(.householdHub), currentLevel: 4).isUnlocked)
+        #expect(!GrowthUnlockPolicy.status(for: FMDest.featureGroup(.householdHub), currentLevel: 0).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.featureGroup(.householdHub), currentLevel: 1).isUnlocked)
+        #expect(!GrowthUnlockPolicy.status(for: FMDest.featureGroup(.plants), currentLevel: 3).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.featureGroup(.plants), currentLevel: 4).isUnlocked)
         #expect(!GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 6).isUnlocked)
         #expect(GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 7).isUnlocked)
+    }
+
+    @Test func homeToolbarMatchesItsIconToTheAvailableDestination() {
+        #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 0) == .growthRoadmap)
+        #expect(HomeToolbarPrimaryActionPolicy.homeIcon(currentLevel: 0) == "tree.fill")
+        #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 1) == .featureGroup(.householdHub))
+        #expect(HomeToolbarPrimaryActionPolicy.homeIcon(currentLevel: 1) == "chart.bar.xaxis")
     }
 
     @Test func currentAndNextStagesTrackLevelProgression() {
@@ -154,7 +163,7 @@ struct GrowthUnlockPolicyTests {
             from: [.dailyCare, .healthBody, .archiveMemory, .householdHub, .plants],
             currentLevel: 1
         )
-        #expect(levelOneGroups == [.dailyCare])
+        #expect(levelOneGroups == [.dailyCare, .householdHub])
 
         let levelFourGroups = AppFeatureRouteGuard.visibleFeatureGroups(
             from: [.dailyCare, .healthBody, .archiveMemory, .householdHub, .plants],

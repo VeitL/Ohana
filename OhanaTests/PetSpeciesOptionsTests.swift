@@ -17,6 +17,8 @@ struct PetSpeciesOptionsTests {
         #expect(Pet.canonicalSpeciesKey("爬宠") == "reptile")
         #expect(Pet.canonicalSpeciesKey("龙猫") == "hamster")
         #expect(Pet.canonicalSpeciesKey("其他") == "other")
+        #expect(Pet.normalizedSpeciesStorageValue("Dog") == "dog")
+        #expect(Pet.normalizedSpeciesStorageValue("Capybara") == "Capybara")
     }
 
     @Test func petSpeciesDisplayAndVisualHelpersSupportCanonicalAndLegacyValues() {
@@ -89,5 +91,19 @@ struct PetSpeciesOptionsTests {
     @Test func memberCreationDraftDoesNotInferPetSpecies() {
         #expect(MemberCreationDraft(kind: .pet).species == "")
         #expect(Pet().species == "dog")
+    }
+
+    @Test func automaticPetThemeIsStableAndExplicitSelectionOverridesIt() {
+        var draft = MemberCreationDraft(kind: .pet)
+        draft.name = "Momo"
+        draft.species = "cat"
+        draft.breed = "布偶猫"
+
+        let automatic = draft.normalizedThemeHex
+        #expect(automatic == draft.normalizedThemeHex)
+
+        draft.themeColorHex = "833471"
+        draft.hasExplicitThemeColor = true
+        #expect(draft.normalizedThemeHex == "833471")
     }
 }

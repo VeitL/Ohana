@@ -1,5 +1,8 @@
 # PlantFeatureGate Logic
 
+> 状态：当前首发边界。
+> 最近核对：2026-07-15，依据 `PlantFeatureGate`、`PlantUnlockPolicy`、Task Center 与 Home 路由。
+
 ## Purpose
 
 `PlantFeatureGate` 是 D19 / GAP-12 的产品/构建支持判定点；`PlantUnlockPolicy` 是用户可见性判定点。首发版本定位为“家中所有生命”，但基础植物照护不在 Lv.1 立即暴露，而在 Lv.4「家庭树冠」作为成长解锁出现。
@@ -11,7 +14,7 @@
 - `PlantFeatureGate.allows(.plants)` 在当前 build 恒为开启，表示 app 支持植物数据、服务、备份、恢复和本地提醒。
 - 用户是否看到基础植物模块由 `PlantUnlockPolicy` 决定：椰子树 Lv.4「家庭树冠」解锁；若本机已经存在植物数据，则 grandfather，低于 Lv.4 也可继续进入植物列表和详情。
 - Lv.1–3 不显示植物 tab、不显示添加植物入口、不生成植物 quest、不展示植物负反馈信号；植物 route / FunctionMenu 入口必须 redirect 到 Growth Roadmap。
-- Lv.4 后开放添加植物、植物 Dashboard、详情、护理计划、日志、照片、资料库、本地提醒和 Today Focus 植物任务。
+- Lv.4 后开放添加植物、植物 Dashboard、详情、护理计划、日志、照片、资料库、本地提醒和待办中的植物事项。
 - Lv.5 不是基础植物管理前置，只用于植物与绿洲/岛屿氛围、装饰或收益反馈的后续联动。
 - Lv.8+ / Care+ 才承载植物 AI 识别、病虫害智能诊断、天气/季节计划和高级趋势洞察。
 - `Plant`、`PlantCareLog`、Plants 模块源码、备份/恢复、物理删除边界、CloudSync mutation metadata 保留；首发不启用 CloudKit。
@@ -43,12 +46,12 @@
 - `Ohana/Features/FunctionMenu/Views/FunctionMenuSheet.swift`：direct landing 初始目的地必须先经 `visibleFunctionDestination`。
 - `Ohana/Features/FunctionMenu/Views/FunctionMenuDestinationRouter.swift`：Plants destination 挂载植物 Dashboard / Detail。
 
-### Today Focus, Quest, And Mood
+### Tasks, Legacy Quest Compatibility, And Mood
 
-- `Ohana/Features/TodayFocus/IslandQuestEngine.swift`：Lv.4 或已有植物数据时才产生 `q_water_plant*` / `q_fertilize_plant*`。
-- `Ohana/Features/Home/Views/FocusHomeAuxiliaryViews.swift`：Today Focus snapshot 只在 `PlantUnlockPolicy` 允许时保留植物快照、植物 quest 和植物 negative signal。
+- `Ohana/Features/Tasks/TaskCenterRouteContainer.swift`：已解锁植物的 Event / Reminder / FamilyTask 统一进入待办清单与日历。
+- `Ohana/Features/TodayFocus/IslandQuestEngine.swift` 与旧 Home Focus 组件仅作兼容保留，不再由首页快照加载或展示，也不产生每日清空奖励。
 - `Ohana/Shared/Components/IslandNegativeFeedback.swift`：可读取植物缺水/黄叶等负反馈信号。
-- `Ohana/Features/Economy/TodayFocusEconomyService.swift`：可 fetch plants，植物 quest 参与可见完成/奖励判断。
+- 植物缺水、黄叶等状态留在植物卡片或植物领域页面；行动事项使用正式 Event / Reminder 进入待办。
 
 ### Plants Module Body
 
@@ -65,7 +68,7 @@
 - `Ohana/Features/Onboarding/Views/OnboardingView.swift`
 - `Ohana/Features/Members/RequiredHumanProfileView.swift`
 
-首发 onboarding 可以采集植物偏好：城市/地区、通知意向、宠物/儿童安全偏好、植物经验和主要护理场景。未授权定位或通知时仍可继续使用；但采集偏好不代表 Lv.1 立即显示植物入口。
+首发 onboarding 不采集城市/地区、通知意向、植物经验或家庭偏好，也不预先请求定位或通知权限。植物资料、提醒偏好和权限只在用户解锁并主动进入对应功能后按需询问；这不改变 Lv.1–3 的入口门禁。
 
 - `Ohana/Features/GrowthUnlock/Views/GrowthUnlockFlowTestView.swift`
 - `Ohana/Features/Settings/DesignLab/VerticalGlassHomeLabView.swift`

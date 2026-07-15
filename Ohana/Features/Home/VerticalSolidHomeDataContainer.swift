@@ -29,10 +29,16 @@ struct HomeReadModelRefreshKey: Hashable {
 
 struct HomeCreatedEntitySignal: Equatable {
     let entityID: UUID
+    let destinationTab: VerticalSolidHomeTab?
     let token: UUID
 
-    init(entityID: UUID, token: UUID = UUID()) {
+    init(
+        entityID: UUID,
+        destinationTab: VerticalSolidHomeTab? = nil,
+        token: UUID = UUID()
+    ) {
         self.entityID = entityID
+        self.destinationTab = destinationTab
         self.token = token
     }
 }
@@ -56,6 +62,7 @@ struct VerticalSolidHomeDataContainer: View {
     let onPresentOasisReward: () -> Void
     let onPresentPetWeightQuick: (UUID) -> Void
     let onPresentQuickMoment: (UUID) -> Void
+    let onRequestStarterGiftClaim: () -> Void
     let onPresentSettings: () -> Void
     let onPresentStreakDetail: () -> Void
     let onPresentWalk: (UUID) -> Void
@@ -63,6 +70,14 @@ struct VerticalSolidHomeDataContainer: View {
     /// The root route host owns this value. A covered Home surface must retain
     /// its frozen snapshot rather than continuing broad SwiftData aggregation.
     let isHomeSurfaceVisible: Bool
+    /// Starter-gift presentation waits for the Home snapshot that contains the
+    /// newly committed Pet. Nil only requires a generally ready Home snapshot.
+    let requiredReadyEntityID: UUID?
+    /// A bounded recovery signal from the root presentation gate. It forces a
+    /// fresh read even when the domain revision itself was already observed.
+    let forcedRefreshGeneration: Int
+    let onHomeSnapshotReadinessChange: (Bool) -> Void
+    let onHomeCoconutBalanceChange: (Int?) -> Void
 
     @StateObject private var readModelStore = HomeReadModelStore()
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
@@ -88,6 +103,7 @@ struct VerticalSolidHomeDataContainer: View {
     @State private var pendingDayTokenRefresh = false
     @State private var pendingReadModelLanguage: String?
     @State private var pendingSurfaceResumeRefresh = false
+    @State private var pendingForcedRefresh = false
     @State private var surfaceResumeRefreshGeneration = 0
 
     init(
@@ -106,11 +122,16 @@ struct VerticalSolidHomeDataContainer: View {
         onPresentOasisReward: @escaping () -> Void,
         onPresentPetWeightQuick: @escaping (UUID) -> Void,
         onPresentQuickMoment: @escaping (UUID) -> Void,
+        onRequestStarterGiftClaim: @escaping () -> Void,
         onPresentSettings: @escaping () -> Void,
         onPresentStreakDetail: @escaping () -> Void,
         onPresentWalk: @escaping (UUID) -> Void,
         cardStateResetToken: UUID,
-        isHomeSurfaceVisible: Bool
+        isHomeSurfaceVisible: Bool,
+        requiredReadyEntityID: UUID? = nil,
+        forcedRefreshGeneration: Int = 0,
+        onHomeSnapshotReadinessChange: @escaping (Bool) -> Void = { _ in },
+        onHomeCoconutBalanceChange: @escaping (Int?) -> Void = { _ in }
     ) {
         self.onOpenPet = onOpenPet
         self.onOpenHuman = onOpenHuman
@@ -127,11 +148,16 @@ struct VerticalSolidHomeDataContainer: View {
         self.onPresentOasisReward = onPresentOasisReward
         self.onPresentPetWeightQuick = onPresentPetWeightQuick
         self.onPresentQuickMoment = onPresentQuickMoment
+        self.onRequestStarterGiftClaim = onRequestStarterGiftClaim
         self.onPresentSettings = onPresentSettings
         self.onPresentStreakDetail = onPresentStreakDetail
         self.onPresentWalk = onPresentWalk
         self.cardStateResetToken = cardStateResetToken
         self.isHomeSurfaceVisible = isHomeSurfaceVisible
+        self.requiredReadyEntityID = requiredReadyEntityID
+        self.forcedRefreshGeneration = forcedRefreshGeneration
+        self.onHomeSnapshotReadinessChange = onHomeSnapshotReadinessChange
+        self.onHomeCoconutBalanceChange = onHomeCoconutBalanceChange
     }
 
     var body: some View {
@@ -152,6 +178,7 @@ struct VerticalSolidHomeDataContainer: View {
             onPresentOasisReward: onPresentOasisReward,
             onPresentPetWeightQuick: onPresentPetWeightQuick,
             onPresentQuickMoment: onPresentQuickMoment,
+            onRequestStarterGiftClaim: onRequestStarterGiftClaim,
             onPresentSettings: onPresentSettings,
             onPresentStreakDetail: onPresentStreakDetail,
             onPresentWalk: onPresentWalk,
@@ -159,27 +186,15 @@ struct VerticalSolidHomeDataContainer: View {
             payload: payload
         )
         .task(id: refreshKey) {
-            guard HomeSurfaceRefreshPolicy.allowsReadModelRefresh(
-                isHomeSurfaceVisible: isHomeSurfaceVisible,
-                isRuntimeRefreshAllowed: homeSurfaceGate.allowsRefresh
-            ) else {
-                return
-            }
-            readModelStore.requestRefresh(
-                context: modelContext,
-                activeHumanIdRaw: activeHumanIdRaw,
-                hiddenPetIDsRaw: hiddenPetIDsRaw,
-                homeCardOrderRaw: homeCardOrderRaw,
-                showDummyCards: showDummyCards,
-                petBondVaultRevision: petBondVaultRevision,
-                equippedTitleRaw: equippedTitleRaw,
-                quickActionItemsRaw: quickActionItemsRaw,
-                language: readModelLanguage,
-                externalRevision: observedHomeInvalidation.revision,
-                force: !payload.snapshot.isReady
-            )
+            requestReadModelRefresh(force: !payload.snapshot.isReady)
         }
         .onAppear {
+            let isReady = isRequiredHomeSnapshotReady
+            onHomeSnapshotReadinessChange(isReady)
+            onHomeCoconutBalanceChange(homeSnapshotCoconutBalance)
+            if !isReady, requiredReadyEntityID != nil {
+                requestReadModelRefresh(force: true)
+            }
             scheduleRefreshKeyStateSync(
                 homeInvalidation: appServices.domainRevisions.homeSurfaceInvalidation,
                 walletProjectionRevision: appServices.domainRevisions.walletProjectionRevision,
@@ -192,6 +207,26 @@ struct VerticalSolidHomeDataContainer: View {
                 walletProjectionRevision: nil,
                 refreshDayToken: false
             )
+        }
+        .onChange(of: isRequiredHomeSnapshotReady) { _, isReady in
+            if isReady {
+                pendingForcedRefresh = false
+            }
+            onHomeSnapshotReadinessChange(isReady)
+        }
+        .onChange(of: requiredReadyEntityID) { _, _ in
+            let isReady = isRequiredHomeSnapshotReady
+            onHomeSnapshotReadinessChange(isReady)
+            if !isReady {
+                requestReadModelRefresh(force: true)
+            }
+        }
+        .onChange(of: homeSnapshotCoconutBalance) { _, balance in
+            onHomeCoconutBalanceChange(balance)
+        }
+        .onChange(of: forcedRefreshGeneration) { previous, current in
+            guard previous != current else { return }
+            requestReadModelRefresh(force: true)
         }
         .onReceive(appServices.domainRevisions.walletProjectionUpdates) { revision in
             scheduleRefreshKeyStateSync(
@@ -253,6 +288,37 @@ struct VerticalSolidHomeDataContainer: View {
         )
     }
 
+    private func requestReadModelRefresh(force: Bool) {
+        guard HomeSurfaceRefreshPolicy.allowsReadModelRefresh(
+            isHomeSurfaceVisible: isHomeSurfaceVisible,
+            isRuntimeRefreshAllowed: homeSurfaceGate.allowsRefresh
+        ) else {
+            if force {
+                pendingForcedRefresh = true
+            }
+            return
+        }
+        readModelStore.requestRefresh(
+            context: modelContext,
+            activeHumanIdRaw: activeHumanIdRaw,
+            hiddenPetIDsRaw: hiddenPetIDsRaw,
+            homeCardOrderRaw: homeCardOrderRaw,
+            showDummyCards: showDummyCards,
+            petBondVaultRevision: petBondVaultRevision,
+            equippedTitleRaw: equippedTitleRaw,
+            quickActionItemsRaw: quickActionItemsRaw,
+            language: readModelLanguage,
+            externalRevision: observedHomeInvalidation.revision,
+            force: force
+        )
+        if force {
+            // Keep the recovery intent until the required entity is actually
+            // projected. A store cancellation or fetch failure has no success
+            // callback, so clearing this at dispatch time would lose recovery.
+            pendingForcedRefresh = requiredReadyEntityID != nil && !isRequiredHomeSnapshotReady
+        }
+    }
+
     private func scheduleReadModelLanguageSync(_ rawLanguage: String) {
         let normalized = AppLanguage.normalize(rawLanguage)
         guard canRefreshHomeSurface else {
@@ -291,6 +357,17 @@ struct VerticalSolidHomeDataContainer: View {
             ids.insert(activeHumanID)
         }
         return ids
+    }
+
+    private var isRequiredHomeSnapshotReady: Bool {
+        guard readModelStore.payload.snapshot.isReady else { return false }
+        guard let requiredReadyEntityID else { return true }
+        return visibleHomeEntityIDs.contains(requiredReadyEntityID)
+    }
+
+    private var homeSnapshotCoconutBalance: Int? {
+        guard readModelStore.payload.snapshot.isReady else { return nil }
+        return Int(readModelStore.payload.snapshot.coconutText)
     }
 
     private var homeSurfaceGate: SurfaceActivityGate {
@@ -382,6 +459,7 @@ struct VerticalSolidHomeDataContainer: View {
                 walletProjectionRevision: appServices.domainRevisions.walletProjectionRevision,
                 refreshDayToken: true
             )
+            consumePendingForcedRefreshIfPossible()
             return
         }
 
@@ -409,6 +487,12 @@ struct VerticalSolidHomeDataContainer: View {
             walletProjectionRevision: appServices.domainRevisions.walletProjectionRevision,
             refreshDayToken: true
         )
+        consumePendingForcedRefreshIfPossible()
+    }
+
+    private func consumePendingForcedRefreshIfPossible() {
+        guard pendingForcedRefresh, canRefreshHomeSurface else { return }
+        requestReadModelRefresh(force: true)
     }
 
     private func updateDayTokenAfterNextMidnight() async {

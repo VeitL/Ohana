@@ -1,7 +1,7 @@
 # OnlineFeatureGate Logic
 
 > 状态：当前首发边界。
-> 最近核对：2026-07-14，依据 `OnlineFeatureGate`、`AppCapabilityProfile`、`AppFeatureRouteGuard`、`TaskCenterRouteContainer` 与 `FamilyTaskService`。
+> 最近核对：2026-07-15，依据 `OnlineFeatureGate`、`AppCapabilityProfile`、`AppFeatureRouteGuard`、`TaskCenterRouteContainer` 与 `FamilyTaskService`。
 > 所有者：`OnlineFeatureGate` 与 `AppCapabilityProfile`；具体远端入口由 `AppFeatureRouteGuard` 和 CKShare / Settings 写入边界共同执行。
 
 ## Purpose
@@ -21,7 +21,7 @@ Center、Human 数量或 FamilyTask 写入路径散落新的在线判定。
 - 关闭门控必须阻止 CloudKit share 接受、云同步设置、远端家庭邀请、共享
   database scope 切换，以及明确标为未来联机面的入口。
 - 关闭门控不得隐藏本机 Task Center、`FamilyCollaborationTask`、家庭分工创建与
-  审核、Today Focus 的本机任务摘要、成员名册、提醒、照护记录、本地备份或
+  审核、成员名册、提醒、照护记录、本地备份或
   家庭周报。
 - 同一设备上存在多个 Human 只决定是否显示领取、分配和审核等本机控件，
   不能被解释为在线能力已开启。
@@ -37,8 +37,8 @@ Center、Human 数量或 FamilyTask 写入路径散落新的在线判定。
 - `TaskCenterRouteContainer` 是清单 / 日历的统一用户入口；
   `TaskActionCommandExecutor` 把事件完成交给 `CalendarCommandExecutor`，把领取、
   提交、通过和驳回交给 `FamilyCollaborationCommandExecutor` / `FamilyTaskService`。
-- `HomeReadModelStore` 使用统一 Task Center 快照投影逾期、今天与待审核项目；
-  Today Focus 的打开和直接动作都回到同一稳定任务 ID 与动作执行器，而不是打开
+- `HomeReadModelStore` 不再投影 Today Focus；逾期、今天、待审核与系统旅程事项
+  只在统一 Task Center 展示，并使用同一稳定任务 ID 与动作执行器，而不是打开
   成员页、Oasis quest 或旧协作 dashboard。
 - `CrewRosterOverlay` 只管理成员名册，并通过 `onOpenTaskCenter` 跳转统一待办；
   Human 详情通过 `TaskCenterRouteContext.human` 打开成员筛选结果。

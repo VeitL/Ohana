@@ -340,7 +340,10 @@ enum GrowthUnlockPolicy {
         case .dailyCare: .dailyCare
         case .healthBody: .bodyHealth
         case .archiveMemory: .memory
-        case .householdHub: .household
+        // Household Insights is a stable container whose children keep their
+        // own unlock levels. Gating the container at the plant milestone would
+        // also hide its Lv.1 expense surface until Lv.4.
+        case .householdHub: .dailyCare
         case .plants: .household
         case .oasisRewards: .rewards
         }

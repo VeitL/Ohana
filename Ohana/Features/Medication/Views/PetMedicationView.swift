@@ -601,7 +601,7 @@ struct PetMedicationContentView: View {
             Text(l.tr(zh: "还没有用药计划", en: "No medication yet", de: "Noch keine Medikamente"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(zh: "添加药物后，Today Focus 可以直接打卡，不需要再跳进用药页。", en: "After adding medication, Today Focus can check in directly.", de: "Nach dem Hinzufügen kannst du direkt in Today Focus abhaken."))
+            Text(l.tr(zh: "添加药物后，可直接在待办中打卡，不需要再跳进用药页。", en: "After adding medication, you can check it off directly in Tasks.", de: "Nach dem Hinzufügen kannst du die Einnahme direkt in Aufgaben abhaken."))
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)

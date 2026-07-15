@@ -10,6 +10,42 @@ import SwiftData
 import SwiftUI
 import UIKit
 
+nonisolated struct OnboardingPetSnapshotHandoffState: Equatable {
+    private(set) var requiredPetID: UUID?
+    private(set) var completionRequestedPetID: UUID?
+    private(set) var homeSnapshotReadyPetID: UUID?
+
+    var completedPetID: UUID? {
+        guard let requiredPetID,
+              completionRequestedPetID == requiredPetID,
+              homeSnapshotReadyPetID == requiredPetID else { return nil }
+        return requiredPetID
+    }
+
+    mutating func stage(_ petID: UUID) {
+        guard requiredPetID != petID else { return }
+        requiredPetID = petID
+        completionRequestedPetID = nil
+        homeSnapshotReadyPetID = nil
+    }
+
+    mutating func requestCompletion(for petID: UUID) {
+        stage(petID)
+        completionRequestedPetID = petID
+    }
+
+    mutating func markHomeSnapshotReady(for petID: UUID) {
+        guard requiredPetID == petID else { return }
+        homeSnapshotReadyPetID = petID
+    }
+
+    mutating func resetAfterCompletion() {
+        requiredPetID = nil
+        completionRequestedPetID = nil
+        homeSnapshotReadyPetID = nil
+    }
+}
+
 struct RootView: View {
     var appLanguage: String = AppLanguage.code
 
@@ -19,6 +55,11 @@ struct RootView: View {
     @AppStorage(AppPrivacySnapshotProtectionStore.hideSnapshotKey) private var hideAppSwitcherSnapshot = AppPrivacySnapshotProtectionStore.defaultHideSnapshot
     @State private var appSwitcherSnapshotCoverRequested = false
     @State private var onboardingFirstPetID: String?
+    @State private var isOnboardingHomePreflightMounted = false
+    @State private var onboardingPetSnapshotHandoff = OnboardingPetSnapshotHandoffState()
+    @State private var onboardingHomeSnapshotRefreshGeneration = 0
+    @State private var onboardingHomeSnapshotRecoveryTask: Task<Void, Never>?
+    @State private var onboardingHomePreparationFailedPetID: UUID?
     @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
     @StateObject private var sharedCareUndo = SharedCareUndoCoordinator.shared
@@ -31,20 +72,42 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            if hasOnboarded {
+            if hasOnboarded || isOnboardingHomePreflightMounted {
                 ContentView(
                     showsEmbeddedOnboarding: false,
                     onboardingFirstPetID: onboardingFirstPetID,
-                    routeLanguageCode: appLanguage
+                    routeLanguageCode: appLanguage,
+                    requiredPetHomeSnapshotRefreshRequest: onboardingHomeSnapshotRefreshGeneration,
+                    onRequiredPetHomeSnapshotReady: markOnboardingPetHomeSnapshotReady
                 )
+                .allowsHitTesting(hasOnboarded)
+                .accessibilityHidden(!hasOnboarded)
             }
 
             if !hasOnboarded {
                 OnboardingView(
-                    onFirstPetSaved: { pet in
-                        onboardingFirstPetID = pet.id.uuidString
+                    onFirstHumanSaved: { humanID in
+                        currentActiveHumanId = humanID.uuidString
+                        appServices.onboardingJourney.markFirstHumanCreated(humanID)
                     },
-                    onHomeJoinHandoffPreflight: beginOnboardingHomePreflight
+                    onPetDeferred: {
+                        appServices.onboardingJourney.markPetDeferred()
+                        showDeferredPetTaskToastAfterHomeHandoff()
+                    },
+                    onPetCreationStarted: {
+                        appServices.onboardingJourney.markPetCreationStarted()
+                    },
+                    onCompletionRequested: requestOnboardingCompletion,
+                    onFirstPetRecovered: { petID in
+                        stageOnboardingPetHomeHandoff(petID)
+                    },
+                    onFirstPetSaved: { pet in
+                        stageOnboardingPetHomeHandoff(pet.id)
+                    },
+                    onHomeJoinHandoffPreflight: beginOnboardingHomePreflight,
+                    homePreparationRecoveryNeeded: onboardingHomePreparationFailedPetID != nil
+                        && onboardingHomePreparationFailedPetID == onboardingPetSnapshotHandoff.requiredPetID,
+                    onRetryHomePreparation: retryOnboardingHomePreparation
                 )
                 .zIndex(100)
             }
@@ -76,6 +139,20 @@ struct RootView: View {
             startupMaintenance.startAfterFirstRender(context: modelContext)
             schedulePlantBatchCareRewardSettlement()
             scheduleAutomaticBackupFailureReminder()
+            resumeOnboardingHomeSnapshotRecoveryIfNeeded()
+        }
+        .onChange(of: hasOnboarded) { _, isComplete in
+            guard isComplete else { return }
+            cancelOnboardingHomeSnapshotRecovery()
+            guard isOnboardingHomePreflightMounted else { return }
+            var handoff = onboardingPetSnapshotHandoff
+            handoff.resetAfterCompletion()
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                onboardingPetSnapshotHandoff = handoff
+                isOnboardingHomePreflightMounted = false
+            }
         }
         .onDisappear {
             sharedCareUndo.pauseDeadlineTimer()
@@ -84,6 +161,7 @@ struct RootView: View {
             plantBatchCareRewardSettlementTask = nil
             automaticBackupReminderTask?.cancel()
             automaticBackupReminderTask = nil
+            cancelOnboardingHomeSnapshotRecovery()
         }
         .onReceive(appServices.notificationRoutes.reminderActionEvents) { event in
             appServices.reminderActions.handle(
@@ -137,9 +215,129 @@ struct RootView: View {
     }
 
     private func beginOnboardingHomePreflight() {
-        // Onboarding owns the visual handoff. Mounting the full Home stack before
-        // the member save commits pulls navigation and read-model work into the
-        // tap frame on real devices with retained data.
+        guard !isOnboardingHomePreflightMounted else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isOnboardingHomePreflightMounted = true
+        }
+    }
+
+    private func stageOnboardingPetHomeHandoff(_ petID: UUID) {
+        if onboardingPetSnapshotHandoff.requiredPetID != petID {
+            cancelOnboardingHomeSnapshotRecovery()
+        }
+        onboardingHomePreparationFailedPetID = nil
+        var handoff = onboardingPetSnapshotHandoff
+        handoff.stage(petID)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            onboardingPetSnapshotHandoff = handoff
+            onboardingFirstPetID = petID.uuidString
+            isOnboardingHomePreflightMounted = true
+        }
+        completeOnboardingPetHandoffIfReady()
+    }
+
+    private func requestOnboardingCompletion(_ petID: UUID) {
+        var handoff = onboardingPetSnapshotHandoff
+        handoff.requestCompletion(for: petID)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            onboardingPetSnapshotHandoff = handoff
+            onboardingFirstPetID = petID.uuidString
+            isOnboardingHomePreflightMounted = true
+        }
+        completeOnboardingPetHandoffIfReady()
+        if !hasOnboarded {
+            scheduleOnboardingHomeSnapshotRecovery(for: petID)
+        }
+    }
+
+    private func markOnboardingPetHomeSnapshotReady(_ petID: UUID) {
+        var handoff = onboardingPetSnapshotHandoff
+        handoff.markHomeSnapshotReady(for: petID)
+        guard handoff != onboardingPetSnapshotHandoff else { return }
+        cancelOnboardingHomeSnapshotRecovery()
+        onboardingPetSnapshotHandoff = handoff
+        completeOnboardingPetHandoffIfReady()
+    }
+
+    private func completeOnboardingPetHandoffIfReady() {
+        guard !hasOnboarded,
+              onboardingPetSnapshotHandoff.completedPetID != nil else { return }
+        cancelOnboardingHomeSnapshotRecovery()
+        var completedHandoff = onboardingPetSnapshotHandoff
+        completedHandoff.resetAfterCompletion()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            onboardingPetSnapshotHandoff = completedHandoff
+            hasOnboarded = true
+            isOnboardingHomePreflightMounted = false
+        }
+    }
+
+    private func scheduleOnboardingHomeSnapshotRecovery(for petID: UUID) {
+        cancelOnboardingHomeSnapshotRecovery()
+        onboardingHomePreparationFailedPetID = nil
+        onboardingHomeSnapshotRecoveryTask = OhanaFrameScheduler.runAfterNextFrame(
+            milliseconds: OnboardingHomeJoinHandoffGate.homeSnapshotRecoveryInitialDelayMilliseconds
+        ) {
+            guard isOnboardingHomeSnapshotPending(for: petID) else {
+                onboardingHomeSnapshotRecoveryTask = nil
+                return
+            }
+            onboardingHomeSnapshotRefreshGeneration &+= 1
+            onboardingHomeSnapshotRecoveryTask = OhanaFrameScheduler.runAfterNextFrame(
+                milliseconds: OnboardingHomeJoinHandoffGate.homeSnapshotRecoveryRetryDelayMilliseconds
+            ) {
+                guard isOnboardingHomeSnapshotPending(for: petID) else {
+                    onboardingHomeSnapshotRecoveryTask = nil
+                    return
+                }
+                onboardingHomeSnapshotRefreshGeneration &+= 1
+                onboardingHomeSnapshotRecoveryTask = OhanaFrameScheduler.runAfterNextFrame(
+                    milliseconds: OnboardingHomeJoinHandoffGate.homeSnapshotRecoveryFailureDelayMilliseconds
+                ) {
+                    guard isOnboardingHomeSnapshotPending(for: petID) else {
+                        onboardingHomeSnapshotRecoveryTask = nil
+                        return
+                    }
+                    onboardingHomePreparationFailedPetID = petID
+                    onboardingHomeSnapshotRecoveryTask = nil
+                }
+            }
+        }
+    }
+
+    private func retryOnboardingHomePreparation() {
+        guard let petID = onboardingPetSnapshotHandoff.requiredPetID,
+              isOnboardingHomeSnapshotPending(for: petID) else { return }
+        onboardingHomePreparationFailedPetID = nil
+        onboardingHomeSnapshotRefreshGeneration &+= 1
+        scheduleOnboardingHomeSnapshotRecovery(for: petID)
+    }
+
+    private func resumeOnboardingHomeSnapshotRecoveryIfNeeded() {
+        guard let petID = onboardingPetSnapshotHandoff.requiredPetID,
+              onboardingPetSnapshotHandoff.completionRequestedPetID == petID,
+              isOnboardingHomeSnapshotPending(for: petID) else { return }
+        scheduleOnboardingHomeSnapshotRecovery(for: petID)
+    }
+
+    private func isOnboardingHomeSnapshotPending(for petID: UUID) -> Bool {
+        !hasOnboarded
+            && onboardingPetSnapshotHandoff.requiredPetID == petID
+            && onboardingPetSnapshotHandoff.completedPetID == nil
+    }
+
+    private func cancelOnboardingHomeSnapshotRecovery() {
+        onboardingHomeSnapshotRecoveryTask?.cancel()
+        onboardingHomeSnapshotRecoveryTask = nil
+        onboardingHomePreparationFailedPetID = nil
     }
 
     private func schedulePlantBatchCareRewardSettlement(now: Date = Date()) {
@@ -197,6 +395,16 @@ struct RootView: View {
             en: "Save failed. Check storage and try again.",
             de: "Speichern fehlgeschlagen. Prüfe den Speicher und versuche es erneut."
         ))
+    }
+
+    private func showDeferredPetTaskToastAfterHomeHandoff() {
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 360) {
+            appServices.islandToasts.show(l.tr(
+                zh: "已放入待办，随时可以继续建立宠物",
+                en: "Added to To-dos. You can add your pet anytime.",
+                de: "Zu Aufgaben hinzugefügt. Du kannst dein Tier jederzeit anlegen."
+            ))
+        }
     }
 
     private func scheduleAutomaticBackupFailureReminder(now: Date = Date()) {

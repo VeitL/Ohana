@@ -110,17 +110,14 @@ final class HomeReadModelStore: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     private var refreshGeneration = 0
     private let privacy: HumanPrivacyManaging
-    private let todayFocus: TodayFocusManaging
-    private let healthAlerts: PetHealthAlerting
-
     init(
         privacy: HumanPrivacyManaging? = nil,
         todayFocus: TodayFocusManaging? = nil,
         healthAlerts: PetHealthAlerting? = nil
     ) {
         self.privacy = privacy ?? StaticHumanPrivacyManager()
-        self.todayFocus = todayFocus ?? StaticTodayFocusManager()
-        self.healthAlerts = healthAlerts ?? SharedPetHealthAlertEngine()
+        _ = todayFocus
+        _ = healthAlerts
     }
 
     func requestRefresh(
@@ -346,8 +343,6 @@ actor HomeReadModelActor {
 
         let humanMedications = fetches.humanMedications()
         let humanMedicationLogs = fetches.humanMedicationLogs()
-        let healthAlertSources = fetches.healthAlertSources(pets: pets)
-        let todayFocusCareLedgerEntries = fetches.todayFocusCareLedgerEntries()
         let feedingLedgerEntries = fetches.feedingLedgerEntries()
         let careLedgerEntries = fetches.careQuickActionEntries()
         let hygieneLedgerEntries = fetches.hygieneQuickActionEntries()
@@ -356,13 +351,6 @@ actor HomeReadModelActor {
         let petExpenseLedgerEntries = fetches.petExpenseQuickActionEntries()
         let petWeightLedgerEntries = fetches.petWeightQuickActionEntries()
         let petMomentEntries = fetches.petMomentQuickActionEntries()
-        let humanWeightLogs = fetches.humanWeightLogs()
-        try Task.checkCancellation()
-
-        // Same-device household tasks are local Solo records and remain visible
-        // while remote collaboration is disabled.
-        let familyTasks = fetches.familyTasks()
-        let exchangeRequests = fetches.exchangeRequests()
         try Task.checkCancellation()
 
         let source = VerticalSolidHomeSourceState(
@@ -375,8 +363,8 @@ actor HomeReadModelActor {
             pendingReminders: pendingReminders,
             humanMedications: humanMedications,
             humanMedicationLogs: humanMedicationLogs,
-            healthAlertSources: healthAlertSources,
-            todayFocusCareLedgerEntries: todayFocusCareLedgerEntries,
+            healthAlertSources: [],
+            todayFocusCareLedgerEntries: [],
             feedingLedgerEntries: feedingLedgerEntries,
             careLedgerEntries: careLedgerEntries,
             hygieneLedgerEntries: hygieneLedgerEntries,
@@ -385,9 +373,9 @@ actor HomeReadModelActor {
             petExpenseLedgerEntries: petExpenseLedgerEntries,
             petWeightLedgerEntries: petWeightLedgerEntries,
             petMomentEntries: petMomentEntries,
-            humanWeightLogs: humanWeightLogs,
-            familyTasks: familyTasks,
-            exchangeRequests: exchangeRequests,
+            humanWeightLogs: [],
+            familyTasks: [],
+            exchangeRequests: [],
             activeHumanIdRaw: input.activeHumanIdRaw,
             hiddenPetIDsRaw: input.hiddenPetIDsRaw,
             homeCardOrderRaw: input.homeCardOrderRaw,

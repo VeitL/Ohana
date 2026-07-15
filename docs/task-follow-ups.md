@@ -9,18 +9,19 @@
 
 ## Current Read
 
-- Last compacted: 2026-07-14.
-- Open follow-ups: 10 total: P1 = 5, P2 = 4, P3 = 1.
+- Last compacted: 2026-07-15.
+- Open follow-ups: 11 total: P1 = 6, P2 = 4, P3 = 1.
 - Open P0: 0.
-- First-release repository blocker: none currently recorded. The unified Task
-  Center, Plant multi-object flow, and shared-litter one-shot undo contract are
-  implemented with repository-local compile, migration, recovery, and targeted
-  consistency evidence.
+- First-release repository blocker: no known defect, but one release-reachable
+  P1 proof gap is open. The current Human-first/D28 worktree supersedes the old
+  Pet-first route and has not yet received current compile, targeted-test, or
+  disposable-Simulator evidence.
 - First-release product/configuration gap: none for accounts; the current Solo
   product deliberately has no Ohana account, login, or developer backend. D24
   still approves iPhone-only, iOS 26.2+, with native iPad/watchOS deferred.
-- Current decision: complete the four physical-device P1 items. The remaining
-  CloudKit P1 is explicitly deferred and unreachable in Solo. The future
+- Current decision: close TFU-20260715-002 before resuming the four
+  physical-device P1 items. The remaining CloudKit P1 is explicitly deferred
+  and unreachable in Solo. The future
   account design is recorded in
   `docs/planning/account-backend-extension.md`; the requested family invitation
   and explicit Human-linking flow is tracked below as P3 discovery only and does
@@ -38,6 +39,29 @@
 | P3 | Future improvement with no current release impact. |
 
 ## Open Items
+
+### TFU-20260715-002 - Validate Human-First Onboarding And Starter Journey
+
+- Priority / bucket: P1, current first-release repository and Simulator proof.
+- Blocker: D17 now requires a local Human name and makes first-Pet creation
+  optional; the first Pet exposes an explicit 50-coconut Task Center claim, and
+  D28 adds six independently claimed member-wallet rewards. Current source and
+  test files implement these boundaries, but this documentation task did not
+  compile the affected target, run the targeted suites, or execute either clean
+  journey. The 2026-07-11 no-Human Pet-first evidence is historical.
+- Next action: on the fixed tests lane, run the focused onboarding coordinator,
+  handoff, starter gift, household journey, Task Center projection, route,
+  reset, growth-unlock, and compatibility suites. Then use only the disposable
+  `iPhone 17 Tests` device for `Human -> Later` and
+  `Human -> Pet -> Task Center -> explicit claim`, including interruption,
+  relaunch, duplicate-tap, failed-claim retry, Oasis lock, Home card handoff,
+  system-item/list-only behavior, and the first three D28 rows.
+- Close when: the affected App/test targets compile; selected tests pass with
+  non-zero execution; both clean journeys pass; the 50-coconut credit is atomic
+  and household-idempotent; Oasis never unlocks before claim; the six D28
+  rewards total 400, enter the resolved Human wallet only after eligibility is
+  rechecked, and preserve privacy-choice equivalence; active status documents
+  record the exact commands and results.
 
 ### TFU-20260614-014 - Validate CloudSync Live-Apply Policy When Family Enables
 
@@ -114,6 +138,9 @@
   gift once without changing the total, and lets tree injection atomically use
   the formal island total. Targeted Unit/Integration passed 32/32 and the
   no-Human Pet-first five-injection UI path passed 1/1 on the iPhone 17 simulator.
+  Those results continue to prove island-reserve migration and injection for
+  that build, but they do not validate the current Human-first route, explicit
+  claim gate, or D28 journey.
   A new incremental `-O` Release device build passed strict signing, overlaid
   without uninstalling, and launched on the same iPhone. A read-only device
   store copy proves the migration committed exactly once: `system:island=50`,

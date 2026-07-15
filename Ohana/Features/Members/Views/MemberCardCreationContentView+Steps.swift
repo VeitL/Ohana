@@ -66,11 +66,13 @@ extension MemberCardCreationContentView {
                     title: l.tr(zh: "物种", en: "Species", de: "Art"),
                     value: draft.species.isEmpty
                         ? l.tr(zh: "选择物种", en: "Choose species", de: "Art wählen")
-                        : speciesLabel(draft.species)
+                        : speciesLabel(draft.resolvedSpecies.isEmpty ? draft.species : draft.resolvedSpecies)
                 ) {
                     ForEach(speciesOptions, id: \.self) { species in
                         Button(speciesLabel(species)) {
                             draft.species = species
+                            draft.isCustomSpecies = Pet.canonicalSpeciesKey(species) == "other"
+                            draft.customSpecies = ""
                             draft.breed = ""
                             draft.customBreed = ""
                             draft.isCustomBreed = false
@@ -80,16 +82,35 @@ extension MemberCardCreationContentView {
                 }
                 .accessibilityIdentifier("member-pet-species-picker")
 
+                if draft.isCustomSpecies {
+                    flatTextField(
+                        l.tr(zh: "输入物种", en: "Enter species", de: "Art eingeben"),
+                        text: $draft.customSpecies
+                    )
+                    .accessibilityIdentifier("member-pet-custom-species-input")
+                }
+
                 if !draft.species.isEmpty {
                     compactBreedPicker
                         .accessibilityIdentifier("member-pet-breed-picker")
                 }
+
                 if draft.isCustomBreed {
                     flatTextField(
                         l.tr(zh: "输入品种", en: "Enter breed", de: "Rasse eingeben"),
                         text: $draft.customBreed
                     )
+                    .accessibilityIdentifier("member-pet-custom-breed-input")
                 }
+
+                Text(l.tr(
+                    zh: "物种和品种为必填；性别、毛色等可稍后补充。",
+                    en: "Species and breed are required; sex and appearance can be added later.",
+                    de: "Art und Rasse sind Pflicht; Geschlecht und Aussehen kannst du später ergänzen."
+                ))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(cardSecondaryForeground)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -99,10 +120,11 @@ extension MemberCardCreationContentView {
             title: l.tr(zh: "品种", en: "Breed", de: "Rasse"),
             value: draft.resolvedBreed.isEmpty ? l.tr(zh: "选择", en: "Choose", de: "Wählen") : draft.resolvedBreed
         ) {
-            ForEach(petBreedOptions.prefix(40), id: \.name) { breed in
+            ForEach(petBreedPickerOptions, id: \.name) { breed in
                 Button(breed.name) {
                     draft.isCustomBreed = breed.name == "其他"
                     draft.breed = breed.name == "其他" ? "" : breed.name
+                    draft.customBreed = ""
                     draft.coatColor = ""
                     clampPetAppearance()
                 }
@@ -211,66 +233,59 @@ extension MemberCardCreationContentView {
     }
 
     var petPersonalityStep: some View {
-        MemberCreationSection(
-            title: l.tr(zh: "它是什么性格？", en: "What's their personality?", de: "Wie ist der Charakter?"),
-            icon: "heart.fill",
-            foreground: cardForeground
-        ) {
-            VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
+            MemberCreationSection(
+                title: l.tr(zh: "性格", en: "Personality", de: "Charakter"),
+                icon: "heart.fill",
+                foreground: cardForeground
+            ) {
+                VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 8) {
                     Text(l.tr(zh: "可跳过，最多选择 3 个", en: "Optional, choose up to 3", de: "Optional, bis zu 3 auswählen"))
-                        .font(OhanaFont.caption(.semibold))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(cardSecondaryForeground)
-                        .lineLimit(2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
                     Spacer(minLength: 8)
                     Text("\(draft.personalityTagIds.count)/3")
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption2(.black))
                         .foregroundStyle(cardForeground)
                         .contentTransition(.numericText())
                 }
 
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2),
-                    spacing: 10
-                ) {
-                    ForEach(PetPersonalityTag.primaryChoices) { tag in
+                LazyVGrid(columns: personalityGridColumns, spacing: 6) {
+                    ForEach(PetPersonalityTag.creationChoices) { tag in
                         let id = tag.id
                         let isSelected = draft.personalityTagIds.contains(id)
                         let isAtLimit = draft.personalityTagIds.count >= 3 && !isSelected
                         Button {
                             togglePetPersonality(id)
                         } label: {
-                            ZStack(alignment: .topTrailing) {
-                                VStack(spacing: 6) {
-                                    Image(systemName: tag.sfSymbol)
-                                        .font(OhanaFont.adaptive(size: 18, weight: .bold))
-                                        .accessibilityHidden(true)
-                                    Text(personalityLabel(id))
-                                        .font(OhanaFont.caption(.black))
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.72)
-                                }
-                                .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
-                                .frame(maxWidth: .infinity, minHeight: 58)
-
+                            HStack(spacing: 3) {
+                                Text(personalityLabel(id))
+                                    .font(OhanaFont.caption2(.black))
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.64)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity, alignment: .center)
                                 if isSelected {
-                                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative selected-state icon; button exposes a text value.
-                                        .font(OhanaFont.adaptive(size: 15, weight: .bold))
-                                        .foregroundStyle(cardSelectedForeground)
-                                        .padding(8)
+                                    Image(systemName: "checkmark") // a11y: allow decorative selected-state mark; the button exposes a selected value.
+                                        .font(OhanaFont.adaptive(size: 11, weight: .black))
                                         .accessibilityHidden(true)
                                 }
                             }
-                            .frame(maxWidth: .infinity, minHeight: 58)
+                            .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+                            .padding(.horizontal, 5)
+                            .frame(maxWidth: .infinity, minHeight: 44)
                             .background(
                                 isSelected ? cardSelectedFill : cardControlFill,
-                                in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                                in: Capsule()
                             )
                             .overlay {
-                                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                                Capsule()
                                     .strokeBorder(isSelected ? cardAccent.opacity(0.62) : cardControlStroke, lineWidth: 1)
                             }
-                            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                            .contentShape(Capsule())
                             .opacity(isAtLimit ? 0.58 : 1)
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -289,7 +304,80 @@ extension MemberCardCreationContentView {
                     }
                 }
             }
+            }
+
+            MemberCreationSection(
+                title: l.tr(zh: "主题色（可选）", en: "Theme color (optional)", de: "Themenfarbe (optional)"),
+                icon: "paintpalette.fill",
+                foreground: cardForeground
+            ) {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(draft.hasExplicitThemeColor
+                            ? l.tr(zh: "已手动选择", en: "Chosen manually", de: "Manuell gewählt")
+                            : l.tr(zh: "根据宠物资料自动搭配", en: "Matched automatically to your pet", de: "Automatisch passend zum Tier"))
+                            .font(OhanaFont.caption2(.semibold))
+                            .foregroundStyle(cardSecondaryForeground)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.68)
+
+                        if draft.hasExplicitThemeColor {
+                            Button {
+                                withAnimation(GoMotion.selection) {
+                                    draft.hasExplicitThemeColor = false
+                                }
+                            } label: {
+                                Text(l.tr(zh: "恢复自动", en: "Use automatic", de: "Automatisch"))
+                                    .font(OhanaFont.caption2(.black))
+                                    .foregroundStyle(cardForeground)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("member-pet-theme-auto")
+                        }
+                    }
+
+                    Spacer(minLength: 4)
+
+                    ColorPicker(
+                        l.tr(zh: "选择宠物主题色", en: "Choose pet theme color", de: "Tier-Themenfarbe wählen"),
+                        selection: petThemeColorBinding,
+                        supportsOpacity: false
+                    )
+                    .labelsHidden()
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityLabel(l.tr(zh: "选择宠物主题色", en: "Choose pet theme color", de: "Tier-Themenfarbe wählen"))
+                    .accessibilityIdentifier("member-pet-theme-color-picker")
+                }
+                .padding(.horizontal, 10)
+                .frame(minHeight: 48)
+                .background(cardControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                        .strokeBorder(cardControlStroke, lineWidth: 1)
+                }
+            }
         }
+    }
+
+    var personalityGridColumns: [GridItem] {
+        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 4
+        return Array(repeating: GridItem(.flexible(), spacing: 6), count: count)
+    }
+
+    var petThemeColorBinding: Binding<Color> {
+        Binding(
+            get: { Color(hex: draft.normalizedThemeHex) },
+            set: { color in
+                guard let hex = color.toHex() else { return }
+                withAnimation(GoMotion.selection) {
+                    draft.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
+                        hex,
+                        fallback: MemberCreationKind.pet.fallbackThemeHex
+                    )
+                    draft.hasExplicitThemeColor = true
+                }
+            }
+        )
     }
 
     func togglePetPersonality(_ id: String) {
@@ -408,6 +496,7 @@ extension MemberCardCreationContentView {
         return Button {
             withAnimation(GoMotion.selection) {
                 draft.themeColorHex = option.hex
+                draft.hasExplicitThemeColor = true
             }
         } label: {
             ZStack {
@@ -476,7 +565,7 @@ extension MemberCardCreationContentView {
     var avatarRefreshSignature: String {
         [
             draft.kind.rawValue,
-            draft.species,
+            draft.resolvedSpecies,
             draft.resolvedBreed,
             draft.petGender,
             draft.coatColor,
@@ -490,7 +579,7 @@ extension MemberCardCreationContentView {
         switch kind {
         case .pet:
             [
-                draft.species.isEmpty ? "" : speciesLabel(draft.species),
+                draft.resolvedSpecies.isEmpty ? "" : speciesLabel(draft.resolvedSpecies),
                 draft.resolvedBreed,
                 draft.petGender.isEmpty ? "" : petGenderLabel(draft.petGender)
             ]
@@ -508,7 +597,7 @@ extension MemberCardCreationContentView {
     }
 
     var petFallbackSymbol: String {
-        Pet.speciesSilhouetteSymbol(forSpecies: draft.species)
+        Pet.speciesSilhouetteSymbol(forSpecies: draft.resolvedSpecies)
     }
 
     var speciesOptions: [String] {
@@ -532,13 +621,21 @@ extension MemberCardCreationContentView {
     }
 
     var petBreedOptions: [BreedInfo] {
-        PetBreedDatabase.breeds(for: draft.species)
+        PetBreedDatabase.breeds(for: draft.resolvedSpecies)
+    }
+
+    var petBreedPickerOptions: [BreedInfo] {
+        let options = petBreedOptions
+        guard options.count > 40,
+              let other = options.first(where: { $0.name == "其他" }) else {
+            return options
+        }
+        return Array(options.filter { $0.name != "其他" }.prefix(39)) + [other]
     }
 
     var petCoatOptions: [String] {
-        let options = PetAvatarAssetCatalog.coatColors(species: draft.species, breed: draft.resolvedBreed)
+        let options = PetAvatarAssetCatalog.coatColors(species: draft.resolvedSpecies, breed: draft.resolvedBreed)
             ?? PetBreedDatabase.genericCoatColors
         return options.map(\.name)
     }
-
 }

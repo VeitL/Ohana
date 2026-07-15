@@ -13,13 +13,13 @@ MODE="${1:-smoke}"
 case "${MODE}" in
   smoke)
     exec scripts/test-simulator.sh \
-      '-only-testing:OhanaUITests/OhanaUITests/testPetFirstOnboardingCompletesCareRewardAndOasisWithoutHuman'
+      '-only-testing:OhanaUITests/OhanaUITests/testHumanFirstOnboardingCreatesPetClaimsGiftAndUnlocksOasis'
     ;;
   first-pet-stability)
     exec scripts/test-simulator.sh \
       -test-iterations 10 \
       -test-repetition-relaunch-enabled YES \
-      '-only-testing:OhanaUITests/OhanaUITests/testPetFirstOnboardingCompletesCareRewardAndOasisWithoutHuman'
+      '-only-testing:OhanaUITests/OhanaUITests/testHumanFirstOnboardingCreatesPetClaimsGiftAndUnlocksOasis'
     ;;
   full)
     exec scripts/test-ui-nightly.sh

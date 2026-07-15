@@ -147,10 +147,10 @@ enum UITestHumanBaselineSeeder {
                 )
             }
             UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
-            // Module UI tests start with a Human baseline but still exercise the
-            // real Pet-first onboarding. Preserve the fresh-journey checkpoint
-            // that production establishes before its first member is written.
+            // Module UI tests start after the Human-name step but still exercise
+            // the real optional Pet choice and first-Pet reward journey.
             UserDefaults.standard.set(true, forKey: StarterGiftStorageKey.pending)
+            OnboardingJourneyCoordinator.markFirstHumanCreated(human.id)
         } catch {
             context.rollback()
             OhanaLog.warning(

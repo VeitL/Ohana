@@ -120,29 +120,10 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
         todayFocus: TodayFocusManaging,
         healthAlerts: PetHealthAlerting
     ) -> VerticalSolidHomeSnapshot {
-        build(
-            from: source,
-            now: now,
-            weightVisibleHumans: privacy.unlockedHumans(for: .weight, from: source.humans, viewedBy: source.activeHumanId),
-            makeTodayFocus: { pets, plants, reminders, events, humans, activeHumanId, todayFocusCareLedgerEntries, humanWeightLogs, familyTasks, exchangeRequests in
-                TodayFocusSnapshot.make(
-                    pets: pets,
-                    plants: plants,
-                    reminders: reminders,
-                    events: events,
-                    humans: humans,
-                    humanMedications: source.humanMedications,
-                    activeHumanId: activeHumanId,
-                    careLedgerEntries: todayFocusCareLedgerEntries,
-                    humanWeightLogs: humanWeightLogs,
-                    familyTasks: familyTasks,
-                    exchangeRequests: exchangeRequests,
-                    todayFocus: todayFocus,
-                    healthAlerts: healthAlerts,
-                    now: now
-                )
-            }
-        )
+        _ = privacy
+        _ = todayFocus
+        _ = healthAlerts
+        return build(from: source, now: now)
     }
 
     static func buildForReadModelActor(
@@ -151,55 +132,16 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
         questProgress: TodayFocusQuestProgress = .fromDefaults(),
         healthAlertEngine: PetHealthAlertEngine = PetHealthAlertEngine()
     ) -> VerticalSolidHomeSnapshot {
-        let clinicalAlerts = healthAlertEngine.scanAlerts(sources: source.healthAlertSources)
-        return build(
-            from: source,
-            now: now,
-            weightVisibleHumans: weightVisibleHumans(from: source),
-            makeTodayFocus: { pets, plants, reminders, events, humans, activeHumanId, todayFocusCareLedgerEntries, humanWeightLogs, familyTasks, exchangeRequests in
-                TodayFocusSnapshot.make(
-                    pets: pets,
-                    plants: plants,
-                    reminders: reminders,
-                    events: events,
-                    humans: humans,
-                    humanMedications: source.humanMedications,
-                    activeHumanId: activeHumanId,
-                    careLedgerEntries: todayFocusCareLedgerEntries,
-                    humanWeightLogs: humanWeightLogs,
-                    familyTasks: familyTasks,
-                    exchangeRequests: exchangeRequests,
-                    questProgress: questProgress,
-                    clinicalAlerts: clinicalAlerts,
-                    now: now
-                )
-            }
-        )
-    }
-
-    private static func weightVisibleHumans(from source: VerticalSolidHomeSourceState) -> [Human] {
-        source.humans.filter { !$0.isPrivate(.weight, viewedBy: source.activeHumanId) }
+        _ = questProgress
+        _ = healthAlertEngine
+        return build(from: source, now: now)
     }
 
     private static func build(
         from source: VerticalSolidHomeSourceState,
-        now: Date,
-        weightVisibleHumans: [Human],
-        makeTodayFocus: (
-            [Pet],
-            [Plant],
-            [Reminder],
-            [Event],
-            [Human],
-            String,
-            [TodayFocusCareLedgerEntry],
-            [HumanWeightLog],
-            [FamilyCollaborationTask],
-            [CoconutExchangeRequest]
-        ) -> TodayFocusSnapshot
+        now: Date
     ) -> VerticalSolidHomeSnapshot {
         let l = L10n(source.language)
-        let activePets = source.pets.filter { !$0.hasPassedAway }
         let cards = enrichCardsWithAvatarData(
             HomeSnapshotBuilder.buildCards(
                 pets: source.pets,
@@ -224,25 +166,15 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             language: source.language
         )
         let visiblePlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? source.plants : []
-        let todayFocus = makeTodayFocus(
-            activePets,
-            visiblePlants,
-            source.pendingReminders,
-            source.events,
-            weightVisibleHumans,
-            source.activeHumanIdRaw,
-            source.todayFocusCareLedgerEntries,
-            source.humanWeightLogs,
-            source.familyTasks,
-            source.exchangeRequests
-        )
 
         return VerticalSolidHomeSnapshot(
             isReady: true,
             greeting: greetingText(l, now: now),
             activeName: source.activeHuman?.name ?? l.tr(zh: "家人", en: "Family", de: "Familie"),
             coconutText: "\(source.islandCoconutReserveBalance + EconomyWalletWritePolicy.familyCoconutTotal(pets: source.pets, humans: source.humans))",
-            todayFocus: todayFocus,
+            // Compatibility field for legacy render helpers. Home no longer
+            // projects or displays the generated Today Focus task deck.
+            todayFocus: .empty,
             cards: cards,
             firstPetEmptyState: nil,
             plants: visiblePlants.sorted { $0.createdAt > $1.createdAt }.map { plant in
@@ -308,8 +240,6 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             reminderSignature(source.pendingReminders),
             medicationSignature(source.humanMedications),
             medicationLogSignature(source.humanMedicationLogs),
-            healthAlertSourceSignature(source.healthAlertSources),
-            todayFocusCareLedgerSignature(source.todayFocusCareLedgerEntries),
             feedingLedgerSignature(source.feedingLedgerEntries),
             careLedgerSignature(source.careLedgerEntries),
             hygieneLedgerSignature(source.hygieneLedgerEntries),
@@ -318,9 +248,6 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             petExpenseLedgerSignature(source.petExpenseLedgerEntries),
             petWeightLedgerSignature(source.petWeightLedgerEntries),
             petMomentSignature(source.petMomentEntries),
-            humanWeightSignature(source.humanWeightLogs),
-            familyTaskSignature(source.familyTasks),
-            exchangeSignature(source.exchangeRequests),
             source.activeHumanIdRaw,
             source.hiddenPetIDsRaw,
             source.homeCardOrderRaw,

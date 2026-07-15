@@ -123,6 +123,9 @@ enum OnboardingHomeJoinHandoffGate {
     private static let homeAppearDelayMilliseconds: UInt64 = 180
     private static let homeVisualEffectDelayMilliseconds: UInt64 = 0
     private static let postHomeEffectDelayMilliseconds: UInt64 = 3400
+    static let homeSnapshotRecoveryInitialDelayMilliseconds: UInt64 = 1200
+    static let homeSnapshotRecoveryRetryDelayMilliseconds: UInt64 = 2400
+    static let homeSnapshotRecoveryFailureDelayMilliseconds: UInt64 = 2400
 
     static func markCompleted(now: Date = Date(), defaults: UserDefaults = .standard) {
         defaults.set(now.timeIntervalSince1970, forKey: completedAtKey)

@@ -244,7 +244,8 @@ struct AchievementCareLedgerSummary {
 
     func hasVaccineRecord() -> Bool {
         healthEvents.contains {
-            $0.actionType == "vaccine"
+            $0.actionType == HealthLogType.vaccine.rawValue
+                || $0.actionType == "vaccine"
                 || $0.actionType == "vaccination"
                 || $0.note.localizedCaseInsensitiveContains("疫苗")
                 || $0.note.localizedCaseInsensitiveContains("vaccine")

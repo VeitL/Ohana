@@ -19,7 +19,7 @@ extension MemberCardCreationContentView {
 
     func personalityLabel(_ id: String) -> String {
         guard let tag = PetPersonalityTag.lookup(id) else { return id }
-        return l.tr(zh: tag.titleZh, en: tag.titleEn, de: tag.titleEn)
+        return l.tr(zh: tag.titleZh, en: tag.titleEn, de: tag.titleDe)
     }
 
     func petGenderLabel(_ gender: String) -> String {

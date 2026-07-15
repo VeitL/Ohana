@@ -1,7 +1,7 @@
 # Economy 规则书
 
 确认日期：2026-06-12  
-最近更新：2026-07-14
+最近更新：2026-07-15
 适用范围：Phase 6 Economy 模块；覆盖椰子钱包、正式岛屿总资产、奖励预算 / 冷却、商店消费、宠物成长椰子、成就奖励、财富页与椰子历史。
 
 本规则书覆盖宪法 D2/D3/D7/D8/D12/D13/D14/G2/G4/G5/G8 在 Economy 模块中的首发语义，并保留 GAP-4 总账恒等、GAP-5 触顶感知、GAP-7 补记结算的已验证规则。
@@ -26,7 +26,7 @@
 - `FamilyCollaborationTask` 的本机家庭悬赏属于首发可达能力，不受 `OnlineFeatureGate` 隐藏。执行者提交后进入待审核，只有发布者确认成功才完成奖励转账；转账必须复用 Economy 钱包写入边界。余额不足、钱包冻结、重复确认或持久化失败时不得把任务标为完成，也不得留下半笔 payer / receiver 钱包流水或照护账本事件。跨设备悬赏仍属于 gated 的未来能力。
 - Economy 首发可见 UI、奖励反馈、钱包流水标题与时间文案必须走已注册语言 fallback；Debug / Preview / 内部测试文案不作为本轮首发阻塞。
 - 财富页使用 Economy screen snapshot / read model 聚合，SwiftUI 视图不直接在 body 中重放账本或扫描成员模型；后续若大数据仍卡顿，再继续拆后台 snapshot store。
-- Calendar / Today Focus / 通知中的宠物照护任务完成不是独立经济活动；它必须等价进入照护事实 + `QuestManager.awardAction` 预算 / 冷却管线。普通非照护日程完成不得凭空产生椰子。
+- Task Center / Calendar / 通知中的宠物照护任务完成不是独立经济活动；它必须等价进入照护事实 + `QuestManager.awardAction` 预算 / 冷却管线。普通非照护日程完成不得凭空产生椰子。
 - 撤销一个已经完成的 Calendar 照护 occurrence 是纠错操作：必须撤销该 occurrence 生成的照护事实、照护账本、钱包奖励与预算占用；钱包以反向冲销流水表达，不物理删除历史奖励流水。
 
 ## 业务不变量
@@ -52,7 +52,7 @@
 - ECO-019：商店购买以全岛未冻结人类钱包作为可支配池；买家优先出资，其他人类钱包只补差额并记录各自支出流水。任何一笔出资失败时必须回滚整笔购买。
 - ECO-020：本机 FamilyTasks 悬赏确认是钱包转账事实边界。若 payer 余额不足、钱包冻结、转账重复键冲突或持久化失败，确认命令必须返回失败并保持任务待审核；不得吞错后展示完成态，也不得落下半笔钱包 / ledger 事实。
 - ECO-021：任何新增奖励入口必须能被 `scripts/audit-economy-boundaries.sh --all` 证明没有散落的 actor 归属缺口；若入口没有明确 executor，必须在规则书记录产品理由和 fallback owner。
-- ECO-022：Calendar / Today Focus / 通知完成宠物照护任务时，奖励归属、预算、冷却与钱包写入必须与同类型 QuickCare 照护动作等价；不得再使用单独的“Calendar 完成奖励”小管线。
+- ECO-022：Task Center / Calendar / 通知完成宠物照护任务时，奖励归属、预算、冷却与钱包写入必须与同类型 QuickCare 照护动作等价；不得再使用单独的“Calendar 完成奖励”小管线。
 - ECO-023：取消完成 Calendar 照护 occurrence 时，必须按 occurrence 幂等撤销该次生成的奖励和预算占用；钱包用 `refund` / reversal 流水冲销，预算使用事件写删除 tombstone 后移除。
 - ECO-024（收口纪律，2026-06-13 拍板）：奖励派生是**纪律**而非**单一漏斗**。所有奖励入口分两个家族，二者都受 `audit-economy-boundaries.sh` 的 R5 规则覆盖，均不得 ad-hoc 直调 `awardAction`：
   - **家族 1 照护事实**（产出 `PetCareLog` 类：喂食/喝水/便便/遛狗/用药剂量/清洁/健康记录/体重）→ 经 `CareEventService.recordCareFact` 收口，事实+奖励+账本+派生在一处一致发生。
@@ -61,8 +61,9 @@
   - 花费归属家族 2 且含 human expense（pet/human 对称，D10），不按宠物/人类拆分。
 - ECO-025（历史 farm-risk）：花费记录可产出椰子奖励曾被登记为"记假账→刷椰子"风险；TFU-20260613-010 已归档为 Done。当前规则是：Expense 属于家族 2 非照护奖励，必须经共享奖励原语、明确 executor、预算/冷却和钱包写入纪律；若未来改变花费发奖/限额/凭证策略，重新开新的 active TFU，不复用已归档编号。
 - ECO-026（冻结成员照护行为，2026-06-14 产品主人拍板二态模型，实现 G4.1）：① active 照护对象正常写事实，所有 reward / ledger / reminder / stock / Oasis / revision 派生必须统一经照护派生执行器裁决；② 离世成员（`hasPassedAway`）作为照护对象时完全只读，任何照护写入、编辑、历史补记和派生都必须 no-op；③ 用户可见回收站 / 可恢复删除 / 删除中转态取消，旧软删字段仅允许作为 legacy store compatibility 存在，不再作为照护写入或钱包写入边界；④ 非空显式 executor id 若不可解析、已被物理删除或不可写（含离世），**不得丢失 active 照护对象的事实**：事实仍写入，奖励归属走明确 fallback（可写 active human；没有可用 owner 则 fact-only 无奖励），且不得把奖励伪装成原 executor；⑤ 共享照护 target 解析必须只接受 active target，离世 target 被过滤或整体 no-op，不允许半笔账。
-- ECO-027（补记奖励按操作日，强化 ECO-010 至所有完成入口）：Calendar / 通知 / Today Focus / QuickCare 补完成历史 occurrence 时，active 照护对象的照护事实保留历史日期，但奖励的预算/冷却结算必须按**操作当日 dayKey**，不得写入历史 dayKey 绕过今日预算触顶。离世照护对象不补写历史事实。所有"完成照护任务"的入口一致适用。
-- ECO-028（岛屿启动赠礼与 Oasis 注入）：D17 的一次性 50 椰子由系统发放到 `system:island`，不得绑定 Human/Pet。旧 v2 赠礼若已落入成员钱包，以一次性成对转账事实把当前仍可用的赠礼余额重分类到岛屿储备，并写幂等 marker；不得改写或删除旧流水。生命树注入可使用全部正式岛屿资产，固定按岛屿储备优先、当前 active Human 次优先、其余活跃成员稳定顺序出资；所有出资、注入 ledger 与能量事实必须同一事务提交，任何余额不足或保存失败都整体不生效。
+- ECO-027（补记奖励按操作日，强化 ECO-010 至所有完成入口）：Task Center / Calendar / 通知 / QuickCare 补完成历史 occurrence 时，active 照护对象的照护事实保留历史日期，但奖励的预算/冷却结算必须按**操作当日 dayKey**，不得写入历史 dayKey 绕过今日预算触顶。离世照护对象不补写历史事实。所有"完成照护任务"的入口一致适用。
+- ECO-028（岛屿启动赠礼与 Oasis 注入）：D17 的一次性 50 椰子在第一只有效 Pet 保存后进入待领取状态，只有用户点击领取才由系统原子写入 `system:island`，不得绑定 Human/Pet，也不要求首次照护。确定性交易键保证重复点击与崩溃恢复不重复发放；领取成功前 Oasis 隐藏。旧 v2 赠礼若已落入成员钱包，以一次性成对转账事实把当前仍可用的赠礼余额重分类到岛屿储备，并写幂等 marker；不得改写或删除旧流水。生命树注入可使用全部正式岛屿资产，固定按岛屿储备优先、当前 active Human 次优先、其余活跃成员稳定顺序出资；所有出资、注入 ledger 与能量事实必须同一事务提交，任何余额不足或保存失败都整体不生效。
+- ECO-029（新手成长计划）：D28 六项家庭级一次性任务合计产出 400 椰子，固定为 100 / 100 / 60 / 80 / 40 / 20。奖励只在用户从 Task Center 明确领取时写入当前有效 Human 钱包；它不是照护频次奖励，不消耗每日照护预算、不增加成长 XP，也不得进入 `system:island` 或 `system:legacy`。领取前必须在同一 command 内重新验证真实资料、证件、保健、计划或照护事实；家庭 + 任务稳定交易键保证重复点击与崩溃恢复不重复发放。资格 checkpoint 只保存任务、选择结果和不透明目标 ID，不复制敏感资料值；填写与明确选择暂无、不适用、不清楚或不愿透露具有相同完成权重。奖励 marker、钱包流水与余额必须同一事务保存，失败整体回滚。旧“首次喂食 +15”和“主动主题色 +10”事实及历史流水保留兼容，但新行为不再产出这两笔隐藏奖励；既有成就奖励继续按其独立规则运行。
 
 ## 当前代码来源
 
@@ -74,11 +75,12 @@
 - 迁移导入会创建 `system:legacy` 兼容账户承接旧全岛总数差额：`Ohana/Domain/Economy/CoconutWalletService.swift:842`。
 - `legacyHistory` 迁移流水以 `affectsBalance == false` 写入：`Ohana/Domain/Economy/CoconutWalletService.swift:888`。
 - D17 启动赠礼与旧赠礼归属迁移由 `StarterGiftService` 写入 `system:island`；Oasis 注入的全岛资金计划与原子扣款由 `OasisCritterEconomyService.spendAvailableCoconuts` 执行。
+- D28 新手成长计划的资格、隐私确认 checkpoint 与领取由 `HouseholdStarterJourneyService` 收口；领取以 `CareLedgerEvent` 奖励 marker 与正式 Human 钱包流水构成同一持久化事务，Task Center 只消费 `Sendable` 快照并发出命令。
 - 每日预算裁决与 `recordOnly` 反馈文案定义在 `CoconutEconomyPolicyV2`：`Ohana/Features/Economy/CoconutEconomyPolicyV2.swift:55`、`Ohana/Features/Economy/CoconutEconomyPolicyV2.swift:120`。
 - 奖励反馈 UI 通过 `CoconutRewardFeedbackOverlay` 展示事件标题：`Ohana/Features/TodayFocus/Views/CheckInRewardFeedback.swift:89`。
 - 普通照护记录先用用户选择的 `date` 写照护事实，再调用经济奖励入口；奖励入口默认以当前操作时间做预算 / 冷却裁决：`Ohana/Domain/Services/CareEventService.swift:82`、`Ohana/Domain/Services/CareEventRecording.swift:567`、`Ohana/Features/Economy/QuestManager+Awards.swift:17`。
 - 预算使用事件的 `dayKey` 来自经济奖励裁决日期，`createdAt` 保留真实写入时间：`Ohana/Features/Economy/CoconutEconomyPolicyV2.swift:653`。
-- Calendar / Today Focus / 通知完成宠物照护任务统一经 `CalendarTaskCompletionSyncService` 生成照护事实，再进入 `QuestManager.awardAction`；旧 `EventCompletionCommandService.awardCompletionIfEligible` 仅保留兼容 no-op，不得直接写钱包 / ledger / 预算事件。
+- Task Center / Calendar / 通知完成宠物照护任务统一经 `CalendarTaskCompletionSyncService` 生成照护事实，再进入 `QuestManager.awardAction`；旧 `EventCompletionCommandService.awardCompletionIfEligible` 仅保留兼容 no-op，不得直接写钱包 / ledger / 预算事件。
 - 首发兑换入口由 `CoconutExchangeFeatureGate` 统一关闭；Shop、Home read model、Today Focus snapshot 与 `CoconutExchangeService` 写命令均必须读取同一判定点。
 - 奖励 owner 解析由 `EconomyRewardOwnerResolver` 统一：`Ohana/Features/Economy/EconomyRewardOwnerResolver.swift`。
 - 体重、宠物花费、宠物健康、补签、手动宠物里程碑等奖励入口均由各自 command/service 将 owner 传入 `QuestManager.awardAction`，并由 `OhanaTests/RecurringFindingsRepairTests.swift` 覆盖 executor 不回落 active human。
@@ -136,6 +138,6 @@
 - 本轮不启用 CloudKit，不修改联机同步语义。
 - `OnlineFeatureGate` 继续关闭跨设备协作，但不得阻断同设备家庭悬赏；本地可达性不改变 ECO-020 的审核、幂等与原子转账要求。
 - `system:legacy` 可继续保留在数据库中用于迁移兼容与开发测试，但正式资产总数、财富页排行榜、椰子历史总额不计入它。
-- 补记结算只管“用户提交历史日期照护事实”的奖励预算 / 冷却日期；不改变 Today Focus 每日完成奖、商店、成就、里程碑、绿洲注入包、自动备份或通知预算语义。
+- 补记结算只管“用户提交历史日期照护事实”的奖励预算 / 冷却日期；Today Focus 每日完成奖已取消，不得从不可见服务重新触发；其余商店、成就、里程碑、绿洲注入包、自动备份或通知预算语义不变。
 - `CoconutExchangeRequest` 继续参与 schema、备份、恢复与历史数据兼容；首发只是入口不可达，不执行 CloudKit 或合资流程。
 - 财富页 snapshot 化不改变余额事实源；它只改变 UI 聚合边界。

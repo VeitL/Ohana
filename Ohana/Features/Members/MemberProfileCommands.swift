@@ -467,7 +467,7 @@ enum MemberProfileCommandService {
             let trimmedEmoji = avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
             pet.avatarEmoji = trimmedEmoji.isEmpty ? "🐾" : trimmedEmoji
         }
-        pet.species = Pet.canonicalSpeciesKey(input.species)
+        pet.species = Pet.normalizedSpeciesStorageValue(input.species)
         pet.breed = input.breed.trimmingCharacters(in: .whitespacesAndNewlines)
         if let sex = Pet.canonicalSex(input.gender) {
             pet.gender = sex

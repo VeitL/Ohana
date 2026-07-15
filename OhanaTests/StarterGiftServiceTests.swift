@@ -13,7 +13,7 @@ struct StarterGiftServiceTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
-        let result = StarterGiftService.prepareOrClaim(
+        let result = StarterGiftService.evaluateEligibility(
             activeHumanID: nil,
             context: context,
             defaults: defaults
@@ -22,9 +22,10 @@ struct StarterGiftServiceTests {
         #expect(result == .pendingFirstPet)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.ceremonyRequested))
     }
 
-    @Test func petFirstJourneyWaitsForCareThenClaimsIntoIslandReserve() throws {
+    @Test func firstActivePetMakesGiftReadyWithoutCareAndConfirmationClaimsIntoIslandReserve() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -35,21 +36,19 @@ struct StarterGiftServiceTests {
         let pet = Pet(name: "Momo", species: "cat")
         context.insert(pet)
         context.safeSave()
-        let waitingForCare = StarterGiftService.prepareOrClaim(
+        let ready = StarterGiftService.evaluateEligibility(
             activeHumanID: nil,
             context: context,
             defaults: defaults
         )
 
-        #expect(waitingForCare == .pendingFirstCare(recipient: .island))
+        #expect(ready == .readyToClaim(recipient: .island, amount: StarterGiftService.giftAmount))
         #expect(pet.coconutBalance == 0)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
 
-        context.insert(PetWeightLog(weight: 4.2, pet: pet))
-        context.safeSave()
-
-        let result = StarterGiftService.prepareOrClaim(
+        let result = StarterGiftService.claimStarterGift(
             activeHumanID: nil,
             context: context,
             defaults: defaults
@@ -64,6 +63,10 @@ struct StarterGiftServiceTests {
         #expect(CoconutWalletService.totalBalance(context: context) == StarterGiftService.giftAmount)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.pending))
+
+        defaults.set(true, forKey: StarterGiftStorageKey.ceremonyRequested)
+        StarterGiftService.markCeremonySeen(defaults: defaults)
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.ceremonyRequested))
 
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledger.count == 1)
@@ -86,10 +89,16 @@ struct StarterGiftServiceTests {
         let pet = Pet(name: "Momo", species: "cat")
         context.insert(human)
         context.insert(pet)
-        context.insert(PetWeightLog(weight: 4.2, pet: pet))
         context.safeSave()
 
-        let result = StarterGiftService.prepareOrClaim(
+        let eligibility = StarterGiftService.evaluateEligibility(
+            activeHumanID: human.id.uuidString,
+            context: context,
+            defaults: defaults
+        )
+        #expect(eligibility == .readyToClaim(recipient: .island, amount: StarterGiftService.giftAmount))
+
+        let result = StarterGiftService.claimStarterGift(
             activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
@@ -107,6 +116,30 @@ struct StarterGiftServiceTests {
         #expect(StarterGiftService.shouldShowCeremony(defaults: defaults))
     }
 
+    @Test func memorialPetDoesNotMakeStarterGiftEligible() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = Date()
+        context.insert(pet)
+        context.safeSave()
+
+        let result = StarterGiftService.evaluateEligibility(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+
+        #expect(result == .pendingFirstPet)
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
+    }
+
     @Test func persistedGiftRecoversDefaultsWithoutMintingTwice() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -117,10 +150,9 @@ struct StarterGiftServiceTests {
         #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
         let pet = Pet(name: "Momo", species: "cat")
         context.insert(pet)
-        context.insert(PetWeightLog(weight: 4.2, pet: pet))
         context.safeSave()
 
-        let first = StarterGiftService.prepareOrClaim(
+        let first = StarterGiftService.claimStarterGift(
             activeHumanID: nil,
             context: context,
             defaults: defaults
@@ -129,7 +161,7 @@ struct StarterGiftServiceTests {
 
         defaults.removeObject(forKey: StarterGiftStorageKey.claimed)
         defaults.set(true, forKey: StarterGiftStorageKey.pending)
-        let recovered = StarterGiftService.prepareOrClaim(
+        let recovered = StarterGiftService.claimStarterGift(
             activeHumanID: nil,
             context: context,
             defaults: defaults
@@ -143,6 +175,8 @@ struct StarterGiftServiceTests {
         ) == StarterGiftService.giftAmount)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.pending))
+        #expect(StarterGiftService.shouldShowCeremony(defaults: defaults))
+        #expect(!StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults))
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).count == 1)
     }
@@ -182,13 +216,13 @@ struct StarterGiftServiceTests {
         )
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
 
-        let first = StarterGiftService.prepareOrClaim(
+        let first = StarterGiftService.evaluateEligibility(
             activeHumanID: nil,
             context: context,
             defaults: defaults
         )
         let entryCountAfterFirst = try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>())
-        let second = StarterGiftService.prepareOrClaim(
+        let second = StarterGiftService.evaluateEligibility(
             activeHumanID: nil,
             context: context,
             defaults: defaults
@@ -220,7 +254,7 @@ struct StarterGiftServiceTests {
         context.safeSave()
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let result = StarterGiftService.prepareOrClaim(
+        let result = StarterGiftService.evaluateEligibility(
             activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
@@ -231,6 +265,115 @@ struct StarterGiftServiceTests {
         #expect(defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
         #expect(human.coconutBalance == 0)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+    }
+
+    @Test func completedLegacyOnboardingWithNoLocalMembersDoesNotStartANewGiftJourney() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let result = StarterGiftService.evaluateEligibility(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+
+        #expect(result == .markedExistingUser)
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.pending))
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+    }
+
+    @Test func repeatedConfirmationMintsStarterGiftOnlyOnce() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
+        context.insert(Pet(name: "Momo", species: "cat"))
+        context.safeSave()
+
+        let first = StarterGiftService.claimStarterGift(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+        let second = StarterGiftService.claimStarterGift(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+
+        #expect(first == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
+        #expect(second == .alreadyHandled)
+        #expect(first.completesClaimRequest)
+        #expect(second.completesClaimRequest)
+        #expect(try context.fetchCount(FetchDescriptor<CareLedgerEvent>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>()) == 1)
+    }
+
+    @Test func homeProjectionGateUsesTheVisibleBalanceInsteadOfTheWholeWallet() {
+        let claimed = StarterGiftHomeProjectionPolicy.expectedVisibleBalance(
+            after: .claimed(recipient: .island, amount: StarterGiftService.giftAmount),
+            visibleBalanceBeforeRequest: 12,
+            existingExpectation: nil
+        )
+        let retry = StarterGiftHomeProjectionPolicy.expectedVisibleBalance(
+            after: .alreadyHandled,
+            visibleBalanceBeforeRequest: 12,
+            existingExpectation: claimed
+        )
+        let crashRecovery = StarterGiftHomeProjectionPolicy.expectedVisibleBalance(
+            after: .alreadyHandled,
+            visibleBalanceBeforeRequest: 62,
+            existingExpectation: nil
+        )
+
+        #expect(claimed == 62)
+        #expect(retry == 62)
+        #expect(crashRecovery == 62)
+    }
+
+    @Test func failedConfirmationLeavesGiftReadyAndDoesNotUnlockOasis() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
+        context.insert(Pet(name: "Momo", species: "cat"))
+        context.safeSave()
+
+        let result = StarterGiftService.claimStarterGift(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults,
+            wallet: FailingCoconutWalletManager()
+        )
+
+        #expect(result == .persistenceFailed)
+        #expect(!result.completesClaimRequest)
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
+        #expect(!StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults))
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+
+        let retry = StarterGiftService.claimStarterGift(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        )
+        #expect(retry == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
+        #expect(try context.fetchCount(FetchDescriptor<CareLedgerEvent>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>()) == 1)
     }
 
     private func makeDefaultsSuiteName() -> String {
@@ -247,5 +390,45 @@ struct StarterGiftServiceTests {
         let schema = Schema(ArkSchemaV64.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private final class FailingCoconutWalletManager: CoconutWalletManaging {
+        enum Failure: Error { case forced }
+
+        func apply(
+            deltas _: [CoconutWalletDelta],
+            context _: ModelContext,
+            save _: Bool,
+            postsRewardFeedback _: Bool,
+            updatesProjection _: Bool,
+            projectionManager _: CoconutProjectionManaging?
+        ) throws -> [CoconutLedgerEntry] {
+            throw Failure.forced
+        }
+
+        func applyActorDelta(
+            amount _: Int,
+            emoji _: String,
+            title _: String,
+            actorId _: String?,
+            actorName _: String?,
+            entryKind _: CoconutWalletEntryKind,
+            source _: CoconutWalletSource,
+            context _: ModelContext,
+            save _: Bool,
+            postsRewardFeedback _: Bool,
+            projectionManager _: CoconutProjectionManaging?
+        ) throws -> [CoconutLedgerEntry] {
+            throw Failure.forced
+        }
+
+        func totalBalance(context _: ModelContext) -> Int { 0 }
+        func balance(accountKey _: String, context _: ModelContext, fallback: Int) -> Int { fallback }
+        func balance(for human: Human, context _: ModelContext) -> Int { human.coconutBalance }
+        func balance(for pet: Pet, context _: ModelContext) -> Int { pet.coconutBalance }
+        func legacySystemBalance(context _: ModelContext, fallback: Int) -> Int { fallback }
+        func setDeveloperOverrideBalance(amount _: Int, for _: Human?, displayName _: String, context _: ModelContext) {}
+        func refreshQuestProjection(context _: ModelContext, manager _: CoconutProjectionManaging?) {}
+        func bootstrapIfNeeded(context _: ModelContext, projectionManager _: CoconutProjectionManaging?) throws {}
     }
 }

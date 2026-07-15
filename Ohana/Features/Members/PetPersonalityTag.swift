@@ -108,8 +108,20 @@ nonisolated struct PetPersonalityTag: Identifiable, Hashable {
         .init(id: "chatty", sfSymbol: "bubble.left.fill", titleZh: "碎碎念", titleEn: "Chatty", titleDe: "Plaudrig")
     ]
 
-    /// 第一版创建与主性格编辑共同使用的精简目录。
+    /// 现有宠物编辑页继续使用的精简目录。
     static let primaryChoices = Array(allTags.prefix(8))
+
+    /// 创建流专用的精简目录。编辑页继续使用 `primaryChoices`，
+    /// 避免首次创建的信息架构调整扩散到已有档案编辑。
+    static let creationChoices: [PetPersonalityTag] = {
+        let ids = [
+            "curious", "lazy", "energetic", "clingy", "smart",
+            "toy", "foodie", "drama", "clean", "shy",
+            "brave", "social", "gentle", "quiet", "stubborn",
+            "vocal", "guardian", "independent", "loyal", "chill"
+        ]
+        return ids.compactMap(lookup)
+    }()
 
     static func lookup(_ id: String) -> PetPersonalityTag? {
         allTags.first { $0.id == id }
