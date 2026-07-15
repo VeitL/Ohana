@@ -248,9 +248,12 @@ require_pattern "$member_deletion_commands" 'let attachmentCleanup = cleanDelete
 require_pattern "$member_deletion_commands" 'HumanNoteAttachmentStore\.deleteHumanDirectory\(' \
   "Human deletion must use the Human Notes directory cleanup boundary."
 
-require_section_pattern "$app_reset" 'let preservedDefaults' 'resetLocalDefaults' \
-  'HumanNoteAttachmentStore\.deleteAll\(storage: attachmentStorage\)' \
+require_section_pattern "$app_reset" 'let preservedDefaults' 'HumanNoteAttachmentStore\.deleteAll\(storage: attachmentStorage\)' \
+  'try deletePersistentModels\(context: context, deletePersistentData: deletePersistentData\)' \
   "Delete-all Reset must remove the Human Notes root after the database commit."
+
+require_pattern "$app_reset" 'HumanNoteAttachmentStore\.deleteAll\(storage: attachmentStorage\)' \
+  "Delete-all Reset must remove the Human Notes root after persistent data deletion succeeds."
 
 require_pattern "$human_note_attachment_tests" 'noteDeletionPreservesSharedReferenceThenRemovesItWhenLastReferenceIsDeleted' \
   "Release data safety must test shared Human Note attachment references and repeated deletion."
@@ -261,15 +264,14 @@ require_pattern "$human_note_attachment_tests" 'noteDeletionSaveFailurePreserves
 require_pattern "$human_note_attachment_tests" 'humanDeletionClearsOwnedAndOrphanFilesButPreservesSharedReference' \
   "Release data safety must test Human-directory cleanup without breaking surviving shared references."
 
-require_pattern "$human_note_attachment_tests" 'appResetSaveFailureLeavesDatabaseAndAttachmentRootUntouched' \
-  "Release data safety must prove failed Reset commits leave the Human Notes root intact."
+require_pattern "$human_note_attachment_tests" 'appResetStoreDeletionFailureLeavesDatabaseAndAttachmentRootUntouched' \
+  "Release data safety must prove failed Reset store deletion leaves the Human Notes root intact."
 
 require_pattern "OhanaTests/LocalBackupExclusionPolicyTests.swift" 'marksDirectoriesAndFilesAsExcludedFromDeviceBackup' \
   "Release data safety must test directory and file backup-exclusion resource values."
 
-require_section_pattern "$app_reset" 'private static func deleteAllPersistentModels' 'private static func delete<' \
-  'delete\(EconomyBudgetUsageEvent\.self' \
-  "Delete-all reset must remove bounded local economy budget guardrail events instead of retaining user-linked rows."
+require_pattern "$app_reset" 'deletePersistentData: \{ \$0\.deleteAllData\(\) \}' \
+  "Delete-all reset must use the full-store deletion boundary so every current and future persisted model is removed."
 
 require_pattern "$app_reset" '"economyV2\."' \
   "Delete-all reset must clear economyV2 daily-budget defaults together with persistent guardrail events."
