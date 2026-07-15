@@ -782,17 +782,17 @@ struct TaskCenterView: View {
         }
         switch destination {
         case .createFirstPet:
-            l.tr(zh: "建立", en: "Create", de: "Erstellen")
+            return l.tr(zh: "建立", en: "Create", de: "Erstellen")
         case .claimStarterGift:
-            l.tr(zh: "领取", en: "Claim", de: "Abholen")
+            return l.tr(zh: "领取", en: "Claim", de: "Abholen")
         case .completeHumanProfile, .completeFirstPetProfile:
-            l.tr(zh: "完善", en: "Complete", de: "Ergänzen")
+            return l.tr(zh: "完善", en: "Complete", de: "Ergänzen")
         case .confirmPetIdentityProtection, .confirmPetPreventiveCare:
-            l.tr(zh: "确认", en: "Review", de: "Prüfen")
+            return l.tr(zh: "确认", en: "Review", de: "Prüfen")
         case .configureFirstCarePlan:
-            l.tr(zh: "设置", en: "Set up", de: "Einrichten")
+            return l.tr(zh: "设置", en: "Set up", de: "Einrichten")
         case .recordFirstCare:
-            l.tr(zh: "记录", en: "Record", de: "Erfassen")
+            return l.tr(zh: "记录", en: "Record", de: "Erfassen")
         }
     }
 
@@ -806,23 +806,23 @@ struct TaskCenterView: View {
         }
         switch item.systemDestination {
         case .createFirstPet:
-            l.tr(zh: "开始建立宠物", en: "Start creating a pet", de: "Haustier erstellen")
+            return l.tr(zh: "开始建立宠物", en: "Start creating a pet", de: "Haustier erstellen")
         case .claimStarterGift:
-            l.tr(zh: "打开首宠奖励领取弹窗", en: "Open the first-pet gift", de: "Belohnung für das erste Tier öffnen")
+            return l.tr(zh: "打开首宠奖励领取弹窗", en: "Open the first-pet gift", de: "Belohnung für das erste Tier öffnen")
         case .completeHumanProfile:
-            l.tr(zh: "查看并完善人类资料", en: "Review and complete the human profile", de: "Menschenprofil ergänzen")
+            return l.tr(zh: "查看并完善人类资料", en: "Review and complete the human profile", de: "Menschenprofil ergänzen")
         case .completeFirstPetProfile:
-            l.tr(zh: "查看并完善宠物资料", en: "Review and complete the pet profile", de: "Haustierprofil ergänzen")
+            return l.tr(zh: "查看并完善宠物资料", en: "Review and complete the pet profile", de: "Haustierprofil ergänzen")
         case .confirmPetIdentityProtection:
-            l.tr(zh: "确认宠物证件与保障状态", en: "Review identity and protection details", de: "Dokumente und Schutz prüfen")
+            return l.tr(zh: "确认宠物证件与保障状态", en: "Review identity and protection details", de: "Dokumente und Schutz prüfen")
         case .confirmPetPreventiveCare:
-            l.tr(zh: "确认疫苗与保健状态", en: "Review preventive care status", de: "Vorsorge prüfen")
+            return l.tr(zh: "确认疫苗与保健状态", en: "Review preventive care status", de: "Vorsorge prüfen")
         case .configureFirstCarePlan:
-            l.tr(zh: "设置一个适用的照护计划", en: "Set up a suitable care plan", de: "Pflegeplan einrichten")
+            return l.tr(zh: "设置一个适用的照护计划", en: "Set up a suitable care plan", de: "Pflegeplan einrichten")
         case .recordFirstCare:
-            l.tr(zh: "记录一次真实照护", en: "Record a real care action", de: "Eine echte Pflege erfassen")
+            return l.tr(zh: "记录一次真实照护", en: "Record a real care action", de: "Eine echte Pflege erfassen")
         case nil:
-            l.tr(zh: "打开事项", en: "Open task", de: "Aufgabe öffnen")
+            return l.tr(zh: "打开事项", en: "Open task", de: "Aufgabe öffnen")
         }
     }
 
