@@ -3,18 +3,27 @@ import XCTest
 
 @MainActor
 final class PlantFeatureGateXCTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
+    private var starterGiftDefaults: UserDefaults!
+    private var starterGiftSuiteName = ""
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        starterGiftSuiteName = "PlantFeatureGateXCTests.\(UUID().uuidString)"
+        starterGiftDefaults = try XCTUnwrap(UserDefaults(suiteName: starterGiftSuiteName))
+        starterGiftDefaults.set(true, forKey: StarterGiftStorageKey.claimed)
+        starterGiftDefaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
         PlantUnlockPolicy.clearExistingPlantData()
         PlantLockedPreviewPolicy.clearOnboardingPlantInterest()
         PlantCatalogFavoriteStore.clearFavorites()
     }
 
-    override func tearDown() {
+    override func tearDownWithError() throws {
         PlantUnlockPolicy.clearExistingPlantData()
         PlantLockedPreviewPolicy.clearOnboardingPlantInterest()
         PlantCatalogFavoriteStore.clearFavorites()
-        super.tearDown()
+        starterGiftDefaults.removePersistentDomain(forName: starterGiftSuiteName)
+        starterGiftDefaults = nil
+        try super.tearDownWithError()
     }
 
     func testPlantBuildGateIsOpenButEntrySurfacesUnlockAtLevelFour() {
@@ -23,8 +32,8 @@ final class PlantFeatureGateXCTests: XCTestCase {
         XCTAssertTrue(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 4))
         XCTAssertFalse(AppFeatureRouteGuard.allowsAppRoute(.plantProfile(id: UUID()), currentLevel: 3))
         XCTAssertTrue(AppFeatureRouteGuard.allowsAppRoute(.plantProfile(id: UUID()), currentLevel: 4))
-        XCTAssertFalse(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3).contains(.plants))
-        XCTAssertTrue(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 4).contains(.plants))
+        XCTAssertFalse(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3, starterGiftDefaults: starterGiftDefaults).contains(.plants))
+        XCTAssertTrue(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 4, starterGiftDefaults: starterGiftDefaults).contains(.plants))
         XCTAssertTrue(AppFeatureRouteGuard.shouldLoadPlantData)
     }
 
@@ -33,7 +42,7 @@ final class PlantFeatureGateXCTests: XCTestCase {
 
         XCTAssertTrue(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
         XCTAssertTrue(AppFeatureRouteGuard.allowsAppRoute(.plantProfile(id: UUID()), currentLevel: 3))
-        XCTAssertTrue(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3).contains(.plants))
+        XCTAssertTrue(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3, starterGiftDefaults: starterGiftDefaults).contains(.plants))
     }
 
     func testLockedPreviewDoesNotUnlockPlantEntrySurfaces() {
@@ -42,7 +51,7 @@ final class PlantFeatureGateXCTests: XCTestCase {
         XCTAssertTrue(PlantLockedPreviewPolicy.shouldShowLockedPreview(currentLevel: 3))
         XCTAssertFalse(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
         XCTAssertFalse(AppFeatureRouteGuard.allowsAppRoute(.plantProfile(id: UUID()), currentLevel: 3))
-        XCTAssertFalse(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3).contains(.plants))
+        XCTAssertFalse(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3, starterGiftDefaults: starterGiftDefaults).contains(.plants))
         XCTAssertEqual(PlantLockedPreviewPolicy.energyRemainingForUnlock(currentEnergy: 300), 200)
     }
 

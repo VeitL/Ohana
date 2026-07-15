@@ -182,12 +182,21 @@ struct GrowthUnlockPolicyTests {
         PlantUnlockPolicy.clearExistingPlantData()
         defer { PlantUnlockPolicy.clearExistingPlantData() }
 
+        let suiteName = "GrowthUnlockPolicyTests.existingPlantDataGrandfathersPlantAccessBeforeLevelFour.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            Issue.record("Expected isolated defaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+        defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
+
         #expect(!AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
 
         PlantUnlockPolicy.noteExistingPlantData()
 
         #expect(AppFeatureRouteGuard.allowsAddEntity(.plant, currentLevel: 3))
-        #expect(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3).contains(.plants))
+        #expect(AppFeatureRouteGuard.visibleHomeTabs(currentLevel: 3, starterGiftDefaults: defaults).contains(.plants))
         if case .allow(.plantsDashboard) = AppFeatureRouteGuard.functionDestinationDecision(.plantsDashboard, currentLevel: 3) {
         } else {
             Issue.record("Expected existing plant data to keep the plant dashboard reachable")

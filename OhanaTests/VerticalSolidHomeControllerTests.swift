@@ -1,12 +1,18 @@
+import Foundation
 import Testing
 @testable import Ohana
 
 @MainActor
 struct VerticalSolidHomeControllerTests {
     @Test func selectingUnpreparedTabMovesImmediatelyIntoPreparingState() {
+        let suiteName = "VerticalSolidHomeControllerTests.selectingUnpreparedTab.\(UUID().uuidString)"
+        guard let defaults = unlockedStarterGiftDefaults(suiteName: suiteName) else { return }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
         let controller = VerticalSolidHomeController(
             initialSnapshot: .empty,
-            initialSignature: "initial"
+            initialSignature: "initial",
+            starterGiftDefaults: defaults
         )
 
         controller.select(.oasis)
@@ -20,9 +26,14 @@ struct VerticalSolidHomeControllerTests {
     }
 
     @Test func selectingPreparedTabDoesNotEnterPreparingState() {
+        let suiteName = "VerticalSolidHomeControllerTests.selectingPreparedTab.\(UUID().uuidString)"
+        guard let defaults = unlockedStarterGiftDefaults(suiteName: suiteName) else { return }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
         let controller = VerticalSolidHomeController(
             initialSnapshot: .empty,
-            initialSignature: "initial"
+            initialSignature: "initial",
+            starterGiftDefaults: defaults
         )
 
         controller.select(.oasis)
@@ -75,5 +86,15 @@ struct VerticalSolidHomeControllerTests {
         #expect(request?.signature == "signature-new")
         #expect(request?.delayMilliseconds == HomeSnapshotRefreshGate.postHeroDelayMilliseconds)
         #expect(gate.pendingSignature == nil)
+    }
+
+    private func unlockedStarterGiftDefaults(suiteName: String) -> UserDefaults? {
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            Issue.record("Expected isolated defaults suite")
+            return nil
+        }
+        defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+        defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
+        return defaults
     }
 }

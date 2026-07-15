@@ -58,15 +58,21 @@ final class VerticalSolidHomeController: ObservableObject {
     @Published private(set) var preparedTabs: Set<VerticalSolidHomeTab> = [.home]
     @Published private(set) var snapshot: VerticalSolidHomeSnapshot
 
+    private let starterGiftDefaults: UserDefaults
     private var snapshotSignature: String
     private var snapshotTask: Task<Void, Never>?
     private var warmupTask: Task<Void, Never>?
     private var deferredPrepareTask: Task<Void, Never>?
     private var outgoingCleanupTask: Task<Void, Never>?
 
-    init(initialSnapshot: VerticalSolidHomeSnapshot, initialSignature: String) {
+    init(
+        initialSnapshot: VerticalSolidHomeSnapshot,
+        initialSignature: String,
+        starterGiftDefaults: UserDefaults = .standard
+    ) {
         snapshot = initialSnapshot
         snapshotSignature = initialSignature
+        self.starterGiftDefaults = starterGiftDefaults
     }
 
     var isCurrentTabPrepared: Bool {
@@ -74,7 +80,7 @@ final class VerticalSolidHomeController: ObservableObject {
     }
 
     func select(_ tab: VerticalSolidHomeTab) {
-        guard AppFeatureRouteGuard.allowsHomeTab(tab) else {
+        guard AppFeatureRouteGuard.allowsHomeTab(tab, starterGiftDefaults: starterGiftDefaults) else {
             AppFeatureRouteGuard.recordIntercept("homeTab:\(tab.rawValue)")
             return
         }
@@ -101,7 +107,7 @@ final class VerticalSolidHomeController: ObservableObject {
     }
 
     func startWarmup() {
-        let visibleTabs = AppFeatureRouteGuard.visibleHomeTabs
+        let visibleTabs = AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: starterGiftDefaults)
         guard preparedTabs.count < visibleTabs.count else { return }
         warmupTask?.cancel()
         warmupTask = Task { @MainActor in
