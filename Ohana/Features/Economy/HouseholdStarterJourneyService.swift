@@ -436,7 +436,7 @@ private extension HouseholdStarterJourneyService {
         return .claimed(task: task, humanID: actingHuman.id, amount: task.rewardCoconuts)
     }
 
-    nonisolated static func makeSnapshotProgress(
+    private nonisolated static func makeSnapshotProgress(
         livingHumans: [Human],
         activeHumanID: UUID?,
         firstLivingPet: Pet?,
@@ -513,7 +513,7 @@ private extension HouseholdStarterJourneyService {
         )
     }
 
-    nonisolated static func makeTaskStates(
+    private nonisolated static func makeTaskStates(
         progress: SnapshotProgress,
         claimedTasks: Set<HouseholdStarterJourneyTask>
     ) -> [HouseholdStarterJourneyTaskState] {
@@ -522,7 +522,7 @@ private extension HouseholdStarterJourneyService {
         }
     }
 
-    nonisolated static func makeTaskState(
+    private nonisolated static func makeTaskState(
         task: HouseholdStarterJourneyTask,
         progress: SnapshotProgress,
         isClaimed: Bool
@@ -587,7 +587,7 @@ private extension HouseholdStarterJourneyService {
         )
     }
 
-    nonisolated static func candidateProgress(
+    private nonisolated static func candidateProgress(
         id: UUID,
         checkpoints: [HouseholdStarterJourneyCheckpoint],
         actual: [HouseholdStarterJourneyCheckpoint: Bool],
@@ -612,7 +612,7 @@ private extension HouseholdStarterJourneyService {
         return CandidateProgress(id: id, completed: completed, resolutions: resolved)
     }
 
-    nonisolated static func selectCandidate(
+    private nonisolated static func selectCandidate(
         _ candidates: [CandidateProgress],
         preferredID: UUID?,
         requiredCount: Int
@@ -875,7 +875,7 @@ private extension HouseholdStarterJourneyService {
         ).hasDefaultRecommendedCarePlan
     }
 
-    nonisolated static func carePlanProgress(
+    private nonisolated static func carePlanProgress(
         for pet: Pet,
         facts: HouseholdStarterJourneyQualificationFacts,
         resolutions: [String: HouseholdStarterJourneyResolution]
@@ -936,14 +936,14 @@ private extension HouseholdStarterJourneyService {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    nonisolated static func encodeCheckpointMetadata(_ metadata: CheckpointMetadata) -> String? {
+    private nonisolated static func encodeCheckpointMetadata(_ metadata: CheckpointMetadata) -> String? {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         guard let data = try? encoder.encode(metadata) else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
-    nonisolated static func decodeCheckpointMetadata(_ value: String) -> CheckpointMetadata? {
+    private nonisolated static func decodeCheckpointMetadata(_ value: String) -> CheckpointMetadata? {
         guard let data = value.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(CheckpointMetadata.self, from: data)
     }
@@ -967,7 +967,7 @@ private extension HouseholdStarterJourneyService {
     }
 
     @MainActor
-    static func resolveActingHuman(
+    private static func resolveActingHuman(
         requestedID: String?,
         activeHumanID: String?,
         humans: [Human]
@@ -1040,8 +1040,4 @@ private extension HouseholdStarterJourneyService {
             l.tr(zh: "完成首次照护", en: "Complete first care", de: "Erste Pflege abschließen")
         }
     }
-}
-
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
