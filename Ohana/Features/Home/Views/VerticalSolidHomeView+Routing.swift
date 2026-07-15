@@ -56,20 +56,20 @@ extension VerticalSolidHomeView {
                 case .claimStarterGift:
                     onRequestStarterGiftClaim()
                 case .completeHumanProfile:
-                    if let id = item.subject.id { routeCoordinator.presentSheet(.humanBasicInfo(id)) }
+                    if let id = item.subject.id { routeCoordinator.openSheet(.humanBasicInfo(id)) }
                 case .completeFirstPetProfile:
-                    if let id = item.subject.id { routeCoordinator.presentSheet(.petBasicInfo(id)) }
+                    if let id = item.subject.id { routeCoordinator.openSheet(.petBasicInfo(id)) }
                 case .confirmPetIdentityProtection:
-                    if let id = item.subject.id { routeCoordinator.presentSheet(.petDocuments(id)) }
+                    if let id = item.subject.id { routeCoordinator.openSheet(.petDocuments(id)) }
                 case .confirmPetPreventiveCare:
                     if let id = item.subject.id {
-                        routeCoordinator.presentSheet(.petHealth(id, initialSection: .preventive))
+                        routeCoordinator.openSheet(.petHealth(id, initialSection: .preventive))
                     }
                 case .configureFirstCarePlan:
-                    if let id = item.subject.id { routeCoordinator.presentSheet(.petFood(id)) }
+                    if let id = item.subject.id { routeCoordinator.openSheet(.petFood(id)) }
                 case .recordFirstCare:
                     if let id = item.subject.id {
-                        routeCoordinator.presentSheet(.petFeed(id, opensManualSheet: true))
+                        routeCoordinator.openSheet(.petFeed(id, opensManualSheet: true))
                     }
                 case nil:
                     break
