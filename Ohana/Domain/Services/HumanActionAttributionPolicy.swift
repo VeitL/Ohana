@@ -30,7 +30,7 @@ extension ExpenseActorAttribution {
         // resolved live Human (or nil), while an unresolved explicit actor
         // correctly suppresses reward side effects.
         let normalizedExecutorId = EconomyRewardOwnerResolver.normalizedExecutorId(executorId)
-        ExpenseActorAttribution(
+        return ExpenseActorAttribution(
             executorId: HumanActionAttributionPolicy.activeHumanID(normalizedExecutorId, context: context)
                 ?? normalizedExecutorId,
             recordedByHumanId: HumanActionAttributionPolicy.activeHumanID(recordedByHumanId, context: context)
