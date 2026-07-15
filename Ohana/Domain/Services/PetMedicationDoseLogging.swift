@@ -93,7 +93,7 @@ nonisolated enum PetMedicationDoseLogging {
         decrementRemaining: Bool = true,
         awardCoconut: Bool = false,
         economy: CareEventEconomyAwarding,
-        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        executorId: String?,
         careLedger providedCareLedger: CareLedgerRecording? = nil,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> Event {
@@ -104,7 +104,7 @@ nonisolated enum PetMedicationDoseLogging {
             decrementRemaining: decrementRemaining,
             awardCoconut: awardCoconut,
             economy: economy,
-            activeHumanSelection: activeHumanSelection,
+            executorId: executorId,
             careLedger: providedCareLedger,
             medicationReminders: providedMedicationReminders
         ).event
@@ -119,14 +119,14 @@ nonisolated enum PetMedicationDoseLogging {
         decrementRemaining: Bool = true,
         awardCoconut: Bool = false,
         economy: CareEventEconomyAwarding,
-        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        executorId: String?,
         careLedger providedCareLedger: CareLedgerRecording? = nil,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> RecordDoseResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         let medicationReminders = providedMedicationReminders ?? DomainServiceDependencyRegistry.medicationReminders(careLedger: careLedger)
         let now = Date()
-        let requestedAssigneeId = activeHumanSelection.currentHumanId
+        let confirmedExecutorId = EconomyRewardOwnerResolver.normalizedExecutorId(executorId)
         let previewIntent = DomainScheduleCreateIntent(
             title: doseEventTitle(petName: pet.name, medicationName: medication.name),
             startDate: now,
@@ -134,15 +134,13 @@ nonisolated enum PetMedicationDoseLogging {
             eventType: EventType.petMedicationDose.rawValue,
             relatedEntityType: relatedEntityTypeMedication,
             relatedEntityId: medication.id.uuidString,
-            assigneeId: requestedAssigneeId,
+            assigneeId: confirmedExecutorId,
             writeKind: .care,
             source: .domainService
         )
-        let actor = CareFactWritePolicy.executorResolution(
-            requestedExecutorId: requestedAssigneeId,
-            context: modelContext,
-            logPrefix: "PetMedicationDoseLogging"
-        )
+        guard let actor = resolvedConfirmedExecutor(executorId: confirmedExecutorId, context: modelContext) else {
+            return rejectedConfirmedExecutorResult(previewIntent: previewIntent)
+        }
         let writeIntent = DomainScheduleCreateIntent(
             title: previewIntent.title,
             startDate: previewIntent.startDate,
@@ -267,6 +265,39 @@ nonisolated enum PetMedicationDoseLogging {
         return .setDouble(
             key: PetMedicationPlanStorageKeys.remainingAmount(medicationID: medication.id),
             value: next
+        )
+    }
+
+    @MainActor
+    private static func resolvedConfirmedExecutor(
+        executorId: String?,
+        context: ModelContext
+    ) -> EconomyRewardOwnerResolution? {
+        if let executorId,
+           EconomyRewardOwnerResolver.explicitHuman(
+               id: executorId,
+               context: context,
+               logPrefix: "PetMedicationDoseLogging.confirmedExecutor"
+           ) == nil {
+            return nil
+        }
+        return CareFactWritePolicy.executorResolution(
+            requestedExecutorId: executorId,
+            context: context,
+            logPrefix: "PetMedicationDoseLogging"
+        )
+    }
+
+    private static func rejectedConfirmedExecutorResult(
+        previewIntent: DomainScheduleCreateIntent
+    ) -> RecordDoseResult {
+        RecordDoseResult(
+            event: DomainScheduleWriter.makeUnpersistedEvent(intent: previewIntent),
+            didRecord: false,
+            coconutDelta: 0,
+            allowsDerivedEffects: false,
+            didPersist: true,
+            persistenceErrorDescription: nil
         )
     }
 }

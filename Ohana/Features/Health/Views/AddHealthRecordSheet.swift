@@ -23,7 +23,6 @@ struct AddHealthRecordSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
-    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var selectedType: HealthLogType
 
@@ -36,6 +35,8 @@ struct AddHealthRecordSheet: View {
     @State private var expirationDate: Date = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var hasNextCheckup: Bool = false
     @State private var nextCheckupDate: Date = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
+    @State private var selectedRecorderHumanID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var isSaving = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     private var l: L10n { L10n(appLanguage) }
@@ -89,10 +90,6 @@ struct AddHealthRecordSheet: View {
         case .surgery: l.tr(zh: "就诊记录", en: "Visit record", de: "Besuchseintrag")
         default: healthLogTypeTitle(selectedType)
         }
-    }
-
-    private var activeExecutorID: String? {
-        activeHumanIdStr.isEmpty ? nil : activeHumanIdStr
     }
 
     var body: some View {
@@ -259,6 +256,14 @@ struct AddHealthRecordSheet: View {
                             }
                         }
 
+                        QuickCareActionHumanPickerContainer(
+                            selectedHumanID: $selectedRecorderHumanID,
+                            requiresSelection: $requiresRecorderSelection,
+                            role: .recorder,
+                            tint: Color.goPrimary
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
                         // 保存按钮
                         Button(action: save) {
                             HStack(spacing: 8) {
@@ -278,7 +283,7 @@ struct AddHealthRecordSheet: View {
                             )
                         }
                         .buttonStyle(ScaleButtonStyle())
-                        .disabled(isSaving || !pet.canWriteHealthFacts)
+                        .disabled(isSaving || !pet.canWriteHealthFacts || requiresRecorderSelection)
 
                         Spacer(minLength: 40)
                     }
@@ -411,7 +416,7 @@ struct AddHealthRecordSheet: View {
     }
 
     private func save() {
-        guard !isSaving, pet.canWriteHealthFacts else { return }
+        guard !isSaving, pet.canWriteHealthFacts, !requiresRecorderSelection else { return }
         isSaving = true
         let input = PetHealthRecordCommandInput(
             type: selectedType,
@@ -422,7 +427,7 @@ struct AddHealthRecordSheet: View {
             cost: CountryDecimalInput.parse(cost, countryCode: AppCountry.code) ?? 0,
             expirationDate: (showsExpiration && hasExpiration) ? expirationDate : nil,
             nextCheckupDate: (showsNextCheckup && hasNextCheckup) ? nextCheckupDate : nil,
-            executorId: activeExecutorID,
+            executorId: selectedRecorderHumanID?.uuidString,
             source: .detail,
             includesNameInNote: showsNameField
         )

@@ -23,6 +23,7 @@ struct GenericWeightEntrySheet: View {
     }
 
     let target: Target
+    var petLedgerSource: CareLedgerSource = .detail
     var onSaved: (() -> Void)?
     var onRewarded: ((Int) -> Void)?
     var onDismiss: (() -> Void)?
@@ -32,10 +33,11 @@ struct GenericWeightEntrySheet: View {
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
-    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
     @State private var weightText = ""
     @State private var selectedDate = Date()
+    @State private var selectedRecorderHumanID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var includesRecordTime = false
     @State private var weightUnit: String = "kg"
     @State private var adaptiveSheetHeight: CGFloat = 500
@@ -134,6 +136,14 @@ struct GenericWeightEntrySheet: View {
                     .padding(.horizontal, 20)
                     quickWeightStrip
                     dateAndTargetBlock
+                    QuickCareActionHumanPickerContainer(
+                        selectedHumanID: $selectedRecorderHumanID,
+                        requiresSelection: $requiresRecorderSelection,
+                        role: .recorder,
+                        tint: accentColor
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
                     bcsBlock
                 }
                 .padding(.vertical, 12)
@@ -147,7 +157,7 @@ struct GenericWeightEntrySheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
-                        .disabled(!isValid || isSaving)
+                        .disabled(!isValid || isSaving || requiresRecorderSelection)
                         .accessibilityIdentifier("generic-weight-entry-save-action")
                 }
             }
@@ -434,7 +444,7 @@ struct GenericWeightEntrySheet: View {
             .accessibilityElement(children: .combine)
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!isValid || isSaving)
+        .disabled(!isValid || isSaving || requiresRecorderSelection)
         .accessibilityLabel(isSaving
             ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
             : l.tr(zh: "保存体重记录", en: "Save weight", de: "Gewicht speichern")
@@ -565,9 +575,12 @@ struct GenericWeightEntrySheet: View {
     }
 
     private func save() {
-        guard !isSaving, let weight = parsedWeight, weight > 0 else { return }
+        guard !isSaving,
+              !requiresRecorderSelection,
+              let weight = parsedWeight,
+              weight > 0 else { return }
         isSaving = true
-        let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
+        let executorId = selectedRecorderHumanID?.uuidString
         let savedDate = recordDate
         let savedUnit = weightUnit
         let savedBcs = autoBcsForPet ?? 0
@@ -585,6 +598,7 @@ struct GenericWeightEntrySheet: View {
                         weightUnit: savedUnit,
                         bcsScore: savedBcs,
                         awardsReward: true,
+                        ledgerSource: petLedgerSource,
                         command: command,
                         note: "weight.entry"
                     )

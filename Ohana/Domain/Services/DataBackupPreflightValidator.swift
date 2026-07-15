@@ -39,7 +39,7 @@ nonisolated enum DataBackupPreflightValidator {
         _ backup: OhanaBackup,
         existing: DataBackupRestoreExistingIdentities
     ) throws {
-        guard backup.schemaVersion >= 1, backup.schemaVersion <= 30 else {
+        guard backup.schemaVersion >= 1, backup.schemaVersion <= 31 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
@@ -267,6 +267,38 @@ nonisolated enum DataBackupPreflightValidator {
         }
         for report in backup.humanHealthReports ?? [] {
             try requireReference(report.humanId, in: humanIDs)
+            if let recorder = report.recordedByHumanId {
+                try requireReference(recorder, in: humanIDs)
+            }
+        }
+        for metric in backup.humanHealthMetricLogs ?? [] {
+            if let humanID = metric.humanId {
+                try requireReference(humanID, in: humanIDs)
+            }
+            if let recorder = metric.recordedByHumanId {
+                try requireReference(recorder, in: humanIDs)
+            }
+        }
+        for record in backup.humanNoteRecords ?? [] {
+            try requireReference(record.humanId, in: humanIDs)
+            if let recorder = record.recordedByHumanId {
+                try requireReference(recorder, in: humanIDs)
+            }
+        }
+        for expense in backup.petExpenseLogs {
+            if let recorder = expense.recordedByHumanId {
+                try requireReference(recorder, in: humanIDs)
+            }
+        }
+        for symptom in backup.symptomLogs ?? [] {
+            if let recorder = symptom.recordedByHumanId {
+                try requireReference(recorder, in: humanIDs)
+            }
+        }
+        for heatCycle in backup.heatCycleLogs ?? [] {
+            if let recorder = heatCycle.recordedByHumanId {
+                try requireReference(recorder, in: humanIDs)
+            }
         }
         for override in backup.appState.plantReminderPreferences?.plantCareOverrides ?? [] {
             try requireReference(override.plantID, in: plantIDs)

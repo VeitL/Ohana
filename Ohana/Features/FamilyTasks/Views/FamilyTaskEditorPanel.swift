@@ -24,6 +24,7 @@ struct FamilyTaskEditorPanel: View {
     @State private var title: String
     @State private var note: String
     @State private var selectedHumanId: String
+    @State private var includesReward: Bool
     @State private var reward: Int
     @State private var hasDueDate: Bool
     @State private var dueAt: Date
@@ -58,14 +59,13 @@ struct FamilyTaskEditorPanel: View {
         let firstAssignableId = humans.first {
             !$0.hasPassedAway && $0.id.uuidString != currentHumanId
         }?.id.uuidString ?? ""
-        let suggestedReward = min(20, max(1, currentHuman?.coconutBalance ?? 1))
-
         switch context.route {
         case .assignReminder:
             _title = State(initialValue: Self.reminderTitle(context.reminder, l: L10n()))
             _note = State(initialValue: "")
             _selectedHumanId = State(initialValue: firstAssignableId)
-            _reward = State(initialValue: suggestedReward)
+            _includesReward = State(initialValue: false)
+            _reward = State(initialValue: 0)
             _hasDueDate = State(initialValue: true)
             _dueAt = State(initialValue: context.reminder?.resolvedOccurrenceAt ?? Date())
             _emoji = State(initialValue: context.reminder?.event?.emoji ?? "🐾")
@@ -80,10 +80,12 @@ struct FamilyTaskEditorPanel: View {
             _title = State(initialValue: task?.title ?? "")
             _note = State(initialValue: task?.note ?? "")
             _selectedHumanId = State(initialValue: isExistingAssignable ? existingAssigneeId : firstAssignableId)
-            _reward = State(initialValue: min(
+            let existingReward = min(
                 FamilyTaskRewardPolicy.cap,
-                max(0, task?.rewardCoconuts ?? suggestedReward)
-            ))
+                max(0, task?.rewardCoconuts ?? 0)
+            )
+            _includesReward = State(initialValue: FamilyTaskRewardDraftPolicy.isExpanded(existingReward: existingReward))
+            _reward = State(initialValue: existingReward)
             _hasDueDate = State(initialValue: task?.dueAt != nil)
             _dueAt = State(initialValue: task?.dueAt ?? Date())
             _emoji = State(initialValue: task?.emoji ?? "🎯")
@@ -91,7 +93,8 @@ struct FamilyTaskEditorPanel: View {
             _title = State(initialValue: "")
             _note = State(initialValue: "")
             _selectedHumanId = State(initialValue: firstAssignableId)
-            _reward = State(initialValue: suggestedReward)
+            _includesReward = State(initialValue: false)
+            _reward = State(initialValue: 0)
             _hasDueDate = State(initialValue: false)
             _dueAt = State(initialValue: Date())
             _emoji = State(initialValue: "🎯")
@@ -100,7 +103,6 @@ struct FamilyTaskEditorPanel: View {
 
     var body: some View {
         Form {
-            publisherSection
             taskSection
             assignmentSection
             scheduleSection
@@ -118,31 +120,6 @@ struct FamilyTaskEditorPanel: View {
             Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {}
         } message: {
             Text(saveErrorMessage ?? "")
-        }
-    }
-
-    private var publisherSection: some View {
-        Section {
-            LabeledContent {
-                Text(currentHuman?.name ?? l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt"))
-            } label: {
-                Label(l.tr(zh: "发布者", en: "Publisher", de: "Ersteller"), systemImage: "person.crop.circle")
-            }
-
-            LabeledContent {
-                Text("\(availableBalance)🥥")
-                    .monospacedDigit()
-            } label: {
-                Label(l.tr(zh: "可用余额", en: "Available", de: "Verfügbar"), systemImage: "wallet.bifold.fill")
-            }
-        } header: {
-            Text(l.tr(zh: "当前记录归属", en: "Current attribution", de: "Aktuelle Zuordnung"))
-        } footer: {
-            Text(l.tr(
-                zh: "任务只记录在本机。奖励可为 0；设置奖励时，执行者提交后由发布者确认并转账。",
-                en: "Tasks stay on this device. A reward is optional; when offered, it transfers after the publisher approves the submission.",
-                de: "Aufgaben bleiben auf diesem Gerät. Eine Prämie ist optional und wird erst nach Bestätigung übertragen."
-            ))
         }
     }
 
@@ -190,56 +167,80 @@ struct FamilyTaskEditorPanel: View {
                 }
             }
 
-            LabeledContent {
-                TextField(
-                    "0–\(FamilyTaskRewardPolicy.cap)",
-                    value: $reward,
-                    format: .number
-                )
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.trailing)
-                .frame(minWidth: 72)
-                .accessibilityLabel(l.tr(
-                    zh: "奖励椰子数量",
-                    en: "Coconut reward amount",
-                    de: "Höhe der Kokosprämie"
-                ))
-            } label: {
+            Toggle(isOn: $includesReward) {
                 Label(
-                    l.tr(zh: "奖励椰子", en: "Coconut reward", de: "Kokosprämie"),
-                    systemImage: "circle.hexagongrid.fill"
+                    l.tr(zh: "添加椰子奖励", en: "Add a coconut reward", de: "Kokosprämie hinzufügen"),
+                    systemImage: "gift.fill"
                 )
             }
-
-            if reward < 0 || reward > FamilyTaskRewardPolicy.cap {
-                Label(
-                    l.tr(
-                        zh: "奖励必须在 0 到 \(FamilyTaskRewardPolicy.cap) 之间。",
-                        en: "The reward must be between 0 and \(FamilyTaskRewardPolicy.cap).",
-                        de: "Die Prämie muss zwischen 0 und \(FamilyTaskRewardPolicy.cap) liegen."
-                    ),
-                    systemImage: "exclamationmark.triangle.fill"
-                )
-                .font(OhanaFont.caption(.bold))
-                .foregroundStyle(Color.goRed)
+            .tint(Color.goPrimary)
+            .accessibilityIdentifier("family-task-reward-toggle")
+            .onChange(of: includesReward) { _, isEnabled in
+                if isEnabled {
+                    if reward <= 0 {
+                        reward = FamilyTaskRewardDraftPolicy.suggestedReward(
+                            availableBalance: availableBalance
+                        )
+                    }
+                } else {
+                    reward = 0
+                }
             }
 
-            if reward > availableBalance {
-                Label(
-                    l.tr(zh: "发布者椰子余额不足。", en: "The publisher does not have enough coconuts.", de: "Der Ersteller hat nicht genug Kokosnüsse."),
-                    systemImage: "exclamationmark.triangle.fill"
-                )
-                .font(OhanaFont.caption(.bold))
-                .foregroundStyle(Color.goRed)
+            if includesReward {
+                LabeledContent {
+                    TextField(
+                        "1–\(FamilyTaskRewardPolicy.cap)",
+                        value: $reward,
+                        format: .number
+                    )
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(minWidth: 72)
+                    .accessibilityLabel(l.tr(
+                        zh: "奖励椰子数量",
+                        en: "Coconut reward amount",
+                        de: "Höhe der Kokosprämie"
+                    ))
+                } label: {
+                    Label(
+                        l.tr(zh: "奖励数量", en: "Reward amount", de: "Prämienhöhe"),
+                        systemImage: "circle.hexagongrid.fill"
+                    )
+                }
+
+                if reward <= 0 || reward > FamilyTaskRewardPolicy.cap {
+                    Label(
+                        l.tr(
+                            zh: "奖励必须在 1 到 \(FamilyTaskRewardPolicy.cap) 之间。",
+                            en: "The reward must be between 1 and \(FamilyTaskRewardPolicy.cap).",
+                            de: "Die Prämie muss zwischen 1 und \(FamilyTaskRewardPolicy.cap) liegen."
+                        ),
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.goRed)
+                }
+
+                if reward > availableBalance {
+                    Label(
+                        l.tr(zh: "当前成员的椰子余额不足。", en: "The current member does not have enough coconuts.", de: "Das aktuelle Mitglied hat nicht genug Kokosnüsse."),
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.goRed)
+                }
             }
         } header: {
-            Text(l.tr(zh: "分工与奖励", en: "Assignment and reward", de: "Zuweisung und Prämie"))
+            Text(l.tr(zh: "分给谁", en: "Who should do it", de: "Wer soll es erledigen"))
         } footer: {
-            Text(l.tr(
-                zh: "0 表示普通分工，可直接完成；正数奖励需要提交并由发布者审核。",
-                en: "Zero creates a regular assignment that can be completed directly; a positive reward requires submission and approval.",
-                de: "Null erstellt eine normale Aufgabe; eine positive Prämie erfordert Einreichung und Bestätigung."
-            ))
+            if includesReward {
+                Text(l.tr(
+                    zh: "奖励任务完成后会请你确认一次，再转出椰子。当前可用 \(availableBalance)🥥。",
+                    en: "When this rewarded task is done, you will confirm it once before the coconuts transfer. \(availableBalance)🥥 available.",
+                    de: "Nach Abschluss bestätigst du die Prämienaufgabe einmal, bevor die Kokosnüsse übertragen werden. \(availableBalance)🥥 verfügbar."
+                ))
+            }
         }
     }
 
@@ -292,9 +293,9 @@ struct FamilyTaskEditorPanel: View {
 
     private var saveActionTitle: String {
         switch route {
-        case .assignReminder: l.tr(zh: "发布指派", en: "Post assignment", de: "Zuweisung erstellen")
+        case .assignReminder: l.tr(zh: "分配任务", en: "Assign task", de: "Aufgabe zuweisen")
         case .editTask: l.tr(zh: "保存任务", en: "Save task", de: "Aufgabe speichern")
-        case .create: l.tr(zh: "发布任务", en: "Post task", de: "Aufgabe erstellen")
+        case .create: l.tr(zh: "创建任务", en: "Create task", de: "Aufgabe erstellen")
         }
     }
 
@@ -318,12 +319,21 @@ struct FamilyTaskEditorPanel: View {
         max(0, currentHuman?.coconutBalance ?? 0)
     }
 
+    private var effectiveReward: Int {
+        FamilyTaskRewardDraftPolicy.effectiveReward(
+            isEnabled: includesReward,
+            draftReward: reward
+        )
+    }
+
     private var canSave: Bool {
         guard currentHuman != nil,
               selectedHuman != nil,
-              reward >= 0,
-              reward <= FamilyTaskRewardPolicy.cap,
-              reward <= availableBalance
+              !includesReward || (
+                  reward > 0 &&
+                      reward <= FamilyTaskRewardPolicy.cap &&
+                      reward <= availableBalance
+              )
         else { return false }
 
         switch route {
@@ -349,19 +359,19 @@ struct FamilyTaskEditorPanel: View {
         switch route {
         case .assignReminder:
             guard let reminder = context.reminder, let selectedHuman else { return }
-            didSave = onAssignReminder(reminder, selectedHuman, reward, note)
+            didSave = onAssignReminder(reminder, selectedHuman, effectiveReward, note)
         case .create:
-            didSave = onCreateTask(title, note, selectedHuman, reward, due, emoji)
+            didSave = onCreateTask(title, note, selectedHuman, effectiveReward, due, emoji)
         case .editTask:
             guard let task = context.task else { return }
-            didSave = onUpdateTask(task, title, note, selectedHuman, reward, due, emoji)
+            didSave = onUpdateTask(task, title, note, selectedHuman, effectiveReward, due, emoji)
         }
 
         guard didSave else {
             saveErrorMessage = l.tr(
-                zh: "任务没有保存。请确认发布者余额、成员状态和任务归属后重试。",
-                en: "The task was not saved. Check the publisher balance, member status, and task ownership, then try again.",
-                de: "Die Aufgabe wurde nicht gespeichert. Prüfe Guthaben, Mitgliedsstatus und Zuordnung und versuche es erneut."
+                zh: "任务没有保存。请检查成员状态、任务归属和奖励余额后重试。",
+                en: "The task was not saved. Check the members, assignment, and reward balance, then try again.",
+                de: "Die Aufgabe wurde nicht gespeichert. Prüfe Mitglieder, Zuordnung und Prämienguthaben und versuche es erneut."
             )
             return
         }
@@ -373,9 +383,9 @@ struct FamilyTaskEditorPanel: View {
     private func delete(_ task: FamilyCollaborationTask) {
         guard onDeleteTask(task) else {
             saveErrorMessage = l.tr(
-                zh: "任务无法删除，请确认当前档案是发布者。",
-                en: "The task could not be deleted. Make sure the current profile is the publisher.",
-                de: "Die Aufgabe konnte nicht gelöscht werden. Das aktuelle Profil muss der Ersteller sein."
+                zh: "任务无法删除。请先切换到创建这项任务的成员。",
+                en: "The task could not be deleted. Switch to the member who created it first.",
+                de: "Die Aufgabe konnte nicht gelöscht werden. Wechsle zuerst zu dem Mitglied, das sie erstellt hat."
             )
             return
         }
@@ -389,15 +399,15 @@ struct FamilyTaskEditorPanel: View {
         if selectedHuman == nil {
             return l.tr(zh: "请选择其他家人。", en: "Choose another household member.", de: "Wähle ein anderes Familienmitglied.")
         }
-        if reward < 0 || reward > FamilyTaskRewardPolicy.cap {
+        if includesReward && (reward <= 0 || reward > FamilyTaskRewardPolicy.cap) {
             return l.tr(
-                zh: "奖励必须在 0 到 \(FamilyTaskRewardPolicy.cap) 之间。",
-                en: "The reward must be between 0 and \(FamilyTaskRewardPolicy.cap).",
-                de: "Die Prämie muss zwischen 0 und \(FamilyTaskRewardPolicy.cap) liegen."
+                zh: "奖励必须在 1 到 \(FamilyTaskRewardPolicy.cap) 之间。",
+                en: "The reward must be between 1 and \(FamilyTaskRewardPolicy.cap).",
+                de: "Die Prämie muss zwischen 1 und \(FamilyTaskRewardPolicy.cap) liegen."
             )
         }
-        if reward > availableBalance {
-            return l.tr(zh: "发布者椰子余额不足。", en: "The publisher does not have enough coconuts.", de: "Der Ersteller hat nicht genug Kokosnüsse.")
+        if includesReward && reward > availableBalance {
+            return l.tr(zh: "当前成员的椰子余额不足。", en: "The current member does not have enough coconuts.", de: "Das aktuelle Mitglied hat nicht genug Kokosnüsse.")
         }
         return l.tr(zh: "请填写任务名称。", en: "Add a task name.", de: "Füge einen Aufgabennamen hinzu.")
     }

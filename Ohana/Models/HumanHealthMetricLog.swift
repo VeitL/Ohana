@@ -25,6 +25,8 @@ final class HumanHealthMetricLog {
     var date: Date
     /// 录入备注（医院/医生/特殊状态等，可空）
     var notes: String
+    /// 本次记录由哪位本地家庭成员录入；与被检查成员分离，可空以兼容旧数据。
+    var recordedByHumanId: String?
     /// 关联的人类成员（与 HumanWeightLog 一致的反向关系模式）
     var human: Human?
     /// 写入时间，用于排序歧义和审计
@@ -36,6 +38,7 @@ final class HumanHealthMetricLog {
         value: Double,
         date: Date = Date(),
         notes: String = "",
+        recordedByHumanId: String? = nil,
         human: Human? = nil
     ) {
         self.id = UUID()
@@ -44,6 +47,7 @@ final class HumanHealthMetricLog {
         self.value = value
         self.date = date
         self.notes = notes
+        self.recordedByHumanId = recordedByHumanId
         self.human = human
         self.createdAt = Date()
     }

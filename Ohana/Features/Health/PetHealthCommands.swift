@@ -322,18 +322,24 @@ enum PetHealthCommandService {
                 sharedSessionId: ""
             ),
             occurredAt: input.date,
-            executorId: input.executorId,
+            // The health form asks who recorded the visit, not who paid. Keep
+            // the embedded expense payer unknown unless a payer is explicitly
+            // collected by an expense-specific flow.
+            executorId: nil,
             source: .userCommand
         )
         guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
             pet: pet,
             intent: intent,
             context: context,
-            logPrefix: "PetHealthCommandService.recordHealth.expense",
-            actorOverride: actor
+            logPrefix: "PetHealthCommandService.recordHealth.expense"
         ) else { return nil }
         return (
-            expense: DomainCareFactWriter.createExpenseLog(plan: write, context: context),
+            expense: DomainCareFactWriter.createExpenseLog(
+                plan: write,
+                recordedByHumanId: actor.effectiveExecutorId,
+                context: context
+            ),
             write: write
         )
     }
@@ -409,6 +415,25 @@ struct PetSymptomCommandInput: Equatable {
     let severity: SymptomSeverity
     let note: String
     let photoData: Data?
+    let recordedByHumanId: String?
+
+    init(
+        date: Date,
+        category: SymptomCategory,
+        symptomName: String,
+        severity: SymptomSeverity,
+        note: String,
+        photoData: Data?,
+        recordedByHumanId: String? = nil
+    ) {
+        self.date = date
+        self.category = category
+        self.symptomName = symptomName
+        self.severity = severity
+        self.note = note
+        self.photoData = photoData
+        self.recordedByHumanId = recordedByHumanId
+    }
 
     var cleanSymptomName: String {
         symptomName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -445,6 +470,10 @@ enum PetSymptomCommandService {
                   logPrefix: "PetSymptomCommandService.recordSymptom"
               ) else { return nil }
         let careLedger = providedCareLedger ?? CareLedgerService()
+        let recordedByHumanId = HumanActionAttributionPolicy.activeHumanID(
+            input.recordedByHumanId,
+            context: context
+        )
 
         let log = DomainMemberFactWriter.createSymptomLog(
             plan: write,
@@ -454,6 +483,7 @@ enum PetSymptomCommandService {
             severity: input.severity,
             note: input.cleanNote,
             photoData: input.photoData,
+            recordedByHumanId: recordedByHumanId,
             context: context
         )
 
@@ -461,8 +491,8 @@ enum PetSymptomCommandService {
         DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
             ledgerEvent = careLedger.record(
                 occurredAt: log.date,
-                actorKind: .unknown,
-                actorId: nil,
+                actorKind: recordedByHumanId == nil ? .unknown : .human,
+                actorId: recordedByHumanId,
                 subjectKind: .pet,
                 subjectId: pet.id.uuidString,
                 eventKind: .health,

@@ -220,8 +220,7 @@ extension PhysicalDeletionService {
         for log in fetchScrubbableRows(PetExpenseLog.self, context: context) where log.pet != nil {
             let key = retainedPetFactKey(for: log)
             retainedFactKeys.insert(key)
-            if sharedCareIdsMatch(log.executorId, humanId) {
-                log.executorId = nil
+            if scrubExpenseActorReferences(log, humanId: humanId) {
                 changedExpenseLogs.append(log)
             }
             recordRetainedActorId(log.executorId, deletedHumanId: humanId, factKey: key, actorIds: &retainedFactActorIds)
@@ -261,6 +260,22 @@ extension PhysicalDeletionService {
             changedExpenseLogs.count +
             changedCareLedgers.count +
             changedCoconutLedgers.count
+    }
+
+    private nonisolated static func scrubExpenseActorReferences(
+        _ log: PetExpenseLog,
+        humanId: String
+    ) -> Bool {
+        var didChange = false
+        if sharedCareIdsMatch(log.executorId, humanId) {
+            log.executorId = nil
+            didChange = true
+        }
+        if sharedCareIdsMatch(log.recordedByHumanId, humanId) {
+            log.recordedByHumanId = nil
+            didChange = true
+        }
+        return didChange
     }
 
     private nonisolated static func scrubCareLedgerActors(

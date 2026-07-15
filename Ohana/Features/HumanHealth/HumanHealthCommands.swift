@@ -35,6 +35,7 @@ enum HumanHealthMetricCommandService {
         value: Double,
         date: Date,
         notes: String,
+        recordedByHumanId: String? = nil,
         context: ModelContext
     ) -> HumanHealthMetricCommandResult? {
         guard value > 0, value.isFinite else { return nil }
@@ -46,6 +47,7 @@ enum HumanHealthMetricCommandService {
             logPrefix: "HumanHealthMetricCommandService.recordMetric"
         ) else { return nil }
         let cleanNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let validatedRecorderID = HumanActionAttributionPolicy.activeHumanID(recordedByHumanId, context: context)
         let log = DomainMemberFactWriter.createHumanHealthMetricLog(
             plan: write,
             human: human,
@@ -53,6 +55,7 @@ enum HumanHealthMetricCommandService {
             unitCode: unitCode,
             value: value,
             notes: cleanNotes,
+            recordedByHumanId: validatedRecorderID,
             context: context
         )
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
@@ -121,6 +124,7 @@ struct HumanHealthReportCommandInput: Equatable {
     let nextCheckDate: Date?
     let summary: String
     let notes: String
+    var recordedByHumanId: String? = nil
 }
 
 struct HumanHealthReportCommandResult: Equatable {
@@ -154,6 +158,10 @@ enum HumanHealthReportCommandService {
                 persistenceErrorDescription: nil
             )
         }
+        let validatedRecorderID = HumanActionAttributionPolicy.activeHumanID(
+            input.recordedByHumanId,
+            context: context
+        )
         let report = DomainMemberFactWriter.createHumanHealthReport(
             plan: write,
             human: human,
@@ -165,7 +173,8 @@ enum HumanHealthReportCommandService {
                 reportDate: input.reportDate,
                 nextCheckDate: input.nextCheckDate,
                 summary: input.summary.trimmingCharacters(in: .whitespacesAndNewlines),
-                notes: input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+                notes: input.notes.trimmingCharacters(in: .whitespacesAndNewlines),
+                recordedByHumanId: validatedRecorderID
             ),
             context: context
         )
@@ -217,6 +226,12 @@ enum HumanHealthReportCommandService {
         report.nextCheckDate = input.nextCheckDate
         report.summary = input.summary.trimmingCharacters(in: .whitespacesAndNewlines)
         report.notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let requestedRecorderID = input.recordedByHumanId {
+            report.recordedByHumanId = HumanActionAttributionPolicy.activeHumanID(
+                requestedRecorderID,
+                context: context
+            )
+        }
         CloudSyncMutationRecorder.markModified(report, context: context, modifiedAt: input.reportDate)
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {

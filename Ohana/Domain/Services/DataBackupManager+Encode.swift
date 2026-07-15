@@ -87,6 +87,17 @@ nonisolated extension DataBackupManager {
         )
     }
 
+    func encodeHumanNoteRecord(_ record: HumanNoteRecord) -> HumanNoteRecordBackup {
+        HumanNoteRecordBackup(
+            id: record.id.uuidString,
+            humanId: record.humanId.uuidString,
+            sequence: record.sequence,
+            date: d(record.date),
+            rawEntry: record.rawEntry,
+            recordedByHumanId: record.recordedByHumanId
+        )
+    }
+
     func encodeEvent(_ e: Event) -> EventBackup {
         EventBackup(
             id: e.id.uuidString, title: e.title, startDate: d(e.startDate),
@@ -275,6 +286,7 @@ nonisolated extension DataBackupManager {
                             amount: l.amount, category: l.category, note: l.note,
                             petId: l.pet?.id.uuidString,
                             executorId: l.executorId,
+                            recordedByHumanId: l.recordedByHumanId,
                             sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
     }
 
@@ -491,6 +503,7 @@ nonisolated extension DataBackupManager {
             date: d(l.date),
             notes: l.notes,
             humanId: l.human?.id.uuidString,
+            recordedByHumanId: l.recordedByHumanId,
             createdAt: d(l.createdAt)
         )
     }
@@ -507,6 +520,7 @@ nonisolated extension DataBackupManager {
             nextCheckDate: d(report.nextCheckDate),
             summary: report.summary,
             notes: report.notes,
+            recordedByHumanId: report.recordedByHumanId,
             colorHex: report.colorHex,
             createdAt: d(report.createdAt)
         )
@@ -527,7 +541,8 @@ nonisolated extension DataBackupManager {
             note: l.note,
             photoBase64: photoRef == nil ? l.photoData?.base64EncodedString() : nil,
             photoRef: photoRef,
-            petId: l.pet?.id.uuidString
+            petId: l.pet?.id.uuidString,
+            recordedByHumanId: l.recordedByHumanId
         )
     }
 
@@ -540,7 +555,8 @@ nonisolated extension DataBackupManager {
             note: l.note,
             isMated: l.isMated,
             expectedDeliveryDate: d(l.expectedDeliveryDate),
-            petId: l.pet?.id.uuidString
+            petId: l.pet?.id.uuidString,
+            recordedByHumanId: l.recordedByHumanId
         )
     }
 

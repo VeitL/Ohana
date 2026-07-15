@@ -124,6 +124,7 @@ struct QuickFeedDetailContent: View {
     @StateObject var presentationState = QuickFeedPresentationState()
     @StateObject var runtimeState = QuickFeedRuntimeState()
     @StateObject var feedHomeController: FeedHomeController
+    @State var selectedActionHumanID: UUID?
     @FocusState var focusedField: FeedInputField?
 
     let stockReminderAdvanceOptions = [1, 3, 7, 14]
@@ -283,6 +284,52 @@ struct QuickFeedDetailContent: View {
 
     var currentUserId: String? {
         appServices.activeHumanSelection.currentHumanId
+    }
+
+    var actionHumanOptions: [ActionHumanOption] {
+        allHumans.map { human in
+            ActionHumanOption(
+                id: human.id,
+                name: human.name,
+                avatarEmoji: human.avatarEmoji,
+                isDeceased: human.hasPassedAway
+            )
+        }
+    }
+
+    var selectedActionExecutorId: String? {
+        ActionHumanDefaultSelectionPolicy.selection(
+            draftHumanID: selectedActionHumanID,
+            currentLocalHumanID: currentUserId.flatMap(UUID.init(uuidString:)),
+            humans: actionHumanOptions
+        )?.uuidString
+    }
+
+    var requiresActionHumanSelection: Bool {
+        ActionHumanDefaultSelectionPolicy.eligibleHumans(from: actionHumanOptions).count > 1 &&
+            selectedActionExecutorId == nil
+    }
+
+    func validateActionHumanSelection() -> Bool {
+        guard requiresActionHumanSelection else { return true }
+        let message = l.tr(
+            zh: "请先选择这次操作的执行人",
+            en: "Choose who did this first",
+            de: "Bitte zuerst die ausführende Person wählen"
+        )
+        draftStore.inputError = message
+        triggerToast(message, tint: Color.goYellow, feedback: .warning)
+        return false
+    }
+
+    var actionHumanPicker: some View {
+        ActionHumanPicker(
+            humans: actionHumanOptions,
+            currentLocalHumanID: currentUserId.flatMap(UUID.init(uuidString:)),
+            selectedHumanID: $selectedActionHumanID,
+            role: .executor,
+            tint: mainFoodTint
+        )
     }
 
     func normalizedSpecies(_ value: String) -> String {
@@ -539,6 +586,9 @@ struct QuickFeedDetailContent: View {
                 petHeader
                 if pet.hasPassedAway {
                     PetMemorialBanner(pet: pet)
+                } else {
+                    actionHumanPicker
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 guidedFeedHome
             }

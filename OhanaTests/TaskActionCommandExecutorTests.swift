@@ -143,6 +143,84 @@ struct TaskActionCommandExecutorTests {
         #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).isEmpty)
     }
 
+    @Test func explicitActionHumanOverridesDeviceDefaultForOneTaskOnly() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let current = Human(name: "Current")
+        let worker = Human(name: "Worker")
+        let task = FamilyCollaborationTask(
+            title: "Take out recycling",
+            kind: .householdTask,
+            createdById: current.id.uuidString,
+            createdByName: current.name,
+            assignedToId: worker.id.uuidString,
+            assignedToName: worker.name
+        )
+        [current, worker].forEach(context.insert)
+        context.insert(task)
+        try context.save()
+
+        let restoreSelection = selectActiveHuman(current.id.uuidString)
+        defer { restoreSelection() }
+        let command = TaskActionCommand(
+            item: standaloneItem(task),
+            action: .complete,
+            actingHumanID: worker.id
+        )
+        let result = TaskActionCommandExecutor(
+            modelContext: context,
+            services: AppServices(modelContainer: container)
+        ).execute(
+            command,
+            events: [],
+            familyTasks: [task],
+            humans: [current, worker],
+            pets: []
+        )
+
+        #expect(result.disposition == .applied)
+        #expect(task.completedById == worker.id.uuidString)
+        #expect(UserDefaults.standard.string(forKey: "currentActiveHumanId") == current.id.uuidString)
+    }
+
+    @Test func invalidExplicitActionHumanNeverFallsBackToDeviceDefault() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let current = Human(name: "Current")
+        let task = FamilyCollaborationTask(
+            title: "Take out recycling",
+            kind: .householdTask,
+            createdById: current.id.uuidString,
+            createdByName: current.name,
+            assignedToId: current.id.uuidString,
+            assignedToName: current.name
+        )
+        context.insert(current)
+        context.insert(task)
+        try context.save()
+
+        let restoreSelection = selectActiveHuman(current.id.uuidString)
+        defer { restoreSelection() }
+        let result = TaskActionCommandExecutor(
+            modelContext: context,
+            services: AppServices(modelContainer: container)
+        ).execute(
+            TaskActionCommand(
+                item: standaloneItem(task),
+                action: .complete,
+                actingHumanID: UUID()
+            ),
+            events: [],
+            familyTasks: [task],
+            humans: [current],
+            pets: []
+        )
+
+        #expect(result.disposition == .rejected)
+        #expect(task.status == .active)
+        #expect(task.completedById == nil)
+    }
+
     @Test func linkedRecurringPlantSubmissionWritesOneFactAndCompletesItsReminder() throws {
         let container = try makeContainer()
         let context = container.mainContext

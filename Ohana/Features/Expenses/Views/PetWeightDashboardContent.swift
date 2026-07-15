@@ -14,12 +14,16 @@ struct PetWeightLedgerEntry: Identifiable, Hashable {
     let date: Date
     let weightKilograms: Double
 
-    static func entries(from events: [CareLedgerEvent], petId: UUID) -> [PetWeightLedgerEntry] {
+    static func entries(
+        from events: [CareLedgerEvent],
+        legacyLogs: [PetWeightLog] = [],
+        petId: UUID
+    ) -> [PetWeightLedgerEntry] {
         let petSubject = CareLedgerSubjectKind.pet.rawValue
         let weightKind = CareLedgerEventKind.weight.rawValue
         let petWeightAction = "petWeight"
         let petIdString = petId.uuidString
-        return events.compactMap { event in
+        let ledgerEntries: [PetWeightLedgerEntry] = events.compactMap { event -> PetWeightLedgerEntry? in
             guard event.subjectKind == petSubject,
                   event.subjectId == petIdString,
                   event.eventKind == weightKind,
@@ -36,7 +40,23 @@ struct PetWeightLedgerEntry: Identifiable, Hashable {
                 weightKilograms: event.amountValue
             )
         }
-        .sorted { $0.date > $1.date }
+        let projectedLogIDs: Set<UUID> = Set(ledgerEntries.compactMap(\.legacyLogId))
+        // Legacy logs remain the durable fact for records created before the
+        // quick-entry route started emitting its matching ledger projection.
+        let orphanLogEntries = legacyLogs.compactMap { log -> PetWeightLedgerEntry? in
+            guard log.pet?.id == petId,
+                  log.weightInKg > 0,
+                  !projectedLogIDs.contains(log.id) else { return nil }
+            return PetWeightLedgerEntry(
+                id: log.id,
+                legacyLogId: log.id,
+                date: log.date,
+                weightKilograms: log.weightInKg
+            )
+        }
+        return (ledgerEntries + orphanLogEntries).sorted { lhs, rhs in
+            lhs.date > rhs.date
+        }
     }
 }
 
@@ -103,7 +123,11 @@ struct PetWeightDashboardContent: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var entries: [PetWeightLedgerEntry] {
-        PetWeightLedgerEntry.entries(from: weightLedgerEvents, petId: pet.id)
+        PetWeightLedgerEntry.entries(
+            from: weightLedgerEvents,
+            legacyLogs: legacyWeightDeleteLogs,
+            petId: pet.id
+        )
     }
 
     private func trendPoints(now: Date = Date()) -> [WeightTrendPoint] {

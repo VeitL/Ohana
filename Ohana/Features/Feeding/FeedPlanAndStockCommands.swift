@@ -276,12 +276,17 @@ enum SaveFoodStockCommand {
             context: context,
             logPrefix: "SaveFoodStockCommand"
         )
+        let recordedByHumanId = HumanActionAttributionPolicy.activeHumanID(
+            executorId,
+            context: context
+        )
         try syncExpenseIfNeeded(
             pet: pet,
             record: savedRecord,
             previousExpenseId: previousExpenseId,
             amount: expenseAmount,
             payerId: actor.effectiveExecutorId,
+            recordedByHumanId: recordedByHumanId,
             date: expenseDate,
             note: expenseNote,
             context: context,
@@ -306,6 +311,7 @@ enum SaveFoodStockCommand {
         previousExpenseId: UUID?,
         amount: Double?,
         payerId: String?,
+        recordedByHumanId: String?,
         date: Date,
         note: String,
         context: ModelContext,
@@ -338,6 +344,7 @@ enum SaveFoodStockCommand {
             ) else { return }
             let expense = DomainCareFactWriter.upsertExpenseLog(
                 plan: write,
+                recordedByHumanId: recordedByHumanId,
                 existing: existingExpense,
                 context: context
             )

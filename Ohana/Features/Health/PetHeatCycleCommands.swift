@@ -15,6 +15,25 @@ struct PetHeatCycleCommandInput: Equatable {
     let note: String
     let isMated: Bool
     let expectedDeliveryDate: Date?
+    let recordedByHumanId: String?
+
+    init(
+        startDate: Date,
+        endDate: Date?,
+        status: HeatCycleStatus,
+        note: String,
+        isMated: Bool,
+        expectedDeliveryDate: Date?,
+        recordedByHumanId: String? = nil
+    ) {
+        self.startDate = startDate
+        self.endDate = endDate
+        self.status = status
+        self.note = note
+        self.isMated = isMated
+        self.expectedDeliveryDate = expectedDeliveryDate
+        self.recordedByHumanId = recordedByHumanId
+    }
 }
 
 struct PetHeatCycleCommandResult: Equatable {
@@ -38,6 +57,10 @@ enum PetHeatCycleCommandService {
             context: context,
             logPrefix: "PetHeatCycleCommandService.recordHeatCycle"
         ) else { return nil }
+        let recordedByHumanId = HumanActionAttributionPolicy.activeHumanID(
+            input.recordedByHumanId,
+            context: context
+        )
         let log = DomainMemberFactWriter.createHeatCycleLog(
             plan: write,
             pet: pet,
@@ -46,6 +69,7 @@ enum PetHeatCycleCommandService {
             note: input.note.trimmingCharacters(in: .whitespacesAndNewlines),
             isMated: input.isMated,
             expectedDeliveryDate: input.expectedDeliveryDate,
+            recordedByHumanId: recordedByHumanId,
             context: context
         )
         let saveResult = context.safeSaveResult(publishFailureEvent: true)

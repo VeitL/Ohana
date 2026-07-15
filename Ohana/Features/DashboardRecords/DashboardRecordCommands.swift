@@ -284,7 +284,7 @@ struct DashboardRecordCommandExecutor {
         weightUnit: String = "kg",
         bcsScore: Int = 0,
         awardsReward: Bool = false,
-        ledgerSource: CareLedgerSource? = nil,
+        ledgerSource: CareLedgerSource,
         command: DomainCommand,
         note: String
     ) throws -> WeightCommandResult {
@@ -353,6 +353,7 @@ struct DashboardRecordCommandExecutor {
         category: ExpenseCategory,
         note expenseNote: String,
         executorId: String?,
+        recordedByHumanId: String? = nil,
         source: CareLedgerSource = .detail,
         receiptTitle: String? = nil,
         receiptCategory: DocumentCategory? = nil,
@@ -368,6 +369,7 @@ struct DashboardRecordCommandExecutor {
             note: expenseNote,
             context: context,
             executorId: executorId,
+            recordedByHumanId: recordedByHumanId,
             source: source,
             receiptTitle: receiptTitle,
             receiptCategory: receiptCategory,
@@ -389,6 +391,7 @@ struct DashboardRecordCommandExecutor {
         category: ExpenseCategory,
         note expenseNote: String,
         executorId: String?,
+        recordedByHumanId: String? = nil,
         source: CareLedgerSource = .detail,
         command: DomainCommand,
         revisionNote: String
@@ -402,6 +405,7 @@ struct DashboardRecordCommandExecutor {
             note: expenseNote,
             context: context,
             executorId: executorId,
+            recordedByHumanId: recordedByHumanId,
             source: source,
             careEvents: careEvents
         )
@@ -449,6 +453,7 @@ struct DashboardRecordCommandExecutor {
         amount: Double,
         date: Date,
         note expenseNote: String,
+        recordedByHumanId: String? = nil,
         category: ExpenseCategory = .other,
         source: CareLedgerSource = .quickAction,
         command: DomainCommand,
@@ -460,6 +465,7 @@ struct DashboardRecordCommandExecutor {
             date: date,
             note: expenseNote,
             context: context,
+            recordedByHumanId: recordedByHumanId,
             category: category,
             source: source,
             questManager: questManager,

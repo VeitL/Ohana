@@ -9,7 +9,7 @@ import SwiftUI
 
 struct FocusHomeToolbar: ToolbarContent {
     let selectedTab: VerticalSolidHomeTab
-    let coconutBalance: Int
+    let coconutBalance: Int?
     let activeHumanDisplayName: String
     let primaryActionIcon: String
     let primaryActionAccessibilityLabel: String
@@ -26,12 +26,9 @@ struct FocusHomeToolbar: ToolbarContent {
             Button(action: onCoconut) {
                 FocusHomeCoconutToolbarLabel(balance: coconutBalance)
             }
-            .accessibilityLabel(localization.tr(
-                zh: "椰子余额 \(coconutBalance)",
-                en: "Coconut balance \(coconutBalance)",
-                de: "Kokosnussguthaben \(coconutBalance)"
-            ))
+            .accessibilityLabel(coconutBalanceAccessibilityLabel)
             .accessibilityIdentifier("home-coconut-action")
+            .disabled(coconutBalance == nil)
         }
 
         ToolbarItemGroup(placement: .topBarTrailing) {
@@ -119,10 +116,25 @@ struct FocusHomeToolbar: ToolbarContent {
             .accessibilityIdentifier("home-settings-action")
         }
     }
+
+    private var coconutBalanceAccessibilityLabel: String {
+        guard let coconutBalance else {
+            return localization.tr(
+                zh: "正在读取椰子余额",
+                en: "Loading coconut balance",
+                de: "Kokosnussguthaben wird geladen"
+            )
+        }
+        return localization.tr(
+            zh: "椰子余额 \(coconutBalance)",
+            en: "Coconut balance \(coconutBalance)",
+            de: "Kokosnussguthaben \(coconutBalance)"
+        )
+    }
 }
 
 private struct FocusHomeCoconutToolbarLabel: View {
-    let balance: Int
+    let balance: Int?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -130,9 +142,13 @@ private struct FocusHomeCoconutToolbarLabel: View {
         HStack(spacing: 4) {
             Text("🥥")
                 .accessibilityHidden(true)
-            Text("\(balance)")
-                .monospacedDigit()
-                .ohanaNumericMotion(balance)
+            if let balance {
+                Text("\(balance)")
+                    .monospacedDigit()
+                    .ohanaNumericMotion(balance)
+            } else {
+                Text("…")
+            }
         }
         .lineLimit(1)
         .fixedSize(horizontal: true, vertical: false)

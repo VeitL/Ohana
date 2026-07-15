@@ -92,6 +92,7 @@ struct VerticalSolidHomeView: View {
     @State var growthLoopSyncTask: Task<Void, Never>?
     @State var growthLoopPulseDismissTask: Task<Void, Never>?
     @State var todayFocusDailyCompletionTask: Task<Void, Never>?
+    @State var pendingActionHumanConfirmation: ActionHumanConfirmationDraft?
     @State var snapshotRefreshGate = HomeSnapshotRefreshGate()
     @State var homeAppearHandoffTask: Task<Void, Never>?
     @State var memberMediaAttachmentIndexRepairTask: Task<Void, Never>?
@@ -325,6 +326,13 @@ struct VerticalSolidHomeView: View {
                 .frame(width: proxy.size.width, height: contentHeight)
                 .position(x: proxy.size.width / 2, y: topChromeHeight + contentHeight / 2)
 
+                if !controller.snapshot.isReady {
+                    HomeReadModelLoadingOverlay(localization: l)
+                        .frame(width: proxy.size.width, height: contentHeight)
+                        .position(x: proxy.size.width / 2, y: topChromeHeight + contentHeight / 2)
+                        .zIndex(20)
+                }
+
                 if controller.preparedTabs.contains(.home), shouldMountTodayFocusChrome {
                     VerticalSolidHomeTodayFocusChrome(
                         snapshot: controller.snapshot.todayFocus,
@@ -419,7 +427,7 @@ struct VerticalSolidHomeView: View {
         .toolbar {
             FocusHomeToolbar(
                 selectedTab: controller.selectedTab,
-                coconutBalance: headerCoconutBalance,
+                coconutBalance: controller.snapshot.isReady ? headerCoconutBalance : nil,
                 activeHumanDisplayName: activeHumanDisplayName,
                 primaryActionIcon: homeToolbarPrimaryActionIcon,
                 primaryActionAccessibilityLabel: homeToolbarPrimaryActionAccessibilityLabel,
@@ -513,6 +521,7 @@ struct VerticalSolidHomeView: View {
                 startWalkFromQuickAction(petID: petID)
             }
         )
+        .actionHumanConfirmationDialog(draft: $pendingActionHumanConfirmation)
         .onChange(of: treeManager.treeLevel.rawValue) { _, _ in
             scheduleGrowthUnlockFeedbackIfNeeded()
             requestHomeSnapshotRefresh()
@@ -526,5 +535,29 @@ struct VerticalSolidHomeView: View {
             !isHomeCardExpandedOrTransitioning &&
             !isHomeCardHeroAnimating &&
             AppFeatureRouteGuard.allowsHomeTab(.oasis, currentLevel: treeManager.treeLevel.rawValue)
+    }
+}
+
+private struct HomeReadModelLoadingOverlay: View {
+    let localization: L10n
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ProgressView()
+                .tint(Color.goPrimary)
+            Text(localization.tr(
+                zh: "正在恢复家庭数据",
+                en: "Loading household data",
+                de: "Haushaltsdaten werden geladen"
+            ))
+            .font(OhanaFont.caption(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(Color.ohanaCardSurface.opacity(0.88), in: Capsule())
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home-read-model-loading")
     }
 }

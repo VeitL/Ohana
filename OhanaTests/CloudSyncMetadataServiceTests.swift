@@ -335,7 +335,7 @@ struct CloudSyncMetadataServiceTests {
 
     @MainActor
     @Test func entityRegistryCoversCurrentSwiftDataSchema() {
-        let schemaNames = Set(ArkSchemaV90.models.map { String(describing: $0) })
+        let schemaNames = Set(ArkSchemaV91.models.map { String(describing: $0) })
             .subtracting(CloudSyncEntityRegistry.localOnlySchemaEntityNames)
         let descriptorNames = Set(CloudSyncEntityRegistry.descriptors.map(\.entityName))
 
@@ -784,6 +784,55 @@ struct CloudSyncMetadataServiceTests {
         #expect(walkPayload.fields["executorIdsRaw"]?.stringValue == "\(executorId)|\(coExecutorId)")
         #expect(walkPayload.fields["behaviorNotes"]?.stringValue == "calm walk")
         #expect(walkPayload.fields["routeLocationsData"] == .assetData(Data([1, 2, 3])))
+
+        let expenseLog = PetExpenseLog(
+            amount: 18,
+            category: .food,
+            pet: pet,
+            executorId: executorId,
+            recordedByHumanId: coExecutorId
+        )
+        let expenseState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: PetExpenseLog.self),
+            localRecordId: expenseLog.id,
+            householdId: householdId,
+            context: context
+        )
+        let expensePayload = try CloudSyncRecordSerializer.payload(for: expenseLog, state: expenseState)
+        #expect(expensePayload.fields["executorId"]?.stringValue == executorId)
+        #expect(expensePayload.fields["recordedByHumanId"]?.stringValue == coExecutorId)
+
+        let symptom = SymptomLog(
+            category: .skin,
+            symptomName: "itch",
+            severity: .moderate,
+            photoData: Data([4, 5]),
+            recordedByHumanId: executorId,
+            pet: pet
+        )
+        let symptomState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: SymptomLog.self),
+            localRecordId: symptom.id,
+            householdId: householdId,
+            context: context
+        )
+        let symptomPayload = try CloudSyncRecordSerializer.payload(for: symptom, state: symptomState)
+        #expect(symptomPayload.fields["recordedByHumanId"]?.stringValue == executorId)
+        #expect(symptomPayload.fields["photoData"] == .assetData(Data([4, 5])))
+
+        let heatCycle = HeatCycleLog(
+            status: .estrus,
+            recordedByHumanId: coExecutorId,
+            pet: pet
+        )
+        let heatState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: HeatCycleLog.self),
+            localRecordId: heatCycle.id,
+            householdId: householdId,
+            context: context
+        )
+        let heatPayload = try CloudSyncRecordSerializer.payload(for: heatCycle, state: heatState)
+        #expect(heatPayload.fields["recordedByHumanId"]?.stringValue == coExecutorId)
     }
 
     @MainActor
@@ -2744,6 +2793,45 @@ struct CloudSyncMetadataServiceTests {
         #expect(walkLog.sharedSessionId == "session-2")
         #expect(walkLog.behaviorNotes == "happy")
         #expect(walkLog.moodRating == 5)
+
+        let symptomId = uuid("33333333-3333-4333-8333-333333333333")
+        let symptomRecord = try makeRecordPayload(
+            entityName: String(describing: SymptomLog.self),
+            recordType: String(describing: SymptomLog.self),
+            localRecordId: symptomId,
+            householdId: householdId,
+            fields: [
+                "date": .date(Date(timeIntervalSinceReferenceDate: 2400)),
+                "categoryRaw": .string(SymptomCategory.skin.rawValue),
+                "symptomName": .string("itch"),
+                "severityRaw": .int(SymptomSeverity.moderate.rawValue),
+                "petId": .string(normalized(petId)),
+                "recordedByHumanId": .string("recorder-1")
+            ]
+        ).makeCKRecord()
+        let symptomResult = try CloudSyncRecordApplier.apply(symptomRecord, context: context)
+        #expect(symptomResult == .inserted(entityName: "SymptomLog", localRecordId: normalized(symptomId)))
+        let symptomLog = try #require(try context.fetch(FetchDescriptor<SymptomLog>()).first { $0.id == symptomId })
+        #expect(symptomLog.recordedByHumanId == "recorder-1")
+
+        let heatId = uuid("44444444-4444-4444-8444-444444444444")
+        let heatRecord = try makeRecordPayload(
+            entityName: String(describing: HeatCycleLog.self),
+            recordType: String(describing: HeatCycleLog.self),
+            localRecordId: heatId,
+            householdId: householdId,
+            fields: [
+                "startDate": .date(Date(timeIntervalSinceReferenceDate: 2500)),
+                "statusRaw": .string(HeatCycleStatus.estrus.rawValue),
+                "isMated": .bool(false),
+                "petId": .string(normalized(petId)),
+                "recordedByHumanId": .string("recorder-2")
+            ]
+        ).makeCKRecord()
+        let heatResult = try CloudSyncRecordApplier.apply(heatRecord, context: context)
+        #expect(heatResult == .inserted(entityName: "HeatCycleLog", localRecordId: normalized(heatId)))
+        let heatLog = try #require(try context.fetch(FetchDescriptor<HeatCycleLog>()).first { $0.id == heatId })
+        #expect(heatLog.recordedByHumanId == "recorder-2")
     }
 
     @MainActor

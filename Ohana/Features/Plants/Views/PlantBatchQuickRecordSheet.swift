@@ -13,23 +13,25 @@ struct PlantBatchQuickRecordSheet: View {
     let initialCareType: PlantCareType?
     let initialSelectedPlantIDs: Set<UUID>
     let imageDataProvider: @Sendable (PersistentIdentifier) async -> Data?
-    let onRecord: @MainActor ([PlantBatchCareSelection]) async -> Bool
+    let onRecord: @MainActor ([PlantBatchCareSelection], UUID?) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
-
     @State private var selectedCareCategory: PlantCareCategory
     @State private var selectedCareType: PlantCareType
     @State private var selectedPlantIDs: Set<UUID> = []
     @State private var isRecording = false
+    @State private var selectedExecutorID: UUID?
+    @State private var requiresExecutorSelection = false
 
     init(
         targets: [PlantBatchQuickRecordTargetSnapshot],
         initialCareType: PlantCareType? = nil,
         initialSelectedPlantIDs: Set<UUID> = [],
+        initialExecutorID: UUID? = nil,
         imageDataProvider: @escaping @Sendable (PersistentIdentifier) async -> Data?,
-        onRecord: @escaping @MainActor ([PlantBatchCareSelection]) async -> Bool
+        onRecord: @escaping @MainActor ([PlantBatchCareSelection], UUID?) async -> Bool
     ) {
         self.targets = targets
         self.initialCareType = initialCareType
@@ -41,6 +43,7 @@ struct PlantBatchQuickRecordSheet: View {
         _selectedCareCategory = State(initialValue: initialType.careCategory)
         _selectedCareType = State(initialValue: initialType)
         _selectedPlantIDs = State(initialValue: initialSelectedPlantIDs.intersection(activePlantIDs))
+        _selectedExecutorID = State(initialValue: initialExecutorID)
     }
 
     private var l: L10n { L10n(appLanguage) }
@@ -69,6 +72,13 @@ struct PlantBatchQuickRecordSheet: View {
         ) {
             VStack(alignment: .leading, spacing: 16) {
                 headerCard
+                QuickCareActionHumanPickerContainer(
+                    selectedHumanID: $selectedExecutorID,
+                    requiresSelection: $requiresExecutorSelection,
+                    role: .executor,
+                    tint: careTint(for: selectedCareType)
+                )
+                .disabled(isRecording)
                 typeSelector
                     .disabled(isRecording)
                 selectionToolbar
@@ -323,7 +333,7 @@ struct PlantBatchQuickRecordSheet: View {
                 .opacity(selectedCount == 0 ? 0.45 : 1)
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(selectedCount == 0 || isRecording)
+        .disabled(selectedCount == 0 || isRecording || requiresExecutorSelection)
         .accessibilityLabel(isRecording ? recordingTitle : recordTitle)
         .accessibilityIdentifier("plant-batch-quick-record-action")
     }
@@ -372,6 +382,7 @@ struct PlantBatchQuickRecordSheet: View {
     @MainActor
     private func record() async {
         guard !isRecording else { return }
+        guard !requiresExecutorSelection else { return }
         let selections = selectedPlantIDs.map {
             PlantBatchCareSelection(plantID: $0, careType: selectedCareType)
         }
@@ -379,7 +390,7 @@ struct PlantBatchQuickRecordSheet: View {
 
         isRecording = true
         defer { isRecording = false }
-        let didRecord = await onRecord(selections)
+        let didRecord = await onRecord(selections, selectedExecutorID)
         guard didRecord else { return }
 
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -419,12 +430,14 @@ extension PlantBatchQuickRecordSheet {
     init(
         plants: [Plant],
         initialCareType: PlantCareType? = nil,
+        initialExecutorID: UUID? = nil,
         imageDataProvider: @escaping @Sendable (PersistentIdentifier) async -> Data?,
-        onRecord: @escaping @MainActor ([PlantBatchCareSelection]) async -> Bool
+        onRecord: @escaping @MainActor ([PlantBatchCareSelection], UUID?) async -> Bool
     ) {
         self.init(
             targets: PlantBatchQuickRecordTargetSnapshot.activeTargets(from: plants),
             initialCareType: initialCareType,
+            initialExecutorID: initialExecutorID,
             imageDataProvider: imageDataProvider,
             onRecord: onRecord
         )

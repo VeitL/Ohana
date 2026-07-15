@@ -17,6 +17,7 @@ struct HumanNoteFileAttachmentPayload: Equatable {
 
 struct HumanNoteCommandResult: Equatable {
     let subjectID: UUID
+    let recordID: UUID?
     let attachmentCount: Int
     let eventID: UUID?
     let reminderID: UUID?
@@ -44,6 +45,7 @@ enum HumanNoteCommandService {
         reminderDate: Date?,
         appLanguage: String,
         context: ModelContext,
+        recordedByHumanId: String? = nil,
         scheduleNotification: Bool = true,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
         attachmentStorage: HumanNoteAttachmentStorage = .live,
@@ -69,6 +71,7 @@ enum HumanNoteCommandService {
         )
         let l = L10n(appLanguage)
         let effectiveReminderDate = disposition.allowsDerivedEffects ? reminderDate : nil
+        let validatedRecorderID = HumanActionAttributionPolicy.activeHumanID(recordedByHumanId, context: context)
         let entry = noteEntry(
             note: cleanNote,
             date: date,
@@ -76,7 +79,16 @@ enum HumanNoteCommandService {
             reminderDate: effectiveReminderDate,
             l: l
         )
+        let sequence = human.notes.isEmpty ? 0 : human.notes.components(separatedBy: "\n\n").count
         human.notes = human.notes.isEmpty ? entry : human.notes + "\n\n" + entry
+        let noteRecord = HumanNoteRecord(
+            humanId: human.id,
+            sequence: sequence,
+            date: date,
+            rawEntry: entry,
+            recordedByHumanId: validatedRecorderID
+        )
+        context.insert(noteRecord)
         CloudSyncMutationRecorder.markModified(human, context: context, modifiedAt: date)
 
         let reminderPair = effectiveReminderDate.flatMap {
@@ -98,6 +110,7 @@ enum HumanNoteCommandService {
             context.rollback()
             return HumanNoteCommandResult(
                 subjectID: human.id,
+                recordID: nil,
                 attachmentCount: 0,
                 eventID: nil,
                 reminderID: nil,
@@ -122,6 +135,7 @@ enum HumanNoteCommandService {
 
         return HumanNoteCommandResult(
             subjectID: human.id,
+            recordID: noteRecord.id,
             attachmentCount: attachments.count,
             eventID: reminderPair?.event.id,
             reminderID: reminderPair?.reminder.id,
@@ -135,6 +149,7 @@ enum HumanNoteCommandService {
     static func deleteNote(
         human: Human,
         rawString: String,
+        recordID: UUID? = nil,
         context: ModelContext,
         attachmentStorage: HumanNoteAttachmentStorage = .live,
         saveChanges: (ModelContext) -> ModelContextSaveResult = {
@@ -162,14 +177,9 @@ enum HumanNoteCommandService {
         }
 
         let parts = human.notes.components(separatedBy: "\n\n")
-        let removedParts = parts.filter { part in
-            part.trimmingCharacters(in: .whitespacesAndNewlines) == target
-        }
-        let remaining = parts.filter { part in
-            part.trimmingCharacters(in: .whitespacesAndNewlines) != target
-        }
-        let didDelete = remaining.count != parts.count
-        guard didDelete else {
+        guard let removedIndex = parts.firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines) == target
+        }) else {
             return HumanNoteDeleteResult(
                 subjectID: human.id,
                 didDelete: false,
@@ -178,13 +188,26 @@ enum HumanNoteCommandService {
                 attachmentCleanup: .notRequired
             )
         }
+        let removedPart = parts[removedIndex]
+        var remaining = parts
+        remaining.remove(at: removedIndex)
 
         human.notes = remaining
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: "\n\n")
-        let removedAttachments = removedParts.flatMap {
-            HumanNoteAttachmentStore.visibleTextAndAttachments(from: $0).attachments
+        let noteRecords = fetchNoteRecords(humanID: human.id, context: context)
+        let matchingRecord = recordID.flatMap { id in noteRecords.first { $0.id == id } }
+            ?? noteRecords.first {
+                $0.sequence == removedIndex &&
+                    $0.rawEntry.trimmingCharacters(in: .whitespacesAndNewlines) == target
+            }
+        if let matchingRecord {
+            context.delete(matchingRecord)
         }
+        noteRecords.filter { $0.id != matchingRecord?.id && $0.sequence > removedIndex }.forEach {
+            $0.sequence -= 1
+        }
+        let removedAttachments = HumanNoteAttachmentStore.visibleTextAndAttachments(from: removedPart).attachments
         let saveResult = saveChanges(context)
         guard saveResult.didSave else {
             context.rollback()
@@ -208,6 +231,14 @@ enum HumanNoteCommandService {
             persistenceErrorDescription: nil,
             attachmentCleanup: attachmentCleanup
         )
+    }
+
+    private static func fetchNoteRecords(humanID: UUID, context: ModelContext) -> [HumanNoteRecord] {
+        let descriptor = FetchDescriptor<HumanNoteRecord>(
+            predicate: #Predicate<HumanNoteRecord> { $0.humanId == humanID },
+            sortBy: [SortDescriptor(\HumanNoteRecord.sequence)]
+        )
+        return (try? context.fetch(descriptor)) ?? []
     }
 
     private static func persistAttachments(
@@ -611,6 +642,7 @@ struct HumanCareCommandExecutor {
         value: Double,
         date: Date,
         notes: String,
+        recordedByHumanId: String? = nil,
         note: String,
         emptyNote: String = "human.health.metric.noop"
     ) -> HumanHealthMetricCommandResult? {
@@ -621,6 +653,7 @@ struct HumanCareCommandExecutor {
             value: value,
             date: date,
             notes: notes,
+            recordedByHumanId: recordedByHumanId,
             context: context
         ) else {
             derivations.derive(
@@ -658,6 +691,7 @@ struct HumanCareCommandExecutor {
         fileAttachments: [HumanNoteFileAttachmentPayload],
         reminderDate: Date?,
         appLanguage: String,
+        recordedByHumanId: String? = nil,
         scheduleNotification: Bool = true,
         note: String,
         emptyNote: String = "human.note.noop"
@@ -671,6 +705,7 @@ struct HumanCareCommandExecutor {
             reminderDate: reminderDate,
             appLanguage: appLanguage,
             context: context,
+            recordedByHumanId: recordedByHumanId,
             scheduleNotification: scheduleNotification,
             reminderScheduling: reminderScheduling
         ) else {
@@ -692,11 +727,13 @@ struct HumanCareCommandExecutor {
     func deleteNote(
         human: Human,
         rawString: String,
+        recordID: UUID? = nil,
         note: String? = nil
     ) -> HumanNoteDeleteResult {
         let result = HumanNoteCommandService.deleteNote(
             human: human,
             rawString: rawString,
+            recordID: recordID,
             context: context
         )
         if result.didPersist {

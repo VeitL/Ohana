@@ -19,7 +19,6 @@ struct PetHealthRecordInlinePopup: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
-    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var selectedType: HealthLogType
     @State private var date = Date()
@@ -31,6 +30,8 @@ struct PetHealthRecordInlinePopup: View {
     @State private var expirationDate = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var hasNextCheckup = false
     @State private var nextCheckupDate = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
+    @State private var selectedRecorderHumanID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var isSaving = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -51,9 +52,6 @@ struct PetHealthRecordInlinePopup: View {
     private var l: L10n { L10n(appLanguage) }
     private var isDark: Bool { colorScheme == .dark }
     private var accent: Color { isDark ? Color.goPrimary : Color.goBlue }
-    private var activeExecutorID: String? {
-        activeHumanIdStr.isEmpty ? nil : activeHumanIdStr
-    }
 
     private var showsNameField: Bool {
         selectedType == .vaccine || selectedType == .dewormingInternal || selectedType == .dewormingExternal || selectedType == .medication
@@ -148,6 +146,13 @@ struct PetHealthRecordInlinePopup: View {
                 } header: {
                     Text(l.tr(zh: "详情", en: "Details", de: "Details"))
                 }
+
+                QuickCareActionHumanPickerContainer(
+                    selectedHumanID: $selectedRecorderHumanID,
+                    requiresSelection: $requiresRecorderSelection,
+                    role: .recorder,
+                    tint: accent
+                )
             }
             .navigationTitle(typeLabel)
             .navigationBarTitleDisplayMode(.inline)
@@ -163,7 +168,7 @@ struct PetHealthRecordInlinePopup: View {
                     Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
                         save()
                     }
-                    .disabled(isSaving || !pet.canWriteHealthFacts)
+                    .disabled(isSaving || !pet.canWriteHealthFacts || requiresRecorderSelection)
                     .accessibilityIdentifier("pet-health-record-save-action")
                 }
             }
@@ -311,7 +316,7 @@ struct PetHealthRecordInlinePopup: View {
     }
 
     private func save() {
-        guard !isSaving, pet.canWriteHealthFacts else { return }
+        guard !isSaving, pet.canWriteHealthFacts, !requiresRecorderSelection else { return }
         isSaving = true
         let input = PetHealthRecordCommandInput(
             type: selectedType,
@@ -322,7 +327,7 @@ struct PetHealthRecordInlinePopup: View {
             cost: CountryDecimalInput.parse(cost, countryCode: AppCountry.code) ?? 0,
             expirationDate: (showsExpiration && hasExpiration) ? expirationDate : nil,
             nextCheckupDate: (showsNextCheckup && hasNextCheckup) ? nextCheckupDate : nil,
-            executorId: activeExecutorID,
+            executorId: selectedRecorderHumanID?.uuidString,
             source: .detail,
             includesNameInNote: showsNameField
         )

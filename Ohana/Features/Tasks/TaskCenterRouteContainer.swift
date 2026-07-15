@@ -27,6 +27,7 @@ struct TaskCenterRouteContainer: View {
     @State private var showingAddChoice = false
     @State private var didAutoPresentCreation = false
     @State private var familyTaskEditorRoute: FamilyCollaborationEditorRoute?
+    @State private var pendingActionHumanConfirmation: ActionHumanConfirmationDraft?
 
     let presentation: TaskCenterPresentation
     let routeContext: TaskCenterRouteContext
@@ -110,7 +111,9 @@ struct TaskCenterRouteContainer: View {
                             showsDailyProgress: routeContext.scope == .all,
                             focusedItemID: focusedItemID,
                             focusRequestID: routeContext.focusRequestID,
-                            onAction: performTaskAction,
+                            onAction: { item, action in
+                                performTaskAction(item, action: action)
+                            },
                             onOpen: openTask,
                             onScrollOffsetChange: onEmbeddedScrollOffsetChange
                         )
@@ -119,7 +122,9 @@ struct TaskCenterRouteContainer: View {
                             TaskCenterCalendarWorkflowStrip(
                                 items: calendarWorkflowItems,
                                 onOpen: openTask,
-                                onAction: performTaskAction
+                                onAction: { item, action in
+                                    performTaskAction(item, action: action)
+                                }
                             )
                             CalendarRouteContainer(
                                 preselectedPetId: effectivePreselectedPetID,
@@ -150,14 +155,16 @@ struct TaskCenterRouteContainer: View {
                 humans: routeData.humans,
                 plants: routeData.plants,
                 allowsEditing: presentation.allowsEditing,
+                requiresActionHumanConfirmation: presentation.event.requiresTodayFocusActionHuman,
                 onDelete: {
                     eventDetailPresentation = nil
                     scheduleRouteDataLoad(delayMilliseconds: 220, force: true)
                 },
-                onComplete: {
+                onComplete: { executorID in
                     _ = completeEvent(
                         presentation.event,
-                        occurrenceDate: presentation.occurrenceDate
+                        occurrenceDate: presentation.occurrenceDate,
+                        executorID: executorID
                     )
                 }
             )
@@ -190,6 +197,7 @@ struct TaskCenterRouteContainer: View {
             }
             Button(L10n.current.cancel, role: .cancel) {}
         }
+        .actionHumanConfirmationDialog(draft: $pendingActionHumanConfirmation)
         .onAppear {
             scheduleRouteDataLoad(delayMilliseconds: routeDataLoadDelayMilliseconds)
             if routeContext.creationPreset != nil, !didAutoPresentCreation {
@@ -309,13 +317,69 @@ struct TaskCenterRouteContainer: View {
 
     private func performTaskAction(
         _ item: TaskCenterItemSnapshot,
+        action: TaskCenterAvailableAction,
+        executorID: String? = nil
+    ) -> Bool {
+        if executorID == nil,
+           item.familyTaskID == nil,
+           action == .complete,
+           let eventID = item.eventID,
+           let event = routeData.events.first(where: { $0.id == eventID }),
+           event.requiresTodayFocusActionHuman {
+            return requestActionHumanForTask(item, action: action)
+        }
+        return executeTaskAction(item, action: action, executorID: executorID)
+    }
+
+    private func requestActionHumanForTask(
+        _ item: TaskCenterItemSnapshot,
         action: TaskCenterAvailableAction
+    ) -> Bool {
+        let options = routeData.humans.map { human in
+            ActionHumanOption(
+                id: human.id,
+                name: human.name,
+                avatarEmoji: human.avatarEmoji,
+                isDeceased: human.hasPassedAway
+            )
+        }
+        let eligible = ActionHumanDefaultSelectionPolicy.eligibleHumans(from: options)
+        let preferredID = ActionHumanDefaultSelectionPolicy.selection(
+            draftHumanID: nil,
+            currentLocalHumanID: appServices.activeHumanSelection.currentHumanId.flatMap(UUID.init(uuidString:)),
+            humans: options
+        )
+        guard eligible.count > 1 else {
+            return executeTaskAction(item, action: action, executorID: preferredID?.uuidString)
+        }
+        pendingActionHumanConfirmation = ActionHumanConfirmationDraft(
+            actionTitle: item.title,
+            humans: eligible,
+            preferredHumanID: preferredID
+        ) { executorID in
+            if executeTaskAction(item, action: action, executorID: executorID) {
+                OhanaFeedback.medium()
+            }
+        }
+        // No mutation has happened yet. The task row stays visible while the
+        // lightweight confirmation is on screen.
+        return false
+    }
+
+    private func executeTaskAction(
+        _ item: TaskCenterItemSnapshot,
+        action: TaskCenterAvailableAction,
+        executorID: String?
     ) -> Bool {
         let result = TaskActionCommandExecutor(
             modelContext: modelContext,
             services: appServices
         ).execute(
-            TaskActionCommand(item: item, action: action),
+            TaskActionCommand(
+                item: item,
+                action: action,
+                actingHumanID: executorID.flatMap(UUID.init(uuidString:))
+            ),
             events: routeData.events,
             familyTasks: routeData.familyTasks,
             humans: routeData.humans,
@@ -326,7 +390,7 @@ struct TaskCenterRouteContainer: View {
         return true
     }
 
-    private func completeEvent(_ event: Event, occurrenceDate: Date) -> Bool {
+    private func completeEvent(_ event: Event, occurrenceDate: Date, executorID: String?) -> Bool {
         guard let item = taskCenterItem(for: event, occurrenceDate: occurrenceDate) else {
             return event.isOccurrenceMarkedComplete(on: occurrenceDate)
         }
@@ -334,10 +398,10 @@ struct TaskCenterRouteContainer: View {
             return true
         }
         if item.availableActions.contains(.submitForReview) {
-            return performTaskAction(item, action: .submitForReview)
+            return performTaskAction(item, action: .submitForReview, executorID: executorID)
         }
         guard item.availableActions.contains(.complete) else { return false }
-        return performTaskAction(item, action: .complete)
+        return performTaskAction(item, action: .complete, executorID: executorID)
     }
 
     private func taskCenterItem(

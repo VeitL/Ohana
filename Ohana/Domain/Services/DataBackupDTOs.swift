@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - 顶层备份结构
 nonisolated struct OhanaBackup: Codable {
-    var schemaVersion: Int = 30
+    var schemaVersion: Int = 31
     var exportedAt: String
     /// Records the destination policy for auditability. Older backups decode as
     /// `nil`; both current user-visible export paths are restricted, while
@@ -49,6 +49,7 @@ nonisolated struct OhanaBackup: Codable {
     var humanMedicationLogs: [HumanMedicationLogBackup]?
     var humanHealthMetricLogs: [HumanHealthMetricLogBackup]?
     var humanHealthReports: [HumanHealthReportBackup]?
+    var humanNoteRecords: [HumanNoteRecordBackup]? = nil
     var waterLogs: [WaterLogBackup]
     var wishlistItems: [WishlistItemBackup]
     var careLedgerEvents: [CareLedgerEventBackup]?
@@ -196,6 +197,15 @@ nonisolated struct HumanBackup: Codable {
     var avatarImageRef: BackupMediaReference? = nil
     var passedAwayDate: String?
     // Intentionally excluded from backups: pinHash, pinSalt, pinFailedAttempts, pinLockedUntil.
+}
+
+nonisolated struct HumanNoteRecordBackup: Codable, Equatable {
+    var id: String
+    var humanId: String
+    var sequence: Int
+    var date: String
+    var rawEntry: String
+    var recordedByHumanId: String?
 }
 
 nonisolated struct EventBackup: Codable {
@@ -439,6 +449,7 @@ nonisolated struct PetExpenseLogBackup: Codable {
     var note: String
     var petId: String?
     var executorId: String?
+    var recordedByHumanId: String? = nil
     var sharedSessionId: String?
 }
 
@@ -639,6 +650,7 @@ nonisolated struct HumanHealthMetricLogBackup: Codable {
     var date: String
     var notes: String
     var humanId: String?
+    var recordedByHumanId: String? = nil
     var createdAt: String
 }
 
@@ -653,6 +665,7 @@ nonisolated struct HumanHealthReportBackup: Codable {
     var nextCheckDate: String?
     var summary: String
     var notes: String
+    var recordedByHumanId: String? = nil
     var colorHex: String
     var createdAt: String
 }
@@ -667,6 +680,7 @@ nonisolated struct SymptomLogBackup: Codable {
     var photoBase64: String?
     var photoRef: BackupMediaReference? = nil
     var petId: String?
+    var recordedByHumanId: String? = nil
 }
 
 nonisolated struct HeatCycleLogBackup: Codable {
@@ -678,6 +692,7 @@ nonisolated struct HeatCycleLogBackup: Codable {
     var isMated: Bool
     var expectedDeliveryDate: String?
     var petId: String?
+    var recordedByHumanId: String? = nil
 }
 
 nonisolated struct WaterLogBackup: Codable {

@@ -166,11 +166,12 @@ extension QuickPottyDetailSheet {
     }
 
     // MARK: - Actions
-    func logPotty(type: PottyType) {
-        guard !isCommittingPottyLog else { return }
+    @discardableResult
+    func logPotty(type: PottyType) -> Bool {
+        guard !isCommittingPottyLog, validateActionHumanDraft() else { return false }
         isCommittingPottyLog = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        let executorId = activeExecutorId()
+        let executorId = selectedActionHumanID?.uuidString
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: type.rawValue)) {
             let result = pottyCommandExecutor.record(
                 petID: pet.id,
@@ -192,11 +193,14 @@ extension QuickPottyDetailSheet {
             showSaveConfirmation(delta > 0 ? "\(type.emoji) +\(delta)🥥" : l.tr(zh: "噗噗已记录", en: "Poop logged", de: "Häufchen erfasst"))
             onRecordChanged()
         }
+        return true
     }
 
-    func logUnknownGroupPotty() {
+    @discardableResult
+    func logUnknownGroupPotty() -> Bool {
+        guard validateActionHumanDraft() else { return false }
         let targetIDs = Set(selectedPottyTargets.map(\.id))
-        let executorId = activeExecutorId()
+        let executorId = selectedActionHumanID?.uuidString
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "unknownSharedPotty")) {
             guard pottyCommandExecutor.recordUnknownSharedPotty(
@@ -222,6 +226,7 @@ extension QuickPottyDetailSheet {
             onRecordChanged()
             showSaveConfirmation(l.tr(zh: "猫砂盆事件已记录", en: "Litter-box event logged", de: "Klo-Ereignis erfasst"))
         }
+        return true
     }
 
     func doScoop() {
@@ -238,10 +243,12 @@ extension QuickPottyDetailSheet {
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 
-    func recordScoop() {
+    @discardableResult
+    func recordScoop() -> Bool {
+        guard validateActionHumanDraft() else { return false }
         let targets = selectedPottyTargets
         let targetIDs = Set(targets.map(\.id))
-        let executorId = activeExecutorId()
+        let executorId = selectedActionHumanID?.uuidString
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "litterScoop")) {
             guard let result = pottyCommandExecutor.recordLitterCare(
@@ -286,15 +293,18 @@ extension QuickPottyDetailSheet {
             }
             onRecordChanged()
         }
+        return true
     }
 
-    func doFullChange() {
+    @discardableResult
+    func doFullChange() -> Bool {
+        guard validateActionHumanDraft() else { return false }
         let now = Date()
         let cycleAnchor = Calendar.current.startOfDay(for: now)
         let shouldRecordLitterCare = todayLitterLogs.isEmpty
         let targets = selectedPottyTargets
         let targetIDs = Set(targets.map(\.id))
-        let executorId = activeExecutorId()
+        let executorId = selectedActionHumanID?.uuidString
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "litterFullChange")) {
             guard canApplyPottyDerivedEffects(executorId: executorId) else {
@@ -336,6 +346,7 @@ extension QuickPottyDetailSheet {
             )
             onRecordChanged()
         }
+        return true
     }
 
     func scheduleFeedbackClear() {
@@ -453,10 +464,6 @@ extension QuickPottyDetailSheet {
             )
             scheduleFeedbackClear()
         }
-    }
-
-    func activeExecutorId() -> String? {
-        appServices.activeHumanSelection.currentHumanId
     }
 
     func canApplyPottyDerivedEffects(executorId: String?) -> Bool {

@@ -3,7 +3,6 @@
 //  Ohana
 //
 
-import SwiftData
 import SwiftUI
 
 extension VerticalSolidHomeView {
@@ -123,26 +122,17 @@ extension VerticalSolidHomeView {
 
         if let medicationId = IslandQuestEngine.medicationId(fromQuestId: quest.id),
            let target = petMedicationTarget(medicationId) {
-            let petID = target
-            let medicationID = medicationId
-            enqueueHomeCommand(.medicationDose(petID: petID, medicationID: medicationID)) {
-                if commandExecutor.recordMedicationDose(petID: petID, medicationID: medicationID) {
-                    applyTodayFocusMutationFeedback(entityId: petID)
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                }
-            }
+            requestTodayFocusMedicationDose(
+                quest: quest,
+                petID: target,
+                medicationID: medicationId
+            )
             return
         }
 
         if let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id),
            interaction.eventRoutesByEventID[eventId] != nil {
-            let eventID = eventId
-            enqueueHomeCommand(.todayFocus(entityID: eventID, action: "eventComplete")) {
-                if commandExecutor.completeTodayFocusEvent(eventID: eventID) {
-                    applyTodayFocusMutationFeedback(entityId: eventID)
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                }
-            }
+            requestTodayFocusEventCompletion(eventID: eventId, actionTitle: quest.title)
             return
         }
 
@@ -151,15 +141,17 @@ extension VerticalSolidHomeView {
            !quest.targetPlantIds.isEmpty {
             let plantIDs = quest.targetPlantIds
             let primaryID = plantIDs[0]
-            enqueueHomeCommand(.todayFocus(entityID: primaryID, action: "plantBatch.\(plantCareType.rawValue)")) {
-                let recordedIDs = commandExecutor.recordPlantCare(
-                    plantCareType,
-                    plantIDs: plantIDs,
-                    executorId: currentExecutorId()
-                )
-                guard let firstRecordedID = recordedIDs.first else { return }
-                applyTodayFocusMutationFeedback(entityId: firstRecordedID)
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            performWithActionHuman(actionTitle: plantCareType.displayName(l: l)) { executorID in
+                enqueueHomeCommand(.todayFocus(entityID: primaryID, action: "plantBatch.\(plantCareType.rawValue)")) {
+                    let recordedIDs = commandExecutor.recordPlantCare(
+                        plantCareType,
+                        plantIDs: plantIDs,
+                        executorId: executorID
+                    )
+                    guard let firstRecordedID = recordedIDs.first else { return }
+                    applyTodayFocusMutationFeedback(entityId: firstRecordedID)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
             }
             return
         }
@@ -186,6 +178,53 @@ extension VerticalSolidHomeView {
             openPetQuickKey(todayFocusPetQuickKey(for: quest, pet: pet), petID: pet.id)
         default:
             openTodayFocusQuest(quest)
+        }
+    }
+
+    func requestTodayFocusEventCompletion(eventID: UUID, actionTitle: String) {
+        let perform: (String?) -> Void = { executorID in
+            enqueueHomeCommand(.todayFocus(entityID: eventID, action: "eventComplete")) {
+                if commandExecutor.completeTodayFocusEvent(eventID: eventID, executorId: executorID) {
+                    applyTodayFocusMutationFeedback(entityId: eventID)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
+            }
+        }
+        guard interaction.eventActionHumanRequiredIDs.contains(eventID) else {
+            perform(nil)
+            return
+        }
+        performWithActionHuman(actionTitle: actionTitle, perform: perform)
+    }
+
+    func requestTodayFocusMedicationDose(
+        quest: IslandQuest,
+        petID: UUID,
+        medicationID: UUID
+    ) {
+        performWithActionHuman(actionTitle: quest.title) { executorID in
+            performTodayFocusMedicationDose(
+                petID: petID,
+                medicationID: medicationID,
+                executorID: executorID
+            )
+        }
+    }
+
+    func performTodayFocusMedicationDose(
+        petID: UUID,
+        medicationID: UUID,
+        executorID: String?
+    ) {
+        enqueueHomeCommand(.medicationDose(petID: petID, medicationID: medicationID)) {
+            if commandExecutor.recordMedicationDose(
+                petID: petID,
+                medicationID: medicationID,
+                executorId: executorID
+            ) {
+                applyTodayFocusMutationFeedback(entityId: petID)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
         }
     }
 

@@ -508,14 +508,21 @@ nonisolated enum DomainCareFactWriter {
     @discardableResult
     static func createExpenseLog(
         plan: AuthorizedDomainCareFactWrite,
+        recordedByHumanId: String? = nil,
         context: ModelContext
     ) -> PetExpenseLog {
-        upsertExpenseLog(plan: plan, existing: nil, context: context)
+        upsertExpenseLog(
+            plan: plan,
+            recordedByHumanId: recordedByHumanId,
+            existing: nil,
+            context: context
+        )
     }
 
     @discardableResult
     static func upsertExpenseLog(
         plan: AuthorizedDomainCareFactWrite,
+        recordedByHumanId: String? = nil,
         existing log: PetExpenseLog?,
         context: ModelContext
     ) -> PetExpenseLog {
@@ -545,6 +552,7 @@ nonisolated enum DomainCareFactWriter {
         expenseLog.note = note
         expenseLog.pet = plan.pet
         expenseLog.executorId = plan.actor.effectiveExecutorId
+        expenseLog.recordedByHumanId = recordedByHumanId
         expenseLog.sharedSessionId = sharedSessionId
         CloudSyncMutationRecorder.markModified(expenseLog, context: context, modifiedAt: plan.intent.modifiedAt)
         return expenseLog
@@ -553,6 +561,7 @@ nonisolated enum DomainCareFactWriter {
     @discardableResult
     static func createHumanExpenseLog(
         plan: AuthorizedDomainHumanExpenseWrite,
+        recordedByHumanId: String? = nil,
         context: ModelContext
     ) -> PetExpenseLog {
         _ = plan.token
@@ -571,6 +580,7 @@ nonisolated enum DomainCareFactWriter {
             executorId: plan.actor.effectiveExecutorId,
             sharedSessionId: sharedSessionId
         )
+        log.recordedByHumanId = recordedByHumanId
         context.insert(log)
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: plan.intent.modifiedAt)
         return log

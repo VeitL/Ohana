@@ -79,6 +79,7 @@ final class SymptomLog {
     var severityRaw: Int
     var note: String
     var photoData: Data?
+    var recordedByHumanId: String?
     // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
     // Active product code must not read or write these fields.
     var trashedAt: Date?
@@ -88,7 +89,16 @@ final class SymptomLog {
 
     var pet: Pet?
 
-    init(date: Date = Date(), category: SymptomCategory, symptomName: String, severity: SymptomSeverity, note: String = "", photoData: Data? = nil, pet: Pet? = nil) {
+    init(
+        date: Date = Date(),
+        category: SymptomCategory,
+        symptomName: String,
+        severity: SymptomSeverity,
+        note: String = "",
+        photoData: Data? = nil,
+        recordedByHumanId: String? = nil,
+        pet: Pet? = nil
+    ) {
         self.id = UUID()
         self.date = date
         self.categoryRaw = category.rawValue
@@ -96,6 +106,7 @@ final class SymptomLog {
         self.severityRaw = severity.rawValue
         self.note = note
         self.photoData = photoData
+        self.recordedByHumanId = recordedByHumanId
         self.pet = pet
     }
 

@@ -38,6 +38,7 @@ final class HeatCycleLog {
     var note: String
     var isMated: Bool
     var expectedDeliveryDate: Date? // 如果确认交配/怀孕，记录预期产期
+    var recordedByHumanId: String?
     // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
     // Active product code must not read or write these fields.
     var trashedAt: Date?
@@ -47,7 +48,16 @@ final class HeatCycleLog {
 
     var pet: Pet?
 
-    init(startDate: Date = Date(), endDate: Date? = nil, status: HeatCycleStatus = .proestrus, note: String = "", isMated: Bool = false, expectedDeliveryDate: Date? = nil, pet: Pet? = nil) {
+    init(
+        startDate: Date = Date(),
+        endDate: Date? = nil,
+        status: HeatCycleStatus = .proestrus,
+        note: String = "",
+        isMated: Bool = false,
+        expectedDeliveryDate: Date? = nil,
+        recordedByHumanId: String? = nil,
+        pet: Pet? = nil
+    ) {
         self.id = UUID()
         self.startDate = startDate
         self.endDate = endDate
@@ -55,6 +65,7 @@ final class HeatCycleLog {
         self.note = note
         self.isMated = isMated
         self.expectedDeliveryDate = expectedDeliveryDate
+        self.recordedByHumanId = recordedByHumanId
         self.pet = pet
     }
 

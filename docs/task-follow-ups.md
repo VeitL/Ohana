@@ -10,7 +10,7 @@
 ## Current Read
 
 - Last compacted: 2026-07-14.
-- Open follow-ups: 9 total: P1 = 5, P2 = 4, P3 = 0.
+- Open follow-ups: 10 total: P1 = 5, P2 = 4, P3 = 1.
 - Open P0: 0.
 - First-release repository blocker: none currently recorded. The unified Task
   Center, Plant multi-object flow, and shared-litter one-shot undo contract are
@@ -22,9 +22,11 @@
 - Current decision: complete the four physical-device P1 items. The remaining
   CloudKit P1 is explicitly deferred and unreachable in Solo. The future
   account design is recorded in
-  `docs/planning/account-backend-extension.md` and is not active backlog until a
-  documented trigger is approved. Do not claim RC/App Store readiness until all
-  release-reachable P1 items are dispositioned.
+  `docs/planning/account-backend-extension.md`; the requested family invitation
+  and explicit Human-linking flow is tracked below as P3 discovery only and does
+  not activate an account, backend, or online collaboration capability. Do not
+  claim RC/App Store readiness until all release-reachable P1 items are
+  dispositioned.
 
 ## Priority Meaning
 
@@ -193,6 +195,29 @@
   ETTrace/Instruments or signpost evidence rather than broad refactoring.
 - Close when: high-cost maintenance is bounded/cancellable/low-power aware and
   measured Home flows no longer depend on broad invalidation.
+
+### TFU-20260715-001 - Design Secure Family Invitation And Explicit Human Linking
+
+- Priority / bucket: P3, future Ohana Family account/backend discovery;
+  first-release-unreachable.
+- Blocker: Solo has no authenticated account, server-owned household membership,
+  invitation service, or remote authorization boundary. An invitation code alone
+  cannot safely establish identity or grant household access, and the permission,
+  privacy, reward, and task behavior of an unlinked membership is not yet approved.
+- Next action: only after D25's account activation trigger is approved, specify
+  an idempotent invitation state machine covering owner/admin issuance,
+  single-use expiry, authenticated redemption, revocation, retry/rate limits,
+  roles, last-owner protection, and audit history. Keep Account, HouseholdMembership,
+  and Human separate: joining creates a membership first, then the owner/admin may
+  propose linking an unclaimed existing Human or the invitee may explicitly create
+  a new Human. An adult existing-Human link requires the invitee's confirmation;
+  define dependent/guardian handling and unlinked-member permissions before schema
+  or UI work begins.
+- Close when: the product foundation explicitly activates the account/Family
+  capability, the identity and data threat model is approved, server authorization
+  tests cover invitation and linking invariants, and signed-device flows prove
+  create/share/enter/redeem/expire/revoke/retry plus explicit Human linking without
+  silently creating, merging, or claiming a profile.
 
 ## Update Rules
 

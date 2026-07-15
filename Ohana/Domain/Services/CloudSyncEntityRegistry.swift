@@ -55,7 +55,11 @@ nonisolated enum CloudSyncEntityRegistry {
         String(describing: RecycleBinBatch.self),
         // Short-lived crash-recovery coordination state. The authoritative
         // shared-care fact is SharedCareSession; receipts must never sync.
-        String(describing: SharedCareUndoReceipt.self)
+        String(describing: SharedCareUndoReceipt.self),
+        // Human notes are private local-first content. The legacy Human.notes
+        // string remains authoritative for compatibility; this sidecar only
+        // preserves per-entry local attribution.
+        String(describing: HumanNoteRecord.self)
     ]
 
     static let descriptors: [CloudSyncEntityDescriptor] = [
@@ -133,6 +137,8 @@ nonisolated enum CloudSyncEntityRegistry {
         String(describing: PetExpenseLog.self),
         String(describing: PetFoodRecord.self),
         String(describing: PetWeightLog.self),
+        String(describing: SymptomLog.self),
+        String(describing: HeatCycleLog.self),
         String(describing: SharedCareSession.self),
         String(describing: CareLedgerEvent.self),
         String(describing: CoconutLedgerEntry.self),

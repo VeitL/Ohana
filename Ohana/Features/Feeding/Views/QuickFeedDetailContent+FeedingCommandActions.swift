@@ -45,8 +45,10 @@ extension QuickFeedDetailContent {
         foodKind selectedFoodKind: FeedFoodKind? = nil,
         date: Date = Date()
     ) {
+        guard validateActionHumanSelection() else { return }
         draftStore.inputError = nil
         let foodKind = selectedFoodKind ?? draftStore.manualFoodKindDraft
+        let executorId = selectedActionExecutorId
         let action = {
             let result = commandExecutor.recordManual(
                 pet: pet,
@@ -56,7 +58,7 @@ extension QuickFeedDetailContent {
                 saveAsDefault: saveAsDefault,
                 foodRecords: observedFoodRecords,
                 allEvents: allEvents,
-                executorId: currentUserId,
+                executorId: executorId,
                 date: date
             )
             guard result.didPersist else {
@@ -64,6 +66,7 @@ extension QuickFeedDetailContent {
                 return
             }
             guard result.didRecord else { return }
+            selectedActionHumanID = nil
             guard result.allowsDerivedEffects else {
                 reloadFeedSnapshots(forceSnapshot: true)
                 return
@@ -97,13 +100,15 @@ extension QuickFeedDetailContent {
     }
 
     func completePlannedFeed(_ reminder: Reminder) {
+        guard validateActionHumanSelection() else { return }
+        let executorId = selectedActionExecutorId
         let action = {
             let result = commandExecutor.completePlanned(
                 pet: pet,
                 reminder: reminder,
                 foodRecords: observedFoodRecords,
                 allEvents: allEvents,
-                executorId: currentUserId
+                executorId: executorId
             )
             guard result.didPersist else {
                 showFeedPersistenceFailure()
@@ -117,6 +122,7 @@ extension QuickFeedDetailContent {
                 )
                 return
             }
+            selectedActionHumanID = nil
             guard result.allowsDerivedEffects else {
                 reloadFeedSnapshots(forceSnapshot: true)
                 return
@@ -160,6 +166,7 @@ extension QuickFeedDetailContent {
 
     func commitTreatFeed() {
         dismissFeedKeyboard()
+        guard validateActionHumanSelection() else { return }
         let grams = parsePositiveDouble(draftStore.treatGramsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "0" : draftStore.treatGramsText)
         guard let grams else {
             draftStore.inputError = l.tr(zh: "请输入有效克数，或留空。", en: "Enter valid grams or leave it empty.", de: "Gültige Gramm oder leer lassen.")
@@ -169,9 +176,10 @@ extension QuickFeedDetailContent {
             pet: pet,
             grams: grams,
             treatKind: draftStore.selectedTreatKind,
-            executorId: currentUserId
+            executorId: selectedActionExecutorId
         )
         guard result.didRecord else { return }
+        selectedActionHumanID = nil
         guard result.allowsDerivedEffects else {
             reloadFeedSnapshots(forceSnapshot: true)
             return

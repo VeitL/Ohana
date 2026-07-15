@@ -15,12 +15,11 @@ Usage:
   scripts/test-ui-shard.sh --list
   scripts/test-ui-shard.sh [--without-building] [--print] <shard> [-- xcodebuild args...]
 
-Runs one UI-test shard sequentially on the pinned iPhone 17 simulator. Normal
-mode builds as needed. --without-building reuses a preceding build-for-testing
-run that used the same DerivedData path. Every run writes a distinct xcresult.
+Runs one UI-test shard sequentially on the disposable iPhone 17 Tests device.
+Normal mode builds once and then tests without rebuilding. --without-building
+reuses a preceding build-for-testing run. Every run writes a distinct xcresult.
 
 Environment:
-  OHANA_UI_TEST_DERIVED_DATA_ROOT  Shared UI-test build cache root
   OHANA_UI_TEST_RESULT_ROOT        Default xcresult directory
   OHANA_RESULT_BUNDLE_PATH         Exact xcresult path override
   OHANA_UI_TEST_SHARD_MANIFEST     Alternate shard manifest
@@ -42,7 +41,7 @@ list_shards() {
 }
 
 mode="run"
-action="test"
+action="build-then-test"
 shard=""
 xcode_args=()
 
@@ -113,7 +112,7 @@ fi
 timestamp="$(date +%Y%m%d-%H%M%S)"
 result_root="${OHANA_UI_TEST_RESULT_ROOT:-${REPO_ROOT}/.build/TestResults/ui-shards}"
 result_bundle="${OHANA_RESULT_BUNDLE_PATH:-${result_root}/${timestamp}-${shard}-$$.xcresult}"
-derived_data_root="${OHANA_UI_TEST_DERIVED_DATA_ROOT:-${REPO_ROOT}/.build/DerivedData/ui-tests}"
+derived_data_root="${REPO_ROOT}/.build/DerivedData/tests"
 
 command=(scripts/test-simulator.sh -parallel-testing-enabled NO)
 command+=("${selectors[@]}")
@@ -122,7 +121,7 @@ if [[ ${#xcode_args[@]} -gt 0 ]]; then
 fi
 
 if [[ "${mode}" == "print" ]]; then
-  printf 'OHANA_TEST_ACTION=%q OHANA_TEST_DERIVED_DATA_ROOT=%q OHANA_RESULT_BUNDLE_PATH=%q' \
+  printf 'OHANA_TEST_ACTION=%q DERIVED_DATA_PATH=%q OHANA_RESULT_BUNDLE_PATH=%q' \
     "${action}" "${derived_data_root}" "${result_bundle}"
   printf ' %q' "${command[@]}"
   printf '\n'
@@ -130,7 +129,7 @@ if [[ "${mode}" == "print" ]]; then
 fi
 
 export OHANA_TEST_ACTION="${action}"
-export OHANA_TEST_DERIVED_DATA_ROOT="${derived_data_root}"
+export DERIVED_DATA_PATH="${derived_data_root}"
 export OHANA_RESULT_BUNDLE_PATH="${result_bundle}"
 
 echo "UI shard: ${shard} (${#selectors[@]} tests)"

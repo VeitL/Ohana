@@ -207,6 +207,7 @@ struct PlantDashboardView: View {
     @State var pendingBatchCareUndoToken: PlantBatchCareUndoToken?
     @State var pendingBatchCareRewardTask: Task<Void, Never>?
     @State var careLogDraft: PlantDashboardCareLogDraft?
+    @State var quickCareActorDraft: PlantQuickCareActorDraft?
     @State var careAggregateDraft: PlantDashboardCareAggregateDraft?
     @State var searchText = ""
     @State var searchFocused = false
@@ -593,33 +594,20 @@ struct PlantDashboardView: View {
                 batchCareRoomFilter = nil
             }
         }
-        .sheet(isPresented: $showingBatchQuickRecordSheet) {
-            PlantBatchQuickRecordSheet(
+        .modifier(
+            PlantDashboardCareSheetsModifier(
+                showingBatchQuickRecordSheet: $showingBatchQuickRecordSheet,
+                quickCareActorDraft: $quickCareActorDraft,
+                careLogDraft: $careLogDraft,
+                careAggregateDraft: $careAggregateDraft,
                 plants: plants,
-                initialCareType: initialBatchCareType,
-                imageDataProvider: { plantModelID in
-                    await previewImageData(for: plantModelID, source: .profile)
-                },
-                onRecord: recordBatchQuickCare
+                initialBatchCareType: initialBatchCareType,
+                imageDataProvider: { await previewImageData(for: $0, source: .profile) },
+                onRecordBatchCare: recordBatchQuickCare,
+                onConfirmQuickCare: confirmPlantDockQuickCare,
+                onSaveCareLog: savePlantCareLog
             )
-        }
-        .sheet(item: $careLogDraft) { draft in
-            PlantCareLogSheet(
-                plant: draft.plant,
-                initialCareType: draft.careType,
-                currentHealthStatus: draft.plant.healthStatus
-            ) { type, careNote, healthStatus, photoData in
-                savePlantCareLog(for: draft.plant, type: type, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
-            }
-        }
-        .sheet(item: $careAggregateDraft) { draft in
-            PlantCareFeatureDetailView(
-                plants: plants,
-                feature: draft.feature,
-                focusedPlantID: nil,
-                focusedCareType: draft.focusedCareType
-            )
-        }
+        )
         .accessibilityIdentifier("plant-dashboard-screen")
         .onChange(of: selectedDashboardMode) { _, _ in
             collapseExpandedPlantIfNeeded()
@@ -1234,14 +1222,23 @@ struct PlantDashboardView: View {
         type: PlantCareType,
         careNote: String,
         photoData: Data?,
-        healthStatus: PlantHealthStatus
+        healthStatus: PlantHealthStatus,
+        executorID: UUID?
     ) {
-        recordPlantCare(type, plant: plant, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
+        recordPlantCare(
+            type,
+            plant: plant,
+            executorId: executorID?.uuidString,
+            careNote: careNote,
+            photoData: photoData,
+            healthStatus: healthStatus
+        )
     }
 
     func recordPlantCare(
         _ type: PlantCareType,
         plant: Plant,
+        executorId: String?,
         careNote: String = "",
         photoData: Data? = nil,
         healthStatus: PlantHealthStatus? = nil
@@ -1251,7 +1248,7 @@ struct PlantDashboardView: View {
             commandExecutor.recordPlantCare(
                 type,
                 plant: plant,
-                executorId: currentExecutorId(),
+                executorId: executorId,
                 careNote: careNote,
                 photoData: photoData,
                 healthStatus: healthStatus
@@ -1263,10 +1260,10 @@ struct PlantDashboardView: View {
         openBatchCareSheet()
     }
 
-    func completeBatchCare(_ selections: [PlantBatchCareSelection]) {
+    func completeBatchCare(_ selections: [PlantBatchCareSelection], executorID: UUID?) {
         guard !selections.isEmpty else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let executorId = currentExecutorId()
+        let executorId = executorID?.uuidString
         let retryCareType = batchCareInitialType
         let retryRoomID = batchCareRoomFilter
         Task { @MainActor in
@@ -1289,15 +1286,15 @@ struct PlantDashboardView: View {
             PlantBatchCarePendingRewardStore.upsert(token)
             publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchCarePendingRewardsChanged")
             pendingBatchCareUndoToken = token
-            publishBatchCareVisualReward(result)
+            publishBatchCareVisualReward(result, actorId: token.executorId)
             scheduleBatchCareRewardCommit(for: token)
         }
     }
 
-    func recordBatchQuickCare(_ selections: [PlantBatchCareSelection]) async -> Bool {
+    func recordBatchQuickCare(_ selections: [PlantBatchCareSelection], executorID: UUID?) async -> Bool {
         guard !selections.isEmpty else { return false }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let executorId = currentExecutorId()
+        let executorId = executorID?.uuidString
         await OhanaFrameScheduler.waitAfterNextFrame()
         let result = commandExecutor.recordPlantBatchQuickCare(
             selections: selections,
@@ -1316,7 +1313,7 @@ struct PlantDashboardView: View {
         PlantBatchCarePendingRewardStore.upsert(token)
         publishPendingBatchCareRewardStoreChanged(batchID: token.batchID, action: "batchQuickRecordPendingRewardsChanged")
         pendingBatchCareUndoToken = token
-        publishBatchCareVisualReward(result)
+        publishBatchCareVisualReward(result, actorId: token.executorId)
         scheduleBatchCareRewardCommit(for: token)
         return true
     }
@@ -1364,7 +1361,7 @@ struct PlantDashboardView: View {
         }
     }
 
-    func publishBatchCareVisualReward(_ result: PlantBatchCareCommandResult) {
+    func publishBatchCareVisualReward(_ result: PlantBatchCareCommandResult, actorId: String?) {
         guard result.estimatedCoconutDelta > 0 else { return }
         appServices.domainRevisions.publishCoconutRewardFeedback(
             OhanaCoconutRewardEvent(
@@ -1373,7 +1370,7 @@ struct PlantDashboardView: View {
                 growthXP: 0,
                 emoji: "🥥",
                 title: l.tr(zh: "批量照护", en: "Batch care", de: "Sammelpflege"),
-                actorId: currentExecutorId(),
+                actorId: actorId,
                 date: Date()
             )
         )
@@ -1429,14 +1426,24 @@ struct PlantDashboardView: View {
         guard let plant = plants.first(where: { $0.id == task.plantID }) else { return }
         let formatter = ISO8601DateFormatter()
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
-        recordPlantCare(.customNote, plant: plant, careNote: "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))")
+        recordPlantCare(
+            .customNote,
+            plant: plant,
+            executorId: currentExecutorId(),
+            careNote: "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))"
+        )
     }
 
     func skipTask(_ task: PlantCareTaskSnapshot) {
         guard let plant = plants.first(where: { $0.id == task.plantID }) else { return }
         let formatter = ISO8601DateFormatter()
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
-        recordPlantCare(.customNote, plant: plant, careNote: "skip:\(task.careType.rawValue):\(formatter.string(from: tomorrow))")
+        recordPlantCare(
+            .customNote,
+            plant: plant,
+            executorId: currentExecutorId(),
+            careNote: "skip:\(task.careType.rawValue):\(formatter.string(from: tomorrow))"
+        )
     }
 
     func currentExecutorId() -> String? {

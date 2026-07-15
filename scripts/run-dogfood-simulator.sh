@@ -4,13 +4,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+# shellcheck source=scripts/lib/local-build-environment.sh
+source "${REPO_ROOT}/scripts/lib/local-build-environment.sh"
+
 cd "${REPO_ROOT}"
 
-SIMULATOR_NAME="${OHANA_DOGFOOD_SIMULATOR_NAME:-${OHANA_SIMULATOR_NAME:-iPhone 17}}"
-PIN_FILE="${OHANA_DOGFOOD_SIMULATOR_PIN_FILE:-${REPO_ROOT}/.build/dogfood-simulator.udid}"
+SIMULATOR_NAME="${OHANA_DOGFOOD_SIMULATOR_NAME:-iPhone 17}"
+PIN_FILE="${OHANA_DOGFOOD_PIN_FILE}"
 BUNDLE_ID="${OHANA_BUNDLE_ID:-com.guanchen.li.Ohana}"
 CONFIGURATION="${CONFIGURATION:-Debug}"
-DERIVED_DATA_PATH="${OHANA_DOGFOOD_DERIVED_DATA_PATH:-${REPO_ROOT}/.build/DerivedData/dogfood}"
+DERIVED_DATA_PATH="${OHANA_DOGFOOD_DERIVED_DATA_PATH:-${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}}"
 BUILD_BEFORE_LAUNCH=1
 MODE="launch"
 REQUIRE_EXISTING_DATA=0
@@ -32,9 +35,8 @@ Options:
 
 Environment:
   OHANA_DOGFOOD_SIMULATOR_UDID       Explicit simulator UDID to pin
-  OHANA_SIMULATOR_UDID               Shared simulator UDID override
   OHANA_DOGFOOD_SIMULATOR_NAME       Simulator name to resolve on first run
-  OHANA_DOGFOOD_DERIVED_DATA_PATH    Stable dogfood build cache path
+  OHANA_DOGFOOD_DERIVED_DATA_PATH    Must equal .build/DerivedData/dogfood
   OHANA_BUNDLE_ID                    App bundle id to launch
 USAGE
 }
@@ -131,11 +133,6 @@ choose_simulator_udid() {
     return 0
   fi
 
-  if [[ -n "${OHANA_SIMULATOR_UDID:-}" ]]; then
-    printf '%s\n' "${OHANA_SIMULATOR_UDID}"
-    return 0
-  fi
-
   if [[ -f "${PIN_FILE}" ]]; then
     local pinned
     pinned="$(tr -d '[:space:]' < "${PIN_FILE}")"
@@ -143,7 +140,9 @@ choose_simulator_udid() {
       printf '%s\n' "${pinned}"
       return 0
     fi
-    echo "Pinned dogfood simulator is unavailable; resolving '${SIMULATOR_NAME}' again." >&2
+    echo "Pinned Dogfood Simulator '${pinned}' is unavailable." >&2
+    echo "Refusing to silently repin another phone; restore the device or explicitly repair the pin." >&2
+    exit 70
   fi
 
   local resolved
@@ -153,8 +152,6 @@ choose_simulator_udid() {
     exit 70
   fi
 
-  mkdir -p "$(dirname "${PIN_FILE}")"
-  printf '%s\n' "${resolved}" > "${PIN_FILE}"
   printf '%s\n' "${resolved}"
 }
 
@@ -230,12 +227,21 @@ print_status_and_validate() {
   fi
 }
 
+ohana_assert_fixed_derived_data_path dogfood "${DERIVED_DATA_PATH}"
+DERIVED_DATA_PATH="${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}"
+
 SIMULATOR_UDID="$(choose_simulator_udid)"
 SIMULATOR_DISPLAY_NAME="$(simulator_exists "${SIMULATOR_UDID}" || true)"
 if [[ -z "${SIMULATOR_DISPLAY_NAME}" ]]; then
   echo "Pinned dogfood simulator '${SIMULATOR_UDID}' is not available." >&2
   exit 70
 fi
+
+if [[ ! -f "${PIN_FILE}" ]]; then
+  mkdir -p "$(dirname "${PIN_FILE}")"
+  printf '%s\n' "${SIMULATOR_UDID}" > "${PIN_FILE}"
+fi
+ohana_assert_dogfood_simulator_udid "${SIMULATOR_UDID}"
 
 APP_PATH="${DERIVED_DATA_PATH}/Build/Products/${CONFIGURATION}-iphonesimulator/Ohana.app"
 
@@ -247,7 +253,8 @@ fi
 if [[ "${BUILD_BEFORE_LAUNCH}" == "1" ]]; then
   echo "Dogfood simulator: ${SIMULATOR_DISPLAY_NAME} (${SIMULATOR_UDID})"
   echo "DerivedData: ${DERIVED_DATA_PATH}"
-  OHANA_SIMULATOR_UDID="${SIMULATOR_UDID}" \
+  OHANA_BUILD_LANE=dogfood \
+    OHANA_DOGFOOD_SIMULATOR_UDID="${SIMULATOR_UDID}" \
     DERIVED_DATA_PATH="${DERIVED_DATA_PATH}" \
     CONFIGURATION="${CONFIGURATION}" \
     "${REPO_ROOT}/scripts/build-debug-fast.sh"

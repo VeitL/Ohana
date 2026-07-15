@@ -58,7 +58,6 @@ struct SettingsView: View {
     @State var showingImportSuccess = false
     @State var showingImportErrorAlert = false
     @State var showingOnboardingReplay = false
-    @State var showingAccountSwitcher = false
     @State var showingBackgroundPicker = false
     @State var showingPetManagement = false
     @State var quickSwitchHuman: SettingsHumanSnapshot? = nil
@@ -134,6 +133,10 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        settingsSharingPresentationContent
+    }
+
+    private var settingsRootContent: some View {
         NavigationStack {
             Form {
                 settingsBodySections
@@ -150,6 +153,17 @@ struct SettingsView: View {
         }
         .preferredColorScheme(preferredScheme)
         .accessibilityIdentifier("settings-screen")
+    }
+
+    /// Settings owns many independent presentations. A single modifier chain
+    /// previously made Release builds recursively instantiate the complete
+    /// generic view type when this route opened, exhausting the physical
+    /// device's main-thread stack. Each `AnyView` below is an intentional,
+    /// low-frequency route boundary that caps metadata depth without changing
+    /// the individual controls or their state ownership.
+    private var settingsAlertContent: AnyView {
+        AnyView(
+            settingsRootContent
         .alert(l.tr(zh: "重置 App", en: "Reset App", de: "App zurucksetzen"), isPresented: $showingAppResetAlert) {
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
             Button(l.tr(zh: "重置", en: "Reset", de: "Zurucksetzen"), role: .destructive) {
@@ -190,11 +204,18 @@ struct SettingsView: View {
                 de: "Versuche in Datensicherung erneut, das vorherige automatische Backup zu entfernen."
             ))
         }
+        )
+    }
+
+    private var settingsLifecycleContent: AnyView {
+        AnyView(
+            settingsAlertContent
         .onAppear {
             syncStoredRegionalDefaultsIfNeeded()
             syncLanguageSelectionFromStorage()
             refreshBiometricGateAvailability()
             scheduleDataSectionsMount()
+            reconcileCurrentActiveHumanSelection()
         }
         .onDisappear {
             dataSectionsMountTask?.cancel()
@@ -204,6 +225,22 @@ struct SettingsView: View {
         .onChange(of: appLanguage) { _, _ in
             syncLanguageSelectionFromStorage()
         }
+        .onChange(of: isRouteDataLoaded) { _, hasLoaded in
+            guard hasLoaded else { return }
+            dataSectionsMountTask?.cancel()
+            dataSectionsMountTask = nil
+            areDataSectionsMounted = true
+            reconcileCurrentActiveHumanSelection()
+        }
+        .onChange(of: homeHumans) { _, _ in
+            reconcileCurrentActiveHumanSelection()
+        }
+        )
+    }
+
+    private var settingsPrimaryPresentationContent: AnyView {
+        AnyView(
+            settingsLifecycleContent
         .fullScreenCover(isPresented: $showingOnboardingReplay) {
             ZStack(alignment: .topTrailing) {
                 OnboardingView(isReplay: true, onReplayFinished: {
@@ -224,10 +261,6 @@ struct SettingsView: View {
                 .buttonStyle(ScaleButtonStyle())
             }
         }
-        .sheet(isPresented: $showingAccountSwitcher) {
-            AppAccountSwitcherRouteContainer(onSwitched: {})
-            .ohanaCompactSheetPresentation(detents: [.medium, .large])
-        }
         .sheet(isPresented: $showingBackgroundPicker) {
             AppBackgroundPickerSheet()
                 .ohanaSheetPagePresentation() // ui-v4: allow background picker is a long visual chooser
@@ -236,6 +269,12 @@ struct SettingsView: View {
             SettingsPetManagementSheet(pets: homePets ?? [])
                 .ohanaCompactSheetPresentation(detents: [.medium, .large])
         }
+        )
+    }
+
+    private var settingsDeveloperPresentationContent: AnyView {
+        AnyView(
+            settingsPrimaryPresentationContent
         .sheet(isPresented: $showingCoconutBalanceTest) {
             NavigationStack {
                 CoconutBalanceTestView()
@@ -259,14 +298,28 @@ struct SettingsView: View {
             }
             .ohanaSheetPagePresentation() // ui-v4: allow developer reminder observability console as long sheet
         }
+        )
+    }
+
+    private var settingsUISpecPresentationContent: AnyView {
         #if DEBUG
-            .sheet(isPresented: $showingUISpecShowcase) {
+            AnyView(
+                settingsDeveloperPresentationContent
+                .sheet(isPresented: $showingUISpecShowcase) {
                 NavigationStack {
                     OhanaUISpecShowcaseView()
                 }
                 .ohanaSheetPagePresentation() // ui-v4: allow developer UI specification console as long sheet
             }
+            )
+        #else
+            settingsDeveloperPresentationContent
         #endif
+    }
+
+    private var settingsReportingPresentationContent: AnyView {
+        AnyView(
+            settingsUISpecPresentationContent
         .sheet(isPresented: $showingFamilyWeeklyReportDebug) {
             NavigationStack {
                 FamilyWeeklyReportDashboardView()
@@ -284,6 +337,12 @@ struct SettingsView: View {
             }
             .ohanaSheetPagePresentation() // ui-v4: allow developer weekly report console as long sheet
         }
+        )
+    }
+
+    private var settingsSharingPresentationContent: AnyView {
+        AnyView(
+            settingsReportingPresentationContent
         .sheet(item: $quickSwitchHuman) { human in
             HumanQuickSwitchPasscodeSheet(human: human) {
                 switchActiveHuman(to: human, emitSuccessFeedback: false)
@@ -310,6 +369,7 @@ struct SettingsView: View {
         } message: {
             Text(householdSyncErrorMessage ?? l.tr(zh: "未知错误", en: "Unknown error", de: "Unbekannter Fehler"))
         }
+        )
     }
 }
 

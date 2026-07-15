@@ -28,6 +28,8 @@ struct PetHygieneDetailContentView: View {
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var groomingPlanTarget: HygieneType? = nil
+    @State private var pendingHygieneAction: PetHygieneActionHumanDraft?
+    @State private var actionHumanOptions: [ActionHumanOption] = []
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     /// 用于匹配 `HygieneTodoSheet` 写入的 Event 标题前缀：`\(pet.name) — \(type.rawValue)`
@@ -39,6 +41,9 @@ struct PetHygieneDetailContentView: View {
     private var isDark: Bool { colorScheme == .dark }
     private var chromeAccent: Color { isDark ? Color.goPrimary : Color.goBlue }
     private var l: L10n { L10n(appLanguage) }
+    private var currentLocalHumanID: UUID? {
+        appServices.activeHumanSelection.currentHumanId.flatMap(UUID.init(uuidString:))
+    }
 
     private func latestHygieneDate(_ type: HygieneType) -> Date? {
         hygieneEntries.first(where: { $0.type == type })?.date
@@ -216,6 +221,16 @@ struct PetHygieneDetailContentView: View {
             }
             .presentationDetents([.medium, .large])
         }
+        .sheet(item: $pendingHygieneAction) { draft in
+            PetHygieneActionHumanConfirmationSheet(
+                draft: draft,
+                humans: actionHumanOptions,
+                tint: themeColor
+            ) { executorID in
+                commitHygiene(draft.type, executorID: executorID)
+            }
+            .presentationDetents([.medium])
+        }
         .alert(l.tr(zh: "今天已经完成了", en: "Already done today", de: "Heute schon erledigt"), isPresented: $showSingleUseNotice) {
             Button(l.tr(zh: "知道了", en: "OK", de: "OK"), role: .cancel) {}
         } message: {
@@ -388,7 +403,7 @@ struct PetHygieneDetailContentView: View {
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityIdentifier("\(accessibilityPrefix)-plan-action")
                 Button {
-                    recordHygiene(type, doneToday: doneToday)
+                    requestHygieneRecord(type, doneToday: doneToday)
                 } label: {
                     if doneToday {
                         Image(systemName: "checkmark").accessibilityHidden(true)
@@ -408,46 +423,7 @@ struct PetHygieneDetailContentView: View {
                 .accessibilityIdentifier("\(accessibilityPrefix)-record-action")
             }
 
-            // 已添加的护理计划（HygieneTodoSheet → Event + Reminder）
-            if !plans.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bell.fill").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 10, weight: .bold))
-                        Text(l.tr(zh: "已设计划", en: "Plans set", de: "Geplante Pflege"))
-                            .font(OhanaFont.adaptive(size: 10, weight: .heavy, design: .rounded))
-                    }
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
-
-                    ForEach(plans, id: \.id) { rem in
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "calendar").accessibilityHidden(true)
-                                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
-                                .foregroundStyle(themeColor)
-                                .frame(width: 16, alignment: .center)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(rem.scheduledAt, format: .dateTime.month().day())
-                                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                if let ev = rem.event, ev.recurrenceDays > 0 {
-                                    Text(l.tr(zh: "重复 · \(recurrenceLabel(ev.recurrenceDays))", en: "Repeats · \(recurrenceLabel(ev.recurrenceDays))", de: "Wiederholt · \(recurrenceLabel(ev.recurrenceDays))"))
-                                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
-                                        .foregroundStyle(Color.ohanaSecondaryText)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.vertical, 2)
-                    }
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(themeColor.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
-                        .strokeBorder(themeColor.opacity(0.22), lineWidth: 0.5)
-                )
-            }
+            hygienePlansSection(plans)
 
             if stripHasData {
                 monthFrequencyStrip(type)
@@ -466,27 +442,7 @@ struct PetHygieneDetailContentView: View {
                 Spacer()
             }
 
-            // 最近记录（无分割线）
-            if !logs.isEmpty {
-                VStack(spacing: 0) {
-                    ForEach(logs.prefix(3)) { log in
-                        HStack {
-                            Text(log.date, format: .dateTime.month().day().hour().minute())
-                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
-                            Spacer()
-                            Button { deleteHygieneEntry(log) } label: {
-                                Image(systemName: "trash").accessibilityHidden(true).font(OhanaFont.adaptive(size: 10))
-                                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
-                            }
-                            .accessibilityIdentifier("\(accessibilityPrefix)-delete-\(log.id.uuidString)")
-                        }
-                        .padding(.vertical, 4)
-                        .accessibilityIdentifier("\(accessibilityPrefix)-recent-row-\(log.id.uuidString)")
-                    }
-                }
-                .padding(.top, 2)
-            }
+            hygieneRecentLogsSection(logs, accessibilityPrefix: accessibilityPrefix)
         }
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
@@ -496,7 +452,81 @@ struct PetHygieneDetailContentView: View {
         )
     }
 
-    private func recordHygiene(_ type: HygieneType, doneToday: Bool) {
+    @ViewBuilder
+    private func hygienePlansSection(_ plans: [Reminder]) -> some View {
+        if !plans.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 4) {
+                    Image(systemName: "bell.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold))
+                    Text(l.tr(zh: "已设计划", en: "Plans set", de: "Geplante Pflege"))
+                        .font(OhanaFont.adaptive(size: 10, weight: .heavy, design: .rounded))
+                }
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
+
+                ForEach(plans, id: \.id) { reminder in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "calendar").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold))
+                            .foregroundStyle(themeColor)
+                            .frame(width: 16, alignment: .center)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(reminder.scheduledAt, format: .dateTime.month().day())
+                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                            if let event = reminder.event, event.recurrenceDays > 0 {
+                                Text(l.tr(
+                                    zh: "重复 · \(recurrenceLabel(event.recurrenceDays))",
+                                    en: "Repeats · \(recurrenceLabel(event.recurrenceDays))",
+                                    de: "Wiederholt · \(recurrenceLabel(event.recurrenceDays))"
+                                ))
+                                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.ohanaSecondaryText)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(themeColor.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
+                    .strokeBorder(themeColor.opacity(0.22), lineWidth: 0.5)
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func hygieneRecentLogsSection(
+        _ logs: [PetHygieneLedgerEntry],
+        accessibilityPrefix: String
+    ) -> some View {
+        if !logs.isEmpty {
+            VStack(spacing: 0) {
+                ForEach(logs.prefix(3)) { log in
+                    HStack {
+                        Text(log.date, format: .dateTime.month().day().hour().minute())
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
+                        Spacer()
+                        Button { deleteHygieneEntry(log) } label: {
+                            Image(systemName: "trash").accessibilityHidden(true).font(OhanaFont.adaptive(size: 10))
+                                .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
+                        }
+                        .accessibilityIdentifier("\(accessibilityPrefix)-delete-\(log.id.uuidString)")
+                    }
+                    .padding(.vertical, 4)
+                    .accessibilityIdentifier("\(accessibilityPrefix)-recent-row-\(log.id.uuidString)")
+                }
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private func requestHygieneRecord(_ type: HygieneType, doneToday: Bool) {
         guard !doneToday else {
             singleUseNoticeMessage = l.tr(
                 zh: "\(pet.name) 今天已经记录过\(type.localizedLabel(l))了，这类护理一天记录一次就够了。",
@@ -508,7 +538,29 @@ struct PetHygieneDetailContentView: View {
             return
         }
 
-        let executorId = appServices.activeHumanSelection.currentHumanId
+        let options = ActionHumanOptionLoader.load(context: modelContext)
+        actionHumanOptions = options
+        let eligibleHumanCount = ActionHumanDefaultSelectionPolicy
+            .eligibleHumans(from: options)
+            .count
+        let defaultHumanID = ActionHumanDefaultSelectionPolicy.selection(
+            draftHumanID: nil,
+            currentLocalHumanID: currentLocalHumanID,
+            humans: options
+        )
+        guard eligibleHumanCount > 1 else {
+            commitHygiene(type, executorID: defaultHumanID)
+            return
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        pendingHygieneAction = PetHygieneActionHumanDraft(
+            type: type,
+            initialExecutorID: defaultHumanID
+        )
+    }
+
+    private func commitHygiene(_ type: HygieneType, executorID: UUID?) {
+        let executorId = executorID?.uuidString
         let command = DomainCommand.petHygieneRecord(petID: pet.id, type: type.rawValue)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {

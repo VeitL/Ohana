@@ -62,6 +62,7 @@ If simctl still reports CoreSimulatorService, simdiskimaged, or connection inval
   4. Restart macOS if simdiskimaged remains crashed or missing.
 
 After simctl works, rerun:
+  scripts/prepare-test-simulator.sh
   scripts/test-simulator.sh <same -only-testing args>
 EOF
 }

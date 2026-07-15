@@ -106,6 +106,22 @@ extension CloudSyncRecordApplier {
         return try context.fetch(descriptor).first
     }
 
+    nonisolated static func fetchSymptomLog(id: UUID, context: ModelContext) throws -> SymptomLog? {
+        var descriptor = FetchDescriptor<SymptomLog>(
+            predicate: #Predicate<SymptomLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    nonisolated static func fetchHeatCycleLog(id: UUID, context: ModelContext) throws -> HeatCycleLog? {
+        var descriptor = FetchDescriptor<HeatCycleLog>(
+            predicate: #Predicate<HeatCycleLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     nonisolated static func fetchSharedCareSession(id: UUID, context: ModelContext) throws -> SharedCareSession? {
         var descriptor = FetchDescriptor<SharedCareSession>(
             predicate: #Predicate<SharedCareSession> { $0.id == id }

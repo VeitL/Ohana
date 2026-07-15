@@ -22,6 +22,7 @@ struct PetMedicationContentView: View {
 
     @State private var showingAddSheet = false
     @State private var selectedMedication: PetMedication?
+    @State private var pendingDoseActorDraft: PetMedicationDoseActorDraft?
     @State private var doseRefreshToken = UUID()
     @State private var toastMessage: String?
 
@@ -169,6 +170,10 @@ struct PetMedicationContentView: View {
             }
             .sheet(item: $selectedMedication) { med in
                 PetMedicationDetailSheet(pet: pet, medication: med, onDataChanged: onDataChanged)
+            }
+            .petMedicationDoseActorConfirmation(draft: $pendingDoseActorDraft) { draft, executorID in
+                guard let medication = medications.first(where: { $0.id == draft.medicationID }) else { return }
+                recordDose(for: medication, executorID: executorID)
             }
             .animation(GoMotion.stateChange, value: doseRefreshToken)
             .animation(GoMotion.feedback, value: toastMessage)
@@ -669,10 +674,34 @@ struct PetMedicationContentView: View {
     @MainActor
     private func recordDose(for med: PetMedication) {
         guard !pet.hasPassedAway else { return }
+        let actorContext = PetMedicationDoseActorSelectionResolver.resolve(
+            context: modelContext,
+            currentLocalHumanIDRaw: appServices.activeHumanSelection.currentHumanId
+        )
+        guard actorContext.needsConfirmation else {
+            recordDose(for: med, executorID: actorContext.defaultExecutorID)
+            return
+        }
+        pendingDoseActorDraft = PetMedicationDoseActorDraft(
+            petID: pet.id,
+            medicationID: med.id,
+            actionTitle: l.tr(
+                zh: "给 \(pet.name) 喂 \(med.name.isEmpty ? "药" : med.name)",
+                en: "Give \(pet.name) \(med.name.isEmpty ? "medicine" : med.name)",
+                de: "\(pet.name) \(med.name.isEmpty ? "Medikament" : med.name) geben"
+            ),
+            initialExecutorID: actorContext.defaultExecutorID
+        )
+    }
+
+    @MainActor
+    private func recordDose(for med: PetMedication, executorID: UUID?) {
+        guard !pet.hasPassedAway else { return }
         let result = PetMedicationCommandExecutor(context: modelContext, services: appServices).recordDose(
             medication: med,
             pet: pet,
             awardCoconut: true,
+            executorId: executorID?.uuidString,
             note: "pet.medication.list.dose"
         )
         guard result.didRecord, result.allowsDerivedEffects else { return }

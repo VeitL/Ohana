@@ -125,6 +125,7 @@ nonisolated struct HomeInteractionSnapshot: @unchecked Sendable {
     let firstActivePetID: UUID?
     let petMedicationTargetsByMedicationID: [UUID: UUID]
     let eventRoutesByEventID: [UUID: HomeReminderRouteSnapshot]
+    let eventActionHumanRequiredIDs: Set<UUID>
     let expandedActionsByCardID: [UUID: HomeExpandedActionSnapshot]
 
     static let empty = HomeInteractionSnapshot(
@@ -136,6 +137,7 @@ nonisolated struct HomeInteractionSnapshot: @unchecked Sendable {
         firstActivePetID: nil,
         petMedicationTargetsByMedicationID: [:],
         eventRoutesByEventID: [:],
+        eventActionHumanRequiredIDs: [],
         expandedActionsByCardID: [:]
     )
 
@@ -228,6 +230,13 @@ nonisolated enum HomeInteractionSnapshotBuilder {
             firstActivePetID: firstActivePetID,
             petMedicationTargetsByMedicationID: petMedicationTargets,
             eventRoutesByEventID: eventRoutes,
+            eventActionHumanRequiredIDs: Set(
+                source.events.lazy
+                    .filter { event in
+                        TodayFocusEventActionHumanPolicy.requiresAttribution(event: event)
+                    }
+                    .map(\.id)
+            ),
             expandedActionsByCardID: expandedActions
         )
     }

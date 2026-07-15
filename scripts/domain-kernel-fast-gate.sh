@@ -208,7 +208,7 @@ if [[ "${run_tests}" == "1" ]]; then
 fi
 
 if [[ "${run_build}" == "1" ]]; then
-  run_step "debug build (iPhone 17 simulator)" scripts/build-debug-fast.sh
+  run_step "debug build (iPhone 17 Tests simulator)" scripts/build-debug-fast.sh
 fi
 
 echo ""

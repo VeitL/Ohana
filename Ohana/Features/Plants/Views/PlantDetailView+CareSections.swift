@@ -321,9 +321,16 @@ extension PlantDetailContentView {
                 .accessibilityLabel(l.tr(zh: "关闭快速记录", en: "Close quick log", de: "Schnellerfassung schließen"))
             }
 
+            QuickCareActionHumanPickerContainer(
+                selectedHumanID: $quickCareExecutorID,
+                requiresSelection: $requiresQuickCareExecutorSelection,
+                role: .executor,
+                tint: careTint(for: draft.careType)
+            )
+
             HStack(spacing: 8) {
                 Button {
-                    recordQuickCare(draft.careType)
+                    recordQuickCare(draft.careType, executorID: quickCareExecutorID)
                 } label: {
                     Label(l.tr(zh: "快速记录", en: "Quick log", de: "Schnell erfassen"), systemImage: "bolt.fill")
                         .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
@@ -334,6 +341,7 @@ extension PlantDetailContentView {
                         .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .disabled(requiresQuickCareExecutorSelection)
                 .accessibilityIdentifier("plant-detail-quick-care-quick-log")
 
                 Button {

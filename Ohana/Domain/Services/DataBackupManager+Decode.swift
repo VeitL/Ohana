@@ -110,6 +110,17 @@ nonisolated extension DataBackupManager {
         )
     }
 
+    func decodeHumanNoteRecordSnapshot(_ dto: HumanNoteRecordBackup) -> DomainHumanNoteRecordRehydrateSnapshot {
+        DomainHumanNoteRecordRehydrateSnapshot(
+            id: UUID(uuidString: dto.id) ?? UUID(),
+            humanId: UUID(uuidString: dto.humanId) ?? UUID(),
+            sequence: max(0, dto.sequence),
+            date: parseDate(dto.date) ?? Date(),
+            rawEntry: dto.rawEntry,
+            recordedByHumanId: dto.recordedByHumanId
+        )
+    }
+
     func decodeHouseholdSnapshot(_ dto: HouseholdBackup) -> DomainHouseholdRehydrateSnapshot {
         DomainHouseholdRehydrateSnapshot(
             id: UUID(uuidString: dto.id) ?? UUID(),
@@ -349,6 +360,7 @@ nonisolated extension DataBackupManager {
             note: dto.note,
             petId: dto.petId.flatMap(UUID.init(uuidString:)),
             executorId: dto.executorId,
+            recordedByHumanId: dto.recordedByHumanId,
             sharedSessionId: dto.sharedSessionId ?? ""
         )
     }
@@ -615,6 +627,7 @@ nonisolated extension DataBackupManager {
             date: parseDate(dto.date) ?? Date(),
             notes: dto.notes,
             humanId: dto.humanId.flatMap(UUID.init(uuidString:)),
+            recordedByHumanId: dto.recordedByHumanId,
             createdAt: parseDate(dto.createdAt) ?? Date()
         )
     }
@@ -631,6 +644,7 @@ nonisolated extension DataBackupManager {
             nextCheckDate: parseDate(dto.nextCheckDate),
             summary: dto.summary,
             notes: dto.notes,
+            recordedByHumanId: dto.recordedByHumanId,
             colorHex: dto.colorHex,
             createdAt: parseDate(dto.createdAt) ?? Date()
         )
@@ -652,7 +666,8 @@ nonisolated extension DataBackupManager {
                 legacyBase64: dto.photoBase64,
                 resolver: mediaResolver
             ),
-            petId: dto.petId.flatMap(UUID.init(uuidString:))
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
+            recordedByHumanId: dto.recordedByHumanId
         )
     }
 
@@ -665,7 +680,8 @@ nonisolated extension DataBackupManager {
             note: dto.note,
             isMated: dto.isMated,
             expectedDeliveryDate: parseDate(dto.expectedDeliveryDate),
-            petId: dto.petId.flatMap(UUID.init(uuidString:))
+            petId: dto.petId.flatMap(UUID.init(uuidString:)),
+            recordedByHumanId: dto.recordedByHumanId
         )
     }
 

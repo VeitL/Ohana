@@ -37,6 +37,7 @@ struct AppPetWeightQuickSheetHost: View {
             if let pet = data.pet, !pet.hasPassedAway {
                 GenericWeightEntrySheet(
                     target: .pet(pet),
+                    petLedgerSource: .quickAction,
                     onDismiss: onDismiss
                 )
             } else if data.hasLoaded {

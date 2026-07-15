@@ -56,6 +56,10 @@ extension CloudSyncRecordApplier {
             CloudSyncRecordApplyOutcome(result: try applyPetFoodRecord(record, metadata: metadata, context: context))
         case String(describing: PetWeightLog.self):
             CloudSyncRecordApplyOutcome(result: try applyPetWeightLog(record, metadata: metadata, context: context))
+        case String(describing: SymptomLog.self):
+            CloudSyncRecordApplyOutcome(result: try applySymptomLog(record, metadata: metadata, context: context))
+        case String(describing: HeatCycleLog.self):
+            CloudSyncRecordApplyOutcome(result: try applyHeatCycleLog(record, metadata: metadata, context: context))
         case String(describing: SharedCareSession.self):
             CloudSyncRecordApplyOutcome(result: try applySharedCareSession(record, metadata: metadata, context: context))
         case String(describing: CareLedgerEvent.self):
@@ -368,6 +372,7 @@ extension CloudSyncRecordApplier {
                 note: record.string(for: "note") ?? "",
                 petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
                 executorId: record.string(for: "executorId"),
+                recordedByHumanId: record.string(for: "recordedByHumanId"),
                 sharedSessionId: record.string(for: "sharedSessionId") ?? ""
             ),
             source: .cloudApply,
@@ -419,6 +424,52 @@ extension CloudSyncRecordApplier {
                 bcsScore: record.int(for: "bcsScore") ?? 0,
                 petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
                 executorId: record.string(for: "executorId")
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
+    }
+
+    private nonisolated static func applySymptomLog(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        let result = try DomainMemberContentRehydrateWriter.insertSymptomLogIfNeeded(
+            snapshot: DomainSymptomLogRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                date: record.date(for: "date") ?? metadata.lastModifiedAt,
+                categoryRaw: record.string(for: "categoryRaw") ?? SymptomCategory.other.rawValue,
+                symptomName: record.string(for: "symptomName") ?? "",
+                severityRaw: record.int(for: "severityRaw") ?? SymptomSeverity.mild.rawValue,
+                note: record.string(for: "note") ?? "",
+                photoData: record.assetData(for: "photoData"),
+                petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
+                recordedByHumanId: record.string(for: "recordedByHumanId")
+            ),
+            source: .cloudApply,
+            context: context
+        )
+        return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
+    }
+
+    private nonisolated static func applyHeatCycleLog(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        let result = try DomainMemberContentRehydrateWriter.insertHeatCycleLogIfNeeded(
+            snapshot: DomainHeatCycleLogRehydrateSnapshot(
+                id: metadata.localRecordUUID,
+                startDate: record.date(for: "startDate") ?? metadata.lastModifiedAt,
+                endDate: record.date(for: "endDate"),
+                statusRaw: record.string(for: "statusRaw") ?? HeatCycleStatus.proestrus.rawValue,
+                note: record.string(for: "note") ?? "",
+                isMated: record.bool(for: "isMated") ?? false,
+                expectedDeliveryDate: record.date(for: "expectedDeliveryDate"),
+                petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
+                recordedByHumanId: record.string(for: "recordedByHumanId")
             ),
             source: .cloudApply,
             context: context

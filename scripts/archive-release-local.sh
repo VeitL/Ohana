@@ -4,6 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+# shellcheck source=scripts/lib/local-build-environment.sh
+source "${REPO_ROOT}/scripts/lib/local-build-environment.sh"
+
 cd "${REPO_ROOT}"
 
 usage() {
@@ -32,8 +35,7 @@ fi
 
 SCHEME="${SCHEME:-Ohana}"
 CONFIGURATION=Release
-WORKTREE_HASH="$(printf '%s' "${REPO_ROOT}" | shasum -a 256 | awk '{ print substr($1, 1, 12) }')"
-DERIVED_DATA_PATH="${OHANA_ARCHIVE_DERIVED_DATA_PATH:-/tmp/OhanaDerivedData/archive-${WORKTREE_HASH}}"
+DERIVED_DATA_PATH="${OHANA_ARCHIVE_DERIVED_DATA_PATH:-${OHANA_RELEASE_DERIVED_DATA_PATH}}"
 ARCHIVE_ROOT="${OHANA_ARCHIVE_ROOT:-/tmp/OhanaArchives}"
 COMMIT="$(git rev-parse --short=10 HEAD 2>/dev/null || echo unknown)"
 DIRTY_SUFFIX=""
@@ -43,13 +45,15 @@ fi
 STAMP="$(date +%Y-%m-%d-%H%M%S)"
 DEFAULT_ARCHIVE_PATH="${ARCHIVE_ROOT}/${STAMP}/Ohana-${COMMIT}${DIRTY_SUFFIX}.xcarchive"
 ARCHIVE_PATH="${OHANA_ARCHIVE_PATH:-${DEFAULT_ARCHIVE_PATH}}"
-LOCK_DIR="${OHANA_ARCHIVE_LOCK_DIR:-/tmp/OhanaBuildLocks/archive-${WORKTREE_HASH}.lock}"
+LOCK_DIR="${REPO_ROOT}/.build/locks/lane-release.lock"
 
 absolute_path() {
   python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$1"
 }
 
 DERIVED_DATA_PATH="$(absolute_path "${DERIVED_DATA_PATH}")"
+ohana_assert_fixed_derived_data_path release "${DERIVED_DATA_PATH}"
+DERIVED_DATA_PATH="${OHANA_RELEASE_DERIVED_DATA_PATH}"
 if [[ -n "${VERIFY_ONLY_PATH}" ]]; then
   ARCHIVE_PATH="$(absolute_path "${VERIFY_ONLY_PATH}")"
   if [[ ! -d "${ARCHIVE_PATH}" ]]; then
@@ -60,7 +64,7 @@ if [[ -n "${VERIFY_ONLY_PATH}" ]]; then
 else
   ARCHIVE_PATH="$(absolute_path "${ARCHIVE_PATH}")"
 
-  for external_path in "${DERIVED_DATA_PATH}" "${ARCHIVE_PATH}"; do
+  for external_path in "${ARCHIVE_PATH}"; do
     case "${external_path}" in
       "${REPO_ROOT}"|"${REPO_ROOT}"/*)
         echo "Refusing File Provider-backed Release output inside the repository:" >&2
@@ -76,7 +80,9 @@ else
     exit 2
   fi
 
-  mkdir -p "$(dirname "${DERIVED_DATA_PATH}")" "$(dirname "${ARCHIVE_PATH}")" "$(dirname "${LOCK_DIR}")"
+  ohana_require_build_disk_space
+
+  mkdir -p "${DERIVED_DATA_PATH}" "$(dirname "${ARCHIVE_PATH}")" "$(dirname "${LOCK_DIR}")"
   if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
     echo "Another signed Archive is already running for this worktree." >&2
     echo "Lock: ${LOCK_DIR}" >&2

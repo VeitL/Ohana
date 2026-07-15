@@ -321,6 +321,7 @@ struct HomeRouteCoordinatorTests {
             firstActivePetID: pet.id,
             petMedicationTargetsByMedicationID: [:],
             eventRoutesByEventID: [:],
+            eventActionHumanRequiredIDs: [],
             expandedActionsByCardID: [:]
         )
 

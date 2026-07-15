@@ -5,6 +5,26 @@ import Testing
 
 @MainActor
 struct TodayFocusTaskProjectionTests {
+    @Test func actionHumanPolicyOnlyFlagsEventsThatMaterializeCareFacts() {
+        let petCare = Event(
+            title: "Feed",
+            eventType: EventType.daily.rawValue,
+            taskCareKindRaw: TaskCareKind.petFeeding.rawValue
+        )
+        let legacyPlantCare = Event(
+            title: "Water",
+            eventType: EventType.watering.rawValue
+        )
+        let information = Event(
+            title: "Birthday",
+            eventType: EventType.birthday.rawValue
+        )
+
+        #expect(TodayFocusEventActionHumanPolicy.requiresAttribution(event: petCare))
+        #expect(TodayFocusEventActionHumanPolicy.requiresAttribution(event: legacyPlantCare))
+        #expect(!TodayFocusEventActionHumanPolicy.requiresAttribution(event: information))
+    }
+
     @Test func familyTaskProjectionOnlyKeepsOverdueTodayAndPendingReview() {
         let now = Date(timeIntervalSince1970: 1_784_000_000)
         let reviewer = Human(name: "Parent")
@@ -314,7 +334,7 @@ struct TodayFocusTaskProjectionTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV90.models)
+        let schema = Schema(ArkSchemaV91.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

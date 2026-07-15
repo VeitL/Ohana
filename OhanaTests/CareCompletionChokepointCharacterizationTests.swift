@@ -32,7 +32,7 @@ struct CareCompletionChokepointCharacterizationTests {
             modelContext: context,
             awardCoconut: true,
             economy: StaticCareEventEconomyAwarder(questManager: questManager),
-            activeHumanSelection: FixedActiveHumanSelection(id: executor.id.uuidString),
+            executorId: executor.id.uuidString,
             medicationReminders: medicationReminders
         )
 
@@ -53,7 +53,7 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(medicationReminders.recordedMedicationIDs == [medication.id])
     }
 
-    @Test func medicationDoseWritesForDeceasedExecutorThroughFallbackOwner() throws {
+    @Test func medicationDoseRejectsDeceasedConfirmedExecutorWithoutFallback() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let activeHuman = Human(name: "Active")
@@ -78,28 +78,27 @@ struct CareCompletionChokepointCharacterizationTests {
         resetEconomy(activeHumanID: activeHuman.id.uuidString, humans: [activeHuman, executor], pets: [pet])
         let medicationReminders = MedicationReminderManagerSpy()
 
-        _ = PetMedicationDoseLogging.recordDose(
+        let result = PetMedicationDoseLogging.recordDoseResult(
             medication: medication,
             pet: pet,
             modelContext: context,
             awardCoconut: true,
             economy: StaticCareEventEconomyAwarder(questManager: makeQuestManager()),
-            activeHumanSelection: FixedActiveHumanSelection(id: executor.id.uuidString),
+            executorId: executor.id.uuidString,
             medicationReminders: medicationReminders
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
-        let medicationLedger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
-        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
-        #expect(medicationLedger.actorId == activeHuman.id.uuidString)
-        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
-        #expect(walletEntries.allSatisfy { $0.ownerId != executor.id.uuidString })
-        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
-        #expect(medication.remainingAmount == 4)
-        #expect(medicationReminders.recordedMedicationIDs == [medication.id])
+        #expect(!result.didRecord)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(walletEntries.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(medication.remainingAmount == 5)
+        #expect(medicationReminders.recordedMedicationIDs.isEmpty)
     }
 
-    @Test func medicationDoseCommandExecutorPublishesForDeceasedExecutorFallbackOwner() throws {
+    @Test func medicationDoseCommandExecutorRejectsDeceasedConfirmedExecutor() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let activeHuman = Human(name: "Active")
@@ -135,20 +134,18 @@ struct CareCompletionChokepointCharacterizationTests {
             medication: medication,
             pet: pet,
             awardCoconut: true,
-            activeHumanSelection: FixedActiveHumanSelection(id: executor.id.uuidString),
+            executorId: executor.id.uuidString,
             note: "test.pet.medication.dose.fallback"
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
-        #expect(result.didRecord)
-        #expect(revisionCenter.lastMutation != nil)
-        #expect(try context.fetch(FetchDescriptor<Event>()).count == 1)
-        #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
-        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
-        #expect(walletEntries.allSatisfy { $0.ownerId != executor.id.uuidString })
-        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
-        #expect(medication.remainingAmount == 4)
-        #expect(medicationReminders.recordedMedicationIDs == [medication.id])
+        #expect(!result.didRecord)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(walletEntries.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(medication.remainingAmount == 5)
+        #expect(medicationReminders.recordedMedicationIDs.isEmpty)
     }
 
     @Test func singleWalkPersistsWalkFactBeforeWalletRewardAndLinksPottyMarkers() throws {
@@ -696,7 +693,7 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
     }
 
-    @Test func medicationDoseWritesForMissingExplicitExecutorThroughFallbackOwner() throws {
+    @Test func medicationDoseRejectsMissingConfirmedExecutorWithoutFallback() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let activeHuman = Human(name: "Active")
@@ -725,24 +722,20 @@ struct CareCompletionChokepointCharacterizationTests {
             modelContext: context,
             awardCoconut: true,
             economy: StaticCareEventEconomyAwarder(questManager: makeQuestManager()),
-            activeHumanSelection: FixedActiveHumanSelection(id: missingExecutorID),
+            executorId: missingExecutorID,
             medicationReminders: medicationReminders
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
-        let event = try #require(try context.fetch(FetchDescriptor<Event>()).first)
-        let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
-
-        #expect(result.didRecord)
-        #expect(result.coconutDelta > 0)
-        #expect(result.allowsDerivedEffects)
-        #expect(event.assigneeId == activeHuman.id.uuidString)
-        #expect(ledger.actorId == activeHuman.id.uuidString)
-        #expect(walletEntries.contains { $0.ownerId == activeHuman.id.uuidString && $0.delta > 0 })
-        #expect(walletEntries.allSatisfy { $0.ownerId != missingExecutorID })
-        #expect(!(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())).isEmpty)
-        #expect(medication.remainingAmount == 4)
-        #expect(medicationReminders.recordedMedicationIDs == [medication.id])
+        #expect(!result.didRecord)
+        #expect(result.coconutDelta == 0)
+        #expect(!result.allowsDerivedEffects)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(walletEntries.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(medication.remainingAmount == 5)
+        #expect(medicationReminders.recordedMedicationIDs.isEmpty)
     }
 
     @Test func calendarCompletionForMissingExplicitExecutorWritesFactAndCompletesThroughFallbackOwner() throws {
@@ -1082,7 +1075,7 @@ struct CareCompletionChokepointCharacterizationTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV71.models)
+        let schema = Schema(ArkSchemaV91.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

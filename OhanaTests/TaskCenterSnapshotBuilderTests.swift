@@ -502,6 +502,8 @@ struct TaskCenterSnapshotBuilderTests {
         )
         let singleHumanItems = Dictionary(uniqueKeysWithValues: allItems(singleHuman).map { ($0.title, $0) })
         #expect(!singleHuman.showsMemberFilters)
+        #expect(singleHuman.resolvedMemberFilter(explicitSelection: nil) == .all)
+        #expect(singleHuman.resolvedMemberFilter(explicitSelection: .waitingForOthers) == .all)
         #expect(try #require(singleHumanItems["Open chore"]).availableActions == [.complete])
         #expect(try #require(singleHumanItems["Review bounty"]).availableActions.isEmpty)
 
@@ -519,6 +521,8 @@ struct TaskCenterSnapshotBuilderTests {
         let workerItems = Dictionary(uniqueKeysWithValues: allItems(workerView).map { ($0.title, $0) })
         #expect(workerView.showsMemberFilters)
         #expect(workerView.memberFilterContext.activeHumanName == worker.name)
+        #expect(workerView.resolvedMemberFilter(explicitSelection: nil) == .currentMember)
+        #expect(workerView.resolvedMemberFilter(explicitSelection: .all) == .all)
         #expect(try #require(workerItems["Open chore"]).availableActions == [.claim])
         #expect(try #require(workerItems["Assigned bounty"]).availableActions == [.submitForReview])
 
@@ -638,7 +642,7 @@ struct TaskCenterSnapshotBuilderTests {
         )
 
         #expect(Set(snapshot.filtered(for: .currentMember).allItems.map(\.title)) == [
-            "Momo care by Ava", "Luna care by Ava"
+            "Momo care by Ava", "Luna care by Ava", "Review Kai task"
         ])
         #expect(snapshot.filtered(for: .waitingForOthers).allItems.map(\.title) == ["Momo care by Kai"])
         #expect(snapshot.filtered(for: .pendingReview).allItems.map(\.title) == ["Review Kai task"])
@@ -651,6 +655,47 @@ struct TaskCenterSnapshotBuilderTests {
             .filtered(for: .pet(firstPet.id))
         #expect(scopeThenMember.allItems.map(\.title) == ["Momo care by Ava"])
         #expect(memberThenScope.allItems.map(\.title) == scopeThenMember.allItems.map(\.title))
+    }
+
+    @Test func currentMemberFilterRebuildsForActiveHumanWithoutTreatingHumanSubjectAsResponsibility() {
+        let calendar = utcCalendar()
+        let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
+        let dueAt = makeDate(calendar, year: 2026, month: 7, day: 14, hour: 10)
+        let ava = Human(name: "Ava")
+        let kai = Human(name: "Kai")
+        let avaTask = Event(title: "Ava assignment", startDate: dueAt, eventType: EventType.task.rawValue)
+        avaTask.assigneeId = ava.id.uuidString
+        let kaiTask = Event(title: "Kai assignment", startDate: dueAt, eventType: EventType.task.rawValue)
+        kaiTask.assigneeId = kai.id.uuidString
+        let avaSubjectOnly = Event(
+            title: "Ava appointment",
+            startDate: dueAt,
+            eventType: EventType.task.rawValue,
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: ava.id.uuidString
+        )
+        let events = [avaTask, kaiTask, avaSubjectOnly]
+
+        func make(activeHumanID: UUID) -> TaskCenterSnapshot {
+            TaskCenterSnapshotBuilder.make(
+                events: events,
+                allEvents: events,
+                pets: [],
+                humans: [ava, kai],
+                plants: [],
+                activeHumanId: activeHumanID.uuidString,
+                now: now,
+                calendar: calendar
+            )
+        }
+
+        let avaSnapshot = make(activeHumanID: ava.id)
+        let kaiSnapshot = make(activeHumanID: kai.id)
+
+        #expect(avaSnapshot.resolvedMemberFilter(explicitSelection: nil) == .currentMember)
+        #expect(avaSnapshot.filtered(for: .currentMember).allItems.map(\.title) == ["Ava assignment"])
+        #expect(kaiSnapshot.filtered(for: .currentMember).allItems.map(\.title) == ["Kai assignment"])
+        #expect(avaSnapshot.filtered(for: TaskCenterScope.all).allItems.contains { $0.title == "Ava appointment" })
     }
 
     @Test func humanScopeFiltersItemsAndDoesNotReuseWholeHouseholdTodayMetrics() {

@@ -15,7 +15,7 @@ struct WalkTrackingCard: View {
     let allHumans: [Human]
     let snapshot: WalkTrackingSnapshot
     var onCloseSummaryToPetCard: (() -> Void)?
-    var onStopWalk: ([Pet], [String]) -> WalkStopRewardSummary
+    var onStopWalk: ([Pet]) -> WalkStopRewardSummary
     var onSaveWeeklyGoal: (Double) -> PetWalkGoalCommandResult
 
     @Environment(AppServices.self) var appServices
@@ -74,19 +74,30 @@ struct WalkTrackingCard: View {
         )
     }
 
+    var walkEligibleHumans: [Human] {
+        allHumans.filter { !$0.hasPassedAway }
+    }
+
     var activeWalkHumanId: String? {
         guard !activeHumanId.isEmpty,
-              allHumans.contains(where: { $0.id.uuidString == activeHumanId }) else {
+              walkEligibleHumans.contains(where: { $0.id.uuidString == activeHumanId }) else {
             return nil
         }
         return activeHumanId
     }
 
     var selectedWalkExecutorIds: [String] {
-        let selected = allHumans
+        let selected = walkEligibleHumans
             .map(\.id.uuidString)
             .filter { selectedSharedWalkExecutorIds.contains($0) }
         return SharedCareParticipantIDs.normalized(selected, preferredFirst: activeWalkHumanId)
+    }
+
+    var canStartWalkWithSelectedExecutor: Bool {
+        WalkActionHumanSelectionPolicy.canStart(
+            eligibleIDs: walkEligibleHumans.map(\.id.uuidString),
+            selectedIDs: selectedWalkExecutorIds
+        )
     }
 
     var walkClockInterval: TimeInterval {
@@ -189,8 +200,11 @@ struct WalkTrackingCard: View {
             }
             updateRainbowRouteFlow()
         }
-        .onChange(of: activeHumanId) { _, _ in refreshDefaultWalkExecutors() }
-        .onChange(of: allHumans.map(\.id)) { _, _ in refreshDefaultWalkExecutors() }
+        .onChange(of: activeHumanId) { _, _ in
+            selectedSharedWalkExecutorIds = []
+            refreshDefaultWalkExecutors()
+        }
+        .onChange(of: walkEligibleHumans.map(\.id)) { _, _ in refreshDefaultWalkExecutors() }
         .onChange(of: shouldAnimateRainbowWalkEffects) { _, _ in updateRainbowRouteFlow() }
     }
 }

@@ -21,7 +21,7 @@ struct CalendarView: View {
     var onEmbeddedScrollOffsetChange: ((CGFloat) -> Void)?
     var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)?
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
-    var onCompleteEvent: ((Event, Date) -> Bool)?
+    var onCompleteEvent: ((Event, Date, String?) -> Bool)?
     var events: [Event] = []
     var pets: [Pet] = []
     var humans: [Human] = []
@@ -51,6 +51,7 @@ struct CalendarView: View {
     @State var hasUserOverriddenRouteFilter = false
     @State var deletingEvent: Event? = nil
     @State var eventDetailPresentation: CalendarEventDetailPresentation?
+    @State var pendingActionHumanConfirmation: ActionHumanConfirmationDraft?
     @State var showDeleteSeriesAlert = false
     @Environment(\.colorScheme) var colorScheme
     @StateObject var visibleDateCoordinator = CalendarVisibleDateCoordinator()
@@ -291,18 +292,21 @@ struct CalendarView: View {
                 humans: humans,
                 plants: plants,
                 allowsEditing: presentation.allowsEditing,
+                requiresActionHumanConfirmation: presentation.event.requiresTodayFocusActionHuman,
                 onDelete: {
                     eventDetailPresentation = nil
                     schedulePreparedCalendarSnapshotRebuild(delayMilliseconds: 220, force: true)
                 },
-                onComplete: {
-                    toggleEventCompletion(
+                onComplete: { executorID in
+                    _ = performEventCompletion(
                         presentation.event,
-                        occurrenceDate: presentation.occurrenceDate
+                        occurrenceDate: presentation.occurrenceDate,
+                        executorID: executorID
                     )
                 }
             )
         }
+        .actionHumanConfirmationDialog(draft: $pendingActionHumanConfirmation)
     }
 }
 

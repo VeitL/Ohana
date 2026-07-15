@@ -22,17 +22,18 @@ extension AddExpenseSheetContent {
     }
 
     func configureInitialPayer() {
-        guard !humans.isEmpty else {
+        guard !activeExpenseHumans.isEmpty else {
             selectedPayerId = nil
             return
         }
-        if let pid = preselectedPayerId, humans.contains(where: { $0.id.uuidString == pid }) {
+        if let pid = preselectedPayerId,
+           activeExpenseHumans.contains(where: { $0.id.uuidString == pid }) {
             selectedPayerId = pid
         } else {
             let stored = appServices.activeHumanSelection.currentHumanIdRaw
-            selectedPayerId = (!stored.isEmpty && humans.contains(where: { $0.id.uuidString == stored }))
+            selectedPayerId = (!stored.isEmpty && activeExpenseHumans.contains(where: { $0.id.uuidString == stored }))
                 ? stored
-                : humans.first?.id.uuidString
+                : activeExpenseHumans.first?.id.uuidString
         }
     }
 

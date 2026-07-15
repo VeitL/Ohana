@@ -22,6 +22,7 @@ struct PetMedicationDetailContentSheet: View {
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingEdit = false
+    @State private var pendingDoseActorDraft: PetMedicationDoseActorDraft?
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
     private var chromeAccent: Color { colorScheme == .dark ? Color.goPrimary : Color.goBlue }
@@ -109,6 +110,9 @@ struct PetMedicationDetailContentSheet: View {
                     }
                 )
             }
+        }
+        .petMedicationDoseActorConfirmation(draft: $pendingDoseActorDraft) { _, executorID in
+            recordDose(executorID: executorID)
         }
     }
 
@@ -204,16 +208,7 @@ struct PetMedicationDetailContentSheet: View {
 
     private var recordDoseButton: some View {
         Button {
-            let result = PetMedicationCommandExecutor(context: modelContext, services: appServices).recordDose(
-                medication: medication,
-                pet: pet,
-                awardCoconut: true,
-                note: "pet.medication.detail.dose"
-            )
-            guard result.didRecord, result.allowsDerivedEffects else { return }
-            appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            onDataChanged?()
+            requestDoseRecording()
         } label: {
             HStack {
                 Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
@@ -228,6 +223,41 @@ struct PetMedicationDetailContentSheet: View {
             .background(chromeAccent, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func requestDoseRecording() {
+        let actorContext = PetMedicationDoseActorSelectionResolver.resolve(
+            context: modelContext,
+            currentLocalHumanIDRaw: appServices.activeHumanSelection.currentHumanId
+        )
+        guard actorContext.needsConfirmation else {
+            recordDose(executorID: actorContext.defaultExecutorID)
+            return
+        }
+        pendingDoseActorDraft = PetMedicationDoseActorDraft(
+            petID: pet.id,
+            medicationID: medication.id,
+            actionTitle: l.tr(
+                zh: "给 \(pet.name) 喂 \(medication.name.isEmpty ? "药" : medication.name)",
+                en: "Give \(pet.name) \(medication.name.isEmpty ? "medicine" : medication.name)",
+                de: "\(pet.name) \(medication.name.isEmpty ? "Medikament" : medication.name) geben"
+            ),
+            initialExecutorID: actorContext.defaultExecutorID
+        )
+    }
+
+    private func recordDose(executorID: UUID?) {
+        let result = PetMedicationCommandExecutor(context: modelContext, services: appServices).recordDose(
+            medication: medication,
+            pet: pet,
+            awardCoconut: true,
+            executorId: executorID?.uuidString,
+            note: "pet.medication.detail.dose"
+        )
+        guard result.didRecord, result.allowsDerivedEffects else { return }
+        appServices.medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        onDataChanged?()
     }
 
     private func deleteMedication() {

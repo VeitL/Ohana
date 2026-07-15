@@ -31,6 +31,8 @@ struct QuickHumanExpenseSheet: View {
     @State private var selectedCategory: ExpenseCategory = .other
     @State private var note = ""
     @State private var date = Date()
+    @State private var selectedRecorderID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var adaptiveSheetHeight: CGFloat = 610
     @State private var contentHeight: CGFloat = 0
     @State private var popupVisible = false
@@ -42,7 +44,7 @@ struct QuickHumanExpenseSheet: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var amount: Double? { CountryDecimalInput.parse(amountText, countryCode: appCountry) }
-    private var isValid: Bool { (amount ?? 0) > 0 }
+    private var isValid: Bool { (amount ?? 0) > 0 && !requiresRecorderSelection }
     private var quickAmounts: [Double] {
         ExpenseAmountPresets.defaults(for: selectedCategory)
     }
@@ -75,6 +77,13 @@ struct QuickHumanExpenseSheet: View {
                     categoryBlock
                     noteBlock
                     dateBlock
+                    QuickCareActionHumanPickerContainer(
+                        selectedHumanID: $selectedRecorderID,
+                        requiresSelection: $requiresRecorderSelection,
+                        role: .recorder,
+                        tint: .goPrimary
+                    )
+                    .padding(.horizontal, 22)
                 }
                 .padding(.vertical, 12)
             }
@@ -367,12 +376,13 @@ struct QuickHumanExpenseSheet: View {
 
     @MainActor
     private func save() {
-        guard !isSaving, let amount, amount > 0 else { return }
+        guard !isSaving, !requiresRecorderSelection, let amount, amount > 0 else { return }
         isSaving = true
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         let savedNote = note
         let savedDate = date
         let savedCategory = selectedCategory
+        let savedRecorderID = selectedRecorderID?.uuidString
         let command = DomainCommand.quickHumanExpense(humanID: human.id)
         commandQueue.enqueue(command) {
             do {
@@ -381,6 +391,7 @@ struct QuickHumanExpenseSheet: View {
                     amount: amount,
                     date: savedDate,
                     note: savedNote,
+                    recordedByHumanId: savedRecorderID,
                     category: savedCategory,
                     command: command,
                     revisionNote: "quick.human.expense"

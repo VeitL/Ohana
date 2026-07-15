@@ -131,6 +131,88 @@ struct DataBackupAtomicRestoreTests {
             petID: source.petID
         )
 
+        let timestamp = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: 1_700_000_500))
+        let restoredHumanID = try #require(source.backup.humans.first?.id)
+        let missingRecorderID = UUID().uuidString
+
+        var brokenMetricRecorder = source.backup
+        brokenMetricRecorder.humanHealthMetricLogs = [
+            HumanHealthMetricLogBackup(
+                id: UUID().uuidString,
+                metricKey: "steps",
+                unitCode: "count",
+                value: 10,
+                date: timestamp,
+                notes: "",
+                humanId: restoredHumanID,
+                recordedByHumanId: missingRecorderID,
+                createdAt: timestamp
+            )
+        ]
+
+        var brokenReportRecorder = source.backup
+        brokenReportRecorder.humanHealthReports = [
+            HumanHealthReportBackup(
+                id: UUID().uuidString,
+                humanId: restoredHumanID,
+                reportTypeRaw: "checkup",
+                conclusionRaw: "normal",
+                hospitalName: "",
+                doctorName: "",
+                reportDate: timestamp,
+                nextCheckDate: nil,
+                summary: "",
+                notes: "",
+                recordedByHumanId: missingRecorderID,
+                colorHex: "",
+                createdAt: timestamp
+            )
+        ]
+
+        var brokenSymptomRecorder = source.backup
+        brokenSymptomRecorder.symptomLogs = [
+            SymptomLogBackup(
+                id: UUID().uuidString,
+                date: timestamp,
+                categoryRaw: "other",
+                symptomName: "test",
+                severityRaw: 1,
+                note: "",
+                photoBase64: nil,
+                photoRef: nil,
+                petId: source.petID.uuidString,
+                recordedByHumanId: missingRecorderID
+            )
+        ]
+
+        var brokenHeatCycleRecorder = source.backup
+        brokenHeatCycleRecorder.heatCycleLogs = [
+            HeatCycleLogBackup(
+                id: UUID().uuidString,
+                startDate: timestamp,
+                endDate: nil,
+                statusRaw: "active",
+                note: "",
+                isMated: false,
+                expectedDeliveryDate: nil,
+                petId: source.petID.uuidString,
+                recordedByHumanId: missingRecorderID
+            )
+        ]
+
+        for backup in [
+            brokenMetricRecorder,
+            brokenReportRecorder,
+            brokenSymptomRecorder,
+            brokenHeatCycleRecorder
+        ] {
+            try assertPreflightFailure(
+                backup,
+                expected: .relationship,
+                petID: source.petID
+            )
+        }
+
         var unsafeMedia = source.backup
         unsafeMedia.pets[0].avatarImageRef = BackupMediaReference(
             path: "../outside.bin",
@@ -378,7 +460,7 @@ struct DataBackupAtomicRestoreTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV85.models)
+        let schema = Schema(ArkSchemaV91.models)
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(
             for: schema,

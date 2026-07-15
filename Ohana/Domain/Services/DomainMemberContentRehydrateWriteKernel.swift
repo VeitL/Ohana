@@ -129,6 +129,7 @@ nonisolated struct DomainHumanHealthMetricLogRehydrateSnapshot: Equatable {
     let date: Date
     let notes: String
     let humanId: UUID?
+    let recordedByHumanId: String?
     let createdAt: Date
 }
 
@@ -143,6 +144,7 @@ nonisolated struct DomainHumanHealthReportRehydrateSnapshot: Equatable {
     let nextCheckDate: Date?
     let summary: String
     let notes: String
+    let recordedByHumanId: String?
     let colorHex: String
     let createdAt: Date
 }
@@ -192,6 +194,7 @@ nonisolated struct DomainSymptomLogRehydrateSnapshot: Equatable {
     let note: String
     let photoData: Data?
     let petId: UUID?
+    let recordedByHumanId: String?
 }
 
 nonisolated struct DomainHeatCycleLogRehydrateSnapshot: Equatable {
@@ -203,6 +206,7 @@ nonisolated struct DomainHeatCycleLogRehydrateSnapshot: Equatable {
     let isMated: Bool
     let expectedDeliveryDate: Date?
     let petId: UUID?
+    let recordedByHumanId: String?
 }
 
 nonisolated struct DomainMemberContentRehydrateResult {
@@ -464,6 +468,7 @@ nonisolated enum DomainMemberContentRehydrateWriter {
             value: snapshot.value,
             date: snapshot.date,
             notes: snapshot.notes,
+            recordedByHumanId: snapshot.recordedByHumanId,
             human: human
         )
         log.id = snapshot.id
@@ -495,6 +500,7 @@ nonisolated enum DomainMemberContentRehydrateWriter {
             nextCheckDate: snapshot.nextCheckDate,
             summary: snapshot.summary,
             notes: snapshot.notes,
+            recordedByHumanId: snapshot.recordedByHumanId,
             colorHex: snapshot.colorHex
         )
         report.id = snapshot.id
@@ -604,6 +610,7 @@ nonisolated enum DomainMemberContentRehydrateWriter {
             severity: SymptomSeverity(rawValue: snapshot.severityRaw) ?? .mild,
             note: snapshot.note,
             photoData: snapshot.photoData,
+            recordedByHumanId: snapshot.recordedByHumanId,
             pet: try petReference(id: snapshot.petId, context: context)
         )
         log.id = snapshot.id
@@ -630,6 +637,7 @@ nonisolated enum DomainMemberContentRehydrateWriter {
             note: snapshot.note,
             isMated: snapshot.isMated,
             expectedDeliveryDate: snapshot.expectedDeliveryDate,
+            recordedByHumanId: snapshot.recordedByHumanId,
             pet: try petReference(id: snapshot.petId, context: context)
         )
         log.id = snapshot.id

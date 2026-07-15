@@ -32,9 +32,12 @@ struct PlantDetailContentView: View {
     @State var careLogDraftType: PlantCareType?
     @State var careFeatureDraft: PlantDetailCareFeatureDraft?
     @State var quickCareConfirmDraft: PlantQuickCareConfirmDraft?
+    @State var quickCareExecutorID: UUID?
+    @State var requiresQuickCareExecutorSelection = false
     @State var quickCareToast: PlantQuickCareToast?
     @State var showingBatchQuickRecordSheet = false
     @State var batchQuickRecordCareType: PlantCareType?
+    @State var batchQuickRecordInitialExecutorID: UUID?
     @State var batchQuickRecordTargets: [PlantBatchQuickRecordTargetSnapshot] = []
     @State var pendingBatchCareUndoToken: PlantBatchCareUndoToken?
     @State var pendingBatchCareRewardTask: Task<Void, Never>?
@@ -877,6 +880,7 @@ struct PlantDetailContentView: View {
                 targets: batchQuickRecordTargets,
                 initialCareType: batchQuickRecordCareType,
                 initialSelectedPlantIDs: [plant.id],
+                initialExecutorID: batchQuickRecordInitialExecutorID,
                 imageDataProvider: { modelID in
                     await batchQuickRecordImageData(for: modelID)
                 },

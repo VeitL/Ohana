@@ -102,13 +102,12 @@ enum ExpandedQuickActionExecutor {
             }
         }
 
-        let dashboard = ExpandedQuickActionLogic.feedDashboard(
-            for: pet,
+        let willWriteFeedLog = willImmediatelyWriteFact(
+            action: .feed,
+            pet: pet,
             allEvents: allEvents,
             now: now
         )
-        let willWriteFeedLog = (dashboard.operatingMode == .manual && pet.dailyPortionGrams > 0) ||
-            (dashboard.operatingMode == .manualReminder && dashboard.nextManualReminder != nil)
 
         if willWriteFeedLog,
            let warning = AntiRepeatCareManager.checkRecentCareLedger(
@@ -193,28 +192,17 @@ enum ExpandedQuickActionExecutor {
     @discardableResult
     static func performMedicationCheckIn(
         pet: Pet,
+        executorId: String?,
         allEvents: [Event],
         modelContext: ModelContext,
+        now: Date,
         openMedication: (Pet) -> Void,
         feedback: (Feedback) -> Void,
         questManager: QuestManager,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> Bool {
         let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
-        let activeMeds = pet.medications.filter(\.isActiveToday)
-        guard !activeMeds.isEmpty else {
-            openMedication(pet)
-            return false
-        }
-
-        let targetMedication = activeMeds.first { medication in
-            let required = PetMedicationDoseLogging.requiredDoses(on: Date(), for: medication)
-            guard required > 0 else { return false }
-            let done = PetMedicationDoseLogging.todayDoseCount(events: allEvents, medicationId: medication.id)
-            return done < required
-        } ?? activeMeds.first(where: { PetMedicationDoseLogging.requiredDoses(on: Date(), for: $0) == 0 })
-
-        guard let medication = targetMedication else {
+        guard let medication = quickActionMedicationTarget(pet: pet, allEvents: allEvents, now: now) else {
             openMedication(pet)
             return false
         }
@@ -225,6 +213,7 @@ enum ExpandedQuickActionExecutor {
             modelContext: modelContext,
             awardCoconut: true,
             economy: StaticCareEventEconomyAwarder(questManager: questManager),
+            executorId: executorId,
             medicationReminders: medicationReminders
         )
         guard result.didPersist, result.didRecord, result.allowsDerivedEffects else { return false }
@@ -305,8 +294,10 @@ enum ExpandedQuickActionExecutor {
         case .medication:
             return performMedicationCheckIn(
                 pet: pet,
+                executorId: executorId,
                 allEvents: allEvents,
                 modelContext: modelContext,
+                now: now,
                 openMedication: actions.openMedication,
                 feedback: feedback,
                 questManager: questManager,

@@ -80,6 +80,7 @@ struct SharedPetActionDescriptor {
     let date: Date
     let executorId: String?
     let executorIds: [String]
+    let recordedByHumanId: String?
     let allocationMode: SharedCareAllocationMode
     let totalAmountGrams: Double
     let totalAmountMl: Double
@@ -102,6 +103,7 @@ struct SharedPetActionDescriptor {
         date: Date = Date(),
         executorId: String? = nil,
         executorIds: [String] = [],
+        recordedByHumanId: String? = nil,
         allocationMode: SharedCareAllocationMode = .equal,
         totalAmountGrams: Double = 0,
         totalAmountMl: Double = 0,
@@ -124,6 +126,7 @@ struct SharedPetActionDescriptor {
         let normalizedExecutorIds = SharedCareParticipantIDs.normalized(executorIds, preferredFirst: executorId)
         self.executorId = normalizedExecutorIds.first ?? executorId
         self.executorIds = normalizedExecutorIds
+        self.recordedByHumanId = recordedByHumanId
         self.allocationMode = allocationMode
         self.totalAmountGrams = totalAmountGrams
         self.totalAmountMl = totalAmountMl
@@ -412,7 +415,7 @@ enum SharedPetActionRecorder {
                     discardPendingFacts()
                     return .noOp()
                 }
-                let log = DomainCareFactWriter.createExpenseLog(plan: write, context: context)
+                let log = createExpenseLog(plan: write, descriptor: descriptor, context: context)
                 expenseLogs.append((target, log))
                 effectPlans.append(write)
             }
@@ -595,6 +598,18 @@ enum SharedPetActionRecorder {
             walkLogs: walkLogs.map(\.1),
             reward: reward,
             disposition: .active
+        )
+    }
+
+    private static func createExpenseLog(
+        plan: AuthorizedDomainCareFactWrite,
+        descriptor: SharedPetActionDescriptor,
+        context: ModelContext
+    ) -> PetExpenseLog {
+        DomainCareFactWriter.createExpenseLog(
+            plan: plan,
+            recordedByHumanId: descriptor.recordedByHumanId,
+            context: context
         )
     }
 

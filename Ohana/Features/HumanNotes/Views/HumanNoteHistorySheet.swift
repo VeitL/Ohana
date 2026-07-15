@@ -16,10 +16,14 @@ struct HumanNoteEntry: Identifiable {
     let text: String
     let attachments: [HumanNoteAttachmentReference]
     let rawString: String
+    let recordedByHumanId: String?
 }
 
-struct HumanNoteHistorySheet: View {
+struct HumanNoteHistoryContent: View {
     let human: Human
+    let humans: [Human]
+    let noteRecords: [HumanNoteRecord]
+    let onRecordsChanged: () -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -38,6 +42,18 @@ struct HumanNoteHistorySheet: View {
     private var noteEntries: [HumanNoteEntry] {
         _ = noteRevision
         return parseNotes()
+    }
+
+    init(
+        human: Human,
+        humans: [Human],
+        noteRecords: [HumanNoteRecord],
+        onRecordsChanged: @escaping () -> Void
+    ) {
+        self.human = human
+        self.humans = humans
+        self.noteRecords = noteRecords
+        self.onRecordsChanged = onRecordsChanged
     }
 
     var body: some View {
@@ -68,7 +84,10 @@ struct HumanNoteHistorySheet: View {
                 if showAddSheet {
                     QuickHumanNoteSheet(
                         human: human,
-                        onSaved: { noteRevision += 1 },
+                        onSaved: {
+                            noteRevision += 1
+                            onRecordsChanged()
+                        },
                         onDismiss: { showAddSheet = false }
                     )
                     .zIndex(20)
@@ -136,6 +155,12 @@ struct HumanNoteHistorySheet: View {
                 Text(entry.date, format: .dateTime.year().month().day())
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.goPrimary)
+                if humans.count > 1, let recorderName = recorderName(for: entry) {
+                    Text("· \(recorderName)")
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                }
                 Spacer()
                 Button {
                     withAnimation(GoMotion.feedback) {
@@ -264,9 +289,11 @@ struct HumanNoteHistorySheet: View {
     private func parseNotes() -> [HumanNoteEntry] {
         guard !human.notes.isEmpty else { return [] }
         let parts = human.notes.components(separatedBy: "\n\n")
-        return parts.compactMap { part in
+        let recordsBySequence = Dictionary(uniqueKeysWithValues: noteRecords.map { ($0.sequence, $0) })
+        return parts.enumerated().compactMap { sequence, part in
             let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
+            let record = recordsBySequence[sequence]
             if trimmed.hasPrefix("["),
                let bracketEnd = trimmed.firstIndex(of: "]") {
                 let dateStr = String(trimmed[trimmed.index(after: trimmed.startIndex) ..< bracketEnd])
@@ -275,26 +302,33 @@ struct HumanNoteHistorySheet: View {
                 if let date = Self.noteDateFormatter.date(from: dateStr) {
                     let parsed = HumanNoteAttachmentStore.visibleTextAndAttachments(from: rest)
                     return HumanNoteEntry(
-                        id: UUID(),
+                        id: record?.id ?? UUID(),
                         date: date,
                         dateString: dateStr,
                         text: parsed.text,
                         attachments: parsed.attachments,
-                        rawString: trimmed
+                        rawString: trimmed,
+                        recordedByHumanId: record?.recordedByHumanId
                     )
                 }
             }
             let parsed = HumanNoteAttachmentStore.visibleTextAndAttachments(from: trimmed)
             return HumanNoteEntry(
-                id: UUID(),
+                id: record?.id ?? UUID(),
                 date: .distantPast,
                 dateString: "",
                 text: parsed.text,
                 attachments: parsed.attachments,
-                rawString: trimmed
+                rawString: trimmed,
+                recordedByHumanId: record?.recordedByHumanId
             )
         }
         .sorted { $0.date > $1.date }
+    }
+
+    private func recorderName(for entry: HumanNoteEntry) -> String? {
+        guard let id = entry.recordedByHumanId else { return nil }
+        return humans.first { $0.id.uuidString == id }?.name
     }
 
     private func deleteNote(_ entry: HumanNoteEntry) {
@@ -303,7 +337,8 @@ struct HumanNoteHistorySheet: View {
         commandQueue.enqueue(command) {
             let result = HumanCareCommandExecutor(context: modelContext, services: appServices).deleteNote(
                 human: human,
-                rawString: entry.rawString
+                rawString: entry.rawString,
+                recordID: entry.id
             )
             if case .pending = result.attachmentCleanup {
                 appServices.islandToasts.show(l.tr(
@@ -312,6 +347,8 @@ struct HumanNoteHistorySheet: View {
                     de: "Die Notiz wurde gelöscht, aber der lokale Anhang konnte nicht vollständig entfernt werden. Kontaktiere den Support."
                 ))
             }
+            noteRevision += 1
+            onRecordsChanged()
         }
     }
 }

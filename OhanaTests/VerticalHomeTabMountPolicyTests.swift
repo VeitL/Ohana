@@ -707,9 +707,9 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(taskCenterSource.contains(".onChange(of: addEventTrigger) { _, _ in\n            requestAdd()"))
         #expect(taskCenterSource.contains("onCompleteEvent: completeEvent"))
         #expect(taskCenterSource.contains("TaskActionCommandExecutor("))
-        #expect(calendarRouteSource.contains("var onCompleteEvent: ((Event, Date) -> Bool)?"))
+        #expect(calendarRouteSource.contains("var onCompleteEvent: ((Event, Date, String?) -> Bool)?"))
         #expect(calendarRouteSource.contains("onCompleteEvent: onCompleteEvent"))
-        #expect(calendarViewSource.contains("var onCompleteEvent: ((Event, Date) -> Bool)?"))
+        #expect(calendarViewSource.contains("var onCompleteEvent: ((Event, Date, String?) -> Bool)?"))
         #expect(calendarListSource.contains("if shouldComplete, let onCompleteEvent"))
         #expect(calendarListSource.contains("let executor = CalendarCommandExecutor"))
     }
@@ -1298,6 +1298,18 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(rosterSource.contains("private func addRosterEntity(_ type: EntityType)"))
         #expect(rosterSource.contains("crew-roster-add-\\(type.rawValue)-action"))
         #expect(!homeSource.contains("VerticalSolidHomeQuickActionMenu("))
+    }
+
+    @Test func unresolvedHomeSnapshotDoesNotPresentEmptyDataAsRealZero() throws {
+        let homeSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift")
+        let toolbarSource = try source("Ohana/Features/Home/Views/FocusHomeHeaderView.swift")
+
+        #expect(toolbarSource.contains("let coconutBalance: Int?"))
+        #expect(toolbarSource.contains("Loading coconut balance"))
+        #expect(toolbarSource.contains(".disabled(coconutBalance == nil)"))
+        #expect(homeSource.contains("controller.snapshot.isReady ? headerCoconutBalance : nil"))
+        #expect(homeSource.contains("HomeReadModelLoadingOverlay(localization: l)"))
+        #expect(homeSource.contains("home-read-model-loading"))
     }
 
     @Test func petFeatureCollectionRoutesToAggregateCards() throws {

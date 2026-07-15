@@ -69,6 +69,8 @@ struct QuickWaterDetailSheet: View {
     @State var inlineSheetDismissTask: Task<Void, Never>?
     @State var overviewChartReplayTask: Task<Void, Never>?
     @State var selectedSharedWaterPetIds: Set<UUID> = []
+    @State var selectedActionHumanID: UUID?
+    @State var requiresActionHumanSelection = false
     @Namespace var waterModeSelectionNamespace
     typealias ActiveSheet = QuickWaterActiveSheet
     init(
@@ -113,6 +115,7 @@ struct QuickWaterDetailSheet: View {
     var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
     var isDark: Bool { colorScheme == .dark }
     var chromeTint: Color { Color.goPrimary }
+    var selectedActionExecutorId: String? { selectedActionHumanID?.uuidString }
     var petKey: String { pet.id.uuidString }
     var isAquatic: Bool { WaterQuickActionPolicy.isAquatic(species: pet.species) }
     var l: L10n { L10n(appLanguage) }
@@ -223,6 +226,14 @@ struct QuickWaterDetailSheet: View {
                         header
                         if pet.hasPassedAway {
                             PetMemorialBanner(pet: pet)
+                        }
+                        if !pet.hasPassedAway {
+                            QuickCareActionHumanPickerContainer(
+                                selectedHumanID: $selectedActionHumanID,
+                                requiresSelection: $requiresActionHumanSelection,
+                                role: .executor,
+                                tint: chromeTint
+                            )
                         }
                         waterDashboard
                         coreCards

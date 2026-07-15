@@ -206,7 +206,7 @@ enum ReminderActionCoordinator {
             medication: medication,
             pet: pet,
             awardCoconut: true,
-            activeHumanSelection: FixedActiveHumanSelection(currentHumanId: executorId),
+            executorId: executorId,
             note: "notification.pet.medication.complete"
         )
         guard result.didRecord, result.allowsDerivedEffects else { return .skipped }

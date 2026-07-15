@@ -82,6 +82,8 @@ final class HumanHealthReport {
     var nextCheckDate: Date?
     var summary: String
     var notes: String
+    /// 本次报告由哪位本地家庭成员录入；与报告所属成员分离，可空以兼容旧数据。
+    var recordedByHumanId: String?
     var colorHex: String
     var createdAt: Date
 
@@ -95,6 +97,7 @@ final class HumanHealthReport {
         nextCheckDate: Date? = nil,
         summary: String = "",
         notes: String = "",
+        recordedByHumanId: String? = nil,
         colorHex: String = "00D4AA"
     ) {
         self.id = UUID()
@@ -107,6 +110,7 @@ final class HumanHealthReport {
         self.nextCheckDate = nextCheckDate
         self.summary = summary
         self.notes = notes
+        self.recordedByHumanId = recordedByHumanId
         self.colorHex = colorHex
         self.createdAt = Date()
     }

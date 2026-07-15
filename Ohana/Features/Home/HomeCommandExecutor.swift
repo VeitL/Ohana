@@ -383,13 +383,13 @@ struct HomeCommandExecutor {
     }
 
     @discardableResult
-    func recordMedicationDose(medication: PetMedication, pet: Pet) -> Bool {
+    func recordMedicationDose(medication: PetMedication, pet: Pet, executorId: String?) -> Bool {
         let result = PetMedicationDoseLogging.recordDoseResult(
             medication: medication,
             pet: pet,
             modelContext: modelContext,
             awardCoconut: true,
-            economy: StaticCareEventEconomyAwarder(questManager: questManager),
+            economy: StaticCareEventEconomyAwarder(questManager: questManager), executorId: executorId,
             medicationReminders: medicationReminders
         )
         guard result.didPersist, result.didRecord, result.allowsDerivedEffects else {
@@ -402,13 +402,13 @@ struct HomeCommandExecutor {
     }
 
     @discardableResult
-    func recordMedicationDose(petID: UUID, medicationID: UUID) -> Bool {
+    func recordMedicationDose(petID: UUID, medicationID: UUID, executorId: String?) -> Bool {
         guard let pet = fetchPet(id: petID),
               let medication = pet.medications.first(where: { $0.id == medicationID }) else {
             publishNoop(QuickCareCommand.medicationDose(petID: petID, medicationID: medicationID), note: "home.medicationDose.missingTarget")
             return false
         }
-        return recordMedicationDose(medication: medication, pet: pet)
+        return recordMedicationDose(medication: medication, pet: pet, executorId: executorId)
     }
 
     @discardableResult
@@ -677,7 +677,7 @@ struct HomeCommandExecutor {
         return true
     }
 
-    private func fetchPet(id: UUID) -> Pet? {
+    func fetchPet(id: UUID) -> Pet? {
         var descriptor = FetchDescriptor<Pet>(
             predicate: #Predicate<Pet> { pet in
                 pet.id == id
@@ -755,7 +755,7 @@ struct HomeCommandExecutor {
         ).first
     }
 
-    private func fetchQuickCareEvents(pet: Pet, now: Date) -> [Event] {
+    func fetchQuickCareEvents(pet: Pet, now: Date) -> [Event] {
         let petIDRaw = pet.id.uuidString
         let petEvents = fetchHomeCommandModelsOrLog(
             FetchDescriptor<Event>(

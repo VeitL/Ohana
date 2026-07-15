@@ -33,6 +33,8 @@ struct HumanHealthMetricEntrySheet: View {
     @State private var selectedDate = Date()
     @State private var includesRecordTime = false
     @State private var notes = ""
+    @State private var selectedRecorderID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var adaptiveSheetHeight: CGFloat = 520
     @State private var scrollContentHeight: CGFloat = 0
     @State private var popupVisible = false
@@ -110,6 +112,14 @@ struct HumanHealthMetricEntrySheet: View {
                     .padding(.horizontal, 20)
                     unitStrip
                     dateAndNotesBlock
+                    QuickCareActionHumanPickerContainer(
+                        selectedHumanID: $selectedRecorderID,
+                        requiresSelection: $requiresRecorderSelection,
+                        role: .recorder,
+                        tint: tint
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
                     referenceBlock
                 }
                 .padding(.vertical, 12)
@@ -123,7 +133,7 @@ struct HumanHealthMetricEntrySheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
-                        .disabled(!isValid || isSaving)
+                        .disabled(!isValid || isSaving || requiresRecorderSelection)
                         .accessibilityIdentifier("human-health-metric-entry-save-action")
                 }
             }
@@ -389,7 +399,7 @@ struct HumanHealthMetricEntrySheet: View {
             .opacity(isValid && !isSaving ? 1 : 0.62)
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!isValid || isSaving)
+        .disabled(!isValid || isSaving || requiresRecorderSelection)
         .accessibilityIdentifier("human-health-metric-entry-save-action")
         .padding(.horizontal, 20)
         .padding(.top, 10)
@@ -419,11 +429,16 @@ struct HumanHealthMetricEntrySheet: View {
 
     @MainActor
     private func save() {
-        guard !isSaving, let value = parsedValue, value > 0, value.isFinite else { return }
+        guard !isSaving,
+              !requiresRecorderSelection,
+              let value = parsedValue,
+              value > 0,
+              value.isFinite else { return }
         isSaving = true
         let savedUnitCode = selectedUnit.code
         let savedDate = recordDate
         let savedNotes = notes
+        let savedRecorderID = selectedRecorderID?.uuidString
         let command = DomainCommand.humanHealthMetric(humanID: human.id, metricKey: metric.key)
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -435,6 +450,7 @@ struct HumanHealthMetricEntrySheet: View {
                 value: value,
                 date: savedDate,
                 notes: savedNotes,
+                recordedByHumanId: savedRecorderID,
                 note: "human.health.metric"
             ) else {
                 isSaving = false

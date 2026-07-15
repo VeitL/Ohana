@@ -518,7 +518,7 @@ extension CareEventService {
         category: ExpenseCategory,
         note: String,
         context: ModelContext,
-        executorId: String?,
+        attribution: ExpenseActorAttribution,
         date: Date,
         currencyCode: String,
         source: CareLedgerSource
@@ -530,7 +530,7 @@ extension CareEventService {
             category: category,
             note: note,
             context: context,
-            executorId: executorId,
+            attribution: attribution,
             date: date,
             currencyCode: currencyCode,
             source: source,

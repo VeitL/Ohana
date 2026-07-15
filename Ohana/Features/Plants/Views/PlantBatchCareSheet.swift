@@ -12,7 +12,7 @@ struct PlantBatchCareSheet: View {
     let snapshot: PlantBatchCareSheetSnapshot
     let initialCareType: PlantCareType?
     let imageDataProvider: @Sendable (PersistentIdentifier) async -> Data?
-    let onComplete: ([PlantBatchCareSelection]) -> Void
+    let onComplete: ([PlantBatchCareSelection], UUID?) -> Void
     let onOpenCareLog: (UUID, PlantCareType) -> Void
     let onDeferTask: (PlantBatchCareSheetTask) -> Void
     let onSkipTask: (PlantBatchCareSheetTask) -> Void
@@ -22,12 +22,15 @@ struct PlantBatchCareSheet: View {
     @State private var selectedCareType: PlantCareType?
     @State private var selectedTaskIDs: Set<String>
     @State private var resolvedTaskIDs: Set<String> = []
+    @State private var selectedExecutorID: UUID?
+    @State private var requiresExecutorSelection = false
 
     init(
         snapshot: PlantBatchCareSheetSnapshot,
         initialCareType: PlantCareType? = nil,
+        initialExecutorID: UUID? = nil,
         imageDataProvider: @escaping @Sendable (PersistentIdentifier) async -> Data?,
-        onComplete: @escaping ([PlantBatchCareSelection]) -> Void,
+        onComplete: @escaping ([PlantBatchCareSelection], UUID?) -> Void,
         onOpenCareLog: @escaping (UUID, PlantCareType) -> Void,
         onDeferTask: @escaping (PlantBatchCareSheetTask) -> Void,
         onSkipTask: @escaping (PlantBatchCareSheetTask) -> Void
@@ -41,6 +44,7 @@ struct PlantBatchCareSheet: View {
         self.onSkipTask = onSkipTask
         _selectedCareType = State(initialValue: initialCareType)
         _selectedTaskIDs = State(initialValue: Set(snapshot.filterSnapshot(for: initialCareType).taskIDs))
+        _selectedExecutorID = State(initialValue: initialExecutorID)
     }
 
     private var l: L10n { L10n(appLanguage) }
@@ -92,6 +96,12 @@ struct PlantBatchCareSheet: View {
         ) {
             VStack(alignment: .leading, spacing: 16) {
                 headerCard
+                QuickCareActionHumanPickerContainer(
+                    selectedHumanID: $selectedExecutorID,
+                    requiresSelection: $requiresExecutorSelection,
+                    role: .executor,
+                    tint: .goPrimary
+                )
                 typeChips
                 checklist
                 bottomAction
@@ -190,7 +200,8 @@ struct PlantBatchCareSheet: View {
         Button {
             let selections = selectedTasks.map(\.selection)
             guard !selections.isEmpty else { return }
-            onComplete(selections)
+            guard !requiresExecutorSelection else { return }
+            onComplete(selections, selectedExecutorID)
             dismiss()
         } label: {
             HStack(spacing: 8) {
@@ -207,7 +218,7 @@ struct PlantBatchCareSheet: View {
             .frame(minHeight: 50)
             .background(selectedTasks.isEmpty ? Color.ohanaControlFill.opacity(0.72) : Color.goPrimary, in: Capsule())
         }
-        .disabled(selectedTasks.isEmpty)
+        .disabled(selectedTasks.isEmpty || requiresExecutorSelection)
         .buttonStyle(ScaleButtonStyle())
         .accessibilityIdentifier("plant-batch-care-complete-selected")
     }

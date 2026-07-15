@@ -127,16 +127,13 @@ extension CloudSyncRecordApplier {
                     deletedByHumanId: deletedByHumanId
                 )
             }
-        case String(describing: PetWeightLog.self):
-            if let model = try fetchPetWeightLog(id: localRecordUUID, context: context) {
-                deletePetScopedRecord(
-                    model,
-                    pet: model.pet,
-                    context: context,
-                    deletedAt: deletedAt,
-                    deletedByHumanId: deletedByHumanId
-                )
-            }
+        case String(describing: PetWeightLog.self),
+             String(describing: SymptomLog.self),
+             String(describing: HeatCycleLog.self):
+            try deletePetObservationRecord(
+                entityName, id: localRecordUUID, deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId, context: context
+            )
         case String(describing: SharedCareSession.self):
             if let model = try fetchSharedCareSession(id: localRecordUUID, context: context) {
                 try SharedCareSessionMaintenance.deleteCascade(
@@ -162,6 +159,33 @@ extension CloudSyncRecordApplier {
         default:
             break
         }
+    }
+
+    private nonisolated static func deletePetObservationRecord(
+        _ entityName: String,
+        id: UUID,
+        deletedAt: Date,
+        deletedByHumanId: String?,
+        context: ModelContext
+    ) throws {
+        let model: (record: any PersistentModel, pet: Pet?)? = switch entityName {
+        case String(describing: PetWeightLog.self):
+            try fetchPetWeightLog(id: id, context: context).map { ($0, $0.pet) }
+        case String(describing: SymptomLog.self):
+            try fetchSymptomLog(id: id, context: context).map { ($0, $0.pet) }
+        case String(describing: HeatCycleLog.self):
+            try fetchHeatCycleLog(id: id, context: context).map { ($0, $0.pet) }
+        default:
+            nil
+        }
+        guard let model else { return }
+        deletePetScopedRecord(
+            model.record,
+            pet: model.pet,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
     }
 
     private nonisolated static func deleteHousehold(id: UUID, context: ModelContext) throws {

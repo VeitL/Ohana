@@ -21,13 +21,18 @@ struct AddSymptomSheet: View {
     @State private var symptomName: String = ""
     @State private var severity: SymptomSeverity = .mild
     @State private var note: String = ""
+    @State private var selectedRecorderHumanID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var isSaving = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
     private var l: L10n { L10n(appLanguage) }
     private var canSave: Bool {
-        pet.canWriteHealthFacts && !symptomName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSaving
+        pet.canWriteHealthFacts &&
+            !symptomName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !requiresRecorderSelection &&
+            !isSaving
     }
 
     var body: some View {
@@ -47,6 +52,7 @@ struct AddSymptomSheet: View {
                         severitySection
                         dateSection
                         noteSection
+                        recorderSection
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 8)
@@ -182,6 +188,16 @@ struct AddSymptomSheet: View {
         }
     }
 
+    private var recorderSection: some View {
+        QuickCareActionHumanPickerContainer(
+            selectedHumanID: $selectedRecorderHumanID,
+            requiresSelection: $requiresRecorderSelection,
+            role: .recorder,
+            tint: themeColor
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var saveBar: some View {
         Button(action: save) {
             Text(l.tr(zh: "保存记录", en: "Save record", de: "Eintrag speichern"))
@@ -267,7 +283,8 @@ struct AddSymptomSheet: View {
             symptomName: symptomName,
             severity: severity,
             note: note,
-            photoData: nil
+            photoData: nil,
+            recordedByHumanId: selectedRecorderHumanID?.uuidString
         )
     }
 

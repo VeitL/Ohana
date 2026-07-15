@@ -215,11 +215,11 @@ extension CalendarTaskCompletionSyncService {
         Event.occurrenceStorageKey(for: occurrenceDate)
     }
 
-    static func normalizedText(for event: Event) -> String {
+    nonisolated static func normalizedText(for event: Event) -> String {
         "\(event.title) \(event.eventType)".lowercased()
     }
 
-    static func careType(for event: Event) -> CareType? {
+    nonisolated static func careType(for event: Event) -> CareType? {
         if !event.taskCareKindRaw.isEmpty {
             return TaskCareKind(rawValue: event.taskCareKindRaw)?.careType
         }
@@ -233,7 +233,7 @@ extension CalendarTaskCompletionSyncService {
         return nil
     }
 
-    static func pottyType(for event: Event) -> PottyType? {
+    nonisolated static func pottyType(for event: Event) -> PottyType? {
         if !event.taskCareKindRaw.isEmpty {
             return TaskCareKind(rawValue: event.taskCareKindRaw)?.pottyType
         }
@@ -242,7 +242,7 @@ extension CalendarTaskCompletionSyncService {
         return nil
     }
 
-    static func hygieneType(for event: Event) -> HygieneType? {
+    nonisolated static func hygieneType(for event: Event) -> HygieneType? {
         if !event.taskCareKindRaw.isEmpty {
             return TaskCareKind(rawValue: event.taskCareKindRaw)?.hygieneType
         }

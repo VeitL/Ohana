@@ -13,7 +13,10 @@ struct SwipeableEventRow: View {
     var occurrenceDate: Date = .init()
     var petThemeColor: Color?
     var allowsUserEventDetail = true
-    let onComplete: () -> Void
+    /// Returns `true` when the occurrence completed immediately. A `false`
+    /// result means the parent presented a lightweight choice first, so the row
+    /// must stay in place instead of playing a premature success animation.
+    let onComplete: () -> Bool
     let onDelete: () -> Void
     var onOpenDetail: (() -> Void)?
     var onOpenRelated: (() -> Bool)?
@@ -375,16 +378,24 @@ struct SwipeableEventRow: View {
 
     private func triggerComplete() {
         isTriggerred = true
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        // Yield one frame so the gesture feedback lands before persistence or
+        // an actor confirmation dialog begins.
+        DispatchQueue.main.async {
+            guard self.onComplete() else {
+                self.isTriggerred = false
+                withAnimation(GoMotion.feedback) { self.offsetX = 0 }
+                return
+            }
+
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-        }
-        launchCelebrationParticles()
-        withAnimation(GoMotion.page) { offsetX = -800 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-            onComplete()
-            self.isTriggerred = false
-            withAnimation(GoMotion.feedback) { self.offsetX = 0 }
+            self.launchCelebrationParticles()
+            withAnimation(GoMotion.page) { self.offsetX = -800 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+                self.isTriggerred = false
+                withAnimation(GoMotion.feedback) { self.offsetX = 0 }
+            }
         }
     }
 
@@ -464,14 +475,17 @@ struct CalendarEventDetailPage: View {
     let humans: [Human]
     let plants: [Plant]
     let allowsEditing: Bool
+    let requiresActionHumanConfirmation: Bool
     let onDelete: () -> Void
-    let onComplete: () -> Void
+    let onComplete: (String?) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(AppServices.self) private var appServices
+    @AppStorage("currentActiveHumanId") private var currentLocalHumanIDRaw = ""
     @State private var showDeleteConfirm = false
     @State private var showEditEvent = false
+    @State private var pendingActionHumanConfirmation: ActionHumanConfirmationDraft?
     private var l: L10n { L10n(appLanguage) }
     private var detailActions: [CalendarEventDetailAction] {
         CalendarEventInteractionPolicy.detailActions(for: event, allowsEditing: allowsEditing)
@@ -526,6 +540,44 @@ struct CalendarEventDetailPage: View {
                 editingOccurrenceDate: occurrenceDate
             )
         }
+        .actionHumanConfirmationDialog(draft: $pendingActionHumanConfirmation)
+    }
+
+    private func requestCompletion() {
+        guard !isOccurrenceComplete, requiresActionHumanConfirmation else {
+            completeAndDismiss(executorID: nil)
+            return
+        }
+        let options = humans.map { human in
+            ActionHumanOption(
+                id: human.id,
+                name: human.name,
+                avatarEmoji: human.avatarEmoji,
+                isDeceased: human.hasPassedAway
+            )
+        }
+        let eligible = ActionHumanDefaultSelectionPolicy.eligibleHumans(from: options)
+        let preferredID = ActionHumanDefaultSelectionPolicy.selection(
+            draftHumanID: nil,
+            currentLocalHumanID: UUID(uuidString: currentLocalHumanIDRaw),
+            humans: options
+        )
+        guard eligible.count > 1 else {
+            completeAndDismiss(executorID: preferredID?.uuidString)
+            return
+        }
+        pendingActionHumanConfirmation = ActionHumanConfirmationDraft(
+            actionTitle: event.title,
+            humans: eligible,
+            preferredHumanID: preferredID
+        ) { executorID in
+            completeAndDismiss(executorID: executorID)
+        }
+    }
+
+    private func completeAndDismiss(executorID: String?) {
+        onComplete(executorID)
+        dismiss()
     }
 
     private var header: some View {
@@ -653,8 +705,7 @@ struct CalendarEventDetailPage: View {
                     systemImage: isOccurrenceComplete ? "xmark.circle" : "checkmark.circle.fill",
                     fill: Color.goTeal
                 ) {
-                    onComplete()
-                    dismiss()
+                    requestCompletion()
                 }
                 .accessibilityIdentifier("calendar-event-complete-action")
             }

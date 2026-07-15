@@ -3,6 +3,16 @@ import SwiftData
 
 typealias CareRecordResult = CareEventService.CareRecordResult
 
+nonisolated struct ExpenseActorAttribution: Hashable, Sendable {
+    let executorId: String?
+    let recordedByHumanId: String?
+
+    init(executorId: String? = nil, recordedByHumanId: String? = nil) {
+        self.executorId = executorId
+        self.recordedByHumanId = recordedByHumanId
+    }
+}
+
 @MainActor
 struct SharedCareRecordRequest {
     let sourcePet: Pet
@@ -292,7 +302,7 @@ protocol CareEventRecording {
         category: ExpenseCategory,
         note: String,
         context: ModelContext,
-        executorId: String?,
+        attribution: ExpenseActorAttribution,
         date: Date,
         currencyCode: String,
         source: CareLedgerSource

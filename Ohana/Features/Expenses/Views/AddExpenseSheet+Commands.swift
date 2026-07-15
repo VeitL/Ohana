@@ -17,9 +17,10 @@ extension AddExpenseSheetContent {
         GoKeyboard.dismiss()
 
         let payerId = selectedPayerId.flatMap { id in
-            humans.contains(where: { $0.id.uuidString == id }) ? id : nil
+            activeExpenseHumans.contains(where: { $0.id.uuidString == id }) ? id : nil
         }
         let cleanNote = noteInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let recorderId = selectedRecorderID?.uuidString
         let savedDate = date
         let savedCategory = selectedCategory
         let savedReceiptTitle = receiptDocumentTitle(note: cleanNote)
@@ -43,6 +44,7 @@ extension AddExpenseSheetContent {
                         category: savedCategory,
                         note: cleanNote,
                         executorId: payerId,
+                        recordedByHumanId: recorderId,
                         source: .detail,
                         command: command,
                         revisionNote: "dashboard.expense.sharedEntry"
@@ -62,6 +64,7 @@ extension AddExpenseSheetContent {
                         category: savedCategory,
                         note: cleanNote,
                         executorId: payerId,
+                        recordedByHumanId: recorderId,
                         source: .detail,
                         receiptTitle: savedReceiptTitle,
                         receiptCategory: savedReceiptCategory,

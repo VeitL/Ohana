@@ -47,6 +47,8 @@ struct QuickHumanNoteSheet: View {
     @State private var attachedFiles: [QuickHumanFileAttachmentDraft] = []
     @State private var reminderEnabled = false
     @State private var reminderDate = Calendar.current.date(byAdding: .hour, value: 3, to: Date()) ?? Date()
+    @State private var selectedRecorderID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var adaptiveSheetHeight: CGFloat = 560
     @State private var contentHeight: CGFloat = 0
     @State private var popupVisible = false
@@ -58,7 +60,9 @@ struct QuickHumanNoteSheet: View {
     private var l: L10n { L10n(appLanguage) }
     private var trimmedNote: String { noteText.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasAttachment: Bool { !selectedImages.isEmpty || !attachedFiles.isEmpty }
-    private var canSave: Bool { !trimmedNote.isEmpty || hasAttachment || reminderEnabled }
+    private var canSave: Bool {
+        (!trimmedNote.isEmpty || hasAttachment || reminderEnabled) && !requiresRecorderSelection
+    }
     private var popupAnimation: Animation {
         .interactiveSpring(response: 0.30, dampingFraction: 0.88, blendDuration: 0.12)
     }
@@ -74,6 +78,13 @@ struct QuickHumanNoteSheet: View {
                     attachmentBlock
                     reminderBlock
                     dateBlock
+                    QuickCareActionHumanPickerContainer(
+                        selectedHumanID: $selectedRecorderID,
+                        requiresSelection: $requiresRecorderSelection,
+                        role: .recorder,
+                        tint: .goPrimary
+                    )
+                    .padding(.horizontal, 22)
                 }
                 .padding(.vertical, 12)
             }
@@ -442,6 +453,7 @@ struct QuickHumanNoteSheet: View {
         }
         let savedReminderDate = reminderEnabled ? reminderDate : nil
         let languageCode = appLanguage
+        let savedRecorderID = selectedRecorderID?.uuidString
         let command = DomainCommand.humanNote(humanID: human.id)
 
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -454,6 +466,7 @@ struct QuickHumanNoteSheet: View {
                 fileAttachments: savedFiles,
                 reminderDate: savedReminderDate,
                 appLanguage: languageCode,
+                recordedByHumanId: savedRecorderID,
                 note: "human.note"
             ) != nil else {
                 isSaving = false

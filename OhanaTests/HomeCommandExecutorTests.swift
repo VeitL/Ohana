@@ -316,7 +316,7 @@ struct HomeCommandExecutorTests {
             modelContext: context,
             awardCoconut: true,
             economy: StaticCareEventEconomyAwarder(questManager: questManager),
-            activeHumanSelection: FixedActiveHumanSelection(currentHumanId: executor.id.uuidString),
+            executorId: executor.id.uuidString,
             medicationReminders: medicationReminders
         )
         let second = PetMedicationDoseLogging.recordDose(
@@ -325,7 +325,7 @@ struct HomeCommandExecutorTests {
             modelContext: context,
             awardCoconut: true,
             economy: StaticCareEventEconomyAwarder(questManager: questManager),
-            activeHumanSelection: FixedActiveHumanSelection(currentHumanId: executor.id.uuidString),
+            executorId: executor.id.uuidString,
             medicationReminders: medicationReminders
         )
 
@@ -1886,6 +1886,8 @@ struct HomeCommandExecutorTests {
         #expect(expenses.first?.amount == 48.5)
         #expect(expenses.first?.category == ExpenseCategory.medical.rawValue)
         #expect(expenses.first?.note == "Rabies")
+        #expect(expenses.first?.executorId == nil)
+        #expect(expenses.first?.recordedByHumanId == executorHuman.id.uuidString)
         #expect(events.count == 1)
         #expect(events.first?.id == result.eventID)
         #expect(events.first?.eventType == EventType.vaccine.rawValue)
@@ -2415,7 +2417,9 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let recorder = Human(name: "Alex")
         context.insert(pet)
+        context.insert(recorder)
         try context.save()
 
         let date = makeDate(year: 2026, month: 6, day: 8, hour: 11, minute: 20)
@@ -2427,7 +2431,8 @@ struct HomeCommandExecutorTests {
                 symptomName: "  vomiting  ",
                 severity: .moderate,
                 note: " after breakfast ",
-                photoData: Data([1, 2, 3])
+                photoData: Data([1, 2, 3]),
+                recordedByHumanId: recorder.id.uuidString
             ),
             context: context
         ))
@@ -2443,6 +2448,7 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.severity == .moderate)
         #expect(logs.first?.note == "after breakfast")
         #expect(logs.first?.photoData == Data([1, 2, 3]))
+        #expect(logs.first?.recordedByHumanId == recorder.id.uuidString)
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.id == result.ledgerEventID)
         #expect(ledgerEvents.first?.subjectKind == CareLedgerSubjectKind.pet.rawValue)
@@ -2451,6 +2457,8 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.first?.actionType == "symptom")
         #expect(ledgerEvents.first?.legacyModelName == "SymptomLog")
         #expect(ledgerEvents.first?.legacyModelId == result.logID.uuidString)
+        #expect(ledgerEvents.first?.actorKind == CareLedgerActorKind.human.rawValue)
+        #expect(ledgerEvents.first?.actorId == recorder.id.uuidString)
     }
 
     @MainActor
@@ -2667,10 +2675,12 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
+        let recorder = Human(name: "Alex")
         let startDate = makeDate(year: 2026, month: 6, day: 8)
         let endDate = makeDate(year: 2026, month: 6, day: 15)
         let deliveryDate = makeDate(year: 2026, month: 8, day: 10)
         context.insert(pet)
+        context.insert(recorder)
         try context.save()
 
         let result = try #require(PetHeatCycleCommandService.recordHeatCycle(
@@ -2681,7 +2691,8 @@ struct HomeCommandExecutorTests {
                 status: .pregnant,
                 note: "  follow up  ",
                 isMated: true,
-                expectedDeliveryDate: deliveryDate
+                expectedDeliveryDate: deliveryDate,
+                recordedByHumanId: recorder.id.uuidString
             ),
             context: context
         ))
@@ -2698,6 +2709,7 @@ struct HomeCommandExecutorTests {
         #expect(log.note == "follow up")
         #expect(log.isMated == true)
         #expect(log.expectedDeliveryDate == deliveryDate)
+        #expect(log.recordedByHumanId == recorder.id.uuidString)
     }
 
     @MainActor
@@ -3515,13 +3527,19 @@ struct HomeCommandExecutorTests {
         let commandSource = try source("Ohana/Features/HumanHealth/HumanHealthCommands.swift", rootURL: rootURL)
         let revisionSource = try source("Ohana/Features/RevisionPublishing/DomainRevisionPublishing+HumanPublishing.swift", rootURL: rootURL)
         let reportViewSource = try source("Ohana/Features/HumanHealth/Views/HumanHealthReportView.swift", rootURL: rootURL)
+        let metricViewSource = try source("Ohana/Features/Health/Views/HumanHealthMetricEntrySheet.swift", rootURL: rootURL)
 
         #expect(commandSource.contains("let didPersist: Bool"))
         #expect(commandSource.contains("let persistenceErrorDescription: String?"))
         #expect(!commandSource.contains("context.safeSave()"))
         #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
         #expect(commandSource.contains("context.rollback()"))
+        #expect(commandSource.contains("HumanActionAttributionPolicy.activeHumanID"))
         #expect(revisionSource.contains("wroteBusinessFact: result.didPersist"))
+        #expect(metricViewSource.contains("role: .recorder"))
+        #expect(metricViewSource.contains("recordedByHumanId: savedRecorderID"))
+        #expect(reportViewSource.contains("role: .recorder"))
+        #expect(reportViewSource.contains("recordedByHumanId: selectedRecorderID?.uuidString"))
         #expect(reportViewSource.contains("if result.didChange {\n                    dismiss()\n                } else {\n                    isSaving = false\n                }"))
     }
 
@@ -5194,7 +5212,9 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
+        let recorder = Human(name: "Alex")
         context.insert(human)
+        context.insert(recorder)
         try context.save()
 
         let previousActiveHumanID = UserDefaults.standard.string(forKey: "currentActiveHumanId")
@@ -5220,6 +5240,7 @@ struct HomeCommandExecutorTests {
             date: date,
             note: "coffee",
             context: context,
+            recordedByHumanId: recorder.id.uuidString,
             category: .medical,
             source: .detail
         )
@@ -5230,6 +5251,7 @@ struct HomeCommandExecutorTests {
         #expect(expenses.first?.id == result.logID)
         #expect(expenses.first?.pet == nil)
         #expect(expenses.first?.executorId == human.id.uuidString)
+        #expect(expenses.first?.recordedByHumanId == recorder.id.uuidString)
         #expect(expenses.first?.amount == 12.5)
         #expect(expenses.first?.expenseCategory == .medical)
         #expect(expenses.first?.note == "coffee")
@@ -5253,8 +5275,10 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
         let human = Human(name: "Guan")
+        let recorder = Human(name: "Alex")
         context.insert(pet)
         context.insert(human)
+        context.insert(recorder)
         try context.save()
 
         let previousActiveHumanID = UserDefaults.standard.string(forKey: "currentActiveHumanId")
@@ -5282,6 +5306,7 @@ struct HomeCommandExecutorTests {
             note: "  clinic  ",
             context: context,
             executorId: human.id.uuidString,
+            recordedByHumanId: recorder.id.uuidString,
             source: .detail
         )
 
@@ -5291,6 +5316,7 @@ struct HomeCommandExecutorTests {
         #expect(expenses.first?.id == result.logID)
         #expect(expenses.first?.pet?.id == pet.id)
         #expect(expenses.first?.executorId == human.id.uuidString)
+        #expect(expenses.first?.recordedByHumanId == recorder.id.uuidString)
         #expect(expenses.first?.amount == 36.8)
         #expect(expenses.first?.expenseCategory == .medical)
         #expect(expenses.first?.note == "clinic")
@@ -5928,7 +5954,7 @@ struct HomeCommandExecutorTests {
         #expect(note.didPersist)
         #expect(note.persistenceErrorDescription == nil)
         #expect(mutation.command == .humanNote(humanID: human.id))
-        #expect(mutation.affectedEntityIDs == [human.id])
+        #expect(Set(mutation.affectedEntityIDs) == Set([human.id, try #require(note.recordID)]))
         #expect(mutation.note == "test.human.note")
 
         let rawNote = try #require(human.notes.components(separatedBy: "\n\n").last)
@@ -6700,7 +6726,9 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
+        let recorder = Human(name: "Alex")
         context.insert(human)
+        context.insert(recorder)
         try context.save()
 
         let date = makeDate(year: 2026, month: 6, day: 8)
@@ -6711,6 +6739,7 @@ struct HomeCommandExecutorTests {
             value: 4.2,
             date: date,
             notes: " fasting ",
+            recordedByHumanId: recorder.id.uuidString,
             context: context
         ))
 
@@ -6723,6 +6752,7 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.value == 4.2)
         #expect(logs.first?.date == date)
         #expect(logs.first?.notes == "fasting")
+        #expect(logs.first?.recordedByHumanId == recorder.id.uuidString)
         #expect(result.subjectID == human.id)
         #expect(result.metricKey == "tsh")
         #expect(result.didPersist)
@@ -6765,11 +6795,56 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func humanHealthAttributionRejectsInactiveRecorders() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let inactiveRecorder = Human(name: "Alex")
+        inactiveRecorder.passedAwayDate = Date(timeIntervalSinceReferenceDate: 100)
+        context.insert(human)
+        context.insert(inactiveRecorder)
+        try context.save()
+
+        let metric = try #require(HumanHealthMetricCommandService.recordMetric(
+            human: human,
+            metricKey: "tsh",
+            unitCode: "mIU_L",
+            value: 2.8,
+            date: makeDate(year: 2026, month: 6, day: 8),
+            notes: "",
+            recordedByHumanId: inactiveRecorder.id.uuidString,
+            context: context
+        ))
+        let reportResult = HumanHealthReportCommandService.createReport(
+            human: human,
+            input: HumanHealthReportCommandInput(
+                reportType: .physical,
+                conclusion: .normal,
+                hospitalName: "",
+                doctorName: "",
+                reportDate: makeDate(year: 2026, month: 6, day: 8),
+                nextCheckDate: nil,
+                summary: "",
+                notes: "",
+                recordedByHumanId: UUID().uuidString
+            ),
+            context: context
+        )
+
+        let report = try #require(try context.fetch(FetchDescriptor<HumanHealthReport>()).first)
+        #expect(metric.log.recordedByHumanId == nil)
+        #expect(reportResult.didChange)
+        #expect(report.recordedByHumanId == nil)
+    }
+
+    @MainActor
     @Test func humanHealthReportServiceCreatesUpdatesAndDeletesReport() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
+        let recorder = Human(name: "Alex")
         context.insert(human)
+        context.insert(recorder)
         try context.save()
 
         let createResult = HumanHealthReportCommandService.createReport(
@@ -6782,7 +6857,8 @@ struct HomeCommandExecutorTests {
                 reportDate: makeDate(year: 2026, month: 6, day: 8),
                 nextCheckDate: makeDate(year: 2026, month: 12, day: 8),
                 summary: "  thyroid review  ",
-                notes: "  fasting  "
+                notes: "  fasting  ",
+                recordedByHumanId: recorder.id.uuidString
             ),
             context: context
         )
@@ -6801,6 +6877,7 @@ struct HomeCommandExecutorTests {
         #expect(report.doctorName == "Dr. Lin")
         #expect(report.summary == "thyroid review")
         #expect(report.notes == "fasting")
+        #expect(report.recordedByHumanId == recorder.id.uuidString)
 
         let updateResult = HumanHealthReportCommandService.updateReport(
             report,
@@ -6824,6 +6901,7 @@ struct HomeCommandExecutorTests {
         #expect(report.conclusion == .normal)
         #expect(report.nextCheckDate == nil)
         #expect(report.summary == "all good")
+        #expect(report.recordedByHumanId == recorder.id.uuidString)
 
         let deleteResult = HumanHealthReportCommandService.deleteReport(report, human: human, context: context)
 
@@ -6920,7 +6998,9 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
+        let recorder = Human(name: "Alex")
         context.insert(human)
+        context.insert(recorder)
         try context.save()
 
         let date = makeDate(year: 2026, month: 6, day: 8)
@@ -6940,19 +7020,27 @@ struct HomeCommandExecutorTests {
             reminderDate: reminderDate,
             appLanguage: "en",
             context: context,
+            recordedByHumanId: recorder.id.uuidString,
             scheduleNotification: false,
             attachmentStorage: attachmentStorage
         ))
 
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        let noteRecords = try context.fetch(FetchDescriptor<HumanNoteRecord>())
         let parsed = HumanNoteAttachmentStore.visibleTextAndAttachments(from: human.notes)
         #expect(result.subjectID == human.id)
+        #expect(result.recordID == noteRecords.first?.id)
         #expect(result.attachmentCount == 1)
         #expect(result.eventID == events.first?.id)
         #expect(result.reminderID == reminders.first?.id)
         #expect(result.didPersist)
         #expect(result.persistenceErrorDescription == nil)
+        #expect(noteRecords.count == 1)
+        #expect(noteRecords.first?.humanId == human.id)
+        #expect(noteRecords.first?.sequence == 0)
+        #expect(noteRecords.first?.recordedByHumanId == recorder.id.uuidString)
+        #expect(noteRecords.first?.rawEntry == human.notes)
         #expect(human.notes.contains("[2026-06-08] remember meds"))
         #expect(human.notes.contains("Files: lab.pdf"))
         #expect(parsed.attachments.count == 1)
@@ -6980,7 +7068,23 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let human = Human(name: "Guan")
         human.notes = "[2026-06-08] first\n\n[2026-06-09] second"
+        let firstRecord = HumanNoteRecord(
+            humanId: human.id,
+            sequence: 0,
+            date: makeDate(year: 2026, month: 6, day: 8),
+            rawEntry: "[2026-06-08] first",
+            recordedByHumanId: "recorder-1"
+        )
+        let secondRecord = HumanNoteRecord(
+            humanId: human.id,
+            sequence: 1,
+            date: makeDate(year: 2026, month: 6, day: 9),
+            rawEntry: "[2026-06-09] second",
+            recordedByHumanId: "recorder-2"
+        )
         context.insert(human)
+        context.insert(firstRecord)
+        context.insert(secondRecord)
         try context.save()
 
         let result = HumanNoteCommandService.deleteNote(
@@ -6994,6 +7098,8 @@ struct HomeCommandExecutorTests {
         #expect(result.didPersist)
         #expect(result.persistenceErrorDescription == nil)
         #expect(human.notes == "[2026-06-09] second")
+        let remainingRecords = try context.fetch(FetchDescriptor<HumanNoteRecord>())
+        #expect(remainingRecords.map(\.id) == [secondRecord.id])
     }
 
     @MainActor
@@ -7670,7 +7776,7 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func dashboardSharedExpenseWritesFactAndRevisionForMissingExecutor() throws {
+    @Test func dashboardSharedExpenseWritesFactAndNormalizesMissingActors() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -7696,6 +7802,7 @@ struct HomeCommandExecutorTests {
         let executor = DashboardRecordCommandExecutor(context: context, revisionCenter: revisionCenter)
         let beforeRevision = revisionCenter.homeRevision.value
         let missingExecutorID = UUID().uuidString
+        let recorderID = UUID().uuidString
         let result = try executor.recordSharedPetExpense(
             sourcePet: first,
             targets: [first, second],
@@ -7704,6 +7811,7 @@ struct HomeCommandExecutorTests {
             category: .food,
             note: "Shared bag",
             executorId: missingExecutorID,
+            recordedByHumanId: recorderID,
             command: .expenseEntry(entityID: first.id, entityKind: EntityKind.pet.rawValue),
             revisionNote: "test.dashboard.shared.expense.missing.executor"
         )
@@ -7720,6 +7828,7 @@ struct HomeCommandExecutorTests {
         #expect(sessions.count == 1)
         #expect(expenses.count == 2)
         #expect(Set(expenses.compactMap { $0.pet?.id }) == Set([first.id, second.id]))
+        #expect(expenses.allSatisfy { $0.executorId == nil && $0.recordedByHumanId == nil })
         #expect(ledgerEvents.count == 2)
         #expect(Set(ledgerEvents.map(\.legacyModelId)) == Set(expenses.map(\.id.uuidString)))
         #expect(walletEntries.isEmpty)
@@ -10951,13 +11060,13 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV85.models)
+        let schema = Schema(ArkSchemaV91.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
 
     private func makeSharedCareUndoContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV90.models)
+        let schema = Schema(ArkSchemaV91.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

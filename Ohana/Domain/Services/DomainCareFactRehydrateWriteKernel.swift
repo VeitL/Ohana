@@ -94,6 +94,7 @@ nonisolated struct DomainPetExpenseLogRehydrateSnapshot: Equatable {
     let note: String
     let petId: UUID?
     let executorId: String?
+    let recordedByHumanId: String?
     let sharedSessionId: String
 }
 
@@ -352,6 +353,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
             note: snapshot.note,
             pet: try petReference(id: snapshot.petId, context: context),
             executorId: snapshot.executorId,
+            recordedByHumanId: snapshot.recordedByHumanId,
             sharedSessionId: snapshot.sharedSessionId
         )
         log.id = snapshot.id

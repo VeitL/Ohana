@@ -45,6 +45,28 @@ struct SettingsHumanSnapshot: Identifiable, Equatable, Sendable {
     }
 }
 
+enum SettingsActiveHumanSelectionPolicy {
+    static func selectableHumans(
+        from humans: [SettingsHumanSnapshot]
+    ) -> [SettingsHumanSnapshot] {
+        humans.filter { !$0.hasPassedAway }
+    }
+
+    /// Keeps a valid local binding, repairs it when exactly one living Human
+    /// remains, and otherwise leaves the device waiting for an explicit choice.
+    static func resolvedHumanID(
+        currentHumanID: UUID?,
+        humans: [SettingsHumanSnapshot]
+    ) -> UUID? {
+        let selectable = selectableHumans(from: humans)
+        if let currentHumanID,
+           selectable.contains(where: { $0.id == currentHumanID }) {
+            return currentHumanID
+        }
+        return selectable.count == 1 ? selectable[0].id : nil
+    }
+}
+
 struct SettingsPetSnapshot: Identifiable, Equatable, Sendable {
     let id: UUID
     let name: String

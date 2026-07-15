@@ -117,6 +117,8 @@ struct AddExpenseSheetContent: View {
     @State var noteInput = ""
     @State var date = Date()
     @State var selectedPayerId: String? = nil
+    @State var selectedRecorderID: UUID?
+    @State var requiresRecorderSelection = false
     @State var selectedSharedExpensePetIds: Set<UUID> = []
     @State var showMore = false
     @State var isSaving = false
@@ -200,7 +202,8 @@ struct AddExpenseSheetContent: View {
     }
 
     var canSave: Bool {
-        isAmountValid && !isSaving && !hasSavedMedicalExpense && !sharedExpenseReceiptBlocked
+        isAmountValid && !isSaving && !hasSavedMedicalExpense && !sharedExpenseReceiptBlocked &&
+            !requiresRecorderSelection
     }
 
     var hasSavedMedicalExpense: Bool {
@@ -210,6 +213,10 @@ struct AddExpenseSheetContent: View {
     // 该宠物的活跃保单（用于报销快捷入口）
     var activeInsurances: [PetInsurance] {
         routeInsurances.filter(\.isActive)
+    }
+
+    var activeExpenseHumans: [Human] {
+        humans.filter { !$0.hasPassedAway }
     }
 
     var sameSpeciesExpensePets: [Pet] {
@@ -271,6 +278,13 @@ struct AddExpenseSheetContent: View {
                     categoryStrip
                     sharedExpenseTargetSection
                     payerSection
+                    QuickCareActionHumanPickerContainer(
+                        selectedHumanID: $selectedRecorderID,
+                        requiresSelection: $requiresRecorderSelection,
+                        role: .recorder,
+                        tint: sheetTint
+                    )
+                    .padding(.horizontal, 20)
                     receiptSection
                     if selectedCategory == .insurancePremium {
                         insurancePolicyNotice

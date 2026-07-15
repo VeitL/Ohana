@@ -268,6 +268,10 @@ nonisolated enum CloudSyncRecordSerializer {
             CloudSyncRecordState.normalizedRecordId(record.id)
         case let log as PetWeightLog:
             CloudSyncRecordState.normalizedRecordId(log.id)
+        case let log as SymptomLog:
+            CloudSyncRecordState.normalizedRecordId(log.id)
+        case let log as HeatCycleLog:
+            CloudSyncRecordState.normalizedRecordId(log.id)
         case let session as SharedCareSession:
             CloudSyncRecordState.normalizedRecordId(session.id)
         case let event as CareLedgerEvent:
@@ -286,6 +290,16 @@ nonisolated enum CloudSyncRecordSerializer {
     }
 
     private static func localFields(
+        for model: Any,
+        entityName: String
+    ) throws -> [String: CloudSyncRecordFieldValue] {
+        if let observationFields = petObservationFields(for: model) {
+            return observationFields
+        }
+        return try coreLocalFields(for: model, entityName: entityName)
+    }
+
+    private static func coreLocalFields(
         for model: Any,
         entityName: String
     ) throws -> [String: CloudSyncRecordFieldValue] {
@@ -407,6 +421,29 @@ nonisolated enum CloudSyncRecordSerializer {
         default:
             throw CloudSyncRecordSerializationError.unsupportedEntity(entityName: entityName)
         }
+        return fields
+    }
+
+    private static func petObservationFields(for model: Any) -> [String: CloudSyncRecordFieldValue]? {
+        var fields: [String: CloudSyncRecordFieldValue]
+        let recycleBinFields: (Date?, Date?, String, String)
+        switch model {
+        case let log as SymptomLog:
+            fields = symptomLogFields(log)
+            recycleBinFields = (log.trashedAt, log.trashExpiresAt, log.trashBatchId, log.trashedByHumanId)
+        case let log as HeatCycleLog:
+            fields = heatCycleLogFields(log)
+            recycleBinFields = (log.trashedAt, log.trashExpiresAt, log.trashBatchId, log.trashedByHumanId)
+        default:
+            return nil
+        }
+        mergeLegacyRecycleBinFields(
+            into: &fields,
+            trashedAt: recycleBinFields.0,
+            trashExpiresAt: recycleBinFields.1,
+            trashBatchId: recycleBinFields.2,
+            trashedByHumanId: recycleBinFields.3
+        )
         return fields
     }
 
@@ -624,6 +661,7 @@ nonisolated enum CloudSyncRecordSerializer {
             "note": .string(log.note),
             "sharedSessionId": .string(log.sharedSessionId),
             "executorId": optionalString(log.executorId),
+            "recordedByHumanId": optionalString(log.recordedByHumanId),
             "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
         ]
     }
@@ -655,6 +693,37 @@ nonisolated enum CloudSyncRecordSerializer {
             "weightUnit": .string(log.weightUnit),
             "bcsScore": .int(log.bcsScore),
             "executorId": optionalString(log.executorId),
+            "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+    }
+
+    private static func symptomLogFields(_ log: SymptomLog) -> [String: CloudSyncRecordFieldValue] {
+        var fields: [String: CloudSyncRecordFieldValue] = [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
+            "date": .date(log.date),
+            "categoryRaw": .string(log.categoryRaw),
+            "symptomName": .string(log.symptomName),
+            "severityRaw": .int(log.severityRaw),
+            "note": .string(log.note),
+            "recordedByHumanId": optionalString(log.recordedByHumanId),
+            "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+        if let photoData = log.photoData {
+            fields["photoData"] = .assetData(photoData)
+        }
+        return fields
+    }
+
+    private static func heatCycleLogFields(_ log: HeatCycleLog) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
+            "startDate": .date(log.startDate),
+            "endDate": optionalDate(log.endDate),
+            "statusRaw": .string(log.statusRaw),
+            "note": .string(log.note),
+            "isMated": .bool(log.isMated),
+            "expectedDeliveryDate": optionalDate(log.expectedDeliveryDate),
+            "recordedByHumanId": optionalString(log.recordedByHumanId),
             "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
         ]
     }

@@ -1,0 +1,57 @@
+{
+  "schema": "ohana.swiftdata.migration-fixture.v1",
+  "sourceSchemaTarget": "ArkSchemaV90",
+  "sourceCommit": "dbe34426f77c8b19c80f0c6082f7be4803f12c63",
+  "sourceApp": {
+    "bundleIdentifier": "com.guanchen.li.Ohana",
+    "debugDylibSHA256": "ecebe778bb509577aab47a6043d477ccd085383f87c1ed86ef450d3e0ee5044a"
+  },
+  "generator": {
+    "xcodeVersion": "26.6",
+    "xcodeBuild": "17F113",
+    "sdk": "iphonesimulator26.5",
+    "simulatorRuntime": "iOS 26.5",
+    "simulatorName": "iPhone 17 Tests",
+    "generatedOn": "2026-07-15"
+  },
+  "seed": {
+    "launchArguments": [
+      "-OHANA_UI_TESTS",
+      "-OHANA_RESET_PERSISTENT_STATE",
+      "-OHANA_UI_TEST_SEED_HUMAN_BASELINE",
+      "-OHANA_UI_TEST_HUMAN_BASELINE_NAME",
+      "FixtureHuman",
+      "-OHANA_UI_TEST_SEED_PLANT_BASELINE",
+      "-OHANA_UI_TEST_PLANT_BASELINE_COUNT",
+      "1"
+    ],
+    "expectedHumans": [
+      "FixtureHuman"
+    ],
+    "expectedPlants": [
+      "Codex Pothos Seed-1"
+    ]
+  },
+  "store": {
+    "file": "default.store",
+    "bytes": 712704,
+    "sha256": "7be79564b3e61ab2b12c5ceddb332670ea46d4fd059358d467d0ca1fc526a880",
+    "observedStoreModelVersionIdentifiers": [
+      "1.0.0"
+    ],
+    "sqliteIntegrityCheck": "ok",
+    "walCheckpointed": true
+  },
+  "legacyShape": {
+    "missingTables": [
+      "ZHUMANNOTERECORD"
+    ],
+    "tablesMissingRecordedByHumanId": [
+      "ZPETEXPENSELOG",
+      "ZHEATCYCLELOG",
+      "ZHUMANHEALTHMETRICLOG",
+      "ZHUMANHEALTHREPORT",
+      "ZSYMPTOMLOG"
+    ]
+  }
+}

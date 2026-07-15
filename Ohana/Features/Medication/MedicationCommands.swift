@@ -958,7 +958,7 @@ struct PetMedicationCommandExecutor {
         pet: Pet,
         decrementRemaining: Bool = true,
         awardCoconut: Bool = true,
-        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        executorId: String?,
         note: String
     ) -> PetMedicationDoseCommandResult {
         let recorded = PetMedicationDoseLogging.recordDoseResult(
@@ -968,7 +968,7 @@ struct PetMedicationCommandExecutor {
             decrementRemaining: decrementRemaining,
             awardCoconut: awardCoconut,
             economy: StaticCareEventEconomyAwarder(questManager: questManager),
-            activeHumanSelection: activeHumanSelection,
+            executorId: executorId,
             medicationReminders: medicationReminders
         )
         let result = PetMedicationDoseCommandResult(

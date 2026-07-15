@@ -264,7 +264,9 @@ struct TaskCenterView: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var performingIDs: Set<String> = []
-    @State private var selectedMemberFilter: TaskCenterMemberFilter = .all
+    /// `nil` preserves the effortless default: the current local member when
+    /// collaboration is relevant, otherwise the complete household list.
+    @State private var selectedMemberFilter: TaskCenterMemberFilter?
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -280,7 +282,7 @@ struct TaskCenterView: View {
                     } else if displayedSnapshot.pendingCount == 0 {
                         emptyState
                     } else {
-                        if showsDailyProgress, selectedMemberFilter == .all {
+                        if showsDailyProgress, resolvedMemberFilter == .all {
                             dailyProgress
                         }
                         taskSection(
@@ -348,7 +350,11 @@ struct TaskCenterView: View {
     }
 
     private var displayedSnapshot: TaskCenterSnapshot {
-        snapshot.filtered(for: selectedMemberFilter)
+        snapshot.filtered(for: resolvedMemberFilter)
+    }
+
+    private var resolvedMemberFilter: TaskCenterMemberFilter {
+        snapshot.resolvedMemberFilter(explicitSelection: selectedMemberFilter)
     }
 
     private var memberFilterRail: some View {
@@ -364,7 +370,7 @@ struct TaskCenterView: View {
     }
 
     private func memberFilterButton(_ filter: TaskCenterMemberFilter) -> some View {
-        let isSelected = selectedMemberFilter == filter
+        let isSelected = resolvedMemberFilter == filter
         return Button {
             guard !isSelected else { return }
             withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.selection) {
@@ -749,7 +755,7 @@ struct TaskCenterView: View {
         let reward = item.rewardCoconuts > 0 ? "+\(item.rewardCoconuts) 🥥" : nil
         return [
             item.subjectName,
-            responsibilityText(item),
+            snapshot.showsMemberFilters ? responsibilityText(item) : nil,
             reward,
             category,
             item.isRecurring ? l.tr(zh: "重复", en: "Repeats", de: "Wiederholt") : nil

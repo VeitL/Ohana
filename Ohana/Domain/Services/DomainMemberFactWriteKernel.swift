@@ -234,6 +234,7 @@ nonisolated struct DomainHumanHealthReportValues {
     let nextCheckDate: Date?
     let summary: String
     let notes: String
+    let recordedByHumanId: String?
 }
 
 nonisolated struct DomainHumanMedicationPlanValues {
@@ -561,6 +562,7 @@ nonisolated enum DomainMemberFactWriter {
         severity: SymptomSeverity,
         note: String,
         photoData: Data?,
+        recordedByHumanId: String?,
         context: ModelContext
     ) -> SymptomLog {
         plan.consume()
@@ -578,6 +580,7 @@ nonisolated enum DomainMemberFactWriter {
             severity: severity,
             note: note,
             photoData: persistedPhotoData,
+            recordedByHumanId: recordedByHumanId,
             pet: pet
         )
         context.insert(log)
@@ -594,6 +597,7 @@ nonisolated enum DomainMemberFactWriter {
         note: String,
         isMated: Bool,
         expectedDeliveryDate: Date?,
+        recordedByHumanId: String?,
         context: ModelContext
     ) -> HeatCycleLog {
         plan.consume()
@@ -604,6 +608,7 @@ nonisolated enum DomainMemberFactWriter {
             note: note,
             isMated: isMated,
             expectedDeliveryDate: expectedDeliveryDate,
+            recordedByHumanId: recordedByHumanId,
             pet: pet
         )
         context.insert(log)
@@ -619,6 +624,7 @@ nonisolated enum DomainMemberFactWriter {
         unitCode: String,
         value: Double,
         notes: String,
+        recordedByHumanId: String?,
         context: ModelContext
     ) -> HumanHealthMetricLog {
         plan.consume()
@@ -628,6 +634,7 @@ nonisolated enum DomainMemberFactWriter {
             value: value,
             date: plan.occurredAt,
             notes: notes,
+            recordedByHumanId: recordedByHumanId,
             human: human
         )
         context.insert(log)
@@ -653,7 +660,8 @@ nonisolated enum DomainMemberFactWriter {
             reportDate: values.reportDate,
             nextCheckDate: values.nextCheckDate,
             summary: values.summary,
-            notes: values.notes
+            notes: values.notes,
+            recordedByHumanId: values.recordedByHumanId
         )
         context.insert(report)
         CloudSyncMutationRecorder.markModified(report, context: context, modifiedAt: plan.modifiedAt)

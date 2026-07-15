@@ -35,6 +35,10 @@ if ! scripts/tests/run-validation-routing-tests.sh; then
   fail "scripts/tests/run-validation-routing-tests.sh: validation lane regression"
 fi
 
+if ! scripts/tests/run-local-build-environment-tests.sh; then
+  fail "scripts/tests/run-local-build-environment-tests.sh: local build isolation regression"
+fi
+
 run_audit() {
   local script="$1"
   shift

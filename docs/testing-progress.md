@@ -17,7 +17,7 @@
 - Last compacted: 2026-07-14.
 - Release bar: **Open P0 = 0; first-release-reachable repo-code P1 = 0**.
 - Active phase: **continue signed-device acceptance for the local-only Solo build before RC**.
-- Open follow-ups: 9 total in `docs/task-follow-ups.md`.
+- Open follow-ups: 10 total in `docs/task-follow-ups.md`.
 - Open P1: 5 total: 1 deferred CloudKit 1.x item and 4 physical-device
   validation items.
 - Current decision: do not submit to App Store or call the app RC-ready until

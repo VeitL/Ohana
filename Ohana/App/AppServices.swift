@@ -116,12 +116,7 @@ final class AppServices {
             medicationReminders: { _ in medicationReminders },
             reminderCompletion: { _ in reminderCompletion }
         )
-        let walkingManager = PetWalkingManager(
-            locationManager: locationManager,
-            questManager: questManager,
-            careLedger: careLedger,
-            walkCareEvents: StaticWalkCareEventManager(dependencies: careEventDependencies)
-        )
+        let walkingManager = AppServices.makeWalker(locationManager, questManager, careLedger, careEventDependencies, activeHumanSelection)
         AppWorkloadPolicy.shared.hasRunningWalkProvider = { walkingManager.hasActiveLocationWalk }
         self.init(
             careEvents: CareEventService(dependencies: careEventDependencies),
@@ -187,6 +182,23 @@ final class AppServices {
         AvatarPipelineRegistry.current = avatarPipeline
         ReminderNotificationSchedulerRegistry.registerLiveSchedulerFactory { notificationManager }
         ReminderNotificationSchedulerRegistry.current = notificationManager
+    }
+
+    private static func makeWalker(
+        _ location: any WalkLocationManaging,
+        _ quests: QuestManager,
+        _ ledger: CareLedgerRecording,
+        _ careEvents: CareEventServiceDependencies,
+        _ activeHuman: ActiveHumanSelecting
+    ) -> PetWalkingManager {
+        PetWalkingManager(
+            locationManager: location,
+            questManager: quests,
+            careEconomy: careEvents.economy,
+            careLedger: ledger,
+            walkCareEvents: StaticWalkCareEventManager(dependencies: careEvents),
+            activeHumanSelection: activeHuman
+        )
     }
 
     private static func makeCloudSyncService() -> any CloudSyncManaging {

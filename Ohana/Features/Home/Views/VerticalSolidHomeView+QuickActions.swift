@@ -68,41 +68,47 @@ extension VerticalSolidHomeView {
 
         switch item.actionType {
         case "groom":
-            OhanaFeedback.light()
-            let petID = card.id
-            enqueueHomeCommand(.quickCare(entityID: petID, action: "groom:\(optionId)")) {
-                commandExecutor.applyGroomCheckIn(
-                    raw: optionId,
-                    petID: petID,
-                    executorId: currentExecutorId(),
-                    showSingleUseNotice: { title, message in
-                        routeCoordinator.showSingleUseNotice(title: title, message: message)
-                    },
-                    feedback: applyQuickActionExecutorFeedback
-                )
+            performWithActionHuman(actionTitle: item.label) { executorID in
+                OhanaFeedback.light()
+                let petID = card.id
+                enqueueHomeCommand(.quickCare(entityID: petID, action: "groom:\(optionId)")) {
+                    commandExecutor.applyGroomCheckIn(
+                        raw: optionId,
+                        petID: petID,
+                        executorId: executorID,
+                        showSingleUseNotice: { title, message in
+                            routeCoordinator.showSingleUseNotice(title: title, message: message)
+                        },
+                        feedback: applyQuickActionExecutorFeedback
+                    )
+                }
             }
         case "potty":
-            OhanaFeedback.light()
-            let petID = card.id
-            enqueueHomeCommand(.quickCare(entityID: petID, action: "potty:\(optionId)")) {
-                commandExecutor.applyPottyCheckIn(
-                    raw: optionId,
-                    petID: petID,
-                    executorId: currentExecutorId(),
-                    feedback: applyQuickActionExecutorFeedback
-                )
+            performWithActionHuman(actionTitle: item.label) { executorID in
+                OhanaFeedback.light()
+                let petID = card.id
+                enqueueHomeCommand(.quickCare(entityID: petID, action: "potty:\(optionId)")) {
+                    commandExecutor.applyPottyCheckIn(
+                        raw: optionId,
+                        petID: petID,
+                        executorId: executorID,
+                        feedback: applyQuickActionExecutorFeedback
+                    )
+                }
             }
         case "health":
-            OhanaFeedback.light()
-            let petID = card.id
-            enqueueHomeCommand(.quickCare(entityID: petID, action: "health:\(optionId)")) {
-                commandExecutor.applyHealthCheckIn(
-                    raw: optionId,
-                    petID: petID,
-                    executorId: currentExecutorId(),
-                    openHealth: { routeCoordinator.openSheet(.petHealth($0, initialSection: nil)) },
-                    feedback: applyQuickActionExecutorFeedback
-                )
+            performWithActionHuman(actionTitle: item.label) { executorID in
+                OhanaFeedback.light()
+                let petID = card.id
+                enqueueHomeCommand(.quickCare(entityID: petID, action: "health:\(optionId)")) {
+                    commandExecutor.applyHealthCheckIn(
+                        raw: optionId,
+                        petID: petID,
+                        executorId: executorID,
+                        openHealth: { routeCoordinator.openSheet(.petHealth($0, initialSection: nil)) },
+                        feedback: applyQuickActionExecutorFeedback
+                    )
+                }
             }
         default:
             if let pet = interaction.activePet(id: card.id) {
@@ -180,14 +186,35 @@ extension VerticalSolidHomeView {
             return
         }
         guard let action = HomePetQuickActionKind(rawValue: actionType) else { return }
+        let now = Date()
+        guard commandExecutor.quickActionWillImmediatelyWriteFact(
+            action: action,
+            petID: petID,
+            now: now
+        ) else {
+            performPetQuickAction(actionType, petID: petID, executorID: nil, now: now)
+            return
+        }
+        performWithActionHuman(actionTitle: l.quickActionLabel(for: actionType)) { executorID in
+            performPetQuickAction(actionType, petID: petID, executorID: executorID, now: now)
+        }
+    }
+
+    func performPetQuickAction(
+        _ actionType: String,
+        petID: UUID,
+        executorID: String?,
+        now: Date
+    ) {
+        guard let action = HomePetQuickActionKind(rawValue: actionType) else { return }
 
         enqueueHomeCommand(.quickCare(entityID: petID, action: actionType)) {
             commandExecutor.performQuickAction(
                 HomePetQuickActionRequest(
                     action: action,
                     petID: petID,
-                    executorID: currentExecutorId(),
-                    now: Date()
+                    executorID: executorID,
+                    now: now
                 ),
                 actions: HomePetQuickActionActions(
                 antiRepeatTitle: l.tr(zh: "刚刚已经记录过", en: "Already logged", de: "Bereits erfasst"),
@@ -244,6 +271,14 @@ extension VerticalSolidHomeView {
     func recordPlantQuickCare(_ type: PlantCareType, plantID: UUID) {
         let key = PlantQuickCareFeedbackKey.key(plantID: plantID, careType: type)
         guard !pendingPlantQuickCareKeys.contains(key) else { return }
+        performWithActionHuman(actionTitle: type.displayName(l: l)) { executorID in
+            performPlantQuickCare(type, plantID: plantID, executorID: executorID)
+        }
+    }
+
+    private func performPlantQuickCare(_ type: PlantCareType, plantID: UUID, executorID: String?) {
+        let key = PlantQuickCareFeedbackKey.key(plantID: plantID, careType: type)
+        guard !pendingPlantQuickCareKeys.contains(key) else { return }
 
         OhanaFeedback.light()
         setPlantQuickCarePending(key)
@@ -251,7 +286,7 @@ extension VerticalSolidHomeView {
             guard let result = commandExecutor.recordPlantCare(
                 type,
                 plantID: plantID,
-                executorId: currentExecutorId()
+                executorId: executorID
             ) else {
                 setPlantQuickCareFailed(key)
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -363,8 +398,19 @@ extension VerticalSolidHomeView {
         if presentExistingWalkFromQuickAction(requestedPetID: pet.id) {
             return
         }
+        performWithActionHuman(actionTitle: l.quickActionLabel(for: "walk")) { executorID in
+            beginWalkFromQuickAction(petID: petID, executorID: executorID)
+        }
+    }
 
-        appServices.walking.start(pet: pet, modelContext: modelContext)
+    private func beginWalkFromQuickAction(petID: UUID, executorID: String?) {
+        guard let pet = fetchPetForHomeAction(id: petID), !pet.hasPassedAway else { return }
+        guard !presentExistingWalkFromQuickAction(requestedPetID: pet.id) else { return }
+        appServices.walking.start(
+            pet: pet,
+            modelContext: modelContext,
+            executorIds: executorID.map { [$0] } ?? []
+        )
         if appServices.walking.currentPet?.id == pet.id {
             appServices.walking.isWalkCardExpandedSurfaceVisible = true
             appServices.publishWalkingPresentationChange()

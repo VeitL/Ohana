@@ -326,9 +326,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let humanHealthMetricLogs = scope.excludesHumanHealthData
             ? []
             : try context.fetch(FetchDescriptor<HumanHealthMetricLog>()) // smoothness: explicit manual-export scan only
-        let humanHealthReports = scope.excludesHumanHealthData
-            ? []
-            : try context.fetch(FetchDescriptor<HumanHealthReport>()) // smoothness: explicit manual-export scan only
+        let humanHealthRecords = try backupHumanHealthRecords(context: context, scope: scope)
         let waterLogs = try context.fetch(FetchDescriptor<WaterLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let wishlist = try context.fetch(FetchDescriptor<WishlistItem>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
@@ -470,7 +468,8 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             humanMedications: humanMeds.map(encodeHumanMedication),
             humanMedicationLogs: humanMedLogs.map(encodeHumanMedicationLog),
             humanHealthMetricLogs: humanHealthMetricLogs.map(encodeHumanHealthMetricLog),
-            humanHealthReports: humanHealthReports.map(encodeHumanHealthReport),
+            humanHealthReports: humanHealthRecords.reports.map(encodeHumanHealthReport),
+            humanNoteRecords: humanHealthRecords.noteRecords,
             waterLogs: waterLogs.map(encodeWaterLog),
             wishlistItems: wishlist.map(encodeWishlist),
             careLedgerEvents: backupLedger.map(encodeCareLedgerEvent),
@@ -490,47 +489,6 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             shopPurchaseRecords: shopPurchaseRecords.map(encodeShopPurchaseRecord),
             appState: appState
         )
-    }
-
-    private static func isHumanHealthEvent(_ event: Event) -> Bool {
-        let role = DomainEntityLinkRegistry.role(for: event)
-        switch role {
-        case .humanMedicationPlan, .humanNote:
-            // Medication schedules and free-form human-note reminders can
-            // include health data in their title or note body.
-            return true
-        case .directHuman:
-            // A direct-human schedule has free-form text and no reliable
-            // health classifier. Preserve only the two structured,
-            // non-health lifecycle entries; omit everything else rather than
-            // allowing a personal-health reminder to leave the device.
-            switch event.eventType {
-            case EventType.birthday.rawValue, EventType.anniversary.rawValue:
-                return false
-            default:
-                return true
-            }
-        case .directPet, .directPlant, .plantScoped, .petFoodStock,
-             .petAutoFeeder, .petWaterPlan, .petInsurance,
-             .petMedicationPlan, .petMedicationDose, .unscoped, .unknown:
-            // `.medication` is the human-only event type. Keeping this check
-            // also protects malformed historical records without excluding
-            // pet-health plans, which use a direct-pet relation.
-            return event.eventType == EventType.medication.rawValue
-        }
-    }
-
-    private static func isHumanHealthLedgerEvent(_ event: CareLedgerEvent) -> Bool {
-        if event.subjectKind == CareLedgerSubjectKind.human.rawValue {
-            return true
-        }
-        guard event.actorKind == CareLedgerActorKind.human.rawValue else { return false }
-        switch event.eventKindEnum {
-        case .health, .weight, .medication, .workout:
-            return true
-        default:
-            return false
-        }
     }
 
     // MARK: - Apply Backup
@@ -690,7 +648,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             )
             rehydrateNotificationIdsToCancel.append(contentsOf: result.notificationIdsToCancel)
         }
-        try restoreBoundary(.membersAndSchedulesPrepared)
+        try restoreHumanNoteRecordsAfterMemberScheduleBoundary(backup, context: context, boundary: restoreBoundary)
 
         for dto in backup.reminders {
             let result = try DomainScheduleRehydrateWriter.upsertReminder(

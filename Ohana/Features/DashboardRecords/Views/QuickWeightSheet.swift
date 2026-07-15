@@ -17,10 +17,11 @@ struct QuickWeightSheet: View {
     @State private var weightText: String = ""
     @State private var recordDate: Date = .init()
     @State private var didSave = false
+    @State private var selectedRecorderHumanID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var latestPetWeightKg: Double?
     @State private var latestPetWeightLoadTask: Task<Void, Never>?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
-    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var parsedWeight: Double? { CountryDecimalInput.parse(weightText, countryCode: AppCountry.code) }
@@ -115,6 +116,16 @@ struct QuickWeightSheet: View {
             .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             .padding(.horizontal, 20)
 
+            QuickCareActionHumanPickerContainer(
+                selectedHumanID: $selectedRecorderHumanID,
+                requiresSelection: $requiresRecorderSelection,
+                role: .recorder,
+                tint: themeColor
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+
             // ── 保存按钮
             Button { saveWeight() } label: {
                 HStack(spacing: 8) {
@@ -131,7 +142,7 @@ struct QuickWeightSheet: View {
                     in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 )
             }
-            .disabled(!isValid || didSave)
+            .disabled(!isValid || didSave || requiresRecorderSelection)
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
             .padding(.top, 16)
@@ -157,8 +168,8 @@ struct QuickWeightSheet: View {
     }
 
     private func saveWeight() {
-        guard let v = parsedWeight, v > 0 else { return }
-        let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
+        guard !requiresRecorderSelection, let v = parsedWeight, v > 0 else { return }
+        let executorId = selectedRecorderHumanID?.uuidString
         let command = DomainCommand.quickWeight(petID: pet.id)
         commandQueue.enqueue(command) {
             do {
@@ -167,6 +178,7 @@ struct QuickWeightSheet: View {
                     weight: v,
                     date: recordDate,
                     executorId: executorId,
+                    ledgerSource: .quickAction,
                     command: command,
                     note: "quick.weight"
                 )

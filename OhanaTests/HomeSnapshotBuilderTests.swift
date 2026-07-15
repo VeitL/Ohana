@@ -144,6 +144,46 @@ struct HomeSnapshotBuilderTests {
         #expect(entries.last?.legacyLogId == legacyLogId)
     }
 
+    @Test func petWeightHistoryMergesOnlyLegacyLogsMissingLedgerProjection() {
+        let pet = Pet(name: "Mochi", species: "Cat")
+        let otherPet = Pet(name: "Nori", species: "Cat")
+        let projectedLog = PetWeightLog(
+            date: Date(timeIntervalSince1970: 100),
+            weight: 4.2,
+            pet: pet
+        )
+        let orphanLog = PetWeightLog(
+            date: Date(timeIntervalSince1970: 200),
+            weight: 4.8,
+            pet: pet
+        )
+        let otherPetLog = PetWeightLog(
+            date: Date(timeIntervalSince1970: 300),
+            weight: 6.1,
+            pet: otherPet
+        )
+        let projectedEvent = CareLedgerEvent(
+            occurredAt: projectedLog.date,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .weight,
+            actionType: "petWeight",
+            amountValue: projectedLog.weightInKg,
+            amountUnit: "kg",
+            legacyModelName: "PetWeightLog",
+            legacyModelId: projectedLog.id.uuidString
+        )
+
+        let entries = PetWeightLedgerEntry.entries(
+            from: [projectedEvent],
+            legacyLogs: [projectedLog, orphanLog, otherPetLog],
+            petId: pet.id
+        )
+
+        #expect(entries.map(\.weightKilograms) == [4.8, 4.2])
+        #expect(entries.map(\.legacyLogId) == [orphanLog.id, projectedLog.id])
+    }
+
     @Test func snapshotOrdersVisiblePetsHumansAndCrittersByCreationDate() throws {
         let olderPet = Pet(name: "Momo", species: "猫")
         olderPet.createdAt = Date(timeIntervalSince1970: 10)
@@ -510,7 +550,7 @@ struct HomeSnapshotBuilderTests {
             activeHuman: nil
         )
         let signature = VerticalSolidHomePreloadPlanner.mediaSignature(for: requests)
-        let allRequestsWantPopout = requests.allSatisfy { $0.wantsPopout }
+        let allRequestsWantPopout = requests.allSatisfy(\.wantsPopout)
 
         #expect(Set(requests.map(\.id)) == Set([visiblePet.id, hiddenPet.id]))
         #expect(allRequestsWantPopout)
@@ -646,6 +686,7 @@ struct HomeSnapshotBuilderTests {
         #expect(interaction.petsByID[pet.id]?.id == pet.id)
         #expect(interaction.humansByID[human.id]?.id == human.id)
         #expect(!interaction.expandedActions(for: pet.id).currentItems.isEmpty)
+        #expect(interaction.eventActionHumanRequiredIDs.contains(event.id))
 
         guard case let .petQuick(key, routePetID) = interaction.eventRoutesByEventID[event.id] else {
             Issue.record("Expected pet quick route hint")
@@ -653,6 +694,40 @@ struct HomeSnapshotBuilderTests {
         }
         #expect(key == "feed")
         #expect(routePetID == pet.id)
+    }
+
+    @Test func interactionSnapshotRequiresAnActorOnlyForCareEvents() {
+        let now = Date(timeIntervalSince1970: 31000)
+        let explicitPetCare = Event(
+            title: "Feed",
+            startDate: now,
+            taskCareKindRaw: TaskCareKind.petFeeding.rawValue
+        )
+        let explicitPlantCare = Event(
+            title: "Water",
+            startDate: now,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
+        )
+        let legacyPetCare = Event(title: "陪玩", startDate: now)
+        let informationalEvent = Event(
+            title: "Birthday",
+            startDate: now,
+            eventType: EventType.birthday.rawValue
+        )
+
+        let interaction = HomeInteractionSnapshotBuilder.build(
+            from: makeVerticalSource(
+                events: [explicitPetCare, explicitPlantCare, legacyPetCare, informationalEvent]
+            ),
+            quickActionItemsRaw: "",
+            now: now
+        )
+
+        #expect(interaction.eventActionHumanRequiredIDs == [
+            explicitPetCare.id,
+            explicitPlantCare.id,
+            legacyPetCare.id
+        ])
     }
 
     @Test func focusCardCarriesTogetherHeadlineText() {

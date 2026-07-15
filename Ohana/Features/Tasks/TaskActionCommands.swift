@@ -16,16 +16,22 @@ nonisolated struct TaskActionCommand: Equatable, Sendable {
     let reminderID: UUID?
     let familyTaskID: UUID?
     let subjectID: UUID?
+    let actingHumanID: UUID?
     let occurrenceDate: Date
     let idempotencyKey: String
 
-    init(item: TaskCenterItemSnapshot, action: TaskCenterAvailableAction) {
+    init(
+        item: TaskCenterItemSnapshot,
+        action: TaskCenterAvailableAction,
+        actingHumanID: UUID? = nil
+    ) {
         itemID = item.id
         self.action = action
         eventID = item.eventID
         reminderID = item.reminderID
         familyTaskID = item.familyTaskID
         subjectID = item.subject.id
+        self.actingHumanID = actingHumanID
         occurrenceDate = item.occurrenceDate
         idempotencyKey = Self.idempotencyKey(
             item: item,
@@ -120,7 +126,7 @@ struct TaskActionCommandExecutor {
         let familyTask = command.familyTaskID.flatMap { id in
             familyTasks.first { $0.id == id }
         }
-        let activeHuman = activeHuman(in: humans)
+        let activeHuman = activeHuman(in: humans, explicitID: command.actingHumanID)
 
         switch command.action {
         case .complete, .submitForReview:
@@ -282,7 +288,10 @@ struct TaskActionCommandExecutor {
         )
     }
 
-    private func activeHuman(in humans: [Human]) -> Human? {
+    private func activeHuman(in humans: [Human], explicitID: UUID?) -> Human? {
+        if let explicitID {
+            return humans.first(where: { $0.id == explicitID && !$0.hasPassedAway })
+        }
         if let activeID = services.activeHumanSelection.currentHumanId,
            let match = humans.first(where: { $0.id.uuidString == activeID && !$0.hasPassedAway }) {
             return match

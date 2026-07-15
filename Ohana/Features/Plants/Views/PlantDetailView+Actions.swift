@@ -155,6 +155,7 @@ extension PlantDetailContentView {
     }
 
     func presentQuickCareConfirm(for careType: PlantCareType, detail: String? = nil) {
+        quickCareExecutorID = nil
         quickCareConfirmDraft = PlantQuickCareConfirmDraft(
             careType: careType,
             title: careType.displayName(l: l),
@@ -180,11 +181,23 @@ extension PlantDetailContentView {
         )
     }
 
-    func savePlantCareLog(_ type: PlantCareType, careNote: String, healthStatus: PlantHealthStatus, photoData: Data?) {
-        recordCare(type, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
+    func savePlantCareLog(
+        _ type: PlantCareType,
+        careNote: String,
+        healthStatus: PlantHealthStatus,
+        photoData: Data?,
+        executorID: UUID?
+    ) {
+        recordCare(
+            type,
+            executorId: executorID?.uuidString,
+            careNote: careNote,
+            photoData: photoData,
+            healthStatus: healthStatus
+        )
     }
 
-    func recordQuickCare(_ type: PlantCareType) {
+    func recordQuickCare(_ type: PlantCareType, executorID: UUID?) {
         guard !pendingDetailQuickCareTypes.contains(type) else { return }
         quickCareConfirmDraft = nil
         withAnimation(GoMotion.feedback) {
@@ -198,7 +211,7 @@ extension PlantDetailContentView {
             let result = commandExecutor.recordPlantCare(
                 type,
                 plant: plant,
-                executorId: currentExecutorId()
+                executorId: executorID?.uuidString
             )
             guard result.didPersist else {
                 withAnimation(GoMotion.feedback) {
@@ -218,6 +231,7 @@ extension PlantDetailContentView {
     }
 
     func openBatchQuickRecordFromDetail(careType: PlantCareType) {
+        batchQuickRecordInitialExecutorID = quickCareExecutorID
         quickCareConfirmDraft = nil
         batchQuickRecordCareType = careType
         UISelectionFeedbackGenerator().selectionChanged()
@@ -243,10 +257,13 @@ extension PlantDetailContentView {
         return await loader.plantAvatarImageData(modelID: modelID)
     }
 
-    func recordBatchQuickCareFromDetail(_ selections: [PlantBatchCareSelection]) async -> Bool {
+    func recordBatchQuickCareFromDetail(
+        _ selections: [PlantBatchCareSelection],
+        executorID: UUID?
+    ) async -> Bool {
         guard !selections.isEmpty else { return false }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let executorId = currentExecutorId()
+        let executorId = executorID?.uuidString
         await OhanaFrameScheduler.waitAfterNextFrame()
         let result = commandExecutor.recordPlantBatchQuickCare(
             selections: selections,
@@ -379,6 +396,7 @@ extension PlantDetailContentView {
 
     func recordCare(
         _ type: PlantCareType,
+        executorId: String?,
         careNote: String = "",
         photoData: Data? = nil,
         healthStatus: PlantHealthStatus? = nil
@@ -390,7 +408,7 @@ extension PlantDetailContentView {
             let result = commandExecutor.recordPlantCare(
                 type,
                 plant: plant,
-                executorId: currentExecutorId(),
+                executorId: executorId,
                 careNote: careNote,
                 photoData: photoData,
                 healthStatus: healthStatus
@@ -407,14 +425,22 @@ extension PlantDetailContentView {
         let formatter = ISO8601DateFormatter()
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
         let reasonSuffix = reason.map { "|\($0)" } ?? ""
-        recordCare(.customNote, careNote: "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))\(reasonSuffix)")
+        recordCare(
+            .customNote,
+            executorId: currentExecutorId(),
+            careNote: "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))\(reasonSuffix)"
+        )
     }
 
     func skipTask(_ task: PlantCareTaskSnapshot, reason: String? = nil) {
         let formatter = ISO8601DateFormatter()
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
         let reasonSuffix = reason.map { "|\($0)" } ?? ""
-        recordCare(.customNote, careNote: "skip:\(task.careType.rawValue):\(formatter.string(from: tomorrow))\(reasonSuffix)")
+        recordCare(
+            .customNote,
+            executorId: currentExecutorId(),
+            careNote: "skip:\(task.careType.rawValue):\(formatter.string(from: tomorrow))\(reasonSuffix)"
+        )
     }
 
     func currentExecutorId() -> String? {

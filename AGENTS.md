@@ -62,6 +62,26 @@ interactions light and changes focused.
 
 - Use the narrowest trustworthy proof after code stabilizes. Do not repeat an
   unchanged passing command or validate merely for reassurance.
+- Use three test environments instead of forcing every test into one mutable
+  Simulator: an isolated SwiftData container for Unit/Integration tests, a
+  disposable clean Simulator/store for destructive flows, and the pinned
+  Dogfood Simulator for long-lived real-user journeys.
+- Run persistent Dogfood checks through `scripts/run-dogfood-simulator.sh`.
+  Preserve its installed app and data container: overlay new builds, never
+  erase, uninstall, reset, or run destructive onboarding/migration/restore
+  scenarios against that pinned virtual phone.
+- Use a disposable clean environment for onboarding, migration, backup restore,
+  app reset, deletion, permissions, and any test that assumes empty state.
+  Physical-device validation still owns notification delivery, permissions,
+  background behavior, energy, and other hardware-dependent evidence.
+- Automated Simulator work uses only `iPhone 17 Tests`; every local test
+  entrypoint must reject the pinned Dogfood UDID. Destructive Simulator setup
+  goes through `scripts/reset-test-simulator.sh` and may target only that test
+  device.
+- Reuse `.build/DerivedData/tests`, `.build/DerivedData/dogfood`, and
+  `.build/DerivedData/release`; do not create task-, TFU-, branch-, or
+  timestamp-named DerivedData. Build/test preflight stops below 20 GiB free and
+  reports oversized `.build` or Simulator caches before doing work.
 - Documentation-only changes need `git diff --check` and only the relevant
   documentation or governance audit; never build the app for them.
 - Small visual changes use path-scoped UI/accessibility checks when applicable;

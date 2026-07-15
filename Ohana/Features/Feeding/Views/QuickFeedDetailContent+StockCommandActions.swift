@@ -4,6 +4,7 @@ import UIKit
 extension QuickFeedDetailContent {
     func saveStock() {
         dismissFeedKeyboard()
+        guard validateActionHumanSelection() else { return }
         guard let totalGrams = parsePositiveDouble(draftStore.stockWeightText), totalGrams > 0 else {
             draftStore.inputError = l.tr(zh: "请输入购买重量。", en: "Enter stock weight.", de: "Vorratsgewicht eingeben.")
             return
@@ -26,7 +27,7 @@ extension QuickFeedDetailContent {
                 calculationMode: draftStore.stockCalculationMode,
                 reminderEnabled: draftStore.stockReminderEnabled,
                 reminderAdvanceDays: draftStore.stockReminderAdvanceDays,
-                executorId: currentUserId,
+                executorId: selectedActionExecutorId,
                 allEvents: allEvents,
                 recordToUpdate: draftStore.editingFoodRecord,
                 previousExpenseId: previousExpenseId,

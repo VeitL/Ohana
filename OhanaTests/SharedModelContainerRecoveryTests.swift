@@ -1,3 +1,4 @@
+import SQLite3
 import SwiftData
 import XCTest
 @testable import Ohana
@@ -92,7 +93,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directoryURL) }
 
         let petID = UUID()
-        let schema = Schema(ArkSchemaV90.models)
+        let schema = Schema(ArkSchemaV91.models)
 
         do {
             let container = try SharedModelContainerOpenPolicy.open { storeKind -> ModelContainer in
@@ -156,8 +157,153 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     func testCloudSyncTombstoneDefaultLandsOnLatestLightweightSchema() {
-        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV90.self))
+        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV91.self))
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
+    }
+
+    func testV91AddsOnlyTheHumanNoteAttributionSidecarToV90ModelRegistration() {
+        let v90 = Set(ArkSchemaV90.models.map { String(describing: $0) })
+        let v91 = Set(ArkSchemaV91.models.map { String(describing: $0) })
+
+        XCTAssertFalse(v90.contains(String(describing: HumanNoteRecord.self)))
+        XCTAssertEqual(v91.subtracting(v90), [String(describing: HumanNoteRecord.self)])
+        XCTAssertTrue(v90.subtracting(v91).isEmpty)
+    }
+
+    @MainActor
+    func testRealV90BinaryStoreMigratesToV91AndPersistsAttributionFacts() throws {
+        let fixtureURL = try v90FixtureStoreURL()
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaRealV90MigrationTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("default.store")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        try FileManager.default.copyItem(at: fixtureURL, to: storeURL)
+
+        let legacyAttributionTables = [
+            "ZPETEXPENSELOG",
+            "ZHEATCYCLELOG",
+            "ZHUMANHEALTHMETRICLOG",
+            "ZHUMANHEALTHREPORT",
+            "ZSYMPTOMLOG"
+        ]
+
+        XCTAssertEqual(
+            try sqliteScalar(
+                at: storeURL,
+                sql: "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'ZHUMANNOTERECORD'"
+            ),
+            0,
+            "The checked-in fixture must remain a pre-V91 store without HumanNoteRecord."
+        )
+        for table in legacyAttributionTables {
+            XCTAssertEqual(
+                try sqliteScalar(
+                    at: storeURL,
+                    sql: "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '\(table)'"
+                ),
+                1,
+                "The V90 fixture should contain the legacy \(table) table."
+            )
+            XCTAssertEqual(
+                try sqliteScalar(
+                    at: storeURL,
+                    sql: "SELECT COUNT(*) FROM pragma_table_info('\(table)') WHERE name = 'ZRECORDEDBYHUMANID'"
+                ),
+                0,
+                "The checked-in V90 fixture must predate \(table).recordedByHumanId."
+            )
+        }
+
+        let schema = Schema(ArkSchemaV91.models)
+        let petID = UUID()
+        let expenseID = UUID()
+        let noteRecordID = UUID()
+        let recordedAt = Date(timeIntervalSince1970: 1_900_200_000)
+        let recorderID: UUID
+
+        do {
+            let configuration = ModelConfiguration(
+                "RealV90ToV91Migration",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [configuration]
+            )
+            let context = container.mainContext
+            let humans = try context.fetch(FetchDescriptor<Human>())
+            let plants = try context.fetch(FetchDescriptor<Plant>())
+
+            XCTAssertEqual(humans.map(\.name), ["FixtureHuman"])
+            XCTAssertEqual(plants.map(\.name), ["Codex Pothos Seed-1"])
+            XCTAssertTrue(try context.fetch(FetchDescriptor<HumanNoteRecord>()).isEmpty)
+
+            let recorder = try XCTUnwrap(humans.first)
+            recorderID = recorder.id
+            let pet = Pet(name: "V91 Fixture Pet", species: "Cat", breed: "Domestic")
+            pet.id = petID
+            let expense = PetExpenseLog(
+                date: recordedAt,
+                amount: 12.5,
+                category: .medical,
+                note: "V91 attribution migration proof",
+                pet: pet,
+                executorId: recorderID.uuidString,
+                recordedByHumanId: recorderID.uuidString
+            )
+            expense.id = expenseID
+            let noteRecord = HumanNoteRecord(
+                id: noteRecordID,
+                humanId: recorderID,
+                sequence: 0,
+                date: recordedAt,
+                rawEntry: "V91 sidecar migration proof",
+                recordedByHumanId: recorderID.uuidString
+            )
+
+            context.insert(pet)
+            context.insert(expense)
+            context.insert(noteRecord)
+            try context.save()
+        }
+
+        do {
+            let configuration = ModelConfiguration(
+                "RealV90ToV91Migration",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [configuration]
+            )
+            let context = container.mainContext
+            var expenseDescriptor = FetchDescriptor<PetExpenseLog>(
+                predicate: #Predicate<PetExpenseLog> { $0.id == expenseID }
+            )
+            expenseDescriptor.fetchLimit = 1
+            var noteDescriptor = FetchDescriptor<HumanNoteRecord>(
+                predicate: #Predicate<HumanNoteRecord> { $0.id == noteRecordID }
+            )
+            noteDescriptor.fetchLimit = 1
+
+            let expense = try XCTUnwrap(context.fetch(expenseDescriptor).first)
+            let noteRecord = try XCTUnwrap(context.fetch(noteDescriptor).first)
+            XCTAssertEqual(expense.pet?.id, petID)
+            XCTAssertEqual(expense.executorId, recorderID.uuidString)
+            XCTAssertEqual(expense.recordedByHumanId, recorderID.uuidString)
+            XCTAssertEqual(noteRecord.humanId, recorderID)
+            XCTAssertEqual(noteRecord.rawEntry, "V91 sidecar migration proof")
+            XCTAssertEqual(noteRecord.recordedByHumanId, recorderID.uuidString)
+            XCTAssertEqual(try context.fetch(FetchDescriptor<Human>()).map(\.name), ["FixtureHuman"])
+            XCTAssertEqual(try context.fetch(FetchDescriptor<Plant>()).map(\.name), ["Codex Pothos Seed-1"])
+        }
     }
 
     @MainActor
@@ -249,7 +395,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV90.models)
+            let schema = Schema(ArkSchemaV91.models)
             let config = ModelConfiguration("EventLatestTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -292,7 +438,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV90.models)
+            let schema = Schema(ArkSchemaV91.models)
             let config = ModelConfiguration("ReminderLatestTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -309,7 +455,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     @MainActor
-    func testV89StoreOpensOnV90WithSharedCareFactsAndNoSyntheticUndoReceipt() throws {
+    func testV89StoreOpensThroughLatestWithSharedCareFactsAndNoSyntheticUndoReceipt() throws {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("OhanaUndoReceiptV90MigrationTests-\(UUID().uuidString)", isDirectory: true)
         let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
@@ -343,7 +489,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV90.models)
+            let schema = Schema(ArkSchemaV91.models)
             let config = ModelConfiguration(
                 "UndoReceiptV90Target",
                 schema: schema,
@@ -365,7 +511,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     @MainActor
-    func testV90UndoReceiptPersistsAcrossContainerRelaunch() throws {
+    func testLatestUndoReceiptPersistsAcrossContainerRelaunch() throws {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("OhanaUndoReceiptPersistenceTests-\(UUID().uuidString)", isDirectory: true)
         let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
@@ -381,7 +527,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         let undoDeadline = occurredAt.addingTimeInterval(6)
 
         do {
-            let schema = Schema(ArkSchemaV90.models)
+            let schema = Schema(ArkSchemaV91.models)
             let config = ModelConfiguration(
                 "UndoReceiptPersistenceSource",
                 schema: schema,
@@ -423,7 +569,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV90.models)
+            let schema = Schema(ArkSchemaV91.models)
             let config = ModelConfiguration(
                 "UndoReceiptPersistenceTarget",
                 schema: schema,
@@ -487,7 +633,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV90.models)
+            let schema = Schema(ArkSchemaV91.models)
             let config = ModelConfiguration("ModelsMigrationTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -626,7 +772,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV90.models)
+            let schema = Schema(ArkSchemaV91.models)
             let config = ModelConfiguration("CoreUserDataMigrationTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -666,6 +812,75 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
             XCTAssertNil(migratedPlant.archivedAt)
             XCTAssertEqual(migratedPlant.avatarAttachmentState, .absent)
         }
+    }
+}
+
+private extension SharedModelContainerRecoveryTests {
+    func v90FixtureStoreURL() throws -> URL {
+        let bundle = Bundle(for: SharedModelContainerRecoveryTests.self)
+        if let nestedURL = bundle.url(
+            forResource: "default",
+            withExtension: "store",
+            subdirectory: "Fixtures/ArkSchemaV90"
+        ) {
+            return nestedURL
+        }
+        if let flatURL = bundle.url(forResource: "default", withExtension: "store") {
+            return flatURL
+        }
+
+        guard let enumerator = FileManager.default.enumerator(
+            at: bundle.bundleURL,
+            includingPropertiesForKeys: nil
+        ) else {
+            throw migrationFixtureError("Unable to enumerate the OhanaTests bundle for the V90 fixture.")
+        }
+        for case let candidate as URL in enumerator where candidate.lastPathComponent == "default.store" {
+            return candidate
+        }
+        throw migrationFixtureError("Missing Fixtures/ArkSchemaV90/default.store in the OhanaTests bundle.")
+    }
+
+    func sqliteScalar(at storeURL: URL, sql: String) throws -> Int64 {
+        var database: OpaquePointer?
+        let immutableStoreURI = storeURL.absoluteString + "?immutable=1"
+        let openResult = sqlite3_open_v2(
+            immutableStoreURI,
+            &database,
+            SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX | SQLITE_OPEN_URI,
+            nil
+        )
+        guard openResult == SQLITE_OK, let database else {
+            let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown SQLite open error"
+            if let database {
+                sqlite3_close(database)
+            }
+            throw migrationFixtureError("Unable to open the V90 fixture: \(message)")
+        }
+        defer { sqlite3_close(database) }
+
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement else {
+            throw migrationFixtureError(
+                "Unable to prepare a V90 fixture assertion: \(String(cString: sqlite3_errmsg(database)))"
+            )
+        }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            throw migrationFixtureError(
+                "V90 fixture assertion returned no row: \(String(cString: sqlite3_errmsg(database)))"
+            )
+        }
+        return sqlite3_column_int64(statement, 0)
+    }
+
+    func migrationFixtureError(_ description: String) -> NSError {
+        NSError(
+            domain: "OhanaTests.ArkSchemaV90Fixture",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: description]
+        )
     }
 }
 

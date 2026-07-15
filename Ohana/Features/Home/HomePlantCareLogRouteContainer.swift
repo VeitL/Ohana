@@ -16,7 +16,6 @@ struct HomePlantCareLogRouteContainer: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
-    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
     init(
         id: UUID,
@@ -40,13 +39,14 @@ struct HomePlantCareLogRouteContainer: View {
                     plant: plant,
                     initialCareType: initialCareType,
                     currentHealthStatus: plant.healthStatus,
-                    onSave: { type, careNote, healthStatus, photoData in
+                    onSave: { type, careNote, healthStatus, photoData, executorID in
                         saveCareLog(
                             type,
                             plant: plant,
                             careNote: careNote,
                             healthStatus: healthStatus,
-                            photoData: photoData
+                            photoData: photoData,
+                            executorID: executorID
                         )
                     }
                 )
@@ -84,12 +84,13 @@ struct HomePlantCareLogRouteContainer: View {
         plant: Plant,
         careNote: String,
         healthStatus: PlantHealthStatus,
-        photoData: Data?
+        photoData: Data?,
+        executorID: UUID?
     ) {
         let result = HomeCommandExecutor(modelContext: modelContext, services: appServices).recordPlantCare(
             type,
             plant: plant,
-            executorId: activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw,
+            executorId: executorID?.uuidString,
             careNote: careNote,
             photoData: photoData,
             healthStatus: healthStatus

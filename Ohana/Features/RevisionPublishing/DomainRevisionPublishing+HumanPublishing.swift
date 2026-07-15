@@ -147,6 +147,9 @@ extension DomainRevisionPublishing {
 
     func publishHumanNote(_ result: HumanNoteCommandResult, note: String) {
         var affected: Set<UUID> = [result.subjectID]
+        if let recordID = result.recordID {
+            affected.insert(recordID)
+        }
         if let eventID = result.eventID {
             affected.insert(eventID)
         }

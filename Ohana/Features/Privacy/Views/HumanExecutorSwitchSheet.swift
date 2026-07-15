@@ -2,7 +2,7 @@
 //  HumanExecutorSwitchSheet.swift
 //  Ohana
 //
-//  Executor account switch sheet.
+//  Local current-member switch sheet.
 //
 
 import SwiftData
@@ -69,10 +69,10 @@ struct HumanExecutorSwitchSheet: View {
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "切换执行人", en: "Switch executor", de: "Ausführende Person wechseln"))
+                Text(l.tr(zh: "切换本机当前成员", en: "Switch current member", de: "Aktuelles Mitglied wechseln"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(zh: "后续打卡会记录到当前账户", en: "Future check-ins will use this account", de: "Künftige Check-ins laufen über dieses Konto"))
+                Text(l.tr(zh: "后续任务和记录会默认使用此成员", en: "Tasks and records will default to this member", de: "Aufgaben und Einträge verwenden standardmäßig dieses Mitglied"))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -154,7 +154,7 @@ struct HumanExecutorSwitchSheet: View {
                     Text(l.tr(zh: "输入 \(displayName(human)) 的 4 位密码", en: "Enter \(displayName(human))'s 4-digit PIN", de: "4-stellige PIN für \(displayName(human)) eingeben"))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(statusMessage.isEmpty ? l.tr(zh: "验证后切换执行人", en: "Verify to switch executor", de: "Zum Wechseln verifizieren") : statusMessage)
+                    Text(statusMessage.isEmpty ? l.tr(zh: "验证后切换成员", en: "Verify to switch member", de: "Zum Mitgliedswechsel verifizieren") : statusMessage)
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(isError ? Color.goRed : .secondary)
                 }
@@ -258,7 +258,7 @@ struct HumanExecutorSwitchSheet: View {
         case .memberInactive:
             pin = ""
             isError = true
-            statusMessage = l.tr(zh: "纪念成员不能切换为执行人", en: "Memorial members cannot become executors", de: "Gedenkmitglieder können nicht ausführend sein")
+            statusMessage = l.tr(zh: "纪念成员不能设为本机当前成员", en: "A memorial member cannot be the current member", de: "Ein Gedenkmitglied kann nicht das aktuelle Mitglied sein")
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
@@ -315,7 +315,7 @@ struct HumanExecutorSwitchSheet: View {
 
     private func executorSwitchSubtitle(for human: Human, isActive: Bool) -> String {
         if isActive {
-            return l.tr(zh: "当前执行人", en: "Current executor", de: "Aktuell ausführend")
+            return l.tr(zh: "本机当前成员", en: "Current member", de: "Aktuelles Mitglied")
         }
         guard HumanLocalPrivacyPolicy.isEnabled,
               appServices.passcodes.hasPasscode(human) else {

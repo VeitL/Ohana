@@ -206,7 +206,7 @@ extension AddExpenseSheetContent {
 
     @ViewBuilder
     var payerSection: some View {
-        if humans.count > 1 {
+        if activeExpenseHumans.count > 1 {
             VStack(alignment: .leading, spacing: 8) {
                 sectionLabel(icon: "person.fill", title: l.quickExpensePayer)
                     .padding(.horizontal, 20)
@@ -217,7 +217,7 @@ extension AddExpenseSheetContent {
                                 .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(selectedPayerId == nil ? Color.arkInk : secondaryText)
                         }
-                        ForEach(humans) { human in
+                        ForEach(activeExpenseHumans) { human in
                             payerChip(
                                 id: human.id.uuidString,
                                 name: human.name,
@@ -228,15 +228,6 @@ extension AddExpenseSheetContent {
                         }
                     }
                     .padding(.horizontal, 20)
-                }
-            }
-        } else if let human = humans.first {
-            infoRow(icon: "creditcard.fill", label: l.quickExpensePayer) {
-                HStack(spacing: 6) {
-                    humanAvatar(human, size: 24)
-                    Text(human.name)
-                        .font(OhanaFont.subheadline(.black))
-                        .foregroundStyle(primaryText)
                 }
             }
         }

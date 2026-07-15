@@ -519,7 +519,34 @@ extension PlantDashboardView {
             onOpenPlant(plant.id)
             return
         }
-        recordPlantCare(careType, plant: plant)
+        let humanContext = PlantActionHumanSelectionResolver.resolve(
+            context: modelContext,
+            currentLocalHumanIDRaw: activeHumanIdRaw
+        )
+        if humanContext.needsConfirmation {
+            quickCareActorDraft = PlantQuickCareActorDraft(
+                plantID: plant.id,
+                plantName: plant.name,
+                careType: careType,
+                initialExecutorID: humanContext.defaultHumanID
+            )
+        } else {
+            recordPlantCare(
+                careType,
+                plant: plant,
+                executorId: humanContext.defaultHumanID?.uuidString
+            )
+        }
+    }
+
+    func confirmPlantDockQuickCare(_ draft: PlantQuickCareActorDraft, executorID: UUID?) {
+        guard let plant = plants.first(where: { $0.id == draft.plantID }),
+              !plant.isArchived else { return }
+        recordPlantCare(
+            draft.careType,
+            plant: plant,
+            executorId: executorID?.uuidString
+        )
     }
 
     func openPlantDockDetail(_ action: PlantDockQuickAction, plant: Plant) {

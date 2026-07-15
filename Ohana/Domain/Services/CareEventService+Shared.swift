@@ -398,20 +398,22 @@ extension CareEventService {
         category: ExpenseCategory,
         note: String,
         context: ModelContext,
-        executorId: String? = nil,
+        attribution: ExpenseActorAttribution = ExpenseActorAttribution(),
         date: Date = Date(),
         currencyCode: String = AppCurrency.code,
         source: CareLedgerSource = .detail,
         dependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
         let targetCount = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet).count
+        let attribution = attribution.validated(context: context)
         return SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
                 actionKind: .expense,
                 sourcePet: sourcePet,
                 targets: targets,
                 date: date,
-                executorId: executorId,
+                executorId: attribution.executorId,
+                recordedByHumanId: attribution.recordedByHumanId,
                 allocationMode: .equal,
                 totalExpenseAmount: amount,
                 currencyCode: currencyCode,

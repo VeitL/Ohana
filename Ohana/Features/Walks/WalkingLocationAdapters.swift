@@ -42,12 +42,13 @@ protocol PetWalkingManaging: AnyObject {
     var lastCompletedPoopMarkers: [WalkPoopMarker] { get }
 
     func start(pet: Pet)
+    func start(pet: Pet, modelContext: ModelContext, executorIds: [String])
     func pause()
     func resume()
     func restore(checkpoint: PetWalkLog, modelContext: ModelContext)
     func discardRecoveryCheckpoint(_ checkpoint: PetWalkLog, modelContext: ModelContext)
     @discardableResult
-    func stop(modelContext: ModelContext, sharedTargets: [Pet], executorIds: [String]) -> WalkStopRewardSummary
+    func stop(modelContext: ModelContext, sharedTargets: [Pet]) -> WalkStopRewardSummary
     func addPoop(type: PottyType)
     func reset()
 }
@@ -55,6 +56,10 @@ protocol PetWalkingManaging: AnyObject {
 extension PetWalkingManaging {
     func start(pet: Pet, modelContext: ModelContext) {
         start(pet: pet)
+    }
+
+    func start(pet: Pet, modelContext: ModelContext, executorIds _: [String]) {
+        start(pet: pet, modelContext: modelContext)
     }
 
     func restore(checkpoint _: PetWalkLog, modelContext _: ModelContext) {}
@@ -67,12 +72,7 @@ extension PetWalkingManaging {
 
     @discardableResult
     func stop(modelContext: ModelContext) -> WalkStopRewardSummary {
-        stop(modelContext: modelContext, sharedTargets: [], executorIds: [])
-    }
-
-    @discardableResult
-    func stop(modelContext: ModelContext, sharedTargets: [Pet]) -> WalkStopRewardSummary {
-        stop(modelContext: modelContext, sharedTargets: sharedTargets, executorIds: [])
+        stop(modelContext: modelContext, sharedTargets: [])
     }
 }
 
@@ -146,6 +146,10 @@ final class SharedPetWalkingManager: PetWalkingManaging {
         manager.start(pet: pet, modelContext: modelContext)
     }
 
+    func start(pet: Pet, modelContext: ModelContext, executorIds: [String]) {
+        manager.start(pet: pet, modelContext: modelContext, executorIds: executorIds)
+    }
+
     func pause() {
         manager.pause()
     }
@@ -163,8 +167,8 @@ final class SharedPetWalkingManager: PetWalkingManaging {
     }
 
     @discardableResult
-    func stop(modelContext: ModelContext, sharedTargets: [Pet], executorIds: [String]) -> WalkStopRewardSummary {
-        manager.stop(modelContext: modelContext, sharedTargets: sharedTargets, executorIds: executorIds)
+    func stop(modelContext: ModelContext, sharedTargets: [Pet]) -> WalkStopRewardSummary {
+        manager.stop(modelContext: modelContext, sharedTargets: sharedTargets)
     }
 
     func addPoop(type: PottyType = .perfectPoop) {

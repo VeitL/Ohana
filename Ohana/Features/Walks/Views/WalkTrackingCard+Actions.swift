@@ -19,7 +19,19 @@ extension WalkTrackingCard {
                 sharedWalkExecutorMenu
                 sharedWalkTargetMenu
                 Button {
-                    mgr.start(pet: pet, modelContext: modelContext)
+                    let executorIDs = selectedWalkExecutorIds
+                    guard WalkActionHumanSelectionPolicy.canStart(
+                        eligibleIDs: walkEligibleHumans.map(\.id.uuidString),
+                        selectedIDs: executorIDs
+                    ) else {
+                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                        return
+                    }
+                    mgr.start(
+                        pet: pet,
+                        modelContext: modelContext,
+                        executorIds: executorIDs
+                    )
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } label: {
                     Label(L10n(appLanguage).tr(zh: "出发", en: "Start", de: "Starten"), systemImage: "figure.walk")
@@ -29,6 +41,7 @@ extension WalkTrackingCard {
                         .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .disabled(!canStartWalkWithSelectedExecutor)
                 .accessibilityIdentifier("walk-tracking-start-action")
 
             case .running:
@@ -64,26 +77,18 @@ extension WalkTrackingCard {
 
     @ViewBuilder
     var sharedWalkExecutorMenu: some View {
-        if allHumans.count > 1 {
+        if walkEligibleHumans.count > 1 {
             Menu {
-                ForEach(allHumans) { human in
+                ForEach(walkEligibleHumans) { human in
                     let humanId = human.id.uuidString
-                    if humanId == activeWalkHumanId {
-                        Label(displayWalkHumanName(human), systemImage: "checkmark.circle.fill")
-                    } else {
-                        Button {
-                            if selectedSharedWalkExecutorIds.contains(humanId) {
-                                selectedSharedWalkExecutorIds.remove(humanId)
-                            } else {
-                                selectedSharedWalkExecutorIds.insert(humanId)
-                            }
-                            UISelectionFeedbackGenerator().selectionChanged()
-                        } label: {
-                            Label(
-                                displayWalkHumanName(human),
-                                systemImage: selectedSharedWalkExecutorIds.contains(humanId) ? "checkmark.circle.fill" : "circle"
-                            )
-                        }
+                    Button {
+                        selectedSharedWalkExecutorIds = [humanId]
+                        UISelectionFeedbackGenerator().selectionChanged()
+                    } label: {
+                        Label(
+                            displayWalkHumanName(human),
+                            systemImage: selectedSharedWalkExecutorIds.contains(humanId) ? "checkmark.circle.fill" : "circle"
+                        )
                     }
                 }
             } label: {
@@ -134,11 +139,14 @@ extension WalkTrackingCard {
     }
 
     var sharedWalkExecutorTitle: String {
-        let count = selectedWalkExecutorIds.count
+        if let selectedID = selectedWalkExecutorIds.first,
+           let human = walkEligibleHumans.first(where: { $0.id.uuidString == selectedID }) {
+            return displayWalkHumanName(human)
+        }
         return L10n(appLanguage).tr(
-            zh: count > 1 ? "\(count)人" : "单人",
-            en: count > 1 ? "\(count) walkers" : "One",
-            de: count > 1 ? "\(count) Personen" : "Allein"
+            zh: "选择成员",
+            en: "Choose",
+            de: "Auswählen"
         )
     }
 
@@ -152,11 +160,11 @@ extension WalkTrackingCard {
     }
 
     func refreshDefaultWalkExecutors() {
-        let validIds = Set(allHumans.map(\.id.uuidString))
-        selectedSharedWalkExecutorIds = selectedSharedWalkExecutorIds.intersection(validIds)
-        if let activeWalkHumanId {
-            selectedSharedWalkExecutorIds.insert(activeWalkHumanId)
-        }
+        selectedSharedWalkExecutorIds = WalkActionHumanSelectionPolicy.reconciledSelection(
+            selectedIDs: selectedSharedWalkExecutorIds,
+            eligibleIDs: walkEligibleHumans.map(\.id.uuidString),
+            currentHumanID: activeWalkHumanId
+        )
     }
 
     func displayWalkHumanName(_ human: Human) -> String {
@@ -217,7 +225,7 @@ extension WalkTrackingCard {
             ))
             return
         }
-        let rewardSummary = onStopWalk(targets, selectedWalkExecutorIds)
+        let rewardSummary = onStopWalk(targets)
         guard rewardSummary.didPersist else {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             appServices.islandToasts.show(L10n(appLanguage).tr(

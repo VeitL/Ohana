@@ -680,9 +680,52 @@ struct PhysicalDeletionServiceTests {
         let drawLog = GachaDrawLog(ownerHumanId: humanId, ownerName: human.name, seriesId: GachaSeriesCatalog.defaultSeriesId, itemId: "plush_coconut_sleepy")
         let purchase = ShopPurchaseRecord(transactionKey: "shop:owned:\(humanId)", itemId: "fx_lime_glow", buyerHumanId: humanId)
         let privateExpense = PetExpenseLog(amount: 18, pet: nil, executorId: humanId)
+        let retainedPetExpense = PetExpenseLog(
+            amount: 24,
+            pet: pet,
+            executorId: survivor.id.uuidString,
+            recordedByHumanId: humanId
+        )
+        let retainedHumanExpense = PetExpenseLog(
+            amount: 9,
+            pet: nil,
+            executorId: survivor.id.uuidString,
+            recordedByHumanId: humanId
+        )
+        let retainedNoteRecord = HumanNoteRecord(
+            humanId: survivor.id,
+            sequence: 0,
+            date: Date(),
+            rawEntry: "[2026-07-15] survivor note",
+            recordedByHumanId: humanId
+        )
+        let retainedSymptom = SymptomLog(
+            category: .skin,
+            symptomName: "itch",
+            severity: .mild,
+            recordedByHumanId: humanId,
+            pet: pet
+        )
+        let retainedHeatCycle = HeatCycleLog(
+            status: .estrus,
+            recordedByHumanId: humanId,
+            pet: pet
+        )
         let weight = HumanWeightLog(weight: 70, human: human, executorId: humanId)
         let workout = HumanWorkoutLog(durationMinutes: 30, human: human)
         let metric = HumanHealthMetricLog(metricKey: "tsh", unitCode: "mIU_L", value: 2.1, human: human)
+        let retainedMetric = HumanHealthMetricLog(
+            metricKey: "hba1c",
+            unitCode: "percent",
+            value: 5.4,
+            recordedByHumanId: humanId,
+            human: survivor
+        )
+        let retainedReport = HumanHealthReport(
+            humanId: survivor.id.uuidString,
+            summary: "survivor report",
+            recordedByHumanId: humanId
+        )
         let account = CoconutAccount(
             accountKey: CoconutAccountKey.human(human.id),
             ownerKind: .human,
@@ -784,9 +827,16 @@ struct PhysicalDeletionServiceTests {
         context.insert(drawLog)
         context.insert(purchase)
         context.insert(privateExpense)
+        context.insert(retainedPetExpense)
+        context.insert(retainedHumanExpense)
+        context.insert(retainedNoteRecord)
+        context.insert(retainedSymptom)
+        context.insert(retainedHeatCycle)
         context.insert(weight)
         context.insert(workout)
         context.insert(metric)
+        context.insert(retainedMetric)
+        context.insert(retainedReport)
         context.insert(account)
         context.insert(walletEntry)
         context.insert(careLedger)
@@ -807,15 +857,27 @@ struct PhysicalDeletionServiceTests {
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<HumanMedication>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<HumanHealthReport>()).isEmpty)
+        let retainedHealthReports = try context.fetch(FetchDescriptor<HumanHealthReport>())
+        #expect(retainedHealthReports.map(\.id) == [retainedReport.id])
+        #expect(retainedHealthReports.first?.recordedByHumanId == nil)
         #expect(try context.fetch(FetchDescriptor<WishlistItem>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<GachaOwnedItem>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<GachaDrawLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).isEmpty)
+        let retainedExpenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
+        #expect(Set(retainedExpenses.map(\.id)) == Set([retainedPetExpense.id, retainedHumanExpense.id]))
+        #expect(retainedExpenses.allSatisfy { $0.executorId == survivor.id.uuidString })
+        #expect(retainedExpenses.allSatisfy { $0.recordedByHumanId == nil })
+        let retainedNoteRecords = try context.fetch(FetchDescriptor<HumanNoteRecord>())
+        #expect(retainedNoteRecords.map(\.id) == [retainedNoteRecord.id])
+        #expect(retainedNoteRecords.first?.recordedByHumanId == nil)
+        #expect(try context.fetch(FetchDescriptor<SymptomLog>()).first?.recordedByHumanId == nil)
+        #expect(try context.fetch(FetchDescriptor<HeatCycleLog>()).first?.recordedByHumanId == nil)
         #expect(try context.fetch(FetchDescriptor<HumanWeightLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<HumanHealthMetricLog>()).isEmpty)
+        let retainedHealthMetrics = try context.fetch(FetchDescriptor<HumanHealthMetricLog>())
+        #expect(retainedHealthMetrics.map(\.id) == [retainedMetric.id])
+        #expect(retainedHealthMetrics.first?.recordedByHumanId == nil)
         let retiredAccount = try #require(try context.fetch(FetchDescriptor<CoconutAccount>()).first { $0.ownerId == humanId })
         #expect(retiredAccount.balance == 0)
         #expect(CoconutWalletAccountLifecycleMetadata.isDeletedOwner(retiredAccount))
@@ -1232,7 +1294,7 @@ struct PhysicalDeletionServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV90.models)
+        let schema = Schema(ArkSchemaV91.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

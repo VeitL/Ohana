@@ -9,19 +9,19 @@ extension SettingsView {
     @ViewBuilder
     var settingsBodySections: some View {
         if SettingsDebugTools.isRunningUITests {
-            settingsUITestShortcutSection
+            AnyView(settingsUITestShortcutSection)
         }
-        settingsDataSections
-        settingsDeferredHeavySections
-        settingsPreferencesSection
+        AnyView(settingsDataSections)
+        AnyView(settingsDeferredHeavySections)
+        AnyView(settingsPreferencesSection)
         if isLanguageCommitInFlight {
-            settingsLanguageCommitPlaceholderSection
+            AnyView(settingsLanguageCommitPlaceholderSection)
         } else {
-            privacySecuritySection
-            settingsNotificationsSection
-            backupSection
-            settingsAboutSection
-            settingsResetSection
+            AnyView(privacySecuritySection)
+            AnyView(settingsNotificationsSection)
+            AnyView(backupSection)
+            AnyView(settingsAboutSection)
+            AnyView(settingsResetSection)
         }
     }
 

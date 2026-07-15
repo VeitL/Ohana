@@ -108,6 +108,37 @@ struct WalkPoopMarker: Identifiable, Equatable {
     }
 }
 
+private struct WalkStopDraft {
+    let pet: Pet
+    let targets: [Pet]
+    let elapsed: TimeInterval
+    let poopCount: Int
+    let poopMarkers: [WalkPoopMarker]
+    let executorIds: [String]
+    let startedAt: Date
+    let endedAt: Date
+    let distanceMeters: Double
+    let routeLocations: [CLLocation]
+    let routeCoordinates: [CLLocationCoordinate2D]
+    let routeData: Data?
+    let isTooShortForReward: Bool
+
+    var executorId: String? {
+        executorIds.first
+    }
+}
+
+private struct WalkStopWalkRecord {
+    let logs: [PetWalkLog]
+    let sourceLog: PetWalkLog?
+    let coconutDelta: Int
+}
+
+private struct WalkStopPottyRecord {
+    let logs: [PetPottyLog]
+    let coconutDelta: Int
+}
+
 @MainActor
 @Observable
 final class PetWalkingManager {
@@ -123,6 +154,7 @@ final class PetWalkingManager {
     var lastCompletedRouteCoordinates: [CLLocationCoordinate2D] = []
     var activePoopMarkers: [WalkPoopMarker] = []
     var lastCompletedPoopMarkers: [WalkPoopMarker] = []
+    private(set) var activeWalkExecutorIds: [String] = []
 
     private var pausedElapsed: TimeInterval = 0 // 暂停前已累计时间
     private var resumeTime: Date? // 最近一次 resume/start 时间
@@ -138,23 +170,28 @@ final class PetWalkingManager {
     private var mapSnapshotGeneration = 0
     private let locationManager: any WalkLocationManaging
     private let questManager: QuestManager
+    private let careEconomy: CareEventEconomyAwarding
     private let careLedger: CareLedgerRecording
     private let walkCareEvents: WalkCareEventManaging
     private let revisions: DomainRevisionPublishing
-    private let activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
+    private let activeHumanSelection: ActiveHumanSelecting
 
     init(
         locationManager: any WalkLocationManaging,
         questManager: QuestManager,
+        careEconomy: CareEventEconomyAwarding? = nil,
         careLedger: CareLedgerRecording = CareLedgerService(),
         walkCareEvents: WalkCareEventManaging? = nil,
-        revisions: DomainRevisionPublishing? = nil
+        revisions: DomainRevisionPublishing? = nil,
+        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
     ) {
         self.locationManager = locationManager
         self.questManager = questManager
+        self.careEconomy = careEconomy ?? StaticCareEventEconomyAwarder(questManager: questManager)
         self.careLedger = careLedger
         self.walkCareEvents = walkCareEvents ?? StaticWalkCareEventManager()
         self.revisions = revisions ?? SharedDomainRevisionPublisher()
+        self.activeHumanSelection = activeHumanSelection
     }
 
     convenience init(locationManager: any WalkLocationManaging) {
@@ -168,12 +205,25 @@ final class PetWalkingManager {
 
     // MARK: - Actions
     func start(pet: Pet) {
-        start(pet: pet, modelContext: nil)
+        start(
+            pet: pet,
+            modelContext: nil,
+            executorIds: SharedCareParticipantIDs.normalized([], preferredFirst: activeHumanSelection.currentHumanId)
+        )
     }
 
     func start(pet: Pet, modelContext: ModelContext?) {
+        start(
+            pet: pet,
+            modelContext: modelContext,
+            executorIds: SharedCareParticipantIDs.normalized([], preferredFirst: activeHumanSelection.currentHumanId)
+        )
+    }
+
+    func start(pet: Pet, modelContext: ModelContext?, executorIds: [String]) {
         guard WalkFeaturePolicy.canStartWalk(for: pet) else { return }
 
+        activeWalkExecutorIds = SharedCareParticipantIDs.normalized(executorIds)
         currentPet = pet
         phase = .running
         startTime = Date()
@@ -222,6 +272,7 @@ final class PetWalkingManager {
         lastCompletedRouteCoordinates = []
         activePoopMarkers = metadata?.poopMarkers.map(WalkPoopMarker.init(checkpoint:)) ?? []
         lastCompletedPoopMarkers = []
+        activeWalkExecutorIds = checkpoint.executorIds
         activeRecoveryCheckpointID = checkpoint.id
         activeWalkModelContext = modelContext
         lastRecoveryCheckpointAt = Date()
@@ -287,270 +338,30 @@ final class PetWalkingManager {
     }
 
     @discardableResult
-    func stop(modelContext: ModelContext, sharedTargets: [Pet] = [], executorIds sharedExecutorIds: [String] = []) -> WalkStopRewardSummary {
+    func stop(modelContext: ModelContext, sharedTargets: [Pet] = []) -> WalkStopRewardSummary {
         walkStopStartedAt = CFAbsoluteTimeGetCurrent()
         guard let pet = currentPet, WalkFeaturePolicy.canStartWalk(for: pet) else {
-            reset()
-            walkStopStartedAt = nil
-            return .empty
+            return finishInvalidStop(resetSession: true, result: .empty)
         }
         let normalizedTargets = WalkFeaturePolicy.normalizedWalkTargets(sharedTargets, fallback: pet)
         guard !normalizedTargets.isEmpty else {
-            walkStopStartedAt = nil
-            return .invalidTargets
+            return finishInvalidStop(resetSession: false, result: .invalidTargets)
         }
 
-        // 最终elapsed：已暂停部分 + 本次跑步部分
-        if let r = resumeTime {
-            pausedElapsed += Date().timeIntervalSince(r)
+        let draft = makeStopDraft(pet: pet, targets: normalizedTargets)
+        guard let walkRecord = recordWalk(draft, modelContext: modelContext) else {
+            return finishInvalidStop(resetSession: true, result: .empty)
         }
-        elapsedTime = pausedElapsed
-        resumeTime = nil
-
-        stopTimer()
-        locationManager.stopWalkSession()
-
-        let elapsed = elapsedTime
-        let poopMarkers = activePoopMarkers
-        let poop = max(poopCount, poopMarkers.count)
-
-        // 隐式读取当前设备执行者（静默，不弹窗）
-        let executorId = activeHumanSelection.currentHumanId
-        let executorIds = SharedCareParticipantIDs.normalized(sharedExecutorIds, preferredFirst: executorId)
-
-        let startedAt = startTime ?? Date()
-        let endedAt = Date()
-        let distanceMeters = recoveredDistanceMeters + locationManager.totalDistance
-
-        let routeLocations = mergedRouteLocationsForPersistence()
-        let routeCoordinates = routeLocations.map(\.coordinate)
-        let coordinates = routeLocations.map {
-            ["lat": $0.coordinate.latitude, "lon": $0.coordinate.longitude]
-        }
-        let routeData = try? JSONSerialization.data(withJSONObject: coordinates)
-
-        // N2/Phase54: 遛狗椰子奖励（距离 < 20m 不发放奖励，日志正常保存）
-        let isTooShortForReward = !CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
-        let walkLogs: [PetWalkLog]
-        var walkCoconutDelta = 0
-        var pottyCoconutDelta = 0
-        if normalizedTargets.count > 1 {
-            let result = walkCareEvents.recordSharedWalk(
-                sourcePet: pet,
-                targets: normalizedTargets,
-                distanceMeters: distanceMeters,
-                endDate: endedAt,
-                context: modelContext,
-                executorId: executorId,
-                executorIds: executorIds,
-                startDate: startedAt
-            )
-            walkLogs = result.walkLogs
-            walkCoconutDelta = result.coconutDelta
-        } else {
-            let intent = DomainCareFactCreateIntent(
-                kind: .walk(
-                    distanceMeters: distanceMeters,
-                    endDate: endedAt,
-                    coconutsEarned: PetWalkLog.coconuts(for: distanceMeters),
-                    behaviorNotes: nil,
-                    moodRating: 0,
-                    executorIds: executorIds,
-                    sharedSessionId: ""
-                ),
-                occurredAt: startedAt,
-                modifiedAt: endedAt,
-                executorId: executorId,
-                source: .userCommand
-            )
-            guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
-                pet: pet,
-                intent: intent,
-                context: modelContext,
-                logPrefix: "PetWalkingManager.stop.walk"
-            ) else {
-                reset()
-                walkStopStartedAt = nil
-                return .empty
-            }
-            let walkLog = DomainCareFactWriter.createWalkLog(plan: write, context: modelContext)
-
-            var reward: (humanGot: Int, petGot: Int)?
-            DomainCareFactEffectsDispatcher.run(plan: write) { actor in
-                if !isTooShortForReward {
-                    reward = EconomyRewardDiscipline.awardCareAction(
-                        type: .walk(distanceMeters: distanceMeters),
-                        pet: pet,
-                        context: modelContext,
-                        executorId: actor.rewardExecutorId,
-                        questManager: questManager
-                    )
-                }
-                let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
-                let ledgerEvent = careLedger.record(
-                    occurredAt: startedAt,
-                    actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
-                    actorId: actor.effectiveExecutorId,
-                    subjectKind: .pet,
-                    subjectId: pet.id.uuidString,
-                    eventKind: .walk,
-                    actionType: "walk",
-                    amountValue: distanceMeters,
-                    amountUnit: "m",
-                    note: walkLog.behaviorNotes ?? "",
-                    source: .quickAction,
-                    sourceEventId: nil,
-                    sourceReminderId: nil,
-                    legacyModelName: String(describing: PetWalkLog.self),
-                    legacyModelId: walkLog.id.uuidString,
-                    coconutDelta: careLedger.rewardDelta(reward),
-                    rewardLogId: nil,
-                    privacyFieldRaw: nil,
-                    metadataJSON: metadataJSON,
-                    context: modelContext,
-                    save: false
-                )
-                CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
-                careLedger.syncLedgerEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
-                let earnedCoconuts = reward.map { $0.humanGot + $0.petGot } ?? 0
-                walkCoconutDelta = earnedCoconuts
-                walkLog.coconutsEarned = earnedCoconuts
-            }
-            walkLogs = [walkLog]
-        }
-
-        for walkLog in walkLogs {
-            walkLog.routeLocationsData = routeData
-        }
-
-        let sourceWalkLog = walkLogs.first { $0.pet?.id == pet.id } ?? walkLogs.first
-
-        // 保存遛狗中的便便路线事件（含真实打卡时间与可选坐标）
-        let persistedMarkers: [WalkPoopMarker] = poopMarkers.isEmpty && poop > 0
-            ? (0 ..< poop).map { _ in WalkPoopMarker(date: Date(), location: nil) }
-            : poopMarkers
-        var pottyLogs: [PetPottyLog] = []
-        var pottyWrites: [(PetPottyLog, AuthorizedDomainCareFactWrite)] = []
-        for marker in persistedMarkers {
-            let intent = DomainCareFactCreateIntent(
-                kind: .potty(type: marker.type, sharedSessionId: ""),
-                occurredAt: marker.date,
-                modifiedAt: endedAt,
-                executorId: executorId,
-                source: .userCommand
-            )
-            guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
-                pet: pet,
-                intent: intent,
-                context: modelContext,
-                logPrefix: "PetWalkingManager.stop.potty"
-            ) else { continue }
-            let pottyLog = DomainCareFactWriter.createPottyLog(plan: write, context: modelContext)
-            pottyLog.latitude = marker.latitude
-            pottyLog.longitude = marker.longitude
-            pottyLog.locationAccuracyMeters = marker.accuracyMeters
-            pottyLog.walkLogId = sourceWalkLog?.id.uuidString
-            pottyLogs.append(pottyLog)
-            pottyWrites.append((pottyLog, write))
-        }
-
-        // 遛狗中每次便便：人+2, 宠物+5（OhanaActionType.potty(isLitter:false)）
-        if poop > 0 {
-            for (pottyLog, write) in pottyWrites {
-                DomainCareFactEffectsDispatcher.run(plan: write) { actor in
-                    let reward = EconomyRewardDiscipline.awardCareAction(
-                        type: .potty(isLitter: false),
-                        pet: pet,
-                        context: modelContext,
-                        executorId: actor.rewardExecutorId,
-                        questManager: questManager
-                    )
-                    let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
-                    let ledgerEvent = careLedger.record(
-                        occurredAt: pottyLog.date,
-                        actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
-                        actorId: actor.effectiveExecutorId,
-                        subjectKind: .pet,
-                        subjectId: pet.id.uuidString,
-                        eventKind: .potty,
-                        actionType: pottyLog.pottyType.rawValue,
-                        amountValue: 0,
-                        amountUnit: "",
-                        note: "walk.poop",
-                        source: .quickAction,
-                        sourceEventId: nil,
-                        sourceReminderId: nil,
-                        legacyModelName: String(describing: PetPottyLog.self),
-                        legacyModelId: pottyLog.id.uuidString,
-                        coconutDelta: careLedger.rewardDelta(reward),
-                        rewardLogId: nil,
-                        privacyFieldRaw: nil,
-                        metadataJSON: metadataJSON,
-                        context: modelContext,
-                        save: false
-                    )
-                    CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: endedAt)
-                    careLedger.syncLedgerEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
-                    pottyCoconutDelta += careLedger.rewardDelta(reward)
-                }
-            }
-        }
-
-        CloudSyncMutationRecorder.markModified(walkLogs, context: modelContext, modifiedAt: endedAt)
-        CloudSyncMutationRecorder.markModified(pottyLogs, context: modelContext, modifiedAt: endedAt)
-        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
-        guard saveResult.didSave else {
-            modelContext.rollback()
-            phase = .paused
-            showSummary = false
-            lastCompletedPetId = nil
-            lastCompletedWalk = nil
-            lastCompletedRouteCoordinates = []
-            lastCompletedPoopMarkers = []
-            AppFlowPerformance.mark(
-                AppPerformanceFlows.walkSession,
-                AppPerformancePhases.writeFailure,
-                startedAt: walkStopStartedAt,
-                note: [
-                    "action": "stop",
-                    "points": "\(routeLocations.count)",
-                    "poopCount": "\(poop)"
-                ]
-            )
-            walkStopStartedAt = nil
-            return .failed(saveResult.errorDescription)
-        }
-
-        publishWalkCompletion(petID: pet.id, targets: normalizedTargets, walkLogs: walkLogs, pottyLogs: pottyLogs, endedAt: endedAt)
-        generateMapSnapshot(for: walkLogs, routeLocations: routeLocations, poopMarkers: poopMarkers, modelContext: modelContext)
-
-        deleteRecoveryCheckpointIfPossible(modelContext: modelContext)
-
-        lastCompletedPetId = pet.id
-        lastCompletedWalk = sourceWalkLog
-        lastCompletedRouteCoordinates = routeCoordinates
-        lastCompletedPoopMarkers = poopMarkers
-        phase = .finished(elapsed: elapsed, poopCount: poop)
-        showSummary = true
-        AppFlowPerformance.mark(
-            AppPerformanceFlows.walkSession,
-            AppPerformancePhases.writeSuccess,
-            startedAt: walkStopStartedAt,
-            note: [
-                "action": "stop",
-                "points": "\(routeLocations.count)",
-                "poopCount": "\(poop)",
-                "rewarded": isTooShortForReward ? "false" : "true"
-            ]
+        let pottyRecord = recordPottyEvents(
+            draft,
+            sourceWalkLog: walkRecord.sourceLog,
+            modelContext: modelContext
         )
-        walkStopStartedAt = nil
-        return WalkStopRewardSummary(
-            walkLogID: sourceWalkLog?.id,
-            coconutDelta: walkCoconutDelta + pottyCoconutDelta,
-            walkCoconutDelta: walkCoconutDelta,
-            pottyCoconutDelta: pottyCoconutDelta,
-            didPersist: true,
-            persistenceErrorDescription: nil
+        return persistStop(
+            draft,
+            walkRecord: walkRecord,
+            pottyRecord: pottyRecord,
+            modelContext: modelContext
         )
     }
 
@@ -595,6 +406,7 @@ final class PetWalkingManager {
         lastCompletedRouteCoordinates = []
         activePoopMarkers = []
         lastCompletedPoopMarkers = []
+        activeWalkExecutorIds = []
         activeRecoveryCheckpointID = nil
         activeWalkModelContext = nil
         lastRecoveryCheckpointAt = nil
@@ -700,7 +512,8 @@ final class PetWalkingManager {
         let checkpoint = PetWalkLog(
             startDate: startTime ?? Date(),
             pet: pet,
-            executorId: activeHumanSelection.currentHumanId,
+            executorId: activeWalkExecutorIds.first,
+            executorIds: activeWalkExecutorIds,
             sharedSessionId: WalkRecoveryCheckpoint.makeSharedSessionID()
         )
         checkpoint.behaviorNotes = WalkRecoveryCheckpoint.encodeMetadata(
@@ -922,5 +735,348 @@ final class PetWalkingManager {
 
     var distanceText: String {
         AppMeasurementSystem.formatDistanceMeters(locationManager.totalDistance, fractionDigits: 2)
+    }
+}
+
+private extension PetWalkingManager {
+    func finishInvalidStop(
+        resetSession: Bool,
+        result: WalkStopRewardSummary
+    ) -> WalkStopRewardSummary {
+        if resetSession {
+            reset()
+        }
+        walkStopStartedAt = nil
+        return result
+    }
+
+    func makeStopDraft(pet: Pet, targets: [Pet]) -> WalkStopDraft {
+        // Final elapsed time is the accumulated paused time plus the current segment.
+        if let resumeTime {
+            pausedElapsed += Date().timeIntervalSince(resumeTime)
+        }
+        elapsedTime = pausedElapsed
+        self.resumeTime = nil
+
+        stopTimer()
+        locationManager.stopWalkSession()
+
+        let poopMarkers = activePoopMarkers
+        let poopCount = max(self.poopCount, poopMarkers.count)
+        let startedAt = startTime ?? Date()
+        let endedAt = Date()
+        let distanceMeters = recoveredDistanceMeters + locationManager.totalDistance
+        let routeLocations = mergedRouteLocationsForPersistence()
+
+        // Participants are locked when the walk starts and restored from its
+        // checkpoint. Never reread the device's current Human while stopping.
+        return WalkStopDraft(
+            pet: pet,
+            targets: targets,
+            elapsed: elapsedTime,
+            poopCount: poopCount,
+            poopMarkers: poopMarkers,
+            executorIds: activeWalkExecutorIds,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            distanceMeters: distanceMeters,
+            routeLocations: routeLocations,
+            routeCoordinates: routeLocations.map(\.coordinate),
+            routeData: routeData(from: routeLocations),
+            isTooShortForReward: !CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
+        )
+    }
+
+    func recordWalk(
+        _ draft: WalkStopDraft,
+        modelContext: ModelContext
+    ) -> WalkStopWalkRecord? {
+        let walkLogs: [PetWalkLog]
+        let coconutDelta: Int
+
+        if draft.targets.count > 1 {
+            let result = walkCareEvents.recordSharedWalk(
+                sourcePet: draft.pet,
+                targets: draft.targets,
+                distanceMeters: draft.distanceMeters,
+                endDate: draft.endedAt,
+                context: modelContext,
+                executorId: draft.executorId,
+                executorIds: draft.executorIds,
+                startDate: draft.startedAt
+            )
+            walkLogs = result.walkLogs
+            coconutDelta = result.coconutDelta
+        } else {
+            guard let record = recordSingleWalk(draft, modelContext: modelContext) else {
+                return nil
+            }
+            walkLogs = record.logs
+            coconutDelta = record.coconutDelta
+        }
+
+        for walkLog in walkLogs {
+            walkLog.routeLocationsData = draft.routeData
+        }
+        let sourceLog = walkLogs.first { $0.pet?.id == draft.pet.id } ?? walkLogs.first
+        return WalkStopWalkRecord(logs: walkLogs, sourceLog: sourceLog, coconutDelta: coconutDelta)
+    }
+
+    func recordSingleWalk(
+        _ draft: WalkStopDraft,
+        modelContext: ModelContext
+    ) -> WalkStopWalkRecord? {
+        let intent = DomainCareFactCreateIntent(
+            kind: .walk(
+                distanceMeters: draft.distanceMeters,
+                endDate: draft.endedAt,
+                coconutsEarned: PetWalkLog.coconuts(for: draft.distanceMeters),
+                behaviorNotes: nil,
+                moodRating: 0,
+                executorIds: draft.executorIds,
+                sharedSessionId: ""
+            ),
+            occurredAt: draft.startedAt,
+            modifiedAt: draft.endedAt,
+            executorId: draft.executorId,
+            source: .userCommand
+        )
+        guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+            pet: draft.pet,
+            intent: intent,
+            context: modelContext,
+            logPrefix: "PetWalkingManager.stop.walk"
+        ) else { return nil }
+
+        let walkLog = DomainCareFactWriter.createWalkLog(plan: write, context: modelContext)
+        var coconutDelta = 0
+        DomainCareFactEffectsDispatcher.run(plan: write) { actor in
+            var reward: (humanGot: Int, petGot: Int)?
+            if !draft.isTooShortForReward {
+                reward = careEconomy.awardCareAction(
+                    type: .walk(distanceMeters: draft.distanceMeters),
+                    pet: draft.pet,
+                    context: modelContext,
+                    quality: .none,
+                    date: draft.endedAt,
+                    executorId: actor.rewardExecutorId,
+                    careObjectKey: nil
+                )
+            }
+            let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
+            let ledgerEvent = careLedger.record(
+                occurredAt: draft.startedAt,
+                actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                actorId: actor.effectiveExecutorId,
+                subjectKind: .pet,
+                subjectId: draft.pet.id.uuidString,
+                eventKind: .walk,
+                actionType: "walk",
+                amountValue: draft.distanceMeters,
+                amountUnit: "m",
+                note: walkLog.behaviorNotes ?? "",
+                source: .quickAction,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: String(describing: PetWalkLog.self),
+                legacyModelId: walkLog.id.uuidString,
+                coconutDelta: careLedger.rewardDelta(reward),
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: metadataJSON,
+                context: modelContext,
+                save: false
+            )
+            CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: draft.endedAt)
+            careLedger.syncLedgerEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
+            coconutDelta = reward.map { $0.humanGot + $0.petGot } ?? 0
+            walkLog.coconutsEarned = coconutDelta
+        }
+        return WalkStopWalkRecord(logs: [walkLog], sourceLog: walkLog, coconutDelta: coconutDelta)
+    }
+
+    func recordPottyEvents(
+        _ draft: WalkStopDraft,
+        sourceWalkLog: PetWalkLog?,
+        modelContext: ModelContext
+    ) -> WalkStopPottyRecord {
+        let markers = persistedPoopMarkers(for: draft)
+        var logs: [PetPottyLog] = []
+        var writes: [(PetPottyLog, AuthorizedDomainCareFactWrite)] = []
+
+        for marker in markers {
+            let intent = DomainCareFactCreateIntent(
+                kind: .potty(type: marker.type, sharedSessionId: ""),
+                occurredAt: marker.date,
+                modifiedAt: draft.endedAt,
+                executorId: draft.executorId,
+                source: .userCommand
+            )
+            guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                pet: draft.pet,
+                intent: intent,
+                context: modelContext,
+                logPrefix: "PetWalkingManager.stop.potty"
+            ) else { continue }
+
+            let pottyLog = DomainCareFactWriter.createPottyLog(plan: write, context: modelContext)
+            pottyLog.latitude = marker.latitude
+            pottyLog.longitude = marker.longitude
+            pottyLog.locationAccuracyMeters = marker.accuracyMeters
+            pottyLog.walkLogId = sourceWalkLog?.id.uuidString
+            logs.append(pottyLog)
+            writes.append((pottyLog, write))
+        }
+
+        let coconutDelta = rewardPottyEvents(writes, draft: draft, modelContext: modelContext)
+        return WalkStopPottyRecord(logs: logs, coconutDelta: coconutDelta)
+    }
+
+    func persistedPoopMarkers(for draft: WalkStopDraft) -> [WalkPoopMarker] {
+        guard draft.poopMarkers.isEmpty, draft.poopCount > 0 else {
+            return draft.poopMarkers
+        }
+        return (0 ..< draft.poopCount).map { _ in WalkPoopMarker(date: Date(), location: nil) }
+    }
+
+    func rewardPottyEvents(
+        _ writes: [(PetPottyLog, AuthorizedDomainCareFactWrite)],
+        draft: WalkStopDraft,
+        modelContext: ModelContext
+    ) -> Int {
+        var coconutDelta = 0
+        for (pottyLog, write) in writes {
+            DomainCareFactEffectsDispatcher.run(plan: write) { actor in
+                let reward = careEconomy.awardCareAction(
+                    type: .potty(isLitter: false),
+                    pet: draft.pet,
+                    context: modelContext,
+                    quality: .none,
+                    date: draft.endedAt,
+                    executorId: actor.rewardExecutorId,
+                    careObjectKey: nil
+                )
+                let metadataJSON = careLedger.rewardMetadata(reward, questManager: questManager)
+                let ledgerEvent = careLedger.record(
+                    occurredAt: pottyLog.date,
+                    actorKind: actor.effectiveExecutorId == nil ? .unknown : .human,
+                    actorId: actor.effectiveExecutorId,
+                    subjectKind: .pet,
+                    subjectId: draft.pet.id.uuidString,
+                    eventKind: .potty,
+                    actionType: pottyLog.pottyType.rawValue,
+                    amountValue: 0,
+                    amountUnit: "",
+                    note: "walk.poop",
+                    source: .quickAction,
+                    sourceEventId: nil,
+                    sourceReminderId: nil,
+                    legacyModelName: String(describing: PetPottyLog.self),
+                    legacyModelId: pottyLog.id.uuidString,
+                    coconutDelta: careLedger.rewardDelta(reward),
+                    rewardLogId: nil,
+                    privacyFieldRaw: nil,
+                    metadataJSON: metadataJSON,
+                    context: modelContext,
+                    save: false
+                )
+                CloudSyncMutationRecorder.markModified(ledgerEvent, context: modelContext, modifiedAt: draft.endedAt)
+                careLedger.syncLedgerEnergyIfNeeded(metadataJSON: metadataJSON, context: modelContext)
+                coconutDelta += careLedger.rewardDelta(reward)
+            }
+        }
+        return coconutDelta
+    }
+
+    func persistStop(
+        _ draft: WalkStopDraft,
+        walkRecord: WalkStopWalkRecord,
+        pottyRecord: WalkStopPottyRecord,
+        modelContext: ModelContext
+    ) -> WalkStopRewardSummary {
+        CloudSyncMutationRecorder.markModified(walkRecord.logs, context: modelContext, modifiedAt: draft.endedAt)
+        CloudSyncMutationRecorder.markModified(pottyRecord.logs, context: modelContext, modifiedAt: draft.endedAt)
+        let saveResult = modelContext.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            return finishFailedStop(
+                draft,
+                errorDescription: saveResult.errorDescription,
+                modelContext: modelContext
+            )
+        }
+
+        publishWalkCompletion(
+            petID: draft.pet.id,
+            targets: draft.targets,
+            walkLogs: walkRecord.logs,
+            pottyLogs: pottyRecord.logs,
+            endedAt: draft.endedAt
+        )
+        generateMapSnapshot(
+            for: walkRecord.logs,
+            routeLocations: draft.routeLocations,
+            poopMarkers: draft.poopMarkers,
+            modelContext: modelContext
+        )
+        deleteRecoveryCheckpointIfPossible(modelContext: modelContext)
+        finishPersistedStop(draft, sourceWalkLog: walkRecord.sourceLog)
+
+        return WalkStopRewardSummary(
+            walkLogID: walkRecord.sourceLog?.id,
+            coconutDelta: walkRecord.coconutDelta + pottyRecord.coconutDelta,
+            walkCoconutDelta: walkRecord.coconutDelta,
+            pottyCoconutDelta: pottyRecord.coconutDelta,
+            didPersist: true,
+            persistenceErrorDescription: nil
+        )
+    }
+
+    func finishFailedStop(
+        _ draft: WalkStopDraft,
+        errorDescription: String?,
+        modelContext: ModelContext
+    ) -> WalkStopRewardSummary {
+        modelContext.rollback()
+        phase = .paused
+        showSummary = false
+        lastCompletedPetId = nil
+        lastCompletedWalk = nil
+        lastCompletedRouteCoordinates = []
+        lastCompletedPoopMarkers = []
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.walkSession,
+            AppPerformancePhases.writeFailure,
+            startedAt: walkStopStartedAt,
+            note: stopPerformanceNote(draft)
+        )
+        walkStopStartedAt = nil
+        return .failed(errorDescription)
+    }
+
+    func finishPersistedStop(_ draft: WalkStopDraft, sourceWalkLog: PetWalkLog?) {
+        lastCompletedPetId = draft.pet.id
+        lastCompletedWalk = sourceWalkLog
+        lastCompletedRouteCoordinates = draft.routeCoordinates
+        lastCompletedPoopMarkers = draft.poopMarkers
+        phase = .finished(elapsed: draft.elapsed, poopCount: draft.poopCount)
+        showSummary = true
+
+        var note = stopPerformanceNote(draft)
+        note["rewarded"] = draft.isTooShortForReward ? "false" : "true"
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.walkSession,
+            AppPerformancePhases.writeSuccess,
+            startedAt: walkStopStartedAt,
+            note: note
+        )
+        walkStopStartedAt = nil
+    }
+
+    func stopPerformanceNote(_ draft: WalkStopDraft) -> [String: String] {
+        [
+            "action": "stop",
+            "points": "\(draft.routeLocations.count)",
+            "poopCount": "\(draft.poopCount)"
+        ]
     }
 }

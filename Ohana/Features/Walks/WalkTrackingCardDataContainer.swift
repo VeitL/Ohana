@@ -18,11 +18,10 @@ struct WalkTrackingCardHost: View {
             allHumans: allHumans,
             snapshot: WalkTrackingSnapshot.make(pet: pet, manager: appServices.walking),
             onCloseSummaryToPetCard: onCloseSummaryToPetCard,
-            onStopWalk: { sharedTargets, executorIds in
+            onStopWalk: { sharedTargets in
                 commandExecutor.stopWalk(
                     manager: appServices.walking,
-                    sharedTargets: sharedTargets,
-                    executorIds: executorIds
+                    sharedTargets: sharedTargets
                 )
             },
             onSaveWeeklyGoal: { goal in

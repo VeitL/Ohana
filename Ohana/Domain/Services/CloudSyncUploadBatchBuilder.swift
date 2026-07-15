@@ -93,6 +93,10 @@ nonisolated enum CloudSyncUploadBatchBuilder {
             try fetchPetFoodRecord(id: localRecordId, context: context)
         case String(describing: PetWeightLog.self):
             try fetchPetWeightLog(id: localRecordId, context: context)
+        case String(describing: SymptomLog.self):
+            try fetchSymptomLog(id: localRecordId, context: context)
+        case String(describing: HeatCycleLog.self):
+            try fetchHeatCycleLog(id: localRecordId, context: context)
         case String(describing: SharedCareSession.self):
             try fetchSharedCareSession(id: localRecordId, context: context)
         case String(describing: CareLedgerEvent.self):
@@ -201,6 +205,22 @@ nonisolated enum CloudSyncUploadBatchBuilder {
     private static func fetchPetWeightLog(id: UUID, context: ModelContext) throws -> PetWeightLog? {
         var descriptor = FetchDescriptor<PetWeightLog>(
             predicate: #Predicate<PetWeightLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchSymptomLog(id: UUID, context: ModelContext) throws -> SymptomLog? {
+        var descriptor = FetchDescriptor<SymptomLog>(
+            predicate: #Predicate<SymptomLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchHeatCycleLog(id: UUID, context: ModelContext) throws -> HeatCycleLog? {
+        var descriptor = FetchDescriptor<HeatCycleLog>(
+            predicate: #Predicate<HeatCycleLog> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

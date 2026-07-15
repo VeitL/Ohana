@@ -95,10 +95,10 @@ struct WalksLogicTests {
             encoding: .utf8
         )
 
-        #expect(cardSource.contains("var onStopWalk: ([Pet], [String]) -> WalkStopRewardSummary"))
+        #expect(cardSource.contains("var onStopWalk: ([Pet]) -> WalkStopRewardSummary"))
         #expect(cardSource.contains("@State var lastStopRewardSummary: WalkStopRewardSummary?"))
         #expect(actionsSource.contains("guard !targets.isEmpty else"))
-        #expect(actionsSource.contains("let rewardSummary = onStopWalk(targets, selectedWalkExecutorIds)"))
+        #expect(actionsSource.contains("let rewardSummary = onStopWalk(targets)"))
         #expect(actionsSource.contains("guard rewardSummary.didPersist else"))
         let persistenceGuard = try #require(actionsSource.range(of: "guard rewardSummary.didPersist else"))
         let selectionWrite = try #require(actionsSource.range(of: "SharedPetSelectionMemory.saveSelection("))
@@ -435,6 +435,121 @@ struct WalksLogicTests {
                 event.actorId == human.id.uuidString
         })
     }
+
+    @Test func defaultWalkExecutorIsCapturedAtStartInsteadOfRereadAtStop() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let first = Human(name: "First walker")
+        let second = Human(name: "Second walker")
+        let pet = Pet(name: "Piper", species: "狗")
+        context.insert(first)
+        context.insert(second)
+        context.insert(pet)
+        try context.save()
+
+        let selection = MutableWalkActiveHumanSelection(id: first.id.uuidString)
+        let manager = PetWalkingManager(
+            locationManager: FakeWalkLocationManager(),
+            questManager: QuestManager(),
+            activeHumanSelection: selection
+        )
+
+        manager.start(pet: pet)
+        selection.id = second.id.uuidString
+        manager.stop(modelContext: context)
+
+        let walk = try #require(try context.fetch(FetchDescriptor<PetWalkLog>()).first)
+        #expect(walk.executorId == first.id.uuidString)
+        #expect(walk.executorIds == [first.id.uuidString])
+    }
+
+    @Test func explicitWalkParticipantsAreCapturedAtStartAndPersistedInOrder() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let first = Human(name: "First walker")
+        let second = Human(name: "Second walker")
+        let laterSelection = Human(name: "Later selection")
+        let pet = Pet(name: "Piper", species: "狗")
+        [first, second, laterSelection].forEach(context.insert)
+        context.insert(pet)
+        try context.save()
+
+        let manager = PetWalkingManager(
+            locationManager: FakeWalkLocationManager(),
+            questManager: QuestManager(),
+            activeHumanSelection: MutableWalkActiveHumanSelection(id: laterSelection.id.uuidString)
+        )
+        let capturedIDs = [first.id.uuidString, second.id.uuidString]
+
+        manager.start(pet: pet, modelContext: context, executorIds: capturedIDs)
+        let checkpoint = try #require(
+            try context.fetch(FetchDescriptor<PetWalkLog>()).first(where: WalkRecoveryCheckpoint.isCheckpoint)
+        )
+        #expect(checkpoint.executorIds == capturedIDs)
+
+        manager.stop(modelContext: context)
+
+        let walks = try context.fetch(FetchDescriptor<PetWalkLog>())
+            .filter { !WalkRecoveryCheckpoint.isCheckpoint($0) }
+        let walk = try #require(walks.first)
+        #expect(walk.executorId == first.id.uuidString)
+        #expect(walk.executorIds == capturedIDs)
+    }
+
+    @Test func restoredWalkKeepsCheckpointParticipantsAndExplicitEmptyStartStaysUnattributed() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let first = Human(name: "First walker")
+        let second = Human(name: "Second walker")
+        let pet = Pet(name: "Piper", species: "狗")
+        let capturedIDs = [first.id.uuidString, second.id.uuidString]
+        let checkpoint = PetWalkLog(
+            startDate: Date().addingTimeInterval(-120),
+            pet: pet,
+            executorId: capturedIDs.first,
+            executorIds: capturedIDs,
+            sharedSessionId: WalkRecoveryCheckpoint.makeSharedSessionID()
+        )
+        checkpoint.behaviorNotes = WalkRecoveryCheckpoint.encodeMetadata(
+            WalkRecoveryCheckpoint.metadata(elapsedTime: 90, poopMarkers: [])
+        )
+        context.insert(first)
+        context.insert(second)
+        context.insert(pet)
+        context.insert(checkpoint)
+        try context.save()
+
+        let manager = PetWalkingManager(
+            locationManager: FakeWalkLocationManager(),
+            questManager: QuestManager(),
+            activeHumanSelection: MutableWalkActiveHumanSelection(id: UUID().uuidString)
+        )
+        manager.restore(checkpoint: checkpoint, modelContext: context)
+        #expect(manager.activeWalkExecutorIds == capturedIDs)
+
+        manager.stop(modelContext: context)
+        let restoredWalk = try #require(
+            try context.fetch(FetchDescriptor<PetWalkLog>()).first { !WalkRecoveryCheckpoint.isCheckpoint($0) }
+        )
+        #expect(restoredWalk.executorIds == capturedIDs)
+
+        let unattributedPet = Pet(name: "Rex", species: "狗")
+        context.insert(unattributedPet)
+        try context.save()
+        let unattributedManager = PetWalkingManager(
+            locationManager: FakeWalkLocationManager(),
+            questManager: QuestManager(),
+            activeHumanSelection: MutableWalkActiveHumanSelection(id: first.id.uuidString)
+        )
+        unattributedManager.start(pet: unattributedPet, modelContext: context, executorIds: [])
+        unattributedManager.stop(modelContext: context)
+
+        let unattributedWalk = try #require(
+            try context.fetch(FetchDescriptor<PetWalkLog>()).first { $0.pet?.id == unattributedPet.id }
+        )
+        #expect(unattributedWalk.executorId == nil)
+        #expect(unattributedWalk.executorIds.isEmpty)
+    }
 }
 
 private final class FakeWalkManager: PetWalkingManaging {
@@ -463,7 +578,7 @@ private final class FakeWalkManager: PetWalkingManaging {
         phase = .running
     }
 
-    func stop(modelContext _: ModelContext, sharedTargets _: [Pet], executorIds _: [String]) -> WalkStopRewardSummary {
+    func stop(modelContext _: ModelContext, sharedTargets _: [Pet]) -> WalkStopRewardSummary {
         phase = .finished(elapsed: elapsedTime, poopCount: poopCount)
         return .empty
     }
@@ -497,6 +612,17 @@ private final class FakeWalkLocationManager: WalkLocationManaging {
     func returnActiveWalkToForegroundDelivery() {}
     func enforceNoLocationUnlessRunningWalk(_: Bool, reason _: String) {}
     func routeLocationsForPersistence(maxCount _: Int) -> [CLLocation] { collectedLocations }
+}
+
+private final nonisolated class MutableWalkActiveHumanSelection: ActiveHumanSelecting {
+    var id: String?
+
+    init(id: String?) {
+        self.id = id
+    }
+
+    var currentHumanId: String? { id }
+    var currentHumanIdRaw: String { id ?? "" }
 }
 
 private func makeContainer() throws -> ModelContainer {

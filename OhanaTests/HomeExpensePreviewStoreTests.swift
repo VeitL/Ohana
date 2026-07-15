@@ -1113,6 +1113,9 @@ struct HomeExpensePreviewStoreTests {
         #expect(weightHosts.contains("RouteFirstFrameDeferredLoad("))
         #expect(weightHosts.contains("AppPetWeightQuickSheetRouteData.load(id: id, from: modelContext)"))
         #expect(weightHosts.contains("AppHumanWeightQuickSheetRouteData.load(id: id, from: modelContext)"))
+        #expect(weightHosts.contains("petLedgerSource: .quickAction"))
+        #expect(petRoute.contains("petLedgerSource: .quickAction"))
+        #expect(weightSheet.contains("ledgerSource: petLedgerSource"))
         #expect(weightSheet.contains("@State private var popupVisible = true"))
         #expect(!weightSheet.contains("DispatchQueue.main.async {\n                withAnimation(popupAnimation)"))
     }

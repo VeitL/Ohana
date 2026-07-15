@@ -198,6 +198,7 @@ struct ExpenseAmountPolicyTests {
             note: note,
             petId: petID,
             executorId: nil,
+            recordedByHumanId: nil,
             sharedSessionId: ""
         )
     }

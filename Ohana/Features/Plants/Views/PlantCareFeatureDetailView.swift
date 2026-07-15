@@ -22,6 +22,7 @@ struct PlantCareFeatureDetailView: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     @State private var logDraft: PlantCareFeatureLogDraft?
+    @State private var quickCareActorDraft: PlantQuickCareActorDraft?
     @State private var waterPlanCalendarEnabled = true
     @State private var waterSystemReminderEnabled = true
     @State private var waterCompletionCalendarEnabled = true
@@ -135,16 +136,22 @@ struct PlantCareFeatureDetailView: View {
                     plant: plant,
                     initialCareType: draft.careType,
                     currentHealthStatus: plant.healthStatus,
-                    onSave: { careType, careNote, healthStatus, photoData in
+                    onSave: { careType, careNote, healthStatus, photoData, executorID in
                         saveCareLog(
                             careType,
                             plant: plant,
                             careNote: careNote,
                             healthStatus: healthStatus,
-                            photoData: photoData
+                            photoData: photoData,
+                            executorID: executorID
                         )
                     }
                 )
+            }
+        }
+        .sheet(item: $quickCareActorDraft) { draft in
+            PlantQuickCareActorConfirmationSheet(draft: draft) { executorID in
+                confirmQuickCare(draft, executorID: executorID)
             }
         }
         .onAppear {
@@ -170,43 +177,16 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private var accessibilityRootID: String {
-        if let focusedPlantID {
-            return "plant-care-feature-\(feature.rawValue)-\(focusedPlantID.uuidString)"
-        }
-        return "plant-care-feature-\(feature.rawValue)-aggregate"
+        PlantCareFeatureAccessibility.rootID(feature: feature, focusedPlantID: focusedPlantID)
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            if let focusedPlant {
-                plantAvatar(focusedPlant)
-                    .frame(width: 46, height: 46)
-            } else {
-                Image(systemName: feature.icon)
-                    .font(OhanaFont.adaptive(size: 19, weight: .black))
-                    .foregroundStyle(feature.tint)
-                    .frame(width: 46, height: 46)
-                    .background(feature.tint.opacity(0.16), in: Circle())
-                    .accessibilityHidden(true)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(focusedPlant?.name ?? pageTitle)
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.76)
-                Text(focusedPlant == nil ? subtitle : pageTitle)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 8)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("plant-care-feature-header")
+        PlantCareFeatureHeaderView(
+            plant: focusedPlant,
+            feature: feature,
+            pageTitle: pageTitle,
+            aggregateSubtitle: subtitle
+        )
     }
 
     private var summaryBand: some View {
@@ -749,14 +729,6 @@ struct PlantCareFeatureDetailView: View {
         .accessibilityElement(children: .contain)
     }
 
-    private func plantAvatar(_ plant: Plant) -> some View {
-        Text(plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji)
-            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
-            .frame(width: 44, height: 44)
-            .background(Color(hex: plant.themeColorHex).opacity(0.16), in: Circle())
-            .accessibilityHidden(true)
-    }
-
     private var recordSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle(l.tr(zh: "历史记录", en: "History", de: "Verlauf"))
@@ -1153,7 +1125,39 @@ struct PlantCareFeatureDetailView: View {
     }
 
     private func quickRecordWater(for plant: Plant) {
-        saveCareLog(.watering, plant: plant, careNote: "", healthStatus: plant.healthStatus, photoData: nil)
+        let humanContext = PlantActionHumanSelectionResolver.resolve(
+            context: modelContext,
+            currentLocalHumanIDRaw: activeHumanIdRaw
+        )
+        if humanContext.needsConfirmation {
+            quickCareActorDraft = PlantQuickCareActorDraft(
+                plantID: plant.id,
+                plantName: plant.name,
+                careType: .watering,
+                initialExecutorID: humanContext.defaultHumanID
+            )
+        } else {
+            saveCareLog(
+                .watering,
+                plant: plant,
+                careNote: "",
+                healthStatus: plant.healthStatus,
+                photoData: nil,
+                executorID: humanContext.defaultHumanID
+            )
+        }
+    }
+
+    private func confirmQuickCare(_ draft: PlantQuickCareActorDraft, executorID: UUID?) {
+        guard let plant = plant(for: draft.plantID), !plant.isArchived else { return }
+        saveCareLog(
+            draft.careType,
+            plant: plant,
+            careNote: "",
+            healthStatus: plant.healthStatus,
+            photoData: nil,
+            executorID: executorID
+        )
     }
 
     private func uniqueStrings(_ values: [String]) -> [String] {
@@ -1244,12 +1248,13 @@ struct PlantCareFeatureDetailView: View {
         plant: Plant,
         careNote: String,
         healthStatus: PlantHealthStatus,
-        photoData: Data?
+        photoData: Data?,
+        executorID: UUID?
     ) {
         let request = PlantCareCommandRequest(
             careType: careType,
             plant: plant,
-            executorID: activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw,
+            executorID: executorID?.uuidString,
             careNote: careNote,
             photoData: photoData,
             healthStatus: healthStatus
@@ -1396,6 +1401,14 @@ struct PlantCareFeatureDetailView: View {
 }
 
 private extension PlantCareFeatureDetailView {
+    func plantAvatar(_ plant: Plant) -> some View {
+        Text(plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji)
+            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+            .frame(width: 44, height: 44)
+            .background(Color(hex: plant.themeColorHex).opacity(0.16), in: Circle())
+            .accessibilityHidden(true)
+    }
+
     func plantStatusText(_ plant: Plant) -> String {
         if showsFertilizingCadence {
             guard let lastDate = plant.lastFertilizedDate else {

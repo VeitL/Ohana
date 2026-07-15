@@ -50,10 +50,7 @@ app_reset="Ohana/App/AppResetService.swift"
 app_runtime_adapters="Ohana/App/AppRuntimeAdapters.swift"
 app_services="Ohana/App/AppServices.swift"
 data_backup_files=(
-  "Ohana/Domain/Services/DataBackupManager.swift"
-  "Ohana/Domain/Services/DataBackupManager+AppState.swift"
-  "Ohana/Domain/Services/DataBackupManager+Encode.swift"
-  "Ohana/Domain/Services/DataBackupManager+Decode.swift"
+  Ohana/Domain/Services/DataBackupManager*.swift
   "Ohana/Domain/Services/DataBackupMediaPackage.swift"
   "Ohana/Domain/Services/DataBackupPreflightValidator.swift"
   "Ohana/Domain/Services/DataBackupRuntime.swift"
@@ -66,6 +63,8 @@ human_note_commands="Ohana/Features/HumanNotes/HumanNoteCommands.swift"
 member_deletion_commands="Ohana/Features/Members/MemberDeletionCommands.swift"
 human_note_attachment_tests="OhanaTests/HumanNoteAttachmentLifecycleTests.swift"
 data_backup_atomic_tests="OhanaTests/DataBackupAtomicRestoreTests.swift"
+v90_migration_fixture="OhanaTests/Fixtures/ArkSchemaV90/default.store"
+v90_migration_manifest="OhanaTests/Fixtures/ArkSchemaV90/manifest.json"
 settings_backup="Ohana/Features/Settings/Views/SettingsView+Backup.swift"
 settings_chrome="Ohana/Features/Settings/Views/SettingsView+Chrome.swift"
 
@@ -152,6 +151,7 @@ backup_contract_entries=(
   "Human|struct HumanBackup"
   "HumanHealthMetricLog|struct HumanHealthMetricLogBackup"
   "HumanHealthReport|struct HumanHealthReportBackup"
+  "HumanNoteRecord|struct HumanNoteRecordBackup"
   "HumanMedication|struct HumanMedicationBackup"
   "HumanMedicationLog|struct HumanMedicationLogBackup"
   "HumanWeightLog|struct HumanWeightLogBackup"
@@ -218,8 +218,8 @@ for entry in "${backup_contract_entries[@]}"; do
     "SwiftData model $model should have a matching backup DTO, or a documented exemption if intentionally excluded."
 done
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV90\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV90 model set."
+require_pattern "$shared_container" 'Schema\(ArkSchemaV91\.models\)' \
+  "SharedModelContainer should open the current ArkSchemaV91 model set."
 
 require_pattern "$local_backup_exclusion" 'values\.isExcludedFromBackup = true' \
   "Local persistence must set URLResourceValues.isExcludedFromBackup before storing private data."
@@ -326,11 +326,11 @@ while IFS= read -r localized_strings; do
     "Localized resources must not retain the obsolete claim that backups include all Human health records."
 done < <(find Ohana -name Localizable.strings -type f -print)
 
-require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 30' \
-  "OhanaBackup.schemaVersion should be 30 after externalizing backup media."
+require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 31' \
+  "OhanaBackup.schemaVersion should be 31 after adding Human action attribution."
 
-require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 30' \
-  "Restore preflight should accept supported backup schema versions through 30."
+require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 31' \
+  "Restore preflight should accept supported backup schema versions through 31."
 
 require_pattern "$data_backup_dtos" 'struct BackupMediaPackageInfo' \
   "OhanaBackup should describe the out-of-line backup media package."
@@ -482,7 +482,7 @@ require_pattern "$data_backup_dtos" 'var humanHealthReports: \[HumanHealthReport
 require_backup_pattern 'FetchDescriptor<HumanHealthReport>' \
   "DataBackupManager should fetch HumanHealthReport during backup/import."
 
-require_backup_pattern 'humanHealthReports: humanHealthReports\.map\(encodeHumanHealthReport\)' \
+require_backup_pattern 'humanHealthReports: [[:alnum:]_.]+\.map\(encodeHumanHealthReport\)' \
   "buildBackup should encode human health reports."
 
 require_backup_pattern 'insertHumanHealthReportIfNeeded' \
@@ -562,6 +562,28 @@ require_pattern "OhanaTests/MediaAttachmentUpgradeCompatibilityTests.swift" 'unk
 
 require_pattern "OhanaTests/SharedModelContainerRecoveryTests.swift" 'testV67StoreOpensThroughLatestLightweightMigrationWithCoreUserData' \
   "Release data safety should cover a realistic old-store upgrade with core user data, not only metadata rows."
+
+require_pattern "OhanaTests/SharedModelContainerRecoveryTests.swift" 'testRealV90BinaryStoreMigratesToV91AndPersistsAttributionFacts' \
+  "Release data safety should exercise the real V90 binary fixture through V91 attribution writes and relaunch."
+
+if [[ ! -s "$v90_migration_fixture" ]]; then
+  failures+=("Release data safety should keep the real V90 SQLite migration fixture.")
+fi
+if [[ -f "$v90_migration_manifest" ]]; then
+  require_pattern "$v90_migration_manifest" '"sourceSchemaTarget"[[:space:]]*:[[:space:]]*"ArkSchemaV90"' \
+    "The V90 migration fixture manifest should identify its source schema target."
+  require_pattern "$v90_migration_manifest" '"sha256"[[:space:]]*:[[:space:]]*"[0-9a-f]{64}"' \
+    "The V90 migration fixture manifest should record a SHA-256 digest."
+  if [[ -s "$v90_migration_fixture" ]]; then
+    manifest_fixture_sha="$(awk -F '"' '$2 == "sha256" { print $4; exit }' "$v90_migration_manifest")"
+    actual_fixture_sha="$(shasum -a 256 "$v90_migration_fixture" | awk '{ print $1 }')"
+    if [[ -z "$manifest_fixture_sha" || "$manifest_fixture_sha" != "$actual_fixture_sha" ]]; then
+      failures+=("The V90 migration fixture no longer matches its reviewed provenance digest.")
+    fi
+  fi
+else
+  failures+=("Release data safety should keep provenance for the real V90 SQLite migration fixture.")
+fi
 
 require_pattern "Ohana/Shared/Media/AttachmentPrivacySanitizer.swift" 'SanitizedAttachmentPayload' \
   "Attachment sanitizer should return both sanitized bytes and the normalized display filename."

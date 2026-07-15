@@ -418,12 +418,15 @@ struct AddVaccineSheet: View {
     @State private var costText: String = ""
     @State private var reminderDaysBefore: Int = 7
     @State private var enableReminder: Bool = true
+    @State private var selectedRecorderHumanID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var isSaving = false
 
     private let reminderOptions = [3, 7, 14, 30]
     private var l: L10n { L10n(appLanguage) }
     private var canSave: Bool {
-        pet.canWriteHealthFacts && !isSaving && !vaccineName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        pet.canWriteHealthFacts && !isSaving && !requiresRecorderSelection &&
+            !vaccineName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var vaccineSuggestions: [String] {
@@ -467,6 +470,13 @@ struct AddVaccineSheet: View {
                         }
                         clinicSection
                         costSection
+                        QuickCareActionHumanPickerContainer(
+                            selectedHumanID: $selectedRecorderHumanID,
+                            requiresSelection: $requiresRecorderSelection,
+                            role: .recorder,
+                            tint: Color.goPrimary
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 8)
@@ -710,7 +720,6 @@ struct AddVaccineSheet: View {
     private func save() {
         guard canSave else { return }
         isSaving = true
-        let executorId = appServices.activeHumanSelection.currentHumanId
         let input = PetHealthRecordCommandInput(
             type: .vaccine,
             date: date,
@@ -720,7 +729,7 @@ struct AddVaccineSheet: View {
             cost: CountryDecimalInput.parse(costText, countryCode: AppCountry.code) ?? 0,
             expirationDate: hasExpiry ? expiryDate : nil,
             nextCheckupDate: nil,
-            executorId: executorId,
+            executorId: selectedRecorderHumanID?.uuidString,
             source: .detail,
             includesNameInNote: true,
             expirationReminderLeadDays: (hasExpiry && enableReminder) ? reminderDaysBefore : nil

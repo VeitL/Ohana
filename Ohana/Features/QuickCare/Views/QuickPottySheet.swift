@@ -19,6 +19,8 @@ struct QuickPottySheet: View {
     @State private var selectedType: PottyType = .perfectPoop
     @State private var date = Date()
     @State private var isSaving = false
+    @State private var selectedActionHumanID: UUID?
+    @State private var requiresActionHumanSelection = false
 
     private var l: L10n { L10n(appLanguage) }
     private var commandExecutor: QuickPottyCommandExecutor {
@@ -48,9 +50,13 @@ struct QuickPottySheet: View {
                 }
                 .padding(.horizontal, 20).padding(.top, 20)
 
-                // 执行人胶囊
                 HStack {
-                    QuickCareExecutorPickerBarContainer(tint: Color.goYellow)
+                    QuickCareActionHumanPickerContainer(
+                        selectedHumanID: $selectedActionHumanID,
+                        requiresSelection: $requiresActionHumanSelection,
+                        role: .executor,
+                        tint: Color.goYellow
+                    )
                     Spacer()
                 }
                 .padding(.horizontal, 20)
@@ -103,7 +109,7 @@ struct QuickPottySheet: View {
                     .background(isSaving ? Color.goYellow.opacity(0.72) : Color.goYellow, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .disabled(isSaving)
+                .disabled(isSaving || requiresActionHumanSelection)
                 .padding(.horizontal, 20)
 
                 Spacer()
@@ -116,8 +122,8 @@ struct QuickPottySheet: View {
     }
 
     private func savePotty() {
-        guard !isSaving else { return }
-        let eid = appServices.activeHumanSelection.currentHumanId
+        guard !isSaving, !requiresActionHumanSelection else { return }
+        let executorId = selectedActionHumanID?.uuidString
         let isLitter = ["猫", "兔子", "仓鼠", "龙猫", "豚鼠"].contains(pet.species)
         let action = isLitter ? CareType.litter.rawValue : selectedType.rawValue
         isSaving = true
@@ -127,7 +133,7 @@ struct QuickPottySheet: View {
                 petID: pet.id,
                 selectedType: selectedType,
                 isLitter: isLitter,
-                executorId: eid,
+                executorId: executorId,
                 date: date
             )
             isSaving = false

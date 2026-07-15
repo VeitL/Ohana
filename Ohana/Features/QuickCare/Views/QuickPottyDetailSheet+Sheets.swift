@@ -28,103 +28,11 @@ extension QuickPottyDetailSheet {
     func sheetContent(_ sheet: ActiveSheet) -> some View {
         switch sheet {
         case .pottyType:
-            PottyTypeSheet(
-                tint: pottyTint,
-                unknownGroupTitle: sameSpeciesPottyPets.count > 1 ? l.tr(zh: "猫砂盆未知噗噗", en: "Mystery litter-box poop", de: "Unbekanntes Klo-Häufchen") : nil,
-                onUnknownGroup: sameSpeciesPottyPets.count > 1 ? {
-                    logUnknownGroupPotty()
-                    dismissInlinePoopSheet()
-                } : nil
-            ) { type in
-                logPotty(type: type)
-                dismissInlinePoopSheet()
-            }
-            .ohanaAdaptiveSheetContentHeight(
-                $adaptiveSheetHeight,
-                minHeight: 350,
-                maxHeight: 620,
-                chromePadding: 70
-            )
+            pottyTypeActionSheet
         case .scoopCheckIn:
-            VStack(spacing: 12) {
-                if sameSpeciesPottyPets.count > 1 {
-                    SharedCareTargetPicker(
-                        title: l.tr(zh: "共同铲砂", en: "Scoop together", de: "Gemeinsam reinigen"),
-                        subtitle: petCountText(selectedPottyTargets.count, species: pet.species),
-                        pets: sameSpeciesPottyPets,
-                        selectedPetIds: $selectedSharedPottyPetIds,
-                        tint: scoopTint,
-                        fixedPetId: pet.id
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.top, 14)
-                }
-                PoopCheckInSheet(
-                    tint: scoopTint,
-                    icon: "trash.fill",
-                    title: l.tr(zh: "铲砂打卡", en: "Scoop check-in", de: "Klo-Check-in"),
-                    value: dueText(daysUntil: daysUntilScoop),
-                    subtitle: scoopSubtitle,
-                    primaryTitle: scoopNeedsCatchUp ? l.tr(zh: "补打卡", en: "Catch up", de: "Nachtragen") : (todayLitterLogs.isEmpty ? l.tr(zh: "完成铲砂", en: "Scoop done", de: "Klo sauber") : l.tr(zh: "今天已完成", en: "Done today", de: "Heute erledigt")),
-                    secondaryTitle: l.tr(zh: "编辑计划", en: "Edit plan", de: "Plan ändern"),
-                    isPrimaryDisabled: !todayLitterLogs.isEmpty && daysUntilScoop >= 0,
-                    primaryAccessibilityIdentifier: "quick-potty-scoop-confirm-action",
-                    secondaryAccessibilityIdentifier: "quick-potty-scoop-edit-plan-action",
-                    primaryAction: {
-                        recordScoop()
-                        dismissInlinePoopSheet()
-                    },
-                    secondaryAction: {
-                        openPottySheet(.scoopSettings)
-                    }
-                )
-            }
-            .ohanaAdaptiveSheetContentHeight(
-                $adaptiveSheetHeight,
-                minHeight: sameSpeciesPottyPets.count > 1 ? 430 : 330,
-                maxHeight: 620,
-                chromePadding: 70
-            )
+            scoopCheckInActionSheet
         case .litterChangeCheckIn:
-            VStack(spacing: 12) {
-                if sameSpeciesPottyPets.count > 1 {
-                    SharedCareTargetPicker(
-                        title: l.tr(zh: "共同换砂", en: "Change together", de: "Gemeinsam wechseln"),
-                        subtitle: petCountText(selectedPottyTargets.count, species: pet.species),
-                        pets: sameSpeciesPottyPets,
-                        selectedPetIds: $selectedSharedPottyPetIds,
-                        tint: litterTint,
-                        fixedPetId: pet.id
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.top, 14)
-                }
-                PoopCheckInSheet(
-                    tint: litterTint,
-                    icon: "tray.full.fill",
-                    title: l.tr(zh: "换猫砂", en: "Change litter", de: "Streu wechseln"),
-                    value: dueText(daysUntil: daysUntilLitterChange),
-                    subtitle: litterChangeSubtitle,
-                    primaryTitle: l.tr(zh: "记录换砂", en: "Log change", de: "Wechsel loggen"),
-                    secondaryTitle: l.tr(zh: "编辑计划", en: "Edit plan", de: "Plan ändern"),
-                    isPrimaryDisabled: false,
-                    primaryAccessibilityIdentifier: "quick-potty-litter-confirm-action",
-                    secondaryAccessibilityIdentifier: "quick-potty-litter-edit-plan-action",
-                    primaryAction: {
-                        doFullChange()
-                        dismissInlinePoopSheet()
-                    },
-                    secondaryAction: {
-                        openPottySheet(.litterSettings)
-                    }
-                )
-            }
-            .ohanaAdaptiveSheetContentHeight(
-                $adaptiveSheetHeight,
-                minHeight: sameSpeciesPottyPets.count > 1 ? 430 : 330,
-                maxHeight: 620,
-                chromePadding: 70
-            )
+            litterChangeActionSheet
         case .scoopSettings:
             PoopCycleSettingsSheet(
                 tint: scoopTint,

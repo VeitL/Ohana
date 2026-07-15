@@ -34,6 +34,8 @@ may override the active sources below.
 | Physical-device acceptance | `docs/release-true-device-test-plan.md` and `docs/planning/gap-acceptance-track-list.md` |
 | Architecture/runtime/privacy gates | `docs/*-governance.md`, `docs/*-policy.md`, and `docs/release-quality-gates.md` |
 | Feature behavior | `docs/specs/*-logic.md` |
+| Unified tasks / Task Center | `docs/specs/TaskCenter-logic.md` |
+| Local build/test storage | `docs/local-build-storage-policy.md` |
 | UI tokens | `ui规范.selection.json`; `docs/design/ui规范.md` is explanatory |
 | Resource ownership | `docs/governance/manifests/*.json` and family manifests under `Resources/` |
 

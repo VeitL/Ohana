@@ -51,6 +51,7 @@ final class PetExpenseLog {
     var note: String
     var sharedSessionId: String = ""
     var executorId: String? // ArkSchemaV11: 花费支付者的 Human.id.uuidString
+    var recordedByHumanId: String? // ArkSchemaV91: 本次录入者；与付款人分开
     var pet: Pet?
     // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
     // Active product code must not read or write these fields.
@@ -59,7 +60,16 @@ final class PetExpenseLog {
     var trashBatchId: String = ""
     var trashedByHumanId: String = ""
 
-    init(date: Date = Date(), amount: Double = 0, category: ExpenseCategory = .other, note: String = "", pet: Pet? = nil, executorId: String? = nil, sharedSessionId: String = "") {
+    init(
+        date: Date = Date(),
+        amount: Double = 0,
+        category: ExpenseCategory = .other,
+        note: String = "",
+        pet: Pet? = nil,
+        executorId: String? = nil,
+        recordedByHumanId: String? = nil,
+        sharedSessionId: String = ""
+    ) {
         self.id = UUID()
         self.date = date
         self.amount = amount
@@ -67,6 +77,7 @@ final class PetExpenseLog {
         self.note = note
         self.sharedSessionId = sharedSessionId
         self.executorId = executorId
+        self.recordedByHumanId = recordedByHumanId
         self.pet = pet
     }
 

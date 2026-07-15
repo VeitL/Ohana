@@ -26,7 +26,7 @@ struct CalendarRouteContainer: View {
     var onEmbeddedScrollOffsetChange: ((CGFloat) -> Void)?
     var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)?
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
-    var onCompleteEvent: ((Event, Date) -> Bool)?
+    var onCompleteEvent: ((Event, Date, String?) -> Bool)?
 
     var body: some View {
         CalendarView(

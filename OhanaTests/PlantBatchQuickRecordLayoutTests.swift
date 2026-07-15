@@ -115,10 +115,11 @@ struct PlantBatchQuickRecordLayoutTests {
         )
 
         #expect(sheetSource.contains("@State private var isRecording = false"))
-        #expect(sheetSource.contains("let didRecord = await onRecord(selections)\n        guard didRecord else { return }\n\n        UINotificationFeedbackGenerator().notificationOccurred(.success)\n        dismiss()"))
-        #expect(sheetSource.contains(".disabled(selectedCount == 0 || isRecording)"))
-        #expect(dashboardSource.contains("func recordBatchQuickCare(_ selections: [PlantBatchCareSelection]) async -> Bool"))
-        #expect(detailActionsSource.contains("func recordBatchQuickCareFromDetail(_ selections: [PlantBatchCareSelection]) async -> Bool"))
+        #expect(sheetSource.contains("let didRecord = await onRecord(selections, resolvedExecutorID)\n        guard didRecord else { return }\n\n        UINotificationFeedbackGenerator().notificationOccurred(.success)\n        dismiss()"))
+        #expect(sheetSource.contains(".disabled(selectedCount == 0 || isRecording || requiresExecutorSelection)"))
+        #expect(dashboardSource.contains("func recordBatchQuickCare(_ selections: [PlantBatchCareSelection], executorID: UUID?) async -> Bool"))
+        #expect(detailActionsSource.contains("func recordBatchQuickCareFromDetail("))
+        #expect(detailActionsSource.contains("executorID: UUID?"))
     }
 
     @Test func fertilizingRowsShowLastDatePlannedCadenceAndLocalizedDueState() throws {

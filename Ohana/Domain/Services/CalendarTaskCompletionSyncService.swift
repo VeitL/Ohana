@@ -255,7 +255,7 @@ enum CalendarTaskCompletionSyncService {
         return .noOp
     }
 
-    static func isPetTask(event: Event) -> Bool {
+    nonisolated static func isPetTask(event: Event) -> Bool {
         careType(for: event) != nil || pottyType(for: event) != nil || hygieneType(for: event) != nil
     }
 

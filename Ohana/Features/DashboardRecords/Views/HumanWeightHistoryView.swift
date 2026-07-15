@@ -22,6 +22,8 @@ struct HumanWeightHistoryView: View {
     @State private var newWeightText = ""
     @State private var newWeightDate = Date()
     @State private var includesWeightTime = false
+    @State private var selectedInlineRecorderHumanID: UUID?
+    @State private var requiresInlineRecorderSelection = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -42,7 +44,7 @@ struct HumanWeightHistoryView: View {
     }
 
     private var canSaveInlineWeight: Bool {
-        (parsedInlineWeight ?? 0) > 0
+        (parsedInlineWeight ?? 0) > 0 && !requiresInlineRecorderSelection
     }
 
     private var inlineWeightRecordDate: Date {
@@ -340,6 +342,14 @@ struct HumanWeightHistoryView: View {
             .padding(12)
             .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
+            QuickCareActionHumanPickerContainer(
+                selectedHumanID: $selectedInlineRecorderHumanID,
+                requiresSelection: $requiresInlineRecorderSelection,
+                role: .recorder,
+                tint: .goPrimary
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             Button(action: saveInlineWeight) {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
@@ -406,8 +416,10 @@ struct HumanWeightHistoryView: View {
     }
 
     private func saveInlineWeight() {
-        guard let value = parsedInlineWeight, value > 0 else { return }
-        let executorId = activeHumanIdStr.isEmpty ? nil : activeHumanIdStr
+        guard !requiresInlineRecorderSelection,
+              let value = parsedInlineWeight,
+              value > 0 else { return }
+        let executorId = selectedInlineRecorderHumanID?.uuidString
         let savedDate = inlineWeightRecordDate
         let command = DomainCommand.weightEntry(entityID: human.id, entityKind: EntityKind.human.rawValue)
         commandQueue.enqueue(command) {
@@ -425,6 +437,7 @@ struct HumanWeightHistoryView: View {
                     newWeightText = ""
                     newWeightDate = Date()
                     includesWeightTime = false
+                    selectedInlineRecorderHumanID = nil
                     isInlineWeightComposerVisible = false
                 }
             } catch {

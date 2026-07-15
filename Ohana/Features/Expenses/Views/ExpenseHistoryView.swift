@@ -527,6 +527,7 @@ struct ExpenseHistoryContentView: View {
         let isReimbursement = log.amount < 0
         let accentColor: Color = isReimbursement ? Color(hex: "4ECDC4") : Color.goYellow
         let payer = payer(for: log)
+        let recorder = recorder(for: log)
         let payerLabel = isReimbursement ? l.tr(zh: "到账", en: "Received", de: "Eingang") : l.tr(zh: "支付者", en: "Payer", de: "Gezahlt von")
         let payerName = payer?.name ?? (isReimbursement ? l.tr(zh: "保险", en: "Insurance", de: "Versicherung") : l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugeordnet"))
         let visibleNote = SharedCareMetadata.visibleNote(log.note)
@@ -573,6 +574,11 @@ struct ExpenseHistoryContentView: View {
                     Text("\(payerLabel)：\(payerName)")
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .lineLimit(1)
+                    if let recorder {
+                        Text("· \(l.tr(zh: "记录", en: "Recorded", de: "Erfasst"))：\(recorder.name)")
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                            .lineLimit(1)
+                    }
                 }
                 .foregroundStyle(accentColor.opacity(payer == nil && !isReimbursement ? 0.65 : 1))
             }
@@ -636,6 +642,12 @@ struct ExpenseHistoryContentView: View {
     private func payer(for log: PetExpenseLog) -> Human? {
         guard let executorId = log.executorId else { return nil }
         return allHumans.first { $0.id.uuidString == executorId }
+    }
+
+    private func recorder(for log: PetExpenseLog) -> Human? {
+        guard let recordedByHumanId = log.recordedByHumanId,
+              recordedByHumanId != log.executorId else { return nil }
+        return allHumans.first { $0.id.uuidString == recordedByHumanId }
     }
 
     private func saveInlineExpense() {

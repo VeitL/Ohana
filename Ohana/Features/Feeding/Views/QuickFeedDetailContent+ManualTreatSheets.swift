@@ -15,6 +15,10 @@ extension QuickFeedDetailContent {
                 if !isSettingsOnly, let reminder = nextReminder {
                     plannedReminderBanner(reminder)
                 }
+                if !isSettingsOnly {
+                    actionHumanPicker
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 if isSettingsOnly || nextReminder == nil {
                     manualFoodKindSelector
                 }
@@ -147,6 +151,8 @@ extension QuickFeedDetailContent {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 sheetHero(icon: "birthday.cake.fill", title: l.tr(zh: "记录零食", en: "Log treats", de: "Snack eintragen"), tint: treatTint)
+                actionHumanPicker
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 treatKindPicker(selection: $draftStore.selectedTreatKind)
                 gramInput(
                     title: l.tr(zh: "克数（可选）", en: "Grams (optional)", de: "Gramm (optional)"),

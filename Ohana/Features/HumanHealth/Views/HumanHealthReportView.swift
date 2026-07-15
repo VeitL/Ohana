@@ -288,6 +288,8 @@ struct AddHumanHealthReportSheet: View {
     @State private var nextCheckDate = Calendar.current.date(byAdding: .month, value: 6, to: Date()) ?? Date()
     @State private var summary = ""
     @State private var notes = ""
+    @State private var selectedRecorderID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var isSaving = false
     private var l: L10n { L10n(appLanguage) }
 
@@ -418,6 +420,14 @@ struct AddHumanHealthReportSheet: View {
                                         .labelsHidden()
                                 }
                             }
+
+                            QuickCareActionHumanPickerContainer(
+                                selectedHumanID: $selectedRecorderID,
+                                requiresSelection: $requiresRecorderSelection,
+                                role: .recorder,
+                                tint: .goTeal
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(16)
                     }
@@ -489,7 +499,7 @@ struct AddHumanHealthReportSheet: View {
                             .background(Color.goTeal, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    .disabled(isSaving)
+                    .disabled(isSaving || requiresRecorderSelection)
                     .accessibilityIdentifier("add-human-health-report-save-action")
                     .padding(.horizontal, 16)
                     .padding(.bottom, 40)
@@ -542,10 +552,11 @@ struct AddHumanHealthReportSheet: View {
         nextCheckDate = r.nextCheckDate ?? Calendar.current.date(byAdding: .month, value: 6, to: Date()) ?? Date()
         summary = r.summary
         notes = r.notes
+        selectedRecorderID = r.recordedByHumanId.flatMap(UUID.init(uuidString:))
     }
 
     private func save() {
-        guard !isSaving else { return }
+        guard !isSaving, !requiresRecorderSelection else { return }
         isSaving = true
         let input = HumanHealthReportCommandInput(
             reportType: reportType,
@@ -555,7 +566,8 @@ struct AddHumanHealthReportSheet: View {
             reportDate: reportDate,
             nextCheckDate: hasNextCheck ? nextCheckDate : nil,
             summary: summary,
-            notes: notes
+            notes: notes,
+            recordedByHumanId: selectedRecorderID?.uuidString
         )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 

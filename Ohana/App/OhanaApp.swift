@@ -13,6 +13,13 @@ import UIKit
 
 let ohanaProcessStartTime = CFAbsoluteTimeGetCurrent()
 
+// ui-v4: allow the Figma-authored fixed launch canvas color.
+private let ohanaLaunchCanvasColor = Color(
+    red: 12.0 / 255.0,
+    green: 12.0 / 255.0,
+    blue: 12.0 / 255.0
+)
+
 @main
 struct OhanaApp: App {
     @UIApplicationDelegateAdaptor(OhanaCloudSharingAppDelegate.self) private var cloudSharingAppDelegate
@@ -106,7 +113,7 @@ private struct OhanaBootstrapRootView: View {
                 .zIndex(1)
             }
         }
-        .background(Color(red: 0.035, green: 0.035, blue: 0.035).ignoresSafeArea())
+        .background(ohanaLaunchCanvasColor.ignoresSafeArea())
         .tint(Color.goPrimary)
         .preferredColorScheme(preferredScheme)
         .onAppear {
@@ -408,7 +415,8 @@ private struct OhanaLaunchLoadingView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @State private var animationStartedAt = Date()
+    @State private var accumulatedMotionTime: TimeInterval = 0
+    @State private var motionResumedAt = Date()
 
     private var canAnimate: Bool {
         !reduceMotion && workloadPolicy.shouldRunRepeatingAnimation(isVisible: true)
@@ -416,20 +424,24 @@ private struct OhanaLaunchLoadingView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.035, green: 0.035, blue: 0.035)
+            ohanaLaunchCanvasColor
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
             GeometryReader { proxy in
                 TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !canAnimate)) { context in
+                    let sample = motionSample(at: context.date)
+
                     ZStack {
-                        OhanaLaunchExpansionField(
-                            phase: canAnimate ? animationPhase(at: context.date) : 0.36,
-                            diameter: min(proxy.size.width * 0.48, 196)
+                        OhanaLaunchGlow(
+                            scale: sample.glowScale,
+                            opacity: sample.glowOpacity
                         )
 
-                        OhanaLaunchMark(phase: canAnimate ? animationPhase(at: context.date) : 0.36)
-                            .frame(width: 72, height: 58)
+                        OhanaLaunchMark(
+                            leftEyeScale: sample.leftEyeScale,
+                            rightEyeScale: sample.rightEyeScale
+                        )
                     }
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .accessibilityHidden(true)
@@ -452,70 +464,154 @@ private struct OhanaLaunchLoadingView: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityAddTraits(.updatesFrequently)
-    }
-
-    private func animationPhase(at date: Date) -> CGFloat {
-        CGFloat(date.timeIntervalSince(animationStartedAt).truncatingRemainder(dividingBy: 1.35) / 1.35)
-    }
-}
-
-private struct OhanaLaunchExpansionField: View {
-    let phase: CGFloat
-    let diameter: CGFloat
-
-    var body: some View {
-        OhanaLaunchExpansionWave(progress: phase, diameter: diameter)
-            .drawingGroup()
-    }
-}
-
-private struct OhanaLaunchExpansionWave: View {
-    let progress: CGFloat
-    let diameter: CGFloat
-
-    var body: some View {
-        let clampedProgress = min(max(progress, 0), 1)
-        let smoothProgress = clampedProgress * clampedProgress * (3 - 2 * clampedProgress)
-        let visibility = sin(clampedProgress * .pi)
-
-        ZStack {
-            Circle()
-                .fill(.white.opacity(0.05)) // ui-v4: allow the Figma-authored launch diffusion on its fixed dark canvas.
-            Circle()
-                .stroke(.white.opacity(0.18), lineWidth: 1.2) // ui-v4: allow the Figma-authored launch diffusion on its fixed dark canvas.
+        .onChange(of: canAnimate) { wasAnimating, isAnimating in
+            let now = Date()
+            if wasAnimating {
+                accumulatedMotionTime += max(0, now.timeIntervalSince(motionResumedAt))
+            }
+            if isAnimating {
+                motionResumedAt = now
+            }
         }
-        .frame(width: diameter, height: diameter)
-        .scaleEffect(0.28 + 0.76 * smoothProgress)
-        .opacity(visibility)
+    }
+
+    private func motionSample(at date: Date) -> OhanaLaunchMotionSample {
+        guard canAnimate else { return .reducedMotion }
+        let elapsed = accumulatedMotionTime + max(0, date.timeIntervalSince(motionResumedAt))
+        return OhanaLaunchMotionSample(elapsed: elapsed)
+    }
+}
+
+private struct OhanaLaunchMotionSample {
+    private static let blinkDuration: TimeInterval = 3.8
+    private static let rightEyeDelay: TimeInterval = 0.08
+    private static let firstBlinkLead = blinkDuration * 0.88
+    private static let glowDuration: TimeInterval = 2.6
+
+    let leftEyeScale: CGFloat
+    let rightEyeScale: CGFloat
+    let glowScale: CGFloat
+    let glowOpacity: CGFloat
+
+    static let reducedMotion = OhanaLaunchMotionSample(
+        leftEyeScale: 1,
+        rightEyeScale: 1,
+        glowScale: 1,
+        glowOpacity: 0.13
+    )
+
+    init(elapsed: TimeInterval) {
+        leftEyeScale = Self.eyeScale(
+            phase: Self.phase(
+                elapsed + Self.firstBlinkLead,
+                duration: Self.blinkDuration
+            )
+        )
+        rightEyeScale = Self.eyeScale(
+            phase: Self.phase(
+                elapsed + Self.firstBlinkLead - Self.rightEyeDelay,
+                duration: Self.blinkDuration
+            )
+        )
+
+        let glowPhase = Self.phase(elapsed, duration: Self.glowDuration)
+        let glowLinearProgress = glowPhase <= 0.5
+            ? glowPhase * 2
+            : (1 - glowPhase) * 2
+        let glowProgress = Self.smoothstep(glowLinearProgress)
+        glowScale = 1 + 0.16 * glowProgress
+        glowOpacity = 0.13 + 0.11 * glowProgress
+    }
+
+    private init(
+        leftEyeScale: CGFloat,
+        rightEyeScale: CGFloat,
+        glowScale: CGFloat,
+        glowOpacity: CGFloat
+    ) {
+        self.leftEyeScale = leftEyeScale
+        self.rightEyeScale = rightEyeScale
+        self.glowScale = glowScale
+        self.glowOpacity = glowOpacity
+    }
+
+    private static func phase(_ elapsed: TimeInterval, duration: TimeInterval) -> CGFloat {
+        let wrapped = elapsed.truncatingRemainder(dividingBy: duration)
+        let positive = wrapped >= 0 ? wrapped : wrapped + duration
+        return CGFloat(positive / duration)
+    }
+
+    private static func eyeScale(phase: CGFloat) -> CGFloat {
+        if phase < 0.88 || phase >= 1 {
+            return 1
+        }
+        if phase <= 0.93 {
+            let progress = smoothstep((phase - 0.88) / 0.05)
+            return 1 - 0.94 * progress
+        }
+        let progress = smoothstep((phase - 0.93) / 0.07)
+        return 0.06 + 0.94 * progress
+    }
+
+    private static func smoothstep(_ value: CGFloat) -> CGFloat {
+        let clamped = min(max(value, 0), 1)
+        return clamped * clamped * (3 - 2 * clamped)
+    }
+}
+
+private struct OhanaLaunchGlow: View {
+    let scale: CGFloat
+    let opacity: CGFloat
+
+    var body: some View {
+        RadialGradient(
+            stops: [
+                .init(color: .white.opacity(0.7), location: 0), // ui-v4: allow the Figma-authored launch glow.
+                .init(color: .clear, location: 0.7),
+                .init(color: .clear, location: 1)
+            ],
+            center: .center,
+            startRadius: 0,
+            endRadius: 144
+        )
+        .frame(width: 288, height: 288)
+        .scaleEffect(scale)
+        .opacity(opacity)
     }
 }
 
 private struct OhanaLaunchMark: View {
-    let phase: CGFloat
+    let leftEyeScale: CGFloat
+    let rightEyeScale: CGFloat
 
     var body: some View {
-        let cycle = phase * .pi * 2
-        let pulse = (sin(cycle - .pi / 2) + 1) / 2
-
         ZStack {
-            OhanaLaunchSmileShape()
-                .fill(.white) // ui-v4: allow Figma-authored launch mark ink on the fixed dark launch canvas.
-                .frame(width: 66, height: 30)
-                .offset(y: 13)
+            launchLayer(named: "LaunchMarkMouth")
 
-            Circle()
-                .fill(.white) // ui-v4: allow Figma-authored launch mark ink on the fixed dark launch canvas.
-                .frame(width: 18, height: 18) // a11y: allow decorative noninteractive launch-mark eye.
-                .offset(x: -15, y: -12)
+            launchLayer(named: "LaunchMarkEyeLeft")
+                .scaleEffect(
+                    x: 1,
+                    y: leftEyeScale,
+                    anchor: UnitPoint(x: 0.364, y: 0.328)
+                )
 
-            Circle()
-                .fill(.white) // ui-v4: allow Figma-authored launch mark ink on the fixed dark launch canvas.
-                .frame(width: 17, height: 17) // a11y: allow decorative noninteractive launch-mark eye.
-                .offset(x: 15, y: -10)
+            launchLayer(named: "LaunchMarkEyeRight")
+                .scaleEffect(
+                    x: 1,
+                    y: rightEyeScale,
+                    anchor: UnitPoint(x: 0.633, y: 0.362)
+                )
         }
-        .drawingGroup()
-        .shadow(color: .white.opacity(0.16 + 0.07 * pulse), radius: 18) // ui-v4: allow the Figma launch mark's intentional soft halo.
-        .scaleEffect(0.985 + 0.015 * pulse)
+        .frame(width: 180, height: 180)
+        .shadow(color: .black.opacity(0.42), radius: 20, x: 0, y: 18) // ui-v4: allow the Figma launch mark's intentional soft shadow.
+    }
+
+    private func launchLayer(named name: String) -> some View {
+        Image(name)
+            .resizable()
+            .renderingMode(.original)
+            .interpolation(.high)
+            .frame(width: 180, height: 180)
     }
 }
 
@@ -542,35 +638,6 @@ private struct OhanaLaunchCircularDismissMask: Shape {
             height: radius * 2
         ))
         return path
-    }
-}
-
-private struct OhanaLaunchSmileShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        Path { path in
-            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-            path.addCurve(
-                to: CGPoint(x: rect.maxX, y: rect.minY),
-                control1: CGPoint(x: rect.width * 0.18, y: rect.height * 0.58),
-                control2: CGPoint(x: rect.width * 0.82, y: rect.height * 0.58)
-            )
-            path.addCurve(
-                to: CGPoint(x: rect.width * 0.73, y: rect.height * 0.86),
-                control1: CGPoint(x: rect.width * 0.97, y: rect.height * 0.46),
-                control2: CGPoint(x: rect.width * 0.87, y: rect.height * 0.76)
-            )
-            path.addCurve(
-                to: CGPoint(x: rect.width * 0.27, y: rect.height * 0.86),
-                control1: CGPoint(x: rect.width * 0.63, y: rect.maxY),
-                control2: CGPoint(x: rect.width * 0.37, y: rect.maxY)
-            )
-            path.addCurve(
-                to: CGPoint(x: rect.minX, y: rect.minY),
-                control1: CGPoint(x: rect.width * 0.13, y: rect.height * 0.76),
-                control2: CGPoint(x: rect.width * 0.03, y: rect.height * 0.46)
-            )
-            path.closeSubpath()
-        }
     }
 }
 

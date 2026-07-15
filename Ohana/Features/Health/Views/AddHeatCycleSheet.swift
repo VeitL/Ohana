@@ -24,6 +24,8 @@ struct AddHeatCycleSheet: View {
     @State private var isMated = false
     @State private var expectedDeliveryDate = Date().addingTimeInterval(86400 * 63)
     @State private var note: String = ""
+    @State private var selectedRecorderHumanID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var isSaving = false
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
@@ -73,6 +75,15 @@ struct AddHeatCycleSheet: View {
                 }
 
                 Section {
+                    QuickCareActionHumanPickerContainer(
+                        selectedHumanID: $selectedRecorderHumanID,
+                        requiresSelection: $requiresRecorderSelection,
+                        role: .recorder,
+                        tint: themeColor
+                    )
+                }
+
+                Section {
                     Button {
                         save()
                     } label: {
@@ -85,7 +96,7 @@ struct AddHeatCycleSheet: View {
                             .padding(.vertical, 8)
                     }
                     .listRowBackground(themeColor)
-                    .disabled(isSaving || !pet.canWriteHealthFacts)
+                    .disabled(isSaving || !pet.canWriteHealthFacts || requiresRecorderSelection)
                 }
             }
             .navigationTitle(l.tr(zh: "记录生理期", en: "Log Heat Cycle", de: "Läufigkeit erfassen"))
@@ -106,14 +117,15 @@ struct AddHeatCycleSheet: View {
     }
 
     private func save() {
-        guard !isSaving, pet.canWriteHealthFacts else { return }
+        guard !isSaving, pet.canWriteHealthFacts, !requiresRecorderSelection else { return }
         let input = PetHeatCycleCommandInput(
             startDate: startDate,
             endDate: hasEndDate ? endDate : nil,
             status: status,
             note: note,
             isMated: isMated,
-            expectedDeliveryDate: (isMated || status == .pregnant) ? expectedDeliveryDate : nil
+            expectedDeliveryDate: (isMated || status == .pregnant) ? expectedDeliveryDate : nil,
+            recordedByHumanId: selectedRecorderHumanID?.uuidString
         )
         let command = DomainCommand.petHealthRecord(petID: pet.id, type: "heat")
 

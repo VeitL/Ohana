@@ -39,7 +39,7 @@ cd "${REPO_ROOT}"
 export SCHEME="${SCHEME:-OhanaUITests}"
 scripts/audit-ui-test-shards.sh
 
-derived_data_root="${OHANA_UI_TEST_DERIVED_DATA_ROOT:-${REPO_ROOT}/.build/DerivedData/ui-tests}"
+derived_data_root="${REPO_ROOT}/.build/DerivedData/tests"
 run_id="$(date +%Y%m%d-%H%M%S)-$$"
 run_root="${OHANA_UI_NIGHTLY_RESULT_ROOT:-${REPO_ROOT}/.build/TestResults/ui-nightly}/${run_id}"
 
@@ -54,10 +54,10 @@ done < <(
 )
 
 if [[ "${print_only}" == "1" ]]; then
-  printf 'OHANA_TEST_ACTION=build-for-testing OHANA_TEST_DERIVED_DATA_ROOT=%q scripts/test-simulator.sh -parallel-testing-enabled NO\n' \
+  printf 'OHANA_TEST_ACTION=build-for-testing DERIVED_DATA_PATH=%q scripts/test-simulator.sh -parallel-testing-enabled NO\n' \
     "${derived_data_root}"
   for shard in "${shards[@]}"; do
-    OHANA_UI_TEST_DERIVED_DATA_ROOT="${derived_data_root}" \
+    DERIVED_DATA_PATH="${derived_data_root}" \
       OHANA_RESULT_BUNDLE_PATH="${run_root}/${shard}.xcresult" \
       scripts/test-ui-shard.sh --without-building --print "${shard}"
   done
@@ -71,7 +71,7 @@ printf 'stage\tstatus\tresult\n' > "${summary_path}"
 echo "Nightly UI result directory: ${run_root}"
 echo "Building UI tests once..."
 if OHANA_TEST_ACTION=build-for-testing \
-  OHANA_TEST_DERIVED_DATA_ROOT="${derived_data_root}" \
+  DERIVED_DATA_PATH="${derived_data_root}" \
   scripts/test-simulator.sh -parallel-testing-enabled NO 2>&1 | tee "${run_root}/build.log"; then
   printf 'build\tPASS\t%s\n' "${run_root}/build.log" >> "${summary_path}"
 else
@@ -84,7 +84,7 @@ failures=0
 for shard in "${shards[@]}"; do
   result_bundle="${run_root}/${shard}.xcresult"
   echo "Running UI shard: ${shard}"
-  if OHANA_UI_TEST_DERIVED_DATA_ROOT="${derived_data_root}" \
+  if DERIVED_DATA_PATH="${derived_data_root}" \
     OHANA_RESULT_BUNDLE_PATH="${result_bundle}" \
     scripts/test-ui-shard.sh --without-building "${shard}" 2>&1 | tee "${run_root}/${shard}.log"; then
     printf '%s\tPASS\t%s\n' "${shard}" "${result_bundle}" >> "${summary_path}"

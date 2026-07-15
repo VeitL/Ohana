@@ -103,6 +103,11 @@ struct SettingsRouteContainerTests {
 
         #expect(settingsSource.contains("let isRouteDataLoaded: Bool"))
         #expect(routeSource.contains("isRouteDataLoaded: data.hasLoaded"))
+        #expect(routeSource.contains("loadDelayMilliseconds: 0"))
+        #expect(!routeSource.contains("RouteFirstFrameDeferredMount("))
+        #expect(!routeSource.contains("SettingsFirstFrameShell"))
+        #expect(settingsSource.contains(".onChange(of: isRouteDataLoaded)"))
+        #expect(settingsSource.contains("areDataSectionsMounted = true"))
         #expect(dataIdentitySource.contains("""
         if !isRouteDataLoaded {
             deviceIdentityPlaceholderSection
@@ -171,6 +176,27 @@ struct SettingsRouteContainerTests {
         #expect(!petManagementSource.contains("let pets: [Pet]"))
         #expect(quickSwitchSource.contains("let human: SettingsHumanSnapshot"))
         #expect(quickSwitchSource.contains("fetchHumanForVerification()"))
+    }
+
+    @Test func settingsRouteCapsPhysicalDeviceGenericMetadataDepth() throws {
+        let settingsSource = try source(
+            "Ohana/Features/Settings/Views/SettingsView.swift",
+            rootURL: repositoryRootURL()
+        )
+        let sectionsSource = try source(
+            "Ohana/Features/Settings/Views/SettingsView+MainSections.swift",
+            rootURL: repositoryRootURL()
+        )
+
+        #expect(settingsSource.contains("private var settingsAlertContent: AnyView"))
+        #expect(settingsSource.contains("private var settingsPrimaryPresentationContent: AnyView"))
+        #expect(settingsSource.contains("private var settingsSharingPresentationContent: AnyView"))
+        #expect(settingsSource.contains("settingsSharingPresentationContent"))
+        #expect(settingsSource.components(separatedBy: "AnyView(").count >= 6)
+        #expect(sectionsSource.contains("AnyView(settingsDataSections)"))
+        #expect(sectionsSource.contains("AnyView(settingsPreferencesSection)"))
+        #expect(sectionsSource.contains("AnyView(backupSection)"))
+        #expect(sectionsSource.components(separatedBy: "AnyView(").count >= 9)
     }
 
     @Test func settingsLanguageSwitchDefersGlobalLocaleCommitOffTapFrame() throws {

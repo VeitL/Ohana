@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct DataBackupCoverageTests {
     @Test func latestSwiftDataModelsHaveExternalBackupCoverageOrExplicitHealthExemption() {
-        let schemaModels = Set(ArkSchemaV90.models.map { String(describing: $0) })
+        let schemaModels = Set(ArkSchemaV91.models.map { String(describing: $0) })
         let externallyCoveredModels: Set<String> = [
             String(describing: Pet.self),
             String(describing: Human.self),
@@ -56,6 +56,7 @@ struct DataBackupCoverageTests {
             String(describing: HumanMedication.self),
             String(describing: HumanMedicationLog.self),
             String(describing: HumanHealthReport.self),
+            String(describing: HumanNoteRecord.self),
             String(describing: HumanHealthMetricLog.self),
             // Family-task text is free-form and legacy tasks may not link to
             // a structured source, so restricted external exports omit it.
@@ -80,7 +81,7 @@ struct DataBackupCoverageTests {
             Issue.record("SwiftData models missing external backup coverage or explicit classification: \(missingModels.sorted())")
         }
         if !staleCoverageModels.isEmpty {
-            Issue.record("External backup coverage lists models no longer in ArkSchemaV90: \(staleCoverageModels.sorted())")
+            Issue.record("External backup coverage lists models no longer in ArkSchemaV91: \(staleCoverageModels.sorted())")
         }
         if !staleExemptModels.isEmpty {
             Issue.record("External backup exclusion list contains stale models: \(staleExemptModels.sorted())")
@@ -92,6 +93,107 @@ struct DataBackupCoverageTests {
         #expect(schemaModels == classifiedModels)
     }
 
+    @Test func expenseRecorderAttributionRoundTripsAndLegacyBackupDefaultsToNil() throws {
+        let manager = TestDataBackupManagerProjection.manager
+        let log = PetExpenseLog(
+            amount: 42,
+            category: .food,
+            note: "shared bag",
+            executorId: "payer-id",
+            recordedByHumanId: "recorder-id"
+        )
+
+        let dto = manager.encodeExpenseLog(log)
+        #expect(dto.executorId == "payer-id")
+        #expect(dto.recordedByHumanId == "recorder-id")
+        #expect(manager.decodeExpenseLogSnapshot(dto).recordedByHumanId == "recorder-id")
+
+        let encodedDTO = try JSONEncoder().encode(dto)
+        var legacyObject = try #require(JSONSerialization.jsonObject(with: encodedDTO) as? [String: Any])
+        legacyObject.removeValue(forKey: "recordedByHumanId")
+        let legacyData = try JSONSerialization.data(withJSONObject: legacyObject)
+        let legacyDTO = try JSONDecoder().decode(PetExpenseLogBackup.self, from: legacyData)
+        #expect(manager.decodeExpenseLogSnapshot(legacyDTO).recordedByHumanId == nil)
+    }
+
+    @Test func humanHealthRecorderAttributionRoundTripsAndLegacyBackupDefaultsToNil() throws {
+        let manager = TestDataBackupManagerProjection.manager
+        let human = Human(name: "Guan")
+        let recorderID = UUID().uuidString
+        let metric = HumanHealthMetricLog(
+            metricKey: "tsh",
+            unitCode: "mIU_L",
+            value: 3.2,
+            recordedByHumanId: recorderID,
+            human: human
+        )
+        let report = HumanHealthReport(
+            humanId: human.id.uuidString,
+            recordedByHumanId: recorderID
+        )
+
+        let metricDTO = manager.encodeHumanHealthMetricLog(metric)
+        let reportDTO = manager.encodeHumanHealthReport(report)
+        #expect(manager.decodeHumanHealthMetricLogSnapshot(metricDTO).recordedByHumanId == recorderID)
+        #expect(manager.decodeHumanHealthReportSnapshot(reportDTO).recordedByHumanId == recorderID)
+
+        var legacyMetricObject = try #require(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(metricDTO)) as? [String: Any]
+        )
+        legacyMetricObject.removeValue(forKey: "recordedByHumanId")
+        let legacyMetricDTO = try JSONDecoder().decode(
+            HumanHealthMetricLogBackup.self,
+            from: JSONSerialization.data(withJSONObject: legacyMetricObject)
+        )
+
+        var legacyReportObject = try #require(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(reportDTO)) as? [String: Any]
+        )
+        legacyReportObject.removeValue(forKey: "recordedByHumanId")
+        let legacyReportDTO = try JSONDecoder().decode(
+            HumanHealthReportBackup.self,
+            from: JSONSerialization.data(withJSONObject: legacyReportObject)
+        )
+
+        #expect(manager.decodeHumanHealthMetricLogSnapshot(legacyMetricDTO).recordedByHumanId == nil)
+        #expect(manager.decodeHumanHealthReportSnapshot(legacyReportDTO).recordedByHumanId == nil)
+    }
+
+    @Test func petHealthRecorderAttributionRoundTripsAndLegacyBackupDefaultsToNil() throws {
+        let manager = TestDataBackupManagerProjection.manager
+        let symptom = SymptomLog(
+            category: .skin,
+            symptomName: "itch",
+            severity: .moderate,
+            recordedByHumanId: "symptom-recorder"
+        )
+        let symptomDTO = try manager.encodeSymptomLog(symptom)
+        #expect(symptomDTO.recordedByHumanId == "symptom-recorder")
+        #expect(try manager.decodeSymptomLogSnapshot(symptomDTO).recordedByHumanId == "symptom-recorder")
+
+        let encodedSymptomDTO = try JSONEncoder().encode(symptomDTO)
+        var legacySymptomObject = try #require(JSONSerialization.jsonObject(with: encodedSymptomDTO) as? [String: Any])
+        legacySymptomObject.removeValue(forKey: "recordedByHumanId")
+        let legacySymptomData = try JSONSerialization.data(withJSONObject: legacySymptomObject)
+        let legacySymptomDTO = try JSONDecoder().decode(SymptomLogBackup.self, from: legacySymptomData)
+        #expect(try manager.decodeSymptomLogSnapshot(legacySymptomDTO).recordedByHumanId == nil)
+
+        let heatCycle = HeatCycleLog(
+            status: .estrus,
+            recordedByHumanId: "heat-recorder"
+        )
+        let heatDTO = manager.encodeHeatCycleLog(heatCycle)
+        #expect(heatDTO.recordedByHumanId == "heat-recorder")
+        #expect(manager.decodeHeatCycleLogSnapshot(heatDTO).recordedByHumanId == "heat-recorder")
+
+        let encodedHeatDTO = try JSONEncoder().encode(heatDTO)
+        var legacyHeatObject = try #require(JSONSerialization.jsonObject(with: encodedHeatDTO) as? [String: Any])
+        legacyHeatObject.removeValue(forKey: "recordedByHumanId")
+        let legacyHeatData = try JSONSerialization.data(withJSONObject: legacyHeatObject)
+        let legacyHeatDTO = try JSONDecoder().decode(HeatCycleLogBackup.self, from: legacyHeatData)
+        #expect(manager.decodeHeatCycleLogSnapshot(legacyHeatDTO).recordedByHumanId == nil)
+    }
+
     @Test func restrictedBackupPreservesPetRelationshipAndOmitsEconomyBudgetUsageEvents() throws {
         let source = try makeInMemoryContainer()
         let sourceContext = source.mainContext
@@ -99,6 +201,26 @@ struct DataBackupCoverageTests {
         let occurredAt = Date(timeIntervalSinceReferenceDate: 7500)
         let human = Human(name: "Guan")
         human.id = try #require(UUID(uuidString: "11111111-1111-4111-8111-111111111111"))
+        human.notes = "[2026-07-15] private note"
+        let noteRecord = HumanNoteRecord(
+            humanId: human.id,
+            sequence: 0,
+            date: occurredAt,
+            rawEntry: human.notes,
+            recordedByHumanId: human.id.uuidString
+        )
+        let healthMetric = HumanHealthMetricLog(
+            metricKey: "private-tsh",
+            unitCode: "mIU_L",
+            value: 3.2,
+            recordedByHumanId: human.id.uuidString,
+            human: human
+        )
+        let healthReport = HumanHealthReport(
+            humanId: human.id.uuidString,
+            summary: "private summary",
+            recordedByHumanId: human.id.uuidString
+        )
         let firstPet = Pet(name: "Miso", species: "猫")
         firstPet.id = try #require(UUID(uuidString: "22222222-2222-4222-8222-222222222222"))
         let secondPet = Pet(name: "Luna", species: "猫")
@@ -129,6 +251,9 @@ struct DataBackupCoverageTests {
             createdAt: createdAt
         )
         sourceContext.insert(human)
+        sourceContext.insert(noteRecord)
+        sourceContext.insert(healthMetric)
+        sourceContext.insert(healthReport)
         sourceContext.insert(firstPet)
         sourceContext.insert(secondPet)
         sourceContext.insert(relationship)
@@ -141,6 +266,10 @@ struct DataBackupCoverageTests {
         #expect(backup.petRelationships?.first?.relationshipTypeRaw == PetRelationshipType.sibling.rawValue)
         #expect(backup.exportScope == DataBackupExportScope.manualExternalRestricted.rawValue)
         #expect(backup.economyBudgetUsageEvents?.isEmpty == true)
+        #expect(backup.humans.first?.notes.isEmpty == true)
+        #expect(backup.humanNoteRecords?.isEmpty == true)
+        #expect(backup.humanHealthMetricLogs?.isEmpty == true)
+        #expect(backup.humanHealthReports?.isEmpty == true)
 
         let target = try makeInMemoryContainer()
         try TestDataBackupManagerProjection.manager.applyBackup(
@@ -159,6 +288,9 @@ struct DataBackupCoverageTests {
         #expect(restoredRelationship.note == "same litter")
         #expect(restoredRelationship.createdAt == createdAt)
         #expect(try target.mainContext.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(try target.mainContext.fetch(FetchDescriptor<HumanNoteRecord>()).isEmpty)
+        #expect(try target.mainContext.fetch(FetchDescriptor<HumanHealthMetricLog>()).isEmpty)
+        #expect(try target.mainContext.fetch(FetchDescriptor<HumanHealthReport>()).isEmpty)
     }
 
     @Test func backupPackageRoundTripsAllExternalStorageMediaFields() async throws {
@@ -402,7 +534,7 @@ struct DataBackupCoverageTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV90.models)
+        let schema = Schema(ArkSchemaV91.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: ArkMigrationPlan.self, configurations: [config])
     }

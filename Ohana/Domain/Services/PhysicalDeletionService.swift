@@ -42,6 +42,7 @@ nonisolated enum PhysicalDeletionService {
         String(describing: HumanMedication.self),
         String(describing: HumanMedicationLog.self),
         String(describing: HumanHealthReport.self),
+        String(describing: HumanNoteRecord.self),
         String(describing: WishlistItem.self),
         String(describing: GachaOwnedItem.self),
         String(describing: GachaDrawLog.self),
@@ -460,9 +461,7 @@ nonisolated enum PhysicalDeletionService {
         deletedCount += deleteRows(fetchAll(ShopPurchaseRecord.self, context: context).filter { idsMatch($0.buyerHumanId, humanId) }, context: context) {
             CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         }
-        deletedCount += deleteRows(fetchAll(PetExpenseLog.self, context: context).filter { $0.executorId == humanId && $0.pet == nil }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, pet: $0.pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
+        deletedCount += scrubHumanAttribution(for: human, in: context, at: deletedAt, by: deletedByHumanId)
         deletedCount += deleteRows(fetchAll(HumanWeightLog.self, context: context).filter { $0.human?.id == human.id }, context: context) {
             CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         }

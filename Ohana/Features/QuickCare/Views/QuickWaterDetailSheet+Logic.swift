@@ -626,17 +626,20 @@ extension QuickWaterDetailSheet {
             openRootWaterSheet(.waterOverview)
             return
         }
-        guard scheduleDeferredWaterAction({ completePlannedWater(reminder) }) else { return }
+        guard validateActionHumanSelection() else { return }
+        let executorId = selectedActionExecutorId
+        guard scheduleDeferredWaterAction({ completePlannedWater(reminder, executorId: executorId) }) else { return }
     }
 
-    func completePlannedWater(_ reminder: Reminder) {
+    func completePlannedWater(_ reminder: Reminder, executorId: String?) {
         let result = commandExecutor.completePlannedWater(
             pet: pet,
             reminder: reminder,
             amountMl: defaultWaterAmountMl ?? 0,
-            executorId: commandExecutor.activeExecutorId()
+            executorId: executorId
         )
         guard result.didRecord else { return }
+        selectedActionHumanID = nil
         guard result.allowsDerivedEffects else { return }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         triggerWaterFeedback()
@@ -645,17 +648,21 @@ extension QuickWaterDetailSheet {
     }
 
     func commitWater() {
-        guard scheduleDeferredWaterAction(commitWaterBusiness) else { return }
+        guard validateActionHumanSelection() else { return }
+        let executorId = selectedActionExecutorId
+        guard scheduleDeferredWaterAction({ commitWaterBusiness(executorId: executorId) }) else { return }
     }
 
-    func commitWaterBusiness() {
+    func commitWaterBusiness(executorId: String?) {
         let result = commandExecutor.recordWater(
             pet: pet,
             targets: selectedWaterTargets,
             amountMl: defaultWaterAmountMl ?? 0,
-            executorId: commandExecutor.activeExecutorId()
+            executorId: executorId
         )
-        guard result.didRecord, result.allowsDerivedEffects else { return }
+        guard result.didRecord else { return }
+        selectedActionHumanID = nil
+        guard result.allowsDerivedEffects else { return }
         SharedPetSelectionMemory.saveSelection(
             Set(selectedWaterTargets.map(\.id)),
             sourcePet: pet,
@@ -670,10 +677,12 @@ extension QuickWaterDetailSheet {
     }
 
     func doWaterChange() {
-        guard scheduleDeferredWaterAction(recordWaterChangeBusiness) else { return }
+        guard validateActionHumanSelection() else { return }
+        let executorId = selectedActionExecutorId
+        guard scheduleDeferredWaterAction({ recordWaterChangeBusiness(executorId: executorId) }) else { return }
     }
 
-    func recordWaterChangeBusiness() {
+    func recordWaterChangeBusiness(executorId: String?) {
         let result = commandExecutor.recordWaterChange(
             pet: pet,
             targets: selectedWaterTargets,
@@ -681,9 +690,11 @@ extension QuickWaterDetailSheet {
             intervalDays: waterIntervalDays,
             reminderOn: waterReminderOn,
             cycleAnchor: waterChangeAnchorDate,
-            executorId: commandExecutor.activeExecutorId()
+            executorId: executorId
         )
-        guard result.didRecord, result.allowsDerivedEffects else { return }
+        guard result.didRecord else { return }
+        selectedActionHumanID = nil
+        guard result.allowsDerivedEffects else { return }
         SharedPetSelectionMemory.saveSelection(
             Set(selectedWaterTargets.map(\.id)),
             sourcePet: pet,
@@ -698,10 +709,12 @@ extension QuickWaterDetailSheet {
     }
 
     func doFilterClean() {
-        guard scheduleDeferredWaterAction(recordFilterCleanBusiness) else { return }
+        guard validateActionHumanSelection() else { return }
+        let executorId = selectedActionExecutorId
+        guard scheduleDeferredWaterAction({ recordFilterCleanBusiness(executorId: executorId) }) else { return }
     }
 
-    func recordFilterCleanBusiness() {
+    func recordFilterCleanBusiness(executorId: String?) {
         let result = commandExecutor.recordFilterClean(
             pet: pet,
             targets: selectedWaterTargets,
@@ -709,9 +722,11 @@ extension QuickWaterDetailSheet {
             cleanIntervalDays: filterCleanIntervalDays,
             replaceIntervalDays: filterReplaceIntervalDays,
             reminderOn: filterReminderOn,
-            executorId: commandExecutor.activeExecutorId()
+            executorId: executorId
         )
-        guard result.didRecord, result.allowsDerivedEffects else { return }
+        guard result.didRecord else { return }
+        selectedActionHumanID = nil
+        guard result.allowsDerivedEffects else { return }
         SharedPetSelectionMemory.saveSelection(
             Set(selectedWaterTargets.map(\.id)),
             sourcePet: pet,
@@ -723,6 +738,19 @@ extension QuickWaterDetailSheet {
         triggerFilterFeedback()
         showSaveConfirmation(l.tr(zh: "滤芯已清洗", en: "Filter cleaned", de: "Filter gereinigt"))
         onRecordChanged?()
+    }
+
+    func validateActionHumanSelection() -> Bool {
+        guard requiresActionHumanSelection else { return true }
+        showSaveConfirmation(
+            l.tr(
+                zh: "请先选择这次操作的执行人",
+                en: "Choose who did this first",
+                de: "Bitte zuerst die ausführende Person wählen"
+            )
+        )
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        return false
     }
 
     func triggerWaterFeedback() {

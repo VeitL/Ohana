@@ -218,6 +218,15 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
         memberFilterContext.showsFilters
     }
 
+    /// The list follows the current local member until the user explicitly chooses
+    /// another visible filter. Hidden collaboration controls always mean the full list.
+    func resolvedMemberFilter(
+        explicitSelection: TaskCenterMemberFilter?
+    ) -> TaskCenterMemberFilter {
+        guard showsMemberFilters else { return .all }
+        return explicitSelection ?? .currentMember
+    }
+
     func filtered(for scope: TaskCenterScope) -> TaskCenterSnapshot {
         guard case .all = scope else {
             let includes: (TaskCenterItemSnapshot) -> Bool = { item in
@@ -952,6 +961,10 @@ nonisolated enum TaskCenterSnapshotBuilder {
         for item in items {
             if item.workflowStatus == .pendingReview {
                 pendingReviewItemIDs.insert(item.id)
+                if item.createdByMember?.id == selectedHuman.id,
+                   item.availableActions.contains(.approve) {
+                    currentMemberItemIDs.insert(item.id)
+                }
             }
             guard let responsibleHumanID = responsibleHumanID(
                 for: item,
@@ -990,7 +1003,7 @@ nonisolated enum TaskCenterSnapshotBuilder {
            let humanID = UUID(uuidString: rawID) {
             return humanID
         }
-        return item.subject.kind == .human ? item.subject.id : nil
+        return nil
     }
 
     private static func participantHumanIDs(

@@ -14,9 +14,9 @@ extension SettingsView {
             deviceIdentityPlaceholderSection
             petManagementPlaceholderSection
         } else {
-            if let homeHumans, !homeHumans.isEmpty {
+            if selectableSettingsHumans.count > 1 {
                 if areDataSectionsMounted {
-                    deviceIdentitySection(homeHumans)
+                    deviceIdentitySection(selectableSettingsHumans)
                 } else {
                     deviceIdentityPlaceholderSection
                 }
@@ -29,6 +29,10 @@ extension SettingsView {
                 }
             }
         }
+    }
+
+    var selectableSettingsHumans: [SettingsHumanSnapshot] {
+        SettingsActiveHumanSelectionPolicy.selectableHumans(from: homeHumans ?? [])
     }
 
     private var deviceIdentityPlaceholderSection: some View {
@@ -104,34 +108,8 @@ extension SettingsView {
 
     // MARK: - Device Identity
     func deviceIdentitySection(_ humans: [SettingsHumanSnapshot]) -> some View {
-        settingsSection(title: l.tr(zh: "设备身份", en: "Device Identity", de: "Geräteidentität")) {
+        settingsSection(title: l.tr(zh: "本机当前成员", en: "Current Member", de: "Aktuelles Mitglied")) {
             VStack(alignment: .leading, spacing: 12) {
-                Button {
-                    withAnimation(GoMotion.page) {
-                        showingAccountSwitcher = true
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        settingsIcon("person.2.fill", color: Color.goPrimary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(l.tr(zh: "切换记录成员", en: "Switch Check-in Member", de: "Eintragsmitglied wechseln"))
-                                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(primaryText)
-                            Text(l.tr(zh: "当前打卡归属", en: "Check-in identity", de: "Check-in-Identität"))
-                                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(tertiaryText)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(tertiaryText)
-                    }
-                    .padding(12)
-                    .frame(minHeight: 44)
-                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityIdentifier("settings-human-account-switcher-action")
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         /* Removing "Unbind" option to enforce mandatory identity */
@@ -177,9 +155,9 @@ extension SettingsView {
                             .foregroundStyle(Color.goPrimary)
                             .font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text(l.tr(
-                            zh: "打卡记录将关联到 \(selectedName)",
-                            en: "Check-ins will be linked to \(selectedName)",
-                            de: "Check-ins werden mit \(selectedName) verknüpft"
+                            zh: "任务和记录会默认使用 \(selectedName)",
+                            en: "Tasks and records will default to \(selectedName)",
+                            de: "Aufgaben und Einträge verwenden standardmäßig \(selectedName)"
                         ))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText)
@@ -228,6 +206,7 @@ extension SettingsView {
 
     func quickSwitch(to human: SettingsHumanSnapshot) {
         UISelectionFeedbackGenerator().selectionChanged()
+        guard !human.hasPassedAway else { return }
         guard currentActiveHumanId != human.id.uuidString else { return }
         if HumanLocalPrivacyPolicy.isEnabled,
            human.hasPasscode {
@@ -238,7 +217,9 @@ extension SettingsView {
     }
 
     func switchActiveHuman(to human: SettingsHumanSnapshot, emitSuccessFeedback: Bool = true) {
-        guard let liveHuman = fetchSettingsHuman(id: human.id) else {
+        guard !human.hasPassedAway,
+              let liveHuman = fetchSettingsHuman(id: human.id),
+              !liveHuman.hasPassedAway else {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             return
         }
@@ -249,6 +230,23 @@ extension SettingsView {
         if emitSuccessFeedback {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
+    }
+
+    func reconcileCurrentActiveHumanSelection() {
+        guard isRouteDataLoaded, let homeHumans else { return }
+        let resolvedID = SettingsActiveHumanSelectionPolicy.resolvedHumanID(
+            currentHumanID: UUID(uuidString: currentActiveHumanId),
+            humans: homeHumans
+        )
+        let resolvedRaw = resolvedID?.uuidString ?? ""
+        guard resolvedRaw != currentActiveHumanId else { return }
+
+        guard let resolvedID,
+              let resolvedHuman = selectableSettingsHumans.first(where: { $0.id == resolvedID }) else {
+            currentActiveHumanId = ""
+            return
+        }
+        switchActiveHuman(to: resolvedHuman, emitSuccessFeedback: false)
     }
 
     func syncHomeCardStackAfterAccountSwitch(from oldHumanIdRaw: String, to human: Human) {

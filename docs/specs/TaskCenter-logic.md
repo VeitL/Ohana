@@ -1,7 +1,7 @@
 # Task Center 业务规则书
 
 > 状态：当前首发实现。
-> 最近核对：2026-07-14，依据 `TaskCenterRouteContainer`、`TaskCenterSnapshotBuilder`、`TaskActionCommandExecutor`、`TaskCareAssignmentCommandExecutor`、`FamilyTaskService` 与 Home / Members / Plant 路由符号。
+> 最近核对：2026-07-15，依据 `TaskCenterRouteContainer`、`TaskCenterSnapshotBuilder`、`TaskActionCommandExecutor`、`TaskCareAssignmentCommandExecutor`、`FamilyTaskService` 与 Home / Members / Plant 路由符号。
 > 所有者：`TaskCenterRouteContainer`（入口与加载）、`TaskCenterSnapshotBuilder`（投影）、`TaskActionCommandExecutor`（动作编排）、`TaskCareAssignmentCommandExecutor`（类型化照顾待办创建）。
 
 ## 1. 职责与入口
@@ -106,15 +106,27 @@ stateDiagram-v2
 ### TC-006 Solo 与多 Human 呈现
 
 家庭分工仍是本机 Solo 数据。奖励为 0 的普通分工可直接完成；正数悬赏才进入
-提交 / 审核，并在审核通过后转账。只有存在至少两位在世 Human 时，
+提交 / 审核，并在审核通过后转账。创建普通分工时奖励默认保持 0，只有用户主动选择
+添加奖励才展开悬赏字段和后续确认流程。角色数据服务于状态机与审计，界面只显示当前
+可执行的下一步，不要求用户理解负责人、完成人、审核人等完整角色模型。
+
+`currentActiveHumanId` 是这台设备上的默认任务视角和动作归属，不是账号或登录身份。
+待办默认显示该 Human 负责或参与的项目。没有角色约束的照顾记录在存在至少两位在世
+Human 时提供轻量的单次执行人覆盖；覆盖值随本次命令使用，不得回写
+`currentActiveHumanId` 或影响之后的操作。已分工任务的领取、提交与确认则直接使用当前
+Human 和快照已经计算出的可用动作，不在点击后再次展示整套成员选择，避免出现无权限
+组合或把负责人、完成人、审核人同时暴露给用户。需要换人处理时，先切换本机当前成员。
+
+只有存在至少两位在世 Human 时，
 `TaskCenterSnapshotBuilder.availableActions` 才显示 claim、submit、approve 和 reject，
 `TaskCenterRouteContainer.requestAdd` 才提供“家庭分工 / 日历事项”的选择。单 Human
-下直接创建日历事项，不展示分配、领取或审核控件；已有的无悬赏本机 FamilyTask
-可直接完成，悬赏任务不得由同一 Human 自审。
+下自动使用唯一 Human，直接创建日历事项，不展示执行、记录、分配、领取或审核控件；
+已有的无悬赏本机 FamilyTask 可直接完成，悬赏任务不得由同一 Human 自审。没有在世
+Human 时任务仍可作为家庭事项存在，但不伪造执行人，也不显示人员选择器。
 
-多人家庭的清单额外提供“全部 / 当前成员 / 等待他人 / 待审核”筛选；这些筛选与
-human、pet、plant 对象 scope 叠加，不会改变底层任务状态。单 Human 时整组筛选
-隐藏，避免把本地档案误呈现成在线操作者。
+多人家庭的清单默认采用“当前成员”，并可切换“全部 / 等待他人 / 待审核”；这些
+筛选与 human、pet、plant 对象 scope 叠加，不会改变底层任务状态。单 Human 时整组
+筛选隐藏，避免把本地档案误呈现成在线操作者。
 
 这项本机能力不读取 `OnlineFeatureGate`；跨设备身份、邀请、同步和远端协作仍由
 [`OnlineFeatureGate-logic.md`](OnlineFeatureGate-logic.md) 约束。
@@ -125,7 +137,7 @@ human、pet、plant 对象 scope 叠加，不会改变底层任务状态。单 H
 
 `HomeReadModelStore` 读取 Task Center 所需的 Event、Reminder、FamilyTask 与对象值，
 再由同一个 `TaskCenterSnapshotBuilder` 生成项目。Today Focus 只保留逾期、今天和
-待审核项目，并继续按 active Human 的执行 / 审核责任过滤；它不再把 care Event
+待审核项目，并继续按本机当前 Human 的执行 / 审核责任过滤；它不再把 care Event
 包装为另一套 Oasis quest。
 
 点击项目会按同一个 `TaskCenterItemSnapshot.id` 聚焦待办；卡片上的直接动作也调用

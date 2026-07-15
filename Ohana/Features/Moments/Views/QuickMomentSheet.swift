@@ -31,7 +31,6 @@ struct QuickMomentSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
-    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var noteText = ""
@@ -42,6 +41,8 @@ struct QuickMomentSheet: View {
     @State private var showCameraPermissionAlert = false
     @State private var manualPlace = ""
     @StateObject private var locationModel = MomentLocationModel()
+    @State private var selectedRecorderHumanID: UUID?
+    @State private var requiresRecorderSelection = false
     @State private var isSaving = false
     @State private var savedSuccess = false
     @State private var showLocationInput = false
@@ -59,7 +60,7 @@ struct QuickMomentSheet: View {
     }
 
     private var canSave: Bool {
-        !selectedPhotos.isEmpty || !trimmedNote.isEmpty
+        (!selectedPhotos.isEmpty || !trimmedNote.isEmpty) && !requiresRecorderSelection
     }
 
     private let maxDraftPhotos = 9
@@ -76,6 +77,14 @@ struct QuickMomentSheet: View {
                     photoSection
                     moodAndNoteSection
                     locationCompactSection
+                    QuickCareActionHumanPickerContainer(
+                        selectedHumanID: $selectedRecorderHumanID,
+                        requiresSelection: $requiresRecorderSelection,
+                        role: .recorder,
+                        tint: momentAccent
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 22)
                 }
                 .padding(.vertical, 12)
             }
@@ -586,7 +595,7 @@ struct QuickMomentSheet: View {
         let hasCoords = lat != 0 || lon != 0
         let baseDate = Date()
         let draftPhotos = selectedPhotos
-        let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
+        let executorId = selectedRecorderHumanID?.uuidString
         commandQueue.enqueue(.quickMoment(petID: pet?.id)) {
             let photoData = draftPhotos.compactMap { photo in
                 photo.image.jpegData(compressionQuality: 0.82) ?? photo.image.pngData()

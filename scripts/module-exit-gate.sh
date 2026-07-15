@@ -105,7 +105,7 @@ else
 fi
 
 if [[ "${RUN_FULL_UNIT}" == "1" ]]; then
-  run_step "full unit test suite (iPhone 17 simulator)" scripts/test-unit.sh
+  run_step "full unit test suite (iPhone 17 Tests simulator)" scripts/test-unit.sh
 elif [[ ${#TEST_SELECTORS[@]} -gt 0 ]]; then
   for selector in "${TEST_SELECTORS[@]}"; do
     if [[ "${selector}" == -only-testing:* ]]; then
@@ -129,12 +129,12 @@ elif [[ ${#TEST_SELECTORS[@]} -gt 0 ]]; then
   done
   if [[ ${#UNIT_TEST_ARGUMENTS[@]} -gt 0 ]]; then
     run_step \
-      "targeted Unit/Integration lane (iPhone 17 simulator)" \
+      "targeted Unit/Integration lane (iPhone 17 Tests simulator)" \
       env SCHEME=OhanaUnitTests scripts/test-simulator.sh "${UNIT_TEST_ARGUMENTS[@]}"
   fi
   if [[ ${#UI_TEST_ARGUMENTS[@]} -gt 0 ]]; then
     run_step \
-      "one targeted UI path (iPhone 17 simulator)" \
+      "one targeted UI path (iPhone 17 Tests simulator)" \
       env SCHEME=OhanaUITests scripts/test-simulator.sh -parallel-testing-enabled NO "${UI_TEST_ARGUMENTS[@]}"
   fi
 else

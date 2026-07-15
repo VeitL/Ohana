@@ -41,6 +41,7 @@ struct PetHealthDetailContentView: View {
     @State var isHealthFabExpanded = false
     @State var healthFabItemsVisible = false
     @State var showingMedicationPopup = false
+    @State var pendingMedicationDoseActorDraft: PetMedicationDoseActorDraft?
     @State var medicationDoseRefreshToken = UUID()
     @State var didOpenInitialSection = false
     @State var deletingHealthRecordIDs: Set<UUID> = []
@@ -565,10 +566,33 @@ struct PetHealthDetailContentView: View {
 
     @MainActor
     func recordMedicationDose(_ item: PetHealthMedicationDoseItem) {
+        let actorContext = PetMedicationDoseActorSelectionResolver.resolve(
+            context: modelContext,
+            currentLocalHumanIDRaw: appServices.activeHumanSelection.currentHumanId
+        )
+        guard actorContext.needsConfirmation else {
+            recordMedicationDose(item.medication, executorID: actorContext.defaultExecutorID)
+            return
+        }
+        pendingMedicationDoseActorDraft = PetMedicationDoseActorDraft(
+            petID: pet.id,
+            medicationID: item.medication.id,
+            actionTitle: l.tr(
+                zh: "给 \(pet.name) 喂 \(item.medication.name.isEmpty ? "药" : item.medication.name)",
+                en: "Give \(pet.name) \(item.medication.name.isEmpty ? "medicine" : item.medication.name)",
+                de: "\(pet.name) \(item.medication.name.isEmpty ? "Medikament" : item.medication.name) geben"
+            ),
+            initialExecutorID: actorContext.defaultExecutorID
+        )
+    }
+
+    @MainActor
+    func recordMedicationDose(_ medication: PetMedication, executorID: UUID?) {
         let result = PetMedicationCommandExecutor(context: modelContext, services: appServices).recordDose(
-            medication: item.medication,
+            medication: medication,
             pet: pet,
             awardCoconut: true,
+            executorId: executorID?.uuidString,
             note: "pet.health.medication.dose"
         )
         guard result.didRecord, result.allowsDerivedEffects else { return }
@@ -720,6 +744,10 @@ struct PetHealthDetailContentView: View {
         .sheet(item: $activeHealthSheet) { sheet in
             healthOverviewSheet(sheet)
                 .ohanaSheetPagePresentation() // ui-v4: allow long health overview sheet
+        }
+        .petMedicationDoseActorConfirmation(draft: $pendingMedicationDoseActorDraft) { draft, executorID in
+            guard let medication = medications.first(where: { $0.id == draft.medicationID }) else { return }
+            recordMedicationDose(medication, executorID: executorID)
         }
         .navigationDestination(isPresented: $showingHistory) {
             PetHealthArchiveView(

@@ -254,6 +254,8 @@ extension QuickFeedDetailContent {
                 title: l.tr(zh: "快速添加零食", en: "Quick add treat", de: "Snack schnell hinzufügen"),
                 tint: treatTint
             )
+            actionHumanPicker
+                .frame(maxWidth: .infinity, alignment: .leading)
             treatKindPicker(selection: $draftStore.selectedTreatKind)
             gramInput(
                 title: l.tr(zh: "克数（可选）", en: "Grams (optional)", de: "Gramm (optional)"),

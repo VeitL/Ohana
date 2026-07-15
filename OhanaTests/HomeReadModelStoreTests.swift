@@ -149,6 +149,111 @@ struct HomeReadModelStoreTests {
         #expect(store.payload.signature.contains(photo.id.uuidString))
     }
 
+    @Test func quickPetWeightWriteProjectsHistoryAndCompletedHomeActionState() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let revisionCenter = ReadModelRevisionCenter()
+        let store = HomeReadModelStore()
+        let human = Human(name: "Owner")
+        let pet = Pet(name: "Mochi", species: "Cat")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let recordedAt = Date()
+        let result = try DashboardRecordCommandExecutor(
+            context: context,
+            revisionCenter: revisionCenter
+        ).recordPetWeight(
+            pet: pet,
+            weight: 4.2,
+            date: recordedAt,
+            executorId: human.id.uuidString,
+            ledgerSource: .quickAction,
+            command: .quickWeight(petID: pet.id),
+            note: "test.quick.weight"
+        )
+
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let weightLogs = try context.fetch(FetchDescriptor<PetWeightLog>())
+        let event = try #require(ledgerEvents.first { $0.id == result.ledgerEventID })
+        #expect(event.legacyModelName == "PetWeightLog")
+        #expect(event.legacyModelId == result.logID.uuidString)
+        #expect(event.source == CareLedgerSource.quickAction.rawValue)
+        let historyEntries = PetWeightLedgerEntry.entries(
+            from: ledgerEvents,
+            legacyLogs: weightLogs,
+            petId: pet.id
+        )
+        #expect(historyEntries.count == 1)
+        #expect(historyEntries.first?.weightKilograms == 4.2)
+
+        await store.refreshImmediately(
+            context: context,
+            activeHumanIdRaw: human.id.uuidString,
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            quickActionItemsRaw: "",
+            language: "zh",
+            externalRevision: revisionCenter.homeRevision,
+            force: true
+        )
+
+        let weightAction = QuickActionItem(
+            label: "体重",
+            icon: "scalemass.fill",
+            colorHex: "4BC6B9",
+            petId: pet.id,
+            actionType: "weight",
+            entityId: pet.id,
+            entityKind: .pet
+        )
+        let state = store.payload.interaction.expandedActions(for: pet.id).state(for: weightAction)
+
+        #expect(state.status == "4.2kg")
+        #expect(state.isCompleted)
+        #expect(store.payload.signature.contains(event.id.uuidString))
+    }
+
+    @Test func orphanPetWeightFactRemainsVisibleBeforeLedgerBackfillRuns() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let store = HomeReadModelStore()
+        let pet = Pet(name: "Mochi", species: "Cat")
+        let log = PetWeightLog(date: Date(), weight: 5.1, pet: pet)
+        context.insert(pet)
+        context.insert(log)
+        try context.save()
+
+        await store.refreshImmediately(
+            context: context,
+            activeHumanIdRaw: "",
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            quickActionItemsRaw: "",
+            language: "zh",
+            externalRevision: HomeRevision(),
+            force: true
+        )
+
+        let weightAction = QuickActionItem(
+            label: "体重",
+            icon: "scalemass.fill",
+            colorHex: "4BC6B9",
+            petId: pet.id,
+            actionType: "weight",
+            entityId: pet.id,
+            entityKind: .pet
+        )
+        let state = store.payload.interaction.expandedActions(for: pet.id).state(for: weightAction)
+
+        #expect(state.status == "5.1kg")
+        #expect(state.isCompleted)
+        #expect(store.payload.signature.contains(log.id.uuidString))
+    }
+
     @Test func activeHumanHeaderAvatarAndCardIgnoreLegacyHomeVisibility() async throws {
         let container = try makeContainer()
         let store = HomeReadModelStore()

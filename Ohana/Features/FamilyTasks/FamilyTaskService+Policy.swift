@@ -9,6 +9,20 @@ nonisolated enum FamilyTaskRewardPolicy {
     }
 }
 
+nonisolated enum FamilyTaskRewardDraftPolicy {
+    static func isExpanded(existingReward: Int) -> Bool {
+        existingReward > 0
+    }
+
+    static func suggestedReward(availableBalance: Int) -> Int {
+        min(20, FamilyTaskRewardPolicy.capped(availableBalance))
+    }
+
+    static func effectiveReward(isEnabled: Bool, draftReward: Int) -> Int {
+        isEnabled ? draftReward : 0
+    }
+}
+
 struct FamilyTaskFunding {
     let creator: Human
     let reward: Int

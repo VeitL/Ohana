@@ -59,11 +59,14 @@ struct QuickPlayDetailSheet: View {
     @State private var isCommittingPlay = false
     @State private var playFeedbackToken: CheckInFeedbackToken?
     @State private var chartProgress: Double = 0
+    @State private var selectedActionHumanID: UUID?
+    @State private var requiresActionHumanSelection = false
 
     private var l: L10n { L10n(appLanguage) }
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
     private var playTint: Color { Color.goOrange }
     private var petKey: String { pet.id.uuidString }
+    private var selectedActionExecutorId: String? { selectedActionHumanID?.uuidString }
     private var playPlanTitle: String { "\(pet.name) 陪玩计划" }
     private var playCommandExecutor: QuickPlayCommandExecutor {
         QuickPlayCommandExecutor(
@@ -184,8 +187,12 @@ struct QuickPlayDetailSheet: View {
                         headerRow
                         playSummaryMetrics
                         primaryPlayCard
-                        QuickCareExecutorPickerBarContainer(tint: playTint)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        QuickCareActionHumanPickerContainer(
+                            selectedHumanID: $selectedActionHumanID,
+                            requiresSelection: $requiresActionHumanSelection,
+                            role: .executor,
+                            tint: playTint
+                        )
                         playFrequencySection
                         playPlanModule
                         recentLogsSection
@@ -736,7 +743,12 @@ struct QuickPlayDetailSheet: View {
 
     private func commitPlay() {
         guard !isCommittingPlay else { return }
-        let executorId = appServices.activeHumanSelection.currentHumanId
+        guard !requiresActionHumanSelection else {
+            showToast(l.tr(zh: "请选择执行人", en: "Choose who did this", de: "Ausführende Person wählen"))
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return
+        }
+        let executorId = selectedActionExecutorId
         let rewardTitle = l.tr(zh: "\(pet.name) 互动奖励", en: "\(pet.name) play reward", de: "\(pet.name) Spielbelohnung")
         isCommittingPlay = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -754,6 +766,7 @@ struct QuickPlayDetailSheet: View {
             }
             let deltaText = result.coconutDelta > 0 ? "+\(result.coconutDelta)" : "+1"
             playFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: deltaText, tint: playTint)
+            selectedActionHumanID = nil
             showToast(l.tr(zh: "已记录", en: "Logged", de: "Gespeichert"))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }

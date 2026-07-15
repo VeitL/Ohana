@@ -38,6 +38,14 @@ extension QuickFeedDetailContent {
                         isOn: $draftStore.stockHasOpenDate,
                         date: $draftStore.stockOpenDate
                     )
+                    ActionHumanPicker(
+                        humans: actionHumanOptions,
+                        currentLocalHumanID: currentUserId.flatMap(UUID.init(uuidString:)),
+                        selectedHumanID: $selectedActionHumanID,
+                        role: .recorder,
+                        tint: stockTint
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 VStack(alignment: .leading, spacing: 12) {

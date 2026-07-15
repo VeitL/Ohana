@@ -58,8 +58,37 @@ extension CloudSyncRecordApplier {
             if let model = try fetchPetFoodRecord(id: localRecordUUID, context: context) {
                 applyLegacyRecycleBinFields(values, to: model)
             }
+        case String(describing: PetWeightLog.self),
+             String(describing: SymptomLog.self),
+             String(describing: HeatCycleLog.self):
+            try applyPetObservationRecycleBinFields(
+                values,
+                entityName: entityName,
+                id: localRecordUUID,
+                context: context
+            )
+        default:
+            break
+        }
+    }
+
+    private nonisolated static func applyPetObservationRecycleBinFields(
+        _ values: LegacyRecycleBinFieldValues,
+        entityName: String,
+        id: UUID,
+        context: ModelContext
+    ) throws {
+        switch entityName {
         case String(describing: PetWeightLog.self):
-            if let model = try fetchPetWeightLog(id: localRecordUUID, context: context) {
+            if let model = try fetchPetWeightLog(id: id, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: SymptomLog.self):
+            if let model = try fetchSymptomLog(id: id, context: context) {
+                applyLegacyRecycleBinFields(values, to: model)
+            }
+        case String(describing: HeatCycleLog.self):
+            if let model = try fetchHeatCycleLog(id: id, context: context) {
                 applyLegacyRecycleBinFields(values, to: model)
             }
         default:
@@ -147,6 +176,20 @@ extension CloudSyncRecordApplier {
     }
 
     private nonisolated static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: PetWeightLog) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private nonisolated static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: SymptomLog) {
+        model.trashedAt = values.trashedAt
+        model.trashExpiresAt = values.trashExpiresAt
+        model.trashBatchId = values.trashBatchId
+        model.trashedByHumanId = values.trashedByHumanId
+    }
+
+    private nonisolated static func applyLegacyRecycleBinFields(_ values: LegacyRecycleBinFieldValues, to model: HeatCycleLog) {
         model.trashedAt = values.trashedAt
         model.trashExpiresAt = values.trashExpiresAt
         model.trashBatchId = values.trashBatchId

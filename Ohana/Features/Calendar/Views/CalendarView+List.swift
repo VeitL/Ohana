@@ -477,13 +477,49 @@ extension CalendarView {
         )
     }
 
-    func toggleEventCompletion(_ event: Event, occurrenceDate: Date) {
+    func toggleEventCompletion(_ event: Event, occurrenceDate: Date) -> Bool {
+        let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
+        if shouldComplete, event.requiresTodayFocusActionHuman {
+            return requestActionHumanForEventCompletion(event, occurrenceDate: occurrenceDate)
+        }
+        return performEventCompletion(event, occurrenceDate: occurrenceDate, executorID: nil)
+    }
+
+    private func requestActionHumanForEventCompletion(_ event: Event, occurrenceDate: Date) -> Bool {
+        let options = QuickCareActionHumanAttribution.options(from: humans)
+        let eligible = ActionHumanDefaultSelectionPolicy.eligibleHumans(from: options)
+        let preferredID = ActionHumanDefaultSelectionPolicy.selection(
+            draftHumanID: nil,
+            currentLocalHumanID: UUID(uuidString: activeHumanIdStr),
+            humans: options
+        )
+        guard eligible.count > 1 else {
+            return performEventCompletion(event, occurrenceDate: occurrenceDate, executorID: preferredID?.uuidString)
+        }
+        pendingActionHumanConfirmation = ActionHumanConfirmationDraft(
+            actionTitle: event.title,
+            humans: eligible,
+            preferredHumanID: preferredID
+        ) { executorID in
+            if performEventCompletion(event, occurrenceDate: occurrenceDate, executorID: executorID) {
+                OhanaFeedback.medium()
+            }
+        }
+        return false
+    }
+
+    func performEventCompletion(
+        _ event: Event,
+        occurrenceDate: Date,
+        executorID: String?
+    ) -> Bool {
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         if shouldComplete, let onCompleteEvent {
-            if onCompleteEvent(event, occurrenceDate) {
+            if onCompleteEvent(event, occurrenceDate, executorID) {
                 schedulePreparedCalendarSnapshotRebuild(force: true)
+                return true
             }
-            return
+            return false
         }
         let executor = CalendarCommandExecutor(context: modelContext, services: appServices)
         let command = DomainCommand.calendarEventCompletion(
@@ -495,12 +531,14 @@ extension CalendarView {
                 event: event,
                 occurrenceDate: occurrenceDate,
                 pets: pets,
-                executorId: appServices.activeHumanSelection.currentHumanId,
+                executorId: executorID ?? appServices.activeHumanSelection.currentHumanId,
                 note: "calendar.event.completion.toggle"
             )
             schedulePreparedCalendarSnapshotRebuild(force: true)
+            return true
         } catch {
             appServices.domainRevisions.publishFailure(command: command, error: error)
+            return false
         }
     }
 

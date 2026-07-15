@@ -6,6 +6,7 @@
 //
 
 import PhotosUI
+import SwiftData
 import SwiftUI
 
 private struct PlantCareLogNoteSuggestion: Identifiable {
@@ -65,7 +66,7 @@ private extension View {
 
 struct PlantCareLogSheet: View {
     let plant: Plant
-    let onSave: (PlantCareType, String, PlantHealthStatus, Data?) -> Void
+    let onSave: (PlantCareType, String, PlantHealthStatus, Data?, UUID?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -77,6 +78,8 @@ struct PlantCareLogSheet: View {
     @State private var isLoadingPhoto = false
     @State private var showsAdvancedOptions = false
     @State private var note = ""
+    @State private var selectedExecutorID: UUID?
+    @State private var requiresExecutorSelection = false
 
     private var l: L10n { L10n(appLanguage) }
     private var tint: Color { careTint(for: selectedCareType) }
@@ -135,13 +138,15 @@ struct PlantCareLogSheet: View {
         plant: Plant,
         initialCareType: PlantCareType,
         currentHealthStatus: PlantHealthStatus,
-        onSave: @escaping (PlantCareType, String, PlantHealthStatus, Data?) -> Void
+        initialExecutorID: UUID? = nil,
+        onSave: @escaping (PlantCareType, String, PlantHealthStatus, Data?, UUID?) -> Void
     ) {
         self.plant = plant
         self.onSave = onSave
         _selectedCareCategory = State(initialValue: initialCareType.careCategory)
         _selectedCareType = State(initialValue: initialCareType)
         _selectedHealthStatus = State(initialValue: currentHealthStatus)
+        _selectedExecutorID = State(initialValue: initialExecutorID)
     }
 
     var body: some View {
@@ -151,6 +156,12 @@ struct PlantCareLogSheet: View {
         ) {
             VStack(alignment: .leading, spacing: 14) {
                 plantCareSheetHero
+                QuickCareActionHumanPickerContainer(
+                    selectedHumanID: $selectedExecutorID,
+                    requiresSelection: $requiresExecutorSelection,
+                    role: .executor,
+                    tint: tint
+                )
                 careTypePicker
                 compactSaveNotice
                 advancedOptionsDisclosure
@@ -443,11 +454,12 @@ struct PlantCareLogSheet: View {
             icon: "checkmark.circle.fill",
             tint: tint
         ) {
-            onSave(selectedCareType, trimmedNote, selectedHealthStatus, selectedPhotoData)
+            guard !requiresExecutorSelection else { return }
+            onSave(selectedCareType, trimmedNote, selectedHealthStatus, selectedPhotoData, selectedExecutorID)
             dismiss()
         }
-        .disabled(isLoadingPhoto)
-        .opacity(isLoadingPhoto ? 0.62 : 1)
+        .disabled(isLoadingPhoto || requiresExecutorSelection)
+        .opacity(isLoadingPhoto || requiresExecutorSelection ? 0.62 : 1)
         .accessibilityIdentifier("plant-care-log-save")
     }
 
