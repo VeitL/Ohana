@@ -1029,17 +1029,17 @@ private extension HouseholdStarterJourneyService {
         let l = L10n.current
         switch task {
         case .humanProfile:
-            l.tr(zh: "完善成员资料", en: "Complete a member profile", de: "Mitgliedsprofil vervollständigen")
+            return l.tr(zh: "完善成员资料", en: "Complete a member profile", de: "Mitgliedsprofil vervollständigen")
         case .petProfile:
-            l.tr(zh: "完善宠物资料", en: "Complete a pet profile", de: "Tierprofil vervollständigen")
+            return l.tr(zh: "完善宠物资料", en: "Complete a pet profile", de: "Tierprofil vervollständigen")
         case .identityProtection:
-            l.tr(zh: "确认证件与保障", en: "Review identity and protection", de: "Identität und Schutz prüfen")
+            return l.tr(zh: "确认证件与保障", en: "Review identity and protection", de: "Identität und Schutz prüfen")
         case .healthProtection:
-            l.tr(zh: "确认健康保护状态", en: "Review health protection", de: "Gesundheitsschutz prüfen")
+            return l.tr(zh: "确认健康保护状态", en: "Review health protection", de: "Gesundheitsschutz prüfen")
         case .carePlan:
-            l.tr(zh: "建立照护计划", en: "Set up a care plan", de: "Pflegeplan einrichten")
+            return l.tr(zh: "建立照护计划", en: "Set up a care plan", de: "Pflegeplan einrichten")
         case .firstCare:
-            l.tr(zh: "完成首次照护", en: "Complete first care", de: "Erste Pflege abschließen")
+            return l.tr(zh: "完成首次照护", en: "Complete first care", de: "Erste Pflege abschließen")
         }
     }
 }
