@@ -52,7 +52,7 @@ enum AppResetService {
             options: options,
             questManager: questManager,
             attachmentStorage: .live,
-            saveChanges: { $0.safeSaveResult(publishFailureEvent: true) }
+            deletePersistentData: { $0.deleteAllData() }
         )
     }
 
@@ -69,7 +69,7 @@ enum AppResetService {
             options: options,
             questManager: questManager,
             attachmentStorage: .live,
-            saveChanges: { $0.safeSaveResult(publishFailureEvent: true) }
+            deletePersistentData: { $0.deleteAllData() }
         )
     }
 
@@ -79,7 +79,7 @@ enum AppResetService {
         defaults: UserDefaults,
         options: Options,
         attachmentStorage: HumanNoteAttachmentStorage,
-        saveChanges: (ModelContext) -> ModelContextSaveResult
+        deletePersistentData: (ModelContainer) throws -> Void
     ) throws -> HumanNoteAttachmentCleanupResult {
         let questManager = options.resetSharedRuntimeState ? QuestManager() : nil
         return try resetInternal(
@@ -88,7 +88,7 @@ enum AppResetService {
             options: options,
             questManager: questManager,
             attachmentStorage: attachmentStorage,
-            saveChanges: saveChanges
+            deletePersistentData: deletePersistentData
         )
     }
 
@@ -98,11 +98,10 @@ enum AppResetService {
         options: Options,
         questManager: QuestManager?,
         attachmentStorage: HumanNoteAttachmentStorage,
-        saveChanges: (ModelContext) -> ModelContextSaveResult
+        deletePersistentData: (ModelContainer) throws -> Void
     ) throws -> HumanNoteAttachmentCleanupResult {
         let preservedDefaults = preservedDefaultValues(in: defaults, options: options)
-        try deleteAllPersistentModels(in: context)
-        try saveResetChanges(context: context, saveChanges: saveChanges)
+        try deletePersistentModels(context: context, deletePersistentData: deletePersistentData)
         let humanNoteAttachmentCleanup = options.deleteHumanNoteAttachments
             ? HumanNoteAttachmentStore.deleteAll(storage: attachmentStorage)
             : .notRequired
@@ -131,69 +130,20 @@ enum AppResetService {
         return humanNoteAttachmentCleanup
     }
 
-    private static func deleteAllPersistentModels(in context: ModelContext) throws {
-        // SwiftData batch deletes must remove cascade roots before their
-        // dependants. Deleting a child batch first can make Core Data nullify a
-        // mandatory inverse and fail before the later parent delete runs.
-        try delete(Event.self, in: context)
-        try delete(Pet.self, in: context)
-        try delete(Plant.self, in: context)
-        try delete(Human.self, in: context)
-        try delete(Household.self, in: context)
-
-        try delete(CloudSyncRecordState.self, in: context)
-        try delete(Reminder.self, in: context)
-        try delete(CareLedgerEvent.self, in: context)
-        try delete(CoconutLedgerEntry.self, in: context)
-        try delete(CoconutAccount.self, in: context)
-        try delete(EconomyBudgetUsageEvent.self, in: context)
-        try delete(FamilyCollaborationTask.self, in: context)
-        try delete(CoconutExchangeRequest.self, in: context)
-        try delete(SharedCareUndoReceipt.self, in: context)
-        try delete(SharedCareSession.self, in: context)
-        try delete(RecycleBinBatch.self, in: context) // legacy V69 compatibility row
-        try delete(ShopPurchaseRecord.self, in: context)
-        try delete(GachaDrawLog.self, in: context)
-        try delete(GachaOwnedItem.self, in: context)
-        try delete(OasisCritterActionLog.self, in: context)
-        try delete(OasisUnlock.self, in: context)
-        try delete(OasisCritterFragmentBalance.self, in: context)
-        try delete(OasisElectronicPet.self, in: context)
-        try delete(OasisUpgradeCoconut.self, in: context)
-        try delete(HumanHealthMetricLog.self, in: context)
-        try delete(HumanMedicationLog.self, in: context)
-        try delete(HumanMedication.self, in: context)
-        try delete(HumanHealthReport.self, in: context)
-        try delete(HumanWorkoutLog.self, in: context)
-        try delete(HumanWeightLog.self, in: context)
-        try delete(WishlistItem.self, in: context)
-        try delete(PetPhotoLog.self, in: context)
-        try delete(PetInsurance.self, in: context)
-        try delete(InsuranceClaim.self, in: context)
-        try delete(PetMedication.self, in: context)
-        try delete(SymptomLog.self, in: context)
-        try delete(HeatCycleLog.self, in: context)
-        try delete(PlantCareLog.self, in: context)
-        try delete(WaterLog.self, in: context)
-        try delete(PetMilestone.self, in: context)
-        try delete(PetFoodRecord.self, in: context)
-        try delete(PetExpenseLog.self, in: context)
-        try delete(PetDocument.self, in: context)
-        try delete(PetDocumentAttachment.self, in: context)
-        try delete(PetHealthLog.self, in: context)
-        try delete(PetWeightLog.self, in: context)
-        try delete(PetHygieneLog.self, in: context)
-        try delete(PetWalkLog.self, in: context)
-        try delete(PetPottyLog.self, in: context)
-        try delete(PetCareLog.self, in: context)
-        try delete(PetRelationship.self, in: context)
-    }
-
-    private static func delete<T: PersistentModel>(_: T.Type, in context: ModelContext) throws {
-        // Reset is a whole-store operation. A batch delete avoids materializing
-        // every live object graph only to tear it down again, which is both
-        // slower and has triggered a SwiftData allocator crash on iOS 26.2.
-        try context.delete(model: T.self) // derived-state: allow intentional local reset without sync tombstones
+    private static func deletePersistentModels(
+        context: ModelContext,
+        deletePersistentData: (ModelContainer) throws -> Void
+    ) throws {
+        // Reset owns the entire local store. ModelContainer.deleteAllData()
+        // is Apple's runtime-safe delete-all API: one store-level operation
+        // that neither materializes every object graph nor issues dozens of
+        // batch-delete requests. Both alternatives crash on iOS 26.2.
+        context.rollback()
+        do {
+            try deletePersistentData(context.container) // derived-state: intentional local reset bypasses sync tombstones
+        } catch {
+            throw AppResetPersistenceError.persistenceFailed(error.localizedDescription)
+        }
     }
 
     private static func preservedDefaultValues(
@@ -240,17 +190,6 @@ enum AppResetService {
     private static func shouldResetDefaultKey(_ key: String) -> Bool {
         exactResetDefaultKeys.contains(key)
             || resetDefaultPrefixes.contains { key.hasPrefix($0) }
-    }
-
-    private static func saveResetChanges(
-        context: ModelContext,
-        saveChanges: (ModelContext) -> ModelContextSaveResult
-    ) throws {
-        let saveResult = saveChanges(context)
-        guard saveResult.didSave else {
-            context.rollback()
-            throw AppResetPersistenceError.persistenceFailed(saveResult.errorDescription)
-        }
     }
 
     private static let exactResetDefaultKeys: Set<String> = [
@@ -333,7 +272,7 @@ enum AppResetPersistenceError: LocalizedError, Equatable {
             message ?? String(
                 localized: "app.reset.persistence.failed",
                 defaultValue: "Unable to reset local data.",
-                comment: "Shown when app reset cannot save the delete-all operation."
+                comment: "Shown when app reset cannot delete the local store."
             )
         }
     }

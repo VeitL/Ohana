@@ -203,7 +203,7 @@ struct HumanNoteAttachmentLifecycleTests {
             defaults: fixture.defaults,
             options: resetOptions,
             attachmentStorage: fixture.storage,
-            saveChanges: { $0.safeSaveResult(publishFailureEvent: false) }
+            deletePersistentData: { $0.deleteAllData() }
         )
 
         #expect(cleanup == .completed(removedFileCount: 1))
@@ -211,7 +211,7 @@ struct HumanNoteAttachmentLifecycleTests {
         #expect(!FileManager.default.fileExists(atPath: rootURL.path))
     }
 
-    @Test func appResetSaveFailureLeavesDatabaseAndAttachmentRootUntouched() throws {
+    @Test func appResetStoreDeletionFailureLeavesDatabaseAndAttachmentRootUntouched() throws {
         let fixture = try makeFixture()
         defer { fixture.removeFiles() }
         let context = fixture.container.mainContext
@@ -229,7 +229,7 @@ struct HumanNoteAttachmentLifecycleTests {
                 defaults: fixture.defaults,
                 options: resetOptions,
                 attachmentStorage: fixture.storage,
-                saveChanges: injectedSaveFailure
+                deletePersistentData: injectedStoreDeletionFailure
             )
         } catch {
             didThrow = true
@@ -305,6 +305,10 @@ struct HumanNoteAttachmentLifecycleTests {
     private func injectedSaveFailure(_: ModelContext) -> ModelContextSaveResult {
         .failed(InjectedSaveError())
     }
+
+    private func injectedStoreDeletionFailure(_: ModelContainer) throws {
+        throw InjectedStoreDeletionError()
+    }
 }
 
 private struct Fixture {
@@ -322,4 +326,8 @@ private struct Fixture {
 
 private struct InjectedSaveError: LocalizedError {
     var errorDescription: String? { "Injected save failure" }
+}
+
+private struct InjectedStoreDeletionError: LocalizedError {
+    var errorDescription: String? { "Injected store deletion failure" }
 }
