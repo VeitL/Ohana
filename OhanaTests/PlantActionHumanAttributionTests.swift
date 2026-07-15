@@ -16,9 +16,9 @@ struct PlantActionHumanAttributionTests {
             #expect(!sheet.contains("@AppStorage(\"currentActiveHumanId\")"))
         }
 
-        #expect(careLog.contains("selectedPhotoData, resolvedExecutorID"))
-        #expect(dueBatch.contains("onComplete(selections, resolvedExecutorID)"))
-        #expect(quickBatch.contains("onRecord(selections, resolvedExecutorID)"))
+        #expect(careLog.contains("selectedPhotoData, selectedExecutorID"))
+        #expect(dueBatch.contains("onComplete(selections, selectedExecutorID)"))
+        #expect(quickBatch.contains("onRecord(selections, selectedExecutorID)"))
         #expect(careLog.contains("requiresExecutorSelection"))
         #expect(dueBatch.contains("requiresExecutorSelection"))
         #expect(quickBatch.contains("requiresExecutorSelection"))

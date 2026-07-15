@@ -373,6 +373,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         let dashboardWalletSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+WalletDeck.swift", rootURL: rootURL)
         let dashboardRoomRailSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+RoomRail.swift", rootURL: rootURL)
         let dashboardEmptyStatesSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+EmptyStates.swift", rootURL: rootURL)
+        let dashboardCareSheetsSource = try source("Ohana/Features/Plants/Views/PlantDashboardCareSheetsModifier.swift", rootURL: rootURL)
         let plantUITestSource = try source("OhanaUITests/PlantModuleUITests.swift", rootURL: rootURL)
         let plantBaselineSeederSource = try source("Ohana/App/UITestPlantBaselineSeeder.swift", rootURL: rootURL)
         let dashboardSource = [
@@ -381,7 +382,8 @@ final class PlantDetailExperienceTests: XCTestCase {
             dashboardDiscoverySource,
             dashboardWalletSource,
             dashboardRoomRailSource,
-            dashboardEmptyStatesSource
+            dashboardEmptyStatesSource,
+            dashboardCareSheetsSource
         ].joined(separator: "\n")
 
         XCTAssertTrue(dashboardSource.contains("enum PlantDashboardEntryMode"))
@@ -712,7 +714,10 @@ final class PlantDetailExperienceTests: XCTestCase {
         let modelSource = try source("Ohana/Features/FunctionMenu/FunctionMenuModels.swift", rootURL: rootURL)
         let groupSource = try source("Ohana/Features/FunctionMenu/Views/FeatureGroupDashboardView.swift", rootURL: rootURL)
         let routerSource = try source("Ohana/Features/FunctionMenu/Views/FunctionMenuDestinationRouter.swift", rootURL: rootURL)
-        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift", rootURL: rootURL)
+        let dashboardSource = try [
+            "Ohana/Features/Plants/Views/PlantDashboardView.swift",
+            "Ohana/Features/Plants/Views/PlantDashboardCareSheetsModifier.swift"
+        ].map { try source($0, rootURL: rootURL) }.joined(separator: "\n")
         let dashboardSectionsSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+Sections.swift", rootURL: rootURL)
         let careFeatureSource = try source("Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift", rootURL: rootURL)
         let guardSource = try source("Ohana/App/AppFeatureRouteGuard.swift", rootURL: rootURL)
@@ -1025,7 +1030,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(careFeatureDetailSource.contains("matchesFocusedFeature(_ careType: PlantCareType)"))
         XCTAssertTrue(detailSource.contains("openPlantCareFeatureDetail(for: task.careType)"))
         XCTAssertTrue(detailSource.contains("recordQuickCare(_ type: PlantCareType, executorID: UUID?)"))
-        XCTAssertTrue(detailSource.contains("resolvedQuickCareExecutorID"))
+        XCTAssertTrue(detailSource.contains("recordQuickCare(draft.careType, executorID: quickCareExecutorID)"))
         XCTAssertTrue(detailSource.contains("showQuickCareToast(type: type, result: result)"))
         XCTAssertTrue(detailSource.contains("destination.careFeatureDestination"))
         XCTAssertTrue(detailSource.contains("openPlantCareFeatureDetail"))

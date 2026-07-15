@@ -115,7 +115,7 @@ struct PlantBatchQuickRecordLayoutTests {
         )
 
         #expect(sheetSource.contains("@State private var isRecording = false"))
-        #expect(sheetSource.contains("let didRecord = await onRecord(selections, resolvedExecutorID)\n        guard didRecord else { return }\n\n        UINotificationFeedbackGenerator().notificationOccurred(.success)\n        dismiss()"))
+        #expect(sheetSource.contains("let didRecord = await onRecord(selections, selectedExecutorID)\n        guard didRecord else { return }\n\n        UINotificationFeedbackGenerator().notificationOccurred(.success)\n        dismiss()"))
         #expect(sheetSource.contains(".disabled(selectedCount == 0 || isRecording || requiresExecutorSelection)"))
         #expect(dashboardSource.contains("func recordBatchQuickCare(_ selections: [PlantBatchCareSelection], executorID: UUID?) async -> Bool"))
         #expect(detailActionsSource.contains("func recordBatchQuickCareFromDetail("))

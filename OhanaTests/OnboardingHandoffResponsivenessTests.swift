@@ -15,7 +15,7 @@ struct OnboardingHandoffResponsivenessTests {
         #expect(source.contains("OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds"))
         #expect(source.contains("scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay)"))
         #expect(source.contains("prepareStarterGiftHomeHandoffIfNeeded(id)"))
-        #expect(source.contains("scheduleOnboardingCreatedEntitySignal(id, destinationTab: .home)"))
+        #expect(source.contains("scheduleOnboardingCreatedEntitySignal(id, destinationTab: .calendar)"))
         #expect(source.contains("finishStarterGiftCeremonyIfProjectionIsReady()"))
         #expect(!source.contains("appRoutes.presentSheet(.petWeightQuick(petID))"))
         #expect(!source.contains("appRoutes.presentSheet(.petWeight(petID))"))

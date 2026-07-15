@@ -24,8 +24,15 @@ nonisolated enum HumanActionAttributionPolicy {
 extension ExpenseActorAttribution {
     @MainActor
     func validated(context: ModelContext) -> ExpenseActorAttribution {
+        // Keep an explicitly supplied executor token long enough for the
+        // downstream reward resolver to distinguish "missing executor" from
+        // "no executor supplied". The write kernel still persists only its
+        // resolved live Human (or nil), while an unresolved explicit actor
+        // correctly suppresses reward side effects.
+        let normalizedExecutorId = EconomyRewardOwnerResolver.normalizedExecutorId(executorId)
         ExpenseActorAttribution(
-            executorId: HumanActionAttributionPolicy.activeHumanID(executorId, context: context),
+            executorId: HumanActionAttributionPolicy.activeHumanID(normalizedExecutorId, context: context)
+                ?? normalizedExecutorId,
             recordedByHumanId: HumanActionAttributionPolicy.activeHumanID(recordedByHumanId, context: context)
         )
     }

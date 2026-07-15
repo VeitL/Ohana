@@ -178,6 +178,7 @@ nonisolated enum CloudSyncEntityRegistry {
         deletionOwnership(HumanMedication.self, parent: .human, reason: "humanId"),
         deletionOwnership(HumanMedicationLog.self, parent: .human, reason: "humanId"),
         deletionOwnership(HumanHealthReport.self, parent: .human, reason: "humanId"),
+        deletionOwnership(HumanNoteRecord.self, parent: .human, reason: "local-only humanId attribution sidecar"),
         deletionOwnership(WishlistItem.self, parent: .human, reason: "creator/redeemer"),
         deletionOwnership(GachaOwnedItem.self, parent: .human, reason: "ownerHumanId"),
         deletionOwnership(GachaDrawLog.self, parent: .human, reason: "ownerHumanId"),
