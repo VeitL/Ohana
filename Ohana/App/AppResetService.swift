@@ -63,7 +63,7 @@ enum AppResetService {
         options: Options,
         questManager: QuestManager
     ) throws -> HumanNoteAttachmentCleanupResult {
-        try resetInternal(
+        try reset(
             context: context,
             defaults: defaults,
             options: options,
@@ -78,15 +78,44 @@ enum AppResetService {
         context: ModelContext,
         defaults: UserDefaults,
         options: Options,
+        questManager: QuestManager,
         attachmentStorage: HumanNoteAttachmentStorage,
         deletePersistentData: (ModelContainer) throws -> Void
     ) throws -> HumanNoteAttachmentCleanupResult {
-        let questManager = options.resetSharedRuntimeState ? QuestManager() : nil
-        return try resetInternal(
+        try resetInternal(
             context: context,
             defaults: defaults,
             options: options,
             questManager: questManager,
+            attachmentStorage: attachmentStorage,
+            deletePersistentData: deletePersistentData
+        )
+    }
+
+    @discardableResult
+    static func reset(
+        context: ModelContext,
+        defaults: UserDefaults,
+        options: Options,
+        attachmentStorage: HumanNoteAttachmentStorage,
+        deletePersistentData: (ModelContainer) throws -> Void
+    ) throws -> HumanNoteAttachmentCleanupResult {
+        let questManager = options.resetSharedRuntimeState ? QuestManager() : nil
+        if let questManager {
+            return try reset(
+                context: context,
+                defaults: defaults,
+                options: options,
+                questManager: questManager,
+                attachmentStorage: attachmentStorage,
+                deletePersistentData: deletePersistentData
+            )
+        }
+        return try resetInternal(
+            context: context,
+            defaults: defaults,
+            options: options,
+            questManager: nil,
             attachmentStorage: attachmentStorage,
             deletePersistentData: deletePersistentData
         )

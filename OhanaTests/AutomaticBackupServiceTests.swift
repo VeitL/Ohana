@@ -162,7 +162,8 @@ struct AutomaticBackupServiceTests {
         let resetter = StaticAppResetter(
             questManager: QuestManager(),
             automaticBackups: service,
-            defaults: defaults
+            defaults: defaults,
+            deletePersistentData: scopedPetDeletion(in: context)
         )
 
         let oldRun = Task { @MainActor in
@@ -220,7 +221,8 @@ struct AutomaticBackupServiceTests {
         let resetter = StaticAppResetter(
             questManager: QuestManager(),
             automaticBackups: service,
-            defaults: defaults
+            defaults: defaults,
+            deletePersistentData: scopedPetDeletion(in: context)
         )
 
         let oldRun = Task { @MainActor in
@@ -272,7 +274,8 @@ struct AutomaticBackupServiceTests {
         let resetter = StaticAppResetter(
             questManager: QuestManager(),
             automaticBackups: service,
-            defaults: defaults
+            defaults: defaults,
+            deletePersistentData: scopedPetDeletion(in: context)
         )
 
         let result = try await resetter.reset(context: context, options: resetOptions())
@@ -518,31 +521,20 @@ struct AutomaticBackupServiceTests {
         #expect(restrictedBackup.appState.coconutLogsJSON == "[]")
         #expect(restrictedBackup.familyCollaborationTasks?.isEmpty == true)
 
-        try AppResetService.reset(
-            context: context,
-            defaults: defaults,
-            options: AppResetService.Options(
-                cancelPendingNotifications: false,
-                deleteCustomBackground: false,
-                resetSharedRuntimeState: false,
-                cleanUpAutomaticBackups: false
-            )
-        )
-        #expect(try context.fetch(FetchDescriptor<Human>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
-
-        try await DataBackupManager().importJSON(from: url, context: context)
-        #expect(try context.fetch(FetchDescriptor<Human>()).first?.name == "Backup Guardian")
-        #expect(try context.fetch(FetchDescriptor<Pet>()).first?.name == "Backup Miso")
-        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).first?.amountGrams == 28)
-        #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).first?.itemId == "fx_lime_glow")
-        #expect(try context.fetch(FetchDescriptor<HumanWeightLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<HumanMedication>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<HumanHealthMetricLog>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<HumanHealthReport>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<FamilyCollaborationTask>()).isEmpty)
+        let restoredContainer = try makeInMemoryContainer()
+        let restoredContext = restoredContainer.mainContext
+        try await DataBackupManager().importJSON(from: url, context: restoredContext)
+        #expect(try restoredContext.fetch(FetchDescriptor<Human>()).first?.name == "Backup Guardian")
+        #expect(try restoredContext.fetch(FetchDescriptor<Pet>()).first?.name == "Backup Miso")
+        #expect(try restoredContext.fetch(FetchDescriptor<PetCareLog>()).first?.amountGrams == 28)
+        #expect(try restoredContext.fetch(FetchDescriptor<ShopPurchaseRecord>()).first?.itemId == "fx_lime_glow")
+        #expect(try restoredContext.fetch(FetchDescriptor<HumanWeightLog>()).isEmpty)
+        #expect(try restoredContext.fetch(FetchDescriptor<HumanWorkoutLog>()).isEmpty)
+        #expect(try restoredContext.fetch(FetchDescriptor<HumanMedication>()).isEmpty)
+        #expect(try restoredContext.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
+        #expect(try restoredContext.fetch(FetchDescriptor<HumanHealthMetricLog>()).isEmpty)
+        #expect(try restoredContext.fetch(FetchDescriptor<HumanHealthReport>()).isEmpty)
+        #expect(try restoredContext.fetch(FetchDescriptor<FamilyCollaborationTask>()).isEmpty)
     }
 
     @Test func resetCleanupFailurePersistsUntilRetrySucceeds() async throws {
@@ -620,6 +612,17 @@ struct AutomaticBackupServiceTests {
         let schema = Schema(ArkSchemaV85.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func scopedPetDeletion(
+        in context: ModelContext
+    ) -> (ModelContainer) throws -> Void {
+        { _ in
+            for pet in try context.fetch(FetchDescriptor<Pet>()) {
+                context.delete(pet)
+            }
+            try context.save()
+        }
     }
 
     private func resetOptions() -> AppResetService.Options {

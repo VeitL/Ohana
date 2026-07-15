@@ -164,7 +164,10 @@ struct AutomaticBackupStatus: Equatable, Sendable {
     }
 }
 
-final class AutomaticBackupStatusStore {
+/// A synchronous `UserDefaults` adapter with no UI-owned state. Keep it out of
+/// the app target's default MainActor isolation so short-lived instances do not
+/// acquire executor-bound destruction semantics.
+final nonisolated class AutomaticBackupStatusStore {
     static let enabledKey = "automaticBackup.enabled.v1"
     static let keyPrefix = "automaticBackup."
 

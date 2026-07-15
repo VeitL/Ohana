@@ -82,15 +82,21 @@ final class StaticAppResetter: AppResetting {
     private let questManager: QuestManager
     private let automaticBackups: AutomaticBackupManaging
     private let defaults: UserDefaults
+    private let attachmentStorage: HumanNoteAttachmentStorage
+    private let deletePersistentData: (ModelContainer) throws -> Void
 
     init(
         questManager: QuestManager,
         automaticBackups: AutomaticBackupManaging,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        attachmentStorage: HumanNoteAttachmentStorage = .live,
+        deletePersistentData: @escaping (ModelContainer) throws -> Void = { $0.deleteAllData() }
     ) {
         self.questManager = questManager
         self.automaticBackups = automaticBackups
         self.defaults = defaults
+        self.attachmentStorage = attachmentStorage
+        self.deletePersistentData = deletePersistentData
     }
 
     func reset(context: ModelContext) async throws -> AppResetService.ResetResult {
@@ -106,7 +112,9 @@ final class StaticAppResetter: AppResetting {
             context: context,
             defaults: defaults,
             options: options,
-            questManager: questManager
+            questManager: questManager,
+            attachmentStorage: attachmentStorage,
+            deletePersistentData: deletePersistentData
         )
         guard options.cleanUpAutomaticBackups else {
             return AppResetService.ResetResult(
@@ -133,7 +141,9 @@ final class StaticAppResetter: AppResetting {
                 resetSharedRuntimeState: true,
                 cleanUpAutomaticBackups: false
             ),
-            questManager: questManager
+            questManager: questManager,
+            attachmentStorage: attachmentStorage,
+            deletePersistentData: deletePersistentData
         )
     }
 }

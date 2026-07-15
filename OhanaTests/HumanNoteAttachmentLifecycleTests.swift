@@ -203,7 +203,10 @@ struct HumanNoteAttachmentLifecycleTests {
             defaults: fixture.defaults,
             options: resetOptions,
             attachmentStorage: fixture.storage,
-            deletePersistentData: { $0.deleteAllData() }
+            deletePersistentData: { _ in
+                context.delete(human)
+                try context.save()
+            }
         )
 
         #expect(cleanup == .completed(removedFileCount: 1))
