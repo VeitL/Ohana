@@ -453,7 +453,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(dashboardSource.contains("openCareLogSheet(for: plant, type: .watering)"))
         XCTAssertTrue(dashboardSource.contains("openCareLogSheet(for: plant, type: task.careType)"))
         XCTAssertTrue(dashboardSource.contains("func savePlantCareLog("))
-        XCTAssertTrue(dashboardSource.contains("executorID: executorID"))
+        XCTAssertTrue(dashboardSource.contains("onSaveCareLog(draft.plant, type, careNote, photoData, healthStatus, executorID)"))
         XCTAssertTrue(dashboardSource.contains("photoData: photoData"))
         XCTAssertTrue(dashboardSource.contains("healthStatus: healthStatus"))
         XCTAssertTrue(dashboardSource.contains("sitesDashboardSection"))
