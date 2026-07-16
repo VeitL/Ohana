@@ -1,18 +1,22 @@
 # Ohana Privacy Policy / Ohana 隐私政策
 
-Last updated / 更新日期：2026-07-12
+Last updated / 更新日期：2026-07-16
 Support / 支持：[guanchen.li.119@gmail.com](mailto:guanchen.li.119@gmail.com?subject=Ohana%20Support)
 
 ## Summary / 摘要
 
-Ohana is a local-first care app. The Solo release does not operate developer-
+Ohana is a local-first care app. The Free / Personal release does not operate developer-
 hosted accounts, advertising, analytics SDKs, tracking, support uploads,
 CloudKit sharing, APNs remote notifications, or remote data synchronization.
-Your records are used on your device to provide the app's features.
+It offers optional Personal monthly/yearly subscriptions and a Personal Lifetime
+purchase through Apple's In-App Purchase. A verified historical Supporter Pack
+purchase is recognized as Personal Lifetime.
+Your care records are used on your device to provide the app's features.
 
-Ohana 是一款本地优先的照护应用。当前 Solo 版本不运营开发者托管账号、广告、
+Ohana 是一款本地优先的照护应用。当前 Free / Personal 版本不运营开发者托管账号、广告、
 分析 SDK、追踪、支持材料上传、CloudKit 共享、APNs 远程通知或远程数据同步。
-你的记录仅在设备上用于提供应用功能。
+应用通过 Apple 的 App 内购买提供可选的 Personal 月付 / 年付订阅和 Personal Lifetime 一次购买；已验证有效的历史 Supporter Pack 购买会被识别为 Personal Lifetime。你的照护记录仅在
+设备上用于提供应用功能。
 
 ## Data Ohana Stores / Ohana 存储的数据
 
@@ -60,11 +64,11 @@ Ohana **不会**将个人的人类健康信息存入 iCloud，包括 HealthKit �
 
 Ohana marks its local Application Support persistence root, including the
 SwiftData store and Human Note attachment directories, as excluded from
-OS-managed device backups. The only app-managed iCloud path in the Solo release
+OS-managed device backups. The only app-managed iCloud path in the Free / Personal release
 is the restricted iCloud Drive package described below.
 
 Ohana 会将本地 Application Support 持久化根目录（包括 SwiftData 存储和
-人类笔记附件目录）标记为不参与系统管理的设备备份。Solo 版本中唯一由应用管理的
+人类笔记附件目录）标记为不参与系统管理的设备备份。Free / Personal 版本中唯一由应用管理的
 iCloud 路径，是下文所述的受限 iCloud Drive 备份包。
 
 ## Backups and Exports / 备份与导出
@@ -113,6 +117,32 @@ Choosing an iOS share destination is your action. The destination's privacy
 practices are governed by that provider's policies.
 
 选择 iOS 分享目的地是你的主动操作；该目的地的隐私做法由相应提供方的政策决定。
+
+## In-App Purchase / App 内购买
+
+Apple processes payment for optional Personal monthly/yearly subscriptions,
+Personal Lifetime, and the historical Supporter Pack through StoreKit and the
+App Store. Ohana reads StoreKit-provided product metadata plus Apple-signed and
+verified transaction/current-entitlement status on-device only to display
+localized offers, complete or restore purchases, recognize expiration, refunds
+or revocations, and unlock eligible local Personal capabilities. Ohana does not
+receive or store your payment card, billing address, Apple Account password, or
+other complete payment credentials.
+
+Apple 通过 StoreKit 和 App Store 处理可选 Personal 月付 / 年付订阅、Personal Lifetime 和历史 Supporter Pack 的付款。Ohana 仅在本机读取 StoreKit 提供的商品元数据，以及 Apple 签名并验证的交易和当前权益状态，用于显示本地化商品、完成或恢复购买、识别过期 / 退款 / 撤销，以及解锁符合条件的本地 Personal 能力。Ohana 不会接收或存储你的支付卡、账单地址、Apple 账号密码
+或其他完整支付凭据。
+
+Ohana does not send care records to the developer or associate Human, pet,
+plant, health, location, or care data with the purchase. Free quota counts are
+computed on-device and are not sent to the developer. Personal does not add
+advertising or analytics. Deleting or resetting local app data does not
+delete Apple's App Store purchase record; an eligible purchase can be restored
+from Apple, and refund requests are handled through Apple's services.
+
+Ohana 不会将照护记录发送给开发者，也不会把 Human、宠物、植物、健康、位置或照护
+数据与购买关联。Free 额度计数仅在设备上计算，不会发送给开发者。Personal 不会引入广告或分析。删除或重置本地 App 数据不会
+删除 Apple 保存的 App Store 购买记录；符合条件的购买可以通过 Apple 恢复，退款申请
+也由 Apple 的服务处理。
 
 ## Permissions / 权限
 
