@@ -6,6 +6,85 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct TaskActionCommandExecutorTests {
+    @Test func localizedDefaultWaterRefillCompletionWritesOneWateringFact() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Solo")
+        let pet = Pet(name: "Mochi", species: "dog")
+        let dueAt = Date(timeIntervalSince1970: 1_784_000_000)
+        let event = Event(
+            title: "Mochi Water refill",
+            startDate: dueAt,
+            isAllDay: true,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.recurrenceDays = 1
+        context.insert(human)
+        context.insert(pet)
+        context.insert(event)
+        try context.save()
+
+        let restoreSelection = selectActiveHuman(human.id.uuidString)
+        defer { restoreSelection() }
+        let item = TaskCenterItemSnapshot(
+            id: "event-\(event.id.uuidString)",
+            eventID: event.id,
+            reminderID: nil,
+            familyTaskID: nil,
+            source: .event,
+            title: event.title,
+            subject: TaskSubjectSnapshot(
+                kind: .pet,
+                id: pet.id,
+                name: pet.name,
+                themeColorHex: nil
+            ),
+            eventType: .daily,
+            symbol: "drop.fill",
+            occurrenceDate: dueAt,
+            scheduledAt: dueAt,
+            dueAt: dueAt,
+            isAllDay: true,
+            isRecurring: true,
+            urgency: .overdue,
+            workflowStatus: .active,
+            availableActions: [.complete],
+            participantHumanIDs: [human.id]
+        )
+        let command = TaskActionCommand(item: item, action: .complete)
+        let executor = TaskActionCommandExecutor(
+            modelContext: context,
+            services: AppServices(modelContainer: container)
+        )
+
+        let first = executor.execute(
+            command,
+            events: [event],
+            familyTasks: [],
+            humans: [human],
+            pets: [pet]
+        )
+        let replay = executor.execute(
+            command,
+            events: [event],
+            familyTasks: [],
+            humans: [human],
+            pets: [pet]
+        )
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let careLedger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(first.disposition == .applied)
+        #expect(replay.disposition == .alreadyApplied)
+        #expect(event.isOccurrenceMarkedComplete(on: dueAt))
+        #expect(careLogs.count == 1)
+        #expect(careLogs.first?.careType == .watering)
+        #expect(careLogs.first?.amountMl == 250)
+        #expect(careLedger.count == 1)
+    }
+
     @Test func linkedCareSubmissionWritesFactThenProjectsReviewExactlyOnce() throws {
         let container = try makeContainer()
         let context = container.mainContext
