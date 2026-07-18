@@ -94,9 +94,11 @@ struct PetHealthRecordInlinePopup: View {
                         Picker(l.tr(zh: "记录类型", en: "Record type", de: "Eintragstyp"), selection: $selectedType) {
                             ForEach(healthSubtypeOptions(mode: entryMode), id: \.self) { type in
                                 Label(healthTypeTitle(type), systemImage: healthIcon(for: type))
+                                    .accessibilityIdentifier(healthSubtypeAccessibilityIdentifier(type))
                                     .tag(type)
                             }
                         }
+                        .accessibilityIdentifier("pet-health-record-type-picker")
                     }
                 }
 
@@ -192,6 +194,23 @@ struct PetHealthRecordInlinePopup: View {
             [.vaccine, .dewormingInternal, .dewormingExternal, .checkup]
         case .visit:
             [.surgery, .general]
+        }
+    }
+
+    private func healthSubtypeAccessibilityIdentifier(_ type: HealthLogType) -> String {
+        switch type {
+        case .vaccine:
+            "pet-health-record-type-vaccine"
+        case .dewormingInternal:
+            "pet-health-record-type-dewormingInternal"
+        case .dewormingExternal:
+            "pet-health-record-type-dewormingExternal"
+        case .checkup:
+            "pet-health-record-type-checkup"
+        case .surgery:
+            "pet-health-record-type-surgery"
+        default:
+            "pet-health-record-type-general"
         }
     }
 
@@ -300,7 +319,13 @@ struct PetHealthRecordInlinePopup: View {
     private func applyDefaultsForSelectedType() {
         switch selectedType {
         case .vaccine:
-            if name.isEmpty { name = "\(pet.name)疫苗" }
+            if name.isEmpty {
+                name = l.tr(
+                    zh: "\(pet.name)接种疫苗",
+                    en: "\(pet.name) vaccination",
+                    de: "\(pet.name) Impfung"
+                )
+            }
             hasExpiration = true
             expirationDate = defaultExpirationDate(from: date)
         case .dewormingInternal, .dewormingExternal, .medication:

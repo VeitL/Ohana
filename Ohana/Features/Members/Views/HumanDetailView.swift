@@ -57,6 +57,7 @@ struct HumanDetailView: View {
     @State var showingMedication = false
     @State var showingHealthReport = false
     @State var showingHealthMetrics = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var avatarSignature = ""
     @State var avatarCacheKey = "human-detail-avatar-empty"
 
@@ -211,12 +212,17 @@ struct HumanDetailView: View {
                             Image(systemName: "pencil.circle") // a11y: allow decorative icon covered by surrounding text or control
                                 .foregroundStyle(Color.ohanaPrimaryText)
                         }
+                        .accessibilityIdentifier("human-detail-edit-action")
                     }
                 }
             }
         }
         .accessibilityIdentifier("human-detail-screen")
         .sheet(isPresented: $showingEditSheet) { EditHumanSheet(human: human) }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
+        }
         .sheet(isPresented: $showWeightHistory) {
             NavigationStack { HumanWeightHistoryView(human: human) }
                 .ohanaSheetPagePresentation() // ui-v4: allow long weight history uses large sheet

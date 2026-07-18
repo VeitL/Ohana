@@ -722,7 +722,7 @@ private struct AppSheetRouteDestination: View {
             )
             .ohanaSheetPagePresentation()
         case .requiredAccountSwitch:
-            AppAccountSwitcherRouteContainer(onSwitched: onDismiss)
+            AppAccountSwitcherRouteContainer(allowsDismiss: false, onSwitched: onDismiss)
                 .interactiveDismissDisabled(true)
         case .settings:
             AppSettingsSheetRouteContainer(onClose: onDismiss)
@@ -805,6 +805,8 @@ private struct AppSheetRouteDestination: View {
             .humanWishlist(humanID)
         case .notes:
             .humanNote(humanID)
+        case .achievements:
+            .functionMenu(destination: .featureAggregate(.achievements))
         }
         presentFeatureRouteAfterTap(route)
     }

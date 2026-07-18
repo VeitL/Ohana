@@ -63,6 +63,13 @@ enum OhanaUITestLaunchOptions {
         return plantBaselineSeedCount(defaultCount: 1)
     }
 
+    static var requestedPlantBaselineRoomCount: Int {
+        plantBaselineRoomCount(
+            defaultCount: 2,
+            arguments: ProcessInfo.processInfo.arguments
+        )
+    }
+
     static var requestedCoconutBalanceSeedAmount: Int? {
         let arguments = ProcessInfo.processInfo.arguments
         guard isRunningUITests,
@@ -88,8 +95,50 @@ enum OhanaUITestLaunchOptions {
         return String((name.isEmpty ? "Codex Human Baseline" : name).prefix(80))
     }
 
+    static var requestsMemberCardBaseline: Bool {
+        isRunningUITests
+            && ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_SEED_MEMBER_CARD_BASELINE")
+    }
+
+    static var requestsSparsePetProfileBaseline: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.contains("-OHANA_UI_TESTS")
+            && resetsPersistentState
+            && requestsMemberCardBaseline
+            && arguments.contains("-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE")
+    }
+
+    static var requestsMatureHouseholdBaseline: Bool {
+        ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_SEED_MATURE_HOUSEHOLD_BASELINE")
+    }
+
+    static var requestedMatureHouseholdBaseline: UITestMatureHouseholdBaselineRequest? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard isRunningUITests,
+              resetsPersistentState,
+              requestedHumanBaselineName != nil,
+              requestsMatureHouseholdBaseline,
+              !requestsMemberCardBaseline,
+              !requestsSparsePetProfileBaseline,
+              let petName = launchArgumentValue("-OHANA_UI_TEST_PET_BASELINE_NAME", in: arguments),
+              let speciesRaw = launchArgumentValue("-OHANA_UI_TEST_PET_BASELINE_SPECIES", in: arguments),
+              let species = UITestMatureHouseholdBaselineRequest.Species(rawValue: speciesRaw.lowercased()) else {
+            return nil
+        }
+        let trimmedName = petName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return nil }
+        return UITestMatureHouseholdBaselineRequest(
+            petName: String(trimmedName.prefix(80)),
+            species: species
+        )
+    }
+
     static var requestsRewardTierUnlock: Bool {
         isRunningUITests && ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_UNLOCK_REWARD_TIER")
+    }
+
+    static var requestsGrowthLoopUnlock: Bool {
+        isRunningUITests && ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_UNLOCK_GROWTH_LOOP")
     }
 
     static var requestsEconomyBudgetReset: Bool {
@@ -103,7 +152,19 @@ enum OhanaUITestLaunchOptions {
               let count = Int(arguments[arguments.index(after: flagIndex)]) else {
             return defaultCount
         }
-        return min(max(count, 1), 12)
+        return min(max(count, 1), 24)
+    }
+
+    static func plantBaselineRoomCount(
+        defaultCount: Int,
+        arguments: [String]
+    ) -> Int {
+        guard let flagIndex = arguments.firstIndex(of: "-OHANA_UI_TEST_PLANT_BASELINE_ROOM_COUNT"),
+              arguments.indices.contains(arguments.index(after: flagIndex)),
+              let count = Int(arguments[arguments.index(after: flagIndex)]) else {
+            return min(max(defaultCount, 1), 6)
+        }
+        return min(max(count, 1), 6)
     }
 
     static func coconutBalanceSeedAmount(defaultAmount: Int) -> Int {
@@ -114,6 +175,14 @@ enum OhanaUITestLaunchOptions {
             return defaultAmount
         }
         return min(max(amount, 0), 100_000)
+    }
+
+    private static func launchArgumentValue(_ flag: String, in arguments: [String]) -> String? {
+        guard let flagIndex = arguments.firstIndex(of: flag),
+              arguments.indices.contains(arguments.index(after: flagIndex)) else {
+            return nil
+        }
+        return arguments[arguments.index(after: flagIndex)]
     }
 }
 
@@ -147,10 +216,40 @@ enum UITestHumanBaselineSeeder {
                 )
             }
             UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
-            // Module UI tests start after the Human-name step but still exercise
-            // the real optional Pet choice and first-Pet reward journey.
-            UserDefaults.standard.set(true, forKey: StarterGiftStorageKey.pending)
-            OnboardingJourneyCoordinator.markFirstHumanCreated(human.id)
+            if OhanaUITestLaunchOptions.requestsMemberCardBaseline {
+                // Member-card UI tests model an existing local-only user. They
+                // must not enter or fabricate the first-Pet starter-gift flow.
+                let defaults = UserDefaults.standard
+                defaults.set(true, forKey: "ohana_has_onboarded")
+                defaults.removeObject(forKey: StarterGiftStorageKey.claimed)
+                defaults.removeObject(forKey: StarterGiftStorageKey.pending)
+                defaults.removeObject(forKey: StarterGiftStorageKey.ceremonySeen)
+                defaults.removeObject(forKey: StarterGiftStorageKey.ceremonyRequested)
+                defaults.removeObject(forKey: StarterGiftStorageKey.oasisTabPromptPending)
+            } else {
+                // Module UI tests start after the Human-name step but still exercise
+                // the real optional Pet choice and first-Pet reward journey.
+                UserDefaults.standard.set(true, forKey: StarterGiftStorageKey.pending)
+                OnboardingJourneyCoordinator.markFirstHumanCreated(human.id)
+            }
+            let matureHouseholdResult = UITestMatureHouseholdBaselineSeeder.seedIfRequested(
+                modelContainer: modelContainer,
+                services: services,
+                human: human
+            )
+            if OhanaUITestLaunchOptions.requestsMatureHouseholdBaseline,
+               case .seeded = matureHouseholdResult {
+                // The requested disposable fixture is ready.
+            } else if OhanaUITestLaunchOptions.requestsMatureHouseholdBaseline {
+                // A partial fixture must never be mistaken for a valid mature
+                // household. This is DEBUG-only and requires an explicit UI-test
+                // launch flag, so failing the app launch is the clearest signal.
+                preconditionFailure("Mature household UI-test baseline was rejected.")
+            }
+            UITestSparsePetProfileBaselineSeeder.seedIfRequested(
+                modelContainer: modelContainer,
+                services: services
+            )
         } catch {
             context.rollback()
             OhanaLog.warning(
@@ -169,6 +268,7 @@ enum UITestPlantBaselineSeeder {
             modelContext: modelContainer.mainContext,
             services: services,
             desiredCount: desiredCount,
+            roomCount: OhanaUITestLaunchOptions.requestedPlantBaselineRoomCount,
             revisionNote: "startup.plant.uiTestBaseline"
         )
     }
@@ -177,9 +277,10 @@ enum UITestPlantBaselineSeeder {
         modelContext: ModelContext,
         services: AppServices,
         desiredCount: Int,
+        roomCount: Int = 2,
         revisionNote: String
     ) {
-        let desiredCount = min(max(desiredCount, 1), 12)
+        let desiredCount = min(max(desiredCount, 1), 24)
         do {
             let existing = try modelContext.fetch(
                 FetchDescriptor<Plant>(
@@ -196,7 +297,7 @@ enum UITestPlantBaselineSeeder {
 
             var createdPlantIDs: [UUID] = []
             for index in existing.count ..< desiredCount {
-                let plant = makeSeedPlant(index: index)
+                let plant = makeSeedPlant(index: index, roomCount: roomCount)
                 modelContext.insert(plant)
                 createdPlantIDs.append(plant.id)
             }
@@ -224,17 +325,26 @@ enum UITestPlantBaselineSeeder {
         }
     }
 
-    private static func makeSeedPlant(index: Int) -> Plant {
+    private static func makeSeedPlant(index: Int, roomCount: Int) -> Plant {
         let ordinal = index + 1
-        let isLivingRoom = index.isMultiple(of: 2)
+        let rooms = [
+            (name: "Living room", location: "South window"),
+            (name: "Balcony", location: "Balcony shelf"),
+            (name: "Kitchen", location: "East window"),
+            (name: "Bedroom", location: "Bedside shelf"),
+            (name: "Office", location: "North window"),
+            (name: "Study", location: "Desk shelf")
+        ]
+        let boundedRoomCount = min(max(roomCount, 1), rooms.count)
+        let room = rooms[index % boundedRoomCount]
         let plant = Plant(
             name: "Codex Pothos Seed-\(ordinal)",
             species: "Epipremnum aureum",
-            location: isLivingRoom ? "South window" : "Balcony shelf",
+            location: room.location,
             avatarEmoji: "🪴",
             wateringIntervalDays: 7,
             fertilizingIntervalDays: 30,
-            roomNameRaw: isLivingRoom ? "Living room" : "Balcony",
+            roomNameRaw: room.name,
             potDiameterCm: 12,
             potMaterialRaw: "Ceramic",
             soilTypeRaw: "Well-draining potting mix",

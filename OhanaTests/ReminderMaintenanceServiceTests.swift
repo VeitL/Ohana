@@ -48,6 +48,43 @@ struct ReminderMaintenanceServiceTests {
         #expect(futurePending.statusEnum == .pending)
     }
 
+    @Test func runLeavesMemorialReminderPendingAndOnlyCancelsItsNotification() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = OhanaNotificationsSchedulingTests.FakeScheduler(
+            pendingNotificationIds: ["memorial-maintenance"]
+        )
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let now = Date()
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = now.addingTimeInterval(-3600)
+        let event = Event(
+            title: "Memorial overdue care",
+            startDate: now.addingTimeInterval(-1800),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: event.startDate)
+        reminder.notificationId = "memorial-maintenance"
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let result = await ReminderMaintenanceService.runPendingReminderMaintenance(context: context)
+
+        #expect(result.completed)
+        #expect(result.pendingCount == 0)
+        #expect(fake.cancelledIds == ["memorial-maintenance"])
+        #expect(fake.scheduledIds.isEmpty)
+        #expect(reminder.statusEnum == .pending)
+        #expect(try context.fetch(FetchDescriptor<Event>()).contains { $0.id == event.id })
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).contains { $0.id == reminder.id })
+    }
+
     @Test func earlyNotificationDoesNotExpireBeforeItsTaskOccurrence() async throws {
         let container = try makeContainer()
         let context = container.mainContext

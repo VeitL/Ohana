@@ -9,6 +9,8 @@ import Foundation
 import SwiftData
 
 nonisolated enum PhysicalDeletionService {
+    static let pendingShopPurchaseDeletionBlockCode = -1
+
     private static let petDeletionCascadeCoverageEntityNames: Set<String> = [
         String(describing: Event.self),
         String(describing: Reminder.self),
@@ -137,6 +139,11 @@ nonisolated enum PhysicalDeletionService {
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId
         )
+        _ = deleteAchievementFacts(
+            scopeKind: .pet,
+            scopeID: petId,
+            context: context
+        )
         deleteSharedCareUndoReceiptsReferencingPet(petId: petId, context: context)
         markPetCascadeDeletedForSync(pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         CloudSyncMutationRecorder.markDeleted(
@@ -166,6 +173,16 @@ nonisolated enum PhysicalDeletionService {
     ) -> Int {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let humanId = human.id.uuidString
+        guard !hasUnsettledShopPurchaseReference(
+            humanID: human.id,
+            context: context
+        ) else {
+            OhanaLog.warning(
+                "PhysicalDeletionService blocked Human deletion while a shop purchase still references its wallet.",
+                category: "Economy"
+            )
+            return pendingShopPurchaseDeletionBlockCode
+        }
         let humanMedications = fetchAll(HumanMedication.self, context: context).filter { $0.humanId == humanId }
         let relatedEventCount = deleteHumanRelatedEvents(
             humanId: humanId,
@@ -190,6 +207,42 @@ nonisolated enum PhysicalDeletionService {
         context.delete(human)
         reconcileWalletAfterEconomyDeletion(context: context)
         return childCount
+    }
+
+    static func hasUnsettledShopPurchaseReference(
+        humanID: UUID,
+        context: ModelContext
+    ) -> Bool {
+        let fulfilled = ShopPurchaseAttemptState.fulfilled.rawValue
+        let refunded = ShopPurchaseAttemptState.refunded.rawValue
+        let descriptor = FetchDescriptor<ShopPurchaseAttempt>(
+            predicate: #Predicate<ShopPurchaseAttempt> { attempt in
+                attempt.stateRaw != fulfilled && attempt.stateRaw != refunded
+            }
+        )
+        do {
+            let attempts = try context.fetch(descriptor)
+            return attempts.contains { attempt in
+                if attempt.buyerHumanId == humanID.uuidString { return true }
+                guard let data = attempt.fundingContributionsJSON.data(using: .utf8),
+                      let contributions = try? JSONDecoder().decode(
+                          [ShopPurchaseFundingContribution].self,
+                          from: data
+                      ) else {
+                    // A corrupt immutable funding snapshot is not evidence that
+                    // this member is safe to delete. Fail closed until the
+                    // purchase is manually repaired.
+                    return true
+                }
+                return contributions.contains { $0.humanID == humanID }
+            }
+        } catch {
+            OhanaLog.warning(
+                "PhysicalDeletionService could not verify pending shop wallet references: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return true
+        }
     }
 
     @discardableResult
@@ -461,6 +514,16 @@ nonisolated enum PhysicalDeletionService {
         deletedCount += deleteRows(fetchAll(ShopPurchaseRecord.self, context: context).filter { idsMatch($0.buyerHumanId, humanId) }, context: context) {
             CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         }
+        deletedCount += deleteAchievementFacts(
+            scopeKind: .human,
+            scopeID: humanId,
+            context: context
+        )
+        for receipt in fetchAll(AchievementRewardReceipt.self, context: context)
+            where receipt.scopeKindRaw == AchievementScopeKind.island.rawValue
+                && idsMatch(receipt.recipientHumanIDRaw, humanId) {
+            receipt.recipientHumanIDRaw = ""
+        }
         deletedCount += scrubHumanAttribution(for: human, in: context, at: deletedAt, by: deletedByHumanId)
         deletedCount += deleteRows(fetchAll(HumanWeightLog.self, context: context).filter { $0.human?.id == human.id }, context: context) {
             CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
@@ -519,6 +582,23 @@ nonisolated enum PhysicalDeletionService {
         }
 
         return deletedCount
+    }
+
+    private static func deleteAchievementFacts(
+        scopeKind: AchievementScopeKind,
+        scopeID: String,
+        context: ModelContext
+    ) -> Int {
+        let kind = scopeKind.rawValue
+        let unlocks = fetchAll(AchievementUnlock.self, context: context).filter {
+            $0.scopeKindRaw == kind && idsMatch($0.scopeIDRaw, scopeID)
+        }
+        let receipts = fetchAll(AchievementRewardReceipt.self, context: context).filter {
+            $0.scopeKindRaw == kind && idsMatch($0.scopeIDRaw, scopeID)
+        }
+        for unlock in unlocks { context.delete(unlock) }
+        for receipt in receipts { context.delete(receipt) }
+        return unlocks.count + receipts.count
     }
 
     private static func petScopedLegacyModelIds(for pet: Pet) -> Set<String> {

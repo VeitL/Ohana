@@ -142,6 +142,22 @@ enum MemberDeletionCommandService {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let humanID = human.id
         let humanIDString = humanID.uuidString
+        guard !PhysicalDeletionService.hasUnsettledShopPurchaseReference(
+            humanID: humanID,
+            context: context
+        ) else {
+            return MemberDeletionCommandResult(
+                entityID: humanID,
+                kind: EntityKind.human.rawValue,
+                removedRelatedEventIDs: [],
+                removedQuickActionCount: 0,
+                requiresReplacementHuman: false,
+                requiresAccountSwitch: false,
+                clearsActiveHumanID: false,
+                didPersist: false,
+                persistenceErrorDescription: "Settle or refund the pending shop purchase before deleting this member."
+            )
+        }
         let remainingHumanDescriptor = FetchDescriptor<Human>(
             predicate: #Predicate<Human> { candidate in
                 candidate.id != humanID && candidate.passedAwayDate == nil

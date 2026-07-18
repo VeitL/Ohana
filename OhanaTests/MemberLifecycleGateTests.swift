@@ -517,7 +517,7 @@ struct MemberLifecycleGateTests {
         #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
     }
 
-    @Test func markingPetPassedAwayRemovesFutureActiveSchedules() throws {
+    @Test func markingPetPassedAwayPreservesFutureSchedulesAndCancelsNotifications() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "cat")
@@ -576,16 +576,17 @@ struct MemberLifecycleGateTests {
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(pet.passedAwayDate == passDate)
-        #expect(!events.contains { $0.id == futureEventID })
-        #expect(!reminders.contains { $0.id == futureReminderID })
+        #expect(events.contains { $0.id == futureEventID })
+        #expect(reminders.contains { $0.id == futureReminderID })
         #expect(events.contains { $0.id == pastEventID })
         #expect(reminders.contains { $0.id == pastReminderID })
         #expect(events.contains { $0.id == otherFutureEventID })
         #expect(reminders.contains { $0.id == otherFutureReminderID })
+        #expect(reminders.first { $0.id == futureReminderID }?.statusEnum == .pending)
         #expect(scheduler.cancelledNotificationIds == ["memorial-pet-future"])
     }
 
-    @Test func markingHumanPassedAwayRemovesFutureActiveSchedulesAndCancelsNotifications() throws {
+    @Test func markingHumanPassedAwayPreservesFutureSchedulesAndCancelsNotifications() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Ava")
@@ -644,12 +645,13 @@ struct MemberLifecycleGateTests {
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(human.passedAwayDate == passDate)
-        #expect(!events.contains { $0.id == futureEventID })
-        #expect(!reminders.contains { $0.id == futureReminderID })
+        #expect(events.contains { $0.id == futureEventID })
+        #expect(reminders.contains { $0.id == futureReminderID })
         #expect(events.contains { $0.id == pastEventID })
         #expect(reminders.contains { $0.id == pastReminderID })
         #expect(events.contains { $0.id == otherFutureEventID })
         #expect(reminders.contains { $0.id == otherFutureReminderID })
+        #expect(reminders.first { $0.id == futureReminderID }?.statusEnum == .pending)
         #expect(scheduler.cancelledNotificationIds == ["memorial-human-future"])
     }
 
@@ -681,8 +683,9 @@ struct MemberLifecycleGateTests {
 
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
-        #expect(!events.contains { $0.id == eventID })
-        #expect(!reminders.contains { $0.id == reminderID })
+        #expect(events.contains { $0.id == eventID })
+        #expect(reminders.contains { $0.id == reminderID })
+        #expect(reminders.first { $0.id == reminderID }?.statusEnum == .pending)
     }
 
     @Test func activeScheduleResolverCoversMemberOwnershipMatrix() {
@@ -3781,8 +3784,10 @@ struct MemberLifecycleGateTests {
         #expect(pdfSource.contains("FetchDescriptor<PetDocument>"))
         #expect(pdfSource.contains("FetchDescriptor<CareLedgerEvent>"))
         #expect(retentionSource.contains("PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)"))
+        #expect(guidedSource.contains("func renderHealthPDF()"))
         #expect(guidedSource.contains("PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)"))
-        #expect(recordsSource.contains("PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)"))
+        #expect(recordsSource.contains("renderHealthPDF()"))
+        #expect(!recordsSource.contains("PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)"))
     }
 
     @MainActor
@@ -5126,7 +5131,7 @@ struct MemberLifecycleGateTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV94.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

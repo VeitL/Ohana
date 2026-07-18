@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftData
 import Testing
@@ -148,6 +149,52 @@ struct OhanaNotificationsSchedulingTests {
         #expect(OhanaNotifications.current is NotificationManager)
     }
 
+    @Test func routeEventWaitsForAConsumerAndDoesNotReplayAfterAcknowledgement() {
+        let center = OhanaNotificationRouteCenter()
+        center.publishRouteEvent(.humanDeleted(requiresReplacementHuman: false, requiresAccountSwitch: false))
+
+        var firstDelivery: AppRoutePublishedEvent?
+        let firstSubscription = center.routeEvents.sink { event in
+            firstDelivery = event
+        }
+        #expect(firstDelivery?.event == .humanDeleted(requiresReplacementHuman: false, requiresAccountSwitch: false))
+
+        if let firstDelivery {
+            center.acknowledgeRouteEvent(id: firstDelivery.id)
+        }
+        firstSubscription.cancel()
+
+        var replayedDelivery: AppRoutePublishedEvent?
+        let replaySubscription = center.routeEvents.sink { event in
+            replayedDelivery = event
+        }
+        #expect(replayedDelivery == nil)
+        replaySubscription.cancel()
+    }
+
+    @Test func reminderActionWaitsForAConsumerAndDoesNotReplayAfterAcknowledgement() {
+        let center = OhanaNotificationRouteCenter()
+        center.publishReminderAction(["reminderId": "reminder-123"])
+
+        var firstDelivery: ReminderNotificationActionEvent?
+        let firstSubscription = center.reminderActionEvents.sink { event in
+            firstDelivery = event
+        }
+        #expect(firstDelivery?.userInfo["reminderId"] as? String == "reminder-123")
+
+        if let firstDelivery {
+            center.acknowledgeReminderActionEvent(id: firstDelivery.id)
+        }
+        firstSubscription.cancel()
+
+        var replayedDelivery: ReminderNotificationActionEvent?
+        let replaySubscription = center.reminderActionEvents.sink { event in
+            replayedDelivery = event
+        }
+        #expect(replayedDelivery == nil)
+        replaySubscription.cancel()
+    }
+
     @Test func routineReminderSchedulingHonorsDailyBudget() async throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -160,13 +207,15 @@ struct OhanaNotificationsSchedulingTests {
         let day = calendar.startOfDay(for: tomorrow)
         let base = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: day)!
         let reminders = (0 ..< 5).map { index in
+            let pet = Pet(name: "Routine \(index)", species: "cat")
             let event = Event(
                 title: "日常照护 \(index)",
                 startDate: base,
                 eventType: EventType.grooming.rawValue,
                 relatedEntityType: EntityKind.pet.rawValue,
-                relatedEntityId: UUID().uuidString
+                relatedEntityId: pet.id.uuidString
             )
+            context.insert(pet)
             context.insert(event)
             let reminder = Reminder(event: event, scheduledAt: base.addingTimeInterval(Double(index) * 3600))
             context.insert(reminder)
@@ -249,14 +298,16 @@ struct OhanaNotificationsSchedulingTests {
         defer { OhanaNotifications.useLive() }
 
         let scheduledAt = futureDate(dayOffset: 2, hour: 10, minute: 0)
+        let human = Human(name: "Medication owner")
         let event = Event(
             title: "Medication",
             startDate: scheduledAt,
             eventType: EventType.medication.rawValue,
             relatedEntityType: EntityKind.human.rawValue,
-            relatedEntityId: UUID().uuidString
+            relatedEntityId: human.id.uuidString
         )
         let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        context.insert(human)
         context.insert(event)
         context.insert(reminder)
         try context.save()
@@ -277,14 +328,16 @@ struct OhanaNotificationsSchedulingTests {
         defer { OhanaNotifications.useLive() }
 
         let scheduledAt = futureDate(dayOffset: 2, hour: 23, minute: 15)
+        let pet = Pet(name: "Night care", species: "cat")
         let event = Event(
             title: "夜间护理",
             startDate: scheduledAt,
             eventType: EventType.grooming.rawValue,
             relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: UUID().uuidString
+            relatedEntityId: pet.id.uuidString
         )
         let reminder = Reminder(event: event, scheduledAt: scheduledAt)
+        context.insert(pet)
         context.insert(event)
         context.insert(reminder)
         try context.save()
@@ -310,14 +363,16 @@ struct OhanaNotificationsSchedulingTests {
 
         let scheduledAt = futureDate(dayOffset: 2, hour: 23, minute: 45)
         let reminders = (0 ..< 7).map { index in
+            let human = Human(name: "Medication owner \(index)")
             let event = Event(
                 title: "用药 \(index)",
                 startDate: scheduledAt,
                 eventType: EventType.medication.rawValue,
                 relatedEntityType: EntityKind.human.rawValue,
-                relatedEntityId: UUID().uuidString
+                relatedEntityId: human.id.uuidString
             )
             let reminder = Reminder(event: event, scheduledAt: scheduledAt.addingTimeInterval(Double(index) * 60))
+            context.insert(human)
             context.insert(event)
             context.insert(reminder)
             return reminder
@@ -339,7 +394,9 @@ struct OhanaNotificationsSchedulingTests {
         OhanaNotifications.current = fake
         defer { OhanaNotifications.useLive() }
 
-        let petId = UUID().uuidString
+        let pet = Pet(name: "Momo", species: "cat")
+        let petId = pet.id.uuidString
+        context.insert(pet)
         let firstTime = futureDate(dayOffset: 2, hour: 9, minute: 0)
         let secondTime = futureDate(dayOffset: 2, hour: 11, minute: 0)
         let first = makeReminder(
@@ -414,11 +471,13 @@ struct OhanaNotificationsSchedulingTests {
 
         let base = futureDate(dayOffset: 2, hour: 12, minute: 0)
         let reminders = (0 ..< 2).map { index in
-            makeReminder(
+            let human = Human(name: "Anniversary owner \(index)")
+            context.insert(human)
+            return makeReminder(
                 title: "纪念日 \(index)",
                 eventType: .anniversary,
                 relatedEntityType: EntityKind.human.rawValue,
-                relatedEntityId: UUID().uuidString,
+                relatedEntityId: human.id.uuidString,
                 scheduledAt: base.addingTimeInterval(Double(index) * 3600),
                 context: context
             )
@@ -489,11 +548,13 @@ struct OhanaNotificationsSchedulingTests {
         defer { OhanaNotifications.useLive() }
 
         let scheduledAt = futureDate(dayOffset: 2, hour: 10, minute: 0)
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
         let reminder = makeReminder(
             title: "梳毛",
             eventType: .grooming,
             relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: UUID().uuidString,
+            relatedEntityId: pet.id.uuidString,
             scheduledAt: scheduledAt,
             context: context
         )
@@ -633,6 +694,43 @@ struct OhanaNotificationsSchedulingTests {
         #expect(fake.scheduledDeliveryDates == [scheduledAt])
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledgerEvents.map(\.actionType) == ["refillSuccess"])
+    }
+
+    @Test func refillCancelsMemorialReminderWithoutSchedulingOrMutatingStoredFacts() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler()
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = Date()
+        let scheduledAt = futureDate(dayOffset: 2, hour: 10, minute: 0)
+        let reminder = makeReminder(
+            title: "Memorial care",
+            eventType: .daily,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString,
+            scheduledAt: scheduledAt,
+            context: context
+        )
+        reminder.notificationId = "memorial-refill"
+        context.insert(pet)
+        try context.save()
+
+        await ReminderSchedulingService.refillMissingPendingNotifications(
+            reminders: [reminder],
+            context: context,
+            careLedger: CareLedgerService()
+        )
+
+        #expect(fake.scheduledIds.isEmpty)
+        #expect(fake.cancelledIds == ["memorial-refill"])
+        #expect(reminder.statusEnum == .pending)
+        #expect(reminder.scheduledAt == scheduledAt)
+        #expect(try context.fetch(FetchDescriptor<Event>()).contains { $0.id == reminder.event?.id })
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).contains { $0.id == reminder.id })
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     @Test func refillReplacesPreviouslyDeferredCalendarReminderRequest() async throws {

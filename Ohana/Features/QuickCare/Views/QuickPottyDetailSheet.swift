@@ -56,6 +56,7 @@ struct QuickPottyDetailSheet: View {
     @State var isCommittingPottyLog = false
     @State var selectedActionHumanID: UUID?
     @State var requiresActionHumanSelection = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     init(
         pet: Pet,
         onRemove: @escaping () -> Void,
@@ -91,7 +92,8 @@ struct QuickPottyDetailSheet: View {
         QuickPottyCommandExecutor(
             context: modelContext,
             careEvents: appServices.careEvents,
-            revisions: appServices.domainRevisions
+            revisions: appServices.domainRevisions,
+            personalAccessLevel: appServices.commerce.hasPersonalEntitlement ? .personal : .free
         )
     }
 
@@ -252,10 +254,14 @@ struct QuickPottyDetailSheet: View {
                                 Button(l.cancel) {
                                     closeActivePottySheet()
                                 }
+                                .accessibilityIdentifier("quick-potty-sheet-cancel-action")
                             }
                         }
                 }
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
+            }
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
             }
             .alert(l.tr(zh: "今天已经完成了", en: "Already done today", de: "Heute schon erledigt"), isPresented: $showSingleUseNotice) {
                 Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {}
@@ -307,6 +313,11 @@ struct QuickPottyDetailSheet: View {
             inlineSheetDragOffset = 0
             if nestedInlineSheet == nil, activeSheet?.usesInlineOverlay != true {
                 inlineSheetVisible = false
+            }
+        }
+        .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, isEntitled in
+            if !isEntitled, overviewRange == .days90 {
+                overviewRange = .days30
             }
         }
         .onDisappear {

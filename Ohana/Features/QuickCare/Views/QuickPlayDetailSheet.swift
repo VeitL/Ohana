@@ -61,6 +61,7 @@ struct QuickPlayDetailSheet: View {
     @State private var chartProgress: Double = 0
     @State private var selectedActionHumanID: UUID?
     @State private var requiresActionHumanSelection = false
+    @State private var personalUpgradePrompt: PersonalUpgradePrompt?
 
     private var l: L10n { L10n(appLanguage) }
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
@@ -72,7 +73,8 @@ struct QuickPlayDetailSheet: View {
         QuickPlayCommandExecutor(
             context: modelContext,
             careEvents: appServices.careEvents,
-            revisions: appServices.domainRevisions
+            revisions: appServices.domainRevisions,
+            personalAccessLevel: appServices.commerce.hasPersonalEntitlement ? .personal : .free
         )
     }
 
@@ -237,6 +239,9 @@ struct QuickPlayDetailSheet: View {
                 }
                 .presentationDetents([.medium, .large])
                 .presentationContentInteraction(.scrolls)
+            }
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
             }
         }
         .accessibilityIdentifier("quick-play-detail-sheet")
@@ -740,6 +745,11 @@ struct QuickPlayDetailSheet: View {
             .padding(.top, 12)
             .transition(.move(edge: .top).combined(with: .opacity))
     }
+}
+
+// MARK: - Actions and Formatting
+
+private extension QuickPlayDetailSheet {
 
     private func commitPlay() {
         guard !isCommittingPlay else { return }
@@ -800,18 +810,28 @@ struct QuickPlayDetailSheet: View {
         playPlanSaveTask?.cancel()
         closePlayPlanEditor()
         playPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: playPlanSaveDelayMilliseconds) {
-            let event = CarePlanCalendarSync.syncPlayPlan(
-                pet: pet,
-                context: modelContext,
-                intervalDays: playPlanIntervalDays,
-                enabled: true,
-                anchor: playPlanAnchorDate
-            )
-            showToast(l.tr(zh: "计划已保存", en: "Plan saved", de: "Plan gespeichert"))
-            if let event {
-                Task { @MainActor in
-                    await appServices.reminderScheduling.scheduleManyIfNeeded(reminders: event.reminders, context: modelContext, source: .detail)
+            do {
+                let event = try playCommandExecutor.syncPlayPlan(
+                    pet: pet,
+                    intervalDays: playPlanIntervalDays,
+                    enabled: true,
+                    anchor: playPlanAnchorDate
+                )
+                showToast(l.tr(zh: "计划已保存", en: "Plan saved", de: "Plan gespeichert"))
+                if let event {
+                    Task { @MainActor in
+                        await appServices.reminderScheduling.scheduleManyIfNeeded(reminders: event.reminders, context: modelContext, source: .detail)
+                    }
                 }
+            } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            } catch {
+                appServices.domainRevisions.publishFailure(
+                    command: .quickCare(entityID: pet.id, action: "playPlan"),
+                    error: error
+                )
+                showToast(l.tr(zh: "保存失败，请重试", en: "Save failed. Please try again.", de: "Speichern fehlgeschlagen. Bitte erneut versuchen."))
             }
             isSavingPlayPlan = false
             playPlanSaveTask = nil
@@ -827,14 +847,20 @@ struct QuickPlayDetailSheet: View {
         playPlanSaveTask?.cancel()
         closePlayPlanEditor()
         playPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: playPlanSaveDelayMilliseconds) {
-            CarePlanCalendarSync.syncPlayPlan(
-                pet: pet,
-                context: modelContext,
-                intervalDays: 0,
-                enabled: false,
-                anchor: playPlanAnchorDate
-            )
-            showToast(l.tr(zh: "计划已关闭", en: "Plan off", de: "Plan aus"))
+            do {
+                _ = try playCommandExecutor.syncPlayPlan(
+                    pet: pet,
+                    intervalDays: 0,
+                    enabled: false,
+                    anchor: playPlanAnchorDate
+                )
+                showToast(l.tr(zh: "计划已关闭", en: "Plan off", de: "Plan aus"))
+            } catch {
+                appServices.domainRevisions.publishFailure(
+                    command: .quickCare(entityID: pet.id, action: "playPlan.delete"),
+                    error: error
+                )
+            }
             isSavingPlayPlan = false
             playPlanSaveTask = nil
         }

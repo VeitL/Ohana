@@ -68,6 +68,7 @@ struct HumanModulePageHeader<Trailing: View>: View {
                         .contentShape(Rectangle())
                 }
                 .ohanaGlassIconButton()
+                .accessibilityIdentifier("human-module-close-action")
                 .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
             }
         }

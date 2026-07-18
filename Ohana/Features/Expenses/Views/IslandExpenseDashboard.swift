@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 private struct PetExpenseSummary: Identifiable {
     let id: UUID
@@ -39,6 +40,7 @@ struct IslandExpenseDashboardContentView: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedRange: ExpenseDashboardRange = .month
+    @State private var showingPersonalPlan = false
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -180,6 +182,15 @@ struct IslandExpenseDashboardContentView: View {
 
     var body: some View {
         dashboardBody
+            .sheet(isPresented: $showingPersonalPlan) {
+                PersonalPlanView()
+                    .ohanaSheetPagePresentation()
+            }
+            .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+                if selectedRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                    selectedRange = .month
+                }
+            }
     }
 
     @ViewBuilder
@@ -300,7 +311,11 @@ struct IslandExpenseDashboardContentView: View {
                     .font(OhanaFont.subheadline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                DashboardRangePicker(ranges: ExpenseDashboardRange.allCases, selection: $selectedRange) {
+                DashboardRangePicker(
+                    ranges: ExpenseDashboardRange.allCases,
+                    selection: personalRangeSelection,
+                    isLocked: { $0.requiresPersonal && !appServices.commerce.allows(.extendedTrends) }
+                ) {
                     $0.title(l)
                 }
             }
@@ -317,6 +332,20 @@ struct IslandExpenseDashboardContentView: View {
         }
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+    }
+
+    private var personalRangeSelection: Binding<ExpenseDashboardRange> {
+        Binding(
+            get: { selectedRange },
+            set: { range in
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                selectedRange = range
+            }
+        )
     }
 
     private var expenseBadgeStrip: some View {

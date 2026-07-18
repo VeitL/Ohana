@@ -28,7 +28,7 @@
 
 # Exclude generated/asset/reference trees and audit test fixtures (which contain
 # intentionally bad Swift).
---exclude .build,Ohana/Assets.xcassets,Ohana/PetAvatarAssets,Ai_Studio_New_UI,ohana-design-system,scripts/tests/fixtures
+--exclude .build,Ohana/Assets.xcassets,Ohana/PetAvatarAssets,Ai_Studio_New_UI,scripts/tests/fixtures
 
 # Disable opinionated rules that would create large, behavior-noisy diffs on the
 # legacy base. Re-enable incrementally.

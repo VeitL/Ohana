@@ -71,6 +71,7 @@ struct QuickWaterDetailSheet: View {
     @State var selectedSharedWaterPetIds: Set<UUID> = []
     @State var selectedActionHumanID: UUID?
     @State var requiresActionHumanSelection = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @Namespace var waterModeSelectionNamespace
     typealias ActiveSheet = QuickWaterActiveSheet
     init(
@@ -154,7 +155,8 @@ struct QuickWaterDetailSheet: View {
             careEvents: appServices.careEvents,
             userNotifications: appServices.userNotifications,
             reminderScheduling: appServices.reminderScheduling,
-            revisions: appServices.domainRevisions
+            revisions: appServices.domainRevisions,
+            personalAccessLevel: appServices.commerce.hasPersonalEntitlement ? .personal : .free
         )
     }
 
@@ -269,6 +271,9 @@ struct QuickWaterDetailSheet: View {
                 }
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
             }
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
+            }
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .petMemorialTone(isActive: pet.hasPassedAway)
         }
@@ -302,6 +307,11 @@ struct QuickWaterDetailSheet: View {
         }
         .onChange(of: waterEntriesRevisionKey) { _, _ in
             scheduleWaterSnapshotRefresh()
+        }
+        .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, isEntitled in
+            if !isEntitled, overviewRange == .days90 {
+                overviewRange = .days30
+            }
         }
         .onChange(of: activeSheet?.id) { _, _ in
             adaptiveSheetHeight = activeSheet?.inlineHeight ?? 430
@@ -773,6 +783,11 @@ struct QuickWaterDetailSheet: View {
             secondaryIdentifier: "quick-water-filter-manage-action"
         )
     }
+}
+
+// MARK: - Recent Activity and Copy
+
+extension QuickWaterDetailSheet {
 
     var recentStrip: some View {
         VStack(alignment: .leading, spacing: 10) {

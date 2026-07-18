@@ -83,7 +83,6 @@ struct HumanWeightHistoryView: View {
                 .zIndex(20)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
     }
 
     private var privacyLockedView: some View {

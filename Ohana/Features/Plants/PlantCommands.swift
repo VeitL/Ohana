@@ -466,17 +466,20 @@ struct PlantCreationCommandResult: Equatable {
     let kind: String
     let didPersist: Bool
     let persistenceErrorDescription: String?
+    let personalDenial: PersonalFreeLimitDenial?
 
     init(
         plantID: UUID,
         kind: String,
         didPersist: Bool = true,
-        persistenceErrorDescription: String? = nil
+        persistenceErrorDescription: String? = nil,
+        personalDenial: PersonalFreeLimitDenial? = nil
     ) {
         self.plantID = plantID
         self.kind = kind
         self.didPersist = didPersist
         self.persistenceErrorDescription = persistenceErrorDescription
+        self.personalDenial = personalDenial
     }
 }
 
@@ -771,9 +774,35 @@ enum PlantCreationCommandService {
     static func createPlant(
         input: PlantCreationCommandInput,
         context: ModelContext,
+        personalAccessLevel: PersonalAccessLevel = .personal,
         scheduleNotifications: Bool = true,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) -> PlantCreationCommandResult {
+        do {
+            let usage = try PersonalUsageSnapshotReader.snapshot(context: context)
+            let disposition = PersonalAccessPolicy.disposition(
+                level: personalAccessLevel,
+                usage: usage,
+                request: .addActivePlant()
+            )
+            if case let .deny(denial) = disposition,
+               case let .wouldExceedFreeLimit(limitDenial) = denial.reason {
+                return PlantCreationCommandResult(
+                    plantID: input.id,
+                    kind: EntityKind.plant.rawValue,
+                    didPersist: false,
+                    personalDenial: limitDenial
+                )
+            }
+        } catch {
+            return PlantCreationCommandResult(
+                plantID: input.id,
+                kind: EntityKind.plant.rawValue,
+                didPersist: false,
+                persistenceErrorDescription: "Could not verify the current Ohana Personal allowance: \(error.localizedDescription)"
+            )
+        }
+
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let plant = Plant(
             name: trimmedName.isEmpty ? "Plant" : trimmedName,
@@ -850,22 +879,40 @@ enum PlantCreationCommandService {
 struct PlantCreationCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    let personalAccessLevel: PersonalAccessLevel
 
     init(context: ModelContext) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher())
+        self.init(
+            context: context,
+            revisions: SharedDomainRevisionPublisher(),
+            personalAccessLevel: .personal
+        )
     }
 
     init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher(center: revisionCenter))
+        self.init(
+            context: context,
+            revisions: SharedDomainRevisionPublisher(center: revisionCenter),
+            personalAccessLevel: .personal
+        )
     }
 
     init(context: ModelContext, services: AppServices) {
-        self.init(context: context, revisions: services.domainRevisions)
+        self.init(
+            context: context,
+            revisions: services.domainRevisions,
+            personalAccessLevel: services.commerce.personalAccessLevel
+        )
     }
 
-    init(context: ModelContext, revisions: DomainRevisionPublishing) {
+    init(
+        context: ModelContext,
+        revisions: DomainRevisionPublishing,
+        personalAccessLevel: PersonalAccessLevel = .personal
+    ) {
         self.context = context
         self.revisions = revisions
+        self.personalAccessLevel = personalAccessLevel
     }
 
     @discardableResult
@@ -878,6 +925,7 @@ struct PlantCreationCommandExecutor {
         let result = PlantCreationCommandService.createPlant(
             input: input,
             context: context,
+            personalAccessLevel: personalAccessLevel,
             scheduleNotifications: scheduleNotifications,
             reminderScheduling: providedReminderScheduling
         )

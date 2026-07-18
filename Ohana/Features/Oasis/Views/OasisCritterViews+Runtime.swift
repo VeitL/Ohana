@@ -44,12 +44,20 @@ extension OasisCritterCodexView {
         }
     }
 
-    func scheduleCritterCommand(milliseconds: UInt64 = 60, _ operation: @escaping @MainActor () -> Void) {
-        let taskId = UUID()
-        critterCommandTasks[taskId] = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) {
+    func scheduleCritterCommand(
+        key: String,
+        milliseconds: UInt64 = 60,
+        _ operation: @escaping @MainActor () -> Void
+    ) {
+        guard critterCommandTasks[key] == nil else { return }
+        critterCommandTasks[key] = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) {
             operation()
-            critterCommandTasks[taskId] = nil
+            critterCommandTasks[key] = nil
         }
+    }
+
+    func isGrowthCommandInFlight(catalogID: String) -> Bool {
+        critterCommandTasks[catalogID] != nil
     }
 
     func cancelDeferredWork() {
@@ -64,11 +72,14 @@ extension OasisCritterCodexView {
 
     func collectionStatus(for entry: OasisElectronicPetCatalogEntry, owned: Bool) -> String {
         if owned { return l.tr(zh: "已唤醒", en: "Awake", de: "Wach") }
-        let fragmentCount = fragments.first(where: { $0.catalogId == entry.id })?.amount ?? 0
-        let cost = OasisCritterPresentationRules.awakeningCost(for: entry.rarity)
-        if fragmentCount > 0 {
-            return "\(fragmentCount)/\(cost.fragments)◇"
+        let availability = commandExecutor.awakenAvailability(catalogId: entry.id)
+        let plan = availability.fundingPlan
+        if availability.reason == .treeLevelLocked {
+            return "Lv.\(entry.sourceLevel)"
         }
-        return "Lv.\(entry.sourceLevel)"
+        if plan.requiredGrowthCurrency == 0 {
+            return l.tr(zh: "免费唤醒", en: "Free awakening", de: "Kostenlos wecken")
+        }
+        return "\(plan.specificFragmentBalance)◇ + \(plan.stardustBalance)✦ / \(plan.requiredGrowthCurrency)"
     }
 }

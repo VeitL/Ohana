@@ -1,22 +1,34 @@
 # Onboarding Logic
 
 - Status: active product behavior specification.
-- Owner: `docs/specs/product-foundation.md` D17.
-- Last verified: 2026-07-15 against the Human-first, optional-Pet and local-only boundary.
+- Owner: `docs/specs/product-foundation.md` D17 and D29.
+- Last verified: 2026-07-18 against the dual-experience, Human-first and local-only boundary.
 - Validation status: owned by `docs/testing-progress.md`; source review is not a
   substitute for the required targeted tests and clean-Simulator journeys below.
 
 ## First-Release Promise
 
-Ohana Solo starts without an account or an up-front permission request:
+Ohana starts without an account or an up-front permission request. A clean install
+first selects Standard or Zen, then creates the first local Human using only a name.
+
+The Standard branch continues:
 
 1. Create the first local Human by entering only a name.
 2. Choose whether to create a Pet now or later.
-3. If creating now, enter Pet name, species and breed; then optionally choose
-   personality and a theme color before the final avatar step.
-4. Return Home only after its read model contains the newly saved cards.
-5. Open Task Center, tap the first-Pet reward item, then claim the one-time
+3. If creating now, enter Pet name, species, breed and sex; coat remains optional.
+   Then optionally choose personality or customize the theme before the final avatar step.
+4. Return Home only after its read model contains the newly saved cards; saving
+   a Pet never switches the selected top-level tab to Tasks.
+5. When ready, open Task Center, tap the first-Pet reward item, then claim the one-time
    50-coconut island gift and unlock Oasis.
+
+The Zen branch binds that first Human as the owner and enters the three-tab Zen
+shell immediately. It does not require a Pet. After the first Pet or Plant is
+created, Zen Oasis exposes the same one-time 50-coconut gift using the same
+household grant key as Standard; the two branches can never both award it.
+
+An existing installation defaults to Standard and sees one dismissible Zen
+introduction. It is never forced through mode choice or member creation again.
 
 After that blocking journey completes, Task Center may surface the separate
 six-item household starter growth plan from D28. Its 400 coconuts are optional,
@@ -29,14 +41,15 @@ item for creating the first Pet. The first-Pet path must still complete within
 
 ## Required And Optional Data
 
-- A clean install requires one Human name. The first Human becomes the local
+- A clean install requires a mode choice and one Human name. The first Human becomes the local
   owner, is visible on Home, and becomes `currentActiveHumanId`.
-- Pet creation is optional during onboarding. Name, species and breed are
+- Pet creation is optional during onboarding. Name, species, breed and sex are
   required. Species and breed both offer an Other choice whose custom text is
-  persisted. Sex, coat and other profile fields remain unset/defaulted for later editing.
+  persisted. Coat and other profile fields remain optional for later editing.
 - Personality is optional, limited to three creation choices. The same compact
-  page exposes an optional native color picker as a clearly separate choice. If
-  the user does not pick a color, a stable color is derived from the Pet profile.
+  page exposes an optional native color picker as a clearly separate choice. Without
+  a coat, a stable theme is assigned from the Pet profile; with a coat, the theme
+  follows its color. An explicit user-selected theme always overrides either result.
   Avatar is the final step and always has a usable default.
 - Initial onboarding never requests location or notification permission. Camera
   or photo access is requested only after the user explicitly chooses that source.
@@ -46,13 +59,15 @@ item for creating the first Pet. The first-Pet path must still complete within
 ## State Machine
 
 ```text
-needs Human name
-  -> Pet choice
-  -> Pet creation -> starter gift task ready
-  -> awaiting Pet -> create-Pet task -> Pet creation -> starter gift task ready
+needs experience choice
+  -> Standard -> Human name -> Pet choice
+  -> Pet creation -> Home -> starter gift task ready
+  -> awaiting Pet -> create-Pet task -> Pet creation -> Home -> starter gift task ready
   -> tap claim task -> reward presentation -> explicit idempotent claim
   -> Oasis visible
   -> complete
+  -> Zen -> Human name / owner binding -> Zen Home
+       -> first Pet or Plant -> Zen Oasis starter gift ready -> explicit idempotent claim
 ```
 
 SwiftData Human/Pet facts remain authoritative. Lightweight defaults may persist
@@ -86,8 +101,9 @@ reward transaction.
 - No Human fact: resume the name step.
 - Human exists but Pet choice is unfinished: resume the choice step.
 - Pet creation was abandoned: persist the deferred state and show the system task.
-- Pet commit succeeds: complete Home snapshot handoff, navigate to Task Center
-  and show the claim item without opening the reward presentation.
+- Pet commit succeeds: complete the Home snapshot handoff and keep Home selected.
+  Task Center shows the claim item when the user opens it, without opening the
+  reward presentation automatically.
 - Claim fails: keep the reward presentation open with retry; never unlock Oasis early.
 - Repeated relaunch or revision events must not duplicate Human, Pet, reward or task state.
 
@@ -114,7 +130,7 @@ member-owned reward, including when the user chooses Later or Prefer not to say.
 - Unit: the create-Pet and claim-gift system items are list-only, ignore the
   default member filter, replace one another at the Pet boundary, and never enter Calendar.
 - UI smoke: verify both `Human -> Later` and
-  `Human -> Pet -> Task Center -> reward presentation -> claim` on iPhone 17;
+  `Human -> Pet -> Home -> user opens Task Center -> reward presentation -> claim` on iPhone 17;
   confirm required/custom species and breed, compact personality/theme layout,
   Home card counts, task visibility, reward amount and progressive tabs.
 - Accessibility: Chinese/English, Dynamic Type, VoiceOver, dark mode and RTL remain usable.

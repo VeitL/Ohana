@@ -8,7 +8,135 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-extension SettingsView {
+struct SettingsBackupPage: View {
+    @Environment(\.modelContext) var modelContext
+    @Environment(AppServices.self) var appServices
+    @Environment(\.ohanaAppLanguageCode) var appLanguage
+    @AppStorage("ohana_has_onboarded") var hasOnboarded = false
+    @AppStorage("currentActiveHumanId") var currentActiveHumanId = ""
+    @State var showingAppResetAlert = false
+    @State var appResetErrorMessage: String?
+    @State var exportedJSONURL: URL?
+    @State var isExporting = false
+    @State var isImporting = false
+    @State var automaticBackupStatus = AutomaticBackupStatusStore().snapshot()
+    @State var isRunningAutomaticBackup = false
+    @State var isRetryingAutomaticBackupCleanup = false
+    @State var isRemovingLegacyAutomaticBackup = false
+    @State var automaticBackupCleanupError: String?
+    @State var backupEncryptionEnabled = false
+    @State var backupPassword = ""
+    @State var backupPasswordConfirmation = ""
+    @State var showingBackupSavePicker = false
+    @State var showingImportPicker = false
+    @State var importError: String?
+    @State var showingImportSuccess = false
+    @State var showingImportErrorAlert = false
+
+    let onClose: () -> Void
+
+    var l: L10n { L10n(appLanguage) }
+    var primaryText: Color { Color.ohanaPrimaryText }
+    var tertiaryText: Color { Color.ohanaTertiaryText }
+    var dividerLine: Color { Color.ohanaDivider }
+
+    var body: some View {
+        Form {
+            backupSection
+            resetSection
+        }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(OhanaStaticAppBackground())
+        .navigationTitle(SettingsDestination.dataAndBackup.title(l))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(role: .cancel, action: onClose) {
+                    Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
+                }
+                .labelStyle(.iconOnly)
+                .accessibilityIdentifier("settings-close-action")
+            }
+        }
+        .alert(l.tr(zh: "重置 App", en: "Reset App", de: "App zurücksetzen"), isPresented: $showingAppResetAlert) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+            Button(l.tr(zh: "重置", en: "Reset", de: "Zurücksetzen"), role: .destructive) { resetApp() }
+        } message: {
+            Text(l.tr(
+                zh: "此操作将删除 App 内的成员、记录、提醒、任务、奖励和本地自定义内容，无法恢复。重置后会从引导页面重新开始。",
+                en: "This deletes members, logs, reminders, tasks, rewards, and local custom content. It cannot be undone. After reset, Ohana starts from onboarding.",
+                de: "Dies löscht Mitglieder, Einträge, Erinnerungen, Aufgaben, Belohnungen und lokale Anpassungen. Danach startet Ohana im Onboarding."
+            ))
+        }
+        .alert(l.tr(zh: "重置失败", en: "Reset Failed", de: "Zurücksetzen fehlgeschlagen"), isPresented: Binding(
+            get: { appResetErrorMessage != nil },
+            set: { if !$0 { appResetErrorMessage = nil } }
+        )) {
+            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) { appResetErrorMessage = nil }
+        } message: {
+            Text(appResetErrorMessage ?? l.tr(zh: "未知错误", en: "Unknown error", de: "Unbekannter Fehler"))
+        }
+        .alert(l.tr(zh: "iCloud 备份需要处理", en: "iCloud Backup Needs Attention", de: "iCloud-Backup braucht Aufmerksamkeit"), isPresented: Binding(
+            get: { automaticBackupCleanupError != nil },
+            set: { if !$0 { automaticBackupCleanupError = nil } }
+        )) {
+            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) { automaticBackupCleanupError = nil }
+        } message: {
+            Text(automaticBackupCleanupError ?? l.tr(zh: "请重试删除旧的自动备份。", en: "Retry removing the previous automatic backup.", de: "Versuche erneut, das vorherige automatische Backup zu entfernen."))
+        }
+        .accessibilityIdentifier("settings-data-backup-screen")
+    }
+
+    var resetSection: some View {
+        settingsSection(title: l.tr(zh: "数据", en: "Data", de: "Daten")) {
+            Button {
+                showingAppResetAlert = true
+            } label: {
+                SettingsNavigationLabel(
+                    icon: "arrow.counterclockwise.circle.fill",
+                    title: l.tr(zh: "重置 App", en: "Reset App", de: "App zurücksetzen"),
+                    subtitle: l.tr(zh: "删除数据并回到引导页", en: "Delete data and restart onboarding", de: "Daten löschen und Onboarding starten")
+                )
+            }
+            .tint(Color.goRed)
+        }
+    }
+
+    func resetApp() {
+        Task { @MainActor in
+            do {
+                let resetResult = try await appServices.appReset.reset(context: modelContext)
+                currentActiveHumanId = ""
+                withAnimation(GoMotion.page) { hasOnboarded = false }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                if case .pending = resetResult.humanNoteAttachmentCleanup {
+                    appServices.islandToasts.show(l.tr(
+                        zh: "App 数据已删除，但部分本地备注附件未能清理。请联系支持。",
+                        en: "App data was deleted, but some local note attachments could not be removed. Contact support.",
+                        de: "Die App-Daten wurden gelöscht, aber einige lokale Notizanhänge konnten nicht entfernt werden. Kontaktiere den Support."
+                    ))
+                }
+                if case let .pending(message) = resetResult.automaticBackupCleanup {
+                    automaticBackupCleanupError = message
+                }
+            } catch {
+                appResetErrorMessage = error.localizedDescription
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
+    }
+
+    func settingsSection(title: String, @ViewBuilder content: () -> some View) -> some View {
+        Section { content() } header: { Text(title) }
+    }
+
+    func settingsIcon(_ icon: String, color _: Color) -> some View {
+        SettingsDestinationIcon(systemName: icon)
+    }
+}
+
+extension SettingsBackupPage {
     // MARK: - Backup Section
     @ViewBuilder
     var backupSection: some View {

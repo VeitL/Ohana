@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum PetAvatarAssetCatalog {
+nonisolated enum PetAvatarAssetCatalog {
     struct Appearance: Hashable {
         let coatName: String
         let coatSlug: String
@@ -1060,8 +1060,15 @@ enum PetAvatarAssetCatalog {
             return "\(speciesSlug)_\(genderSlug)_standard.webp"
         }
 
-        guard coatColor != "自定义",
-              let appearance = appearances.first(where: { $0.matches(coatColor: coatColor) }) else {
+        let normalizedCoat = coatColor.trimmingCharacters(in: .whitespacesAndNewlines)
+        let appearance: Appearance? = if normalizedCoat.isEmpty {
+            appearances.first
+        } else if normalizedCoat == "自定义" {
+            nil
+        } else {
+            appearances.first(where: { $0.matches(coatColor: normalizedCoat) })
+        }
+        guard let appearance else {
             return "\(speciesSlug)_\(genderSlug)_standard.webp"
         }
 

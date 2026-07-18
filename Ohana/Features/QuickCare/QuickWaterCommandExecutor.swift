@@ -26,8 +26,14 @@ struct QuickWaterCareResult {
     let didRecord: Bool
     let allowsDerivedEffects: Bool
     let reminders: [Reminder]
+    let personalDenial: PersonalFreeLimitDenial?
 
-    static let noOp = QuickWaterCareResult(didRecord: false, allowsDerivedEffects: false, reminders: [])
+    static let noOp = QuickWaterCareResult(
+        didRecord: false,
+        allowsDerivedEffects: false,
+        reminders: [],
+        personalDenial: nil
+    )
 }
 
 enum QuickWaterDeletedLogKind {
@@ -76,6 +82,7 @@ struct QuickWaterCommandExecutor {
     private let userNotifications: UserNotificationManaging
     private let reminderScheduling: ReminderSchedulingManaging
     private let derivations: CareDerivationExecutor
+    private let personalAccessLevel: PersonalAccessLevel
 
     init(
         context: ModelContext,
@@ -96,7 +103,8 @@ struct QuickWaterCommandExecutor {
         careEvents: CareEventRecording,
         userNotifications: UserNotificationManaging,
         reminderScheduling: ReminderSchedulingManaging,
-        revisions: DomainRevisionPublishing? = nil
+        revisions: DomainRevisionPublishing? = nil,
+        personalAccessLevel: PersonalAccessLevel = .personal
     ) {
         self.context = context
         self.activeHumanSelection = activeHumanSelection
@@ -104,6 +112,7 @@ struct QuickWaterCommandExecutor {
         self.userNotifications = userNotifications
         self.reminderScheduling = reminderScheduling
         derivations = CareDerivationExecutor(revisions: revisions ?? SharedDomainRevisionPublisher())
+        self.personalAccessLevel = personalAccessLevel
     }
 
     func latestAllEvents(fallback: [Event]) -> [Event] {
@@ -238,6 +247,60 @@ struct QuickWaterCommandExecutor {
         return carePlanReminders(pet: pet, allEvents: allEvents, kinds: ["filterClean", "filterReplace"])
     }
 
+    func saveWaterChangePlanEnforcingPersonalAccess(
+        pet: Pet,
+        allEvents: [Event],
+        intervalDays: Int,
+        reminderOn: Bool,
+        cycleAnchor: Date
+    ) throws -> [Reminder] {
+        let replacingPlans = allEvents.filter {
+            CarePlanCalendarSync.isStoredPlan($0, kind: "waterChange", pet: pet)
+        }
+        try PersonalPlanQuotaCommandGate.requirePlanChange(
+            context: context,
+            personalAccessLevel: personalAccessLevel,
+            addingActivePlanCount: reminderOn && intervalDays > 0 ? 1 : 0,
+            replacingPlans: replacingPlans
+        )
+        return saveWaterChangePlan(
+            pet: pet,
+            allEvents: allEvents,
+            intervalDays: intervalDays,
+            reminderOn: reminderOn,
+            cycleAnchor: cycleAnchor
+        )
+    }
+
+    func syncFilterPlanEnforcingPersonalAccess(
+        pet: Pet,
+        allEvents: [Event],
+        cleanIntervalDays: Int,
+        replaceIntervalDays: Int,
+        reminderOn: Bool
+    ) throws -> [Reminder] {
+        let kinds = ["filterClean", "filterReplace"]
+        let replacingPlans = allEvents.filter { event in
+            kinds.contains { CarePlanCalendarSync.isStoredPlan(event, kind: $0, pet: pet) }
+        }
+        let addingCount = reminderOn
+            ? (cleanIntervalDays > 0 ? 1 : 0) + (replaceIntervalDays > 0 ? 1 : 0)
+            : 0
+        try PersonalPlanQuotaCommandGate.requirePlanChange(
+            context: context,
+            personalAccessLevel: personalAccessLevel,
+            addingActivePlanCount: addingCount,
+            replacingPlans: replacingPlans
+        )
+        return syncFilterPlan(
+            pet: pet,
+            allEvents: allEvents,
+            cleanIntervalDays: cleanIntervalDays,
+            replaceIntervalDays: replaceIntervalDays,
+            reminderOn: reminderOn
+        )
+    }
+
     func saveWaterPlan(
         pet: Pet,
         targets: [Pet],
@@ -246,37 +309,53 @@ struct QuickWaterCommandExecutor {
         allEvents: [Event]
     ) throws -> QuickWaterPlanSaveResult {
         let normalized = WaterPlanWriter.normalizedTimes(times, count: count)
+        let writableTargets = SharedPetTargetResolver
+            .normalizedTargets(targets, fallback: pet)
+            .filter { canWriteActiveWaterData(for: $0) }
+        let replacingPlans = writableTargets.flatMap { target -> [Event] in
+            guard WaterRuleState(pet: target, allEvents: allEvents).operatingMode == .reminder else {
+                return []
+            }
+            return WaterPlanWriter.planEvents(pet: target, allEvents: allEvents)
+        }
+        try PersonalPlanQuotaCommandGate.requirePlanChange(
+            context: context,
+            personalAccessLevel: personalAccessLevel,
+            // Multiple daily times are one logical water plan per pet.
+            addingActivePlanCount: writableTargets.count,
+            replacingPlans: replacingPlans
+        )
         var latestEvents = allEvents
         var reminders: [Reminder] = []
-        var writableTargets: [Pet] = []
+        var savedTargets: [Pet] = []
         for target in targets {
             let targetIsWritable = canWriteActiveWaterData(for: target)
-            let created = try WaterPlanWriter.replacePlan(
+            let created = try WaterPlanWriter.replacePlanResult(
                 pet: target,
                 times: normalized,
                 allEvents: latestEvents,
                 context: context
             )
-            reminders.append(contentsOf: created)
+            reminders.append(contentsOf: created.reminders)
             let replacedEventIds = Set(WaterPlanWriter.planEvents(pet: target, allEvents: latestEvents).map(\.id))
             latestEvents = latestEvents
-                .filter { !replacedEventIds.contains($0.id) } + created.compactMap(\.event)
-            if targetIsWritable { writableTargets.append(target) }
+                .filter { !replacedEventIds.contains($0.id) } + created.events
+            if targetIsWritable { savedTargets.append(target) }
         }
-        for target in writableTargets {
+        for target in savedTargets {
             WaterOperatingMode.set(target.id, mode: .reminder)
         }
         deriveWaterMutation(
             .waterPlan(petID: pet.id, action: "save_drink"),
-            pets: writableTargets.isEmpty ? [pet] : writableTargets,
-            wroteBusinessFact: !writableTargets.isEmpty,
-            note: "targets:\(writableTargets.count)"
+            pets: savedTargets.isEmpty ? [pet] : savedTargets,
+            wroteBusinessFact: !savedTargets.isEmpty,
+            note: "targets:\(savedTargets.count)"
         )
         return QuickWaterPlanSaveResult(
             normalizedTimes: normalized,
             optimisticPlanEvents: WaterPlanWriter.planEvents(pet: pet, allEvents: latestEvents),
             reminders: reminders,
-            targetCount: writableTargets.count
+            targetCount: savedTargets.count
         )
     }
 
@@ -498,6 +577,35 @@ struct QuickWaterCommandExecutor {
             pets: liveTargets,
             note: "water_change"
         )
+        let replacingPlans = liveTargets.flatMap { target in
+            allEvents.filter { CarePlanCalendarSync.isStoredPlan($0, kind: "waterChange", pet: target) }
+        }
+        do {
+            try PersonalPlanQuotaCommandGate.requirePlanChange(
+                context: context,
+                personalAccessLevel: personalAccessLevel,
+                addingActivePlanCount: reminderOn && intervalDays > 0 ? liveTargets.count : 0,
+                replacingPlans: replacingPlans
+            )
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            return QuickWaterCareResult(
+                didRecord: true,
+                allowsDerivedEffects: true,
+                reminders: [],
+                personalDenial: denial
+            )
+        } catch {
+            OhanaLog.warning(
+                "QuickWaterCommandExecutor skipped water-change plan repair: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return QuickWaterCareResult(
+                didRecord: true,
+                allowsDerivedEffects: true,
+                reminders: [],
+                personalDenial: nil
+            )
+        }
         let reminders = liveTargets.flatMap {
             saveWaterChangePlan(
                 pet: $0,
@@ -507,7 +615,12 @@ struct QuickWaterCommandExecutor {
                 cycleAnchor: cycleAnchor
             )
         }
-        return QuickWaterCareResult(didRecord: true, allowsDerivedEffects: true, reminders: reminders)
+        return QuickWaterCareResult(
+            didRecord: true,
+            allowsDerivedEffects: true,
+            reminders: reminders,
+            personalDenial: nil
+        )
     }
 
     func recordFilterClean(
@@ -574,6 +687,41 @@ struct QuickWaterCommandExecutor {
             pets: liveTargets,
             note: "filter_clean"
         )
+        let filterPlanKinds = ["filterClean", "filterReplace"]
+        let replacingPlans = liveTargets.flatMap { target in
+            allEvents.filter { event in
+                filterPlanKinds.contains { CarePlanCalendarSync.isStoredPlan(event, kind: $0, pet: target) }
+            }
+        }
+        let plansPerTarget = reminderOn
+            ? (cleanIntervalDays > 0 ? 1 : 0) + (replaceIntervalDays > 0 ? 1 : 0)
+            : 0
+        do {
+            try PersonalPlanQuotaCommandGate.requirePlanChange(
+                context: context,
+                personalAccessLevel: personalAccessLevel,
+                addingActivePlanCount: liveTargets.count * plansPerTarget,
+                replacingPlans: replacingPlans
+            )
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            return QuickWaterCareResult(
+                didRecord: true,
+                allowsDerivedEffects: true,
+                reminders: [],
+                personalDenial: denial
+            )
+        } catch {
+            OhanaLog.warning(
+                "QuickWaterCommandExecutor skipped filter plan repair: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return QuickWaterCareResult(
+                didRecord: true,
+                allowsDerivedEffects: true,
+                reminders: [],
+                personalDenial: nil
+            )
+        }
         let reminders = liveTargets.flatMap {
             syncFilterPlan(
                 pet: $0,
@@ -583,7 +731,12 @@ struct QuickWaterCommandExecutor {
                 reminderOn: reminderOn
             )
         }
-        return QuickWaterCareResult(didRecord: true, allowsDerivedEffects: true, reminders: reminders)
+        return QuickWaterCareResult(
+            didRecord: true,
+            allowsDerivedEffects: true,
+            reminders: reminders,
+            personalDenial: nil
+        )
     }
 
     func deleteLog(_ log: PetCareLog) throws -> QuickWaterDeletedLogKind {

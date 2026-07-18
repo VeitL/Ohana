@@ -309,19 +309,22 @@ struct MemberLifecycleCommandResult: Equatable {
     let action: String
     let didPersist: Bool
     let persistenceError: String?
+    let personalDenial: PersonalFreeLimitDenial?
 
     init(
         entityID: UUID,
         kind: String,
         action: String,
         didPersist: Bool = true,
-        persistenceError: String? = nil
+        persistenceError: String? = nil,
+        personalDenial: PersonalFreeLimitDenial? = nil
     ) {
         self.entityID = entityID
         self.kind = kind
         self.action = action
         self.didPersist = didPersist
         self.persistenceError = persistenceError
+        self.personalDenial = personalDenial
     }
 
     var didWrite: Bool { didPersist && action != "no-op" }

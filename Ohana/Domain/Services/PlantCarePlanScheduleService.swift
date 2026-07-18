@@ -266,6 +266,13 @@ enum PlantCarePlanScheduleService {
             defaults: defaults
         )
     }
+
+    /// Automatic plant care projections support the Free core workflow and do
+    /// not consume a user-created ordinary-plan slot.
+    static func isGeneratedCalendarPlan(_ event: Event) -> Bool {
+        event.relatedEntityType == EntityKind.plant.rawValue &&
+            event.title.contains(PlantReminderPreferenceStore.generatedPlanTitleMarker)
+    }
 }
 
 private extension PlantCarePlanScheduleService {

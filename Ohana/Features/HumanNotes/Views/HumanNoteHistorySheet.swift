@@ -81,19 +81,17 @@ struct HumanNoteHistoryContent: View {
                         .padding(.bottom, 24)
                 }
 
-                if showAddSheet {
-                    QuickHumanNoteSheet(
-                        human: human,
-                        onSaved: {
-                            noteRevision += 1
-                            onRecordsChanged()
-                        },
-                        onDismiss: { showAddSheet = false }
-                    )
-                    .zIndex(20)
-                }
             }
             .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showAddSheet) {
+                QuickHumanNoteSheet(
+                    human: human,
+                    onSaved: {
+                        noteRevision += 1
+                        onRecordsChanged()
+                    }
+                )
+            }
             .onDisappear {
                 commandQueue.cancelAll()
             }

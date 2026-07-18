@@ -2983,7 +2983,10 @@ struct HomeCommandExecutorTests {
         let plantCommandSource = try source("Ohana/Features/Plants/PlantCommands.swift", rootURL: rootURL)
         let revisionSource = try source("Ohana/Features/RevisionPublishing/DomainRevisionPublishing+FeaturePublishing.swift", rootURL: rootURL)
         let detailActionsSource = try source("Ohana/Features/Plants/Views/PlantDetailView+Actions.swift", rootURL: rootURL)
-        let featureDetailSource = try source("Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift", rootURL: rootURL)
+        let featureDetailSource = try [
+            "Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift",
+            "Ohana/Features/Plants/Views/PlantCareFeatureDetailView+Support.swift"
+        ].map { try source($0, rootURL: rootURL) }.joined(separator: "\n")
         let routeContainerSource = try source("Ohana/Features/Home/HomePlantCareLogRouteContainer.swift", rootURL: rootURL)
         let quickActionSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+QuickActions.swift", rootURL: rootURL)
         let viewSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift", rootURL: rootURL)
@@ -3065,6 +3068,7 @@ struct HomeCommandExecutorTests {
         let rootURL = repositoryRootURL()
         let resultSource = try source("Ohana/Features/Members/MemberProfileCommands.swift", rootURL: rootURL)
         let lifecycleSource = try source("Ohana/Features/Members/MemberInteractionCommands.swift", rootURL: rootURL)
+        let rainbowBridgeSource = try source("Ohana/Features/Memorial/RainbowBridgeService.swift", rootURL: rootURL)
         let petDetailSource = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView+MemorialDanger.swift", rootURL: rootURL)
         let petSettingsSource = try source("Ohana/Features/Members/Views/PetCardBackSettingsSheet.swift", rootURL: rootURL)
         let humanBasicSource = try source("Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift", rootURL: rootURL)
@@ -3078,6 +3082,10 @@ struct HomeCommandExecutorTests {
         #expect(lifecycleSource.contains("let saveResult = context.safeSaveResult(publishFailureEvent: true)"))
         #expect(lifecycleSource.contains("context.rollback()"))
         #expect(lifecycleSource.contains("return .failed"))
+        #expect(lifecycleSource.contains("if result.didPersist"))
+        #expect(lifecycleSource.contains("MemberLifecycleActiveScheduleNotifications.cancel(notificationIDs)"))
+        #expect(!rainbowBridgeSource.contains("DomainScheduleWriter.delete"))
+        #expect(!rainbowBridgeSource.contains("truncateRecurringEvent"))
         #expect(!lifecycleSource.contains("RainbowBridgeService().markPassedAway(pet: pet, date: date, context: context)\n        CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: date)\n        context.safeSave()"))
         #expect(petDetailSource.contains("notificationOccurred(result.didPersist ? .success : .error)"))
         #expect(petSettingsSource.contains("notificationOccurred(result.didPersist ? .success : .error)"))
@@ -3142,7 +3150,10 @@ struct HomeCommandExecutorTests {
     @Test func plantBatchCareCommandsStopFeedbackWhenPersistenceFails() throws {
         let rootURL = repositoryRootURL()
         let commandSource = try source("Ohana/Features/Plants/PlantBatchCareCommands.swift", rootURL: rootURL)
-        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift", rootURL: rootURL)
+        let dashboardSource = try source(
+            "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift",
+            rootURL: rootURL
+        )
 
         #expect(commandSource.contains("let didPersist: Bool"))
         #expect(commandSource.contains("let persistenceErrorDescription: String?"))
@@ -9072,7 +9083,6 @@ struct HomeCommandExecutorTests {
         defer {
             questManager.coconutCount = oldCoconutCount
             questManager.coconutLogs = oldCoconutLogs
-            questManager.persistQuestFlags()
         }
         questManager.coconutCount = 500
         questManager.coconutLogs = []
@@ -9096,7 +9106,8 @@ struct HomeCommandExecutorTests {
         #expect(result.didPurchase == true)
         #expect(result.cost == item.cost)
         #expect(result.ledgerEventID == ledger.id)
-        #expect(result.transactionKey == "shop:\(item.id):\(human.id.uuidString)")
+        #expect(result.transactionKey?.hasPrefix("shop:\(item.id):\(human.id.uuidString):") == true)
+        #expect(result.attemptID == nil)
         #expect(human.coconutBalance == 500 - item.cost)
         #expect(questManager.coconutCount == 500 - item.cost)
         #expect(ledgerEvents.count == 1)
@@ -9111,7 +9122,7 @@ struct HomeCommandExecutorTests {
         #expect(purchaseRecords.count == 1)
         #expect(purchaseRecord.itemId == item.id)
         #expect(purchaseRecord.buyerHumanId == human.id.uuidString)
-        #expect(purchaseRecord.transactionKey == "shop:\(item.id):\(human.id.uuidString)")
+        #expect(purchaseRecord.transactionKey == result.transactionKey)
 
         let duplicate = ShopPurchaseCommandService.purchase(
             item: item,
@@ -9141,8 +9152,30 @@ struct HomeCommandExecutorTests {
     @Test func shopCatalogRejectsUnknownItemAndDeleteUnknownOwnershipIsNoOp() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
+        let human = Human(name: "Guan")
+        human.coconutBalance = 1000
+        context.insert(human)
+        try context.save()
+
+        let unknownItem = ShopItem(
+            id: "not_a_real_shop_item",
+            emoji: "?",
+            nameText: .init(zh: "未知", en: "Unknown", de: "Unbekannt"),
+            descriptionText: .init(zh: "未知", en: "Unknown", de: "Unbekannt"),
+            cost: 1,
+            category: .effect
+        )
 
         #expect(ShopCatalog.item(id: "not_a_real_shop_item") == nil)
+
+        let purchase = ShopPurchaseCommandService.purchase(
+            item: unknownItem,
+            buyer: human,
+            itemName: "Unknown",
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
 
         let deleted = try ShopPurchaseRecordStore.deleteOwnershipRecord(
             itemID: "not_a_real_shop_item",
@@ -9151,9 +9184,13 @@ struct HomeCommandExecutorTests {
         )
 
         #expect(deleted == false)
+        #expect(purchase.didPurchase == false)
+        #expect(purchase.failure == .invalidItem)
+        #expect(human.coconutBalance == 1000)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<ShopPurchaseAttempt>()).isEmpty)
     }
 
     @MainActor
@@ -9164,17 +9201,10 @@ struct HomeCommandExecutorTests {
         let item = try #require(ShopCatalog.item(id: "boost_backdate_pack"))
         let startingBalance = item.cost + 20
         human.coconutBalance = startingBalance
-        let defaults = UserDefaults.standard
-        let oldBackdatePassRaw = defaults.object(forKey: CheckInStreakStore.makeupPackKey)
-        defer {
-            if let oldBackdatePassRaw {
-                defaults.set(oldBackdatePassRaw, forKey: CheckInStreakStore.makeupPackKey)
-            } else {
-                defaults.removeObject(forKey: CheckInStreakStore.makeupPackKey)
-            }
-        }
-        defaults.removeObject(forKey: CheckInStreakStore.makeupPackKey)
-        let services = AppServices()
+        let inventoryDefaultsName = "HomeCommandExecutorTests.consumableShopPurchase.\(UUID().uuidString)"
+        let inventoryDefaults = try #require(UserDefaults(suiteName: inventoryDefaultsName))
+        defer { inventoryDefaults.removePersistentDomain(forName: inventoryDefaultsName) }
+        let inventory = UserDefaultsShopInventoryManager(defaults: inventoryDefaults)
         context.insert(human)
         try context.save()
 
@@ -9186,10 +9216,11 @@ struct HomeCommandExecutorTests {
             wallet: SwiftDataCoconutWalletManager(),
             careLedger: CareLedgerService()
         )
-        let fulfilled = ShopPurchaseFulfillmentService().fulfillConsumable(
+        let fulfilled = ShopPurchaseFulfillmentService().fulfillInventoryConsumable(
             item: item,
+            attemptID: try #require(result.attemptID),
             context: context,
-            services: services
+            inventory: inventory
         )
 
         #expect(result.didPurchase)
@@ -9197,8 +9228,8 @@ struct HomeCommandExecutorTests {
         #expect(human.coconutBalance == startingBalance - item.cost)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
-        #expect(services.shopInventory.consumableSnapshot().backdatePassCount == 3)
-        #expect(services.shopInventory.consumeBackdatePass() == 2)
+        #expect(inventory.consumableSnapshot().backdatePassCount == 3)
+        #expect(inventory.consumeBackdatePass() == 2)
     }
 
     @MainActor
@@ -9290,14 +9321,8 @@ struct HomeCommandExecutorTests {
         let contributor = Human(name: "Guan")
         contributor.coconutBalance = 100
         contributor.createdAt = buyer.createdAt.addingTimeInterval(1)
-        let item = ShopItem(
-            id: "test_cofund_shop_item",
-            emoji: "🥥",
-            nameText: .init(zh: "合资测试", en: "Cofund Test", de: "Mitfinanzierungstest"),
-            descriptionText: .init(zh: "测试合资扣款。", en: "Tests cofunded spend.", de: "Testet mitfinanzierte Ausgabe."),
-            cost: 50,
-            category: .effect
-        )
+        contributor.coconutBalance = 500
+        let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
         context.insert(buyer)
         context.insert(contributor)
         try context.save()
@@ -9316,12 +9341,12 @@ struct HomeCommandExecutorTests {
         #expect(result.failure == nil)
         #expect(result.fundingContributions == [
             ShopPurchaseFundingContribution(humanID: buyer.id, amount: 10),
-            ShopPurchaseFundingContribution(humanID: contributor.id, amount: 40)
+            ShopPurchaseFundingContribution(humanID: contributor.id, amount: item.cost - 10)
         ])
         #expect(buyer.coconutBalance == 0)
-        #expect(contributor.coconutBalance == 60)
+        #expect(contributor.coconutBalance == 500 - (item.cost - 10))
         #expect(walletEntries.count(where: { $0.ownerId == buyer.id.uuidString && $0.delta == -10 }) == 1)
-        #expect(walletEntries.count(where: { $0.ownerId == contributor.id.uuidString && $0.delta == -40 }) == 1)
+        #expect(walletEntries.count(where: { $0.ownerId == contributor.id.uuidString && $0.delta == -(item.cost - 10) }) == 1)
         #expect(walletEntries.allSatisfy { $0.balanceAfter >= 0 })
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
     }
@@ -9337,14 +9362,8 @@ struct HomeCommandExecutorTests {
         frozenContributor.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
         let activeContributor = Human(name: "Guan")
         activeContributor.coconutBalance = 100
-        let item = ShopItem(
-            id: "test_cofund_skip_frozen_item",
-            emoji: "🥥",
-            nameText: .init(zh: "冻结跳过测试", en: "Frozen Skip Test", de: "Frozen-Skip-Test"),
-            descriptionText: .init(zh: "测试合资跳过冻结钱包。", en: "Tests skipping frozen cofunders.", de: "Testet eingefrorene Mitfinanzierer."),
-            cost: 50,
-            category: .effect
-        )
+        activeContributor.coconutBalance = 500
+        let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
         context.insert(buyer)
         context.insert(frozenContributor)
         context.insert(activeContributor)
@@ -9363,11 +9382,11 @@ struct HomeCommandExecutorTests {
         #expect(result.didPurchase)
         #expect(result.fundingContributions == [
             ShopPurchaseFundingContribution(humanID: buyer.id, amount: 10),
-            ShopPurchaseFundingContribution(humanID: activeContributor.id, amount: 40)
+            ShopPurchaseFundingContribution(humanID: activeContributor.id, amount: item.cost - 10)
         ])
         #expect(buyer.coconutBalance == 0)
         #expect(frozenContributor.coconutBalance == 100)
-        #expect(activeContributor.coconutBalance == 60)
+        #expect(activeContributor.coconutBalance == 500 - (item.cost - 10))
         #expect(!walletEntries.contains { $0.ownerId == frozenContributor.id.uuidString })
     }
 
@@ -9391,7 +9410,6 @@ struct HomeCommandExecutorTests {
         defer {
             questManager.coconutCount = oldCoconutCount
             questManager.coconutLogs = oldCoconutLogs
-            questManager.persistQuestFlags()
         }
         questManager.coconutCount = item.cost
         questManager.coconutLogs = []
@@ -9424,13 +9442,16 @@ struct HomeCommandExecutorTests {
         let human = Human(name: "Guan")
         human.coconutBalance = 500
         let item = try #require(ShopCatalog.item(id: "boost_backdate_single"))
+        let inventoryDefaultsName = "HomeCommandExecutorTests.repeatedConsumable.\(UUID().uuidString)"
+        let inventoryDefaults = try #require(UserDefaults(suiteName: inventoryDefaultsName))
+        defer { inventoryDefaults.removePersistentDomain(forName: inventoryDefaultsName) }
+        let inventory = UserDefaultsShopInventoryManager(defaults: inventoryDefaults)
         let questManager = TestQuestManagerProjection.manager
         let oldCoconutCount = questManager.coconutCount
         let oldCoconutLogs = questManager.coconutLogs
         defer {
             questManager.coconutCount = oldCoconutCount
             questManager.coconutLogs = oldCoconutLogs
-            questManager.persistQuestFlags()
         }
         questManager.coconutCount = 500
         questManager.coconutLogs = []
@@ -9446,6 +9467,13 @@ struct HomeCommandExecutorTests {
             wallet: SwiftDataCoconutWalletManager(),
             careLedger: CareLedgerService()
         )
+        let firstAttemptID = try #require(first.attemptID)
+        let firstFulfilled = ShopPurchaseFulfillmentService().fulfillInventoryConsumable(
+            item: item,
+            attemptID: firstAttemptID,
+            context: context,
+            inventory: inventory
+        )
         let second = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
@@ -9458,6 +9486,7 @@ struct HomeCommandExecutorTests {
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         #expect(first.didPurchase)
+        #expect(firstFulfilled)
         #expect(second.didPurchase)
         #expect(first.transactionKey != nil)
         #expect(second.transactionKey != nil)
@@ -9465,6 +9494,8 @@ struct HomeCommandExecutorTests {
         #expect(human.coconutBalance == 500 - item.cost * 2)
         #expect(questManager.coconutCount == 500 - item.cost * 2)
         #expect(walletEntries.count(where: { $0.source == .shop && $0.entryKind == .spend }) == 2)
+        #expect(inventory.consumableSnapshot().backdatePassCount == 1)
+        #expect(try context.fetch(FetchDescriptor<ShopPurchaseAttempt>()).count == 2)
     }
 
     @MainActor
@@ -9889,6 +9920,7 @@ struct HomeCommandExecutorTests {
         let defaults = UserDefaults.standard
         let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
         let oldBoostDouble = defaults.object(forKey: "shop_boostDoubleActive")
+        let oldDurableInventory = defaults.object(forKey: ShopInventoryDefaultsKeys.durableStateV2)
         let questManager = TestQuestManagerProjection.manager
         let oldCoconutCount = questManager.coconutCount
         let oldCoconutLogs = questManager.coconutLogs
@@ -9903,12 +9935,18 @@ struct HomeCommandExecutorTests {
             } else {
                 defaults.removeObject(forKey: "shop_boostDoubleActive")
             }
+            if let oldDurableInventory {
+                defaults.set(oldDurableInventory, forKey: ShopInventoryDefaultsKeys.durableStateV2)
+            } else {
+                defaults.removeObject(forKey: ShopInventoryDefaultsKeys.durableStateV2)
+            }
             questManager.coconutCount = oldCoconutCount
             questManager.coconutLogs = oldCoconutLogs
             questManager.persistQuestFlags()
         }
         defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
         defaults.removeObject(forKey: "shop_boostDoubleActive")
+        defaults.removeObject(forKey: ShopInventoryDefaultsKeys.durableStateV2)
         EconomyDailyBudgetStore.reset(
             householdKey: CoconutEconomyPolicyV2.householdBudgetKey(),
             memberKey: human.id.uuidString
@@ -10537,13 +10575,20 @@ struct HomeCommandExecutorTests {
         human.notes = "性别:女"
         let defaults = UserDefaults.standard
         let oldPassRaw = defaults.object(forKey: Avatar2DAccess.extraPassInventoryKey)
+        let oldDurableInventory = defaults.object(forKey: ShopInventoryDefaultsKeys.durableStateV2)
         defer {
             if let oldPassRaw {
                 defaults.set(oldPassRaw, forKey: Avatar2DAccess.extraPassInventoryKey)
             } else {
                 defaults.removeObject(forKey: Avatar2DAccess.extraPassInventoryKey)
             }
+            if let oldDurableInventory {
+                defaults.set(oldDurableInventory, forKey: ShopInventoryDefaultsKeys.durableStateV2)
+            } else {
+                defaults.removeObject(forKey: ShopInventoryDefaultsKeys.durableStateV2)
+            }
         }
+        defaults.removeObject(forKey: ShopInventoryDefaultsKeys.durableStateV2)
         defaults.set(1, forKey: Avatar2DAccess.extraPassInventoryKey)
         context.insert(human)
         try context.save()
@@ -10577,6 +10622,7 @@ struct HomeCommandExecutorTests {
         let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
         let oldClaimedRaw = defaults.object(forKey: "achievement_claimedRewardIDs")
         let oldBoostDouble = defaults.object(forKey: "shop_boostDoubleActive")
+        let oldDurableInventory = defaults.object(forKey: ShopInventoryDefaultsKeys.durableStateV2)
         let bondItem = try #require(PetBondVaultCatalog.items.first)
         let unlockKey = "petBondVaultUnlocked_\(pet.id.uuidString)"
         let oldUnlockRaw = defaults.object(forKey: unlockKey)
@@ -10600,6 +10646,11 @@ struct HomeCommandExecutorTests {
             } else {
                 defaults.removeObject(forKey: "shop_boostDoubleActive")
             }
+            if let oldDurableInventory {
+                defaults.set(oldDurableInventory, forKey: ShopInventoryDefaultsKeys.durableStateV2)
+            } else {
+                defaults.removeObject(forKey: ShopInventoryDefaultsKeys.durableStateV2)
+            }
             if let oldUnlockRaw {
                 defaults.set(oldUnlockRaw, forKey: unlockKey)
             } else {
@@ -10617,6 +10668,7 @@ struct HomeCommandExecutorTests {
         defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
         defaults.removeObject(forKey: "achievement_claimedRewardIDs")
         defaults.removeObject(forKey: "shop_boostDoubleActive")
+        defaults.removeObject(forKey: ShopInventoryDefaultsKeys.durableStateV2)
         defaults.removeObject(forKey: unlockKey)
         questManager.coconutCount = 500
         questManager.coconutLogs = []
@@ -11060,13 +11112,13 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV94.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
 
     private func makeSharedCareUndoContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV94.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -11076,6 +11128,7 @@ struct HomeCommandExecutorTests {
         let oldActiveHuman = defaults.object(forKey: "currentActiveHumanId")
         let oldCooldown = defaults.object(forKey: "quest_cooldownLogs")
         let oldBoost = defaults.object(forKey: "shop_boostDoubleActive")
+        let oldDurableInventory = defaults.object(forKey: ShopInventoryDefaultsKeys.durableStateV2)
         let oldCoconutCount = TestQuestManagerProjection.manager.coconutCount
         let oldCoconutLogs = TestQuestManagerProjection.manager.coconutLogs
         let oldLastReward = TestQuestManagerProjection.manager.lastEconomyRewardResult
@@ -11085,6 +11138,7 @@ struct HomeCommandExecutorTests {
         EconomyDailyBudgetStore.resetAll()
         defaults.removeObject(forKey: "quest_cooldownLogs")
         defaults.removeObject(forKey: "shop_boostDoubleActive")
+        defaults.removeObject(forKey: ShopInventoryDefaultsKeys.durableStateV2)
         defaults.set(activeHumanID, forKey: "currentActiveHumanId")
         TestQuestManagerProjection.manager.coconutCount = 0
         TestQuestManagerProjection.manager.coconutLogs = []
@@ -11109,6 +11163,11 @@ struct HomeCommandExecutorTests {
                 defaults.set(oldBoost, forKey: "shop_boostDoubleActive")
             } else {
                 defaults.removeObject(forKey: "shop_boostDoubleActive")
+            }
+            if let oldDurableInventory {
+                defaults.set(oldDurableInventory, forKey: ShopInventoryDefaultsKeys.durableStateV2)
+            } else {
+                defaults.removeObject(forKey: ShopInventoryDefaultsKeys.durableStateV2)
             }
             TestQuestManagerProjection.manager.coconutCount = oldCoconutCount
             TestQuestManagerProjection.manager.coconutLogs = oldCoconutLogs

@@ -87,6 +87,7 @@ extension PetBasicInfoDetailView {
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             withAnimation { isEditing = false }
+            onSave?()
         }
     }
 }

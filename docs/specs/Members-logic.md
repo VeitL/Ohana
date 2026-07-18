@@ -19,7 +19,7 @@
 
 ### MBR-004 新宠物创建会写 Pet、相关日历事实和首宠完成标记
 
-任何情况下，新宠物会从草稿写入核心资料、头像数据和性格标签；名称、物种与品种为必填，物种和品种的 Other 自定义文本按用户输入保存。未在极简创建流填写的性别与毛色保持空值或 `unknown`，不得伪造。主题色可由用户明确选择；未选择时由名称、物种、品种和可用毛色稳定推导，重启或重试不会随机跳色。Pet 插入后会标记 CloudSync modified。保存成功后，若草稿包含生日则创建生日 Event + Reminder，若包含到家日则创建周年 Event 和若干 PetMilestone，并确保默认 CarePlan 日历计划；生日 Event、生日 Reminder、到家周年 Event 都必须写入 CloudSync 本地 dirty state。首只有效宠物使 D17 的 50 椰子启动赠礼进入待领取状态；Pet 保存不会直接弹领取层，Task Center 的奖励事项才是弹层入口。实际领取由 `StarterGiftService` 通过确定性交易键独立写入 `system:island`，不属于 Pet 创建事务，也不绑定 Pet/Human，不再要求第一笔照护。来源：`Ohana/Features/Members/MemberCreationService.swift`、`Ohana/Features/Economy/StarterGiftService.swift`、`docs/specs/Onboarding-logic.md`。
+任何情况下，新宠物会从草稿写入核心资料、头像数据和性格标签；名称、物种、品种与性别为必填，物种和品种的 Other 自定义文本按用户输入保存。毛色可跳过并保持空值，不得伪造。主题色可由用户明确选择；未选择毛色时由名称、物种与品种稳定自动分配，选择毛色时优先使用该毛色对应色值，用户手动主题色始终覆盖自动结果。Pet 插入后会标记 CloudSync modified。保存成功后，若草稿包含生日则创建生日 Event + Reminder，若包含到家日则创建周年 Event 和若干 PetMilestone，并确保默认 CarePlan 日历计划；生日 Event、生日 Reminder、到家周年 Event 都必须写入 CloudSync 本地 dirty state。首只有效宠物使 D17 的 50 椰子启动赠礼进入待领取状态；Pet 保存不会直接弹领取层，Task Center 的奖励事项才是弹层入口。实际领取由 `StarterGiftService` 通过确定性交易键独立写入 `system:island`，不属于 Pet 创建事务，也不绑定 Pet/Human，不再要求第一笔照护。来源：`Ohana/Features/Members/MemberCreationService.swift`、`Ohana/Features/Economy/StarterGiftService.swift`、`docs/specs/Onboarding-logic.md`。
 
 ### MBR-005 新人类创建会写 Human、可选初始体重、生日 Event 和隐私字段
 
@@ -71,7 +71,7 @@
 
 ### MBR-017 创建向导步骤由成员类型决定
 
-完整人类创建向导仍为 basicInfo -> avatar -> theme；首次引导另用只输入名字的极简 Human 页面。宠物创建步骤统一为名字 -> 物种与品种 -> 性格与可选主题色 -> 头像。名字、物种和品种必填；两个分类都支持 Other 自定义文本。性格最多三项，未手动选择主题色时自动稳定搭配，头像有默认值。来源：`Ohana/Features/Members/MemberCardCreationSupport.swift`、`Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift`。
+完整人类创建向导仍为 basicInfo -> avatar -> theme；首次引导另用只输入名字的极简 Human 页面。宠物创建步骤统一为名字 -> 物种与品种 -> 外观 -> 性格与可选主题色 -> 头像。名字、物种、品种和外观页的性别必填；毛色可跳过，两个分类都支持 Other 自定义文本。性格最多三项；未选毛色时稳定自动分配主题色，选毛色时按毛色搭配，手动自定义始终覆盖自动结果；头像有默认值。来源：`Ohana/Features/Members/MemberCardCreationSupport.swift`、`Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift`。
 
 ### MBR-018 成员页只管理名册，家庭分工进入统一 Task Center
 
@@ -91,10 +91,11 @@ stateDiagram-v2
     theme --> Saved: Human save succeeds
     [*] --> petName: Pet wizard
     petName --> petSpecies
-    petSpecies --> petPersonality
+    petSpecies --> petAppearance
+    petAppearance --> petPersonality: sex selected; coat optional
     petPersonality --> petAvatar
     petAvatar --> Saved: Pet save succeeds
-    petAvatar --> Error: empty or duplicate name / missing species or breed / avatar pass / save failure
+    petAvatar --> Error: empty or duplicate name / missing species, breed or sex / avatar pass / save failure
 ```
 
 代码实际约束：步骤列表由 `MemberCreationStep.steps(for:)` 静态决定；保存时才执行名称、2.5D 权限、SwiftData 写入和派生事件/里程碑。来源：`Ohana/Features/Members/MemberCardCreationSupport.swift`、`Ohana/Features/Members/MemberCreationService.swift`。

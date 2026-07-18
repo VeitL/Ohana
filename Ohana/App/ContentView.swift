@@ -23,7 +23,6 @@ struct ContentView: View {
     @State private var createdEntitySignal: HomeCreatedEntitySignal?
     @State private var rootAppearHandoffTask: Task<Void, Never>?
     @State private var onboardingJourneyEvaluationTask: Task<Void, Never>?
-    @State private var coconutWalletBootstrapTask: Task<Void, Never>?
     @State private var activeHumanReactionTask: Task<Void, Never>?
     @State private var onboardingCreatedEntitySignalTask: Task<Void, Never>?
     @State private var uiTestRouteTask: Task<Void, Never>?
@@ -230,6 +229,7 @@ struct ContentView: View {
             scheduleOnboardingJourneyEvaluation(delayMilliseconds: 180)
         }
         .onReceive(appServices.notificationRoutes.routeEvents) { published in
+            appServices.notificationRoutes.acknowledgeRouteEvent(id: published.id)
             scheduleHomeCardStateResetIfNeeded(for: published.event)
             handleRouteNotificationOutcome(
                 appRoutes.handleNotificationEvent(published.event)
@@ -239,10 +239,10 @@ struct ContentView: View {
             coordinator: appRoutes,
             onRequiredHumanSaved: { activateRequiredHuman($0) },
             onPetSavedFromAddEntity: { pet in
-                let isStarterGiftHandoff = prepareStarterGiftHomeHandoffIfNeeded(pet.id)
+                _ = prepareStarterGiftHomeHandoffIfNeeded(pet.id)
                 scheduleCreatedEntitySignalAfterHomeHandoff(
                     pet.id,
-                    destinationTab: isStarterGiftHandoff ? .calendar : nil
+                    destinationTab: .home
                 )
                 scheduleUITestEconomyStateSeedIfNeeded()
                 scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
@@ -265,7 +265,6 @@ struct ContentView: View {
             scheduleActiveHumanReaction(newValue)
         }
         .onChange(of: scenePhase) { _, newPhase in
-            appServices.lifecycle.handle(.scenePhaseChanged(newPhase))
             if newPhase == .active {
                 reconcileHumanProfileRequirement()
             }
@@ -443,9 +442,6 @@ struct ContentView: View {
         }
         let bootstrapDelay = OnboardingHomeJoinHandoffGate.remainingRootBootstrapDelayMilliseconds()
         rootAppearHandoffTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: bootstrapDelay) {
-            appServices.lifecycle.handle(.rootAppeared(scenePhase: scenePhase))
-            appServices.cloudSync.startAfterFirstRender(modelContainer: modelContext.container)
-            scheduleCoconutWalletBootstrap()
             scheduleUITestEconomyStateSeedIfNeeded(delayMilliseconds: 120)
             reconcileHumanProfileRequirement()
             scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
@@ -474,24 +470,6 @@ struct ContentView: View {
             appRoutes.dismissFullScreen(.requiredHumanProfile)
         case .readyWithoutHuman, .ready:
             appRoutes.dismissFullScreen(.requiredHumanProfile)
-        }
-    }
-
-    private func scheduleCoconutWalletBootstrap() {
-        guard coconutWalletBootstrapTask == nil else { return }
-        coconutWalletBootstrapTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
-            defer { coconutWalletBootstrapTask = nil }
-            do {
-                try appServices.coconutWallet.bootstrapIfNeeded(
-                    context: modelContext,
-                    projectionManager: appServices.questManager
-                )
-                EconomyDailyBudgetStore.pruneOldUsageEvents(context: modelContext)
-            } catch {
-                #if DEBUG
-                    OhanaLog.error("[ContentView] coconut wallet bootstrap failed: \(error.localizedDescription)", category: "Startup")
-                #endif
-            }
         }
     }
 
@@ -540,6 +518,7 @@ struct ContentView: View {
         if !currentActiveHumanId.isEmpty {
             return currentActiveHumanId
         }
+        guard appRoutes.sheet != .requiredAccountSwitch else { return nil }
         return appServices.onboardingJourney.interruptedOnboardingPrimaryHumanID(context: modelContext)
     }
 
@@ -579,7 +558,7 @@ struct ContentView: View {
             signaledOnboardingFirstPetID = petID
             prepareRequiredHomeSnapshot(for: id)
             _ = prepareStarterGiftHomeHandoffIfNeeded(id)
-            scheduleOnboardingCreatedEntitySignal(id, destinationTab: .calendar)
+            scheduleOnboardingCreatedEntitySignal(id, destinationTab: .home)
         }
         guard hasOnboarded, handledOnboardingFirstPetID != petID else { return }
         handledOnboardingFirstPetID = petID
@@ -647,6 +626,7 @@ struct ContentView: View {
         #if DEBUG
             guard OhanaUITestLaunchOptions.requestedCoconutBalanceSeedAmount != nil
                 || OhanaUITestLaunchOptions.requestsRewardTierUnlock
+                || OhanaUITestLaunchOptions.requestsGrowthLoopUnlock
                 || OhanaUITestLaunchOptions.requestsEconomyBudgetReset else {
                 return
             }
@@ -658,7 +638,9 @@ struct ContentView: View {
                     currentActiveHumanId: currentActiveHumanId,
                     revisionNote: "content.uiTestEconomySeed"
                 )
-                if currentActiveHumanId.isEmpty, let activeHumanID {
+                if currentActiveHumanId.isEmpty,
+                   appRoutes.sheet != .requiredAccountSwitch,
+                   let activeHumanID {
                     currentActiveHumanId = activeHumanID.uuidString
                 }
                 uiTestEconomyStateSeedTask = nil

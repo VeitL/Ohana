@@ -67,6 +67,7 @@ struct CalendarEventPlanCommandResult: Equatable {
 
 enum CalendarCommandError: LocalizedError, Equatable {
     case persistenceFailed(String?)
+    case personalUpgradeRequired(PersonalFreeLimitDenial)
 
     var errorDescription: String? {
         switch self {
@@ -75,6 +76,8 @@ enum CalendarCommandError: LocalizedError, Equatable {
                 return "日历保存失败：\(reason)"
             }
             return "日历保存失败，请稍后重试。"
+        case let .personalUpgradeRequired(denial):
+            return "Ohana Free supports up to \(denial.limit) active ordinary plans. Ohana Personal removes this limit."
         }
     }
 }
@@ -87,10 +90,16 @@ enum CalendarEventPlanCommandService {
     static func createEvent(
         input: CalendarEventPlanCommandInput,
         context: ModelContext,
+        personalAccessLevel: PersonalAccessLevel = .personal,
         scheduleNotifications: Bool = true,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) throws -> CalendarEventPlanCommandResult? {
         guard !input.cleanTitle.isEmpty else { return nil }
+        try requirePersonalAccessForNewPlan(
+            input: input,
+            context: context,
+            personalAccessLevel: personalAccessLevel
+        )
         let intent = DomainScheduleCreateIntent(
             title: input.cleanTitle,
             startDate: input.startDate,
@@ -139,17 +148,69 @@ enum CalendarEventPlanCommandService {
         )
     }
 
+    @MainActor
+    private static func requirePersonalAccessForNewPlan(
+        input: CalendarEventPlanCommandInput,
+        context: ModelContext,
+        personalAccessLevel: PersonalAccessLevel
+    ) throws {
+        guard input.recurrenceDays > 0 || input.reminderLeadMinutes != nil else { return }
+
+        let usage: PersonalUsageSnapshot
+        do {
+            usage = try PersonalUsageSnapshotReader.snapshot(context: context)
+        } catch {
+            throw CalendarCommandError.persistenceFailed(
+                "Could not verify the current Ohana Personal allowance: \(error.localizedDescription)"
+            )
+        }
+        let quotaClass = PersonalPlanQuotaClassifier.quotaClass(for: input.eventType)
+        let disposition = PersonalAccessPolicy.disposition(
+            level: personalAccessLevel,
+            usage: usage,
+            request: .createPlan(quotaClass)
+        )
+        guard case let .deny(denial) = disposition,
+              case let .wouldExceedFreeLimit(limitDenial) = denial.reason
+        else { return }
+        throw CalendarCommandError.personalUpgradeRequired(limitDenial)
+    }
+
     @discardableResult
     @MainActor
     static func updateEvent(
         event: Event,
         input: CalendarEventPlanCommandInput,
         context: ModelContext,
+        personalAccessLevel: PersonalAccessLevel = .personal,
         scheduleNotifications: Bool = true,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
         now: Date = Date()
     ) throws -> CalendarEventPlanCommandResult? {
         guard !input.cleanTitle.isEmpty else { return nil }
+        let newPlanIsOrdinaryAndActive = PersonalPlanQuotaClassifier.quotaClass(for: input.eventType) == .ordinary &&
+            (input.recurrenceDays > 0 || input.reminderLeadMinutes != nil)
+        if newPlanIsOrdinaryAndActive {
+            let alreadyConsumesOrdinarySlot: Bool
+            do {
+                alreadyConsumesOrdinarySlot = try PersonalUsageSnapshotReader.countsAsOrdinaryActiveUserPlan(
+                    event,
+                    context: context,
+                    now: now
+                )
+            } catch {
+                throw CalendarCommandError.persistenceFailed(
+                    "Could not verify the current Ohana Personal allowance: \(error.localizedDescription)"
+                )
+            }
+            if !alreadyConsumesOrdinarySlot {
+                try requirePersonalAccessForNewPlan(
+                    input: input,
+                    context: context,
+                    personalAccessLevel: personalAccessLevel
+                )
+            }
+        }
         let intent = DomainScheduleCreateIntent(
             title: input.cleanTitle,
             startDate: input.startDate,
@@ -479,15 +540,18 @@ nonisolated struct CalendarEventCompletionOptions {
     let reminderCompletion: ReminderCompleting?
     let economy: CareEventEconomyAwarding?
     let schedulePlantCareNotifications: Bool
+    let personalAccessLevel: PersonalAccessLevel
 
     init(
         reminderCompletion: ReminderCompleting? = nil,
         economy: CareEventEconomyAwarding? = nil,
-        schedulePlantCareNotifications: Bool = true
+        schedulePlantCareNotifications: Bool = true,
+        personalAccessLevel: PersonalAccessLevel = .personal
     ) {
         self.reminderCompletion = reminderCompletion
         self.economy = economy
         self.schedulePlantCareNotifications = schedulePlantCareNotifications
+        self.personalAccessLevel = personalAccessLevel
     }
 }
 
@@ -650,6 +714,7 @@ enum CalendarEventCommandService {
 struct CalendarCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    let personalAccessLevel: PersonalAccessLevel
     private let derivations: CareDerivationExecutor
     let reminderScheduling: ReminderSchedulingManaging
     let reminderCompletion: ReminderCompleting
@@ -658,6 +723,7 @@ struct CalendarCommandExecutor {
         self.init(
             context: context,
             revisions: SharedDomainRevisionPublisher(),
+            personalAccessLevel: .personal,
             reminderScheduling: ReminderSchedulingManager(),
             reminderCompletion: ReminderCompletionService()
         )
@@ -667,6 +733,7 @@ struct CalendarCommandExecutor {
         self.init(
             context: context,
             revisions: SharedDomainRevisionPublisher(center: revisionCenter),
+            personalAccessLevel: .personal,
             reminderScheduling: ReminderSchedulingManager(),
             reminderCompletion: ReminderCompletionService()
         )
@@ -676,6 +743,7 @@ struct CalendarCommandExecutor {
         self.init(
             context: context,
             revisions: services.domainRevisions,
+            personalAccessLevel: services.commerce.personalAccessLevel,
             reminderScheduling: services.reminderScheduling,
             reminderCompletion: services.reminderCompletion
         )
@@ -684,11 +752,13 @@ struct CalendarCommandExecutor {
     init(
         context: ModelContext,
         revisions: DomainRevisionPublishing,
+        personalAccessLevel: PersonalAccessLevel = .personal,
         reminderScheduling: ReminderSchedulingManaging,
         reminderCompletion: ReminderCompleting
     ) {
         self.context = context
         self.revisions = revisions
+        self.personalAccessLevel = personalAccessLevel
         derivations = CareDerivationExecutor(revisions: revisions)
         self.reminderScheduling = reminderScheduling
         self.reminderCompletion = reminderCompletion
@@ -700,6 +770,7 @@ struct CalendarCommandExecutor {
         guard let result = try CalendarEventPlanCommandService.createEvent(
             input: input,
             context: context,
+            personalAccessLevel: personalAccessLevel,
             reminderScheduling: reminderScheduling
         ) else {
             derivations.derive(
@@ -726,6 +797,7 @@ struct CalendarCommandExecutor {
             event: event,
             input: input,
             context: context,
+            personalAccessLevel: personalAccessLevel,
             reminderScheduling: reminderScheduling
         ) else {
             derivations.derive(
@@ -759,7 +831,10 @@ struct CalendarCommandExecutor {
             pets: pets,
             context: context,
             executorId: executorId,
-            options: CalendarEventCompletionOptions(reminderCompletion: reminderCompletion)
+            options: CalendarEventCompletionOptions(
+                reminderCompletion: reminderCompletion,
+                personalAccessLevel: personalAccessLevel
+            )
         )
         deriveCalendarCompletion(result, occurrenceDate: occurrenceDate, note: note)
         return result
@@ -824,6 +899,7 @@ struct ReminderCommandResult: Equatable {
     let eventID: UUID?
     let affectedSubjectIDs: Set<UUID>
     let action: String
+    let personalDenial: PersonalFreeLimitDenial?
 
     var revisionAffectedEntityIDs: Set<UUID> {
         var affected = affectedSubjectIDs
@@ -842,6 +918,7 @@ struct ReminderCommandExecutor {
     let careLedger: CareLedgerRecording
     let revisions: DomainRevisionPublishing
     let reminderCompletion: ReminderCompleting
+    let personalAccessLevel: PersonalAccessLevel
 
     init(context: ModelContext) {
         self.init(
@@ -849,7 +926,8 @@ struct ReminderCommandExecutor {
             wallet: SwiftDataCoconutWalletManager(),
             careLedger: CareLedgerService(),
             revisions: SharedDomainRevisionPublisher(),
-            reminderCompletion: ReminderCompletionService()
+            reminderCompletion: ReminderCompletionService(),
+            personalAccessLevel: .personal
         )
     }
 
@@ -859,7 +937,8 @@ struct ReminderCommandExecutor {
             wallet: SwiftDataCoconutWalletManager(),
             careLedger: CareLedgerService(),
             revisions: SharedDomainRevisionPublisher(center: revisionCenter),
-            reminderCompletion: ReminderCompletionService()
+            reminderCompletion: ReminderCompletionService(),
+            personalAccessLevel: .personal
         )
     }
 
@@ -869,7 +948,8 @@ struct ReminderCommandExecutor {
             wallet: services.coconutWallet,
             careLedger: services.careLedger,
             revisions: services.domainRevisions,
-            reminderCompletion: services.reminderCompletion
+            reminderCompletion: services.reminderCompletion,
+            personalAccessLevel: services.commerce.personalAccessLevel
         )
     }
 
@@ -878,13 +958,15 @@ struct ReminderCommandExecutor {
         wallet: CoconutWalletManaging,
         careLedger: CareLedgerRecording,
         revisions: DomainRevisionPublishing,
-        reminderCompletion: ReminderCompleting
+        reminderCompletion: ReminderCompleting,
+        personalAccessLevel: PersonalAccessLevel = .personal
     ) {
         self.context = context
         self.wallet = wallet
         self.careLedger = careLedger
         self.revisions = revisions
         self.reminderCompletion = reminderCompletion
+        self.personalAccessLevel = personalAccessLevel
     }
 
     @discardableResult
@@ -963,6 +1045,27 @@ struct ReminderCommandExecutor {
         reschedule: Bool = true,
         note: String
     ) -> ReminderCommandResult {
+        if let event = reminder.event {
+            do {
+                if try PersonalUsageSnapshotReader.isOrdinaryUserPlanCandidate(event, context: context),
+                   try !PersonalUsageSnapshotReader.countsAsOrdinaryActiveUserPlan(event, context: context) {
+                    try PersonalPlanQuotaCommandGate.requirePlanChange(
+                        context: context,
+                        personalAccessLevel: personalAccessLevel,
+                        addingActivePlanCount: 1
+                    )
+                }
+            } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+                return publish(
+                    reminder,
+                    action: "reopen.personalDenied",
+                    note: note,
+                    personalDenial: denial
+                )
+            } catch {
+                return publish(reminder, action: "reopen.noop", note: note)
+            }
+        }
         let didReopen = reminderCompletion.reopen(reminder, by: humanId, context: context, reschedule: reschedule)
         return publish(reminder, action: didReopen ? "reopen" : "reopen.noop", note: note)
     }
@@ -979,12 +1082,18 @@ struct ReminderCommandExecutor {
     }
 
     @discardableResult
-    private func publish(_ reminder: Reminder, action: String, note: String) -> ReminderCommandResult {
+    private func publish(
+        _ reminder: Reminder,
+        action: String,
+        note: String,
+        personalDenial: PersonalFreeLimitDenial? = nil
+    ) -> ReminderCommandResult {
         let result = ReminderCommandResult(
             reminderID: reminder.id,
             eventID: reminder.event?.id,
             affectedSubjectIDs: Self.affectedSubjectIDs(for: reminder.event, context: context),
-            action: action
+            action: action,
+            personalDenial: personalDenial
         )
         revisions.publishReminderCommand(result, note: note)
         return result

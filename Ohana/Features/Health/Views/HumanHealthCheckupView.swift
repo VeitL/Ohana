@@ -78,36 +78,32 @@ struct HumanHealthCheckupView: View {
                 .scrollBounceBehavior(.basedOnSize)
             }
 
-            if let recordingMetric {
-                HumanHealthMetricEntrySheet(
-                    human: human,
-                    metric: recordingMetric,
-                    initialUnitCode: preferredUnit(for: recordingMetric).code,
-                    onSaved: { _ in
-                        metricToOpenAfterEntry = recordingMetric
-                    },
-                    onDismiss: {
-                        withAnimation(GoMotion.feedback) {
-                            self.recordingMetric = nil
-                        }
-                        if let metric = metricToOpenAfterEntry {
-                            metricToOpenAfterEntry = nil
-                            DispatchQueue.main.async {
-                                detailMetric = metric
-                            }
-                        }
-                    }
-                )
-                .zIndex(20)
-            }
         }
         .navigationTitle(l.tr(zh: "体检指标", en: "Checkup Metrics", de: "Check-up-Werte"))
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $detailMetric) { metric in
             HumanHealthMetricDetailView(human: human, metric: metric)
         }
+        .sheet(item: $recordingMetric, onDismiss: openSavedMetricDetailIfNeeded) { metric in
+            HumanHealthMetricEntrySheet(
+                human: human,
+                metric: metric,
+                initialUnitCode: preferredUnit(for: metric).code,
+                onSaved: { _ in
+                    metricToOpenAfterEntry = metric
+                }
+            )
+        }
         .toolbarBackground(.hidden, for: .navigationBar)
         .environment(\.locale, AppLanguage.effectiveLocale)
+    }
+
+    private func openSavedMetricDetailIfNeeded() {
+        guard let metric = metricToOpenAfterEntry else { return }
+        metricToOpenAfterEntry = nil
+        DispatchQueue.main.async {
+            detailMetric = metric
+        }
     }
 
     private var pageHeader: some View {

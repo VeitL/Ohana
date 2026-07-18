@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # shellcheck source=scripts/lib/local-build-environment.sh
 source "${REPO_ROOT}/scripts/lib/local-build-environment.sh"
+ohana_assert_storage_fixture_configuration "${REPO_ROOT}"
 
 section() {
   printf '\n== %s ==\n' "$1"
@@ -28,22 +29,19 @@ if ((available_kib < OHANA_MINIMUM_FREE_GIB * 1024 * 1024)); then
 else
   echo "status: ready"
 fi
+ohana_print_largest_storage_sources
 
 section "Fixed DerivedData lanes"
 print_path_size "${OHANA_TEST_DERIVED_DATA_PATH}" "tests (preserve)"
 print_path_size "${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}" "dogfood (preserve)"
 print_path_size "${OHANA_RELEASE_DERIVED_DATA_PATH}" "release (preserve)"
-print_path_size "${REPO_ROOT}/.build" ".build total"
+print_path_size "${OHANA_LOCAL_BUILD_REPO_ROOT}/.build" ".build total"
 
 section "Legacy DerivedData candidates"
 legacy_count=0
 for path in "${OHANA_LOCAL_DERIVED_DATA_ROOT}"/*; do
   [[ -e "${path}" ]] || continue
-  case "$(basename "${path}")" in
-    tests|dogfood|release)
-      continue
-      ;;
-  esac
+  ohana_is_fixed_derived_data_lane "${path}" && continue
   print_path_size "${path}" "${path}"
   legacy_count=$((legacy_count + 1))
 done
@@ -118,28 +116,94 @@ if [[ "${device_support_count}" == "0" ]]; then
 fi
 echo "Keep only OS/build versions for physical devices that still need to connect; this report never deletes them."
 
-section "/private/tmp build and archive roots"
+section "${OHANA_LOCAL_BUILD_TMP_ROOT} build and archive roots"
 tmp_count=0
-for path in /private/tmp/OhanaDerivedData* /private/tmp/OhanaArchives; do
+for path in "${OHANA_LOCAL_BUILD_TMP_ROOT}"/OhanaDerivedData* \
+  "${OHANA_LOCAL_BUILD_TMP_ROOT}"/OhanaArchives; do
   [[ -e "${path}" ]] || continue
-  print_path_size "${path}" "${path}"
+  label="${path}"
+  if [[ "${path}" == "${OHANA_LOCAL_BUILD_TMP_ROOT}/OhanaArchives" ]]; then
+    label="${path} (preserve; cleanup never deletes this tree)"
+  fi
+  print_path_size "${path}" "${label}"
   tmp_count=$((tmp_count + 1))
 done
 if [[ "${tmp_count}" == "0" ]]; then
   echo "none"
 fi
 
-section "/private/tmp other Ohana artifacts (report only)"
+section "${OHANA_LOCAL_BUILD_TMP_ROOT}/ohana-* artifacts"
 tmp_artifact_count=0
 tmp_artifact_kib=0
-for path in /private/tmp/ohana-*; do
-  [[ -e "${path}" ]] || continue
+tmp_candidate_count=0
+tmp_candidate_kib=0
+ohana_tmp_artifact_ttl_seconds >/dev/null
+echo "Expiry threshold: ${OHANA_LOCAL_BUILD_TMP_TTL_HOURS} h; age uses the newest item in each artifact tree."
+for path in "${OHANA_LOCAL_BUILD_TMP_ROOT}"/ohana-*; do
+  [[ -e "${path}" || -L "${path}" ]] || continue
   size_kib="$(ohana_path_size_kib "${path}")"
+  age_seconds="$(ohana_path_age_seconds "${path}" || true)"
+  state="$(ohana_tmp_artifact_state "${path}" "${age_seconds}")"
+  if [[ -n "${age_seconds}" ]]; then
+    age_label="$(ohana_format_age_seconds "${age_seconds}")"
+  else
+    age_label="unknown"
+  fi
+  case "${state}" in
+    candidate)
+      disposition="EXPIRED CANDIDATE"
+      tmp_candidate_count=$((tmp_candidate_count + 1))
+      tmp_candidate_kib=$((tmp_candidate_kib + size_kib))
+      ;;
+    recent)
+      disposition="preserve: recent"
+      ;;
+    active)
+      disposition="preserve: open files"
+      ;;
+    unsafe)
+      disposition="preserve: unsafe boundary/owner/symlink"
+      ;;
+    *)
+      disposition="preserve: activity/age could not be verified"
+      ;;
+  esac
+  printf '%9s  age %-9s  %-39s  %s\n' \
+    "$(ohana_format_kib_human "${size_kib}")" "${age_label}" "${disposition}" "${path}"
   tmp_artifact_kib=$((tmp_artifact_kib + size_kib))
   tmp_artifact_count=$((tmp_artifact_count + 1))
 done
-printf '%9s  %s artifact(s); excluded from automatic cleanup\n' \
-  "$(ohana_format_kib_human "${tmp_artifact_kib}")" "${tmp_artifact_count}"
+if [[ "${tmp_artifact_count}" == "0" ]]; then
+  echo "none"
+else
+  printf '%9s  %s artifact(s) total\n' \
+    "$(ohana_format_kib_human "${tmp_artifact_kib}")" "${tmp_artifact_count}"
+  printf '%9s  %s expired safe candidate(s)\n' \
+    "$(ohana_format_kib_human "${tmp_candidate_kib}")" "${tmp_candidate_count}"
+fi
+
+section "Read-only Git and system Xcode growth detectors"
+conflict_summary="$(ohana_git_numbered_conflict_copy_summary)"
+conflict_count="${conflict_summary%%$'\t'*}"
+conflict_kib="${conflict_summary#*$'\t'}"
+printf '%9s  %s numbered conflict copy/copies under .git/objects or .git/index*\n' \
+  "$(ohana_format_kib_human "${conflict_kib}")" "${conflict_count}"
+if ((conflict_count > 0)); then
+  echo "WARNING: numbered Finder/conflict copies are not Git object names and can grow every sync cycle. Report only; this script never deletes .git."
+fi
+
+print_path_size "${OHANA_XCODE_DERIVED_DATA_ROOT}" "Xcode default DerivedData total (report only)"
+xcode_ohana_count=0
+xcode_ohana_kib=0
+for path in "${OHANA_XCODE_DERIVED_DATA_ROOT}"/Ohana-*; do
+  [[ -e "${path}" ]] || continue
+  size_kib="$(ohana_path_size_kib "${path}")"
+  xcode_ohana_kib=$((xcode_ohana_kib + size_kib))
+  xcode_ohana_count=$((xcode_ohana_count + 1))
+done
+printf '%9s  %s Ohana-named Xcode cache(s)\n' \
+  "$(ohana_format_kib_human "${xcode_ohana_kib}")" "${xcode_ohana_count}"
+echo "These system caches sit outside Ohana's fixed lanes and may come from Xcode UI builds or older repo checkouts; inspect them separately."
 
 section "Next step"
 echo "No files were changed or deleted."

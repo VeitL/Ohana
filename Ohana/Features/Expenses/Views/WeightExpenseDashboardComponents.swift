@@ -123,6 +123,10 @@ struct ExpenseDashboardRange: CaseIterable, Hashable {
     static let all = ExpenseDashboardRange(kind: .all)
     static let allCases: [ExpenseDashboardRange] = [.week, .month, .quarter, .all]
 
+    var requiresPersonal: Bool {
+        kind == .quarter || kind == .all
+    }
+
     func title(_ l: L10n) -> String {
         switch kind {
         case .week: l.tr(zh: "7天", en: "7D", de: "7T")
@@ -184,6 +188,7 @@ struct ExpenseBarDashboardChart: View {
 struct DashboardRangePicker<Range: Hashable>: View {
     let ranges: [Range]
     @Binding var selection: Range
+    var isLocked: (Range) -> Bool = { _ in false }
     let title: (Range) -> String
 
     var body: some View {
@@ -196,14 +201,23 @@ struct DashboardRangePicker<Range: Hashable>: View {
                     }
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
-                    Text(title(range))
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(selected ? Color.arkInk : Color.ohanaSecondaryText)
-                        .padding(.horizontal, 12)
-                        .frame(height: 32)
-                        .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                    HStack(spacing: 3) {
+                        Text(title(range))
+                        if isLocked(range) {
+                            Image(systemName: "lock.fill").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 8, weight: .black))
+                        }
+                    }
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(selected ? Color.arkInk : Color.ohanaSecondaryText)
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
+                    .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(
+                    isLocked(range) ? "\(title(range)), Ohana Personal" : title(range)
+                )
             }
         }
     }

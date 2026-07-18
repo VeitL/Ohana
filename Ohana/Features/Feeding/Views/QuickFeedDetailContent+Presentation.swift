@@ -91,6 +91,7 @@ extension QuickFeedDetailContent {
                     Button(l.cancel) {
                         closeActiveFeedSheet()
                     }
+                    .accessibilityIdentifier("quick-feed-sheet-cancel-action")
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()

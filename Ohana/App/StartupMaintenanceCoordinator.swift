@@ -22,6 +22,8 @@ final class StartupMaintenanceCoordinator: ObservableObject {
 
     private static let maintenanceStepNames: Set<String> = [
         "input_warmup",
+        "shop_purchase_recovery",
+        "companion_lifecycle_compatibility",
         "auto_feeder_materialization",
         "reminder_refill",
         "media_attachment_presence_backfill",
@@ -37,7 +39,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         self.defaults = defaults
     }
 
-    func startAfterFirstRender(context: ModelContext) {
+    func startAfterFirstRender(context: ModelContext, services: AppServices) {
         guard !didStart else { return }
         didStart = true
         let persistedCursor = defaults.string(forKey: Keys.maintenanceCursor)
@@ -67,6 +69,44 @@ final class StartupMaintenanceCoordinator: ObservableObject {
 
             guard await runStep("input_warmup", delayMilliseconds: 700, operation: {
                 InputLatencyWarmupService.warmUpOnce()
+            }) else {
+                maintenanceTask = nil
+                return
+            }
+
+            guard await runStep("shop_purchase_recovery", delayMilliseconds: 120, operation: {
+                let results = ShopPurchaseRecoveryService.settleRecoverable(
+                    context: context,
+                    services: services
+                )
+                guard !results.isEmpty else { return }
+                AppPerformanceMonitor.shared.record(
+                    "startup_shop_purchase_recovery",
+                    valueMS: 0,
+                    note: "settled=\(results.count)"
+                )
+            }) else {
+                maintenanceTask = nil
+                return
+            }
+
+            guard await runStep("companion_lifecycle_compatibility", delayMilliseconds: 120, operation: {
+                do {
+                    let result = try OasisCompanionLifecycleCompatibilityService.reconcile(
+                        context: context
+                    )
+                    guard result.repairedCount > 0 || result.hasMoreWork else { return }
+                    AppPerformanceMonitor.shared.record(
+                        "startup_companion_lifecycle_compatibility",
+                        valueMS: 0,
+                        note: "inspected=\(result.inspectedCount), repaired=\(result.repairedCount), more=\(result.hasMoreWork)"
+                    )
+                } catch {
+                    OhanaLog.error(
+                        "Companion lifecycle compatibility failed: \(error.localizedDescription)",
+                        category: "StartupMaintenance"
+                    )
+                }
             }) else {
                 maintenanceTask = nil
                 return

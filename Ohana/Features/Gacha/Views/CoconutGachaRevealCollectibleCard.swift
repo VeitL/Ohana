@@ -107,6 +107,7 @@ struct GachaCollectibleRevealCardView: View {
     let isNewCollectible: Bool
     var onTap: (() -> Void)?
     var onKeep: (() -> Void)?
+    var onRepeat: (() -> Void)?
 
     @State private var flashlightSweep = false
 
@@ -206,19 +207,15 @@ struct GachaCollectibleRevealCardView: View {
                     }
 
                     if isKeepReady {
-                        Button {
-                            onKeep?()
-                        } label: {
-                            Label(l.tr(zh: "收下", en: "Collect", de: "Sammeln"), systemImage: "tray.and.arrow.down.fill")
-                                .font(OhanaFont.caption2(.black))
-                                .foregroundStyle(Color.arkInk)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.goPrimary, in: Capsule())
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 6) {
+                                collectibleActionButtons
+                            }
+                            VStack(spacing: 4) {
+                                collectibleActionButtons
+                            }
                         }
-                        .buttonStyle(ScaleButtonStyle())
                         .transition(.scale(scale: 0.88).combined(with: .opacity))
-                        .accessibilityLabel(l.tr(zh: "收下玩偶", en: "Collect plush", de: "Figur sammeln"))
                     }
                 }
                 .padding(.horizontal, 12)
@@ -248,6 +245,37 @@ struct GachaCollectibleRevealCardView: View {
         .onAppear {
             triggerFlashlightIfNeeded(for: phase)
         }
+    }
+
+    @ViewBuilder
+    private var collectibleActionButtons: some View {
+        Button {
+            onKeep?()
+        } label: {
+            Label(l.tr(zh: "收下", en: "Collect", de: "Nehmen"), systemImage: "tray.and.arrow.down.fill")
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(Color.arkInk)
+                .lineLimit(1)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Color.goPrimary, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(zh: "收下玩偶", en: "Collect plush", de: "Figur sammeln"))
+
+        Button {
+            onRepeat?()
+        } label: {
+            Label(l.tr(zh: "再来", en: "Again", de: "Nochmal"), systemImage: "sparkles")
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Color.ohanaControlFill, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(zh: "收下并再来一次", en: "Collect and open another", de: "Sammeln und noch einmal öffnen"))
     }
 
     private func triggerFlashlightIfNeeded(for newPhase: GachaCollectibleRevealPhase) {

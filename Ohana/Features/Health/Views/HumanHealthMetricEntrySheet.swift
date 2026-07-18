@@ -21,8 +21,8 @@ struct HumanHealthMetricEntrySheet: View {
     let metric: HealthMetric
     var initialUnitCode: String
     var onSaved: ((HumanHealthMetricLog) -> Void)?
-    var onDismiss: () -> Void
 
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -47,14 +47,12 @@ struct HumanHealthMetricEntrySheet: View {
         human: Human,
         metric: HealthMetric,
         initialUnitCode: String,
-        onSaved: ((HumanHealthMetricLog) -> Void)? = nil,
-        onDismiss: @escaping () -> Void
+        onSaved: ((HumanHealthMetricLog) -> Void)? = nil
     ) {
         self.human = human
         self.metric = metric
         self.initialUnitCode = initialUnitCode
         self.onSaved = onSaved
-        self.onDismiss = onDismiss
         _selectedUnitCode = State(initialValue: initialUnitCode)
     }
 
@@ -125,6 +123,7 @@ struct HumanHealthMetricEntrySheet: View {
                 .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
+            .accessibilityIdentifier("human-health-metric-entry-sheet-\(metric.key)")
             .navigationTitle(l.tr(zh: "记录指标", en: "Record metric", de: "Wert erfassen"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -464,6 +463,6 @@ struct HumanHealthMetricEntrySheet: View {
     private func close() {
         guard !isClosing else { return }
         isClosing = true
-        onDismiss()
+        dismiss()
     }
 }

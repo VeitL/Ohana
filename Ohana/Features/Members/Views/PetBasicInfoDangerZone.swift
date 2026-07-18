@@ -131,6 +131,7 @@ private struct PetDeleteConfirmationSheet: View {
                             .background(Color.primary.opacity(0.08), in: Circle())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("pet-delete-confirm-close")
                 }
 
                 VStack(alignment: .leading, spacing: 10) {

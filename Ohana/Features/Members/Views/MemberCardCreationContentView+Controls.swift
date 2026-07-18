@@ -13,6 +13,69 @@ import SwiftUI
 import UIKit
 
 extension MemberCardCreationContentView {
+    var petSpeciesGridColumns: [GridItem] {
+        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 4
+        return Array(repeating: GridItem(.flexible(), spacing: 7), count: count)
+    }
+
+    @ViewBuilder
+    func petSpeciesButton(_ species: String) -> some View {
+        let key = Pet.canonicalSpeciesKey(species)
+        let isSelected = !draft.species.isEmpty &&
+            Pet.canonicalSpeciesKey(draft.species) == key
+        let button = Button {
+            selectPetSpecies(species)
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: species))
+                    .font(OhanaFont.adaptive(size: 17, weight: .bold))
+                    .accessibilityHidden(true)
+                Text(speciesLabel(species))
+                    .font(OhanaFont.caption2(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
+            }
+            .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+            .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonBorderShape(.roundedRectangle(radius: OhanaRadius.control))
+        .accessibilityIdentifier("member-pet-species-option-\(key)")
+        .accessibilityLabel(speciesLabel(species))
+        .accessibilityValue(
+            isSelected
+                ? l.tr(zh: "已选择", en: "Selected", de: "Ausgewählt")
+                : l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt")
+        )
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+
+        if isSelected {
+            button
+                .buttonStyle(.borderedProminent)
+                .tint(cardAccent)
+        } else {
+            button
+                .buttonStyle(.bordered)
+                .tint(cardForeground)
+        }
+    }
+
+    func selectPetSpecies(_ species: String) {
+        let nextKey = Pet.canonicalSpeciesKey(species)
+        let currentKey = draft.species.isEmpty ? "" : Pet.canonicalSpeciesKey(draft.species)
+        guard currentKey != nextKey else { return }
+
+        withAnimation(GoMotion.selection) {
+            draft.species = species
+            draft.isCustomSpecies = nextKey == "other"
+            draft.customSpecies = ""
+            draft.breed = ""
+            draft.customBreed = ""
+            draft.isCustomBreed = false
+            draft.coatColor = ""
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
     func humanNameInput(width: CGFloat) -> some View {
         OhanaTextField(
             placeholder: l.tr(zh: "名字", en: "Name", de: "Name"),

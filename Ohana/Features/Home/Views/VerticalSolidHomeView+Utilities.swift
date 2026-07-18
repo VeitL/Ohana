@@ -22,6 +22,10 @@ extension VerticalSolidHomeView {
             for: FMDest.gacha,
             currentLevel: 0
         ).step.requiredLevel
+        let achievementsUnlockLevel = GrowthUnlockPolicy.status(
+            for: PetFeature.achievements,
+            currentLevel: 0
+        ).step.requiredLevel
         let critterUnlockLevel = OasisUpgradeRewardCatalog.critter(
             id: OasisUpgradeRewardCatalog.firstCritterId
         )?.sourceLevel ?? 10
@@ -36,6 +40,7 @@ extension VerticalSolidHomeView {
                 nextLevelThreshold: treeManager.nextLevelThreshold,
                 shopLockedLevel: treeLevel >= shopUnlockLevel ? nil : shopUnlockLevel,
                 shopInitialCategory: shopInitialCategory,
+                achievementsLockedLevel: treeLevel >= achievementsUnlockLevel ? nil : achievementsUnlockLevel,
                 crittersLockedLevel: treeLevel >= critterUnlockLevel ? nil : critterUnlockLevel,
                 gachaLockedLevel: treeLevel >= gachaUnlockLevel ? nil : gachaUnlockLevel
             ),
@@ -44,6 +49,15 @@ extension VerticalSolidHomeView {
             onInjectEnergy: injectEmbeddedOasisEnergy,
             onOpenShop: { category in
                 routeCoordinator.openCoconutShop(category, currentLevel: treeLevel)
+            },
+            onOpenAchievements: {
+                openFunctionMenu(destination: .featureAggregate(.achievements))
+            },
+            onOpenCritters: {
+                routeCoordinator.openCritterCodex(currentLevel: treeLevel)
+            },
+            onOpenGacha: {
+                openFunctionMenu(destination: .gacha)
             }
         )
     }

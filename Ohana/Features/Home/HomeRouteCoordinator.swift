@@ -104,6 +104,7 @@ private extension PetHealthInitialSection {
 
 enum HomeModalRoute: Identifiable {
     case functionMenu(destination: FMDest?)
+    case critterCodex
     case streakDetail
     case addEntity(EntityType)
     case coconutLog(CoconutLogSubject?)
@@ -116,6 +117,8 @@ enum HomeModalRoute: Identifiable {
         switch self {
         case let .functionMenu(destination):
             "function-menu-\(String(describing: destination))"
+        case .critterCodex:
+            "critter-codex"
         case .streakDetail:
             "streak-detail"
         case let .addEntity(type):
@@ -305,6 +308,17 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = .functionMenu(destination: routedDestination)
     }
 
+    func openCritterCodex(currentLevel: Int) {
+        guard AppFeatureRouteGuard.allowsOasisSheetRoute(.critterCodex, currentLevel: currentLevel) else {
+            AppFeatureRouteGuard.recordIntercept(
+                AppFeatureRouteGuard.lockedRouteNote(for: .critterCodex, currentLevel: currentLevel)
+            )
+            openFunctionMenu(destination: .growthRoadmap, currentLevel: currentLevel)
+            return
+        }
+        modal = .critterCodex
+    }
+
     func openStreakDetail() {
         if let appSheetRouteSink {
             appSheetRouteSink(.streakDetail)
@@ -385,6 +399,7 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openSettings() {
+        SettingsOpenPerformance.start(source: "home")
         if let appSheetRouteSink {
             appSheetRouteSink(.appSheet(.settings))
             modal = nil

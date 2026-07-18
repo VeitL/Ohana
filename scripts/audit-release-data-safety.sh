@@ -175,10 +175,15 @@ backup_contract_entries=(
   "PetWeightLog|struct PetWeightLogBackup"
   "Plant|struct PlantBackup"
   "PlantCareLog|struct PlantCareLogBackup"
+  "PresenceCheckIn|struct PresenceCheckInBackup"
+  "PresenceParticipationPeriod|struct PresenceParticipationPeriodBackup"
+  "PresenceRewardReceipt|struct PresenceRewardReceiptBackup"
   "RecycleBinBatch|EXEMPT:short-lived recycle-bin grouping metadata, not durable user content"
   "Reminder|struct ReminderBackup"
+  "SafetyContact|EXEMPT:device-local phone-number data, intentionally excluded from every backup destination"
   "SharedCareSession|struct SharedCareSessionBackup"
   "SharedCareUndoReceipt|EXEMPT:local short-lived crash-recovery coordination state, not user-authored history"
+  "ShopPurchaseAttempt|EXEMPT:local shop fulfillment recovery state, not user-authored history"
   "ShopPurchaseRecord|struct ShopPurchaseRecordBackup"
   "SymptomLog|struct SymptomLogBackup"
   "WaterLog|struct WaterLogBackup"
@@ -218,8 +223,8 @@ for entry in "${backup_contract_entries[@]}"; do
     "SwiftData model $model should have a matching backup DTO, or a documented exemption if intentionally excluded."
 done
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV91\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV91 model set."
+require_pattern "$shared_container" 'Schema\(ArkSchemaV93\.models\)' \
+  "SharedModelContainer should open the current ArkSchemaV93 model set."
 
 require_pattern "$local_backup_exclusion" 'values\.isExcludedFromBackup = true' \
   "Local persistence must set URLResourceValues.isExcludedFromBackup before storing private data."
@@ -326,11 +331,11 @@ while IFS= read -r localized_strings; do
     "Localized resources must not retain the obsolete claim that backups include all Human health records."
 done < <(find Ohana -name Localizable.strings -type f -print)
 
-require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 31' \
-  "OhanaBackup.schemaVersion should be 31 after adding Human action attribution."
+require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 32' \
+  "OhanaBackup.schemaVersion should be 32 after adding presence and safety-contact data."
 
-require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 31' \
-  "Restore preflight should accept supported backup schema versions through 31."
+require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 32' \
+  "Restore preflight should accept supported backup schema versions through 32."
 
 require_pattern "$data_backup_dtos" 'struct BackupMediaPackageInfo' \
   "OhanaBackup should describe the out-of-line backup media package."

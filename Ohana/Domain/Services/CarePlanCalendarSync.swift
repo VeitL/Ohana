@@ -235,6 +235,19 @@ enum CarePlanCalendarSync {
         return waterMaintenanceKind(for: event, petKey: petKey)
     }
 
+    /// Stable identity check for an explicit feature plan persisted through
+    /// this service. Default recommendation keys use the `default_` prefix and
+    /// remain distinguishable from user-enabled plans.
+    nonisolated static func isStoredPlan(_ event: Event, kind: String, pet: Pet) -> Bool {
+        guard MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+            event,
+            petId: pet.id.uuidString
+        ) else { return false }
+        return UserDefaults.standard.string(
+            forKey: eventStorageKey(kind: kind, petKey: pet.id.uuidString)
+        ) == event.id.uuidString
+    }
+
     nonisolated static func waterMaintenanceKind(for event: Event) -> String? {
         guard let petId = DomainEntityLinkRegistry.resolvedId(for: DomainEntityLink(event: event), role: .directPet) else {
             return nil
@@ -1021,6 +1034,29 @@ enum CarePlanCalendarSync {
 }
 
 extension CarePlanCalendarSync {
+    nonisolated static func storedDefaultCalendarPlanEventIDs(for petID: UUID) -> [UUID] {
+        storedCalendarPlanEventIDs(kinds: knownDefaultPlanKinds, petID: petID)
+    }
+
+    nonisolated static func storedExplicitCalendarPlanEventIDs(for petID: UUID) -> [UUID] {
+        storedCalendarPlanEventIDs(kinds: storedGeneratedPlanKinds, petID: petID)
+    }
+
+    nonisolated static func defaultGeneratedCalendarPlanTitles(for pet: Pet) -> Set<String> {
+        Set(defaultPlanItems(for: pet).map { eventTitle(pet: pet, title: $0.title) })
+    }
+
+    private nonisolated static func storedCalendarPlanEventIDs(
+        kinds: Set<String>,
+        petID: UUID
+    ) -> [UUID] {
+        let petKey = petID.uuidString
+        return kinds.sorted().compactMap { kind in
+            UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey))
+                .flatMap(UUID.init(uuidString:))
+        }
+    }
+
     /// Calendar display boundary: default recommendation events are implementation
     /// scaffolding, while explicit feature plans remain user-visible.
     nonisolated static func isDefaultGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
@@ -1040,7 +1076,7 @@ extension CarePlanCalendarSync {
             return true
         }
         guard event.recurrenceDays > 0, event.feedRuleKindRaw.isEmpty, !hasReminder else { return false }
-        let generatedTitles = Set(defaultPlanItems(for: pet).map { eventTitle(pet: pet, title: $0.title) })
+        let generatedTitles = defaultGeneratedCalendarPlanTitles(for: pet)
         return generatedTitles.contains(event.title)
     }
 

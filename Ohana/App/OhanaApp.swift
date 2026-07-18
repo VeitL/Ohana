@@ -79,6 +79,7 @@ private struct OhanaBootstrapRootView: View {
     @State private var launchRevealTask: Task<Void, Never>?
     @State private var launchRevealProgress: CGFloat = 0
     @State private var isLaunchOverlayVisible = true
+    @State private var commerce = CommerceEntitlementService()
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -117,6 +118,9 @@ private struct OhanaBootstrapRootView: View {
         .tint(Color.goPrimary)
         .preferredColorScheme(preferredScheme)
         .onAppear {
+            Task { @MainActor in
+                await commerce.start()
+            }
             startBootstrapIfNeeded()
             beginLaunchRevealIfReady()
         }
@@ -146,6 +150,9 @@ private struct OhanaBootstrapRootView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
                 payload.appServices.lifecycle.handle(.didBecomeActive)
+                Task { @MainActor in
+                    await payload.appServices.commerce.refreshEntitlements()
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
                 payload.appServices.lifecycle.handle(.willTerminate)
@@ -187,7 +194,7 @@ private struct OhanaBootstrapRootView: View {
             bootstrapStatus = .openingStore
             let openResult = await Self.openModelContainerOffMain()
             guard !Task.isCancelled else { return }
-            let modelContainer: ModelContainer
+            var modelContainer: ModelContainer
             switch openResult {
             case let .success(openedContainer):
                 modelContainer = openedContainer
@@ -200,9 +207,24 @@ private struct OhanaBootstrapRootView: View {
                 return
             }
             OhanaStartupProbe.mark("bootstrap.container-ready")
-            resetPersistentStateForUITestsIfNeeded(modelContainer: modelContainer)
+            if resetPersistentStateForUITestsIfNeeded(modelContainer: modelContainer) {
+                let reopenResult = await Self.openModelContainerOffMain()
+                guard !Task.isCancelled else { return }
+                switch reopenResult {
+                case let .success(reopenedContainer):
+                    modelContainer = reopenedContainer
+                    OhanaStartupProbe.mark("ui-test-reset.container-reopened")
+                case .failure:
+                    OhanaStartupProbe.mark("ui-test-reset.container-reopen-failed")
+                    bootstrapStatus = .storeUnavailable
+                    bootstrapWatchdogTask?.cancel()
+                    bootstrapWatchdogTask = nil
+                    bootstrapTask = nil
+                    return
+                }
+            }
             bootstrapStatus = .buildingServices
-            let services = AppServices(modelContainer: modelContainer)
+            let services = AppServices(modelContainer: modelContainer, commerce: commerce)
 #if DEBUG
             seedHumanBaselineForUITestsIfNeeded(modelContainer: modelContainer, services: services)
             seedPlantBaselineForUITestsIfNeeded(modelContainer: modelContainer, services: services)
@@ -283,19 +305,24 @@ private struct OhanaBootstrapRootView: View {
         }
     #endif
 
-    private func resetPersistentStateForUITestsIfNeeded(modelContainer: ModelContainer) {
+    private func resetPersistentStateForUITestsIfNeeded(modelContainer: ModelContainer) -> Bool {
         #if DEBUG
-            guard OhanaUITestLaunchOptions.resetsPersistentState else { return }
+            guard OhanaUITestLaunchOptions.resetsPersistentState else { return false }
             do {
                 try StaticAppResetter(
                     questManager: QuestManager(),
                     automaticBackups: AutomaticBackupService()
                 ).resetForUITests(context: modelContainer.mainContext)
+                SharedModelContainer.invalidateCachedContainer(modelContainer)
                 OhanaStartupProbe.mark("ui-test-reset.complete")
+                return true
             } catch {
                 OhanaStartupProbe.mark("ui-test-reset.failed")
                 OhanaLog.error("UI test persistent reset failed: \(error.localizedDescription)", category: "Startup")
+                return false
             }
+        #else
+            return false
         #endif
     }
 

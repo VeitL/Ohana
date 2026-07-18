@@ -150,6 +150,15 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .functionMenu(destination):
             FunctionMenuSheet(initialDestination: destination)
                 .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
+        case .critterCodex:
+            OasisCritterCodexRouteContainer(
+                mode: .codex,
+                onClose: { routes.dismissModal() },
+                onPresentCoconutLog: { subject in
+                    routes.openCoconutLog(subject)
+                }
+            )
+            .ohanaSheetPagePresentation()
         case .streakDetail:
             DailyStreakDetailRouteContainer(
                 onClose: { routes.dismissModal() },
@@ -578,7 +587,14 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 id: id,
                 onMissing: { routes.dismissSheet() },
                 onOpenDestination: { humanID, destination in
-                    routes.openSheet(homeHumanFeatureRoute(humanID: humanID, destination: destination))
+                    if let route = homeHumanFeatureRoute(humanID: humanID, destination: destination) {
+                        routes.openSheet(route)
+                    } else {
+                        routes.dismissSheet()
+                        DispatchQueue.main.async {
+                            openFunctionMenu(destination: .featureAggregate(.achievements))
+                        }
+                    }
                 }
             )
             .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
@@ -764,7 +780,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private func homeHumanFeatureRoute(
         humanID: UUID,
         destination: HumanAllFeatureDestination
-    ) -> HomeSheetRoute {
+    ) -> HomeSheetRoute? {
         switch destination {
         case .basicInfo:
             .humanBasicInfo(humanID)
@@ -784,6 +800,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .humanWishlist(humanID)
         case .notes:
             .humanNote(humanID)
+        case .achievements:
+            nil
         }
     }
 

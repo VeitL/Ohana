@@ -16,6 +16,7 @@ extension OasisUpgradeRewardService {
         var riskStartedAt: Date?
         var criticalStartedAt: Date?
         var diedAt: Date?
+        var lastGentlePromptAt: Date?
         var lastStateRefreshAt: Date
         var isFeaturedOnOasis: Bool
     }
@@ -30,98 +31,41 @@ extension OasisUpgradeRewardService {
             riskStartedAt: critter.riskStartedAt,
             criticalStartedAt: critter.criticalStartedAt,
             diedAt: critter.diedAt,
+            lastGentlePromptAt: critter.lastGentlePromptAt,
             lastStateRefreshAt: critter.lastStateRefreshAt,
             isFeaturedOnOasis: critter.isFeaturedOnOasis
         )
     }
 
     static func settleElapsedNeeds(for critter: OasisElectronicPet, now: Date) {
-        let elapsed = max(0, now.timeIntervalSince(critter.lastStateRefreshAt))
-        let ticks = Int(elapsed / lifecycleCareTick)
-        guard ticks > 0 else { return }
-
-        let start = critter.lastStateRefreshAt
-        var hunger = critter.hunger
-        var mood = critter.mood
-        var health = critter.health
-
-        for index in 0 ..< ticks {
-            let tickDate = start.addingTimeInterval(Double(index + 1) * lifecycleCareTick)
-            let idleHours = hoursBetween(critter.lastInteractionAt, tickDate)
-
-            hunger = max(0, hunger - 3)
-
-            if idleHours >= 24 || hunger < needsCareThreshold {
-                mood = max(0, mood - (hunger < atRiskThreshold ? 3 : 2))
-            }
-
-            if hunger < atRiskThreshold || mood < atRiskThreshold {
-                health = max(0, health - 2)
-            } else if hunger < needsCareThreshold || mood < needsCareThreshold {
-                health = max(0, health - 1)
-            } else if health < 100, (index + 1).isMultiple(of: 4) {
-                health = min(100, health + 1)
-            }
-        }
-
-        critter.hunger = hunger
-        critter.mood = mood
-        critter.health = health
-        critter.lastStateRefreshAt = start.addingTimeInterval(Double(ticks) * lifecycleCareTick)
+        // Compatibility hook only. V94 companions never lose condition while
+        // the app is closed and no elapsed-time lifecycle task is scheduled.
+        critter.lastStateRefreshAt = now
     }
 
     static func refreshLifecycleState(for critter: OasisElectronicPet, now: Date) {
-        guard critter.lifeState != .dead else { return }
-        let age = ageDays(for: critter, now: now)
-        if age >= oldAgeDeathDays {
-            markDead(critter, reason: .oldAge, now: now)
-            return
-        }
-
-        if isLowCondition(critter) {
-            if critter.riskStartedAt == nil {
-                critter.riskStartedAt = now
-            }
-            let riskHours = hoursBetween(critter.riskStartedAt ?? now, now)
-            if riskHours >= riskToCriticalHours {
-                if critter.criticalStartedAt == nil {
-                    critter.criticalStartedAt = now
-                }
-                if hoursBetween(critter.criticalStartedAt ?? now, now) >= criticalToDeathHours {
-                    markDead(critter, reason: deathReason(for: critter), now: now)
-                    return
-                }
-                critter.lifeState = .critical
-            } else if critter.health < sickHealthThreshold || riskHours >= 48 {
-                critter.lifeState = .sick
-            } else {
-                critter.lifeState = .atRisk
-            }
-            return
-        }
-
-        critter.riskStartedAt = nil
-        critter.criticalStartedAt = nil
-        if critter.hunger < needsCareThreshold ||
-            critter.mood < needsCareThreshold ||
-            critter.health < 70 ||
-            age >= elderWarningDays {
-            critter.lifeState = .needsCare
-        } else {
+        if critter.lifeState == .dead || critter.lifeState == .critical {
+            critter.lifeState = .sleeping
+            critter.isFeaturedOnOasis = false
+        } else if critter.lifeState != .sleeping {
             critter.lifeState = .healthy
         }
+        critter.riskStartedAt = nil
+        critter.criticalStartedAt = nil
         critter.deathReason = nil
         critter.diedAt = nil
+        critter.lastStateRefreshAt = now
     }
 
     static func isLowCondition(_ critter: OasisElectronicPet) -> Bool {
-        critter.hunger < atRiskThreshold ||
-            critter.mood < atRiskThreshold ||
-            critter.health < sickHealthThreshold
+        _ = critter
+        return false
     }
 
     static func recommendedCareAction(for critter: OasisElectronicPet) -> OasisCritterAction? {
-        guard critter.lifeState != .dead else { return nil }
+        guard critter.lifeState != .dead,
+              critter.lifeState != .critical,
+              critter.lifeState != .sleeping else { return nil }
         if critter.health < 70 { return .rest }
         if critter.hunger < needsCareThreshold, critter.hunger <= critter.mood { return .feed }
         if critter.mood < needsCareThreshold { return .play }
@@ -143,12 +87,16 @@ extension OasisUpgradeRewardService {
     }
 
     static func markDead(_ critter: OasisElectronicPet, reason: OasisCritterDeathReason, now: Date) {
-        critter.lifeState = .dead
-        critter.deathReason = reason
-        critter.diedAt = critter.diedAt ?? now
+        // Retained for old call sites and restored backups. New behavior is
+        // always reversible sleep and never emits a death fact.
+        _ = reason
+        critter.lifeState = .sleeping
+        critter.deathReason = nil
+        critter.diedAt = nil
         critter.riskStartedAt = nil
         critter.criticalStartedAt = nil
         critter.isFeaturedOnOasis = false
+        critter.lastStateRefreshAt = now
     }
 
     static func ageDays(for critter: OasisElectronicPet, now: Date) -> Int {

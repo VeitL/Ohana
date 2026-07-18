@@ -76,7 +76,7 @@ extension OasisCritterCodexView {
     func perform(_ action: OasisCritterAction, critter: OasisElectronicPet) {
         OhanaFeedback.light()
         pulse(catalogId: critter.catalogId)
-        scheduleCritterCommand {
+        scheduleCritterCommand(key: critter.catalogId) {
             do {
                 let outcome = try commandExecutor.interact(with: critter, action: action)
                 withAnimation(GoMotion.feedback) {
@@ -99,7 +99,7 @@ extension OasisCritterCodexView {
             rescuingCritterId = critter.id
         }
         OhanaFeedback.light()
-        scheduleCritterCommand {
+        scheduleCritterCommand(key: critter.catalogId) {
             defer { clearRescueBusyState(for: critter.id) }
             do {
                 let outcome = try commandExecutor.rescue(critter)
@@ -131,7 +131,7 @@ extension OasisCritterCodexView {
     func upgrade(_ critter: OasisElectronicPet) {
         OhanaFeedback.light()
         pulse(catalogId: critter.catalogId)
-        scheduleCritterCommand {
+        scheduleCritterCommand(key: critter.catalogId) {
             do {
                 try feedback(for: critter.catalogId, success: commandExecutor.upgradeLevel(critter))
                 scheduleRenderSnapshotRefresh(milliseconds: 30)
@@ -141,10 +141,28 @@ extension OasisCritterCodexView {
         }
     }
 
+    func requestAwaken(_ entry: OasisElectronicPetCatalogEntry) {
+        let availability = commandExecutor.awakenAvailability(
+            catalogId: entry.id,
+            isProcessing: isGrowthCommandInFlight(catalogID: entry.id)
+        )
+        guard availability.isAvailable else {
+            feedback(for: entry.id, success: false)
+            return
+        }
+        pendingGrowthConfirmation = CompanionGrowthConfirmation(
+            kind: .awaken,
+            catalogID: entry.id,
+            critterID: nil,
+            companionName: entry.name(l),
+            fundingPlan: availability.fundingPlan
+        )
+    }
+
     func awaken(_ entry: OasisElectronicPetCatalogEntry) {
         OhanaFeedback.light()
         pulse(catalogId: entry.id)
-        scheduleCritterCommand {
+        scheduleCritterCommand(key: entry.id) {
             do {
                 if let critter = try commandExecutor.awakenWithFragments(catalogId: entry.id) {
                     withAnimation(GoMotion.fab) {
@@ -161,8 +179,57 @@ extension OasisCritterCodexView {
         }
     }
 
+    func requestStarUpgrade(_ critter: OasisElectronicPet) {
+        let availability = commandExecutor.starUpgradeAvailability(
+            for: critter,
+            isProcessing: isGrowthCommandInFlight(catalogID: critter.catalogId)
+        )
+        guard availability.isAvailable else {
+            feedback(for: critter.catalogId, success: false)
+            return
+        }
+        pendingGrowthConfirmation = CompanionGrowthConfirmation(
+            kind: .starUpgrade,
+            catalogID: critter.catalogId,
+            critterID: critter.id,
+            companionName: critter.displayName(l),
+            fundingPlan: availability.fundingPlan
+        )
+    }
+
+    func upgradeStar(_ critter: OasisElectronicPet) {
+        OhanaFeedback.light()
+        pulse(catalogId: critter.catalogId)
+        scheduleCritterCommand(key: critter.catalogId) {
+            do {
+                let success = try commandExecutor.upgradeStar(critter)
+                feedback(for: critter.catalogId, success: success)
+                if success {
+                    scheduleRenderSnapshotRefresh(milliseconds: 30)
+                }
+            } catch {
+                feedback(for: critter.catalogId, success: false)
+            }
+        }
+    }
+
+    func confirmGrowth(_ confirmation: CompanionGrowthConfirmation) {
+        pendingGrowthConfirmation = nil
+        switch confirmation.kind {
+        case .awaken:
+            guard let entry = OasisUpgradeRewardCatalog.critter(id: confirmation.catalogID) else { return }
+            awaken(entry)
+        case .starUpgrade:
+            guard let critterID = confirmation.critterID,
+                  let critter = electronicPets.first(where: { $0.id == critterID && !$0.isArchived }) else { return }
+            upgradeStar(critter)
+        }
+    }
+
     func toggleHomeDisplay(_ critter: OasisElectronicPet, desired: Bool) {
-        guard critter.lifeState != .dead else {
+        guard critter.lifeState != .dead,
+              critter.lifeState != .critical,
+              critter.lifeState != .sleeping else {
             feedback(for: critter.catalogId, success: false)
             return
         }
@@ -170,7 +237,7 @@ extension OasisCritterCodexView {
             featuredDisplayOverrides[critter.id] = desired
         }
         OhanaFeedback.light()
-        scheduleCritterCommand {
+        scheduleCritterCommand(key: critter.catalogId) {
             do {
                 try commandExecutor.setFeatured(critter, desired: desired)
                 featuredDisplayOverrides[critter.id] = nil
@@ -241,7 +308,7 @@ extension OasisCritterCodexView {
         switch state {
         case .healthy:
             Color.goPrimary
-        case .dead:
+        case .dead, .sleeping:
             Color.ohanaTertiaryText
         case .needsCare, .atRisk, .sick, .critical:
             Color.goRed

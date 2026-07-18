@@ -46,6 +46,11 @@ nonisolated struct OnboardingPetSnapshotHandoffState: Equatable {
     }
 }
 
+private enum SupporterIconAccessNotice: Equatable {
+    case requiresDefault
+    case applyFailed(String)
+}
+
 struct RootView: View {
     var appLanguage: String = AppLanguage.code
 
@@ -61,34 +66,41 @@ struct RootView: View {
     @State private var onboardingHomeSnapshotRecoveryTask: Task<Void, Never>?
     @State private var onboardingHomePreparationFailedPetID: UUID?
     @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
+    @State private var supporterIconAccessNotice: SupporterIconAccessNotice?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
     @StateObject private var sharedCareUndo = SharedCareUndoCoordinator.shared
     @State private var plantBatchCareRewardSettlementTask: Task<Void, Never>?
     @State private var plantBatchCareRewardRetryAfterFailure: Date?
     @State private var automaticBackupReminderTask: Task<Void, Never>?
     @State private var lastPersistenceFailureToastDate: Date?
+    @State private var showingZenSettings = false
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
 
     var body: some View {
+        AppRuntimeHost { experienceController in
+            rootContent(experienceController)
+        }
+    }
+
+    private func rootContent(_ experienceController: AppExperienceController) -> some View {
         ZStack {
-            if hasOnboarded || isOnboardingHomePreflightMounted {
-                ContentView(
-                    showsEmbeddedOnboarding: false,
-                    onboardingFirstPetID: onboardingFirstPetID,
-                    routeLanguageCode: appLanguage,
-                    requiredPetHomeSnapshotRefreshRequest: onboardingHomeSnapshotRefreshGeneration,
-                    onRequiredPetHomeSnapshotReady: markOnboardingPetHomeSnapshotReady
-                )
-                .allowsHitTesting(hasOnboarded)
-                .accessibilityHidden(!hasOnboarded)
+            if !experienceController.requiresInitialSelection,
+               hasOnboarded || (experienceController.mode == .standard && isOnboardingHomePreflightMounted) {
+                experienceShell(experienceController)
+                    .id(experienceController.shellIdentity)
             }
 
-            if !hasOnboarded {
+            if !experienceController.requiresInitialSelection, !hasOnboarded {
                 OnboardingView(
+                    experienceMode: experienceController.mode,
                     onFirstHumanSaved: { humanID in
                         currentActiveHumanId = humanID.uuidString
-                        appServices.onboardingJourney.markFirstHumanCreated(humanID)
+                        if experienceController.mode == .zen {
+                            experienceController.bindZenOwner(humanID)
+                        } else {
+                            appServices.onboardingJourney.markFirstHumanCreated(humanID)
+                        }
                     },
                     onPetDeferred: {
                         appServices.onboardingJourney.markPetDeferred()
@@ -112,6 +124,13 @@ struct RootView: View {
                 .zIndex(100)
             }
 
+            if experienceController.requiresInitialSelection {
+                AppExperienceSelectionView(appLanguage: appLanguage) { mode in
+                    experienceController.selectInitialMode(mode)
+                }
+                .zIndex(110)
+            }
+
             if let snapshot = sharedCareUndo.banner {
                 VStack {
                     Spacer()
@@ -126,6 +145,20 @@ struct RootView: View {
                 .zIndex(900)
             }
 
+            if hasOnboarded,
+               experienceController.mode == .standard,
+               experienceController.shouldOfferZenIntroduction {
+                VStack {
+                    AppExperienceIntroductionBanner(appLanguage: appLanguage) {
+                        experienceController.dismissZenIntroduction()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    Spacer(minLength: 0)
+                }
+                .zIndex(850)
+            }
+
             if shouldShowPrivacySnapshotCover {
                 AppPrivacySnapshotCover()
                     .zIndex(1000)
@@ -133,13 +166,23 @@ struct RootView: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .toggleStyle(OhanaPillToggleStyle())
+        .environment(\.hasSupporterPackEntitlement, appServices.commerce.allows(.supporterAppearance))
         .islandToastOverlay()
         .onAppear {
             sharedCareUndo.configure(context: modelContext, appServices: appServices)
-            startupMaintenance.startAfterFirstRender(context: modelContext)
+            startupMaintenance.startAfterFirstRender(context: modelContext, services: appServices)
             schedulePlantBatchCareRewardSettlement()
             scheduleAutomaticBackupFailureReminder()
             resumeOnboardingHomeSnapshotRecoveryIfNeeded()
+            evaluateSupporterIconAccessAfterVerification()
+        }
+        .onChange(of: appServices.commerce.entitlementStatus) { _, status in
+            if status == .notOwnedVerified {
+                evaluateSupporterIconAccessAfterVerification()
+            } else if status == .ownedVerified,
+                      case .requiresDefault? = supporterIconAccessNotice {
+                supporterIconAccessNotice = nil
+            }
         }
         .onChange(of: hasOnboarded) { _, isComplete in
             guard isComplete else { return }
@@ -154,6 +197,9 @@ struct RootView: View {
                 isOnboardingHomePreflightMounted = false
             }
         }
+        .onChange(of: experienceController.mode) { previousMode, currentMode in
+            handleExperienceModeChange(from: previousMode, to: currentMode)
+        }
         .onDisappear {
             sharedCareUndo.pauseDeadlineTimer()
             startupMaintenance.cancel()
@@ -164,6 +210,10 @@ struct RootView: View {
             cancelOnboardingHomeSnapshotRecovery()
         }
         .onReceive(appServices.notificationRoutes.reminderActionEvents) { event in
+            appServices.notificationRoutes.acknowledgeReminderActionEvent(id: event.id)
+            if handlePresenceReminderAction(event, experienceController: experienceController) {
+                return
+            }
             appServices.reminderActions.handle(
                 userInfo: event.userInfo,
                 currentActiveHumanId: currentActiveHumanId,
@@ -204,6 +254,115 @@ struct RootView: View {
         } message: {
             Text(onlineGateNoticeMessage)
         }
+        .alert(Text(supporterIconAccessNoticeTitle), isPresented: supporterIconAccessNoticeBinding) {
+            if case .requiresDefault? = supporterIconAccessNotice {
+                Button(l.tr(
+                    zh: "恢复默认图标",
+                    en: "Use default icon",
+                    de: "Standardsymbol verwenden"
+                )) {
+                    applyDefaultIconAfterSupporterRevocation()
+                }
+            } else {
+                Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {
+                    supporterIconAccessNotice = nil
+                }
+            }
+        } message: {
+            Text(supporterIconAccessNoticeMessage)
+        }
+        .sheet(isPresented: $showingZenSettings) {
+            AppSettingsSheetRouteContainer {
+                showingZenSettings = false
+            }
+            .ohanaSheetPagePresentation()
+        }
+    }
+
+    @ViewBuilder
+    private func experienceShell(_ experienceController: AppExperienceController) -> some View {
+        switch experienceController.mode {
+        case .standard:
+            ContentView(
+                showsEmbeddedOnboarding: false,
+                onboardingFirstPetID: onboardingFirstPetID,
+                routeLanguageCode: appLanguage,
+                requiredPetHomeSnapshotRefreshRequest: onboardingHomeSnapshotRefreshGeneration,
+                onRequiredPetHomeSnapshotReady: markOnboardingPetHomeSnapshotReady
+            )
+            .allowsHitTesting(hasOnboarded)
+            .accessibilityHidden(!hasOnboarded)
+        case .zen:
+            zenExperienceShell(experienceController)
+        }
+    }
+
+    @ViewBuilder
+    private func zenExperienceShell(_ experienceController: AppExperienceController) -> some View {
+        switch experienceController.zenOwnerBindingState {
+        case .unresolved:
+            ZenOwnerResolutionView(appLanguage: appLanguage)
+        case .ready:
+            ZenExperienceContainer {
+                showingZenSettings = true
+            }
+        case let .requiresSelection(humans):
+            ZenOwnerSelectionView(
+                appLanguage: appLanguage,
+                humans: humans,
+                onSelect: experienceController.bindZenOwner
+            )
+        case .unavailable:
+            ZenOwnerUnavailableView(appLanguage: appLanguage) {
+                showingZenSettings = true
+            }
+        }
+    }
+
+    private func handleExperienceModeChange(
+        from previousMode: AppExperienceMode,
+        to currentMode: AppExperienceMode
+    ) {
+        guard previousMode != currentMode else { return }
+        showingZenSettings = false
+        cancelOnboardingHomeSnapshotRecovery()
+        onboardingFirstPetID = nil
+        isOnboardingHomePreflightMounted = false
+    }
+
+    @discardableResult
+    private func handlePresenceReminderAction(
+        _ event: ReminderNotificationActionEvent,
+        experienceController: AppExperienceController
+    ) -> Bool {
+        guard event.userInfo["presenceAction"] as? String == "checkInOwner",
+              event.userInfo["action"] as? String == PresenceReminderRequestFactory.okayActionIdentifier
+        else { return false }
+
+        guard experienceController.mode == .zen,
+              UUID(uuidString: experienceController.zenOwnerHumanID) != nil else {
+            return true
+        }
+
+        do {
+            let service = PresenceCheckInCommandService(
+                context: modelContext,
+                wallet: appServices.coconutWallet,
+                projectionManager: appServices.questManager
+            )
+            let result = try service.checkInOwner(source: .notificationAction)
+            if let ownerCheckIn = result.checkIns.first(where: \.isOwner) {
+                Task { @MainActor in
+                    await SystemPresenceReminderScheduler().cancelToday(now: ownerCheckIn.checkedInAt)
+                }
+            }
+        } catch {
+            OhanaLog.warning(
+                "Presence notification action could not check in the owner: \(error.localizedDescription)",
+                category: "Notifications"
+            )
+        }
+        return true
     }
 
     private var shouldShowPrivacySnapshotCover: Bool {
@@ -451,6 +610,92 @@ struct RootView: View {
 
     private var onlineGateNoticeMessage: String {
         onlineGateNoticeReason?.message(l) ?? ""
+    }
+
+    private var supporterIconAccessNoticeBinding: Binding<Bool> {
+        Binding(
+            get: { supporterIconAccessNotice != nil },
+            set: { isPresented in
+                if !isPresented {
+                    supporterIconAccessNotice = nil
+                }
+            }
+        )
+    }
+
+    private var supporterIconAccessNoticeTitle: String {
+        switch supporterIconAccessNotice {
+        case .requiresDefault:
+            l.tr(
+                zh: "Personal 图标权益已变化",
+                en: "Personal icon access changed",
+                de: "Zugriff auf Personal-Symbol geändert"
+            )
+        case .applyFailed:
+            l.tr(
+                zh: "无法恢复默认图标",
+                en: "Could not restore the default icon",
+                de: "Standardsymbol konnte nicht wiederhergestellt werden"
+            )
+        case nil:
+            ""
+        }
+    }
+
+    private var supporterIconAccessNoticeMessage: String {
+        switch supporterIconAccessNotice {
+        case .requiresDefault:
+            l.tr(
+                zh: "App Store 已确认 Ohana Personal 权益不再有效，且霓虹笑脸没有椰子购买记录。你的照护数据不会受到影响；请在方便时恢复默认图标。",
+                en: "The App Store no longer reports an active Ohana Personal entitlement, and Neon Smile was not earned with coconuts. Your care data is unaffected; switch to the default icon when convenient.",
+                de: "Der App Store meldet keinen aktiven Ohana-Personal-Anspruch mehr, und Neon Smile wurde nicht mit Kokosnüssen verdient. Deine Pflegedaten bleiben unverändert; wechsle bei Gelegenheit zum Standardsymbol."
+            )
+        case let .applyFailed(message):
+            message
+        case nil:
+            ""
+        }
+    }
+
+    private func evaluateSupporterIconAccessAfterVerification() {
+        guard appServices.commerce.entitlementStatus == .notOwnedVerified,
+              appServices.appIcons.currentDescriptor.itemId == SupporterPackCatalog.supporterIconItemID
+        else { return }
+
+        do {
+            let hasSwiftDataOwnership = try ShopPurchaseRecordStore.isOwned(
+                itemID: SupporterPackCatalog.supporterIconItemID,
+                context: modelContext
+            )
+            let legacyIDs = Set(ShopPurchaseRecordStore.legacyPurchasedItemIDs(
+                raw: UserDefaults.standard.string(
+                    forKey: SupporterPackCatalog.supporterIconLegacyOwnershipKey
+                ) ?? ""
+            ))
+            let hasCoconutOwnership = hasSwiftDataOwnership ||
+                legacyIDs.contains(SupporterPackCatalog.supporterIconItemID)
+            guard SupporterPackAccessPolicy.shouldOfferDefaultIconAfterEntitlementRefresh(
+                status: appServices.commerce.entitlementStatus,
+                currentIconItemID: appServices.appIcons.currentDescriptor.itemId,
+                hasCoconutOwnership: hasCoconutOwnership
+            )
+            else { return }
+            supporterIconAccessNotice = .requiresDefault
+        } catch {
+            // A failed local ownership read is inconclusive. Preserve the icon
+            // and try again at the next verified entitlement refresh.
+        }
+    }
+
+    private func applyDefaultIconAfterSupporterRevocation() {
+        guard let descriptor = AppIconCatalog.descriptor(forItemId: AppIconCatalog.defaultItemId)
+        else { return }
+        supporterIconAccessNotice = nil
+        appServices.appIcons.setIcon(descriptor) { result in
+            if case let .failure(error) = result {
+                supporterIconAccessNotice = .applyFailed(error.localizedDescription)
+            }
+        }
     }
 }
 

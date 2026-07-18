@@ -473,7 +473,11 @@ final class AppRouteCoordinator: ObservableObject {
     func handleNotificationEvent(_ event: AppRouteNotificationEvent) -> AppRouteNotificationOutcome {
         switch event {
         case let .humanDeleted(requiresReplacementHuman, requiresAccountSwitch):
-            resetToHome(rebuildRoot: true)
+            // The deletion command dismisses its member route before publishing.
+            // Clearing the route state is enough to release that destination;
+            // re-identifying the whole root can trap the native TabView in a
+            // continuous tab rebuild while Home refreshes after the deletion.
+            resetToHome()
             if requiresReplacementHuman {
                 presentRequiredHumanProfile()
                 return .clearActiveHuman

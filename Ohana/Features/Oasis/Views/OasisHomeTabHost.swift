@@ -31,6 +31,9 @@ struct OasisHomeTabHost: View {
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
     var onInjectEnergy: () -> Void = {}
     var onOpenShop: (ShopItem.ShopCategory) -> Void = { _ in }
+    var onOpenAchievements: () -> Void = {}
+    var onOpenCritters: () -> Void = {}
+    var onOpenGacha: () -> Void = {}
 
     @State private var showsTreeContent = false
     @State private var forwardedInjectEnergyTrigger = 0
@@ -61,7 +64,10 @@ struct OasisHomeTabHost: View {
                 VerticalSolidHomeOasisFrozenTreeStage(
                     snapshot: treeSnapshot,
                     onInjectEnergy: onInjectEnergy,
-                    onOpenShop: onOpenShop
+                    onOpenShop: onOpenShop,
+                    onOpenAchievements: onOpenAchievements,
+                    onOpenCritters: onOpenCritters,
+                    onOpenGacha: onOpenGacha
                 )
             } else {
                 Color.clear

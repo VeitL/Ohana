@@ -536,6 +536,10 @@ extension CalendarView {
             )
             schedulePreparedCalendarSnapshotRebuild(force: true)
             return true
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return false
         } catch {
             appServices.domainRevisions.publishFailure(command: command, error: error)
             return false

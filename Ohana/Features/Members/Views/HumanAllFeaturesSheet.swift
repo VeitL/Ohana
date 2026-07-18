@@ -18,6 +18,7 @@ enum HumanAllFeatureDestination: Hashable {
     case expense
     case wishlist
     case notes
+    case achievements
 }
 
 extension HumanAllFeatureDestination: Identifiable {
@@ -32,12 +33,13 @@ extension HumanAllFeatureDestination: Identifiable {
         case .expense: "expense"
         case .wishlist: "wishlist"
         case .notes: "notes"
+        case .achievements: "achievements"
         }
     }
 
     var privacyField: HumanPrivateField? {
         switch self {
-        case .basicInfo:
+        case .basicInfo, .achievements:
             nil
         case .weight, .metrics, .report:
             .weight
@@ -56,7 +58,7 @@ extension HumanAllFeatureDestination: Identifiable {
 
     var isAvailableInMemorialMode: Bool {
         switch self {
-        case .basicInfo, .notes:
+        case .basicInfo, .notes, .achievements:
             true
         case .weight, .workout, .metrics, .medication, .report, .expense, .wishlist:
             false
@@ -458,6 +460,32 @@ struct HumanAllFeaturesSheet: View {
                 items: moneyItems
             ),
             FeatureHubSectionData(
+                id: "growth",
+                title: l.tr(
+                    zh: "成长",
+                    en: "Growth",
+                    de: "Wachstum",
+                    es: "Crecimiento",
+                    pt: "Crescimento",
+                    fr: "Progression",
+                    ja: "成長",
+                    ko: "성장",
+                    it: "Crescita"
+                ),
+                subtitle: l.tr(
+                    zh: "个人、伙伴与全岛里程碑",
+                    en: "Personal, companion, and island milestones",
+                    de: "Persönliche, Begleiter- und Inselmeilensteine",
+                    es: "Hitos personales, de compañeros y de la isla",
+                    pt: "Marcos pessoais, de companheiros e da ilha",
+                    fr: "Jalons personnels, des compagnons et de l’île",
+                    ja: "個人・仲間・島のマイルストーン",
+                    ko: "개인·동료·섬 마일스톤",
+                    it: "Traguardi personali, dei compagni e dell’isola"
+                ),
+                items: growthItems
+            ),
+            FeatureHubSectionData(
                 id: "account",
                 title: l.tr(zh: "账户隐私", en: "Account", de: "Konto"),
                 subtitle: l.tr(zh: "身份、权限和安全", en: "Identity, access, privacy", de: "Identität, Zugriff, Datenschutz"),
@@ -582,6 +610,50 @@ struct HumanAllFeaturesSheet: View {
                 tint: Color(hex: "64748B"),
                 chart: FeatureHubMiniChartData(style: .bar, points: summary.profileChartPoints),
                 destination: .basicInfo
+            )
+        ]
+    }
+
+    private var growthItems: [FeatureHubDestinationItem<HumanAllFeatureDestination>] {
+        [
+            item(
+                id: "achievements",
+                title: l.tr(
+                    zh: "成就",
+                    en: "Achievements",
+                    de: "Erfolge",
+                    es: "Logros",
+                    pt: "Conquistas",
+                    fr: "Succès",
+                    ja: "実績",
+                    ko: "업적",
+                    it: "Obiettivi"
+                ),
+                value: l.tr(
+                    zh: "查看",
+                    en: "View",
+                    de: "Öffnen",
+                    es: "Ver",
+                    pt: "Ver",
+                    fr: "Voir",
+                    ja: "表示",
+                    ko: "보기",
+                    it: "Apri"
+                ),
+                subtitle: l.tr(
+                    zh: "个人、伙伴与全岛进度",
+                    en: "Personal, companion, and island progress",
+                    de: "Persönlicher, Begleiter- und Inselfortschritt",
+                    es: "Progreso personal, de compañeros y de la isla",
+                    pt: "Progresso pessoal, de companheiros e da ilha",
+                    fr: "Progression personnelle, des compagnons et de l’île",
+                    ja: "個人・仲間・島の進捗",
+                    ko: "개인·동료·섬 진행도",
+                    it: "Progressi personali, dei compagni e dell’isola"
+                ),
+                icon: "trophy.fill",
+                tint: Color.goYellow,
+                destination: .achievements
             )
         ]
     }

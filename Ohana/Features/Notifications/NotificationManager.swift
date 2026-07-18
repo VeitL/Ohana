@@ -19,6 +19,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
     private let plantBatchCareCategoryID = "OHANA_PLANT_BATCH_CARE"
     private let petMedicationCategoryID = "MED_REMINDER"
     private let humanMedicationCategoryID = "HUMAN_MED_REMINDER"
+    private let presenceCategoryID = PresenceReminderRequestFactory.categoryIdentifier
     private let routeCenter: OhanaNotificationRouteCenter
 
     init(routeCenter: OhanaNotificationRouteCenter) {
@@ -66,6 +67,21 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             title: l.tr(zh: "全部完成", en: "Complete all", de: "Alle erledigen"),
             options: [.foreground]
         )
+        let presenceOkayAction = UNNotificationAction(
+            identifier: PresenceReminderRequestFactory.okayActionIdentifier,
+            title: l.tr(
+                zh: "我没事",
+                en: "I'm okay",
+                de: "Mir geht's gut",
+                es: "Estoy bien",
+                pt: "Estou bem",
+                fr: "Je vais bien",
+                ja: "大丈夫です",
+                ko: "괜찮아요",
+                it: "Sto bene"
+            ),
+            options: []
+        )
 
         let category = UNNotificationCategory(
             identifier: categoryID,
@@ -92,8 +108,20 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             intentIdentifiers: [],
             options: []
         )
+        let presenceCategory = UNNotificationCategory(
+            identifier: presenceCategoryID,
+            actions: [presenceOkayAction],
+            intentIdentifiers: [],
+            options: []
+        )
 
-        center.setNotificationCategories([category, plantBatchCareCategory, petMedicationCategory, humanMedicationCategory])
+        center.setNotificationCategories([
+            category,
+            plantBatchCareCategory,
+            petMedicationCategory,
+            humanMedicationCategory,
+            presenceCategory
+        ])
     }
 
     // MARK: - 滚动窗口常量
@@ -554,8 +582,18 @@ final class OhanaNotificationRouteCenter: ObservableObject {
         lastRouteEvent = AppRoutePublishedEvent(event: event)
     }
 
+    func acknowledgeRouteEvent(id: UUID) {
+        guard lastRouteEvent?.id == id else { return }
+        lastRouteEvent = nil
+    }
+
     func publishReminderAction(_ payload: [String: Any]) {
         lastReminderActionEvent = ReminderNotificationActionEvent(payload: payload)
+    }
+
+    func acknowledgeReminderActionEvent(id: UUID) {
+        guard lastReminderActionEvent?.id == id else { return }
+        lastReminderActionEvent = nil
     }
 
     func pendingRoute() -> [String: Any]? {
@@ -633,6 +671,9 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         if let doseIndex = userInfo["doseIndex"] as? Int {
             payload["doseIndex"] = doseIndex
         }
+        if let presenceAction = userInfo["presenceAction"] as? String {
+            payload["presenceAction"] = presenceAction
+        }
 
         switch action {
         case UNNotificationDefaultActionIdentifier:
@@ -651,7 +692,7 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
                     careType: (payload["plantCareType"] as? String).flatMap(PlantCareType.init(rawValue:))
                 )
             }
-        case "COMPLETE", "SKIP", "SNOOZE":
+        case "COMPLETE", "SKIP", "SNOOZE", PresenceReminderRequestFactory.okayActionIdentifier:
             DispatchQueue.main.async {
                 self.routeCenter.publishReminderAction(payload)
             }

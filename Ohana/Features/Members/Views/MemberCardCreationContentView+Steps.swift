@@ -62,25 +62,16 @@ extension MemberCardCreationContentView {
             foreground: cardForeground
         ) {
             VStack(alignment: .leading, spacing: 12) {
-                compactMenuPicker(
-                    title: l.tr(zh: "物种", en: "Species", de: "Art"),
-                    value: draft.species.isEmpty
-                        ? l.tr(zh: "选择物种", en: "Choose species", de: "Art wählen")
-                        : speciesLabel(draft.resolvedSpecies.isEmpty ? draft.species : draft.resolvedSpecies)
-                ) {
+                Text(l.tr(zh: "物种", en: "Species", de: "Art"))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(cardSecondaryForeground)
+
+                LazyVGrid(columns: petSpeciesGridColumns, spacing: 7) {
                     ForEach(speciesOptions, id: \.self) { species in
-                        Button(speciesLabel(species)) {
-                            draft.species = species
-                            draft.isCustomSpecies = Pet.canonicalSpeciesKey(species) == "other"
-                            draft.customSpecies = ""
-                            draft.breed = ""
-                            draft.customBreed = ""
-                            draft.isCustomBreed = false
-                            draft.coatColor = ""
-                        }
+                        petSpeciesButton(species)
                     }
                 }
-                .accessibilityIdentifier("member-pet-species-picker")
+                .accessibilityIdentifier("member-pet-species-grid")
 
                 if draft.isCustomSpecies {
                     flatTextField(
@@ -103,14 +94,6 @@ extension MemberCardCreationContentView {
                     .accessibilityIdentifier("member-pet-custom-breed-input")
                 }
 
-                Text(l.tr(
-                    zh: "物种和品种为必填；性别、毛色等可稍后补充。",
-                    en: "Species and breed are required; sex and appearance can be added later.",
-                    de: "Art und Rasse sind Pflicht; Geschlecht und Aussehen kannst du später ergänzen."
-                ))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(cardSecondaryForeground)
-                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -118,10 +101,12 @@ extension MemberCardCreationContentView {
     var compactBreedPicker: some View {
         compactMenuPicker(
             title: l.tr(zh: "品种", en: "Breed", de: "Rasse"),
-            value: draft.resolvedBreed.isEmpty ? l.tr(zh: "选择", en: "Choose", de: "Wählen") : draft.resolvedBreed
+            value: draft.resolvedBreed.isEmpty
+                ? l.tr(zh: "选择", en: "Choose", de: "Wählen")
+                : breedLabel(draft.resolvedBreed)
         ) {
             ForEach(petBreedPickerOptions, id: \.name) { breed in
-                Button(breed.name) {
+                Button(breedLabel(breed.name)) {
                     draft.isCustomBreed = breed.name == "其他"
                     draft.breed = breed.name == "其他" ? "" : breed.name
                     draft.customBreed = ""
@@ -139,7 +124,7 @@ extension MemberCardCreationContentView {
             foreground: cardForeground
         ) {
             VStack(alignment: .leading, spacing: 12) {
-                Text(l.tr(zh: "性别", en: "Sex", de: "Geschlecht"))
+                Text(l.tr(zh: "性别（必填）", en: "Sex (required)", de: "Geschlecht (Pflicht)"))
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(cardSecondaryForeground)
                 compactGenderIconRow(
@@ -149,19 +134,37 @@ extension MemberCardCreationContentView {
                     icon: petGenderIcon
                 )
 
-                Text(l.tr(zh: "毛色", en: "Coat", de: "Fell"))
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(cardSecondaryForeground)
                 compactMenuPicker(
-                    title: l.tr(zh: "毛色", en: "Coat", de: "Fell"),
+                    title: l.tr(zh: "毛色（可选）", en: "Coat (optional)", de: "Fell (optional)"),
                     value: draft.coatColor.isEmpty
-                        ? l.tr(zh: "选择毛色", en: "Choose coat", de: "Fell wählen")
-                        : draft.coatColor
+                        ? l.tr(zh: "暂不设置", en: "Skip for now", de: "Vorerst überspringen")
+                        : coatLabel(draft.coatColor)
                 ) {
+                    Button(l.tr(zh: "暂不设置", en: "Skip for now", de: "Vorerst überspringen")) {
+                        draft.coatColor = ""
+                    }
+                    .accessibilityIdentifier("member-pet-coat-skip")
+                    .accessibilityValue(
+                        draft.coatColor.isEmpty
+                            ? l.tr(zh: "已选择", en: "Selected", de: "Ausgewählt")
+                            : l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt")
+                    )
+                    .accessibilityAddTraits(draft.coatColor.isEmpty ? .isSelected : [])
+
+                    Divider()
+
                     ForEach(petCoatOptions, id: \.self) { option in
-                        Button(option) {
+                        let isSelected = draft.coatColor == option
+                        Button(coatLabel(option)) {
                             draft.coatColor = option
                         }
+                        .accessibilityLabel(coatLabel(option))
+                        .accessibilityValue(
+                            isSelected
+                                ? l.tr(zh: "已选择", en: "Selected", de: "Ausgewählt")
+                                : l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt")
+                        )
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
                     }
                 }
                 .accessibilityIdentifier("member-pet-coat-picker")
@@ -218,40 +221,38 @@ extension MemberCardCreationContentView {
     }
 
     var avatarHintText: String? {
-        if draft.avatarSource == .avatar2D {
-            return canUseFree2D
-                ? l.tr(zh: "已使用首位免费智能 2.5D。", en: "Using the first free smart 2.5D avatar.", de: "Der erste kostenlose smarte 2,5D-Avatar ist aktiv.")
-                : l.tr(zh: "保存时将消耗 1 张头像券。", en: "Saving will use 1 avatar pass.", de: "Beim Speichern wird 1 Avatarpass verwendet.")
-        }
-        if !canUseFree2D, avatarPassCount > 0 {
-            return l.tr(zh: "你有 \(avatarPassCount) 张头像券，可手动开启 2.5D。", en: "You have \(avatarPassCount) avatar pass; turn on 2.5D when you want it.", de: "Du hast \(avatarPassCount) Avatarpass; aktiviere 2,5D bei Bedarf.")
-        }
-        if !canUseFree2D {
-            return l.tr(zh: "2.5D 头像券 \(avatarPassCost) 椰子。", en: "A 2.5D avatar pass costs \(avatarPassCost) coconuts.", de: "Ein 2,5D-Avatarpass kostet \(avatarPassCost) Kokosnüsse.")
-        }
-        return nil
+        guard draft.avatarSource == .avatar2D, !canUseFree2D else { return nil }
+        return l.tr(
+            zh: "保存时消耗 1 张头像券",
+            en: "Uses 1 avatar pass when saved",
+            de: "Verbraucht beim Speichern 1 Avatarpass"
+        )
     }
 
     var petPersonalityStep: some View {
         VStack(alignment: .leading, spacing: 10) {
             MemberCreationSection(
-                title: l.tr(zh: "性格", en: "Personality", de: "Charakter"),
+                title: l.tr(zh: "性格（可选）", en: "Personality (optional)", de: "Charakter (optional)"),
                 icon: "heart.fill",
                 foreground: cardForeground
             ) {
                 VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 8) {
-                    Text(l.tr(zh: "可跳过，最多选择 3 个", en: "Optional, choose up to 3", de: "Optional, bis zu 3 auswählen"))
-                        .font(OhanaFont.caption2(.semibold))
-                        .foregroundStyle(cardSecondaryForeground)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                    Spacer(minLength: 8)
-                    Text("\(draft.personalityTagIds.count)/3")
-                        .font(OhanaFont.caption2(.black))
-                        .foregroundStyle(cardForeground)
-                        .contentTransition(.numericText())
-                }
+                Text("\(draft.personalityTagIds.count)/3")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(cardForeground)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .contentTransition(.numericText())
+                    .accessibilityLabel(l.tr(
+                        zh: "已选择 \(draft.personalityTagIds.count) 个，最多 3 个",
+                        en: "\(draft.personalityTagIds.count) selected, 3 maximum",
+                        de: "\(draft.personalityTagIds.count) ausgewählt, maximal 3",
+                        es: "\(draft.personalityTagIds.count) seleccionados, máximo 3",
+                        pt: "\(draft.personalityTagIds.count) selecionados, máximo de 3",
+                        fr: "\(draft.personalityTagIds.count) sélectionnés, 3 maximum",
+                        ja: "\(draft.personalityTagIds.count)個選択、最大3個",
+                        ko: "\(draft.personalityTagIds.count)개 선택됨, 최대 3개",
+                        it: "\(draft.personalityTagIds.count) selezionati, massimo 3"
+                    ))
 
                 LazyVGrid(columns: personalityGridColumns, spacing: 6) {
                     ForEach(PetPersonalityTag.creationChoices) { tag in
@@ -313,9 +314,7 @@ extension MemberCardCreationContentView {
             ) {
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(draft.hasExplicitThemeColor
-                            ? l.tr(zh: "已手动选择", en: "Chosen manually", de: "Manuell gewählt")
-                            : l.tr(zh: "根据宠物资料自动搭配", en: "Matched automatically to your pet", de: "Automatisch passend zum Tier"))
+                        Text(petThemeSelectionDescription)
                             .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(cardSecondaryForeground)
                             .lineLimit(1)
@@ -580,7 +579,7 @@ extension MemberCardCreationContentView {
         case .pet:
             [
                 draft.resolvedSpecies.isEmpty ? "" : speciesLabel(draft.resolvedSpecies),
-                draft.resolvedBreed,
+                draft.resolvedBreed.isEmpty ? "" : breedLabel(draft.resolvedBreed),
                 draft.petGender.isEmpty ? "" : petGenderLabel(draft.petGender)
             ]
                 .filter { !$0.isEmpty }
@@ -635,7 +634,22 @@ extension MemberCardCreationContentView {
 
     var petCoatOptions: [String] {
         let options = PetAvatarAssetCatalog.coatColors(species: draft.resolvedSpecies, breed: draft.resolvedBreed)
+            ?? petBreedOptions.first(where: { $0.name == draft.resolvedBreed })?.coatColors
             ?? PetBreedDatabase.genericCoatColors
         return options.map(\.name)
+    }
+
+    var petThemeSelectionDescription: String {
+        if draft.hasExplicitThemeColor {
+            return l.tr(zh: "已手动选择", en: "Chosen manually", de: "Manuell gewählt")
+        }
+        if draft.coatColor.isEmpty {
+            return l.tr(zh: "已自动分配", en: "Assigned automatically", de: "Automatisch gewählt")
+        }
+        return l.tr(
+            zh: "已按毛色自动搭配",
+            en: "Matched automatically to the coat",
+            de: "Automatisch passend zum Fell"
+        )
     }
 }

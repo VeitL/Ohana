@@ -206,6 +206,76 @@ enum StarterGiftService {
         )
     }
 
+    /// Zen uses the same household grant and transaction key as Standard, but
+    /// either the first active Pet or the first active Plant makes the card
+    /// eligible. This does not unlock the Standard Task Center route.
+    @MainActor
+    static func evaluateZenEligibility(
+        context: ModelContext,
+        defaults: UserDefaults = .standard,
+        wallet providedWallet: CoconutWalletManaging? = nil,
+        projectionManager: QuestManager? = nil
+    ) -> Result {
+        let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
+        guard prepareEligibilityState(
+            context: context,
+            defaults: defaults,
+            wallet: wallet,
+            projectionManager: projectionManager
+        ) else {
+            return .persistenceFailed
+        }
+        if defaults.bool(forKey: StarterGiftStorageKey.claimed) {
+            return .alreadyHandled
+        }
+        do {
+            if try hasPersistedStarterGift(context: context) {
+                defaults.set(true, forKey: StarterGiftStorageKey.claimed)
+                defaults.set(false, forKey: StarterGiftStorageKey.pending)
+                return .alreadyHandled
+            }
+        } catch {
+            OhanaLog.warning(
+                "StarterGiftService failed to recover the Zen starter gift: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return .persistenceFailed
+        }
+        guard defaults.bool(forKey: StarterGiftStorageKey.pending) else {
+            markExistingUser(defaults: defaults)
+            return .markedExistingUser
+        }
+        guard firstActivePet(context: context) != nil || firstActivePlant(context: context) != nil else {
+            return .pendingFirstPet
+        }
+        return .readyToClaim(recipient: .island, amount: giftAmount)
+    }
+
+    @MainActor
+    static func claimZenStarterGift(
+        context: ModelContext,
+        defaults: UserDefaults = .standard,
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        wallet providedWallet: CoconutWalletManaging? = nil,
+        projectionManager: QuestManager? = nil
+    ) -> Result {
+        let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
+        let eligibility = evaluateZenEligibility(
+            context: context,
+            defaults: defaults,
+            wallet: wallet,
+            projectionManager: projectionManager
+        )
+        guard case .readyToClaim = eligibility else { return eligibility }
+        return claim(
+            context: context,
+            defaults: defaults,
+            careLedger: providedCareLedger ?? CareLedgerService(),
+            wallet: wallet,
+            projectionManager: projectionManager
+        )
+    }
+
     @MainActor
     static func markCeremonySeen(defaults: UserDefaults = .standard) {
         guard defaults.bool(forKey: StarterGiftStorageKey.claimed) else { return }
@@ -483,6 +553,18 @@ enum StarterGiftService {
         )
         descriptor.fetchLimit = 1
         return fetchModelsOrLog(descriptor, context: context, operation: "fetch starter gift pet").first
+    }
+
+    @MainActor
+    private static func firstActivePlant(context: ModelContext) -> Plant? {
+        var descriptor = FetchDescriptor<Plant>(
+            predicate: #Predicate<Plant> { plant in
+                plant.archivedAt == nil
+            },
+            sortBy: [SortDescriptor(\Plant.createdAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 1
+        return fetchModelsOrLog(descriptor, context: context, operation: "fetch starter gift plant").first
     }
 
     @MainActor

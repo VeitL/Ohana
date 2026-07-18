@@ -67,10 +67,47 @@ enum CoconutEconomyBootstrapService {
 
         let humans = try context.fetch(FetchDescriptor<Human>()) // smoothness: allow legacy bootstrap lookup
         let pets = try context.fetch(FetchDescriptor<Pet>()) // smoothness: allow legacy bootstrap lookup
+        let existingAccounts = try context.fetch(FetchDescriptor<CoconutAccount>())
+        let existingAccountByKey = Dictionary(
+            existingAccounts.map { ($0.accountKey, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let existingLedgerEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let existingTransactionKeys = Set(existingLedgerEntries.map(\.transactionKey))
+        let existingDeltaByAccountKey = Dictionary(
+            grouping: existingLedgerEntries.filter(\.affectsBalance),
+            by: \.accountKey
+        ).mapValues { entries in
+            entries.reduce(0) { $0 + $1.delta }
+        }
+        var backfilledOpeningEntries: [CoconutLedgerEntry] = []
         var deltas: [CoconutWalletDelta] = []
 
         var memberTotal = 0
         for human in humans {
+            let accountKey = CoconutAccountKey.human(human.id)
+            if let existingAccount = existingAccountByKey[accountKey] {
+                // A command may legitimately create this wallet before the
+                // deferred compatibility bootstrap runs. The model field is
+                // then a projection of that account, not an opening balance.
+                let legacyBaseline = max(
+                    0,
+                    existingAccount.balance - (existingDeltaByAccountKey[accountKey] ?? 0)
+                )
+                memberTotal += max(0, legacyBaseline)
+                backfillOpeningEntryIfNeeded(
+                    account: existingAccount,
+                    ownerKind: .human,
+                    ownerId: human.id.uuidString,
+                    ownerName: human.name,
+                    legacyBalance: legacyBaseline,
+                    legacyIslandCount: legacyIslandCount,
+                    occurredAt: human.createdAt,
+                    existingTransactionKeys: existingTransactionKeys,
+                    preparedEntries: &backfilledOpeningEntries
+                )
+                continue
+            }
             let originalBalance = human.coconutBalance
             let balance = max(0, originalBalance)
             memberTotal += balance
@@ -82,6 +119,7 @@ enum CoconutEconomyBootstrapService {
                 title: "Imported coconut balance",
                 emoji: "🥥",
                 metadataJSON: metadata(originalBalance: originalBalance, legacyIslandCount: legacyIslandCount),
+                occurredAt: human.createdAt,
                 transactionKey: "bootstrap:v58:opening:\(CoconutAccountKey.human(human.id))"
             ))
             if originalBalance < 0 {
@@ -96,6 +134,26 @@ enum CoconutEconomyBootstrapService {
         }
 
         for pet in pets {
+            let accountKey = CoconutAccountKey.pet(pet.id)
+            if let existingAccount = existingAccountByKey[accountKey] {
+                let legacyBaseline = max(
+                    0,
+                    existingAccount.balance - (existingDeltaByAccountKey[accountKey] ?? 0)
+                )
+                memberTotal += max(0, legacyBaseline)
+                backfillOpeningEntryIfNeeded(
+                    account: existingAccount,
+                    ownerKind: .pet,
+                    ownerId: pet.id.uuidString,
+                    ownerName: pet.name,
+                    legacyBalance: legacyBaseline,
+                    legacyIslandCount: legacyIslandCount,
+                    occurredAt: pet.createdAt,
+                    existingTransactionKeys: existingTransactionKeys,
+                    preparedEntries: &backfilledOpeningEntries
+                )
+                continue
+            }
             let originalBalance = pet.coconutBalance
             let balance = max(0, originalBalance)
             memberTotal += balance
@@ -107,6 +165,7 @@ enum CoconutEconomyBootstrapService {
                 title: "Imported coconut balance",
                 emoji: "🥥",
                 metadataJSON: metadata(originalBalance: originalBalance, legacyIslandCount: legacyIslandCount),
+                occurredAt: pet.createdAt,
                 transactionKey: "bootstrap:v58:opening:\(CoconutAccountKey.pet(pet.id))"
             ))
             if originalBalance < 0 {
@@ -139,10 +198,11 @@ enum CoconutEconomyBootstrapService {
             postsRewardFeedback: false,
             updatesProjection: false
         )
-
-        if saveChanges {
-            try CoconutWalletPersistence.save(context: context)
+        for entry in backfilledOpeningEntries {
+            context.insert(entry)
         }
+        CloudSyncMutationRecorder.markModified(backfilledOpeningEntries, context: context)
+
         try importLegacyHistory(legacyLogs, humans: humans, pets: pets, context: context)
         if saveChanges {
             try CoconutWalletPersistence.save(context: context)
@@ -150,6 +210,43 @@ enum CoconutEconomyBootstrapService {
         if updatesProjection {
             CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
         }
+    }
+
+    private static func backfillOpeningEntryIfNeeded(
+        account: CoconutAccount,
+        ownerKind: CoconutWalletOwnerKind,
+        ownerId: String,
+        ownerName: String,
+        legacyBalance: Int,
+        legacyIslandCount: Int,
+        occurredAt: Date,
+        existingTransactionKeys: Set<String>,
+        preparedEntries: inout [CoconutLedgerEntry]
+    ) {
+        guard legacyBalance > 0 else { return }
+        let transactionKey = "bootstrap:v58:opening:\(account.accountKey)"
+        guard !existingTransactionKeys.contains(transactionKey) else { return }
+
+        let entry = CoconutLedgerEntry(
+            transactionKey: transactionKey,
+            accountKey: account.accountKey,
+            ownerKind: ownerKind,
+            ownerId: ownerId,
+            ownerName: ownerName,
+            delta: legacyBalance,
+            balanceBefore: 0,
+            balanceAfter: legacyBalance,
+            entryKind: .openingBalance,
+            source: .legacyUserDefaults,
+            title: "Imported coconut balance",
+            emoji: "🥥",
+            metadataJSON: metadata(
+                originalBalance: legacyBalance,
+                legacyIslandCount: legacyIslandCount
+            ),
+            occurredAt: occurredAt
+        )
+        preparedEntries.append(entry)
     }
 
     private static func importLegacyHistory(

@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct CareLedgerAnalysisContentView: View {
     let ledgerEvents: [CareLedgerEvent]
@@ -14,6 +15,8 @@ struct CareLedgerAnalysisContentView: View {
     let humans: [Human]
 
     @State private var screenModel = CareLedgerAnalysisScreenModel()
+    @State private var showingPersonalPlan = false
+    @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     private var l: L10n { L10n(appLanguage) }
 
@@ -35,6 +38,15 @@ struct CareLedgerAnalysisContentView: View {
         }
         .navigationTitle(l.tr(zh: "照护账本分析", en: "Care ledger analysis", de: "Pflegebuch-Analyse"))
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingPersonalPlan) {
+            PersonalPlanView()
+                .ohanaSheetPagePresentation()
+        }
+        .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+            if screenModel.selectedRange == .all, !appServices.commerce.allows(.extendedTrends) {
+                screenModel.selectedRange = .month
+            }
+        }
         .onAppear(perform: syncScreenModel)
         .onChange(of: ledgerEvents.count) { syncScreenModel() }
         .onChange(of: pets.count) { syncScreenModel() }
@@ -85,9 +97,14 @@ struct CareLedgerAnalysisContentView: View {
     private var filterCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(l.tr(zh: "筛选", en: "Filter", de: "Filter"), icon: "line.3.horizontal.decrease.circle.fill")
-            Picker(l.tr(zh: "范围", en: "Range", de: "Zeitraum"), selection: $screenModel.selectedRange) {
+            Picker(l.tr(zh: "范围", en: "Range", de: "Zeitraum"), selection: personalRangeSelection) {
                 ForEach(CareLedgerRangeFilter.allCases, id: \.self) { range in
-                    Text(range.title(l: l)).tag(range)
+                    Text(
+                        range == .all && !appServices.commerce.allows(.extendedTrends)
+                            ? "\(range.title(l: l)) · Personal"
+                            : range.title(l: l)
+                    )
+                    .tag(range)
                 }
             }
             .pickerStyle(.segmented)
@@ -105,6 +122,20 @@ struct CareLedgerAnalysisContentView: View {
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
+    }
+
+    private var personalRangeSelection: Binding<CareLedgerRangeFilter> {
+        Binding(
+            get: { screenModel.selectedRange },
+            set: { range in
+                guard range != .all || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                screenModel.selectedRange = range
+            }
+        )
     }
 
     private var kindBreakdownCard: some View {

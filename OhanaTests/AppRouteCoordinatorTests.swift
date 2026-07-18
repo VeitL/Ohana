@@ -576,25 +576,28 @@ struct AppRouteCoordinatorTests {
 
         #expect(outcome == .clearActiveHuman)
         #expect(coordinator.path.isEmpty)
-        #expect(coordinator.rootIdentity != initialRoot)
+        #expect(coordinator.rootIdentity == initialRoot)
         #expect(coordinator.fullScreen == .requiredHumanProfile)
         #expect(coordinator.sheet == nil)
     }
 
     @Test func accountSwitchNotificationRoutesThroughCoordinator() {
         let coordinator = AppRouteCoordinator()
+        let initialRoot = coordinator.rootIdentity
 
         let outcome = coordinator.handleNotificationEvent(
             .humanDeleted(requiresReplacementHuman: false, requiresAccountSwitch: true)
         )
 
         #expect(outcome == .clearActiveHuman)
+        #expect(coordinator.rootIdentity == initialRoot)
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.sheet == .requiredAccountSwitch)
     }
 
     @Test func plainHumanDeletionRequestsRequirementReconciliation() {
         let coordinator = AppRouteCoordinator()
+        let initialRoot = coordinator.rootIdentity
 
         let outcome = coordinator.handleNotificationEvent(
             .humanDeleted(requiresReplacementHuman: false, requiresAccountSwitch: false)
@@ -602,6 +605,7 @@ struct AppRouteCoordinatorTests {
 
         #expect(outcome == .reconcileHumanRequirement)
         #expect(coordinator.path.isEmpty)
+        #expect(coordinator.rootIdentity == initialRoot)
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.sheet == nil)
     }

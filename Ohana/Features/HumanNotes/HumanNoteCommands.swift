@@ -380,6 +380,7 @@ struct HumanCareCommandExecutor {
     let careLedger: CareLedgerRecording
     let reminderScheduling: ReminderSchedulingManaging
     let medicationReminders: MedicationReminderManaging
+    let personalAccessLevel: PersonalAccessLevel
 
     init(context: ModelContext) {
         let careLedger = CareLedgerService()
@@ -387,6 +388,7 @@ struct HumanCareCommandExecutor {
             context: context,
             revisions: SharedDomainRevisionPublisher(),
             careLedger: careLedger,
+            personalAccessLevel: .personal,
             reminderScheduling: ReminderSchedulingManager(careLedger: careLedger),
             medicationReminders: SharedMedicationReminderManager(careLedger: careLedger)
         )
@@ -398,6 +400,7 @@ struct HumanCareCommandExecutor {
             context: context,
             revisions: SharedDomainRevisionPublisher(center: revisionCenter),
             careLedger: careLedger,
+            personalAccessLevel: .personal,
             reminderScheduling: ReminderSchedulingManager(careLedger: careLedger),
             medicationReminders: SharedMedicationReminderManager(careLedger: careLedger)
         )
@@ -408,6 +411,7 @@ struct HumanCareCommandExecutor {
             context: context,
             revisions: services.domainRevisions,
             careLedger: services.careLedger,
+            personalAccessLevel: services.commerce.hasPersonalEntitlement ? .personal : .free,
             reminderScheduling: services.reminderScheduling,
             medicationReminders: services.medicationReminders
         )
@@ -417,6 +421,7 @@ struct HumanCareCommandExecutor {
         context: ModelContext,
         revisions: DomainRevisionPublishing,
         careLedger: CareLedgerRecording,
+        personalAccessLevel: PersonalAccessLevel = .personal,
         reminderScheduling: ReminderSchedulingManaging,
         medicationReminders: MedicationReminderManaging
     ) {
@@ -424,6 +429,7 @@ struct HumanCareCommandExecutor {
         self.revisions = revisions
         derivations = CareDerivationExecutor(revisions: revisions)
         self.careLedger = careLedger
+        self.personalAccessLevel = personalAccessLevel
         self.reminderScheduling = reminderScheduling
         self.medicationReminders = medicationReminders
     }
@@ -721,6 +727,42 @@ struct HumanCareCommandExecutor {
         guard result.didPersist else { return result }
         revisions.publishHumanNote(result, note: note)
         return result
+    }
+
+    @discardableResult
+    func recordNoteEnforcingPersonalAccess(
+        human: Human,
+        noteText: String,
+        date: Date,
+        imageAttachments: [UIImage],
+        fileAttachments: [HumanNoteFileAttachmentPayload],
+        reminderDate: Date?,
+        appLanguage: String,
+        recordedByHumanId: String? = nil,
+        scheduleNotification: Bool = true,
+        note: String,
+        emptyNote: String = "human.note.noop"
+    ) throws -> HumanNoteCommandResult? {
+        if reminderDate != nil {
+            try PersonalPlanQuotaCommandGate.requirePlanChange(
+                context: context,
+                personalAccessLevel: personalAccessLevel,
+                addingActivePlanCount: 1
+            )
+        }
+        return recordNote(
+            human: human,
+            noteText: noteText,
+            date: date,
+            imageAttachments: imageAttachments,
+            fileAttachments: fileAttachments,
+            reminderDate: reminderDate,
+            appLanguage: appLanguage,
+            recordedByHumanId: recordedByHumanId,
+            scheduleNotification: scheduleNotification,
+            note: note,
+            emptyNote: emptyNote
+        )
     }
 
     @discardableResult

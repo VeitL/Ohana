@@ -1,5 +1,7 @@
 # Privacy & Store Compliance
 
+Last reviewed: 2026-07-16
+
 Ohana stores sensitive local data (health, medication, insurance, documents,
 photos, location traces, family member info). Because the app ships with German
 localization, assume an EU audience and GDPR obligations. This complements the
@@ -22,6 +24,21 @@ in-app member-privacy/PIN rules in `docs/app-architecture-governance.md`.
   transmitted data beyond the user's chosen share action. If that ever changes
   (analytics, accounts, CloudKit family sync, support uploads, third-party SDKs),
   update the label in the same change.
+- **StoreKit Personal:** Apple processes the Personal monthly/yearly
+  auto-renewable subscriptions, Personal Lifetime non-consumable purchase, and
+  the historical Supporter Pack non-consumable that grandfathers verified owners
+  into Personal Lifetime. Ohana reads StoreKit-provided product metadata plus
+  Apple-signed and verified transaction/current-entitlement status on-device to
+  present, complete, restore, recognize expiration, refunds or revocations, and
+  deliver local Personal capabilities. It does not receive payment card,
+  billing address, Apple Account password, or full payment credentials; it does
+  not associate
+  the purchase with Human, pet, plant, health, location, or care records or send
+  those records to the developer. Free quota counts are computed on-device and
+  are not transmitted. With no developer purchase backend, advertising,
+  or analytics, this does not change the current **Data Not Collected** answer.
+  Re-audit the privacy label and policy before adding server receipt validation,
+  account mapping, analytics, advertising, or another third party.
 - **Privacy policy URL:** App Store Connect requires a public privacy policy URL
   for iOS. The release policy is `docs/privacy-policy.md`, and the in-app
   Settings link targets its public repository URL. It states that Ohana is
@@ -41,7 +58,8 @@ in-app member-privacy/PIN rules in `docs/app-architecture-governance.md`.
   they override the localized strings. Draft review copy and in-app rationale
   live in `docs/permission-rationale-draft.md`.
 - **No unused permissions/capabilities:** Do not declare a permission, entitlement,
-  or background mode that the code does not actually use. The Solo profile keeps
+  or background mode that the code does not actually use. The local-only Free /
+  Personal profile keeps
   CloudDocuments for the restricted iCloud Drive backup and HealthKit for the
   read-only Human Workout view. It declares no Sign in with Apple, APNs,
   `remote-notification` background mode, CloudKit sharing service, or App Group.
@@ -93,6 +111,10 @@ Before shipping a change that touches data, permissions, or background work:
 - `PrivacyInfo.xcprivacy` still accurate.
 - App Store privacy label still accurate (`Data Not Collected` for the current
   zero-upload build).
+- StoreKit Personal purchase, subscription, legacy Supporter grandfathering,
+  and restore use only Apple-signed product / entitlement
+  state; no payment credentials or care records enter app logs, exports, a
+  developer backend, advertising, or analytics.
 - Published privacy policy URL exists and matches the current local-first /
   zero-upload behavior.
 - No unused permission/entitlement/background mode.

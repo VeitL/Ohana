@@ -40,6 +40,7 @@ struct AddEventContentView: View {
     @State var rewardCoconuts = 0
     @State private var showsTypePicker = false
     @State var isSaving = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State private var didSave = false
     @State private var keyboardHeight: CGFloat = 0
     @StateObject var commandQueue = DeferredDomainCommandQueue()
@@ -318,6 +319,7 @@ extension AddEventContentView {
                                     .accessibilityIdentifier("add-event-related-human-\(human.name)")
                             }
                         }
+                        .accessibilityIdentifier("add-event-related-entity-picker")
                     }
                 }
 
@@ -375,12 +377,15 @@ extension AddEventContentView {
                         isOn: $hasReminder
                     )
                         .tint(Color.goPrimary)
+                        .accessibilityIdentifier("add-event-reminder-toggle")
                     if hasReminder {
                         Picker(l.tr(zh: "提前提醒", en: "Remind before", de: "Vorher erinnern"), selection: $reminderLeadOption) {
                             ForEach(allowedReminderLeadOptions) { option in
                                 Text(option.title(l)).tag(option)
                             }
                         }
+                        .accessibilityIdentifier("add-event-reminder-lead-picker")
+                        .accessibilityValue(reminderLeadOption.title(l))
                     }
                 }
 
@@ -444,6 +449,10 @@ extension AddEventContentView {
         }
         .ohanaSheetPagePresentation() // ui-v4: allow long calendar editor uses system sheet
         .interactiveDismissDisabled(isSaving)
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
+        }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()

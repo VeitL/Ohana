@@ -39,6 +39,14 @@ if ! scripts/tests/run-local-build-environment-tests.sh; then
   fail "scripts/tests/run-local-build-environment-tests.sh: local build isolation regression"
 fi
 
+if ! scripts/tests/run-dogfood-user-status-tests.sh; then
+  fail "scripts/tests/run-dogfood-user-status-tests.sh: Dogfood user readiness regression"
+fi
+
+if ! scripts/tests/run-dogfood-simulator-tests.sh; then
+  fail "scripts/tests/run-dogfood-simulator-tests.sh: Dogfood Simulator safety regression"
+fi
+
 run_audit() {
   local script="$1"
   shift
@@ -110,9 +118,12 @@ governance_manifest_path="docs/governance/manifests/feature-ownership.json"
 governance_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-feature-ownership.XXXXXX")"
 release_device_manifest_path="docs/governance/manifests/release-device-matrix.json"
 release_device_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-release-device-matrix.XXXXXX")"
+dogfood_manifest_path="docs/governance/manifests/dogfood-user-profile.json"
+dogfood_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-dogfood-profile.XXXXXX")"
 ui_shard_manifest_fixture=""
 cp "$governance_manifest_path" "$governance_manifest_backup"
 cp "$release_device_manifest_path" "$release_device_manifest_backup"
+cp "$dogfood_manifest_path" "$dogfood_manifest_backup"
 
 cleanup_architecture_fixture() {
   rm -f "$architecture_fixture_path"
@@ -130,6 +141,10 @@ cleanup_governance_fixture() {
   if [[ -f "$release_device_manifest_backup" ]]; then
     cp "$release_device_manifest_backup" "$release_device_manifest_path"
     rm -f "$release_device_manifest_backup"
+  fi
+  if [[ -f "$dogfood_manifest_backup" ]]; then
+    cp "$dogfood_manifest_backup" "$dogfood_manifest_path"
+    rm -f "$dogfood_manifest_backup"
   fi
   if [[ -n "$ui_shard_manifest_fixture" ]]; then
     rm -f "$ui_shard_manifest_fixture"
@@ -314,6 +329,25 @@ if [[ "$status" -ne 0 ]]; then
   fail "scripts/audit-governance-manifests.sh: expected current manifests to pass, got $status: $output"
 else
   echo "ok  scripts/audit-governance-manifests.sh passes current manifests"
+fi
+
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path("docs/governance/manifests/dogfood-user-profile.json")
+data = json.loads(path.read_text(encoding="utf-8"))
+data["milestones"]["day7"]["minMoments"] = 0
+path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PY
+run_audit scripts/audit-governance-manifests.sh
+cp "$dogfood_manifest_backup" "$dogfood_manifest_path"
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-governance-manifests.sh Dogfood milestone fixture: expected strict exit 1, got $status"
+elif ! grep -qF "dogfood day7 must define positive integer minMoments" <<<"$output"; then
+  fail "scripts/audit-governance-manifests.sh Dogfood milestone fixture: positive-threshold guard no longer fires"
+else
+  echo "ok  scripts/audit-governance-manifests.sh catches invalid Dogfood milestones"
 fi
 
 cp "$fixtures/SaveFailureBoundaryBad.swift" "$save_failure_fixture_path"

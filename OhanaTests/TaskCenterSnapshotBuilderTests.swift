@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Ohana
 
@@ -803,6 +804,56 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == 1)
     }
 
+    @Test func routeDataKeepsMemorialSchedulesStoredButExcludesTheirActiveTaskProjection() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = now.addingTimeInterval(-60)
+        let event = Event(
+            title: "Memorial future care",
+            startDate: now.addingTimeInterval(3600),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: event.startDate)
+        let task = FamilyCollaborationTask(
+            title: event.title,
+            kind: .careReminder,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            relatedPetId: pet.id.uuidString,
+            relatedEventId: event.id.uuidString,
+            relatedReminderId: reminder.id.uuidString,
+            createdById: human.id.uuidString,
+            createdByName: human.name,
+            assignedToId: human.id.uuidString,
+            assignedToName: human.name,
+            dueAt: event.startDate
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        context.insert(task)
+        try context.save()
+
+        let reference = try await TaskCenterRouteDataActor(modelContainer: container).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            now: now
+        )
+
+        #expect(!reference.eventModelIDs.contains(event.persistentModelID))
+        #expect(!reference.reminderModelIDs.contains(reminder.persistentModelID))
+        #expect(!reference.familyTaskModelIDs.contains(task.persistentModelID))
+        #expect(allItems(reference.snapshot).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).contains { $0.id == event.id })
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).contains { $0.id == reminder.id })
+    }
+
     @Test func createFirstPetSystemJourneyRequiresAnActiveHumanAndNoActivePet() {
         let calendar = utcCalendar()
         let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
@@ -1112,6 +1163,12 @@ struct TaskCenterSnapshotBuilderTests {
 
     private func allItems(_ snapshot: TaskCenterSnapshot) -> [TaskCenterItemSnapshot] {
         snapshot.overdue + snapshot.today + snapshot.upcoming + snapshot.unscheduled
+    }
+
+    private func makeContainer() throws -> ModelContainer {
+        let schema = Schema(ArkSchemaV85.models)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return try ModelContainer(for: schema, configurations: [config])
     }
 
     private func assignedEvent(

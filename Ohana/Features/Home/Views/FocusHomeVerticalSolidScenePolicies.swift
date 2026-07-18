@@ -151,6 +151,7 @@ nonisolated enum FocusHomeVerticalSolidCollapsedLayoutPolicy {
     static let defaultVerticalBias: CGFloat = 0
     static let bottomExtendedVerticalBias: CGFloat = 0.12
     static let cardAspectRatio: CGFloat = 1.58
+    static let cardCornerRadius: CGFloat = 30
     static let scrollExtendedCardWidthEstimate: CGFloat = 144
     static let scrollExtendedVerticalPadding: CGFloat = 64
 

@@ -30,7 +30,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
     }
 
     private var cornerRadius: CGFloat {
-        lerp(30, 44, visualProgress)
+        lerp(FocusHomeVerticalSolidCollapsedLayoutPolicy.cardCornerRadius, 44, visualProgress)
     }
 
     var body: some View {

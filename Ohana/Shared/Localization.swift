@@ -31,6 +31,27 @@ nonisolated struct L10n {
         value.resolve(lang)
     }
 
+    /// Resolves dynamic catalog keys through the App's selected language instead
+    /// of the device language. Chinese source keys remain the storage value.
+    func resourceName(_ key: String, bundle: Bundle = .main) -> String {
+        guard !key.isEmpty, !isChinese else { return key }
+        let missingValue = "__OHANA_MISSING_LOCALIZATION__"
+        for code in AppLanguage.fallbackChain(for: lang) where code != "zh" {
+            let lproj = AppLanguage.lprojName(for: code)
+            guard let path = bundle.path(forResource: lproj, ofType: "lproj"),
+                  let localizedBundle = Bundle(path: path) else { continue }
+            let value = localizedBundle.localizedString(
+                forKey: key,
+                value: missingValue,
+                table: nil
+            )
+            if value != missingValue {
+                return value
+            }
+        }
+        return key
+    }
+
     func tr(
         zh: String,
         en: String,
@@ -43,7 +64,7 @@ nonisolated struct L10n {
         it: String? = nil,
         extras: [String: String] = [:]
     ) -> String {
-        var values = Self.curatedStaticTranslations[zh] ?? [:]
+        var values = Self.curatedStaticTranslations[zh] ?? Self.curatedPrefixTranslations(for: zh) ?? [:]
         values.merge(extras) { _, new in new }
         return AppLocalizedText(zh: zh, en: en, de: de, es: es, pt: pt, fr: fr, ja: ja, ko: ko, it: it, extras: values).resolve(lang)
     }
@@ -53,6 +74,16 @@ nonisolated struct L10n {
         fallbackCode: String = AppLanguage.fallbackCode
     ) -> String {
         AppLocalizedText(translations: translations, fallbackCode: fallbackCode).resolve(lang)
+    }
+
+    private static func curatedPrefixTranslations(for zh: String) -> [String: String]? {
+        let prefix = "支持并解锁 · "
+        guard zh.hasPrefix(prefix),
+              let translations = curatedStaticTranslations[prefix]
+        else { return nil }
+
+        let suffix = zh.dropFirst(prefix.count)
+        return translations.mapValues { $0 + suffix }
     }
 
     private static let curatedStaticTranslationsBase: [String: [String: String]] = [
@@ -144,13 +175,26 @@ nonisolated struct L10n {
         "生物特征": ["es": "Bio y fechas", "pt": "Bio e datas", "fr": "Bio et dates"],
         "外貌特征": ["es": "Aspecto", "pt": "Aparência", "fr": "Apparence"],
         "主题色": ["es": "Color de acento", "pt": "Cor de destaque", "fr": "Couleur d'accent"],
+        "主题色（可选）": ["es": "Color de acento (opcional)", "pt": "Cor de destaque (opcional)", "fr": "Couleur d’accent (facultative)"],
         "名字（必填）": ["es": "Nombre (obligatorio)", "pt": "Nome (obrigatório)", "fr": "Nom (obligatoire)"],
         "物种": ["es": "Especie", "pt": "Espécie", "fr": "Espèce"],
         "生日": ["es": "Cumpleaños", "pt": "Aniversário", "fr": "Anniversaire"],
         "到家日": ["es": "Día de llegada", "pt": "Dia de chegada", "fr": "Jour d'arrivée"],
         "性别": ["es": "Sexo", "pt": "Gênero", "fr": "Sexe"],
+        "性别（必填）": ["es": "Sexo (obligatorio)", "pt": "Gênero (obrigatório)", "fr": "Sexe (obligatoire)"],
         "未知": ["es": "Desconocido", "pt": "Desconhecido", "fr": "Inconnu"],
         "毛色": ["es": "Pelaje", "pt": "Pelagem", "fr": "Robe"],
+        "毛色（可选）": ["es": "Pelaje (opcional)", "pt": "Pelagem (opcional)", "fr": "Robe (facultative)"],
+        "暂不设置": ["es": "Omitir por ahora", "pt": "Pular por enquanto", "fr": "Ignorer pour l’instant"],
+        "性格（可选）": ["es": "Personalidad (opcional)", "pt": "Personalidade (opcional)", "fr": "Personnalité (facultative)"],
+        "已手动选择": ["es": "Elegido manualmente", "pt": "Seleção manual", "fr": "Choisie manuellement"],
+        "已自动分配": ["es": "Asignado automáticamente", "pt": "Atribuída automaticamente", "fr": "Attribuée automatiquement"],
+        "已按毛色自动搭配": ["es": "Combinado automáticamente con el pelaje", "pt": "Combinada automaticamente com a pelagem", "fr": "Assortie automatiquement à la robe"],
+        "恢复自动": ["es": "Usar automático", "pt": "Usar automático", "fr": "Utiliser le mode automatique"],
+        "选择宠物主题色": ["es": "Elegir el color de acento de la mascota", "pt": "Escolher a cor de destaque do pet", "fr": "Choisir la couleur d’accent de l’animal"],
+        "保存时消耗 1 张头像券": ["es": "Usa 1 pase de avatar al guardar", "pt": "Usa 1 passe de avatar ao salvar", "fr": "Utilise 1 pass d’avatar lors de l’enregistrement"],
+        "正在检查 Personal 额度": ["es": "Comprobando el límite de Personal", "pt": "Verificando o limite do Personal", "fr": "Vérification du quota Personal"],
+        "暂时无法检查宠物额度": ["es": "No se puede comprobar ahora el límite de mascotas", "pt": "Não foi possível verificar o limite de pets agora", "fr": "Impossible de vérifier le quota d’animaux pour le moment"],
         "自定义": ["es": "Personalizado", "pt": "Personalizado", "fr": "Personnalisé"],
         "保存中…": ["es": "Guardando…", "pt": "Salvando…", "fr": "Enregistrement…"],
         "保存失败": ["es": "No se pudo guardar", "pt": "Não foi possível salvar", "fr": "Échec de l'enregistrement"],
@@ -198,7 +242,89 @@ nonisolated struct L10n {
         "噗噗站点": ["es": "Paradas popó", "pt": "Paradas cocô", "fr": "Arrêts caca"],
         "暂停": ["es": "Pausa", "pt": "Pausar", "fr": "Pause"],
         "继续": ["es": "Continuar", "pt": "Continuar", "fr": "Continuer"],
-        "结束": ["es": "Terminar", "pt": "Encerrar", "fr": "Terminer"]
+        "结束": ["es": "Terminar", "pt": "Encerrar", "fr": "Terminer"],
+        // MARK: - Supporter Pack
+        "3 组 Supporter 背景": ["es": "3 fondos Supporter", "pt": "3 fundos Supporter", "fr": "3 arrière-plans Supporter", "ja": "Supporter背景3種", "ko": "Supporter 배경 3종", "it": "3 sfondi Supporter"],
+        "App Store 已确认此设备不再拥有 Supporter Pack，且霓虹笑脸没有椰子购买记录。你的照护数据不会受到影响；请在方便时恢复默认图标。": [
+            "es": "El App Store ha confirmado que este dispositivo ya no tiene el Supporter Pack y que Sonrisa Neón no se obtuvo con cocos. Tus datos de cuidados no se verán afectados; cambia al icono predeterminado cuando puedas.",
+            "pt": "A App Store confirmou que este dispositivo não possui mais o Supporter Pack e que o Sorriso Neon não foi obtido com cocos. Seus dados de cuidados não serão afetados; volte ao ícone padrão quando puder.",
+            "fr": "L’App Store a confirmé que cet appareil ne possède plus le Supporter Pack et que Sourire néon n’a pas été obtenu avec des noix de coco. Tes données de soins ne sont pas affectées ; rétablis l’icône par défaut quand tu le peux.",
+            "ja": "App Storeにより、このデバイスではSupporter Packが所有されておらず、ネオンスマイルもココナッツで入手されていないことが確認されました。お世話のデータには影響しません。都合のよいときにデフォルトアイコンへ戻してください。",
+            "ko": "App Store에서 이 기기에 더 이상 Supporter Pack이 없고 네온 스마일도 코코넛으로 획득하지 않았음을 확인했습니다. 돌봄 데이터에는 영향이 없습니다. 편할 때 기본 아이콘으로 변경해 주세요.",
+            "it": "L’App Store ha confermato che questo dispositivo non possiede più il Supporter Pack e che Sorriso neon non è stato ottenuto con le noci di cocco. I dati di cura non subiranno modifiche; ripristina l’icona predefinita quando vuoi."
+        ],
+        "App Store 暂不可用": ["es": "App Store no disponible", "pt": "App Store indisponível", "fr": "App Store indisponible", "ja": "App Storeを利用できません", "ko": "App Store를 사용할 수 없음", "it": "App Store non disponibile"],
+        "App Store 无法完成此请求，请重试。": ["es": "El App Store no pudo completar esta solicitud. Inténtalo de nuevo.", "pt": "A App Store não conseguiu concluir esta solicitação. Tente novamente.", "fr": "L’App Store n’a pas pu traiter cette demande. Réessaie.", "ja": "App Storeでこのリクエストを完了できませんでした。もう一度お試しください。", "ko": "App Store에서 이 요청을 완료할 수 없습니다. 다시 시도해 주세요.", "it": "L’App Store non ha potuto completare la richiesta. Riprova."],
+        "Founding Ohana 海报": ["es": "Póster Founding Ohana", "pt": "Pôster Founding Ohana", "fr": "Affiche Founding Ohana", "ja": "Founding Ohanaポスター", "ko": "Founding Ohana 포스터", "it": "Poster Founding Ohana"],
+        "Solo 永久完整免费": ["es": "Solo siempre será totalmente gratis", "pt": "Solo será sempre totalmente gratuito", "fr": "Solo restera toujours entièrement gratuit", "ja": "Soloはずっとすべて無料", "ko": "Solo는 언제나 모든 기능이 무료", "it": "Solo sarà sempre completamente gratuito"],
+        "Supporter Pack": ["es": "Supporter Pack", "pt": "Supporter Pack", "fr": "Supporter Pack", "ja": "Supporter Pack", "ko": "Supporter Pack", "it": "Supporter Pack"],
+        "Supporter Pack 暂时无法使用。": ["es": "El Supporter Pack no está disponible temporalmente.", "pt": "O Supporter Pack está temporariamente indisponível.", "fr": "Le Supporter Pack est temporairement indisponible.", "ja": "Supporter Packは現在利用できません。", "ko": "Supporter Pack을 일시적으로 사용할 수 없습니다.", "it": "Il Supporter Pack non è temporaneamente disponibile."],
+        "Supporter Pack 已恢复。": ["es": "Supporter Pack restaurado.", "pt": "Supporter Pack restaurado.", "fr": "Supporter Pack restauré.", "ja": "Supporter Packを復元しました。", "ko": "Supporter Pack을 복원했습니다.", "it": "Supporter Pack ripristinato."],
+        "Supporter 周报海报": ["es": "Póster semanal Supporter", "pt": "Pôster semanal Supporter", "fr": "Affiche hebdomadaire Supporter", "ja": "Supporter週間レポートポスター", "ko": "Supporter 주간 리포트 포스터", "it": "Poster settimanale Supporter"],
+        "Supporter 图标权益已变化": ["es": "El acceso al icono Supporter ha cambiado", "pt": "O acesso ao ícone Supporter mudou", "fr": "L’accès à l’icône Supporter a changé", "ja": "Supporterアイコンの利用権が変更されました", "ko": "Supporter 아이콘 사용 권한이 변경됨", "it": "L’accesso all’icona Supporter è cambiato"],
+        "Supporter 背景": ["es": "Fondos Supporter", "pt": "Fundos Supporter", "fr": "Arrière-plans Supporter", "ja": "Supporter背景", "ko": "Supporter 배경", "it": "Sfondi Supporter"],
+        "一次性购买": ["es": "Compra única", "pt": "Compra única", "fr": "Achat unique", "ja": "買い切り", "ko": "일회성 구매", "it": "Acquisto una tantum"],
+        "一起让 Ohana 长久生长": ["es": "Ayuda a Ohana a crecer a largo plazo", "pt": "Ajude o Ohana a crescer por muito tempo", "fr": "Aide Ohana à grandir durablement", "ja": "Ohanaをこれからも育てよう", "ko": "Ohana가 오래 성장하도록 함께해 주세요", "it": "Aiuta Ohana a crescere nel tempo"],
+        "使用": ["es": "Usar", "pt": "Usar", "fr": "Utiliser", "ja": "使用する", "ko": "사용", "it": "Usa"],
+        "使用中": ["es": "En uso", "pt": "Em uso", "fr": "En cours d’utilisation", "ja": "使用中", "ko": "사용 중", "it": "In uso"],
+        "此购买无法验证，未解锁任何付费内容。": ["es": "No se pudo verificar esta compra. No se ha desbloqueado ningún contenido de pago.", "pt": "Não foi possível verificar esta compra. Nenhum conteúdo pago foi desbloqueado.", "fr": "Cet achat n’a pas pu être vérifié. Aucun contenu payant n’a été débloqué.", "ja": "この購入を検証できなかったため、有料コンテンツはアンロックされていません。", "ko": "이 구매를 확인할 수 없어 유료 콘텐츠가 잠금 해제되지 않았습니다.", "it": "Non è stato possibile verificare l’acquisto. Nessun contenuto a pagamento è stato sbloccato."],
+        "保留原版分享，再增加 Founding Ohana 样式": ["es": "Conserva el formato estándar y añade un estilo Founding Ohana", "pt": "Mantenha o compartilhamento padrão e adicione um estilo Founding Ohana", "fr": "Conserve le partage standard et ajoute un style Founding Ohana", "ja": "通常の共有に加えて、Founding Ohanaスタイルを利用可能", "ko": "기본 공유는 그대로 두고 Founding Ohana 스타일을 추가", "it": "Mantieni la condivisione standard e aggiungi uno stile Founding Ohana"],
+        "关闭": ["es": "Cerrar", "pt": "Fechar", "fr": "Fermer", "ja": "閉じる", "ko": "닫기", "it": "Chiudi"],
+        "分享海报": ["es": "Póster para compartir", "pt": "Pôster para compartilhar", "fr": "Affiche à partager", "ja": "共有ポスター", "ko": "공유 포스터", "it": "Poster da condividere"],
+        "午夜群岛": ["es": "Islas de Medianoche", "pt": "Ilhas da Meia-noite", "fr": "Îles de minuit", "ja": "真夜中の島々", "ko": "한밤의 섬", "it": "Isole di mezzanotte"],
+        "可选择": ["es": "Disponible", "pt": "Disponível", "fr": "Disponible", "ja": "選択可能", "ko": "선택 가능", "it": "Disponibile"],
+        "安静深蓝，衬托夜间记录": ["es": "Azul profundo y sereno para los registros nocturnos", "pt": "Azul-escuro tranquilo para os registros noturnos", "fr": "Un bleu profond et paisible pour les notes du soir", "ja": "夜の記録を引き立てる静かな深いブルー", "ko": "밤 기록을 돋보이게 하는 차분한 딥 블루", "it": "Blu profondo e tranquillo per le note notturne"],
+        "家庭成员、宠物、植物、记录、提醒与导出都不设数量付费墙。": [
+            "es": "Los miembros de la familia, las mascotas, las plantas, los registros, los recordatorios y las exportaciones no están sujetos a límites de pago.",
+            "pt": "Membros da família, pets, plantas, registros, lembretes e exportações não têm limites de quantidade pagos.",
+            "fr": "Les membres de la famille, les animaux, les plantes, les notes, les rappels et les exportations ne sont soumis à aucune limite payante.",
+            "ja": "家族、ペット、植物、記録、リマインダー、書き出しに有料の数制限はありません。",
+            "ko": "가족 구성원, 반려동물, 식물, 기록, 알림, 내보내기에 유료 수량 제한이 없습니다.",
+            "it": "Familiari, animali, piante, registri, promemoria ed esportazioni non hanno limiti quantitativi a pagamento."
+        ],
+        "已使用椰子获得，继续永久可用": ["es": "Ya se obtuvo con cocos y seguirá disponible para siempre", "pt": "Já foi obtido com cocos e continuará disponível para sempre", "fr": "Déjà obtenu avec des noix de coco et disponible définitivement", "ja": "ココナッツで入手済みのため、今後もずっと利用可能", "ko": "코코넛으로 이미 획득했으며 계속 영구 사용 가능", "it": "Già ottenuto con le noci di cocco e disponibile per sempre"],
+        "已由 Supporter Pack 解锁": ["es": "Desbloqueado con el Supporter Pack", "pt": "Desbloqueado pelo Supporter Pack", "fr": "Débloqué grâce au Supporter Pack", "ja": "Supporter Packでアンロック済み", "ko": "Supporter Pack으로 잠금 해제됨", "it": "Sbloccato con il Supporter Pack"],
+        "已解锁": ["es": "Desbloqueado", "pt": "Desbloqueado", "fr": "Débloqué", "ja": "アンロック済み", "ko": "잠금 해제됨", "it": "Sbloccato"],
+        "已选择": ["es": "Seleccionado", "pt": "Selecionado", "fr": "Sélectionné", "ja": "選択中", "ko": "선택됨", "it": "Selezionato"],
+        "当前 Apple 账号没有可恢复的 Supporter Pack 购买。": ["es": "La cuenta de Apple actual no tiene ninguna compra del Supporter Pack que se pueda restaurar.", "pt": "A Conta Apple atual não tem nenhuma compra do Supporter Pack para restaurar.", "fr": "Le compte Apple actuel ne possède aucun achat du Supporter Pack à restaurer.", "ja": "現在のApple Accountには、復元できるSupporter Packの購入がありません。", "ko": "현재 Apple 계정에 복원할 수 있는 Supporter Pack 구매 내역이 없습니다.", "it": "L’Apple Account attuale non ha acquisti del Supporter Pack da ripristinare."],
+        "恢复购买": ["es": "Restaurar compras", "pt": "Restaurar compras", "fr": "Restaurer les achats", "ja": "購入を復元", "ko": "구매 복원", "it": "Ripristina acquisti"],
+        "恢复默认图标": ["es": "Usar el icono predeterminado", "pt": "Usar o ícone padrão", "fr": "Utiliser l’icône par défaut", "ja": "デフォルトアイコンを使用", "ko": "기본 아이콘 사용", "it": "Usa l’icona predefinita"],
+        "感谢支持 · Founding Ohana": ["es": "Gracias por tu apoyo · Founding Ohana", "pt": "Obrigado pelo apoio · Founding Ohana", "fr": "Merci pour ton soutien · Founding Ohana", "ja": "ご支援ありがとう · Founding Ohana", "ko": "응원해 주셔서 감사합니다 · Founding Ohana", "it": "Grazie per il supporto · Founding Ohana"],
+        "支持 Ohana": ["es": "Apoya a Ohana", "pt": "Apoie o Ohana", "fr": "Soutenir Ohana", "ja": "Ohanaを応援", "ko": "Ohana 응원하기", "it": "Sostieni Ohana"],
+        // Prefix entry for the localized StoreKit price appended by SupporterPackView.
+        "支持并解锁 · ": ["es": "Apoya y desbloquea · ", "pt": "Apoie e desbloqueie · ", "fr": "Soutenir et débloquer · ", "ja": "応援してアンロック · ", "ko": "응원하고 잠금 해제 · ", "it": "Sostieni e sblocca · "],
+        "无法恢复默认图标": ["es": "No se pudo restaurar el icono predeterminado", "pt": "Não foi possível restaurar o ícone padrão", "fr": "Impossible de rétablir l’icône par défaut", "ja": "デフォルトアイコンに戻せませんでした", "ko": "기본 아이콘을 복원할 수 없음", "it": "Impossibile ripristinare l’icona predefinita"],
+        "暂时无法从 App Store 获取此商品。Solo 的全部功能仍可正常使用。": ["es": "Este producto no está disponible temporalmente en el App Store. Todas las funciones de Solo siguen funcionando.", "pt": "Este produto está temporariamente indisponível na App Store. Todos os recursos do Solo continuam funcionando.", "fr": "Ce produit est temporairement indisponible sur l’App Store. Toutes les fonctions de Solo restent accessibles.", "ja": "この商品は現在App Storeから取得できません。Soloのすべての機能は引き続き利用できます。", "ko": "현재 App Store에서 이 상품을 불러올 수 없습니다. Solo의 모든 기능은 계속 사용할 수 있습니다.", "it": "Questo prodotto non è temporaneamente disponibile sull’App Store. Tutte le funzioni di Solo restano utilizzabili."],
+        "标准": ["es": "Estándar", "pt": "Padrão", "fr": "Standard", "ja": "標準", "ko": "기본", "it": "Standard"],
+        "标准海报": ["es": "Póster estándar", "pt": "Pôster padrão", "fr": "Affiche standard", "ja": "標準ポスター", "ko": "기본 포스터", "it": "Poster standard"],
+        "正在恢复…": ["es": "Restaurando…", "pt": "Restaurando…", "fr": "Restauration…", "ja": "復元中…", "ko": "복원 중…", "it": "Ripristino…"],
+        "正在获取价格": ["es": "Cargando precio", "pt": "Carregando preço", "fr": "Chargement du prix", "ja": "価格を取得中", "ko": "가격 불러오는 중", "it": "Caricamento prezzo"],
+        "等待 App Store 批准": ["es": "Esperando la aprobación del App Store", "pt": "Aguardando aprovação da App Store", "fr": "En attente de l’approbation de l’App Store", "ja": "App Storeの承認待ち", "ko": "App Store 승인 대기 중", "it": "In attesa dell’approvazione dell’App Store"],
+        "流光绿洲": ["es": "Resplandor del oasis", "pt": "Brilho do oásis", "fr": "Lueur de l’oasis", "ja": "オアシスの輝き", "ko": "오아시스 글로우", "it": "Bagliore dell’oasi"],
+        "流光绿洲、午夜群岛与霓虹网格": ["es": "Resplandor del oasis, Islas de Medianoche y Cuadrícula Neón", "pt": "Brilho do oásis, Ilhas da Meia-noite e Grade Neon", "fr": "Lueur de l’oasis, Îles de minuit et Grille néon", "ja": "オアシスの輝き、真夜中の島々、ネオングリッド", "ko": "오아시스 글로우, 한밤의 섬, 네온 그리드", "it": "Bagliore dell’oasi, Isole di mezzanotte e Griglia neon"],
+        "知道了": ["es": "Entendido", "pt": "Entendi", "fr": "Compris", "ja": "わかりました", "ko": "확인", "it": "Ho capito"],
+        "稍后": ["es": "Más tarde", "pt": "Mais tarde", "fr": "Plus tard", "ja": "あとで", "ko": "나중에", "it": "Più tardi"],
+        "立即解锁；也可以在椰子商店中赚取": ["es": "Desbloquéalo ahora o consíguelo en la Tienda de Cocos", "pt": "Desbloqueie agora ou ganhe na Loja de Cocos", "fr": "Débloque-la maintenant ou obtiens-la dans la Boutique Coco", "ja": "今すぐアンロックするか、ココナッツショップで獲得", "ko": "지금 잠금 해제하거나 코코넛 상점에서 획득", "it": "Sblocca subito oppure ottienila nel Negozio delle noci di cocco"],
+        "谢谢你成为 Founding Ohana。外观权益已解锁。": ["es": "Gracias por convertirte en Founding Ohana. Tus extras visuales están desbloqueados.", "pt": "Obrigado por se tornar Founding Ohana. Seus extras visuais foram desbloqueados.", "fr": "Merci de devenir Founding Ohana. Tes bonus visuels sont débloqués.", "ja": "Founding Ohanaになってくれてありがとう。外観特典をアンロックしました。", "ko": "Founding Ohana가 되어 주셔서 감사합니다. 꾸미기 혜택이 잠금 해제되었습니다.", "it": "Grazie per essere diventato Founding Ohana. Gli extra estetici sono sbloccati."],
+        "购买后立即使用，也可在椰子商店赚取": ["es": "Úsalo de inmediato con el pack o consíguelo en la Tienda de Cocos", "pt": "Use imediatamente com o pacote ou ganhe na Loja de Cocos", "fr": "Utilise-la immédiatement avec le pack ou obtiens-la dans la Boutique Coco", "ja": "パックですぐに使うか、ココナッツショップで獲得", "ko": "팩으로 바로 사용하거나 코코넛 상점에서 획득", "it": "Usala subito con il pacchetto oppure ottienila nel Negozio delle noci di cocco"],
+        "购买正在等待批准，完成后会自动解锁。": ["es": "La compra está pendiente de aprobación y se desbloqueará automáticamente cuando se complete.", "pt": "A compra está aguardando aprovação e será desbloqueada automaticamente quando for concluída.", "fr": "L’achat attend une approbation et se débloquera automatiquement une fois terminé.", "ja": "購入は承認待ちです。完了すると自動的にアンロックされます。", "ko": "구매 승인 대기 중이며 완료되면 자동으로 잠금 해제됩니다.", "it": "L’acquisto è in attesa di approvazione e si sbloccherà automaticamente al termine."],
+        "这是一次性支持购买。它只解锁外观，不会把照护能力变成付费门槛。": [
+            "es": "Esta es una compra única de apoyo. Solo desbloquea extras visuales y nunca convierte los cuidados en una función de pago.",
+            "pt": "Esta é uma compra única de apoio. Ela só desbloqueia extras visuais e nunca transforma os cuidados em um recurso pago.",
+            "fr": "Il s’agit d’un achat de soutien unique. Il débloque seulement des bonus visuels, sans jamais rendre les soins payants.",
+            "ja": "一度きりの応援購入です。外観特典だけをアンロックし、お世話機能を有料にすることはありません。",
+            "ko": "한 번만 결제하는 응원 구매입니다. 꾸미기 혜택만 잠금 해제하며 돌봄 기능을 유료화하지 않습니다.",
+            "it": "È un acquisto di supporto una tantum. Sblocca solo extra estetici e non rende mai a pagamento le funzioni di cura."
+        ],
+        "选择分享海报": ["es": "Elegir póster para compartir", "pt": "Escolher pôster para compartilhar", "fr": "Choisir l’affiche à partager", "ja": "共有ポスターを選択", "ko": "공유 포스터 선택", "it": "Scegli il poster da condividere"],
+        "重试获取商品": ["es": "Volver a cargar el producto", "pt": "Tentar carregar o produto novamente", "fr": "Réessayer de charger le produit", "ja": "商品を再取得", "ko": "상품 다시 불러오기", "it": "Riprova a caricare il prodotto"],
+        "需要 Supporter Pack": ["es": "Requiere el Supporter Pack", "pt": "Requer o Supporter Pack", "fr": "Nécessite le Supporter Pack", "ja": "Supporter Packが必要", "ko": "Supporter Pack 필요", "it": "Richiede il Supporter Pack"],
+        "霓虹笑脸": ["es": "Sonrisa Neón", "pt": "Sorriso Neon", "fr": "Sourire néon", "ja": "ネオンスマイル", "ko": "네온 스마일", "it": "Sorriso neon"],
+        "霓虹笑脸 App 图标": ["es": "Icono de la app Sonrisa Neón", "pt": "Ícone do app Sorriso Neon", "fr": "Icône de l’app Sourire néon", "ja": "ネオンスマイルのAppアイコン", "ko": "네온 스마일 앱 아이콘", "it": "Icona app Sorriso neon"],
+        "霓虹网格": ["es": "Cuadrícula Neón", "pt": "Grade Neon", "fr": "Grille néon", "ja": "ネオングリッド", "ko": "네온 그리드", "it": "Griglia neon"],
+        "青柠光球缓慢漂浮": ["es": "Luz verde lima a la deriva", "pt": "Luz verde-limão flutuando lentamente", "fr": "Lueur citron vert en mouvement lent", "ja": "ライム色の光がゆっくり漂う", "ko": "라임빛 구체가 천천히 떠다님", "it": "Luce color lime che fluttua lentamente"],
+        "青蓝与紫色交织的数字夜景": ["es": "Una noche digital entre cian y violeta", "pt": "Uma noite digital entre ciano e violeta", "fr": "Une nuit numérique entre cyan et violet", "ja": "シアンと紫が交差するデジタルな夜景", "ko": "청록과 보라가 어우러진 디지털 야경", "it": "Una notte digitale tra ciano e viola"],
+        "首发支持者标记": ["es": "Distintivo de apoyo del lanzamiento", "pt": "Marca de apoiador do lançamento", "fr": "Badge de soutien au lancement", "ja": "ローンチサポーターマーク", "ko": "출시 서포터 표시", "it": "Contrassegno sostenitore del lancio"]
     ]
     private static let curatedStaticTranslationsExpansion: [String: [String: String]] = [
         "首页": ["ja": "ホーム", "ko": "홈", "it": "Home"],
@@ -289,13 +415,26 @@ nonisolated struct L10n {
         "生物特征": ["ja": "生体情報", "ko": "생체 정보", "it": "Bio e date"],
         "外貌特征": ["ja": "見た目", "ko": "외모", "it": "Aspetto"],
         "主题色": ["ja": "テーマカラー", "ko": "테마 색", "it": "Colore tema"],
+        "主题色（可选）": ["ja": "テーマカラー（任意）", "ko": "테마 색(선택)", "it": "Colore tema (opzionale)"],
         "名字（必填）": ["ja": "名前（必須）", "ko": "이름(필수)", "it": "Nome (obbligatorio)"],
         "物种": ["ja": "種類", "ko": "종", "it": "Specie"],
         "生日": ["ja": "誕生日", "ko": "생일", "it": "Compleanno"],
         "到家日": ["ja": "お迎え日", "ko": "집에 온 날", "it": "Giorno d'arrivo"],
         "性别": ["ja": "性別", "ko": "성별", "it": "Sesso"],
+        "性别（必填）": ["ja": "性別（必須）", "ko": "성별(필수)", "it": "Sesso (obbligatorio)"],
         "未知": ["ja": "不明", "ko": "알 수 없음", "it": "Sconosciuto"],
         "毛色": ["ja": "毛色", "ko": "털색", "it": "Mantello"],
+        "毛色（可选）": ["ja": "毛色（任意）", "ko": "털색(선택)", "it": "Mantello (opzionale)"],
+        "暂不设置": ["ja": "今は設定しない", "ko": "나중에 설정", "it": "Salta per ora"],
+        "性格（可选）": ["ja": "性格（任意）", "ko": "성격(선택)", "it": "Personalità (opzionale)"],
+        "已手动选择": ["ja": "手動で選択", "ko": "직접 선택", "it": "Scelto manualmente"],
+        "已自动分配": ["ja": "自動で割り当て", "ko": "자동 배정", "it": "Assegnato automaticamente"],
+        "已按毛色自动搭配": ["ja": "毛色に合わせて自動設定", "ko": "털색에 맞춰 자동 설정", "it": "Abbinato automaticamente al mantello"],
+        "恢复自动": ["ja": "自動に戻す", "ko": "자동으로 설정", "it": "Usa automatico"],
+        "选择宠物主题色": ["ja": "ペットのテーマカラーを選択", "ko": "반려동물 테마 색 선택", "it": "Scegli il colore tema del pet"],
+        "保存时消耗 1 张头像券": ["ja": "保存時にアバターパスを1枚使用", "ko": "저장 시 아바타 패스 1장 사용", "it": "Usa 1 pass avatar al salvataggio"],
+        "正在检查 Personal 额度": ["ja": "Personalの上限を確認中", "ko": "Personal 한도 확인 중", "it": "Verifica del limite Personal"],
+        "暂时无法检查宠物额度": ["ja": "ペットの上限を現在確認できません", "ko": "현재 반려동물 한도를 확인할 수 없습니다", "it": "Impossibile verificare ora il limite di pet"],
         "自定义": ["ja": "カスタム", "ko": "직접 설정", "it": "Personalizzato"],
         "保存中…": ["ja": "保存中…", "ko": "저장 중…", "it": "Salvataggio…"],
         "保存失败": ["ja": "保存できません", "ko": "저장 실패", "it": "Salvataggio non riuscito"],
@@ -345,9 +484,166 @@ nonisolated struct L10n {
         "继续": ["ja": "再開", "ko": "계속", "it": "Riprendi"],
         "结束": ["ja": "終了", "ko": "종료", "it": "Fine"]
     ]
+    private static let curatedPersonalCommerceTranslations: [String: [String: String]] = [
+        // MARK: - Free / Personal commerce
+        "Ohana Personal 已解锁。": ["es": "Ohana Personal ya está desbloqueado.", "pt": "Ohana Personal foi desbloqueado.", "fr": "Ohana Personal est maintenant débloqué.", "ja": "Ohana Personalが利用可能になりました。", "ko": "Ohana Personal이 잠금 해제되었습니다.", "it": "Ohana Personal è ora sbloccato."],
+        "Ohana Personal 已启用": ["es": "Ohana Personal está activo", "pt": "Ohana Personal está ativo", "fr": "Ohana Personal est actif", "ja": "Ohana Personalは有効です", "ko": "Ohana Personal이 활성화되었습니다", "it": "Ohana Personal è attivo"],
+        "免费够用，需要更多时再升级": ["es": "Free cubre lo esencial. Mejora cuando necesites más.", "pt": "Free cobre o essencial. Faça upgrade quando precisar de mais.", "fr": "Free couvre l’essentiel. Passez à la version supérieure si nécessaire.", "ja": "基本機能はFreeで。必要になったらアップグレード。", "ko": "필수 기능은 Free로. 더 필요할 때 업그레이드하세요.", "it": "Free copre l’essenziale. Passa al livello superiore quando serve."],
+        "Free 没有广告，也不会锁住你的记录。Personal 为更多活跃成员与进阶本地工具而生。": [
+            "es": "Free no tiene anuncios y nunca bloquea tus registros. Ohana Personal ofrece más espacio para crecer y herramientas locales avanzadas.",
+            "pt": "Free não tem anúncios e nunca bloqueia seus registros. Ohana Personal oferece mais espaço para crescer e ferramentas locais avançadas.",
+            "fr": "Free est sans publicité et ne bloque jamais vos données. Ohana Personal offre plus de capacité et des outils locaux avancés.",
+            "ja": "Freeには広告がなく、記録がロックされることもありません。Ohana Personalでは利用枠が広がり、高度なローカルツールを使えます。",
+            "ko": "Free에는 광고가 없으며 기록을 잠그지 않습니다. Ohana Personal은 더 넉넉한 이용 한도와 고급 로컬 도구를 제공합니다.",
+            "it": "Free è senza pubblicità e non blocca mai i tuoi dati. Ohana Personal offre più spazio per crescere e strumenti locali avanzati."
+        ],
+        "无限数量与全部 Personal 功能已可使用。": [
+            "es": "Las cantidades son ilimitadas y todas las funciones de Ohana Personal están disponibles.",
+            "pt": "As quantidades são ilimitadas e todos os recursos do Ohana Personal estão disponíveis.",
+            "fr": "Les quantités sont illimitées et toutes les fonctionnalités Ohana Personal sont disponibles.",
+            "ja": "利用数は無制限で、Ohana Personalのすべての機能を利用できます。",
+            "ko": "이용 수는 무제한이며 Ohana Personal의 모든 기능을 사용할 수 있습니다.",
+            "it": "Le quantità sono illimitate e tutte le funzioni Ohana Personal sono disponibili."
+        ],
+        "Ohana Personal 年度方案": ["es": "Ohana Personal anual", "pt": "Ohana Personal anual", "fr": "Ohana Personal annuel", "ja": "Ohana Personal 年額", "ko": "Ohana Personal 연간", "it": "Ohana Personal annuale"],
+        "Ohana Personal 月度方案": ["es": "Ohana Personal mensual", "pt": "Ohana Personal mensal", "fr": "Ohana Personal mensuel", "ja": "Ohana Personal 月額", "ko": "Ohana Personal 월간", "it": "Ohana Personal mensile"],
+        "你之前购买的 Supporter Pack 已自动升级为 Ohana Personal Lifetime，无需再次付费。": [
+            "es": "Tu compra anterior de Supporter Pack se ha actualizado a Ohana Personal Lifetime sin coste adicional.",
+            "pt": "Sua compra anterior do Supporter Pack foi atualizada para Ohana Personal Lifetime sem custo adicional.",
+            "fr": "Votre ancien achat de Supporter Pack a été converti en Ohana Personal Lifetime sans frais supplémentaires.",
+            "ja": "以前購入したSupporter Packは、追加料金なしでOhana Personal Lifetimeにアップグレードされました。",
+            "ko": "이전에 구매한 Supporter Pack이 추가 비용 없이 Ohana Personal Lifetime으로 업그레이드되었습니다.",
+            "it": "Il tuo precedente acquisto di Supporter Pack è stato aggiornato a Ohana Personal Lifetime senza costi aggiuntivi."
+        ],
+        "Free 与 Personal": ["es": "Free y Personal", "pt": "Free e Personal", "fr": "Free et Personal", "ja": "FreeとPersonal", "ko": "Free와 Personal", "it": "Free e Personal"],
+        "永久免费 · 无广告": ["es": "Free para siempre · Sin anuncios", "pt": "Free para sempre · Sem anúncios", "fr": "Free pour toujours · Sans publicité", "ja": "ずっとFree · 広告なし", "ko": "평생 Free · 광고 없음", "it": "Free per sempre · Senza pubblicità"],
+        "1 只活跃宠物、2 位活跃 Human、5 株活跃植物": ["es": "1 mascota activa, 2 Human activos y 5 plantas activas", "pt": "1 animal ativo, 2 Human ativos e 5 plantas ativas", "fr": "1 animal actif, 2 Human actifs et 5 plantes actives", "ja": "アクティブなペット1匹、Human 2人、植物5株", "ko": "활성 반려동물 1마리, Human 2명, 식물 5개", "it": "1 animale attivo, 2 Human attivi e 5 piante attive"],
+        "3 个普通活跃计划；健康关键提醒不限数量": ["es": "3 planes cotidianos activos; los recordatorios críticos de salud no tienen límite", "pt": "3 planos ativos do dia a dia; lembretes críticos de saúde são ilimitados", "fr": "3 plans courants actifs ; les rappels de santé essentiels sont illimités", "ja": "通常のアクティブなプランは3件まで。健康上重要なリマインダーは無制限", "ko": "일반 활성 플랜 3개, 건강상 중요한 미리 알림은 무제한", "it": "3 piani quotidiani attivi; i promemoria sanitari essenziali sono illimitati"],
+        "全部历史、现有数据、核心照护记录与导出始终可用": [
+            "es": "Todo el historial, los datos existentes, los registros de cuidados esenciales y las exportaciones siguen disponibles",
+            "pt": "Todo o histórico, os dados existentes, os registros essenciais de cuidados e as exportações continuam disponíveis",
+            "fr": "Tout l’historique, les données existantes, les soins essentiels et les exportations restent disponibles",
+            "ja": "すべての履歴、既存データ、基本のケア記録、エクスポートは引き続き利用できます",
+            "ko": "전체 기록, 기존 데이터, 핵심 돌봄 기록 및 내보내기는 계속 이용할 수 있습니다",
+            "it": "Tutta la cronologia, i dati esistenti, le cure essenziali e le esportazioni restano disponibili"
+        ],
+        "按月、按年或 Lifetime": ["es": "Mensual, anual o Lifetime", "pt": "Mensal, anual ou Lifetime", "fr": "Mensuel, annuel ou Lifetime", "ja": "月額、年額、またはLifetime", "ko": "월간, 연간 또는 Lifetime", "it": "Mensile, annuale o Lifetime"],
+        "月度、年度或 Lifetime": ["es": "Mensual, anual o Lifetime", "pt": "Mensal, anual ou Lifetime", "fr": "Mensuel, annuel ou Lifetime", "ja": "月額、年額、またはLifetime", "ko": "월간, 연간 또는 Lifetime", "it": "Mensile, annuale o Lifetime"],
+        "活跃宠物、Human、植物与计划不限数量": ["es": "Mascotas activas, Human, plantas y planes sin límite", "pt": "Animais ativos, Human, plantas e planos sem limite", "fr": "Animaux actifs, Human, plantes et plans sans limite", "ja": "アクティブなペット、Human、植物、プランが無制限", "ko": "활성 반려동물, Human, 식물 및 플랜 무제한", "it": "Animali attivi, Human, piante e piani senza limiti"],
+        "90 天与全部时间的进阶趋势分析": ["es": "Análisis avanzados de tendencias de 90 días y de todo el historial", "pt": "Análises avançadas de tendências de 90 dias e de todo o histórico", "fr": "Analyses avancées des tendances sur 90 jours et sur tout l’historique", "ja": "90日間と全期間の高度な傾向分析", "ko": "90일 및 전체 기간 고급 추세 분석", "it": "Analisi avanzate delle tendenze a 90 giorni e dell’intero storico"],
+        "兽医 PDF 摘要": ["es": "Resúmenes veterinarios en PDF", "pt": "Resumos veterinários em PDF", "fr": "Résumés vétérinaires en PDF", "ja": "獣医向けPDF要約", "ko": "수의사용 PDF 요약", "it": "Riepiloghi veterinari in PDF"],
+        "全部 Founding Supporter 外观权益": ["es": "Todos los extras visuales de Founding Supporter", "pt": "Todos os extras visuais de Founding Supporter", "fr": "Tous les extras visuels Founding Supporter", "ja": "Founding Supporterのすべての外観特典", "ko": "Founding Supporter의 모든 디자인 혜택", "it": "Tutti gli extra estetici Founding Supporter"],
+        "管理订阅": ["es": "Gestionar suscripción", "pt": "Gerenciar assinatura", "fr": "Gérer l’abonnement", "ja": "サブスクリプションを管理", "ko": "구독 관리", "it": "Gestisci abbonamento"],
+        "升级为 Lifetime": ["es": "Actualizar a Lifetime", "pt": "Fazer upgrade para Lifetime", "fr": "Passer à Lifetime", "ja": "Lifetimeにアップグレード", "ko": "Lifetime으로 업그레이드", "it": "Passa a Lifetime"],
+        "Lifetime 是可选的一次性购买。购买后 Apple 不会自动取消你现有的月度或年度订阅，请在订阅管理中确认续订状态。": [
+            "es": "Lifetime es una compra única opcional. Apple no cancela automáticamente tu suscripción mensual o anual actual; comprueba su renovación en la gestión de suscripciones.",
+            "pt": "Lifetime é uma compra única opcional. A Apple não cancela automaticamente sua assinatura mensal ou anual atual; confira a renovação no gerenciamento de assinaturas.",
+            "fr": "Lifetime est un achat unique facultatif. Apple n’annule pas automatiquement votre abonnement mensuel ou annuel actuel ; vérifiez son renouvellement dans la gestion des abonnements.",
+            "ja": "Lifetimeは任意の買い切り購入です。Appleが現在の月額または年額サブスクリプションを自動的に解約することはありません。サブスクリプション管理で更新状況を確認してください。",
+            "ko": "Lifetime은 선택 가능한 일회성 구매입니다. Apple은 기존 월간 또는 연간 구독을 자동으로 취소하지 않으니 구독 관리에서 갱신 상태를 확인하세요.",
+            "it": "Lifetime è un acquisto una tantum facoltativo. Apple non annulla automaticamente l’abbonamento mensile o annuale esistente; verificane il rinnovo nella gestione abbonamenti."
+        ],
+        "管理现有订阅": ["es": "Gestionar suscripción actual", "pt": "Gerenciar assinatura atual", "fr": "Gérer l’abonnement actuel", "ja": "現在のサブスクリプションを管理", "ko": "기존 구독 관리", "it": "Gestisci abbonamento esistente"],
+        "正在向 App Store 核对你的 Personal 方案。核对完成前不会推荐重复购买。": [
+            "es": "Ohana está comprobando tu plan Ohana Personal con App Store. No se ofrecerá otra compra hasta que termine la verificación.",
+            "pt": "Ohana está verificando seu plano Ohana Personal com a App Store. Nenhuma nova compra será oferecida até o fim da verificação.",
+            "fr": "Ohana vérifie votre formule Ohana Personal auprès de l’App Store. Aucun nouvel achat ne sera proposé avant la fin de la vérification.",
+            "ja": "OhanaがApp StoreでOhana Personalプランを確認しています。確認が完了するまで、再購入は案内されません。",
+            "ko": "Ohana가 App Store에서 Ohana Personal 플랜을 확인하고 있습니다. 확인이 끝날 때까지 재구매가 제공되지 않습니다.",
+            "it": "Ohana sta verificando il tuo piano Ohana Personal con l’App Store. Non verrà proposto un nuovo acquisto finché la verifica non sarà completata."
+        ],
+        "选择方案": ["es": "Elegir un plan", "pt": "Escolher um plano", "fr": "Choisir une formule", "ja": "プランを選択", "ko": "플랜 선택", "it": "Scegli un piano"],
+        "暂时无法从 App Store 获取这个方案。Free 仍可正常使用。": [
+            "es": "Este plan no está disponible temporalmente en App Store. Free sigue funcionando con normalidad.",
+            "pt": "Este plano está temporariamente indisponível na App Store. Free continua funcionando normalmente.",
+            "fr": "Cette formule est temporairement indisponible sur l’App Store. Free reste pleinement utilisable.",
+            "ja": "このプランは現在App Storeで一時的に利用できません。Freeは引き続き通常どおり使えます。",
+            "ko": "이 플랜은 현재 App Store에서 일시적으로 사용할 수 없습니다. Free는 계속 정상적으로 이용할 수 있습니다.",
+            "it": "Questo piano è temporaneamente non disponibile sull’App Store. Free continua a funzionare normalmente."
+        ],
+        "重试获取方案": ["es": "Volver a cargar los planes", "pt": "Carregar planos novamente", "fr": "Recharger les formules", "ja": "プランを再読み込み", "ko": "플랜 다시 불러오기", "it": "Ricarica i piani"],
+        "推荐": ["es": "Recomendado", "pt": "Recomendado", "fr": "Recommandé", "ja": "おすすめ", "ko": "추천", "it": "Consigliato"],
+        "未选择": ["es": "No seleccionado", "pt": "Não selecionado", "fr": "Non sélectionné", "ja": "未選択", "ko": "선택되지 않음", "it": "Non selezionato"],
+        "月度": ["es": "Mensual", "pt": "Mensal", "fr": "Mensuel", "ja": "月額", "ko": "월간", "it": "Mensile"],
+        "年度": ["es": "Anual", "pt": "Anual", "fr": "Annuel", "ja": "年額", "ko": "연간", "it": "Annuale"],
+        "按月自动续订，可随时在 Apple 账号中取消": ["es": "Se renueva mensualmente; cancela cuando quieras en tu cuenta de Apple", "pt": "Renovação mensal; cancele quando quiser na sua Conta Apple", "fr": "Renouvellement mensuel ; annulez à tout moment dans votre compte Apple", "ja": "毎月自動更新。Apple Accountでいつでも解約できます", "ko": "매월 자동 갱신되며 Apple 계정에서 언제든지 취소할 수 있습니다", "it": "Rinnovo mensile; annulla in qualsiasi momento nel tuo Apple Account"],
+        "可免费试用 14 天，之后按年续订": ["es": "14 días de prueba gratis; después, renovación anual", "pt": "Teste grátis por 14 dias; depois, renovação anual", "fr": "Essai gratuit de 14 jours, puis renouvellement annuel", "ja": "14日間無料、その後は年額で更新", "ko": "14일 무료 체험 후 연간 갱신", "it": "Prova gratuita di 14 giorni, poi rinnovo annuale"],
+        "按年自动续订，可随时在 Apple 账号中取消": ["es": "Se renueva anualmente; cancela cuando quieras en tu cuenta de Apple", "pt": "Renovação anual; cancele quando quiser na sua Conta Apple", "fr": "Renouvellement annuel ; annulez à tout moment dans votre compte Apple", "ja": "毎年自動更新。Apple Accountでいつでも解約できます", "ko": "매년 자동 갱신되며 Apple 계정에서 언제든지 취소할 수 있습니다", "it": "Rinnovo annuale; annulla in qualsiasi momento nel tuo Apple Account"],
+        "一次购买，永久解锁当前 Personal 功能": ["es": "Una compra para acceder permanentemente a las funciones actuales de Ohana Personal", "pt": "Uma compra para acesso permanente aos recursos atuais do Ohana Personal", "fr": "Un achat pour un accès permanent aux fonctionnalités Ohana Personal actuelles", "ja": "1回の購入で、現在のOhana Personal機能を永続的に利用できます", "ko": "한 번 구매하면 현재 Ohana Personal 기능을 영구적으로 이용할 수 있습니다", "it": "Un solo acquisto per accedere permanentemente alle attuali funzioni Ohana Personal"],
+        "载入中": ["es": "Cargando", "pt": "Carregando", "fr": "Chargement", "ja": "読み込み中", "ko": "불러오는 중", "it": "Caricamento"],
+        "请先选择一个方案": ["es": "Elige un plan para continuar", "pt": "Escolha um plano para continuar", "fr": "Choisissez une formule pour continuer", "ja": "続けるにはプランを選択してください", "ko": "계속하려면 플랜을 선택하세요", "it": "Scegli un piano per continuare"],
+        "Personal 外观权益": ["es": "Extras visuales de Personal", "pt": "Extras visuais do Personal", "fr": "Bonus visuels de Personal", "ja": "Personalの外観特典", "ko": "Personal 디자인 혜택", "it": "Extra estetici di Personal"],
+        "流光绿洲、午夜群岛与霓虹网格背景": ["es": "Fondos Resplandor del oasis, Islas de Medianoche y Cuadrícula Neón", "pt": "Fundos Brilho do oásis, Ilhas da Meia-noite e Grade Neon", "fr": "Arrière-plans Lueur de l’oasis, Îles de minuit et Grille néon", "ja": "オアシスの輝き、真夜中の島々、ネオングリッドの背景", "ko": "오아시스 글로우, 한밤의 섬, 네온 그리드 배경", "it": "Sfondi Bagliore dell’oasi, Isole di mezzanotte e Griglia neon"],
+        "Founding Ohana 周报海报与支持者标记": ["es": "Póster semanal Founding Ohana y distintivo de apoyo", "pt": "Pôster semanal Founding Ohana e marca de apoiador", "fr": "Affiche hebdomadaire Founding Ohana et badge de soutien", "ja": "Founding Ohana週間レポートポスターとサポーターマーク", "ko": "Founding Ohana 주간 리포트 포스터 및 서포터 표시", "it": "Poster settimanale Founding Ohana e contrassegno sostenitore"],
+        "已由 Ohana Personal 解锁": ["es": "Desbloqueado con Ohana Personal", "pt": "Desbloqueado pelo Ohana Personal", "fr": "Débloqué grâce à Ohana Personal", "ja": "Ohana Personalでアンロック済み", "ko": "Ohana Personal로 잠금 해제됨", "it": "Sbloccato con Ohana Personal"],
+        "Personal 可立即解锁，也可在椰子商店赚取": ["es": "Desbloquéalo con Personal o consíguelo en la Tienda de Cocos", "pt": "Desbloqueie com o Personal ou ganhe na Loja de Cocos", "fr": "Débloquez-le avec Personal ou obtenez-le dans la Boutique Coco", "ja": "Personalですぐにアンロックするか、ココナッツショップで獲得", "ko": "Personal로 바로 잠금 해제하거나 코코넛 상점에서 획득", "it": "Sbloccalo con Personal oppure ottienilo nel Negozio delle noci di cocco"],
+        "月度与年度方案会自动续订，除非在当前周期结束前至少 24 小时于 Apple 账号中取消。Lifetime 为一次性购买。付款由 Apple 处理。": [
+            "es": "Los planes mensuales y anuales se renuevan automáticamente, salvo que se cancelen en tu cuenta de Apple al menos 24 horas antes de que finalice el periodo actual. Lifetime es una compra única. Apple procesa el pago.",
+            "pt": "Os planos mensais e anuais são renovados automaticamente, a menos que sejam cancelados na sua Conta Apple pelo menos 24 horas antes do fim do período atual. Lifetime é uma compra única. O pagamento é processado pela Apple.",
+            "fr": "Les formules mensuelles et annuelles se renouvellent automatiquement, sauf annulation dans votre compte Apple au moins 24 heures avant la fin de la période en cours. Lifetime est un achat unique. Le paiement est traité par Apple.",
+            "ja": "月額および年額プランは、現在の期間が終了する24時間以上前にApple Accountで解約しない限り自動更新されます。Lifetimeは買い切りです。支払いはAppleが処理します。",
+            "ko": "월간 및 연간 요금제는 현재 이용 기간이 끝나기 최소 24시간 전에 Apple 계정에서 취소하지 않으면 자동 갱신됩니다. Lifetime은 일회성 구매이며 결제는 Apple에서 처리합니다.",
+            "it": "I piani mensili e annuali si rinnovano automaticamente, salvo annullamento nell’Apple Account almeno 24 ore prima della fine del periodo corrente. Lifetime è un acquisto una tantum. Il pagamento è gestito da Apple."
+        ],
+        "Lifetime 仅包含当前平台的本地 Personal 功能，不包含未来的 Family 在线服务或 Care+。": [
+            "es": "Lifetime cubre las funciones locales de Ohana Personal en esta plataforma; no incluye futuros servicios en línea de Family ni Care+.",
+            "pt": "Lifetime cobre os recursos locais do Ohana Personal nesta plataforma; futuros serviços online do Family e o Care+ não estão incluídos.",
+            "fr": "Lifetime couvre les fonctionnalités locales Ohana Personal sur cette plateforme ; les futurs services en ligne Family et Care+ ne sont pas inclus.",
+            "ja": "Lifetimeには、このプラットフォームのローカルなOhana Personal機能のみが含まれます。将来のFamilyオンラインサービスやCare+は含まれません。",
+            "ko": "Lifetime에는 이 플랫폼의 로컬 Ohana Personal 기능만 포함되며 향후 Family 온라인 서비스와 Care+는 포함되지 않습니다.",
+            "it": "Lifetime include le funzionalità locali Ohana Personal su questa piattaforma; i futuri servizi online Family e Care+ non sono inclusi."
+        ],
+        "隐私政策": ["es": "Política de privacidad", "pt": "Política de Privacidade", "fr": "Politique de confidentialité", "ja": "プライバシーポリシー", "ko": "개인정보 처리방침", "it": "Informativa sulla privacy"],
+        "使用条款": ["es": "Términos de uso", "pt": "Termos de Uso", "fr": "Conditions d’utilisation", "ja": "利用規約", "ko": "이용 약관", "it": "Termini di utilizzo"],
+        "Ohana Personal 已解锁。谢谢你的支持。": ["es": "Ohana Personal está desbloqueado. Gracias por tu apoyo.", "pt": "Ohana Personal foi desbloqueado. Obrigado pelo apoio.", "fr": "Ohana Personal est débloqué. Merci pour votre soutien.", "ja": "Ohana Personalをアンロックしました。ご支援ありがとうございます。", "ko": "Ohana Personal이 잠금 해제되었습니다. 응원해 주셔서 감사합니다.", "it": "Ohana Personal è sbloccato. Grazie per il supporto."],
+        "Ohana Personal 已恢复。": ["es": "Ohana Personal se ha restaurado.", "pt": "Ohana Personal foi restaurado.", "fr": "Ohana Personal a été restauré.", "ja": "Ohana Personalを復元しました。", "ko": "Ohana Personal을 복원했습니다.", "it": "Ohana Personal è stato ripristinato."],
+        "当前 Apple 账号没有可恢复的 Personal 或 Supporter Pack 购买。": [
+            "es": "La cuenta de Apple actual no tiene ninguna compra de Personal o Supporter Pack que se pueda restaurar.",
+            "pt": "A Conta Apple atual não tem nenhuma compra do Personal ou Supporter Pack para restaurar.",
+            "fr": "Le compte Apple actuel ne possède aucun achat Personal ou Supporter Pack à restaurer.",
+            "ja": "現在のApple Accountには、復元できるPersonalまたはSupporter Packの購入がありません。",
+            "ko": "현재 Apple 계정에 복원할 수 있는 Personal 또는 Supporter Pack 구매 내역이 없습니다.",
+            "it": "L’Apple Account attuale non ha acquisti Personal o Supporter Pack da ripristinare."
+        ],
+        "Ohana Personal 暂时无法使用。": ["es": "Ohana Personal no está disponible temporalmente.", "pt": "Ohana Personal está temporariamente indisponível.", "fr": "Ohana Personal est temporairement indisponible.", "ja": "Ohana Personalは現在利用できません。", "ko": "Ohana Personal을 일시적으로 사용할 수 없습니다.", "it": "Ohana Personal non è temporaneamente disponibile."],
+        "Personal 背景": ["es": "Fondos Personal", "pt": "Fundos Personal", "fr": "Arrière-plans Personal", "ja": "Personal背景", "ko": "Personal 배경", "it": "Sfondi Personal"],
+        "需要 Ohana Personal": ["es": "Requiere Ohana Personal", "pt": "Requer o Ohana Personal", "fr": "Nécessite Ohana Personal", "ja": "Ohana Personalが必要", "ko": "Ohana Personal 필요", "it": "Richiede Ohana Personal"],
+        "添加另一只宠物": ["es": "Añadir otra mascota", "pt": "Adicionar outro animal", "fr": "Ajouter un autre animal", "ja": "別のペットを追加", "ko": "다른 반려동물 추가", "it": "Aggiungi un altro animale"],
+        "添加更多 Human": ["es": "Añadir más Human", "pt": "Adicionar mais Human", "fr": "Ajouter d’autres Human", "ja": "Humanをさらに追加", "ko": "Human 더 추가", "it": "Aggiungi altri Human"],
+        "添加更多活跃植物": ["es": "Añadir más plantas activas", "pt": "Adicionar mais plantas ativas", "fr": "Ajouter d’autres plantes actives", "ja": "アクティブな植物をさらに追加", "ko": "활성 식물 더 추가", "it": "Aggiungi altre piante attive"],
+        "创建更多普通计划": ["es": "Crear más planes cotidianos", "pt": "Criar mais planos do dia a dia", "fr": "Créer plus de plans courants", "ja": "通常プランをさらに作成", "ko": "일반 플랜 더 만들기", "it": "Crea altri piani quotidiani"],
+        "查看更长期趋势": ["es": "Ver tendencias a más largo plazo", "pt": "Ver tendências de prazo mais longo", "fr": "Voir les tendances à plus long terme", "ja": "より長期の傾向を見る", "ko": "더 장기적인 추세 보기", "it": "Visualizza tendenze a più lungo termine"],
+        "生成兽医 PDF 摘要": ["es": "Crear un resumen veterinario en PDF", "pt": "Criar um resumo veterinário em PDF", "fr": "Créer un résumé vétérinaire en PDF", "ja": "獣医向けPDF要約を作成", "ko": "수의사용 PDF 요약 만들기", "it": "Crea un riepilogo veterinario in PDF"],
+        "使用 Personal 外观": ["es": "Usar estilos de Ohana Personal", "pt": "Usar visuais do Ohana Personal", "fr": "Utiliser les styles Ohana Personal", "ja": "Ohana Personalの外観を使用", "ko": "Ohana Personal 디자인 사용", "it": "Usa gli stili di Ohana Personal"],
+        "现有数据不会被锁定或删除。": ["es": "Tus datos existentes nunca se bloquearán ni eliminarán.", "pt": "Seus dados existentes nunca serão bloqueados nem excluídos.", "fr": "Vos données existantes ne seront jamais bloquées ni supprimées.", "ja": "既存のデータがロックまたは削除されることはありません。", "ko": "기존 데이터는 잠기거나 삭제되지 않습니다.", "it": "I dati esistenti non verranno mai bloccati né eliminati."],
+        "Free 提供最近 30 天的基础趋势；Ohana Personal 解锁 90 天与全部时间分析。现有记录始终可用。": [
+            "es": "Free incluye tendencias básicas de los últimos 30 días. Ohana Personal desbloquea análisis de 90 días y de todo el historial. Los registros existentes siguen siempre disponibles.",
+            "pt": "Free inclui tendências básicas dos últimos 30 dias. Ohana Personal libera análises de 90 dias e de todo o histórico. Os registros existentes continuam sempre disponíveis.",
+            "fr": "Free inclut les tendances de base des 30 derniers jours. Ohana Personal débloque les analyses sur 90 jours et sur tout l’historique. Les données existantes restent toujours disponibles.",
+            "ja": "Freeでは直近30日間の基本的な傾向を確認できます。Ohana Personalでは90日間と全期間の分析を利用できます。既存の記録は常に利用できます。",
+            "ko": "Free에서는 최근 30일의 기본 추세를 볼 수 있습니다. Ohana Personal에서는 90일 및 전체 기간 분석을 이용할 수 있습니다. 기존 기록은 항상 이용할 수 있습니다.",
+            "it": "Free include le tendenze di base degli ultimi 30 giorni. Ohana Personal sblocca analisi a 90 giorni e dell’intero storico. I dati esistenti restano sempre disponibili."
+        ],
+        "Ohana Personal 可从本地记录生成兽医 PDF 摘要；原始记录与手动导出始终可用。": [
+            "es": "Ohana Personal crea resúmenes veterinarios en PDF a partir de registros locales. Los registros originales y la exportación manual siguen siempre disponibles.",
+            "pt": "Ohana Personal cria resumos veterinários em PDF a partir de registros locais. Os registros originais e a exportação manual continuam sempre disponíveis.",
+            "fr": "Ohana Personal crée des résumés vétérinaires en PDF à partir des données locales. Les données brutes et l’export manuel restent toujours disponibles.",
+            "ja": "Ohana Personalではローカルの記録から獣医向けPDF要約を作成できます。元の記録と手動エクスポートは常に利用できます。",
+            "ko": "Ohana Personal은 로컬 기록으로 수의사용 PDF 요약을 만들 수 있습니다. 원본 기록과 수동 내보내기는 항상 이용할 수 있습니다.",
+            "it": "Ohana Personal crea riepiloghi veterinari in PDF dai dati locali. I dati originali e l’esportazione manuale restano sempre disponibili."
+        ],
+        "Ohana Personal 解锁全部 Founding Supporter 外观权益。": ["es": "Ohana Personal desbloquea todos los extras visuales de Founding Supporter.", "pt": "Ohana Personal libera todos os extras visuais de Founding Supporter.", "fr": "Ohana Personal débloque tous les extras visuels Founding Supporter.", "ja": "Ohana PersonalではFounding Supporterのすべての外観特典を利用できます。", "ko": "Ohana Personal은 Founding Supporter의 모든 디자인 혜택을 잠금 해제합니다.", "it": "Ohana Personal sblocca tutti gli extra estetici Founding Supporter."],
+        "Personal Lifetime · 已启用": ["es": "Personal Lifetime · Activo", "pt": "Personal Lifetime · Ativo", "fr": "Personal Lifetime · Actif", "ja": "Personal Lifetime · 有効", "ko": "Personal Lifetime · 활성", "it": "Personal Lifetime · Attivo"],
+        "Personal 年度方案 · 已启用": ["es": "Personal anual · Activo", "pt": "Personal anual · Ativo", "fr": "Personal annuel · Actif", "ja": "Personal 年額 · 有効", "ko": "Personal 연간 · 활성", "it": "Personal annuale · Attivo"],
+        "Personal 月度方案 · 已启用": ["es": "Personal mensual · Activo", "pt": "Personal mensal · Ativo", "fr": "Personal mensuel · Actif", "ja": "Personal 月額 · 有効", "ko": "Personal 월간 · 활성", "it": "Personal mensile · Attivo"],
+        "已启用": ["es": "Activo", "pt": "Ativo", "fr": "Actif", "ja": "有効", "ko": "활성", "it": "Attivo"]
+    ]
     private static let curatedStaticTranslations: [String: [String: String]] = {
         var values = curatedStaticTranslationsBase
         for (key, translations) in curatedStaticTranslationsExpansion {
+            values[key, default: [:]].merge(translations) { _, new in new }
+        }
+        for (key, translations) in curatedPersonalCommerceTranslations {
             values[key, default: [:]].merge(translations) { _, new in new }
         }
         return values

@@ -378,6 +378,7 @@ struct VerticalSolidHomeView: View {
                 localization: l,
                 onCoconut: openHeaderCoconutDestination,
                 onPrimaryAction: performHomeToolbarPrimaryAction,
+                onOpenAllFeatures: { openFunctionMenu(destination: nil) },
                 onOpenPlantData: { openFunctionMenu(destination: .plantFeatureCollection) },
                 onCrew: { routeCoordinator.openCrewRoster() },
                 onAccountSwitcher: { routeCoordinator.openAccountSwitcher() },

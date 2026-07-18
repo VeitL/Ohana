@@ -181,11 +181,13 @@ struct QuickHumanMedicationSheet: View {
                     )
                 }
             }
+            .accessibilityIdentifier("quick-human-medication-sheet")
             .navigationTitle(l.tr(zh: "添加药物", en: "Add Medication", de: "Medikament hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(l.cancel, role: .cancel) { close() }
+                        .accessibilityIdentifier("ohana-sheet-close-action")
                 }
                 if onManage != nil {
                     ToolbarItem(placement: .secondaryAction) {
@@ -260,7 +262,6 @@ struct QuickHumanMedicationSheet: View {
                 Text(l.tr(zh: "添加药物", en: "Add Medication", de: "Medikament hinzufügen"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .accessibilityIdentifier("quick-human-medication-sheet")
                 Text(human.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)

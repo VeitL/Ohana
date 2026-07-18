@@ -247,6 +247,8 @@ enum AppResetService {
         "ohanaGrowthLastSeenTreeLevelV1",
         "ohanaGrowthOnboardingCompletedV1",
         "petBondVaultRevision",
+        AppExperienceMode.zenOwnerHumanIDKey,
+        AppExperienceMode.zenOwnerNeedsRebindKey,
         "purchasedShopItems",
         "quickActionItems_v2"
     ]
@@ -280,6 +282,7 @@ enum AppResetService {
         "oasis_",
         "petBondVaultConsumed_",
         "petBondVaultUnlocked_",
+        "presence.",
         "quest_",
         "shop_",
         "scoopAnchorDate_",

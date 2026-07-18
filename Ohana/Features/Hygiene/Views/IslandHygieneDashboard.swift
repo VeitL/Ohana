@@ -6,12 +6,17 @@
 //
 
 import SwiftUI
+import UIKit
 
 private enum HygieneDashboardRange: Hashable, CaseIterable {
     case days7
     case days30
     case days90
     case all
+
+    var requiresPersonal: Bool {
+        self == .days90 || self == .all
+    }
 
     func title(_ l: L10n) -> String {
         switch self {
@@ -62,10 +67,12 @@ struct IslandHygieneDashboardContentView: View {
     let hygieneLedgerEntries: [HygieneDashboardLedgerEntry]
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedPetId: UUID? = nil
     @State private var selectedRange: HygieneDashboardRange = .days30
+    @State private var showingPersonalPlan = false
     @State private var sheetPet: Pet? = nil
     @State private var chartProgress: Double = 0
 
@@ -153,6 +160,15 @@ struct IslandHygieneDashboardContentView: View {
         dashboardBody
             .sheet(item: $sheetPet) { pet in
                 PetHygieneDetailView(pet: pet)
+            }
+            .sheet(isPresented: $showingPersonalPlan) {
+                PersonalPlanView()
+                    .ohanaSheetPagePresentation()
+            }
+            .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+                if selectedRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                    selectedRange = .days30
+                }
             }
             .onAppear { playChartEntrance() }
             .onChange(of: selectedPetId) { _, _ in playChartEntrance() }
@@ -282,7 +298,11 @@ struct IslandHygieneDashboardContentView: View {
                     .font(OhanaFont.subheadline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                DashboardRangePicker(ranges: HygieneDashboardRange.allCases, selection: $selectedRange) {
+                DashboardRangePicker(
+                    ranges: HygieneDashboardRange.allCases,
+                    selection: personalRangeSelection,
+                    isLocked: { $0.requiresPersonal && !appServices.commerce.allows(.extendedTrends) }
+                ) {
                     $0.title(l)
                 }
             }
@@ -305,6 +325,20 @@ struct IslandHygieneDashboardContentView: View {
         }
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+    }
+
+    private var personalRangeSelection: Binding<HygieneDashboardRange> {
+        Binding(
+            get: { selectedRange },
+            set: { range in
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                selectedRange = range
+            }
+        )
     }
 
     private var hygieneBadgeStrip: some View {

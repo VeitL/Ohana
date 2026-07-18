@@ -80,7 +80,11 @@ struct FeatureAggregateView: View {
         .onDisappear {
             avatarPipeline.cancel(key: humanAvatarCacheKey)
         }
-        .accessibilityIdentifier("function-menu-aggregate-\(feature.rawValue)")
+        .accessibilityIdentifier(
+            feature == .achievements
+                ? "achievement-unified-wall"
+                : "function-menu-aggregate-\(feature.rawValue)"
+        )
     }
 
     private var pageHeader: some View {
@@ -235,6 +239,8 @@ struct FeatureAggregateView: View {
             IslandExpenseDashboard(standalone: false)
         case .walks:
             IslandExplorationDashboard(standalone: false)
+        case .achievements:
+            AchievementUnifiedWallView(pets: activePets, humans: visibleHumans)
         default:
             summaryList
         }

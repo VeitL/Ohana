@@ -44,7 +44,7 @@ iPhone 11 through the current iPhone generation:
 | Lane | Required evidence |
 | --- | --- |
 | Automated tests | Unit, Integration, and UI tests use only the disposable `iPhone 17 Tests` device and `.build/DerivedData/tests`. |
-| Persistent Dogfood | Non-destructive long-lived journeys use the pinned `iPhone 17` through `scripts/run-dogfood-simulator.sh` and preserve its app/data container. |
+| Persistent Dogfood | Non-destructive long-lived journeys use the pinned `iPhone 17 Dogfood` Release synthetic user through `scripts/run-dogfood-simulator.sh` and preserve its durable app data across container remounts. |
 | Release compiler lane | Optimized compiler validation uses a generic iOS Simulator destination and `.build/DerivedData/release`; signed-device proof still requires an Archive. |
 | Hardware floor | Signed Release smoke on iPhone SE (2nd generation), or the smallest supported iPhone actually used for launch, running iOS 26.2 or later. |
 | Current hardware | Signed Release smoke on a current iPhone and current supported iOS. |

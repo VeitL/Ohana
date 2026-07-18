@@ -113,6 +113,46 @@ enum AchievementRewardCommandService {
     ) -> AchievementRewardCommandResult {
         let entityID = human?.id ?? pet.id
         let entityKind = human == nil ? EntityKind.pet.rawValue : EntityKind.human.rawValue
+        return PersistenceWriteFence.withExclusiveAccess(
+            context: context,
+            unavailable: {
+                AchievementRewardCommandResult(
+                    entityID: entityID,
+                    entityKind: entityKind,
+                    badgeIDs: claims.map(\.badgeID),
+                    totalAmount: 0,
+                    updatedClaimedRewardRaw: claimedRewardRaw,
+                    didClaim: false
+                )
+            },
+            operation: {
+                claimRewardsWhileFenced(
+                    claims,
+                    claimedRewardRaw: claimedRewardRaw,
+                    amountPerBadge: amountPerBadge,
+                    human: human,
+                    pet: pet,
+                    context: context,
+                    questManager: providedQuestManager,
+                    wallet: wallet
+                )
+            }
+        )
+    }
+
+    @MainActor
+    private static func claimRewardsWhileFenced(
+        _ claims: [AchievementRewardClaim],
+        claimedRewardRaw: String,
+        amountPerBadge: Int,
+        human: Human?,
+        pet: Pet,
+        context: ModelContext,
+        questManager providedQuestManager: QuestManager? = nil,
+        wallet: CoconutWalletManaging
+    ) -> AchievementRewardCommandResult {
+        let entityID = human?.id ?? pet.id
+        let entityKind = human == nil ? EntityKind.pet.rawValue : EntityKind.human.rawValue
         let canWriteWallet = if let human {
             EconomyWalletWritePolicy.canWrite(human)
         } else {
@@ -129,6 +169,14 @@ enum AchievementRewardCommandService {
             )
         }
         var claimedIDs = Set(claimedRewardRaw.split(separator: ",").map(String.init))
+        let durableReceipts = (try? context.fetch(FetchDescriptor<AchievementRewardReceipt>())) ?? []
+        var durableReceiptKeys = Set(durableReceipts.map(\.achievementKey))
+        durableReceiptKeys.formUnion(
+            durableReceipts
+                .filter { $0.achievementID.hasPrefix("global_") }
+                .map { AchievementScopeReference.island.achievementKey(for: $0.achievementID) }
+        )
+        claimedIDs.formUnion(durableReceiptKeys)
         let claimable = claims.filter { claim in
             claim.isUnlocked && !claimedIDs.contains(claim.rewardKey)
         }
@@ -139,6 +187,20 @@ enum AchievementRewardCommandService {
                 badgeIDs: claims.map(\.badgeID),
                 totalAmount: 0,
                 updatedClaimedRewardRaw: claimedRewardRaw,
+                didClaim: false
+            )
+        }
+
+        // Global facts belong to the island but their coconut reward must have
+        // an explicit active Human recipient. Never fall back to a Pet wallet
+        // or partially claim a mixed batch.
+        guard human != nil || !claimable.contains(where: { $0.badgeID.hasPrefix("global_") }) else {
+            return AchievementRewardCommandResult(
+                entityID: entityID,
+                entityKind: entityKind,
+                badgeIDs: claims.map(\.badgeID),
+                totalAmount: 0,
+                updatedClaimedRewardRaw: claimedIDs.sorted().joined(separator: ","),
                 didClaim: false
             )
         }
@@ -194,6 +256,73 @@ enum AchievementRewardCommandService {
                 updatesProjection: true,
                 projectionManager: questManager
             )
+            let now = Date()
+            let stardustAmount = claimable.reduce(0) { total, claim in
+                total + (AchievementDefinitionCatalog.definition(id: claim.badgeID)?.reward.stardust ?? 0)
+            }
+            if stardustAmount > 0 {
+                let catalogID = OasisCompanionCurrency.stardustCatalogID
+                var descriptor = FetchDescriptor<OasisCritterFragmentBalance>(
+                    predicate: #Predicate { $0.catalogId == catalogID }
+                )
+                descriptor.fetchLimit = 1
+                let balance: OasisCritterFragmentBalance
+                if let existing = try context.fetch(descriptor).first {
+                    balance = existing
+                } else {
+                    balance = OasisCritterFragmentBalance(catalogId: catalogID, updatedAt: now)
+                    context.insert(balance)
+                }
+                balance.amount += stardustAmount
+                balance.updatedAt = now
+            }
+            for claim in claimable {
+                let rewardKey = claim.rewardKey
+                let scopeKind: AchievementScopeKind
+                let scopeID: String
+                if claim.badgeID.hasPrefix("global_") {
+                    scopeKind = .island
+                    scopeID = AchievementScopeReference.islandID
+                } else if let human {
+                    scopeKind = .human
+                    scopeID = human.id.uuidString
+                } else {
+                    scopeKind = .pet
+                    scopeID = pet.id.uuidString
+                }
+                var unlockDescriptor = FetchDescriptor<AchievementUnlock>(
+                    predicate: #Predicate { $0.achievementKey == rewardKey }
+                )
+                unlockDescriptor.fetchLimit = 1
+                if try context.fetch(unlockDescriptor).isEmpty {
+                    context.insert(
+                        AchievementUnlock(
+                            achievementKey: rewardKey,
+                            achievementID: claim.badgeID,
+                            scopeKindRaw: scopeKind.rawValue,
+                            scopeIDRaw: scopeID,
+                            unlockedAt: now,
+                            createdAt: now
+                        )
+                    )
+                }
+                let definition = AchievementDefinitionCatalog.definition(id: claim.badgeID)
+                context.insert(
+                    AchievementRewardReceipt(
+                        receiptKey: "achievement-reward:\(rewardKey)",
+                        achievementKey: rewardKey,
+                        achievementID: claim.badgeID,
+                        scopeKindRaw: scopeKind.rawValue,
+                        scopeIDRaw: scopeID,
+                        recipientHumanIDRaw: human?.id.uuidString ?? "",
+                        claimedAt: now,
+                        awardedCoconutAmount: amountPerBadge,
+                        awardedStardustAmount: definition?.reward.stardust ?? 0,
+                        walletTransactionKey: "achievement:\(rewardKey)",
+                        createdAt: now
+                    )
+                )
+            }
             try saveRewardEconomyChanges(context: context)
         } catch {
             context.rollback()
@@ -294,13 +423,16 @@ enum BackdateCheckInCommandService {
 }
 
 enum ShopPurchaseFailure: Equatable {
+    case invalidItem
     case missingActiveHuman
     case insufficientBalance(missing: Int)
     case walletFrozen
+    case backupOrRestoreInProgress
     case persistenceFailed
 }
 
 struct ShopPurchaseCommandResult: Equatable {
+    let attemptID: UUID?
     let humanID: UUID?
     let itemID: String
     let cost: Int
@@ -311,16 +443,54 @@ struct ShopPurchaseCommandResult: Equatable {
     let fundingContributions: [ShopPurchaseFundingContribution]
 }
 
-struct ShopPurchaseFundingContribution: Equatable {
+nonisolated struct ShopPurchaseFundingContribution: Codable, Equatable, Sendable {
     let humanID: UUID
     let amount: Int
+}
+
+nonisolated enum ShopPurchaseFundingSnapshotValidator {
+    static func isValid(
+        _ contributions: [ShopPurchaseFundingContribution],
+        expectedTotal: Int
+    ) -> Bool {
+        guard expectedTotal >= 0 else { return false }
+        guard expectedTotal > 0 else { return contributions.isEmpty }
+        guard !contributions.isEmpty else { return false }
+
+        var seenHumanIDs = Set<UUID>()
+        var total = 0
+        for contribution in contributions {
+            guard contribution.amount > 0,
+                  seenHumanIDs.insert(contribution.humanID).inserted else {
+                return false
+            }
+            let addition = total.addingReportingOverflow(contribution.amount)
+            guard !addition.overflow else { return false }
+            total = addition.partialValue
+        }
+        return total == expectedTotal
+    }
+}
+
+nonisolated struct ShopPurchaseFulfillmentPayload: Codable, Equatable, Sendable {
+    static let currentVersion = 2
+
+    let version: Int
+    let purchasedAt: Date
+    var treeEnergyXP: Int?
+
+    init(purchasedAt: Date, treeEnergyXP: Int? = nil) {
+        version = Self.currentVersion
+        self.purchasedAt = purchasedAt
+        self.treeEnergyXP = treeEnergyXP
+    }
 }
 
 enum ShopPurchaseCommandService {
     @discardableResult
     @MainActor
     static func purchase(
-        item: ShopItem,
+        item submittedItem: ShopItem,
         buyer: Human?,
         itemName: String,
         context: ModelContext,
@@ -328,8 +498,68 @@ enum ShopPurchaseCommandService {
         wallet: CoconutWalletManaging,
         careLedger: CareLedgerRecording
     ) -> ShopPurchaseCommandResult {
+        ShopPurchaseBackupFence.withExclusiveAccess(
+            context: context,
+            unavailable: {
+                ShopPurchaseCommandResult(
+                    attemptID: nil,
+                    humanID: buyer?.id,
+                    itemID: submittedItem.id,
+                    cost: submittedItem.cost,
+                    didPurchase: false,
+                    failure: .backupOrRestoreInProgress,
+                    ledgerEventID: nil,
+                    transactionKey: nil,
+                    fundingContributions: []
+                )
+            },
+            operation: {
+                purchaseWhileFenced(
+                    item: submittedItem,
+                    buyer: buyer,
+                    itemName: itemName,
+                    context: context,
+                    questManager: providedQuestManager,
+                    wallet: wallet,
+                    careLedger: careLedger
+                )
+            }
+        )
+    }
+
+    @MainActor
+    private static func purchaseWhileFenced(
+        item submittedItem: ShopItem,
+        buyer: Human?,
+        itemName: String,
+        context: ModelContext,
+        questManager providedQuestManager: QuestManager? = nil,
+        wallet: CoconutWalletManaging,
+        careLedger: CareLedgerRecording
+    ) -> ShopPurchaseCommandResult {
+        guard let item = ShopCatalog.item(id: submittedItem.id),
+              submittedItem.emoji == item.emoji,
+              submittedItem.nameText == item.nameText,
+              submittedItem.descriptionText == item.descriptionText,
+              submittedItem.cost == item.cost,
+              submittedItem.category == item.category,
+              submittedItem.isConsumable == item.isConsumable,
+              submittedItem.appIcon == item.appIcon else {
+            return ShopPurchaseCommandResult(
+                attemptID: nil,
+                humanID: buyer?.id,
+                itemID: submittedItem.id,
+                cost: submittedItem.cost,
+                didPurchase: false,
+                failure: .invalidItem,
+                ledgerEventID: nil,
+                transactionKey: nil,
+                fundingContributions: []
+            )
+        }
         guard item.cost > 0 else {
             return ShopPurchaseCommandResult(
+                attemptID: nil,
                 humanID: buyer?.id,
                 itemID: item.id,
                 cost: item.cost,
@@ -342,6 +572,7 @@ enum ShopPurchaseCommandService {
         }
         guard let buyer else {
             return ShopPurchaseCommandResult(
+                attemptID: nil,
                 humanID: nil,
                 itemID: item.id,
                 cost: item.cost,
@@ -354,6 +585,7 @@ enum ShopPurchaseCommandService {
         }
         guard EconomyWalletWritePolicy.canWrite(buyer) else {
             return ShopPurchaseCommandResult(
+                attemptID: nil,
                 humanID: buyer.id,
                 itemID: item.id,
                 cost: item.cost,
@@ -368,6 +600,7 @@ enum ShopPurchaseCommandService {
             do {
                 if try ShopPurchaseRecordStore.isOwned(itemID: item.id, context: context) {
                     return ShopPurchaseCommandResult(
+                        attemptID: nil,
                         humanID: buyer.id,
                         itemID: item.id,
                         cost: item.cost,
@@ -378,8 +611,32 @@ enum ShopPurchaseCommandService {
                         fundingContributions: []
                     )
                 }
+                if item.appIcon != nil,
+                   let pending = try pendingAttempt(itemID: item.id, context: context) {
+                    return pendingResult(for: pending)
+                }
             } catch {
                 return ShopPurchaseCommandResult(
+                    attemptID: nil,
+                    humanID: buyer.id,
+                    itemID: item.id,
+                    cost: item.cost,
+                    didPurchase: false,
+                    failure: .persistenceFailed,
+                    ledgerEventID: nil,
+                    transactionKey: nil,
+                    fundingContributions: []
+                )
+            }
+        }
+        if item.isConsumable {
+            do {
+                if let pending = try pendingAttempt(itemID: item.id, context: context) {
+                    return pendingResult(for: pending)
+                }
+            } catch {
+                return ShopPurchaseCommandResult(
+                    attemptID: nil,
                     humanID: buyer.id,
                     itemID: item.id,
                     cost: item.cost,
@@ -399,6 +656,7 @@ enum ShopPurchaseCommandService {
         )
         guard fundingPlan.missing == 0 else {
             return ShopPurchaseCommandResult(
+                attemptID: nil,
                 humanID: buyer.id,
                 itemID: item.id,
                 cost: item.cost,
@@ -411,17 +669,14 @@ enum ShopPurchaseCommandService {
         }
 
         let purchaseID = UUID()
-        let transactionKey = item.isConsumable
-            ? "shop:\(item.id):\(buyer.id.uuidString):\(purchaseID.uuidString)"
-            : "shop:\(item.id):\(buyer.id.uuidString)"
+        let purchasedAt = Date()
+        let transactionKey = "shop:\(item.id):\(buyer.id.uuidString):\(purchaseID.uuidString)"
         let cofundingMetadata = fundingPlan.contributions.count > 1
             ? ",\"cofunded\":true,\"fundingSourceCount\":\(fundingPlan.contributions.count)"
             : ""
-        let metadataJSON = item.isConsumable
-            ? "{\"shopItemId\":\"\(item.id)\",\"purchaseId\":\"\(purchaseID.uuidString)\",\"consumable\":true\(cofundingMetadata)}"
-            : "{\"shopItemId\":\"\(item.id)\"\(cofundingMetadata)}"
+        let metadataJSON = "{\"shopItemId\":\"\(item.id)\",\"purchaseId\":\"\(purchaseID.uuidString)\",\"consumable\":\(item.isConsumable)\(cofundingMetadata)}"
         let ledger = careLedger.record(
-            occurredAt: Date(),
+            occurredAt: purchasedAt,
             actorKind: .human,
             actorId: buyer.id.uuidString,
             subjectKind: .system,
@@ -450,7 +705,7 @@ enum ShopPurchaseCommandService {
                 delta: -contribution.amount,
                 entryKind: isBuyer ? .spend : .transferOut,
                 source: .shop,
-                title: isBuyer ? itemName : "合资补差：\(itemName)",
+                title: itemName,
                 emoji: item.emoji,
                 actorId: contribution.human.id.uuidString,
                 actorName: contribution.human.name,
@@ -465,6 +720,28 @@ enum ShopPurchaseCommandService {
                     : "\(transactionKey):\(contribution.human.id.uuidString)"
             )
         }
+        let contributionSnapshots = fundingPlan.contributions.map {
+            ShopPurchaseFundingContribution(humanID: $0.human.id, amount: $0.amount)
+        }
+        let needsDeferredFulfillment = item.isConsumable || item.appIcon != nil
+        let attempt: ShopPurchaseAttempt? = if needsDeferredFulfillment {
+            ShopPurchaseAttempt(
+                id: purchaseID,
+                transactionKey: transactionKey,
+                itemId: item.id,
+                buyerHumanId: buyer.id.uuidString,
+                price: item.cost,
+                state: .purchased,
+                purchaseLedgerEventId: ledger.id,
+                fundingContributionsJSON: encode(contributionSnapshots),
+                fulfillmentPayloadJSON: encode(ShopPurchaseFulfillmentPayload(purchasedAt: purchasedAt)),
+                nextRetryAt: item.appIcon == nil ? nil : purchasedAt.addingTimeInterval(60),
+                createdAt: purchasedAt,
+                updatedAt: purchasedAt
+            )
+        } else {
+            nil
+        }
         do {
             try CoconutWalletMutationWriter.applyHumanMutations(
                 walletMutations,
@@ -475,12 +752,17 @@ enum ShopPurchaseCommandService {
                 updatesProjection: true,
                 projectionManager: providedQuestManager ?? QuestManager()
             )
-            try ShopPurchaseRecordStore.insertOwnershipRecordIfNeeded(
-                item: item,
-                buyer: buyer,
-                transactionKey: transactionKey,
-                context: context
-            )
+            if let attempt {
+                context.insert(attempt)
+            } else {
+                try ShopPurchaseRecordStore.insertOwnershipRecordIfNeeded(
+                    item: item,
+                    buyer: buyer,
+                    transactionKey: transactionKey,
+                    context: context,
+                    purchasedAt: purchasedAt
+                )
+            }
             try saveRewardEconomyChanges(context: context)
         } catch {
             context.rollback()
@@ -495,6 +777,7 @@ enum ShopPurchaseCommandService {
                 .persistenceFailed
             }
             return ShopPurchaseCommandResult(
+                attemptID: nil,
                 humanID: buyer.id,
                 itemID: item.id,
                 cost: item.cost,
@@ -507,6 +790,7 @@ enum ShopPurchaseCommandService {
         }
 
         return ShopPurchaseCommandResult(
+            attemptID: attempt?.id,
             humanID: buyer.id,
             itemID: item.id,
             cost: item.cost,
@@ -514,10 +798,56 @@ enum ShopPurchaseCommandService {
             failure: nil,
             ledgerEventID: ledger.id,
             transactionKey: transactionKey,
-            fundingContributions: fundingPlan.contributions.map {
-                ShopPurchaseFundingContribution(humanID: $0.human.id, amount: $0.amount)
-            }
+            fundingContributions: contributionSnapshots
         )
+    }
+
+    private static func pendingAttempt(
+        itemID: String,
+        context: ModelContext
+    ) throws -> ShopPurchaseAttempt? {
+        let fulfilled = ShopPurchaseAttemptState.fulfilled.rawValue
+        let refunded = ShopPurchaseAttemptState.refunded.rawValue
+        var descriptor = FetchDescriptor<ShopPurchaseAttempt>(
+            predicate: #Predicate<ShopPurchaseAttempt> { attempt in
+                attempt.itemId == itemID &&
+                    attempt.stateRaw != fulfilled &&
+                    attempt.stateRaw != refunded
+            },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func pendingResult(for attempt: ShopPurchaseAttempt) -> ShopPurchaseCommandResult {
+        let contributions = decode(
+            [ShopPurchaseFundingContribution].self,
+            from: attempt.fundingContributionsJSON
+        ) ?? []
+        let remainsFulfillable = attempt.state == .purchased || attempt.state == .fulfilling
+        return ShopPurchaseCommandResult(
+            attemptID: attempt.id,
+            humanID: UUID(uuidString: attempt.buyerHumanId),
+            itemID: attempt.itemId,
+            cost: attempt.price,
+            didPurchase: remainsFulfillable,
+            failure: remainsFulfillable ? nil : .persistenceFailed,
+            ledgerEventID: attempt.purchaseLedgerEventId,
+            transactionKey: attempt.transactionKey,
+            fundingContributions: contributions
+        )
+    }
+
+    private static func encode(_ value: some Encodable) -> String {
+        guard let data = try? JSONEncoder().encode(value),
+              let json = String(data: data, encoding: .utf8) else { return "{}" }
+        return json
+    }
+
+    private static func decode<Value: Decodable>(_: Value.Type, from raw: String) -> Value? {
+        guard let data = raw.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(Value.self, from: data)
     }
 }
 
@@ -704,6 +1034,27 @@ enum Avatar2DUpgradeCommandService {
         _ human: Human,
         context: ModelContext
     ) -> Avatar2DUpgradeCommandResult {
+        ShopPurchaseBackupFence.withExclusiveAccess(
+            context: context,
+            unavailable: {
+                Avatar2DUpgradeCommandResult(
+                    entityID: human.id,
+                    kind: EntityKind.human.rawValue,
+                    didUpgrade: false,
+                    failure: .persistenceFailed
+                )
+            },
+            operation: {
+                upgradeHumanWhileFenced(human, context: context)
+            }
+        )
+    }
+
+    @MainActor
+    private static func upgradeHumanWhileFenced(
+        _ human: Human,
+        context: ModelContext
+    ) -> Avatar2DUpgradeCommandResult {
         guard MemberLifecycleGate.disposition(human: human, writeKind: .presentationPreference).writesContent else {
             return Avatar2DUpgradeCommandResult(
                 entityID: human.id,
@@ -759,6 +1110,27 @@ enum Avatar2DUpgradeCommandService {
     @discardableResult
     @MainActor
     static func upgradePet(
+        _ pet: Pet,
+        context: ModelContext
+    ) -> Avatar2DUpgradeCommandResult {
+        ShopPurchaseBackupFence.withExclusiveAccess(
+            context: context,
+            unavailable: {
+                Avatar2DUpgradeCommandResult(
+                    entityID: pet.id,
+                    kind: EntityKind.pet.rawValue,
+                    didUpgrade: false,
+                    failure: .persistenceFailed
+                )
+            },
+            operation: {
+                upgradePetWhileFenced(pet, context: context)
+            }
+        )
+    }
+
+    @MainActor
+    private static func upgradePetWhileFenced(
         _ pet: Pet,
         context: ModelContext
     ) -> Avatar2DUpgradeCommandResult {

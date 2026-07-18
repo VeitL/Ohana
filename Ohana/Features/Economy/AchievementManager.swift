@@ -9,7 +9,7 @@ import SwiftUI
 
 // MARK: - Achievement Definition
 
-struct Achievement: Identifiable, Equatable {
+nonisolated struct Achievement: Identifiable, Equatable {
     let id: String
     let emoji: String
     let title: String
@@ -23,8 +23,9 @@ struct Achievement: Identifiable, Equatable {
     }
 }
 
-struct AchievementComputationContext {
+nonisolated struct AchievementComputationContext {
     var allPets: [Pet] = []
+    var allHumans: [Human] = []
     var electronicPets: [OasisElectronicPet] = []
     var critterFragments: [OasisCritterFragmentBalance] = []
     var critterActionLogs: [OasisCritterActionLog] = []
@@ -37,6 +38,7 @@ struct AchievementComputationContext {
 
     var includesGlobalAchievements: Bool {
         !allPets.isEmpty
+            || !allHumans.isEmpty
             || !electronicPets.isEmpty
             || !critterFragments.isEmpty
             || !critterActionLogs.isEmpty
@@ -53,7 +55,7 @@ struct AchievementComputationContext {
     }
 }
 
-struct AchievementPetActivitySummary: Equatable {
+nonisolated struct AchievementPetActivitySummary: Equatable {
     var foodRecordDates: [Date]
     var photoDates: [Date]
     var milestoneDates: [Date]
@@ -102,7 +104,7 @@ struct AchievementPetActivitySummary: Equatable {
     }
 }
 
-struct AchievementCareLedgerSummary {
+nonisolated struct AchievementCareLedgerSummary {
     private let events: [CareLedgerEvent]
 
     init(events: [CareLedgerEvent], petID: UUID) {
@@ -225,6 +227,25 @@ struct AchievementCareLedgerSummary {
         return calendar.dateComponents([.day], from: first, to: last).day ?? 0
     }
 
+    static func longestConsecutiveCalendarDays(_ dates: [Date], calendar: Calendar) -> Int {
+        let uniqueDays = Set(dates.map { calendar.startOfDay(for: $0) }).sorted()
+        guard !uniqueDays.isEmpty else { return 0 }
+        var longest = 1
+        var current = 1
+        for index in uniqueDays.indices.dropFirst() {
+            let previous = uniqueDays[uniqueDays.index(before: index)]
+            let day = uniqueDays[index]
+            let distance = calendar.dateComponents([.day], from: previous, to: day).day ?? 0
+            if distance == 1 {
+                current += 1
+                longest = max(longest, current)
+            } else {
+                current = 1
+            }
+        }
+        return longest
+    }
+
     func recordedFoodKindCount() -> Int {
         Set(mainFeedEvents.compactMap {
             CareLedgerMetadata.stringValue(named: CareLedgerMetadata.feedFoodKind, in: $0.metadataJSON)
@@ -302,6 +323,23 @@ struct AchievementCareLedgerSummary {
     }
 }
 
+private nonisolated enum AchievementColorPalette {
+    static let teal = Color(hex: "00D4AA")
+    static let yellow = Color(hex: "FFF44F")
+    static let mint = Color(hex: "B8FFD0")
+    static let orange = Color(hex: "FF8C42")
+    static let red = Color(hex: "FF4757")
+    static let cardBlue = Color(hex: "5B6AFF")
+    static let cardCyan = Color(hex: "80FFEA")
+    static let primary = Color(
+        UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 200 / 255, green: 255 / 255, blue: 0, alpha: 1)
+                : UIColor(red: 59 / 255, green: 130 / 255, blue: 246 / 255, alpha: 1)
+        }
+    )
+}
+
 // MARK: - Achievement Manager
 
 @Observable
@@ -311,7 +349,7 @@ final class AchievementManager {
 
     init() {}
 
-    private static func copy(zh: String, en: String) -> String {
+    private nonisolated static func copy(zh: String, en: String) -> String {
         L10n.current.tr(zh: zh, en: en)
     }
 
@@ -370,12 +408,13 @@ final class AchievementManager {
         return [bondedWalk, stepChampion]
     }
 
-    static func compute(for pet: Pet, context: AchievementComputationContext = .empty) -> [Achievement] {
+    nonisolated static func compute(for pet: Pet, context: AchievementComputationContext = .empty) -> [Achievement] {
         let calendar = Calendar.current
         let now = Date()
         let today = calendar.startOfDay(for: now)
         let allPets = context.allPets.isEmpty ? [pet] : context.allPets
         let livePets = allPets.filter { !$0.hasPassedAway }
+        let liveHumans = context.allHumans.filter { !$0.hasPassedAway }
         let careLedgerSummary = context.careLedgerSummary(for: pet)
         let petActivitySummary = context.petActivitySummary(for: pet)
 
@@ -412,7 +451,7 @@ final class AchievementManager {
             }
             return Achievement(id: "iron_gut", emoji: "💪", title: copy(zh: "钢铁肠胃", en: "Iron Stomach"),
                                description: copy(zh: "连续 7 天每天都有完美便便记录", en: "Log perfect poop for 7 days in a row."),
-                               color: Color.goTeal, isUnlocked: streak)
+                               color: AchievementColorPalette.teal, isUnlocked: streak)
         }()
 
         // 2. 🏃 铁脚板：累计遛狗 >= 100km
@@ -420,7 +459,7 @@ final class AchievementManager {
             let total = careLedgerSummary.totalWalkMeters()
             return Achievement(id: "iron_paw", emoji: "🏃", title: copy(zh: "铁脚板", en: "Iron Paws"),
                                description: copy(zh: "累计遛狗总距离达到 100km", en: "Reach 100 km total walking distance."),
-                               color: Color.goTeal, isUnlocked: total >= 100_000)
+                               color: AchievementColorPalette.teal, isUnlocked: total >= 100_000)
         }()
 
         // 3. 📅 连续巡岛：连续 7 天都有 walkLog
@@ -437,7 +476,7 @@ final class AchievementManager {
             }
             return Achievement(id: "walk_streak", emoji: "📅", title: copy(zh: "连续巡岛", en: "Walking Streak"),
                                description: copy(zh: "连续 7 天都有遛狗记录", en: "Log a walk for 7 days in a row."),
-                               color: Color.goYellow, isUnlocked: streak)
+                               color: AchievementColorPalette.yellow, isUnlocked: streak)
         }()
 
         // 4. 💎 健康达人：30 天内无 emergency / surgery healthLog
@@ -447,25 +486,20 @@ final class AchievementManager {
             let hasHealth = !careLedgerSummary.healthEvents.isEmpty
             return Achievement(id: "health_hero", emoji: "💎", title: copy(zh: "健康达人", en: "Health Hero"),
                                description: copy(zh: "30 天内无紧急就医或手术记录", en: "No emergency or surgery record in the last 30 days."),
-                               color: Color.goMint, isUnlocked: !hasEmergency && hasHealth)
+                               color: AchievementColorPalette.mint, isUnlocked: !hasEmergency && hasHealth)
         }()
 
-        // 5. 🍗 营养师：连续记录喂食 14 天（foodRecords 中最近记录间隔 ≤ 1天）
+        // 5. 🍗 营养师：真实连续 14 个日历日均有喂食记录
         let nutritionist: Achievement = {
             let feedDates = petActivitySummary.foodRecordDates
                 + careLedgerSummary.mainFeedEvents.map(\.occurredAt)
-            let sorted = feedDates.sorted()
-            guard sorted.count >= 2 else {
-                return Achievement(id: "nutritionist", emoji: "🍗", title: copy(zh: "营养师", en: "Nutritionist"),
-                                   description: copy(zh: "坚持记录喂食信息超过 14 天", en: "Keep food records for more than 14 days."),
-                                   color: Color.goOrange, isUnlocked: false)
-            }
-            let first = sorted.first!
-            let last = sorted.last!
-            let days = calendar.dateComponents([.day], from: first, to: last).day ?? 0
+            let days = AchievementCareLedgerSummary.longestConsecutiveCalendarDays(
+                feedDates,
+                calendar: calendar
+            )
             return Achievement(id: "nutritionist", emoji: "🍗", title: copy(zh: "营养师", en: "Nutritionist"),
-                               description: copy(zh: "坚持记录喂食信息超过 14 天", en: "Keep food records for more than 14 days."),
-                               color: Color.goOrange, isUnlocked: days >= 14)
+                               description: copy(zh: "连续 14 天记录喂食信息", en: "Keep food records for 14 consecutive days."),
+                               color: AchievementColorPalette.orange, isUnlocked: days >= 14)
         }()
 
         // 6. 🎂 生日快乐：今天是宠物生日
@@ -478,26 +512,26 @@ final class AchievementManager {
             }
             return Achievement(id: "happy_birthday", emoji: "🎂", title: copy(zh: "生日快乐", en: "Happy Birthday"),
                                description: copy(zh: "在宠物生日当天打开 Ohana", en: "Open Ohana on your pet's birthday."),
-                               color: Color.goRed, isUnlocked: unlocked)
+                               color: AchievementColorPalette.red, isUnlocked: unlocked)
         }()
 
         // 7. 🗓️ 相伴百日：daysTogether >= 100
         let hundredDays = Achievement(id: "hundred_days", emoji: "🗓️", title: copy(zh: "相伴百日", en: "100 Days Together"),
                                       description: copy(zh: "与宠物共同生活超过 100 天", en: "Live together with your pet for more than 100 days."),
-                                      color: Color.goCardBlue, isUnlocked: pet.daysTogether >= 100)
+                                      color: AchievementColorPalette.cardBlue, isUnlocked: pet.daysTogether >= 100)
 
         // 8. 📝 第一步：拥有至少一条任意记录（健康/排泄/遛狗/护理）
         let firstRecord: Achievement = {
             let hasAny = careLedgerSummary.hasAnyRecord || petActivitySummary.hasArchiveRecord
             return Achievement(id: "first_record", emoji: "📝", title: copy(zh: "第一步", en: "First Step"),
                                description: copy(zh: "完成第一条宠物记录", en: "Complete your first pet record."),
-                               color: Color.goCardCyan, isUnlocked: hasAny)
+                               color: AchievementColorPalette.cardCyan, isUnlocked: hasAny)
         }()
 
         // 9. ✅ 今日全勤：今天完成了至少一次打卡
         let dayOneCheckin = Achievement(id: "day_one_checkin", emoji: "✅", title: copy(zh: "今日全勤", en: "Checked In Today"),
                                         description: copy(zh: "今天至少完成了一次打卡记录", en: "Complete at least one check-in today."),
-                                        color: Color.goTeal,
+                                        color: AchievementColorPalette.teal,
                                         isUnlocked: hasTodayHealth || hasTodayHygiene || hasTodayPotty || hasTodayCare || hasTodayWalk || hasTodayWeight)
 
         // 10. 🤝 老朋友：使用 Ohana 超过 7 天（基于 pet.createdAt）
@@ -505,7 +539,7 @@ final class AchievementManager {
             let daysSinceCreated = calendar.dateComponents([.day], from: pet.createdAt, to: now).day ?? 0
             return Achievement(id: "old_friend", emoji: "🤝", title: copy(zh: "老朋友", en: "Old Friend"),
                                description: copy(zh: "与 Ohana 相伴超过 7 天", en: "Use Ohana for more than 7 days."),
-                               color: Color.goPrimary, isUnlocked: daysSinceCreated >= 7)
+                               color: AchievementColorPalette.primary, isUnlocked: daysSinceCreated >= 7)
         }()
 
         // 11. 🐾 长跑健将：单次遛狗超过 5km
@@ -513,7 +547,7 @@ final class AchievementManager {
             let has5km = careLedgerSummary.maxSingleWalkMeters() >= 5000
             return Achievement(id: "long_runner", emoji: "🐾", title: copy(zh: "长跑健将", en: "Long-Distance Walker"),
                                description: copy(zh: "单次遛狗距离超过 5km", en: "Walk more than 5 km in one session."),
-                               color: Color.goOrange, isUnlocked: has5km)
+                               color: AchievementColorPalette.orange, isUnlocked: has5km)
         }()
 
         // 12. 💊 坚持到底：完成至少一个疗程用药（有 endDate 且已过期的药）
@@ -521,23 +555,23 @@ final class AchievementManager {
             let completed = !petActivitySummary.completedMedicationEndDates(now: now).isEmpty
             return Achievement(id: "medication_complete", emoji: "💊", title: copy(zh: "坚持到底", en: "Followed Through"),
                                description: copy(zh: "认真完成了一个完整的用药疗程", en: "Complete a full medication course."),
-                               color: Color.goTeal, isUnlocked: completed)
+                               color: AchievementColorPalette.teal, isUnlocked: completed)
         }()
 
         // 13. 📸 拍照达人：上传 20 张以上照片
         let photoEnthusiast = Achievement(id: "photo_enthusiast", emoji: "📸", title: copy(zh: "拍照达人", en: "Photo Enthusiast"),
                                           description: copy(zh: "为宠物上传了 20 张以上照片", en: "Add more than 20 pet photos."),
-                                          color: Color.goPrimary, isUnlocked: petActivitySummary.photoCount >= 20)
+                                          color: AchievementColorPalette.primary, isUnlocked: petActivitySummary.photoCount >= 20)
 
         // 14. 💰 记账能手：累计记录 10 条以上花费
         let expenseTracker = Achievement(id: "expense_tracker", emoji: "💰", title: copy(zh: "记账能手", en: "Expense Tracker"),
                                          description: copy(zh: "累计记录了 10 条以上花费", en: "Log more than 10 expense records."),
-                                         color: Color.goYellow, isUnlocked: careLedgerSummary.expenseEvents.count >= 10)
+                                         color: AchievementColorPalette.yellow, isUnlocked: careLedgerSummary.expenseEvents.count >= 10)
 
         // 15. 🏋️ 体重管理师：累计体重记录 7 条以上
         let weightManager = Achievement(id: "weight_manager", emoji: "🏋️", title: copy(zh: "体重管理师", en: "Weight Keeper"),
                                         description: copy(zh: "坚持记录体重，累计超过 7 条记录", en: "Keep tracking weight for more than 7 records."),
-                                        color: Color.goCardBlue, isUnlocked: careLedgerSummary.weightEvents.count >= 7)
+                                        color: AchievementColorPalette.cardBlue, isUnlocked: careLedgerSummary.weightEvents.count >= 7)
 
         // 16. 💧 喝水伙伴：累计喂水 14 次
         let hydrationBuddy = Achievement(
@@ -545,7 +579,7 @@ final class AchievementManager {
             emoji: "💧",
             title: copy(zh: "喝水伙伴", en: "Hydration Buddy"),
             description: copy(zh: "累计完成 14 次喂水记录", en: "Complete 14 water records."),
-            color: Color.goTeal,
+            color: AchievementColorPalette.teal,
             isUnlocked: careLedgerSummary.wateringEvents.count >= 14
         )
 
@@ -555,7 +589,7 @@ final class AchievementManager {
             emoji: "🎾",
             title: copy(zh: "逗玩达人", en: "Play Champion"),
             description: copy(zh: "累计完成 20 次陪玩或逗玩记录", en: "Complete 20 play records."),
-            color: Color.goOrange,
+            color: AchievementColorPalette.orange,
             isUnlocked: careLedgerSummary.playEvents.count >= 20
         )
 
@@ -565,7 +599,7 @@ final class AchievementManager {
             emoji: "🧹",
             title: copy(zh: "清洁管家", en: "Clean Keeper"),
             description: copy(zh: "累计完成 20 次清洁类照护", en: "Complete 20 cleaning care records."),
-            color: Color.goMint,
+            color: AchievementColorPalette.mint,
             isUnlocked: careLedgerSummary.hygieneEvents.count + careLedgerSummary.cleaningCareEvents.count >= 20
         )
 
@@ -575,7 +609,7 @@ final class AchievementManager {
             emoji: "🦴",
             title: copy(zh: "零食侦探", en: "Treat Scout"),
             description: copy(zh: "累计记录 10 次零食", en: "Log 10 treat records."),
-            color: Color.goYellow,
+            color: AchievementColorPalette.yellow,
             isUnlocked: careLedgerSummary.treatEvents.count >= 10
         )
 
@@ -585,7 +619,7 @@ final class AchievementManager {
             emoji: "🥣",
             title: copy(zh: "干湿双修", en: "Dry and Wet Explorer"),
             description: copy(zh: "干粮和湿粮都完成过记录", en: "Record both dry food and wet food."),
-            color: Color.goOrange,
+            color: AchievementColorPalette.orange,
             isUnlocked: careLedgerSummary.recordedFoodKindCount() >= 2
         )
 
@@ -595,7 +629,7 @@ final class AchievementManager {
             emoji: "🤖",
             title: copy(zh: "自动喂养", en: "Auto Feeding"),
             description: copy(zh: "自动猫粮机完成过 3 次记录", en: "Log 3 records from an automatic feeder."),
-            color: Color.goTeal,
+            color: AchievementColorPalette.teal,
             isUnlocked: careLedgerSummary.autoMainFeedCount() >= 3
         )
 
@@ -605,7 +639,7 @@ final class AchievementManager {
             emoji: "🧺",
             title: copy(zh: "粮仓管理员", en: "Pantry Keeper"),
             description: copy(zh: "累计添加 2 次余粮或补粮记录", en: "Add 2 stock or refill records."),
-            color: Color.goPrimary,
+            color: AchievementColorPalette.primary,
             isUnlocked: petActivitySummary.foodRecordCount >= 2
         )
 
@@ -615,7 +649,7 @@ final class AchievementManager {
             emoji: "🛡️",
             title: copy(zh: "证件守护", en: "Protection Ready"),
             description: copy(zh: "为宠物添加证件或保险保障", en: "Add a document or insurance policy for your pet."),
-            color: Color.goCardBlue,
+            color: AchievementColorPalette.cardBlue,
             isUnlocked: petActivitySummary.hasProtectionRecord
         )
 
@@ -625,7 +659,7 @@ final class AchievementManager {
             emoji: "💉",
             title: copy(zh: "疫苗本", en: "Vaccine Keeper"),
             description: copy(zh: "在健康模块记录过疫苗", en: "Record a vaccine in the health module."),
-            color: Color.goMint,
+            color: AchievementColorPalette.mint,
             isUnlocked: careLedgerSummary.hasVaccineRecord()
         )
 
@@ -635,7 +669,7 @@ final class AchievementManager {
             emoji: "🌡️",
             title: copy(zh: "异常观察员", en: "Symptom Watcher"),
             description: copy(zh: "累计记录 3 次症状或异常", en: "Log 3 symptom or abnormality records."),
-            color: Color.goRed,
+            color: AchievementColorPalette.red,
             isUnlocked: petActivitySummary.symptomCount >= 3
         )
 
@@ -655,7 +689,7 @@ final class AchievementManager {
                 emoji: "🧭",
                 title: copy(zh: "照护连线", en: "Care Streak"),
                 description: copy(zh: "连续 14 天都有任意照护记录", en: "Log any care record for 14 days in a row."),
-                color: Color.goMint,
+                color: AchievementColorPalette.mint,
                 isUnlocked: streak
             )
         }()
@@ -666,7 +700,7 @@ final class AchievementManager {
             emoji: "🍽️",
             title: copy(zh: "餐桌档案", en: "Meal Archivist"),
             description: copy(zh: "累计完成 50 次主食喂养记录", en: "Complete 50 main meal records."),
-            color: Color.goOrange,
+            color: AchievementColorPalette.orange,
             isUnlocked: careLedgerSummary.mainFeedEvents.count >= 50
         )
 
@@ -676,7 +710,7 @@ final class AchievementManager {
             emoji: "🚰",
             title: copy(zh: "清泉守卫", en: "Water Guardian"),
             description: copy(zh: "累计完成 50 次喂水或换水记录", en: "Complete 50 water or water-change records."),
-            color: Color.goTeal,
+            color: AchievementColorPalette.teal,
             isUnlocked: careLedgerSummary.waterCareEvents.count >= 50
         )
 
@@ -686,7 +720,7 @@ final class AchievementManager {
             emoji: "🖼️",
             title: copy(zh: "记忆相册", en: "Memory Album"),
             description: copy(zh: "为宠物留下 50 张照片记录", en: "Save 50 pet photo records."),
-            color: Color.goCardBlue,
+            color: AchievementColorPalette.cardBlue,
             isUnlocked: petActivitySummary.photoCount >= 50
         )
 
@@ -696,7 +730,7 @@ final class AchievementManager {
             emoji: "📊",
             title: copy(zh: "体重节奏", en: "Weight Rhythm"),
             description: copy(zh: "累计记录 14 次体重变化", en: "Log 14 weight changes."),
-            color: Color.goCardCyan,
+            color: AchievementColorPalette.cardCyan,
             isUnlocked: careLedgerSummary.weightEvents.count >= 14
         )
 
@@ -706,7 +740,7 @@ final class AchievementManager {
             emoji: "🌿",
             title: copy(zh: "一年同行", en: "One Year Together"),
             description: copy(zh: "与宠物共同生活超过 365 天", en: "Live together with your pet for more than 365 days."),
-            color: Color.goPrimary,
+            color: AchievementColorPalette.primary,
             isUnlocked: pet.daysTogether >= 365
         )
 
@@ -716,8 +750,8 @@ final class AchievementManager {
             emoji: "🏝️",
             title: copy(zh: "Ohana 小队", en: "Ohana Crew"),
             description: copy(zh: "至少建立 2 位宠物或家庭成员档案", en: "Create at least 2 pet or family member profiles."),
-            color: Color.goPrimary,
-            isUnlocked: livePets.count >= 2
+            color: AchievementColorPalette.primary,
+            isUnlocked: livePets.count + liveHumans.count >= 2
         )
 
         // 27. 🌳 伙伴初醒：获得第一只电子宠物
@@ -726,7 +760,7 @@ final class AchievementManager {
             emoji: "🌳",
             title: copy(zh: "伙伴初醒", en: "First Companion"),
             description: copy(zh: "在 Oasis 中获得第一只电子宠物", en: "Get your first electronic pet in Oasis."),
-            color: Color.goMint,
+            color: AchievementColorPalette.mint,
             isUnlocked: !context.electronicPets.isEmpty
         )
 
@@ -736,7 +770,7 @@ final class AchievementManager {
             emoji: "✨",
             title: copy(zh: "传说伙伴", en: "Legendary Companion"),
             description: copy(zh: "获得一只传说级电子宠物", en: "Get a legendary electronic pet."),
-            color: Color.goYellow,
+            color: AchievementColorPalette.yellow,
             isUnlocked: context.electronicPets.contains { $0.rarity == .legendary }
         )
 
@@ -746,7 +780,7 @@ final class AchievementManager {
             emoji: "🐾",
             title: copy(zh: "电子宠物图鉴", en: "Electronic Pet Collection"),
             description: copy(zh: "收集 3 只电子宠物", en: "Collect 3 electronic pets."),
-            color: Color.goTeal,
+            color: AchievementColorPalette.teal,
             isUnlocked: Set(context.electronicPets.map(\.catalogId)).count >= 3
         )
 
@@ -756,7 +790,7 @@ final class AchievementManager {
             emoji: "⭐",
             title: copy(zh: "星级伙伴", en: "Star Companion"),
             description: copy(zh: "将任意电子宠物升到 2 星", en: "Upgrade any electronic pet to 2 stars."),
-            color: Color.goYellow,
+            color: AchievementColorPalette.yellow,
             isUnlocked: context.electronicPets.contains { $0.starLevel >= 2 }
         )
 
@@ -766,7 +800,7 @@ final class AchievementManager {
             emoji: "🤲",
             title: copy(zh: "轻养成", en: "Gentle Care"),
             description: copy(zh: "累计完成 10 次电子宠物互动", en: "Complete 10 electronic pet interactions."),
-            color: Color.goCardBlue,
+            color: AchievementColorPalette.cardBlue,
             isUnlocked: context.critterActionLogs.count(where: { $0.action != .careEcho }) >= 10
         )
 
@@ -776,7 +810,7 @@ final class AchievementManager {
             emoji: "🎁",
             title: copy(zh: "第一颗盲盒", en: "First Blind Box"),
             description: copy(zh: "完成第一次扭蛋抽取", en: "Complete your first capsule draw."),
-            color: Color.goOrange,
+            color: AchievementColorPalette.orange,
             isUnlocked: !context.gachaDrawLogs.isEmpty
         )
 
@@ -786,7 +820,7 @@ final class AchievementManager {
             emoji: "🧸",
             title: copy(zh: "盲盒收藏家", en: "Blind Box Collector"),
             description: copy(zh: "累计拥有 8 个不同盲盒款式", en: "Own 8 different blind box styles."),
-            color: Color.goPrimary,
+            color: AchievementColorPalette.primary,
             isUnlocked: Set(context.gachaOwnedItems.map { "\($0.seriesId)#\($0.itemId)" }).count >= 8
         )
 
@@ -796,7 +830,7 @@ final class AchievementManager {
             emoji: "🌘",
             title: copy(zh: "隐藏款！", en: "Secret Pull!"),
             description: copy(zh: "抽中任意系列的隐藏款", en: "Pull a secret item from any series."),
-            color: Color.goYellow,
+            color: AchievementColorPalette.yellow,
             isUnlocked: context.gachaOwnedItems.contains(where: \.isHidden)
         )
 
@@ -806,7 +840,7 @@ final class AchievementManager {
             emoji: "🧩",
             title: copy(zh: "系列完成", en: "Series Complete"),
             description: copy(zh: "集齐任意盲盒系列的全部普通款", en: "Complete all regular items in any blind box series."),
-            color: Color.goTeal,
+            color: AchievementColorPalette.teal,
             isUnlocked: Self.completedGachaSeriesCount(context.gachaOwnedItems) >= 1
         )
 
@@ -816,7 +850,7 @@ final class AchievementManager {
             emoji: "🥥",
             title: copy(zh: "欧气爆棚", en: "Jackpot Luck"),
             description: copy(zh: "在扭蛋中抽到 500 椰子大礼包", en: "Pull the 500-coconut jackpot from a capsule draw."),
-            color: Color.goYellow,
+            color: AchievementColorPalette.yellow,
             isUnlocked: context.gachaDrawLogs.contains { $0.instantCoconutDelta >= 500 }
         )
 
@@ -840,7 +874,7 @@ final class AchievementManager {
         badge.id.hasPrefix("global_")
     }
 
-    static func completedGachaSeriesCount(_ ownedItems: [GachaOwnedItem]) -> Int {
+    nonisolated static func completedGachaSeriesCount(_ ownedItems: [GachaOwnedItem]) -> Int {
         let ownedBySeries = Dictionary(grouping: ownedItems, by: \.seriesId)
         return GachaSeriesCatalog.allSeries.reduce(0) { count, series in
             let ownedIDs = Set((ownedBySeries[series.id] ?? []).map(\.itemId))

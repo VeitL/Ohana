@@ -125,6 +125,101 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertEqual(CoconutWalletService.legacySystemBalance(context: context), 99)
     }
 
+    func testBootstrapDoesNotReimportAnAccountCreatedByAPreBootstrapReward() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let defaults = try makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let human = Human(name: "Guan")
+        human.coconutBalance = 10
+        context.insert(human)
+        try context.save()
+        defaults.set(20, forKey: "quest_coconutCount")
+
+        try CoconutWalletService.apply(
+            deltas: [.human(
+                human,
+                delta: 1,
+                entryKind: .reward,
+                source: .service,
+                title: "Pre-bootstrap reward",
+                transactionKey: "test:pre-bootstrap-reward"
+            )],
+            context: context,
+            save: true,
+            postsRewardFeedback: false,
+            updatesProjection: false
+        )
+
+        try CoconutEconomyBootstrapService.bootstrapIfNeeded(context: context, defaults: defaults)
+
+        let accountKey = CoconutAccountKey.human(human.id)
+        let accounts = try context.fetch(FetchDescriptor<CoconutAccount>())
+        XCTAssertEqual(accounts.first { $0.accountKey == accountKey }?.balance, 11)
+        XCTAssertEqual(accounts.first { $0.accountKey == CoconutAccountKey.legacySystem }?.balance, 10)
+
+        let entries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let accountEntries = entries.filter { $0.accountKey == accountKey && $0.affectsBalance }
+        XCTAssertEqual(accountEntries.count, 2)
+        XCTAssertEqual(accountEntries.reduce(0) { $0 + $1.delta }, 11)
+        XCTAssertEqual(accountEntries.count(where: { $0.transactionKey == "test:pre-bootstrap-reward" }), 1)
+        XCTAssertEqual(
+            accountEntries.count(where: { $0.transactionKey == "bootstrap:v58:opening:\(accountKey)" }),
+            1
+        )
+    }
+
+    func testBootstrapFailureDoesNotLeavePreparedOpeningEntriesPending() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let human = Human(name: "Guan")
+        human.coconutBalance = 10
+        let pet = Pet(name: "Miso")
+        pet.coconutBalance = 5
+        let humanAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            displayName: human.name,
+            balance: 10
+        )
+        let systemOpeningKey = "bootstrap:v58:opening:\(CoconutAccountKey.legacySystem)"
+        let partialSystemEntry = CoconutLedgerEntry(
+            transactionKey: systemOpeningKey,
+            accountKey: CoconutAccountKey.legacySystem,
+            ownerKind: .system,
+            ownerId: "",
+            ownerName: "Legacy island total",
+            delta: 0,
+            balanceBefore: 0,
+            balanceAfter: 0,
+            entryKind: .openingBalance,
+            source: .legacyUserDefaults,
+            title: "Partial legacy opening",
+            emoji: "🥥"
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(humanAccount)
+        context.insert(partialSystemEntry)
+        try context.save()
+
+        XCTAssertThrowsError(
+            try CoconutEconomyBootstrapService.bootstrapIfNeeded(
+                context: context,
+                legacyIslandCount: 20,
+                legacyLogsJSON: "[]"
+            )
+        )
+
+        let humanOpeningKey = "bootstrap:v58:opening:\(CoconutAccountKey.human(human.id))"
+        let entries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        XCTAssertFalse(entries.contains { $0.transactionKey == humanOpeningKey })
+        XCTAssertEqual(entries.map(\.transactionKey), [systemOpeningKey])
+        XCTAssertFalse(context.hasChanges)
+    }
+
     func testWalletProjectionPublishesWalletRevisionWithoutCommandMutation() {
         let revisionCenter = ReadModelRevisionCenter()
         let questManager = retainUntilProcessExit(

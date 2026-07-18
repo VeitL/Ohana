@@ -24,6 +24,7 @@ enum NotificationDeliveryCategory: String, Equatable {
     case insurance
     case calendar
     case weeklyReport
+    case presenceCheckIn
 }
 
 nonisolated enum NotificationPreferenceGroup: String, CaseIterable, Equatable {
@@ -57,7 +58,7 @@ nonisolated enum NotificationPreferenceGroup: String, CaseIterable, Equatable {
             [.plantCare]
         case .calendar:
             [.calendar]
-        case .weeklyReport:
+        case .weeklyReport, .presenceCheckIn:
             [.checkIn]
         case .health, .hydration, .insurance:
             []
@@ -176,6 +177,48 @@ nonisolated enum NotificationPendingBudget {
     }
 }
 
+/// Presence reminders are routine notifications, so they use only the shared
+/// managed capacity left after existing requests and a rolling health reserve.
+/// This prevents a long series of one-shot check-in reminders from crowding
+/// out medication or other health-critical requests that are added later.
+nonisolated enum PresenceNotificationPendingPolicy {
+    static let rollingWindowDays = 14
+    static let maximumRequestsPerCheckInDay = 2
+    static let reservedHealthCriticalRequestSlots = 14
+
+    static var maximumPresencePendingRequestCount: Int {
+        max(
+            0,
+            min(
+                rollingWindowDays * maximumRequestsPerCheckInDay,
+                NotificationPendingBudget.managedPendingRequestLimit - reservedHealthCriticalRequestSlots
+            )
+        )
+    }
+
+    static func availableRequestCount(
+        nonPresencePendingCount: Int,
+        healthCriticalPendingCount: Int
+    ) -> Int {
+        let boundedNonPresenceCount = max(0, nonPresencePendingCount)
+        let boundedHealthCriticalCount = min(
+            max(0, healthCriticalPendingCount),
+            boundedNonPresenceCount
+        )
+        let unfilledHealthReserve = max(
+            0,
+            reservedHealthCriticalRequestSlots - boundedHealthCriticalCount
+        )
+        let sharedCapacity = max(
+            0,
+            NotificationPendingBudget.managedPendingRequestLimit
+                - boundedNonPresenceCount
+                - unfilledHealthReserve
+        )
+        return min(maximumPresencePendingRequestCount, sharedCapacity)
+    }
+}
+
 nonisolated enum NotificationDeliveryPolicy {
     static let routineDailyLimit = 4
     static let ambientDailyLimit = 1
@@ -243,6 +286,10 @@ nonisolated enum NotificationDeliveryPolicy {
 
     static func weeklyReportClassification() -> NotificationDeliveryClassification {
         NotificationDeliveryClassification(tier: .ambient, category: .weeklyReport, mergeAllowed: true)
+    }
+
+    static func presenceCheckInClassification() -> NotificationDeliveryClassification {
+        NotificationDeliveryClassification(tier: .routine, category: .presenceCheckIn, mergeAllowed: false)
     }
 
     private static let plantCareEventTypes: Set<String> = [

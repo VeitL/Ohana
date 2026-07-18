@@ -66,6 +66,7 @@ extension HumanDetailView {
             .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-detail-medication-action")
         .padding(.horizontal, 16)
     }
 
@@ -118,6 +119,7 @@ extension HumanDetailView {
             .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-detail-health-report-action")
         .padding(.horizontal, 16)
     }
 
@@ -175,6 +177,7 @@ extension HumanDetailView {
             .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-detail-health-metrics-action")
         .padding(.horizontal, 16)
     }
 
@@ -221,6 +224,7 @@ extension HumanDetailView {
             .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-detail-weight-action")
         .padding(.horizontal, 16)
     }
 }

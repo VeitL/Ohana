@@ -67,14 +67,7 @@ struct VerticalSolidHomeDashboardPage: View {
             }
         }
         .onDisappear {
-            collapseCleanupTask?.cancel()
-            collapseCleanupTask = nil
-            headerContextCardId = nil
-            isCardExpandedOrTransitioning = false
-            isCardHeroAnimating = false
-            activeHeroSnapshot = nil
-            heroGeneration += 1
-            cardHeroProgress = 0
+            resetCardPresentationState()
         }
         .onAppear {
             prepareHeroSnapshots()
@@ -571,6 +564,7 @@ struct OasisTreeRenderSnapshot: Equatable {
     let nextLevelThreshold: Int
     let shopLockedLevel: Int?
     let shopInitialCategory: ShopItem.ShopCategory
+    let achievementsLockedLevel: Int?
     let crittersLockedLevel: Int?
     let gachaLockedLevel: Int?
 
@@ -581,6 +575,7 @@ struct OasisTreeRenderSnapshot: Equatable {
         nextLevelThreshold: Int = 0,
         shopLockedLevel: Int? = nil,
         shopInitialCategory: ShopItem.ShopCategory = .effect,
+        achievementsLockedLevel: Int? = nil,
         crittersLockedLevel: Int? = nil,
         gachaLockedLevel: Int? = nil
     ) {
@@ -590,6 +585,7 @@ struct OasisTreeRenderSnapshot: Equatable {
         self.nextLevelThreshold = max(0, nextLevelThreshold)
         self.shopLockedLevel = shopLockedLevel
         self.shopInitialCategory = shopInitialCategory
+        self.achievementsLockedLevel = achievementsLockedLevel
         self.crittersLockedLevel = crittersLockedLevel
         self.gachaLockedLevel = gachaLockedLevel
     }
@@ -604,6 +600,9 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
     let snapshot: OasisTreeRenderSnapshot
     var onInjectEnergy: () -> Void = {}
     var onOpenShop: (ShopItem.ShopCategory) -> Void = { _ in }
+    var onOpenAchievements: () -> Void = {}
+    var onOpenCritters: () -> Void = {}
+    var onOpenGacha: () -> Void = {}
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
@@ -720,16 +719,17 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             ),
             localization: l,
             shopLockedLevel: snapshot.shopLockedLevel,
+            achievementsLockedLevel: snapshot.achievementsLockedLevel,
             crittersLockedLevel: snapshot.crittersLockedLevel,
             gachaLockedLevel: snapshot.gachaLockedLevel,
             isCompact: true,
-            interactiveFeatures: [.shop],
+            interactiveFeatures: Set(OasisBentoFeature.allCases),
             onOpenShop: {
                 onOpenShop(snapshot.shopInitialCategory)
             },
-            onOpenAchievements: {},
-            onOpenCritters: {},
-            onOpenGacha: {}
+            onOpenAchievements: onOpenAchievements,
+            onOpenCritters: onOpenCritters,
+            onOpenGacha: onOpenGacha
         )
     }
 

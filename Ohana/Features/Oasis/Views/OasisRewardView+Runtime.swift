@@ -88,6 +88,7 @@ extension OasisRewardView {
                         sheetRoute: $activeSheetRoute,
                         fullScreenRoute: $activeFullScreenRoute,
                         pets: pets,
+                        humans: humans,
                         onPresentCoconutLog: onPresentCoconutLog
                     )
                 )

@@ -93,7 +93,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directoryURL) }
 
         let petID = UUID()
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV94.models)
 
         do {
             let container = try SharedModelContainerOpenPolicy.open { storeKind -> ModelContainer in
@@ -157,7 +157,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     func testCloudSyncTombstoneDefaultLandsOnLatestLightweightSchema() {
-        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV91.self))
+        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV94.self))
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
     }
 
@@ -168,6 +168,179 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         XCTAssertFalse(v90.contains(String(describing: HumanNoteRecord.self)))
         XCTAssertEqual(v91.subtracting(v90), [String(describing: HumanNoteRecord.self)])
         XCTAssertTrue(v90.subtracting(v91).isEmpty)
+    }
+
+    func testV92AddsOnlyTheShopPurchaseAttemptToV91ModelRegistration() {
+        let v91 = Set(ArkSchemaV91.models.map { String(describing: $0) })
+        let v92 = Set(ArkSchemaV92.models.map { String(describing: $0) })
+
+        XCTAssertFalse(v91.contains(String(describing: ShopPurchaseAttempt.self)))
+        XCTAssertEqual(v92.subtracting(v91), [String(describing: ShopPurchaseAttempt.self)])
+        XCTAssertTrue(v91.subtracting(v92).isEmpty)
+    }
+
+    @MainActor
+    func testV91StoreMigratesToV92AndPersistsShopPurchaseAttempt() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaShopAttemptV92MigrationTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let humanID = UUID()
+        do {
+            let schema = Schema(ArkSchemaV91.models)
+            let configuration = ModelConfiguration(
+                "ShopAttemptV91Source",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkSchemaV91OnlyMigrationPlan.self,
+                configurations: [configuration]
+            )
+            let human = Human(name: "V91 Shop Buyer")
+            human.id = humanID
+            container.mainContext.insert(human)
+            try container.mainContext.save()
+        }
+
+        let attemptID = UUID()
+        let ledgerEventID = UUID()
+        let createdAt = Date(timeIntervalSinceReferenceDate: 92000)
+        do {
+            let schema = Schema(ArkSchemaV92.models)
+            let configuration = ModelConfiguration(
+                "ShopAttemptV92Target",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [configuration]
+            )
+            XCTAssertEqual(try container.mainContext.fetch(FetchDescriptor<Human>()).map(\.id), [humanID])
+            XCTAssertTrue(try container.mainContext.fetch(FetchDescriptor<ShopPurchaseAttempt>()).isEmpty)
+
+            let attempt = ShopPurchaseAttempt(
+                id: attemptID,
+                transactionKey: "shop:v92:\(attemptID.uuidString)",
+                itemId: "boost_double",
+                buyerHumanId: humanID.uuidString,
+                price: 35,
+                state: .fulfilling,
+                purchaseLedgerEventId: ledgerEventID,
+                fundingContributionsJSON: "{\"version\":1,\"contributions\":[]}",
+                fulfillmentPayloadJSON: "{\"version\":1}",
+                attemptCount: 1,
+                lastError: "interrupted",
+                nextRetryAt: createdAt.addingTimeInterval(30),
+                createdAt: createdAt
+            )
+            container.mainContext.insert(attempt)
+            try container.mainContext.save()
+        }
+
+        do {
+            let schema = Schema(ArkSchemaV92.models)
+            let configuration = ModelConfiguration(
+                "ShopAttemptV92Target",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [configuration]
+            )
+            let attempt = try XCTUnwrap(
+                try container.mainContext.fetch(FetchDescriptor<ShopPurchaseAttempt>()).first
+            )
+            XCTAssertEqual(attempt.id, attemptID)
+            XCTAssertEqual(attempt.itemId, "boost_double")
+            XCTAssertEqual(attempt.buyerHumanId, humanID.uuidString)
+            XCTAssertEqual(attempt.price, 35)
+            XCTAssertEqual(attempt.state, .fulfilling)
+            XCTAssertEqual(attempt.purchaseLedgerEventId, ledgerEventID)
+            XCTAssertEqual(attempt.attemptCount, 1)
+            XCTAssertEqual(attempt.lastError, "interrupted")
+            XCTAssertEqual(attempt.createdAt, createdAt)
+        }
+    }
+
+    @MainActor
+    func testV92StoreMigratesToCurrentV93AndPreservesUnsettledShopPurchaseAttempt() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaShopAttemptV93MigrationTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let humanID = UUID()
+        let attemptID = UUID()
+        let createdAt = Date(timeIntervalSinceReferenceDate: 93000)
+        do {
+            let schema = Schema(ArkSchemaV92.models)
+            let configuration = ModelConfiguration(
+                "ShopAttemptV92Source",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkSchemaV92OnlyMigrationPlan.self,
+                configurations: [configuration]
+            )
+            let human = Human(name: "V92 Pending Shop Buyer")
+            human.id = humanID
+            let fundingData = try JSONEncoder().encode([
+                ShopPurchaseFundingContribution(humanID: humanID, amount: 580)
+            ])
+            let fundingJSON = try XCTUnwrap(String(data: fundingData, encoding: .utf8))
+            let attempt = ShopPurchaseAttempt(
+                id: attemptID,
+                transactionKey: "shop:v92-current:\(attemptID.uuidString)",
+                itemId: "boost_backdate_pack",
+                buyerHumanId: humanID.uuidString,
+                price: 580,
+                state: .refundPending,
+                fundingContributionsJSON: fundingJSON,
+                createdAt: createdAt
+            )
+            container.mainContext.insert(human)
+            container.mainContext.insert(attempt)
+            try container.mainContext.save()
+        }
+
+        do {
+            let schema = Schema(ArkSchemaV94.models)
+            let configuration = ModelConfiguration(
+                "ShopAttemptV93Target",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [configuration]
+            )
+            let attempt = try XCTUnwrap(
+                try container.mainContext.fetch(FetchDescriptor<ShopPurchaseAttempt>()).first
+            )
+            XCTAssertEqual(attempt.id, attemptID)
+            XCTAssertEqual(attempt.buyerHumanId, humanID.uuidString)
+            XCTAssertEqual(attempt.itemId, "boost_backdate_pack")
+            XCTAssertEqual(attempt.state, .refundPending)
+            XCTAssertEqual(attempt.price, 580)
+            XCTAssertEqual(attempt.createdAt, createdAt)
+        }
     }
 
     @MainActor
@@ -395,7 +568,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV91.models)
+            let schema = Schema(ArkSchemaV94.models)
             let config = ModelConfiguration("EventLatestTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -438,7 +611,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV91.models)
+            let schema = Schema(ArkSchemaV94.models)
             let config = ModelConfiguration("ReminderLatestTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -489,7 +662,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV91.models)
+            let schema = Schema(ArkSchemaV94.models)
             let config = ModelConfiguration(
                 "UndoReceiptV90Target",
                 schema: schema,
@@ -527,7 +700,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         let undoDeadline = occurredAt.addingTimeInterval(6)
 
         do {
-            let schema = Schema(ArkSchemaV91.models)
+            let schema = Schema(ArkSchemaV94.models)
             let config = ModelConfiguration(
                 "UndoReceiptPersistenceSource",
                 schema: schema,
@@ -569,7 +742,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV91.models)
+            let schema = Schema(ArkSchemaV94.models)
             let config = ModelConfiguration(
                 "UndoReceiptPersistenceTarget",
                 schema: schema,
@@ -633,7 +806,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV91.models)
+            let schema = Schema(ArkSchemaV94.models)
             let config = ModelConfiguration("ModelsMigrationTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -772,7 +945,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV91.models)
+            let schema = Schema(ArkSchemaV94.models)
             let config = ModelConfiguration("CoreUserDataMigrationTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -897,6 +1070,16 @@ private enum ArkSchemaV67OnlyMigrationPlan: SchemaMigrationPlan {
 
 private enum ArkSchemaV86OnlyMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] { [ArkSchemaV86.self] }
+    static var stages: [MigrationStage] { [] }
+}
+
+private enum ArkSchemaV91OnlyMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [ArkSchemaV91.self] }
+    static var stages: [MigrationStage] { [] }
+}
+
+private enum ArkSchemaV92OnlyMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [ArkSchemaV92.self] }
     static var stages: [MigrationStage] { [] }
 }
 

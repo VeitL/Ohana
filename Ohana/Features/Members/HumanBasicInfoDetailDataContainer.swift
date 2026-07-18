@@ -3,6 +3,8 @@ import SwiftUI
 
 struct HumanBasicInfoDetailView: View {
     let human: Human
+    var startsEditing = false
+    var onSave: (() -> Void)? = nil
 
     @Query private var allPets: [Pet]
     @Query private var allHumans: [Human]
@@ -11,7 +13,9 @@ struct HumanBasicInfoDetailView: View {
         HumanBasicInfoDetailContentView(
             human: human,
             allPets: allPets,
-            allHumans: allHumans
+            allHumans: allHumans,
+            startsEditing: startsEditing,
+            onSave: onSave
         )
     }
 }

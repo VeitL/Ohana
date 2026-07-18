@@ -251,6 +251,7 @@ struct ReminderObservabilityContentView: View {
         case "scheduleFailed", "failed", "refillFailed": l.tr(zh: "调度失败", en: "Schedule failed", de: "Planung fehlgeschlagen")
         case "scheduleSkippedDuplicate", "skippedDuplicate", "refillSkippedExisting": l.tr(zh: "重复跳过", en: "Duplicate skipped", de: "Duplikat uebersprungen")
         case "scheduleSkippedPastDue", "skippedPastDue", "refillSkippedPastDue": l.tr(zh: "过期跳过", en: "Past due skipped", de: "Ueberfaellig uebersprungen")
+        case "scheduleSkippedInactiveMember", "refillSkippedInactiveMember": l.tr(zh: "纪念成员退场", en: "Memorial member excluded", de: "Gedenkmitglied ausgeschlossen")
         case "scheduleSkippedBudget", "refillSkippedBudget": l.tr(zh: "预算跳过", en: "Budget skipped", de: "Budget uebersprungen")
         case "scheduleMerged", "refillMerged": l.tr(zh: "同类合并", en: "Merged", de: "Zusammengefuehrt")
         case "refillSuccess": l.tr(zh: "补注册成功", en: "Refill registered", de: "Nachfuellung registriert")

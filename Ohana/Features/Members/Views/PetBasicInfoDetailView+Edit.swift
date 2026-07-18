@@ -52,18 +52,24 @@ extension PetBasicInfoDetailView {
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasBirthday) {
                     editLabel(l.tr(zh: "设置生日", en: "Set birthday", de: "Geburtstag festlegen"))
-                }.tint(Color.goPrimary)
+                }
+                .tint(Color.goPrimary)
+                .accessibilityIdentifier("pet-basic-info-birthday-toggle")
                 if eHasBirthday {
                     DatePicker("", selection: $eBirthday, in: ...Date(), displayedComponents: .date)
                         .datePickerStyle(.compact).tint(Color.goPrimary).labelsHidden()
+                        .accessibilityIdentifier("pet-basic-info-birthday-date-picker")
                 }
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasHomeDate) {
                     editLabel(l.tr(zh: "设置到家日", en: "Set home date", de: "Einzugstag festlegen"))
-                }.tint(Color.goPrimary)
+                }
+                .tint(Color.goPrimary)
+                .accessibilityIdentifier("pet-basic-info-home-date-toggle")
                 if eHasHomeDate {
                     DatePicker("", selection: $eHomeDate, displayedComponents: .date)
                         .datePickerStyle(.compact).tint(Color.goPrimary).labelsHidden()
+                        .accessibilityIdentifier("pet-basic-info-home-date-picker")
                 }
             }
             // 外貌
@@ -393,26 +399,57 @@ extension PetBasicInfoDetailView {
     }
 
     var primaryPersonalityPickerRow: some View {
-        petProfileEditableRow(l.tr(zh: "主性格", en: "Primary vibe", de: "Hauptcharakter")) {
-            primaryPersonalityPicker
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        } stackedContent: {
-            primaryPersonalityPicker
-        }
-    }
+        VStack(alignment: .leading, spacing: 10) {
+            editLabel(l.tr(zh: "主性格", en: "Primary vibe", de: "Hauptcharakter"))
 
-    var primaryPersonalityPicker: some View {
-        Picker("", selection: $ePrimaryPersonalityTagID) {
-            if ePrimaryPersonalityTagID.isEmpty {
-                Text(l.tr(zh: "请选择", en: "Choose", de: "Auswählen")).tag("")
-            }
-            ForEach(primaryPersonalityOptionIDs, id: \.self) { id in
-                Text(PetPersonalityTag.displayTitle(for: id, l: l)).tag(id)
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 116), spacing: 8)],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                ForEach(primaryPersonalityOptionIDs, id: \.self) { id in
+                    let isSelected = ePrimaryPersonalityTagID == id
+                    let title = PetPersonalityTag.displayTitle(for: id, l: l)
+
+                    Button {
+                        ePrimaryPersonalityTagID = id
+                    } label: {
+                        HStack(spacing: 6) {
+                            if let tag = PetPersonalityTag.lookup(id) {
+                                Image(systemName: tag.sfSymbol)
+                                    .accessibilityHidden(true)
+                            }
+                            Text(title)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            if isSelected {
+                                Image(systemName: "checkmark.circle.fill") // a11y: allow decorative selection glyph is hidden by the chained modifier below
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(isSelected ? Color.goPrimary : Color.ohanaPrimaryText.opacity(0.82))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .background(
+                            isSelected ? Color.goPrimary.opacity(0.16) : Color.ohanaPrimaryText.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
+                        )
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(title)
+                    .accessibilityValue(
+                        isSelected
+                            ? l.tr(zh: "已选择", en: "Selected", de: "Ausgewählt")
+                            : l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt")
+                    )
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    .accessibilityIdentifier("pet-basic-info-primary-personality-option-\(id)")
+                }
             }
         }
-        .pickerStyle(.menu)
-        .tint(Color.goPrimary)
-        .accessibilityIdentifier("pet-basic-info-primary-personality-picker")
     }
 
     var primaryPersonalityOptionIDs: [String] {

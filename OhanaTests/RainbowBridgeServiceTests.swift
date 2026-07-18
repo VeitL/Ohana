@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct RainbowBridgeServiceTests {
-    @Test func markPassedAwayRemovesFutureSchedulesAndKeepsHistoryReadOnly() throws {
+    @Test func markPassedAwayPreservesFutureSchedulesAndKeepsHistoryReadOnly() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let now = Date()
@@ -59,17 +59,18 @@ struct RainbowBridgeServiceTests {
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(pet.passedAwayDate == now)
-        #expect(!events.contains { $0.id == futureEventID })
+        #expect(events.contains { $0.id == futureEventID })
         #expect(events.contains { $0.id == pastEventID })
         #expect(events.contains { $0.id == otherFutureEventID })
-        #expect(!reminders.contains { $0.id == futureReminderID })
+        #expect(reminders.contains { $0.id == futureReminderID })
         #expect(reminders.contains { $0.id == pastReminderID })
         #expect(reminders.contains { $0.id == otherFutureReminderID })
+        #expect(reminders.first { $0.id == futureReminderID }?.statusEnum == .pending)
         #expect(reminders.first { $0.id == pastReminderID }?.statusEnum == .pending)
         #expect(reminders.first { $0.id == otherFutureReminderID }?.statusEnum == .pending)
     }
 
-    @Test func undoPassedAwayClearsLifecycleFieldWithoutRestoringFutureSchedules() throws {
+    @Test func undoPassedAwayClearsOnlyLifecycleFieldAndLeavesFutureSchedulesUntouched() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let now = Date()
@@ -111,13 +112,15 @@ struct RainbowBridgeServiceTests {
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(pet.passedAwayDate == nil)
-        #expect(!events.contains { $0.id == eventID })
-        #expect(!reminders.contains { $0.id == reminderID })
+        #expect(events.contains { $0.id == eventID })
+        #expect(reminders.contains { $0.id == reminderID })
         #expect(events.contains { $0.id == skippedEventID })
         #expect(reminders.contains { $0.id == skippedReminderID })
+        #expect(reminders.first { $0.id == reminderID }?.statusEnum == .pending)
+        #expect(reminders.first { $0.id == skippedReminderID }?.statusEnum == .skipped)
     }
 
-    @Test func markPassedAwayTrimsRecurringFutureRemindersButKeepsHistoricalOccurrences() throws {
+    @Test func markPassedAwayPreservesRecurringScheduleAndAllOccurrences() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let now = Date()
@@ -150,12 +153,12 @@ struct RainbowBridgeServiceTests {
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         let retainedEvent = try #require(events.first { $0.id == eventID })
-        #expect(retainedEvent.recurrenceDays == 0)
-        #expect(retainedEvent.recurrenceEndDate == now)
+        #expect(retainedEvent.recurrenceDays == 1)
+        #expect(retainedEvent.recurrenceEndDate == nil)
         #expect(retainedEvent.completedOccurrences == ["past-occurrence"])
         #expect(reminders.contains { $0.id == pastReminderID })
-        #expect(!reminders.contains { $0.id == futureReminderID })
-        #expect(!MemberLifecycleActiveScheduleResolver.isActiveSchedule(retainedEvent, now: now))
+        #expect(reminders.contains { $0.id == futureReminderID })
+        #expect(MemberLifecycleActiveScheduleResolver.isActiveSchedule(retainedEvent, now: now))
     }
 
     @Test func deceasedHumanDoesNotReceiveEconomyRewards() throws {

@@ -20,6 +20,8 @@ extension AppPresentationPolicyProvider {
             )
         case .functionMenu:
             homeSheetPagePolicy("home.functionMenu")
+        case .critterCodex:
+            homeSheetPagePolicy("home.critterCodex")
         case .streakDetail:
             AppPresentationPolicy(
                 surface: .sheetPage,

@@ -13,6 +13,7 @@ import SwiftData
 enum UITestEconomyStateSeeder {
     private static var didResetEconomyBudget = false
     private static var didUnlockRewardTier = false
+    private static var didUnlockGrowthLoop = false
     private static var seededHumanIDs: Set<UUID> = []
     private static var seededPetIDs: Set<UUID> = []
 
@@ -31,6 +32,10 @@ enum UITestEconomyStateSeeder {
 
         if OhanaUITestLaunchOptions.requestsRewardTierUnlock {
             unlockRewardTierIfNeeded(services: services)
+        }
+
+        if OhanaUITestLaunchOptions.requestsGrowthLoopUnlock {
+            unlockGrowthLoopIfNeeded(services: services)
         }
 
         guard let amount = OhanaUITestLaunchOptions.requestedCoconutBalanceSeedAmount else {
@@ -96,6 +101,7 @@ enum UITestEconomyStateSeeder {
     static func resetSessionTrackingForTests() {
         didResetEconomyBudget = false
         didUnlockRewardTier = false
+        didUnlockGrowthLoop = false
         seededHumanIDs.removeAll()
         seededPetIDs.removeAll()
     }
@@ -112,6 +118,14 @@ enum UITestEconomyStateSeeder {
             injectedEnergy: services.oasisTree.levelStartThreshold(forRawLevel: 6)
         )
         didUnlockRewardTier = true
+    }
+
+    private static func unlockGrowthLoopIfNeeded(services: AppServices) {
+        guard !didUnlockGrowthLoop else { return }
+        OasisTreeManagerRegistry.current.setEnergyForTesting(
+            injectedEnergy: services.oasisTree.levelStartThreshold(forRawLevel: 10)
+        )
+        didUnlockGrowthLoop = true
     }
 
     private static func fetchHumans(modelContext: ModelContext) -> [Human] {

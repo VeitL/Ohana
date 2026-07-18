@@ -65,11 +65,23 @@ interactions light and changes focused.
 - Use three test environments instead of forcing every test into one mutable
   Simulator: an isolated SwiftData container for Unit/Integration tests, a
   disposable clean Simulator/store for destructive flows, and the pinned
-  Dogfood Simulator for long-lived real-user journeys.
-- Run persistent Dogfood checks through `scripts/run-dogfood-simulator.sh`.
-  Preserve its installed app and data container: overlay new builds, never
-  erase, uninstall, reset, or run destructive onboarding/migration/restore
-  scenarios against that pinned virtual phone.
+  `iPhone 17 Dogfood` Simulator for one long-lived synthetic user.
+- Dogfood is the default second-stage acceptance environment after narrow tests
+  pass for a stabilized change that can affect persisted facts or stateful
+  existing-user behavior. This includes schema/migration compatibility,
+  persistent commands and projections, recurring plans/reminders, wallet and
+  economy flows, route restoration, upgrade readback, and accumulated-data
+  performance. Run one relevant normal-UI journey against the final Release
+  artifact; this is standing authorization and needs no per-task confirmation.
+  It never authorizes destructive actions. Run at most once per stabilized
+  change batch unless the first journey fails or the user explicitly requests
+  another run; do not overlay on every edit.
+- Follow `docs/dogfood-testing.md` for persistent Dogfood journeys. Use only
+  `scripts/run-dogfood-simulator.sh`, its Release overlay, and normal product UI;
+  seal the ready user's hashed SwiftData identity before the first overlay;
+  never use XCTest, UI-test/reset/seed arguments, direct store/defaults writes,
+  Debug economy tools, erase, uninstall, reset, or destructive
+  onboarding/migration/restore scenarios on that virtual phone.
 - Use a disposable clean environment for onboarding, migration, backup restore,
   app reset, deletion, permissions, and any test that assumes empty state.
   Physical-device validation still owns notification delivery, permissions,
@@ -88,9 +100,14 @@ interactions light and changes focused.
   they do not require a build, Simulator run, or screenshots by default.
 - Logic changes use the narrowest relevant Unit/Integration test. A successful
   targeted test that compiles the affected target replaces a separate build.
-- Use Simulator only for an explicit visual/flow request or a simulator-only
-  defect. Target `iPhone 17` by name and capture only final evidence, not every
-  navigation step.
+- Skip Dogfood for documentation-only work, isolated logic with no runtime or
+  persistence effect, unchanged artifacts, destructive/empty-state flows, and
+  hardware-only behavior. When a normally relevant change cannot safely use
+  Dogfood, report the concrete reason and remaining existing-data risk.
+- Use Simulator for an explicit visual/flow request, a simulator-only defect,
+  or the default Dogfood acceptance above. Target `iPhone 17 Tests` for
+  automated/disposable work and the pinned `iPhone 17 Dogfood` only through its
+  guarded existing-data workflow; capture only final evidence, not every step.
 - Report commands actually run, their results, and any unverified risk. Stop
   when the requested behavior has trustworthy evidence.
 
@@ -102,5 +119,6 @@ Open these only when the task reaches their scope:
 - UI design: `docs/design/ohana-ui-spec.md`
 - Privacy and data safety: `docs/privacy-compliance.md`
 - Release evidence: `docs/release-quality-gates.md`
+- Long-lived synthetic user: `docs/dogfood-testing.md`
 - Status and deferred work: `docs/status-ledger-map.md` and
   `docs/task-follow-ups.md`

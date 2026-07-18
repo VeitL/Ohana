@@ -38,6 +38,7 @@ may override the active sources below.
 | Unified tasks / Task Center | `docs/specs/TaskCenter-logic.md` |
 | Starter gift and household starter plan | `docs/specs/Economy-logic.md` plus D17/D28 in `docs/specs/product-foundation.md` |
 | Local build/test storage | `docs/local-build-storage-policy.md` |
+| Persistent synthetic-user testing | `docs/dogfood-testing.md` and `docs/governance/manifests/dogfood-user-profile.json` |
 | UI tokens | `ui规范.selection.json`; `docs/design/ui规范.md` is explanatory |
 | Resource ownership | `docs/governance/manifests/*.json` and family manifests under `Resources/` |
 
@@ -49,8 +50,9 @@ may override the active sources below.
   completed hardening pass, not a permanent release certificate.
 - `docs/planning/`: implementation plans and dated inventories. A planning file
   is not current product or code truth unless an active source explicitly adopts it.
-- `docs/reference/`, `docs/archive/`, `DesignExports/`, and
-  `ohana-design-system/`: historical/reference material only.
+- `docs/reference/` and `docs/archive/`: historical/reference material only.
+- `DesignExports/`: organized brand/icon sources and generated exports. It is a
+  design reference, not current product or implementation truth.
 
 ## Maintenance Rules
 

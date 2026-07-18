@@ -9,19 +9,37 @@
 
 ## Current Read
 
-- Last compacted: 2026-07-15.
+- Last compacted: 2026-07-18.
 - Open follow-ups: 11 total: P1 = 6, P2 = 4, P3 = 1.
 - Open P0: 0.
-- First-release repository blocker: no known defect, but one release-reachable
-  P1 proof gap is open. The current Human-first/D28 worktree supersedes the old
-  Pet-first route and has not yet received current compile, targeted-test, or
-  disposable-Simulator evidence.
-- First-release product/configuration gap: none for accounts; the current Solo
-  product deliberately has no Ohana account, login, or developer backend. D24
-  still approves iPhone-only, iOS 26.2+, with native iPad/watchOS deferred.
-- Current decision: close TFU-20260715-002 before resuming the four
-  physical-device P1 items. The remaining CloudKit P1 is explicitly deferred
-  and unreachable in Solo. The future
+- First-release repository blocker: no known P0 defect, and one
+  release-reachable P1 implementation/proof gap remains. Human-first/D28
+  repository and Simulator proof closed on 2026-07-18: the final repair batch
+  passed 57/57 focused tests and 15/15 after its last warning-only isolation
+  annotation; the complete release-static lane passed; optimized and WMO
+  Simulator Release products compiled; and the protected Dogfood user passed
+  a normal-UI Task Center branch/relaunch readback with sealed identity and no
+  balance or test-artifact pollution. Signed-device acceptance remains open
+  under the existing physical-device items. The Free / Personal worktree
+  contains quota enforcement, three Personal products, StoreKit
+  trial-eligibility handling, legacy Supporter
+  grandfathering, downgrade protection, paid capability gates, and the paywall;
+  its App + UI target compiles and its focused Unit artifact reports 67/67
+  passing. Complete nine-language in-app commerce copy and real App Store /
+  Sandbox acceptance remain open. The earlier storage and conflict-copy build
+  Swift-source build blockers are cleared.
+- First-release product/configuration gap: 1.0 is now Free plus Personal.
+  Free allows 1 active Pet, 2 active Humans, 5 active Plants, and 3 ordinary
+  active logical plans while preserving basic records, existing history,
+  manual export, critical-health plans, and memorials. Personal is monthly,
+  yearly, or Lifetime and adds unlimited active capacity plus approved advanced
+  local tools and Supporter cosmetics. The app still deliberately has no Ohana
+  account, login, developer backend, Family, Care+, or ads. D24 still approves
+  iPhone-only, iOS 26.2+, with native
+  iPad/watchOS deferred.
+- Current decision: close TFU-20260715-003 before resuming final signed-device
+  RC acceptance. The remaining CloudKit P1 is explicitly
+  deferred and unreachable in the local-only first release. The future
   account design is recorded in
   `docs/planning/account-backend-extension.md`; the requested family invitation
   and explicit Human-linking flow is tracked below as P3 discovery only and does
@@ -40,28 +58,41 @@
 
 ## Open Items
 
-### TFU-20260715-002 - Validate Human-First Onboarding And Starter Journey
+### TFU-20260715-003 - Ship And Validate Free / Personal 1.0
 
-- Priority / bucket: P1, current first-release repository and Simulator proof.
-- Blocker: D17 now requires a local Human name and makes first-Pet creation
-  optional; the first Pet exposes an explicit 50-coconut Task Center claim, and
-  D28 adds six independently claimed member-wallet rewards. Current source and
-  test files implement these boundaries, but this documentation task did not
-  compile the affected target, run the targeted suites, or execute either clean
-  journey. The 2026-07-11 no-Human Pet-first evidence is historical.
-- Next action: on the fixed tests lane, run the focused onboarding coordinator,
-  handoff, starter gift, household journey, Task Center projection, route,
-  reset, growth-unlock, and compatibility suites. Then use only the disposable
-  `iPhone 17 Tests` device for `Human -> Later` and
-  `Human -> Pet -> Task Center -> explicit claim`, including interruption,
-  relaunch, duplicate-tap, failed-claim retry, Oasis lock, Home card handoff,
-  system-item/list-only behavior, and the first three D28 rows.
-- Close when: the affected App/test targets compile; selected tests pass with
-  non-zero execution; both clean journeys pass; the 50-coconut credit is atomic
-  and household-idempotent; Oasis never unlocks before claim; the six D28
-  rewards total 400, enter the resolved Human wallet only after eligibility is
-  rechecked, and preserve privacy-choice equivalence; active status documents
-  record the exact commands and results.
+- Priority / bucket: P1, current first-release implementation, Store
+  configuration, quota migration, and purchase acceptance.
+- Blocker: the current worktree implements the centralized Monthly / Yearly /
+  Lifetime catalog, verified legacy Supporter grandfathering, Free quotas,
+  logical-plan grouping, reactivation protection, downgrade grandfathering,
+  StoreKit-sourced trial eligibility, paid capability gates, and paywall. The
+  current App + UI target compiles and
+  `.build/TestResults/PersonalFocused.xcresult` reports 67/67 focused Unit tests
+  passing. Free space is about 44 GiB and no `* 2.swift` / `* 3.swift` conflict
+  copies remain, so the earlier local build blockers are cleared. App Store
+  Connect, Sandbox, second-device restore, subscription lifecycle, signed
+  Storefront, assistive-technology, and complete nine-language App commerce
+  copy remain absent.
+- Next action: reconcile any remaining focused quota,
+  plan-grouping/reactivation, capability, UI-contract, catalog, and entitlement
+  selectors against the current source, and complete the remaining App commerce
+  languages. Then validate StoreKit product
+  loading, verified/unverified purchase, pending, cancel, failure,
+  `currentEntitlements`, `Transaction.updates`, `AppStore.sync()`, offline,
+  trial conversion, subscription expiration, Lifetime, refund/revocation, and
+  restore. Keep ads absent and preserve Coconut / `ShopPurchaseRecord`
+  ownership.
+- Close when: affected App/test targets compile and targeted tests execute with
+  non-zero coverage; Free quotas and logical-plan deduplication pass; Personal
+  is unlimited; all over-quota grandfather/downgrade paths preserve data and
+  only block further increasing operations; Monthly / Yearly / Lifetime and
+  legacy Supporter all produce the correct unified Personal entitlement; yearly
+  trial eligibility comes from StoreKit; every failure leaves Free data and
+  Coconut ownership unchanged; nine-language/accessibility coverage passes; a
+  final signed 1.0 build loads the real localized Storefront products; Sandbox
+  subscription, Lifetime, second-device restore, trial/expiration, and
+  refund/revocation pass; agreements, tax/banking, metadata, review materials,
+  and submission are ready and recorded in the active release dashboard.
 
 ### TFU-20260614-014 - Validate CloudSync Live-Apply Policy When Family Enables
 
@@ -183,12 +214,21 @@
 ### TFU-20260629-004 - Finish Pet Simulator GUI Depth
 
 - Priority / bucket: P2, simulator/UI coverage depth.
-- Blocker: broad Pet paths pass, but some negative/edit/shop/stale-route and
-  cross-feature long-session combinations remain unautomated.
-- Next action: add only narrow tests exposed by real regression risk; use the
-  dogfood simulator for persistent old-user scenarios.
-- Close when: the remaining release-relevant Pet negative paths have stable
-  automated or recorded manual proof.
+- Blocker: all 119/119 formal UI selectors now have cumulative trusted green
+  evidence, but some negative/edit/shop/stale-route combinations remain outside
+  the manifest. Two passing current-build Walk journeys reproducibly emit
+  CoreLocation's main-thread UI-unresponsiveness runtime warning as the live
+  route starts. The result bundles provide no stack or source location, and a
+  source search finds no direct `locationServicesEnabled()` call, so App versus
+  MapKit/CoreLocation attribution remains open; no visible stall was measured.
+- Next action: add only narrow tests exposed by real regression risk. Attribute
+  the Walk warning with a focused stack/profile or signpost before changing
+  product code, rerun the narrow Walk path afterward, and cover locked-screen
+  location on the physical-device lane. Use the Dogfood simulator only for
+  non-destructive persistent old-user scenarios.
+- Close when: remaining release-relevant Pet negative paths have stable
+  automated or recorded manual proof and the Walk warning is either removed
+  from product code or attributed to the platform with measured non-regression.
 
 ### TFU-20260612-020 - Finish Long-Language Visual Coverage
 

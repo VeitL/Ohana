@@ -16,6 +16,7 @@ struct FocusHomeToolbar: ToolbarContent {
     let localization: L10n
     let onCoconut: () -> Void
     let onPrimaryAction: () -> Void
+    let onOpenAllFeatures: () -> Void
     let onOpenPlantData: () -> Void
     let onCrew: () -> Void
     let onAccountSwitcher: () -> Void
@@ -40,6 +41,7 @@ struct FocusHomeToolbar: ToolbarContent {
                             systemImage: "arrow.triangle.2.circlepath"
                         )
                     }
+                    .accessibilityIdentifier("home-account-switcher-menu-action")
                 } label: {
                     Image(systemName: "person.2.fill") // a11y: allow parent Menu provides the localized label
                         .accessibilityHidden(true)
@@ -59,7 +61,50 @@ struct FocusHomeToolbar: ToolbarContent {
                 .accessibilityIdentifier("home-crew-roster-action")
             }
 
-            if selectedTab == .plants {
+            if selectedTab == .home {
+                Menu {
+                    Button {
+                        OhanaFeedback.light()
+                        onOpenAllFeatures()
+                    } label: {
+                        Label(
+                            localization.tr(
+                                zh: "全部功能",
+                                en: "All Features",
+                                de: "Alle Funktionen",
+                                es: "Todas las funciones",
+                                pt: "Todos os recursos",
+                                fr: "Toutes les fonctions",
+                                ja: "すべての機能",
+                                ko: "모든 기능",
+                                it: "Tutte le funzioni"
+                            ),
+                            systemImage: "square.grid.2x2.fill"
+                        )
+                    }
+                    .accessibilityIdentifier("home-all-features-action")
+                } label: {
+                    Label(primaryActionAccessibilityLabel, systemImage: primaryActionIcon)
+                        .labelStyle(.iconOnly)
+                        .contentTransition(.symbolEffect(.replace))
+                } primaryAction: {
+                    OhanaFeedback.light()
+                    onPrimaryAction()
+                }
+                .accessibilityLabel(primaryActionAccessibilityLabel)
+                .accessibilityHint(localization.tr(
+                    zh: "点击查看家庭洞察，长按打开全部功能",
+                    en: "Tap for household insights. Long press for all features.",
+                    de: "Tippen für Haushaltseinblicke. Lange drücken für alle Funktionen.",
+                    es: "Toca para ver información del hogar. Mantén pulsado para ver todas las funciones.",
+                    pt: "Toque para ver insights da casa. Mantenha pressionado para ver todos os recursos.",
+                    fr: "Touchez pour les aperçus du foyer. Appui long pour toutes les fonctions.",
+                    ja: "タップで世帯インサイト、長押しですべての機能を開きます。",
+                    ko: "탭하면 가정 인사이트, 길게 누르면 모든 기능이 열립니다.",
+                    it: "Tocca per gli insight della casa. Tieni premuto per tutte le funzioni."
+                ))
+                .accessibilityIdentifier("home-primary-action")
+            } else if selectedTab == .plants {
                 Menu {
                     Button {
                         OhanaFeedback.light()

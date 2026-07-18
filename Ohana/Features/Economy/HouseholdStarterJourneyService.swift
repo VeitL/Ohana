@@ -9,12 +9,12 @@ import Foundation
 import SwiftData
 
 enum HouseholdStarterJourneyService {
-    static let checkpointActionType = "householdStarterJourneyCheckpoint"
-    static let checkpointSourceModelName = "HouseholdStarterJourneyCheckpoint"
-    static let rewardActionType = "householdStarterJourneyReward"
-    static let rewardSourceModelName = "HouseholdStarterJourneyReward"
+    nonisolated static let checkpointActionType = "householdStarterJourneyCheckpoint"
+    nonisolated static let checkpointSourceModelName = "HouseholdStarterJourneyCheckpoint"
+    nonisolated static let rewardActionType = "householdStarterJourneyReward"
+    nonisolated static let rewardSourceModelName = "HouseholdStarterJourneyReward"
 
-    private struct CheckpointMetadata: Codable, Equatable, Sendable {
+    private nonisolated struct CheckpointMetadata: Codable, Equatable, Sendable {
         let journeyKey: String
         let taskRaw: String
         let checkpointRaw: String
@@ -605,8 +605,7 @@ private extension HouseholdStarterJourneyService {
             )
             if actual[checkpoint] == true {
                 completed.insert(checkpoint)
-            }
-            if let resolution = resolutions[key] {
+            } else if let resolution = resolutions[key] {
                 completed.insert(checkpoint)
                 resolved[checkpoint] = resolution
             }
@@ -854,27 +853,58 @@ private extension HouseholdStarterJourneyService {
     ) throws -> Bool {
         guard let pet = livingPets.first(where: { $0.id == petID }) else { return false }
         let petIDRaw = petID.uuidString
-        var eventDescriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityId == petIDRaw
-                    && event.recurrenceDays > 0
-                    && !event.isCompleted
+        for eventID in CarePlanCalendarSync.storedDefaultCalendarPlanEventIDs(for: petID) {
+            var descriptor = FetchDescriptor<Event>(
+                predicate: #Predicate<Event> { event in
+                    event.id == eventID
+                        && event.relatedEntityId == petIDRaw
+                        && event.recurrenceDays > 0
+                        && !event.isCompleted
+                }
+            )
+            descriptor.fetchLimit = 1
+            if let event = try context.fetch(descriptor).first,
+               carePlanEvidence(
+                   targetPet: pet,
+                   events: [event],
+                   reminderEventIDs: []
+               ).hasDefaultRecommendedCarePlan {
+                return true
             }
-        )
-        eventDescriptor.fetchLimit = 64
-        var reminderDescriptor = FetchDescriptor<Reminder>(
-            predicate: #Predicate<Reminder> { reminder in
-                reminder.event?.relatedEntityId == petIDRaw
+        }
+
+        for title in CarePlanCalendarSync.defaultGeneratedCalendarPlanTitles(for: pet).sorted() {
+            var eventDescriptor = FetchDescriptor<Event>(
+                predicate: #Predicate<Event> { event in
+                    event.relatedEntityId == petIDRaw
+                        && event.title == title
+                        && event.recurrenceDays > 0
+                        && !event.isCompleted
+                },
+                sortBy: [
+                    SortDescriptor(\.createdAt),
+                    SortDescriptor(\.id)
+                ]
+            )
+            eventDescriptor.fetchLimit = 1
+            guard let event = try context.fetch(eventDescriptor).first else { continue }
+            let eventID = event.id
+            var reminderDescriptor = FetchDescriptor<Reminder>(
+                predicate: #Predicate<Reminder> { reminder in
+                    reminder.event?.id == eventID
+                }
+            )
+            reminderDescriptor.fetchLimit = 1
+            let reminderEventIDs: Set<UUID> = try context.fetch(reminderDescriptor).isEmpty ? [] : [eventID]
+            if carePlanEvidence(
+                targetPet: pet,
+                events: [event],
+                reminderEventIDs: reminderEventIDs
+            ).hasDefaultRecommendedCarePlan {
+                return true
             }
-        )
-        reminderDescriptor.fetchLimit = 128
-        let events = try context.fetch(eventDescriptor)
-        let reminderIDs = Set(try context.fetch(reminderDescriptor).compactMap { $0.event?.id })
-        return carePlanEvidence(
-            targetPet: pet,
-            events: events,
-            reminderEventIDs: reminderIDs
-        ).hasDefaultRecommendedCarePlan
+        }
+        return false
     }
 
     private nonisolated static func carePlanProgress(
@@ -894,8 +924,7 @@ private extension HouseholdStarterJourneyService {
         var recordedResolutions: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution] = [:]
         if hasExplicitPlan {
             completed.insert(checkpoint)
-        }
-        if hasAnyPlan, let resolution = resolutions[key] {
+        } else if hasAnyPlan, let resolution = resolutions[key] {
             completed.insert(checkpoint)
             recordedResolutions[checkpoint] = resolution
         }
@@ -962,9 +991,14 @@ private extension HouseholdStarterJourneyService {
                 event.actionType == actionType
                     && event.legacyModelName == modelName
                     && event.legacyModelId == recordKey
-            }
+            },
+            sortBy: [
+                SortDescriptor(\.occurredAt, order: .reverse),
+                SortDescriptor(\.createdAt, order: .reverse),
+                SortDescriptor(\.id, order: .reverse)
+            ]
         )
-        descriptor.fetchLimit = 8
+        descriptor.fetchLimit = 1
         return try context.fetch(descriptor)
     }
 

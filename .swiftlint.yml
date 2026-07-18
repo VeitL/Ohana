@@ -17,7 +17,6 @@ excluded:
   - Ohana/PetAvatarAssets
   - "**/*.generated.swift"
   - Ai_Studio_New_UI
-  - ohana-design-system
 
 # Rules that are too noisy for this codebase's current style; revisit later.
 disabled_rules:

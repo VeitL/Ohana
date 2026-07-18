@@ -15,7 +15,10 @@ struct WeeklyReportCard: View {
     @State private var shareImage: UIImage? = nil
     @State private var pulseShare = false
     @State private var isVisible = false
+    @State private var showingSupporterPack = false
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @Environment(\.hasSupporterPackEntitlement) private var hasSupporterPack
+    @AppStorage(SupporterPackCatalog.weeklyPosterPreferenceKey) private var posterStyleRaw = SupporterWeeklyPosterStyle.standard.rawValue
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     init(pet: Pet, ledgerEvents: [CareLedgerEvent] = []) {
@@ -28,6 +31,13 @@ struct WeeklyReportCard: View {
     }
 
     private var l: L10n { L10n(appLanguage) }
+
+    private var posterStyle: SupporterWeeklyPosterStyle {
+        SupporterPackAccessPolicy.resolvedPosterStyle(
+            requested: SupporterWeeklyPosterStyle(rawValue: posterStyleRaw) ?? .standard,
+            hasSupporterPack: hasSupporterPack
+        )
+    }
 
     private var weekStart: Date {
         Calendar.current.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
@@ -115,6 +125,46 @@ struct WeeklyReportCard: View {
                 .disabled(isRendering)
             }
 
+            HStack(spacing: 10) {
+                Text(l.tr(zh: "分享海报", en: "Share poster", de: "Poster teilen"))
+                    .font(OhanaFont.footnote(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                Spacer()
+                Menu {
+                    Button {
+                        posterStyleRaw = SupporterWeeklyPosterStyle.standard.rawValue
+                    } label: {
+                        Label(
+                            l.tr(zh: "标准海报", en: "Standard poster", de: "Standardposter"),
+                            systemImage: posterStyle == .standard ? "checkmark" : "rectangle.portrait"
+                        )
+                    }
+
+                    Button {
+                        if hasSupporterPack {
+                            posterStyleRaw = SupporterWeeklyPosterStyle.supporter.rawValue
+                        } else {
+                            showingSupporterPack = true
+                        }
+                    } label: {
+                        Label(
+                            l.tr(zh: "Founding Ohana 海报", en: "Founding Ohana poster", de: "Founding-Ohana-Poster"),
+                            systemImage: hasSupporterPack
+                                ? (posterStyle == .supporter ? "checkmark" : "checkmark.seal.fill")
+                                : "lock.fill"
+                        )
+                    }
+                } label: {
+                    Label(posterStyleTitle, systemImage: posterStyle == .supporter ? "checkmark.seal.fill" : "rectangle.portrait")
+                        .font(OhanaFont.footnote(.bold))
+                }
+                .buttonStyle(.bordered)
+                .tint(posterStyle == .supporter ? Color.goPrimary : Color.goTeal)
+                .accessibilityLabel(l.tr(zh: "选择分享海报", en: "Choose share poster", de: "Poster auswählen"))
+                .accessibilityValue(posterStyleTitle)
+                .accessibilityIdentifier("weekly-report-poster-style-menu")
+            }
+
             // 统计网格
             LazyVGrid(columns: [
                 GridItem(.flexible(), spacing: 10),
@@ -160,6 +210,19 @@ struct WeeklyReportCard: View {
             if let img = shareImage {
                 ShareSheet(image: img)
             }
+        }
+        .sheet(isPresented: $showingSupporterPack) {
+            SupporterPackView()
+                .ohanaSheetPagePresentation()
+        }
+    }
+
+    private var posterStyleTitle: String {
+        switch posterStyle {
+        case .standard:
+            l.tr(zh: "标准", en: "Standard", de: "Standard")
+        case .supporter:
+            "Founding Ohana"
         }
     }
 
@@ -253,6 +316,11 @@ struct WeeklyReportCard: View {
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                 Spacer()
+                if posterStyle == .supporter {
+                    Label("Founding Ohana", systemImage: "checkmark.seal.fill")
+                        .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.goPrimary)
+                }
                 Text("\(weekStart, format: .dateTime.month().day()) — \(weekEnd, format: .dateTime.month().day())")
                     .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
@@ -330,9 +398,9 @@ struct WeeklyReportCard: View {
             // 底部水印
             HStack {
                 Spacer()
-                Text("Made with Ohana 🏝️")
+                Text(posterStyle == .supporter ? "Founding Ohana · Made with Ohana 🏝️" : "Made with Ohana 🏝️")
                     .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.18))
+                    .foregroundStyle(posterStyle == .supporter ? Color.goPrimary.opacity(0.72) : Color.ohanaPrimaryText.opacity(0.18))
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -340,14 +408,16 @@ struct WeeklyReportCard: View {
         }
         .background(
             LinearGradient(
-                colors: [Color(hex: "2A1F6B"), Color(hex: "1A0E4B")],
+                colors: posterStyle == .supporter
+                    ? [Color(hex: "10170B"), Color(hex: "1D2B0D"), Color(hex: "090A08")]
+                    : [Color(hex: "2A1F6B"), Color(hex: "1A0E4B")],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             ),
             in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
-                .strokeBorder(Color.goPrimary.opacity(0.25), lineWidth: 1.5)
+                .strokeBorder(Color.goPrimary.opacity(posterStyle == .supporter ? 0.58 : 0.25), lineWidth: 1.5)
         )
     }
 

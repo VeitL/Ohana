@@ -18,7 +18,8 @@ extension MemberCardCreationContentView {
             if !isJoinHandoffRunning {
                 MemberPortraitDraftCardSurface(
                     snapshot: snapshot,
-                    layoutMode: memberPortraitCardLayoutMode
+                    layoutMode: memberPortraitCardLayoutMode,
+                    showsAvatar: shouldShowDraftCardAvatar
                 ) {
                     cardControls
                 }
@@ -40,10 +41,17 @@ extension MemberCardCreationContentView {
     }
 
     var memberPortraitCardLayoutMode: MemberPortraitDraftCardLayoutMode {
+        if kind == .pet, currentStep == .avatar {
+            return .avatarFocus
+        }
         if currentStep == .petPersonality, !dynamicTypeSize.isAccessibilitySize {
             return .compactPersonalization
         }
         return .standard
+    }
+
+    var shouldShowDraftCardAvatar: Bool {
+        kind != .pet || currentStep == .avatar
     }
 
     var permissionAlertBinding: Binding<Bool> {
@@ -74,19 +82,13 @@ extension MemberCardCreationContentView {
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(l.cancel)
+            .accessibilityIdentifier("member-creation-cancel-action")
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(kind.title(l))
-                    .font(OhanaFont.title(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                Text(l.tr(zh: "先加入，更多资料稍后编辑", en: "Add now, edit details later", de: "Jetzt hinzufügen, Details später bearbeiten"))
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
+            Text(kind.title(l))
+                .font(OhanaFont.title(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
             Spacer()
         }
     }
@@ -165,6 +167,7 @@ extension MemberCardCreationContentView {
                         }
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("member-creation-back-action")
                     .disabled(isJoinHandoffRunning || isSaving)
                 }
 

@@ -33,6 +33,16 @@ extension CalendarEventCommandService {
         let reminderCompletion = options.reminderCompletion ?? ReminderCompletionService()
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         let affectedSubjectIDs = affectedSubjectIDs(for: event, context: context)
+        if !shouldComplete,
+           try PersonalUsageSnapshotReader.isOrdinaryUserPlanCandidate(event, context: context, now: now),
+           try !PersonalUsageSnapshotReader.countsAsOrdinaryActiveUserPlan(event, context: context, now: now) {
+            try PersonalPlanQuotaCommandGate.requirePlanChange(
+                context: context,
+                personalAccessLevel: options.personalAccessLevel,
+                addingActivePlanCount: 1,
+                now: now
+            )
+        }
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
             event: event,
             writeKind: writeKind(for: event),

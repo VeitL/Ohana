@@ -62,6 +62,26 @@ extension SettingsView {
             .accessibilityIdentifier("settings-debug-reminder-observability")
 
             #if DEBUG
+                NavigationLink {
+                    PerformanceDiagnosticsView()
+                        .toolbar {
+                            ToolbarItem(placement: .primaryAction) {
+                                Button(role: .cancel) { closeSettings() } label: {
+                                    Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
+                                }
+                                .labelStyle(.iconOnly)
+                                .accessibilityIdentifier("settings-close-action")
+                            }
+                        }
+                } label: {
+                    SettingsNavigationLabel(
+                        icon: "speedometer",
+                        title: l.tr(zh: "性能诊断", en: "Performance diagnostics", de: "Leistungsdiagnose"),
+                        subtitle: l.tr(zh: "设置打开阶段与轻量视觉实验", en: "Settings-open phases and visual experiment", de: "Einstellungsphasen und Darstellungstest")
+                    )
+                }
+                .accessibilityIdentifier("settings-debug-performance-diagnostics")
+
                 settingsRow(
                     icon: "paintpalette.fill",
                     title: l.tr(zh: "UI 规范展示", en: "UI Specification Showcase"),

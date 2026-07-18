@@ -39,7 +39,7 @@ nonisolated enum DataBackupPreflightValidator {
         _ backup: OhanaBackup,
         existing: DataBackupRestoreExistingIdentities
     ) throws {
-        guard backup.schemaVersion >= 1, backup.schemaVersion <= 31 else {
+        guard backup.schemaVersion >= 1, backup.schemaVersion <= 33 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 

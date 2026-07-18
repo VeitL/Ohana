@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct HumanWeightDashboardContent: View {
     let human: Human
@@ -19,6 +20,7 @@ struct HumanWeightDashboardContent: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedRange: PetWeightDashboardContent.WeightRange = .days30
+    @State private var showingPersonalPlan = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
@@ -77,6 +79,15 @@ struct HumanWeightDashboardContent: View {
                 }
             }
         )
+        .sheet(isPresented: $showingPersonalPlan) {
+            PersonalPlanView()
+                .ohanaSheetPagePresentation()
+        }
+        .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+            if selectedRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                selectedRange = .days30
+            }
+        }
     }
 
     private var metrics: some View {
@@ -94,7 +105,11 @@ struct HumanWeightDashboardContent: View {
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                DashboardRangePicker(ranges: PetWeightDashboardContent.WeightRange.allCases, selection: $selectedRange) {
+                DashboardRangePicker(
+                    ranges: PetWeightDashboardContent.WeightRange.allCases,
+                    selection: personalRangeSelection,
+                    isLocked: { $0.requiresPersonal && !appServices.commerce.allows(.extendedTrends) }
+                ) {
                     $0.title(l)
                 }
             }
@@ -109,6 +124,20 @@ struct HumanWeightDashboardContent: View {
         }
     }
 
+    private var personalRangeSelection: Binding<PetWeightDashboardContent.WeightRange> {
+        Binding(
+            get: { selectedRange },
+            set: { range in
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                selectedRange = range
+            }
+        )
+    }
+
     private var historyBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
@@ -118,7 +147,7 @@ struct HumanWeightDashboardContent: View {
                 emptyState(icon: "scalemass.fill", text: l.tr(zh: "还没有体重记录", en: "No weight logs yet", de: "Noch keine Gewichtseinträge"))
             } else {
                 LazyVStack(spacing: 10) {
-                    ForEach(logs.prefix(20)) { log in
+                    ForEach(logs) { log in
                         HStack(spacing: 12) {
                             Image(systemName: "scalemass.fill").accessibilityHidden(true)
                                 .font(OhanaFont.adaptive(size: 14, weight: .black))

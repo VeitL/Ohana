@@ -111,6 +111,13 @@ reimbursement in the insurance category. Zero, NaN, infinity, unmarked negative
 expenses, and expense sessions without a valid amount fail preflight; direct
 rehydrate writers enforce the same rule as defense in depth.
 
+BR-014. Restricted backup schema v32 includes `PresenceCheckIn`, its fixed status,
+`PresenceParticipationPeriod`, and `PresenceRewardReceipt`. Schema v31 remains
+decodable. Restore upserts these facts without executing check-in/reward commands,
+so it can never mint coconuts. App experience mode, owner binding, reminder times,
+grace settings, `SafetyContact` names/numbers, and message templates are device-local
+and excluded from backup, manual export, logs and current CloudSync.
+
 ## Validation
 
 Required launch evidence:
@@ -134,6 +141,8 @@ Required launch evidence:
 - Fault injection at every restore phase, transaction-save failure,
   cancellation, and repeated-restore idempotency with original-store,
   UserDefaults, and notification assertions.
+- v31/v32 presence round trips, repeated upsert idempotency, restore-without-reward,
+  and explicit proof that contacts, phone numbers, templates and mode settings are absent.
 
 Do not close a backup/restore item with only a successful build. Data safety
 requires projection, import, error, and wipe-restore evidence.

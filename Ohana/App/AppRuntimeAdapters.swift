@@ -50,15 +50,25 @@ extension DataBackupManaging {
 
 @MainActor
 final class SharedDataBackupManagerAdapter: DataBackupManaging {
-    private let manager = DataBackupManager()
+    private let manager: DataBackupManager
     private let projectionManager: CoconutProjectionManaging
+    private var settleShopPurchases: ((ModelContext) -> Void)?
 
-    init(projectionManager: CoconutProjectionManaging) {
+    init(
+        projectionManager: CoconutProjectionManaging,
+        manager: DataBackupManager = DataBackupManager()
+    ) {
         self.projectionManager = projectionManager
+        self.manager = manager
+    }
+
+    func registerShopPurchaseSettlement(_ settlement: @escaping (ModelContext) -> Void) {
+        settleShopPurchases = settlement
     }
 
     func exportJSON(container: ModelContainer, password: String?) async throws -> URL {
-        try await manager.exportJSON(
+        settleShopPurchases?(container.mainContext)
+        return try await manager.exportJSON(
             container: container,
             password: password,
             scope: .manualExternalRestricted
@@ -66,7 +76,15 @@ final class SharedDataBackupManagerAdapter: DataBackupManaging {
     }
 
     func importJSON(from url: URL, context: ModelContext, password: String?) async throws {
-        try await manager.importJSON(from: url, context: context, projectionManager: projectionManager, password: password)
+        try await manager.importJSON(
+            from: url,
+            context: context,
+            projectionManager: projectionManager,
+            password: password,
+            settleShopPurchases: { [settleShopPurchases] in
+                settleShopPurchases?(context)
+            }
+        )
     }
 }
 
@@ -192,6 +210,8 @@ protocol NotificationRoutePublishing {
     var reminderActionEvents: AnyPublisher<ReminderNotificationActionEvent, Never> { get }
 
     func publishRouteEvent(_ event: AppRouteNotificationEvent)
+    func acknowledgeRouteEvent(id: UUID)
+    func acknowledgeReminderActionEvent(id: UUID)
 }
 
 @MainActor
@@ -216,5 +236,13 @@ final class SharedNotificationRoutePublisher: NotificationRoutePublishing {
 
     func publishRouteEvent(_ event: AppRouteNotificationEvent) {
         center.publishRouteEvent(event)
+    }
+
+    func acknowledgeRouteEvent(id: UUID) {
+        center.acknowledgeRouteEvent(id: id)
+    }
+
+    func acknowledgeReminderActionEvent(id: UUID) {
+        center.acknowledgeReminderActionEvent(id: id)
     }
 }

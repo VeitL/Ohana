@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct PetExpenseDashboardContent: View {
     let pet: Pet
@@ -23,6 +24,7 @@ struct PetExpenseDashboardContent: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedRange: ExpenseDashboardRange = .month
+    @State private var showingPersonalPlan = false
     @State private var selectedCategory: ExpenseCategory?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -36,6 +38,11 @@ struct PetExpenseDashboardContent: View {
     }
 
     private var positiveLogs: [PetExpenseLog] { ExpenseSummaryBuilder.positiveLogs(filteredLogs) }
+    /// Time-range gates affect analysis only. Raw history remains available to
+    /// Free users and may still use the independent category filter.
+    private var historyLogs: [PetExpenseLog] {
+        ExpenseSummaryBuilder.logs(baseLogs, category: selectedCategory)
+    }
     private var totals: ExpenseTotals { ExpenseSummaryBuilder.totals(from: filteredLogs) }
     private var categoryBreakdown: [ExpenseCategoryBreakdown] { ExpenseSummaryBuilder.categoryBreakdown(from: filteredLogs) }
 
@@ -68,6 +75,15 @@ struct PetExpenseDashboardContent: View {
                 addButton
             }
         )
+        .sheet(isPresented: $showingPersonalPlan) {
+            PersonalPlanView()
+                .ohanaSheetPagePresentation()
+        }
+        .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+            if selectedRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                selectedRange = .month
+            }
+        }
     }
 
     private var metrics: some View {
@@ -89,7 +105,11 @@ struct PetExpenseDashboardContent: View {
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                DashboardRangePicker(ranges: ExpenseDashboardRange.allCases, selection: $selectedRange) {
+                DashboardRangePicker(
+                    ranges: ExpenseDashboardRange.allCases,
+                    selection: personalRangeSelection,
+                    isLocked: { $0.requiresPersonal && !appServices.commerce.allows(.extendedTrends) }
+                ) {
                     $0.title(l)
                 }
             }
@@ -100,6 +120,20 @@ struct PetExpenseDashboardContent: View {
                 emptyState(icon: AppCurrency.systemIconName, text: l.tr(zh: "记录花费后显示趋势", en: "Add an expense to show bars", de: "Ausgaben zeigen Balken"))
             }
         }
+    }
+
+    private var personalRangeSelection: Binding<ExpenseDashboardRange> {
+        Binding(
+            get: { selectedRange },
+            set: { range in
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                selectedRange = range
+            }
+        )
     }
 
     private var categoryStrip: some View {
@@ -119,11 +153,11 @@ struct PetExpenseDashboardContent: View {
             Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
                 .font(OhanaFont.headline(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            if filteredLogs.isEmpty {
+            if historyLogs.isEmpty {
                 emptyState(icon: AppCurrency.systemIconName, text: l.tr(zh: "还没有花费记录", en: "No expenses yet", de: "Noch keine Kosten"))
             } else {
                 LazyVStack(spacing: 10) {
-                    ForEach(filteredLogs.prefix(30)) { log in expenseRow(log) }
+                    ForEach(historyLogs) { log in expenseRow(log) }
                 }
             }
         }

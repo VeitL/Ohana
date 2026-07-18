@@ -6,15 +6,29 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # shellcheck source=scripts/lib/local-build-environment.sh
 source "${REPO_ROOT}/scripts/lib/local-build-environment.sh"
+# shellcheck source=scripts/lib/test-build-provenance.sh
+source "${REPO_ROOT}/scripts/lib/test-build-provenance.sh"
 
 cd "${REPO_ROOT}"
 
 export COPYFILE_DISABLE="${COPYFILE_DISABLE:-1}"
 
+ORIGINAL_XCODEBUILD_ARGS=("$@")
+BUILD_XCODEBUILD_ARGS=()
+while IFS= read -r -d '' argument; do
+  BUILD_XCODEBUILD_ARGS+=("${argument}")
+done < <(
+  ohana_test_build_provenance_filter_build_args \
+    ${ORIGINAL_XCODEBUILD_ARGS[@]+"${ORIGINAL_XCODEBUILD_ARGS[@]}"}
+)
+
 if [[ -n "${SCHEME:-}" ]]; then
   SCHEME_SOURCE="explicit"
 else
-  SCHEME="$("${REPO_ROOT}/scripts/resolve-test-scheme.sh" "$@")"
+  SCHEME="$(
+    "${REPO_ROOT}/scripts/resolve-test-scheme.sh" \
+      ${ORIGINAL_XCODEBUILD_ARGS[@]+"${ORIGINAL_XCODEBUILD_ARGS[@]}"}
+  )"
   SCHEME_SOURCE="automatic"
 fi
 SDK="${SDK:-iphonesimulator}"
@@ -26,6 +40,9 @@ DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-${OHANA_TEST_DERIVED_DATA_ROOT:-${OHANA_
 LOCK_ROOT="${REPO_ROOT}/.build/locks"
 LOCK_DIR="${LOCK_ROOT}/lane-tests.lock"
 LOCK_ACQUIRED=0
+resolved_test_udid=""
+PROVENANCE_SOURCE_HASH=""
+PROVENANCE_FIELDS=()
 
 case "${TEST_ACTION}" in
   build-then-test|build-for-testing|test-without-building)
@@ -49,6 +66,7 @@ fi
 
 ohana_assert_fixed_derived_data_path tests "${DERIVED_DATA_PATH}"
 DERIVED_DATA_PATH="${OHANA_TEST_DERIVED_DATA_PATH}"
+PROVENANCE_STAMP_PATH="${DERIVED_DATA_PATH}/.ohana-test-build-provenance-v1.json"
 
 destination_udid() {
   local destination="$1"
@@ -100,6 +118,7 @@ resolve_test_destination() {
   fi
 
   ohana_assert_test_simulator_udid "${resolved}" || return
+  resolved_test_udid="${resolved}"
   DESTINATION="platform=iOS Simulator,id=${resolved}"
   echo "Test Simulator: ${OHANA_TEST_SIMULATOR_NAME_FIXED} (${resolved})"
 }
@@ -117,6 +136,117 @@ sanitize_derived_data_products() {
   if [[ -x "${STRIP_XATTRS_SCRIPT}" && -d "${products_dir}" ]]; then
     "${STRIP_XATTRS_SCRIPT}" "${products_dir}" || true
   fi
+}
+
+provenance_input_scope() {
+  case "${SCHEME}" in
+    OhanaUITests)
+      printf '%s\n' "app+ui"
+      ;;
+    OhanaUnitTests)
+      printf '%s\n' "app+unit"
+      ;;
+    *)
+      printf '%s\n' "app+unit+ui"
+      ;;
+  esac
+}
+
+refresh_test_build_provenance_contract() {
+  local input_scope
+  local source_paths=(
+    Ohana
+    Ohana.xcodeproj
+    scripts/test-simulator.sh
+    scripts/resolve-test-scheme.sh
+    scripts/strip-build-xattrs.sh
+    scripts/lib/local-build-environment.sh
+    scripts/lib/test-build-provenance.sh
+  )
+  input_scope="$(provenance_input_scope)"
+  case "${input_scope}" in
+    app+ui)
+      source_paths+=(OhanaUITests)
+      ;;
+    app+unit)
+      source_paths+=(OhanaTests)
+      ;;
+    *)
+      source_paths+=(OhanaTests OhanaUITests)
+      ;;
+  esac
+
+  PROVENANCE_SOURCE_HASH="$(
+    ohana_test_build_provenance_hash_inputs "${REPO_ROOT}" "${source_paths[@]}"
+  )" || return
+
+  local build_args_hash
+  local developer_dir
+  local sdk_version
+  local sdk_build_version
+  local xcode_version_hash
+  build_args_hash="$(
+    ohana_test_build_provenance_build_args_sha256 \
+      ${BUILD_XCODEBUILD_ARGS[@]+"${BUILD_XCODEBUILD_ARGS[@]}"}
+  )" || return
+  developer_dir="${DEVELOPER_DIR:-$(xcode-select -p)}" || return
+  developer_dir="$(cd "${developer_dir}" && pwd -P)" || return
+  sdk_version="$(xcrun --sdk "${SDK}" --show-sdk-version)" || return
+  sdk_build_version="$(xcrun --sdk "${SDK}" --show-sdk-build-version)" || return
+  xcode_version_hash="$(xcodebuild -version | shasum -a 256 | awk '{print $1}')" || return
+
+  PROVENANCE_FIELDS=(
+    "project=Ohana.xcodeproj"
+    "scheme=${SCHEME}"
+    "sdk_name=${SDK}"
+    "sdk_version=${sdk_version}"
+    "sdk_build_version=${sdk_build_version}"
+    "developer_dir=${developer_dir}"
+    "xcode_version_sha256=${xcode_version_hash}"
+    "destination_udid=${resolved_test_udid}"
+    "code_signing_allowed=${CODE_SIGNING_ALLOWED_VALUE}"
+    "copyfile_disable=${COPYFILE_DISABLE}"
+    "build_args_sha256=${build_args_hash}"
+    "input_scope=${input_scope}"
+    "source_tree_sha256=${PROVENANCE_SOURCE_HASH}"
+  )
+}
+
+has_scheme_test_products() {
+  local products_dir="${DERIVED_DATA_PATH}/Build/Products"
+  [[ -d "${products_dir}" ]] || return 1
+  find "${products_dir}" -maxdepth 1 -type f -name "${SCHEME}_*.xctestrun" -print -quit \
+    | grep -q .
+}
+
+stamp_successful_test_build() {
+  local source_hash_before_build="$1"
+  refresh_test_build_provenance_contract || return
+  if [[ "${PROVENANCE_SOURCE_HASH}" != "${source_hash_before_build}" ]]; then
+    echo "Build inputs changed while build-for-testing was running." >&2
+    echo "Refusing to stamp potentially mixed products; rerun after edits settle." >&2
+    return 75
+  fi
+  if ! has_scheme_test_products; then
+    echo "build-for-testing succeeded but no ${SCHEME} xctestrun product was found." >&2
+    echo "Refusing to stamp an incomplete fixed tests cache." >&2
+    return 66
+  fi
+  ohana_test_build_provenance_write_stamp \
+    "${PROVENANCE_STAMP_PATH}" \
+    "${PROVENANCE_FIELDS[@]}" >/dev/null
+}
+
+validate_test_build_provenance() {
+  if ! has_scheme_test_products; then
+    echo "Fixed tests cache has no ${SCHEME} test products." >&2
+    echo "Run this request with OHANA_TEST_ACTION=build-then-test." >&2
+    return 66
+  fi
+  refresh_test_build_provenance_contract || return
+  ohana_test_build_provenance_validate_stamp \
+    "${PROVENANCE_STAMP_PATH}" \
+    "${PROVENANCE_FIELDS[@]}"
 }
 
 resolve_test_destination
@@ -149,6 +279,8 @@ while ! mkdir "${LOCK_DIR}" 2>/dev/null; do
 done
 LOCK_ACQUIRED=1
 printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+
+ohana_quiesce_test_simulator_companion_apps "${resolved_test_udid}"
 
 if [[ -n "${RESULT_BUNDLE_PATH}" ]]; then
   mkdir -p "$(dirname "${RESULT_BUNDLE_PATH}")"
@@ -196,33 +328,71 @@ run_xcodebuild_action() {
   xcodebuild "${xcodebuild_args[@]}"
 }
 
+source_hash_before_test=""
 set +e
 case "${TEST_ACTION}" in
   build-then-test)
     echo "Building test products once..."
-    run_xcodebuild_action build-for-testing 0 "$@"
+    ohana_test_build_provenance_invalidate_stamp "${PROVENANCE_STAMP_PATH}"
+    refresh_test_build_provenance_contract
     test_status=$?
+    source_hash_before_build="${PROVENANCE_SOURCE_HASH}"
     if [[ "${test_status}" == "0" ]]; then
+      run_xcodebuild_action build-for-testing 0 \
+        ${BUILD_XCODEBUILD_ARGS[@]+"${BUILD_XCODEBUILD_ARGS[@]}"}
+      test_status=$?
+    fi
+    if [[ "${test_status}" == "0" ]]; then
+      stamp_successful_test_build "${source_hash_before_build}"
+      test_status=$?
+    fi
+    if [[ "${test_status}" == "0" ]]; then
+      source_hash_before_test="${PROVENANCE_SOURCE_HASH}"
       sanitize_derived_data_products
       echo "Running tests without rebuilding..."
-      run_xcodebuild_action test-without-building 1 "$@"
+      run_xcodebuild_action test-without-building 1 \
+        ${ORIGINAL_XCODEBUILD_ARGS[@]+"${ORIGINAL_XCODEBUILD_ARGS[@]}"}
       test_status=$?
     fi
     ;;
   build-for-testing)
-    run_xcodebuild_action build-for-testing 1 "$@"
+    ohana_test_build_provenance_invalidate_stamp "${PROVENANCE_STAMP_PATH}"
+    refresh_test_build_provenance_contract
     test_status=$?
+    source_hash_before_build="${PROVENANCE_SOURCE_HASH}"
+    if [[ "${test_status}" == "0" ]]; then
+      run_xcodebuild_action build-for-testing 1 \
+        ${BUILD_XCODEBUILD_ARGS[@]+"${BUILD_XCODEBUILD_ARGS[@]}"}
+      test_status=$?
+    fi
+    if [[ "${test_status}" == "0" ]]; then
+      stamp_successful_test_build "${source_hash_before_build}"
+      test_status=$?
+    fi
     ;;
   test-without-building)
-    if [[ ! -d "${DERIVED_DATA_PATH}/Build/Products" ]]; then
-      echo "Fixed tests cache has no built products. Run build-for-testing first." >&2
-      test_status=66
-    else
-      run_xcodebuild_action test-without-building 1 "$@"
+    validate_test_build_provenance
+    test_status=$?
+    source_hash_before_test="${PROVENANCE_SOURCE_HASH}"
+    if [[ "${test_status}" == "0" ]]; then
+      run_xcodebuild_action test-without-building 1 \
+        ${ORIGINAL_XCODEBUILD_ARGS[@]+"${ORIGINAL_XCODEBUILD_ARGS[@]}"}
       test_status=$?
     fi
     ;;
 esac
+
+if [[ "${TEST_ACTION}" != "build-for-testing" && -n "${source_hash_before_test}" ]]; then
+  refresh_test_build_provenance_contract
+  provenance_status=$?
+  if [[ "${provenance_status}" != "0" ]]; then
+    test_status="${provenance_status}"
+  elif [[ "${PROVENANCE_SOURCE_HASH}" != "${source_hash_before_test}" ]]; then
+    echo "Build inputs changed while tests were running." >&2
+    echo "The xcresult was preserved, but it does not represent the current worktree." >&2
+    test_status=75
+  fi
+fi
 set -e
 
 sanitize_derived_data_products

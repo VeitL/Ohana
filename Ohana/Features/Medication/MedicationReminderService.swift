@@ -106,6 +106,8 @@ nonisolated enum MedicationNotificationBudget {
             return "{\(base),\"reason\":\"budget\",\"budget\":\(metadata)}"
         case .skippedPastDue:
             return "{\(base),\"reason\":\"pastDue\"}"
+        case .skippedInactiveMember:
+            return "{\(base),\"reason\":\"inactiveMember\"}"
         case .missingEvent:
             return "{\(base),\"reason\":\"missingEvent\"}"
         case let .failed(message):
@@ -128,6 +130,8 @@ nonisolated enum MedicationNotificationBudget {
             scheduledActionType.replacingOccurrences(of: "Success", with: "SkippedBudget")
         case .skippedPastDue:
             scheduledActionType.replacingOccurrences(of: "Success", with: "SkippedPastDue")
+        case .skippedInactiveMember:
+            scheduledActionType.replacingOccurrences(of: "Success", with: "SkippedInactiveMember")
         case .missingEvent:
             scheduledActionType.replacingOccurrences(of: "Success", with: "MissingEvent")
         case .failed:

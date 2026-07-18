@@ -34,6 +34,7 @@ enum MemberCreationError: LocalizedError {
     case insufficientCoconuts(missing: Int)
     case missingActiveHuman
     case walletFrozen
+    case personalUpgradeRequired(PersonalFreeLimitDenial)
     case saveFailed(String)
 
     var errorDescription: String? {
@@ -43,7 +44,7 @@ enum MemberCreationError: LocalizedError {
         case .duplicateName:
             "Name already exists."
         case .incompletePetProfile:
-            "Species and breed are required."
+            "Species, breed, and sex are required."
         case .avatarPassRequired:
             "A 2.5D avatar pass is required."
         case let .insufficientCoconuts(missing):
@@ -52,6 +53,8 @@ enum MemberCreationError: LocalizedError {
             "No active human member."
         case .walletFrozen:
             "This wallet is frozen."
+        case let .personalUpgradeRequired(denial):
+            "Ohana Free supports up to \(denial.limit) active items of this type. Ohana Personal removes this limit."
         case let .saveFailed(message):
             message
         }
@@ -68,19 +71,28 @@ final class MemberCreationService: MemberCreating {
     private let careLedger: CareLedgerRecording
     private let revisions: DomainRevisionPublishing
     private let questManager: QuestManager
+    private let shopInventory: ShopInventoryManaging
+    private let shopPurchaseFulfillment: ShopPurchaseFulfilling
+    private let personalAccessLevel: @MainActor () -> PersonalAccessLevel
 
     init(
         activeHumanSelection: ActiveHumanSelecting,
         wallet: CoconutWalletManaging,
         careLedger: CareLedgerRecording,
         revisions: DomainRevisionPublishing,
-        questManager: QuestManager
+        questManager: QuestManager,
+        shopInventory: ShopInventoryManaging = UserDefaultsShopInventoryManager(),
+        shopPurchaseFulfillment: ShopPurchaseFulfilling? = nil,
+        personalAccessLevel: @escaping @MainActor () -> PersonalAccessLevel = { .personal }
     ) {
         self.activeHumanSelection = activeHumanSelection
         self.wallet = wallet
         self.careLedger = careLedger
         self.revisions = revisions
         self.questManager = questManager
+        self.shopInventory = shopInventory
+        self.shopPurchaseFulfillment = shopPurchaseFulfillment ?? ShopPurchaseFulfillmentService()
+        self.personalAccessLevel = personalAccessLevel
     }
 
     var avatarPassCost: Int {
@@ -93,6 +105,34 @@ final class MemberCreationService: MemberCreating {
             return match
         }
         return humans.first(where: EconomyWalletWritePolicy.canWrite)
+    }
+
+    func creationAccessDenial(
+        kind: MemberCreationKind,
+        context: ModelContext
+    ) throws -> PersonalFreeLimitDenial? {
+        let request: PersonalAccessRequest
+        let usage: PersonalUsageSnapshot
+        do {
+            switch kind {
+            case .pet:
+                request = .addActivePet()
+                usage = PersonalUsageSnapshot(
+                    activePetCount: try PersonalUsageSnapshotReader.activePetCount(context: context)
+                )
+            case .human:
+                request = .addActiveHuman()
+                usage = PersonalUsageSnapshot(
+                    activeHumanCount: try PersonalUsageSnapshotReader.activeHumanCount(context: context)
+                )
+            }
+        } catch {
+            throw ServiceError.saveFailed(
+                "Could not verify the current Ohana Personal allowance: \(error.localizedDescription)"
+            )
+        }
+
+        return personalAccessDenial(for: request, usage: usage)
     }
 
     func purchaseAvatarPassForCurrentDraft(
@@ -124,11 +164,21 @@ final class MemberCreationService: MemberCreating {
                 throw ServiceError.insufficientCoconuts(missing: missing)
             case .walletFrozen:
                 throw ServiceError.walletFrozen
-            case .persistenceFailed, nil:
+            case .backupOrRestoreInProgress:
+                throw ServiceError.saveFailed("Wait for the backup or restore to finish before buying an avatar pass.")
+            case .invalidItem, .persistenceFailed, nil:
                 throw ServiceError.saveFailed("2.5D Avatar Pass purchase was not saved.")
             }
         }
-        Avatar2DAccess.addExtraPasses(1)
+        guard let attemptID = result.attemptID,
+              shopPurchaseFulfillment.fulfillInventoryConsumable(
+                  item: item,
+                  attemptID: attemptID,
+                  context: context,
+                  inventory: shopInventory
+              ) else {
+            throw ServiceError.saveFailed("2.5D Avatar Pass could not be added to inventory.")
+        }
     }
 
     func save(
@@ -151,25 +201,88 @@ final class MemberCreationService: MemberCreating {
         switch draft.kind {
         case .pet:
             guard !draft.resolvedSpecies.isEmpty,
-                  !draft.resolvedBreed.isEmpty else {
+                  !draft.resolvedBreed.isEmpty,
+                  ["boy", "girl"].contains(draft.petGender) else {
                 throw ServiceError.incompletePetProfile
             }
-            return try savePet(
-                draft: draft,
-                existingPets: currentMembers.pets,
-                existingHumans: currentMembers.humans,
-                context: context,
-                countryCode: countryCode
-            )
+            try requirePersonalAccess(for: .addActivePet(), context: context)
+            return try saveWithShopInventoryFenceIfNeeded(
+                shouldFence: draft.avatarSource == .avatar2D && draft.avatarImageData != nil,
+                context: context
+            ) {
+                try savePet(
+                    draft: draft,
+                    existingPets: currentMembers.pets,
+                    existingHumans: currentMembers.humans,
+                    context: context,
+                    countryCode: countryCode
+                )
+            }
         case .human:
-            return try saveHuman(
-                draft: draft,
-                existingPets: currentMembers.pets,
-                existingHumans: currentMembers.humans,
-                context: context,
-                countryCode: countryCode
+            try requirePersonalAccess(for: .addActiveHuman(), context: context)
+            return try saveWithShopInventoryFenceIfNeeded(
+                shouldFence: draft.avatarSource == .avatar2D && draft.avatarImageData != nil,
+                context: context
+            ) {
+                try saveHuman(
+                    draft: draft,
+                    existingPets: currentMembers.pets,
+                    existingHumans: currentMembers.humans,
+                    context: context,
+                    countryCode: countryCode
+                )
+            }
+        }
+    }
+
+    private func saveWithShopInventoryFenceIfNeeded(
+        shouldFence: Bool,
+        context: ModelContext,
+        operation: () throws -> SaveResult
+    ) throws -> SaveResult {
+        guard shouldFence else { return try operation() }
+        return try ShopPurchaseBackupFence.withExclusiveAccess(
+            context: context,
+            unavailable: {
+                throw ServiceError.saveFailed(
+                    "Wait for the backup or restore to finish before using a 2.5D avatar pass."
+                )
+            },
+            operation: operation
+        )
+    }
+
+    private func requirePersonalAccess(
+        for request: PersonalAccessRequest,
+        context: ModelContext
+    ) throws {
+        let usage: PersonalUsageSnapshot
+        do {
+            usage = try PersonalUsageSnapshotReader.snapshot(context: context)
+        } catch {
+            throw ServiceError.saveFailed(
+                "Could not verify the current Ohana Personal allowance: \(error.localizedDescription)"
             )
         }
+
+        if let denial = personalAccessDenial(for: request, usage: usage) {
+            throw ServiceError.personalUpgradeRequired(denial)
+        }
+    }
+
+    private func personalAccessDenial(
+        for request: PersonalAccessRequest,
+        usage: PersonalUsageSnapshot
+    ) -> PersonalFreeLimitDenial? {
+        let disposition = PersonalAccessPolicy.disposition(
+            level: personalAccessLevel(),
+            usage: usage,
+            request: request
+        )
+        guard case let .deny(denial) = disposition,
+              case let .wouldExceedFreeLimit(limitDenial) = denial.reason
+        else { return nil }
+        return limitDenial
     }
 
     private func existingMembers(

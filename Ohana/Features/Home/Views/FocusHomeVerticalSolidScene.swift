@@ -358,7 +358,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         let opacity = inactiveOpacity(for: renderCard) * arrival.opacity
         let zIndex = zIndex(for: renderIndex, isSelected: isSelected)
         let visualProgress = isExpandedSurface ? progress : 0
-        let cornerRadius = lerp(30, 42, eased(visualProgress))
+        let cornerRadius = lerp(FocusHomeVerticalSolidCollapsedLayoutPolicy.cardCornerRadius, 42, eased(visualProgress))
         let frozenAvatarSource = motionSnapshot?.avatarSource ?? preparedHeroSnapshots[card.id]?.avatarSource
             ?? (selectedCardId == nil ? nil : FocusHomeFrozenAvatarSource.cached(for: renderCard))
         let walkTrackingPet = isExpandedInteractionMounted ? walkTrackingPet(for: renderCard, isSelected: isExpandedSurface) : nil

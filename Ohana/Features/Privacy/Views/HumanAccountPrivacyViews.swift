@@ -13,6 +13,7 @@ struct HumanAccountSwitcherSheet: View {
     var homePets: [Pet]?
     var homeHumans: [Human]?
     var homeElectronicPets: [OasisElectronicPet]?
+    var allowsDismiss = true
     var onSwitched: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
@@ -97,17 +98,19 @@ struct HumanAccountSwitcherSheet: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.ohanaControlFill, in: Capsule())
+            if allowsDismiss {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                        .background(Color.ohanaControlFill, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("human-account-switcher-close-action")
             }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityIdentifier("human-account-switcher-close-action")
         }
     }
 

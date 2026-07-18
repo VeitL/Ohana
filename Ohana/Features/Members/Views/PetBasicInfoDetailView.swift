@@ -10,6 +10,9 @@ import SwiftUI
 
 struct PetBasicInfoDetailView: View {
     let pet: Pet
+    var startsEditing = false
+    var onSave: (() -> Void)? = nil
+    var onClose: (() -> Void)? = nil
     var onCreateCareTask: ((TaskCreationPreset) -> Void)? = nil
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
@@ -18,10 +21,12 @@ struct PetBasicInfoDetailView: View {
 
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @State var isEditing = false
+    @State var didApplyInitialEditing = false
     @State var breedTipsExpanded = true
 
     @State var showingRainbowBridgeAlert = false
     @State var showingUndoPassingAlert = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var rainbowBridgeDate = Date()
     @State var healthSummary = PetBasicInfoHealthSummary.empty
     @State var healthSummaryLoadTask: Task<Void, Never>?
@@ -63,6 +68,9 @@ struct PetBasicInfoDetailView: View {
         ("F472B6", "rose"), ("A8E6CF", "sage"), ("FFD3B6", "peach"), ("95ADBE", "slate")
     ]
     var l: L10n { L10n(appLanguage) }
+    var canSaveProfileEdit: Bool {
+        Pet.canonicalSex(eGender) != nil || Pet.canonicalSex(pet.gender) == nil
+    }
 
     var body: some View {
         ZStack {
@@ -108,10 +116,10 @@ struct PetBasicInfoDetailView: View {
                         } label: {
                             Text(l.save)
                                 .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(Pet.canonicalSex(eGender) == nil ? Color.ohanaSecondaryText : Color.goPrimary)
+                                .foregroundStyle(canSaveProfileEdit ? Color.goPrimary : Color.ohanaSecondaryText)
                         }
                         .accessibilityIdentifier("pet-basic-info-save-action")
-                        .disabled(Pet.canonicalSex(eGender) == nil)
+                        .disabled(!canSaveProfileEdit)
                     } else if !pet.hasPassedAway {
                         Button {
                             loadEditState()
@@ -127,10 +135,17 @@ struct PetBasicInfoDetailView: View {
                     }
                 }
             }
-            if isEditing {
+            if isEditing || onClose != nil {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { withAnimation { isEditing = false } }
+                    if isEditing {
+                        Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) {
+                            withAnimation { isEditing = false }
+                        }
                         .accessibilityIdentifier("pet-basic-info-cancel-edit-action")
+                    } else if let onClose {
+                        Button(l.tr(zh: "关闭", en: "Close", de: "Schließen"), action: onClose)
+                            .accessibilityIdentifier("pet-basic-info-close-action")
+                    }
                 }
             }
         }
@@ -141,9 +156,21 @@ struct PetBasicInfoDetailView: View {
         }
         .onAppear {
             scheduleHealthSummaryLoad()
+            guard startsEditing,
+                  !didApplyInitialEditing,
+                  !pet.hasPassedAway else {
+                return
+            }
+            didApplyInitialEditing = true
+            loadEditState()
+            isEditing = true
         }
         .task(id: vetVisitSummaryPreparationSignature) {
             await prepareVetVisitSummaryText()
+        }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
         }
         .onDisappear {
             healthSummaryLoadTask?.cancel()

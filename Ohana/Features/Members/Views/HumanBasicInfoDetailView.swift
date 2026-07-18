@@ -10,6 +10,8 @@ struct HumanBasicInfoDetailContentView: View {
     let human: Human
     let allPets: [Pet]
     let allHumans: [Human]
+    var startsEditing = false
+    var onSave: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -23,7 +25,9 @@ struct HumanBasicInfoDetailContentView: View {
     private var l: L10n { L10n(appLanguage) }
 
     @State private var isEditing = false
+    @State private var didApplyInitialEditing = false
     @State private var isDeleting = false
+    @State private var personalUpgradePrompt: PersonalUpgradePrompt?
 
     @State private var eName = ""
     @State private var eAvatarImageData: Data? = nil
@@ -100,6 +104,7 @@ struct HumanBasicInfoDetailContentView: View {
             ToolbarItem(placement: .topBarLeading) {
                 if isEditing {
                     Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { withAnimation { isEditing = false } }
+                        .accessibilityIdentifier("human-basic-info-cancel-edit-action")
                 } else {
                     Button(l.tr(zh: "关闭", en: "Close", de: "Schließen")) { dismiss() }
                         .accessibilityIdentifier("human-basic-info-close-action")
@@ -110,6 +115,21 @@ struct HumanBasicInfoDetailContentView: View {
             if hasPassedAway {
                 isEditing = false
             }
+        }
+        .onAppear {
+            guard startsEditing,
+                  !didApplyInitialEditing,
+                  isViewingOwnProfile,
+                  !human.hasPassedAway else {
+                return
+            }
+            didApplyInitialEditing = true
+            loadEditState()
+            isEditing = true
+        }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
         }
         .accessibilityIdentifier("human-basic-info-screen")
     }
@@ -251,7 +271,11 @@ struct HumanBasicInfoDetailContentView: View {
             editSection(title: l.tr(zh: "基本信息", en: "Basic Info", de: "Basisinfos"), icon: "person.fill", iconColor: Color.goPrimary) {
                 editField(l.tr(zh: "名字", en: "Name", de: "Name"), text: $eName)
                 Divider().opacity(0.1)
-                editField(l.tr(zh: "头像 Emoji", en: "Avatar Emoji", de: "Avatar-Emoji"), text: $eAvatarEmoji)
+                editField(
+                    l.tr(zh: "头像 Emoji", en: "Avatar Emoji", de: "Avatar-Emoji"),
+                    text: $eAvatarEmoji,
+                    accessibilityIdentifier: "human-basic-info-avatar-emoji-input"
+                )
                 Divider().opacity(0.1)
                 HStack {
                     editLabel(l.tr(zh: "权限", en: "Role", de: "Rolle"))
@@ -280,6 +304,7 @@ struct HumanBasicInfoDetailContentView: View {
                     editLabel(l.tr(zh: "设置生日", en: "Set Birthday", de: "Geburtstag festlegen"))
                 }
                 .tint(Color.goPrimary)
+                .accessibilityIdentifier("human-basic-info-birthday-toggle")
                 if eHasBirthday {
                     DatePicker("", selection: $eBirthday, in: ...Date(), displayedComponents: .date)
                         .datePickerStyle(.compact)
@@ -394,13 +419,26 @@ struct HumanBasicInfoDetailContentView: View {
             .foregroundStyle(Color.ohanaSecondaryText)
     }
 
-    private func editField(_ title: String, text: Binding<String>) -> some View {
+    private func editField(
+        _ title: String,
+        text: Binding<String>,
+        accessibilityIdentifier: String? = nil
+    ) -> some View {
         HStack {
             editLabel(title)
-            TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .multilineTextAlignment(.trailing)
+            if let accessibilityIdentifier {
+                editTextField(title, text: text)
+                    .accessibilityIdentifier(accessibilityIdentifier)
+            } else {
+                editTextField(title, text: text)
+            }
         }
+    }
+
+    private func editTextField(_ title: String, text: Binding<String>) -> some View {
+        TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .multilineTextAlignment(.trailing)
     }
 
     private var countryOptions: [String] {
@@ -607,6 +645,7 @@ struct HumanBasicInfoDetailContentView: View {
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             withAnimation { isEditing = false }
+            onSave?()
         }
     }
 
@@ -723,6 +762,11 @@ struct HumanBasicInfoDetailContentView: View {
                 human,
                 note: "humanBasicInfo.passed.undo"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }

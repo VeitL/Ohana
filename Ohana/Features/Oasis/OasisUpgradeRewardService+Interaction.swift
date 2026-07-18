@@ -38,7 +38,8 @@ extension OasisUpgradeRewardService {
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let questManager = providedQuestManager ?? QuestManager()
         normalizeLifecycle(for: critter, context: context)
-        if critter.lifeState == .dead, action != .rescue {
+        if critter.lifeState == .dead || critter.lifeState == .critical || critter.lifeState == .sleeping,
+           action != .rescue {
             return deadInteractionOutcome(for: critter, action: action)
         }
         let wish = dailyWish(for: critter, context: context)
@@ -199,7 +200,9 @@ extension OasisUpgradeRewardService {
         questManager providedQuestManager: QuestManager? = nil
     ) -> Bool {
         let questManager = providedQuestManager ?? QuestManager()
-        guard critter.lifeState != .dead else { return false }
+        guard critter.lifeState != .dead,
+              critter.lifeState != .critical,
+              critter.lifeState != .sleeping else { return false }
         switch action {
         case .feed:
             return OasisCritterEconomyService.canSpendCurrentHumanCoconuts(

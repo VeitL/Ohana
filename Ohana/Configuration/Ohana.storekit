@@ -1,0 +1,325 @@
+{
+  "identifier" : "CB5D8E73-178F-4572-8249-80B92C843812",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "14.99",
+      "familyShareable" : false,
+      "internalID" : "5FE76EE9-A8C6-426A-9A6D-FCD6B64EE8CC",
+      "localizations" : [
+        {
+          "description" : "Previous purchase grants Personal Lifetime.",
+          "displayName" : "Ohana Supporter Pack (Legacy)",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Früherer Kauf gewährt Personal dauerhaft.",
+          "displayName" : "Ohana Supporter-Paket (alt)",
+          "locale" : "de_DE"
+        },
+        {
+          "description" : "Compra anterior: Personal de por vida.",
+          "displayName" : "Pack de apoyo Ohana (antiguo)",
+          "locale" : "es_ES"
+        },
+        {
+          "description" : "A compra anterior dá Personal vitalício.",
+          "displayName" : "Pacote de apoio Ohana (antigo)",
+          "locale" : "pt_BR"
+        },
+        {
+          "description" : "Un ancien achat donne Personal à vie.",
+          "displayName" : "Pack de soutien Ohana (ancien)",
+          "locale" : "fr_FR"
+        },
+        {
+          "description" : "以前の購入はPersonal買い切りとして有効です",
+          "displayName" : "Ohana サポーターパック（旧商品）",
+          "locale" : "ja_JP"
+        },
+        {
+          "description" : "기존 구매는 Personal 평생 이용권으로 인정됩니다.",
+          "displayName" : "Ohana 서포터 팩(이전 상품)",
+          "locale" : "ko_KR"
+        },
+        {
+          "description" : "L'acquisto precedente dà Personal a vita.",
+          "displayName" : "Pacchetto Ohana (precedente)",
+          "locale" : "it_IT"
+        },
+        {
+          "description" : "已验证的历史购买可恢复 Personal 永久权益",
+          "displayName" : "Ohana 支持者礼包（旧版）",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.guanchen.li.Ohana.supporterPack",
+      "referenceName" : "Ohana Supporter Pack",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "49.99",
+      "familyShareable" : false,
+      "internalID" : "38D78C31-4DB9-4BBA-9A0E-084A1919DAA5",
+      "localizations" : [
+        {
+          "description" : "One purchase for current Personal features.",
+          "displayName" : "Ohana Personal Lifetime",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Einmalkauf für aktuelle Personal-Funktionen.",
+          "displayName" : "Ohana Personal dauerhaft",
+          "locale" : "de_DE"
+        },
+        {
+          "description" : "Compra única: funciones Personal actuales.",
+          "displayName" : "Ohana Personal de por vida",
+          "locale" : "es_ES"
+        },
+        {
+          "description" : "Compra única: recursos Personal atuais.",
+          "displayName" : "Ohana Personal vitalício",
+          "locale" : "pt_BR"
+        },
+        {
+          "description" : "Achat unique : fonctions Personal actuelles.",
+          "displayName" : "Ohana Personal à vie",
+          "locale" : "fr_FR"
+        },
+        {
+          "description" : "1回の購入で現在のPersonal機能を利用できます",
+          "displayName" : "Ohana Personal 買い切り",
+          "locale" : "ja_JP"
+        },
+        {
+          "description" : "한 번 구매로 현재 Personal 기능 이용",
+          "displayName" : "Ohana Personal 평생 이용권",
+          "locale" : "ko_KR"
+        },
+        {
+          "description" : "Acquisto unico: funzioni Personal attuali.",
+          "displayName" : "Ohana Personal a vita",
+          "locale" : "it_IT"
+        },
+        {
+          "description" : "一次购买，永久使用当前 Personal 功能",
+          "displayName" : "Ohana Personal 永久版",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.guanchen.li.Ohana.personal.lifetime",
+      "referenceName" : "Ohana Personal Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "de_DE",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "DEU",
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "A4E5CF33-6538-4A3E-8DB6-9DF8E472FD9D",
+      "localizations" : [
+        {
+          "description" : "Ohana Personal",
+          "displayName" : "Ohana Personal",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Ohana Personal",
+          "displayName" : "Ohana Personal",
+          "locale" : "de_DE"
+        },
+        {
+          "description" : "Ohana Personal",
+          "displayName" : "Ohana Personal",
+          "locale" : "es_ES"
+        },
+        {
+          "description" : "Ohana Personal",
+          "displayName" : "Ohana Personal",
+          "locale" : "pt_BR"
+        },
+        {
+          "description" : "Ohana Personal",
+          "displayName" : "Ohana Personal",
+          "locale" : "fr_FR"
+        },
+        {
+          "description" : "Ohana Personal",
+          "displayName" : "Ohana Personal",
+          "locale" : "ja_JP"
+        },
+        {
+          "description" : "Ohana Personal",
+          "displayName" : "Ohana Personal",
+          "locale" : "ko_KR"
+        },
+        {
+          "description" : "Ohana Personal",
+          "displayName" : "Ohana Personal",
+          "locale" : "it_IT"
+        },
+        {
+          "description" : "Ohana Personal",
+          "displayName" : "Ohana Personal",
+          "locale" : "zh_CN"
+        }
+      ],
+      "name" : "Ohana Personal",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "90975122-54FA-4E60-ACA5-1BFEC28FEC71",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Monthly access to Ohana Personal.",
+              "displayName" : "Ohana Personal Monthly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "Monatlicher Zugriff auf Ohana Personal.",
+              "displayName" : "Ohana Personal monatlich",
+              "locale" : "de_DE"
+            },
+            {
+              "description" : "Acceso mensual a Ohana Personal.",
+              "displayName" : "Ohana Personal mensual",
+              "locale" : "es_ES"
+            },
+            {
+              "description" : "Acesso mensal ao Ohana Personal.",
+              "displayName" : "Ohana Personal mensal",
+              "locale" : "pt_BR"
+            },
+            {
+              "description" : "Accès mensuel à Ohana Personal.",
+              "displayName" : "Ohana Personal mensuel",
+              "locale" : "fr_FR"
+            },
+            {
+              "description" : "月ごとにOhana Personalを利用できます",
+              "displayName" : "Ohana Personal 月額",
+              "locale" : "ja_JP"
+            },
+            {
+              "description" : "월간 Ohana Personal 이용권",
+              "displayName" : "Ohana Personal 월간",
+              "locale" : "ko_KR"
+            },
+            {
+              "description" : "Accesso mensile a Ohana Personal.",
+              "displayName" : "Ohana Personal mensile",
+              "locale" : "it_IT"
+            },
+            {
+              "description" : "按月使用 Ohana Personal 功能",
+              "displayName" : "Ohana Personal 月付",
+              "locale" : "zh_CN"
+            }
+          ],
+          "productID" : "com.guanchen.li.Ohana.personal.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Ohana Personal Monthly",
+          "subscriptionGroupID" : "A4E5CF33-6538-4A3E-8DB6-9DF8E472FD9D",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "14.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "86FB7EA8-6AF8-40DB-9B17-2ADC1F5A0B8E",
+          "introductoryOffer" : {
+            "displayPrice" : "0",
+            "internalID" : "1F1B62C7-1226-4DC7-ABE2-B8A406617BBA",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P2W"
+          },
+          "localizations" : [
+            {
+              "description" : "Yearly access to Ohana Personal.",
+              "displayName" : "Ohana Personal Yearly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "Jährlicher Zugriff auf Ohana Personal.",
+              "displayName" : "Ohana Personal jährlich",
+              "locale" : "de_DE"
+            },
+            {
+              "description" : "Acceso anual a Ohana Personal.",
+              "displayName" : "Ohana Personal anual",
+              "locale" : "es_ES"
+            },
+            {
+              "description" : "Acesso anual ao Ohana Personal.",
+              "displayName" : "Ohana Personal anual",
+              "locale" : "pt_BR"
+            },
+            {
+              "description" : "Accès annuel à Ohana Personal.",
+              "displayName" : "Ohana Personal annuel",
+              "locale" : "fr_FR"
+            },
+            {
+              "description" : "1年ごとにOhana Personalを利用できます",
+              "displayName" : "Ohana Personal 年額",
+              "locale" : "ja_JP"
+            },
+            {
+              "description" : "연간 Ohana Personal 이용권",
+              "displayName" : "Ohana Personal 연간",
+              "locale" : "ko_KR"
+            },
+            {
+              "description" : "Accesso annuale a Ohana Personal.",
+              "displayName" : "Ohana Personal annuale",
+              "locale" : "it_IT"
+            },
+            {
+              "description" : "按年使用 Ohana Personal 功能",
+              "displayName" : "Ohana Personal 年付",
+              "locale" : "zh_CN"
+            }
+          ],
+          "productID" : "com.guanchen.li.Ohana.personal.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Ohana Personal Yearly",
+          "subscriptionGroupID" : "A4E5CF33-6538-4A3E-8DB6-9DF8E472FD9D",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

@@ -60,21 +60,29 @@ final class AppServices {
     let domainRevisions: DomainRevisionPublishing
     let lifecycle: AppLifecycleHandling
     let cloudSync: CloudSyncManaging
+    let commerce: CommerceEntitlementService
     let sharedCareUndo: SharedCareUndoRegistering
     var walkingPresentationRevision = 0
 
-    convenience init(modelContainer: ModelContainer? = nil) {
+    convenience init(
+        modelContainer: ModelContainer? = nil,
+        commerce: CommerceEntitlementService? = nil
+    ) {
+        let commerce = commerce ?? CommerceEntitlementService()
         let activeHumanSelection = UserDefaultsActiveHumanSelection()
         let notificationRouteCenter = OhanaNotificationRouteCenter()
         let notificationManager = NotificationManager(routeCenter: notificationRouteCenter)
         let revisionCenter = ReadModelRevisionCenter.shared
         let avatarPipeline = AvatarPipeline()
         let coconutWallet = SwiftDataCoconutWalletManager()
+        let shopInventory = UserDefaultsShopInventoryManager()
+        let shopPurchaseFulfillment = ShopPurchaseFulfillmentService()
         let domainRevisions = SharedDomainRevisionPublisher(center: revisionCenter)
         let questManager = QuestManager(wallet: coconutWallet, revisions: domainRevisions)
         let locationManager = LocationManager()
         let careLedger = CareLedgerService()
         let automaticBackups = AutomaticBackupService()
+        let backupAdapter = SharedDataBackupManagerAdapter(projectionManager: questManager)
         let oasisRewardManager = StaticOasisRewardManager(
             activeHumanSelection: activeHumanSelection,
             wallet: coconutWallet,
@@ -127,22 +135,25 @@ final class AppServices {
             questManager: questManager,
             familyTasks: familyTasks,
             gacha: StaticGachaDrawer(wallet: coconutWallet, careLedger: careLedger, questManager: questManager),
-            memberCreation: MemberCreationService(
-                activeHumanSelection: activeHumanSelection,
-                wallet: coconutWallet,
-                careLedger: careLedger,
-                revisions: domainRevisions,
-                questManager: questManager
+            memberCreation: AppServices.makeMemberCreationService(
+                activeHumanSelection,
+                coconutWallet,
+                careLedger,
+                domainRevisions,
+                questManager,
+                shopInventory,
+                shopPurchaseFulfillment,
+                commerce
             ),
             oasisRewards: oasisRewardManager,
             privacy: StaticHumanPrivacyManager(),
             passcodes: StaticHumanPasscodeManager(),
             appIcons: SystemAppIconManager(),
-            shopInventory: UserDefaultsShopInventoryManager(),
-            shopPurchaseFulfillment: ShopPurchaseFulfillmentService(),
+            shopInventory: shopInventory,
+            shopPurchaseFulfillment: shopPurchaseFulfillment,
             islandToasts: IslandToastManager(),
             metricKit: MetricKitObserver(),
-            backups: SharedDataBackupManagerAdapter(projectionManager: questManager),
+            backups: backupAdapter,
             automaticBackups: automaticBackups,
             appReset: StaticAppResetter(
                 questManager: questManager,
@@ -176,12 +187,51 @@ final class AppServices {
                 automaticBackups: automaticBackups,
                 modelContainer: modelContainer
             )),
-            cloudSync: AppServices.makeCloudSyncService()
+            cloudSync: AppServices.makeCloudSyncService(),
+            commerce: commerce
         )
+        backupAdapter.registerShopPurchaseSettlement { [weak self] context in
+            guard let self else { return }
+            _ = ShopPurchaseRecoveryService.settleRecoverable(
+                context: context,
+                services: self
+            )
+        }
+        automaticBackups.registerShopPurchaseSettlement { [weak self] context in
+            guard let self else { return }
+            _ = ShopPurchaseRecoveryService.settleRecoverable(
+                context: context,
+                services: self
+            )
+        }
         OasisTreeManagerRegistry.current = oasisTreeManager
         AvatarPipelineRegistry.current = avatarPipeline
         ReminderNotificationSchedulerRegistry.registerLiveSchedulerFactory { notificationManager }
         ReminderNotificationSchedulerRegistry.current = notificationManager
+    }
+
+    private static func makeMemberCreationService(
+        _ activeHumanSelection: ActiveHumanSelecting,
+        _ wallet: CoconutWalletManaging,
+        _ careLedger: CareLedgerRecording,
+        _ revisions: DomainRevisionPublishing,
+        _ questManager: QuestManager,
+        _ shopInventory: ShopInventoryManaging,
+        _ shopPurchaseFulfillment: ShopPurchaseFulfilling,
+        _ commerce: CommerceEntitlementService
+    ) -> MemberCreating {
+        MemberCreationService(
+            activeHumanSelection: activeHumanSelection,
+            wallet: wallet,
+            careLedger: careLedger,
+            revisions: revisions,
+            questManager: questManager,
+            shopInventory: shopInventory,
+            shopPurchaseFulfillment: shopPurchaseFulfillment,
+            personalAccessLevel: {
+                commerce.personalAccessLevel
+            }
+        )
     }
 
     private static func makeWalker(
@@ -255,6 +305,7 @@ final class AppServices {
         domainRevisions: DomainRevisionPublishing,
         lifecycle: AppLifecycleHandling,
         cloudSync: CloudSyncManaging,
+        commerce: CommerceEntitlementService? = nil,
         sharedCareUndo: SharedCareUndoRegistering? = nil
     ) {
         self.careEvents = careEvents
@@ -298,6 +349,7 @@ final class AppServices {
         self.domainRevisions = domainRevisions
         self.lifecycle = lifecycle
         self.cloudSync = cloudSync
+        self.commerce = commerce ?? CommerceEntitlementService()
         self.sharedCareUndo = sharedCareUndo ?? SharedCareUndoCoordinator.shared
     }
 

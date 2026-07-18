@@ -18,12 +18,20 @@ struct OasisCritterIllustration: View {
 
     var body: some View {
         ZStack {
-            if catalogId == OasisUpgradeRewardCatalog.firstCritterId {
-                lumo
-            } else if catalogId == OasisUpgradeRewardCatalog.legendaryCritterId {
-                auroraLuma
+            if let image = OasisCritterAssetResolver.image(
+                catalogID: catalogId,
+                stage: resolvedAppearanceStage
+            ) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)
             } else {
-                sproutMochi
+                Image(systemName: "pawprint.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(size * 0.25)
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
         }
         .frame(width: size, height: size)
@@ -42,44 +50,8 @@ struct OasisCritterIllustration: View {
         .accessibilityHidden(true)
     }
 
-    var lumo: some View {
-        ZStack {
-            Ellipse()
-                .fill(Color.ohanaPrimaryText.opacity(0.16))
-                .frame(width: size * 0.62, height: size * 0.12)
-                .blur(radius: 5)
-                .offset(y: size * 0.39)
-
-            if let image = lumoImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: size * 0.92, height: size * 1.18)
-            } else {
-                sproutMochi
-            }
-        }
-    }
-
-    var lumoImage: UIImage? {
-        lumoAssetCandidates.lazy.compactMap { UIImage(named: $0) }.first
-    }
-
-    var lumoAssetCandidates: [String] {
-        let baseName = OasisUpgradeRewardCatalog.critter(id: catalogId)?.assetName ?? "CritterLumo"
-        let stageName = lumoEvolutionStageName
-        return [
-            "\(baseName)\(stageName)",
-            "\(baseName)Adult",
-            baseName
-        ]
-    }
-
-    var lumoEvolutionStageName: String {
-        if let critter, critter.lifeState == .dead, critter.deathReason == .oldAge {
-            return "Elder"
-        }
-        let stage: Int = if let appearanceStageOverride {
+    private var resolvedAppearanceStage: Int {
+        if let appearanceStageOverride {
             max(1, min(OasisCritterPresentationRules.maxAppearanceStage, appearanceStageOverride))
         } else if let critter {
             max(
@@ -89,140 +61,56 @@ struct OasisCritterIllustration: View {
         } else {
             1
         }
-        switch stage {
-        case 1:
-            return "Baby"
-        case 2:
-            return "Child"
-        case 3:
-            return "Teen"
-        case 4:
-            return "Adult"
-        default:
-            return "Elder"
-        }
-    }
-
-    var sproutMochi: some View {
-        ZStack {
-            Ellipse()
-                .fill(Color.ohanaPrimaryText.opacity(0.18))
-                .frame(width: size * 0.58, height: size * 0.13)
-                .blur(radius: 5)
-                .offset(y: size * 0.38)
-
-            Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [Color(hex: "E8FFE3"), Color(hex: "86D98B"), Color(hex: "43A45F")],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: size * 0.46, height: size * 0.68)
-                .rotationEffect(.degrees(-4))
-
-            HStack(spacing: size * 0.1) {
-                Circle().fill(Color(hex: "10231B")).frame(width: size * 0.06, height: size * 0.075)
-                Circle().fill(Color(hex: "10231B")).frame(width: size * 0.06, height: size * 0.075)
-            }
-            .offset(y: size * 0.02)
-
-            Capsule()
-                .fill(Color(hex: "10231B").opacity(0.85))
-                .frame(width: size * 0.13, height: size * 0.025)
-                .offset(y: size * 0.15)
-
-            OasisCritterLeafShape()
-                .fill(
-                    LinearGradient(colors: [Color(hex: "C8FF7A"), Color(hex: "38B765")], startPoint: .top, endPoint: .bottom)
-                )
-                .frame(width: size * 0.32, height: size * 0.24)
-                .rotationEffect(.degrees(-22))
-                .offset(x: -size * 0.12, y: -size * 0.42)
-
-            OasisCritterLeafShape()
-                .fill(
-                    LinearGradient(colors: [Color(hex: "D8FF91"), Color(hex: "48C56F")], startPoint: .top, endPoint: .bottom)
-                )
-                .frame(width: size * 0.28, height: size * 0.22)
-                .rotationEffect(.degrees(24))
-                .offset(x: size * 0.13, y: -size * 0.42)
-        }
-    }
-
-    var auroraLuma: some View {
-        ZStack {
-            Ellipse()
-                .fill(Color.ohanaPrimaryText.opacity(0.22))
-                .frame(width: size * 0.62, height: size * 0.14)
-                .blur(radius: 6)
-                .offset(y: size * 0.38)
-
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [Color.ohanaCardSurface, Color(hex: "9FE7FF"), Color(hex: "7F5CFF")],
-                        center: .topLeading,
-                        startRadius: 2,
-                        endRadius: size * 0.55
-                    )
-                )
-                .frame(width: size * 0.58, height: size * 0.58)
-
-            ForEach(0 ..< 4, id: \.self) { index in
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "D7FFFE"), Color(hex: "9277FF").opacity(0.2)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: size * 0.08, height: size * CGFloat(0.36 - Double(index) * 0.03))
-                    .rotationEffect(.degrees(Double(index - 2) * 18))
-                    .offset(x: CGFloat(index - 2) * size * 0.11, y: -size * 0.36)
-            }
-
-            HStack(spacing: size * 0.12) {
-                Circle().fill(Color(hex: "10122F")).frame(width: size * 0.055, height: size * 0.07)
-                Circle().fill(Color(hex: "10122F")).frame(width: size * 0.055, height: size * 0.07)
-            }
-
-            Circle()
-                .stroke(Color.ohanaCardSurface.opacity(0.85), lineWidth: max(1.5, size * 0.018))
-                .frame(width: size * 0.18, height: size * 0.18)
-                .offset(x: size * 0.2, y: -size * 0.15)
-
-            Image(systemName: "sparkle") // a11y: allow decorative icon covered by surrounding text or control
-                .font(.system(size: size * 0.16, weight: .black))
-                .foregroundStyle(Color.ohanaCardSurface)
-                .offset(x: -size * 0.22, y: -size * 0.18)
-        }
     }
 }
 
-struct OasisCritterLeafShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addCurve(
-            to: CGPoint(x: rect.midX, y: rect.maxY),
-            control1: CGPoint(x: rect.minX, y: rect.height * 0.14),
-            control2: CGPoint(x: rect.minX, y: rect.height * 0.82)
-        )
-        path.addCurve(
-            to: CGPoint(x: rect.midX, y: rect.minY),
-            control1: CGPoint(x: rect.maxX, y: rect.height * 0.82),
-            control2: CGPoint(x: rect.maxX, y: rect.height * 0.14)
-        )
-        return path
+nonisolated enum OasisCritterAssetResolver {
+    static let stageSuffixes = ["Baby", "Child", "Teen", "Adult", "Elder"]
+
+    @MainActor
+    static func image(catalogID: String, stage: Int) -> UIImage? {
+        assetCandidates(catalogID: catalogID, stage: stage)
+            .lazy
+            .compactMap { UIImage(named: $0) }
+            .first
+    }
+
+    static func assetCandidates(catalogID: String, stage: Int) -> [String] {
+        let normalizedStage = max(1, min(stageSuffixes.count, stage))
+        let suffix = stageSuffixes[normalizedStage - 1]
+        let baseName = OasisUpgradeRewardCatalog.critter(id: catalogID)?.assetName ?? "CritterLumo"
+        return [
+            "\(baseName)\(suffix)",
+            "\(baseName)Baby",
+            "CritterLumo\(suffix)",
+            "CritterLumoBaby"
+        ]
     }
 }
 
 enum OasisCritterViewMode: Equatable {
     case codex
     case nest
+}
+
+struct CompanionGrowthConfirmation: Identifiable {
+    enum Kind {
+        case awaken
+        case starUpgrade
+    }
+
+    let kind: Kind
+    let catalogID: String
+    let critterID: UUID?
+    let companionName: String
+    let fundingPlan: CompanionFundingPlan
+
+    var id: String {
+        switch kind {
+        case .awaken: "awaken:\(catalogID)"
+        case .starUpgrade: "star:\(critterID?.uuidString ?? catalogID)"
+        }
+    }
 }
 
 struct OasisCritterCodexView: View {
@@ -238,6 +126,7 @@ struct OasisCritterCodexView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(AppServices.self) var appServices
     @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage("currentActiveHumanId") var currentActiveHumanId = ""
@@ -246,13 +135,14 @@ struct OasisCritterCodexView: View {
     @State var focusedCodexCatalogId: String?
     @State var pulseCatalogId: String?
     @State var lastInteractionOutcome: OasisCritterInteractionOutcome?
+    @State var pendingGrowthConfirmation: CompanionGrowthConfirmation?
     @State var rescuingCritterId: UUID?
     var treeMgr: OasisTreeManaging { appServices.oasisTree }
     @State var renderSnapshots: [UUID: OasisCritterRenderSnapshot] = [:]
     @State var featuredDisplayOverrides: [UUID: Bool] = [:]
     @State var lifecycleRefreshTask: Task<Void, Never>?
     @State var renderSnapshotTask: Task<Void, Never>?
-    @State var critterCommandTasks: [UUID: Task<Void, Never>] = [:]
+    @State var critterCommandTasks: [String: Task<Void, Never>] = [:]
     @State var pulseCleanupTask: Task<Void, Never>?
     @State var rescueBusyCleanupTask: Task<Void, Never>?
     @State var outcomeCleanupTask: Task<Void, Never>?
@@ -291,7 +181,10 @@ struct OasisCritterCodexView: View {
     }
 
     var currentCoconutBalance: Int {
-        activeHuman?.coconutBalance ?? 0
+        commandExecutor.currentHumanCoconutBalance(
+            humans: humans,
+            currentActiveHumanId: currentActiveHumanId
+        )
     }
 
     var body: some View {
@@ -322,6 +215,78 @@ struct OasisCritterCodexView: View {
         }
         .onChange(of: currentCoconutBalance) { _, _ in
             scheduleRenderSnapshotRefresh(milliseconds: 60)
+        }
+        .sheet(item: $pendingGrowthConfirmation) { confirmation in
+            CompanionGrowthConfirmationSheet(
+                confirmation: confirmation,
+                localization: l,
+                onConfirm: { confirmGrowth(confirmation) }
+            )
+        }
+        .accessibilityIdentifier("oasis-critter-codex")
+    }
+}
+
+private struct CompanionGrowthConfirmationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let confirmation: CompanionGrowthConfirmation
+    let localization: L10n
+    let onConfirm: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    LabeledContent(
+                        localization.tr(zh: "伙伴", en: "Companion", de: "Begleiter"),
+                        value: confirmation.companionName
+                    )
+                    LabeledContent(
+                        localization.tr(zh: "专属碎片", en: "Specific fragments", de: "Spezifische Fragmente"),
+                        value: "\(confirmation.fundingPlan.specificFragmentsUsed)◇"
+                    )
+                    LabeledContent(
+                        localization.tr(zh: "伙伴星光", en: "Companion stardust", de: "Begleiter-Sternenstaub"),
+                        value: "\(confirmation.fundingPlan.stardustUsed)✦"
+                    )
+                    LabeledContent(
+                        localization.tr(zh: "椰子", en: "Coconuts", de: "Kokosnüsse"),
+                        value: "\(confirmation.fundingPlan.coconutCost)🥥"
+                    )
+                } footer: {
+                    Text(localization.tr(
+                        zh: "会先使用这位伙伴的专属碎片，不足部分再由全岛通用星光补足。",
+                        en: "Specific fragments are used first; island-wide stardust fills the remainder.",
+                        de: "Zuerst werden spezifische Fragmente verwendet, dann Sternenstaub."
+                    ))
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(localization.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(localization.tr(zh: "确认", en: "Confirm", de: "Bestätigen")) {
+                        onConfirm()
+                        dismiss()
+                    }
+                    .disabled(!confirmation.fundingPlan.isFullyFunded)
+                }
+            }
+        }
+    }
+
+    private var title: String {
+        switch confirmation.kind {
+        case .awaken:
+            localization.tr(zh: "确认唤醒", en: "Confirm awakening", de: "Erweckung bestätigen")
+        case .starUpgrade:
+            localization.tr(zh: "确认升星", en: "Confirm star upgrade", de: "Sternupgrade bestätigen")
         }
     }
 }

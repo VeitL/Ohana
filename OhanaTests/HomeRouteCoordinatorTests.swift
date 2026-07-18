@@ -388,6 +388,24 @@ struct HomeRouteCoordinatorTests {
         #expect(destination == .featureGroup(.dailyCare))
     }
 
+    @Test func critterCodexOpensAtLevelTenAndRedirectsEarlierLevels() {
+        let coordinator = HomeRouteCoordinator()
+
+        coordinator.openCritterCodex(currentLevel: 9)
+        guard case let .functionMenu(destination) = coordinator.modal else {
+            Issue.record("Expected the locked critter codex to redirect to the growth roadmap")
+            return
+        }
+        #expect(destination == .growthRoadmap)
+
+        coordinator.dismissModal()
+        coordinator.openCritterCodex(currentLevel: 10)
+        guard case .critterCodex = coordinator.modal else {
+            Issue.record("Expected the critter codex to open at level ten")
+            return
+        }
+    }
+
     @Test func addPlantRedirectsToLocalRoadmapBeforeLevelFourWithoutAppSheetSink() {
         PlantUnlockPolicy.clearExistingPlantData()
         defer { PlantUnlockPolicy.clearExistingPlantData() }

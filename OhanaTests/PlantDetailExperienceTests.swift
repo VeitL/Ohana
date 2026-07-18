@@ -180,9 +180,15 @@ final class PlantDetailExperienceTests: XCTestCase {
         let homePlantSource = [componentsSource, plantsPageSource].joined(separator: "\n")
         let homeQuickActionsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+QuickActions.swift", rootURL: rootURL)
         let careFeatureViewSource = try source("Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift", rootURL: rootURL)
+        let careFeatureSupportSource = try source("Ohana/Features/Plants/Views/PlantCareFeatureDetailView+Support.swift", rootURL: rootURL)
         let careFeatureWaterSource = try source("Ohana/Features/Plants/Views/PlantCareFeatureWaterComponents.swift", rootURL: rootURL)
         let waterScheduleControlSource = try source("Ohana/Features/Plants/Views/PlantWaterScheduleControlSection.swift", rootURL: rootURL)
-        let careFeatureSource = [careFeatureViewSource, careFeatureWaterSource, waterScheduleControlSource]
+        let careFeatureSource = [
+            careFeatureViewSource,
+            careFeatureSupportSource,
+            careFeatureWaterSource,
+            waterScheduleControlSource
+        ]
             .joined(separator: "\n")
         let careFeatureScheduleCommandSource = try source("Ohana/Features/Plants/PlantCareFeatureScheduleCommandExecutor.swift", rootURL: rootURL)
         let plantCareCommandExecutorSource = try source("Ohana/Features/Plants/PlantCareCommandExecutor.swift", rootURL: rootURL)
@@ -226,7 +232,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(homeQuickActionsSource.contains(".plantFeature(plant.id, destination)"))
         XCTAssertTrue(homeQuickActionsSource.contains("commandExecutor.recordPlantCare("))
         XCTAssertTrue(careFeatureSource.contains("struct PlantCareFeatureDetailView"))
-        XCTAssertTrue(careFeatureSource.contains("@State private var routeSnapshot"))
+        XCTAssertTrue(careFeatureSource.contains("@State var routeSnapshot"))
         XCTAssertTrue(careFeatureSource.contains("PlantCareFeatureRouteSnapshotActor(modelContainer: container)"))
         XCTAssertTrue(careFeatureSource.contains("routeSnapshot.records"))
         XCTAssertTrue(careFeatureSource.contains("routeSnapshot.wateringTasksByPlantID[plant.id]"))
@@ -368,6 +374,7 @@ final class PlantDetailExperienceTests: XCTestCase {
     func testPlantDashboardReadsLikeCareHubInsteadOfIconGrid() throws {
         let rootURL = repositoryRootURL()
         let dashboardBaseSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift", rootURL: rootURL)
+        let dashboardActionsSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift", rootURL: rootURL)
         let dashboardSectionsSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+Sections.swift", rootURL: rootURL)
         let dashboardDiscoverySource = try source("Ohana/Features/Plants/Views/PlantDashboardView+DiscoverySections.swift", rootURL: rootURL)
         let dashboardWalletSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+WalletDeck.swift", rootURL: rootURL)
@@ -378,6 +385,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         let plantBaselineSeederSource = try source("Ohana/App/UITestPlantBaselineSeeder.swift", rootURL: rootURL)
         let dashboardSource = [
             dashboardBaseSource,
+            dashboardActionsSource,
             dashboardSectionsSource,
             dashboardDiscoverySource,
             dashboardWalletSource,

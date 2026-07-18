@@ -150,6 +150,14 @@ struct FunctionMenuRootView: View {
                 destination: .wealthDashboard
             ),
             ToolEntry(
+                id: "achievements",
+                title: l.tr(zh: "成就", en: "Achievements", de: "Erfolge"),
+                subtitle: l.tr(zh: "本人 · 伙伴 · 全岛", en: "You · Pets · Island", de: "Du · Tiere · Insel"),
+                icon: "trophy.fill",
+                color: Color(hex: "EAB308"),
+                destination: .featureAggregate(.achievements)
+            ),
+            ToolEntry(
                 id: "shop",
                 title: l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokos-Shop"),
                 subtitle: l.tr(zh: "装饰 · 周报 · 奖励", en: "Cosmetics · Reports · Rewards", de: "Deko · Berichte · Belohnungen"),

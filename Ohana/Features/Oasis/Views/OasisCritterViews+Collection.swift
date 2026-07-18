@@ -9,11 +9,43 @@ import UIKit
 
 extension OasisCritterCodexView {
     var collectionStrip: some View {
-        LazyVGrid(
-            columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2),
-            spacing: 12
-        ) {
-            ForEach(OasisUpgradeRewardCatalog.critters) { entry in
+        let total = OasisUpgradeRewardCatalog.critters.count
+        let nextEntry = OasisUpgradeRewardCatalog.critters.first(where: { ownedCritter($0.id) == nil })
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(l.tr(zh: "拥有进度", en: "Collection progress", de: "Sammlungsfortschritt"))
+                        .font(OhanaFont.headline(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Spacer()
+                    Text("\(ownedCount)/\(total)")
+                        .font(OhanaFont.headline(.black))
+                        .foregroundStyle(Color.goPrimary)
+                        .monospacedDigit()
+                }
+                ProgressView(value: Double(ownedCount), total: Double(max(1, total)))
+                    .tint(Color.goPrimary)
+                if let nextEntry {
+                    Text(l.tr(
+                        zh: "下一位：\(nextEntry.nameZh) · \(collectionStatus(for: nextEntry, owned: false))",
+                        en: "Next: \(nextEntry.nameEn) · \(collectionStatus(for: nextEntry, owned: false))",
+                        de: "Als Nächstes: \(nextEntry.nameDe) · \(collectionStatus(for: nextEntry, owned: false))"
+                    ))
+                    .font(OhanaFont.subheadline(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                }
+            }
+            .padding(14)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: 12),
+                    count: dynamicTypeSize.isAccessibilitySize ? 1 : 2
+                ),
+                spacing: 12
+            ) {
+                ForEach(OasisUpgradeRewardCatalog.critters) { entry in
                 let critter = ownedCritter(entry.id)
                 let owned = critter != nil
                 Button {
@@ -56,6 +88,7 @@ extension OasisCritterCodexView {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityHint(l.tr(zh: "点按查看这个电子宠物的详细信息", en: "Tap to view this critter's details", de: "Tippen, um Details zu diesem Begleiter zu sehen"))
+                }
             }
         }
     }

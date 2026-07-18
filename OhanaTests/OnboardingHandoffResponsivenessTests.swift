@@ -15,7 +15,8 @@ struct OnboardingHandoffResponsivenessTests {
         #expect(source.contains("OnboardingHomeJoinHandoffGate.remainingPostHomeEffectDelayMilliseconds"))
         #expect(source.contains("scheduleOnboardingJourneyEvaluation(delayMilliseconds: handoffDelay)"))
         #expect(source.contains("prepareStarterGiftHomeHandoffIfNeeded(id)"))
-        #expect(source.contains("scheduleOnboardingCreatedEntitySignal(id, destinationTab: .calendar)"))
+        #expect(source.contains("scheduleOnboardingCreatedEntitySignal(id, destinationTab: .home)"))
+        #expect(!source.contains("destinationTab: isStarterGiftHandoff ? .calendar : nil"))
         #expect(source.contains("finishStarterGiftCeremonyIfProjectionIsReady()"))
         #expect(!source.contains("appRoutes.presentSheet(.petWeightQuick(petID))"))
         #expect(!source.contains("appRoutes.presentSheet(.petWeight(petID))"))
@@ -80,7 +81,13 @@ struct OnboardingHandoffResponsivenessTests {
         )
 
         #expect(source.contains("private func beginOnboardingHomePreflight()"))
-        #expect(source.contains("if hasOnboarded || isOnboardingHomePreflightMounted"))
+        #expect(source.contains(
+            "hasOnboarded || (experienceController.mode == .standard && isOnboardingHomePreflightMounted)"
+        ))
+        #expect(source.contains("case .standard:"))
+        #expect(source.contains("ContentView("))
+        #expect(source.contains("case .zen:"))
+        #expect(source.contains("zenExperienceShell(experienceController)"))
         #expect(source.contains(".allowsHitTesting(hasOnboarded)"))
         #expect(source.contains(".accessibilityHidden(!hasOnboarded)"))
         #expect(source.contains("onCompletionRequested: requestOnboardingCompletion"))

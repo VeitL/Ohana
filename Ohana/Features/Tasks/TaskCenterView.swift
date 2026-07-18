@@ -290,7 +290,6 @@ struct TaskCenterView: View {
                             ),
                             items: visible(systemJourneyItems),
                             tint: .goYellow,
-                            identifier: "starter-journey",
                             badgeText: starterJourneyRewardProgressText
                         )
                         if showsDailyProgress, resolvedMemberFilter == .all {
@@ -299,32 +298,27 @@ struct TaskCenterView: View {
                         taskSection(
                             title: l.tr(zh: "待审核", en: "Needs review", de: "Zu prüfen"),
                             items: visible(pendingReviewItems),
-                            tint: .goYellow,
-                            identifier: "pending-review"
+                            tint: .goYellow
                         )
                         taskSection(
                             title: l.tr(zh: "逾期", en: "Overdue", de: "Überfällig"),
                             items: visible(nonReview(displayedSnapshot.overdue)),
-                            tint: displayedSnapshot.criticalCount > 0 ? .goRed : .goOrange,
-                            identifier: "overdue"
+                            tint: displayedSnapshot.criticalCount > 0 ? .goRed : .goOrange
                         )
                         taskSection(
                             title: l.tr(zh: "今天", en: "Today", de: "Heute"),
                             items: visible(nonReview(displayedSnapshot.today)),
-                            tint: .goPrimary,
-                            identifier: "today"
+                            tint: .goPrimary
                         )
                         taskSection(
                             title: l.tr(zh: "接下来", en: "Upcoming", de: "Als Nächstes"),
                             items: visible(nonReview(displayedSnapshot.upcoming)),
-                            tint: .goTeal,
-                            identifier: "upcoming"
+                            tint: .goTeal
                         )
                         taskSection(
                             title: l.tr(zh: "未排期", en: "Unscheduled", de: "Ohne Termin"),
                             items: visible(ordinaryUnscheduledItems),
-                            tint: .goPurple,
-                            identifier: "unscheduled"
+                            tint: .goPurple
                         )
                     }
                 }
@@ -513,7 +507,6 @@ struct TaskCenterView: View {
         title: String,
         items: [TaskCenterItemSnapshot],
         tint: Color,
-        identifier: String,
         badgeText: String? = nil
     ) -> some View {
         if !items.isEmpty {
@@ -553,7 +546,6 @@ struct TaskCenterView: View {
                         .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
                 }
             }
-            .accessibilityIdentifier("task-center-section-\(identifier)")
         }
     }
 
@@ -605,7 +597,6 @@ struct TaskCenterView: View {
         .opacity(performingIDs.contains(item.id) ? 0.44 : 1)
         .scaleEffect(performingIDs.contains(item.id) && !reduceMotion ? 0.985 : 1)
         .animation(reduceMotion ? GoMotion.reduced : GoMotion.feedback, value: performingIDs.contains(item.id))
-        .accessibilityIdentifier("task-center-item-\(item.id)")
     }
 
     @ViewBuilder

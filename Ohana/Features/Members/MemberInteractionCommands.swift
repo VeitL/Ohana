@@ -10,6 +10,24 @@ import SwiftData
 
 enum MemberLifecycleCommandService {
     @MainActor
+    private static func personalDenial(
+        for request: PersonalAccessRequest,
+        accessLevel: PersonalAccessLevel,
+        context: ModelContext
+    ) throws -> PersonalFreeLimitDenial? {
+        let usage = try PersonalUsageSnapshotReader.snapshot(context: context)
+        let disposition = PersonalAccessPolicy.disposition(
+            level: accessLevel,
+            usage: usage,
+            request: request
+        )
+        guard case let .deny(denial) = disposition,
+              case let .wouldExceedFreeLimit(limitDenial) = denial.reason
+        else { return nil }
+        return limitDenial
+    }
+
+    @MainActor
     private static func persistLifecycleMutation(
         entityID: UUID,
         kind: String,
@@ -34,24 +52,57 @@ enum MemberLifecycleCommandService {
         guard MemberLifecycleGate.disposition(pet: pet, writeKind: .lifecycle(.markPassedAway)).isAllowed else {
             return .noOp(entityID: pet.id, kind: EntityKind.pet.rawValue)
         }
+        let notificationIDs = MemberLifecycleActiveScheduleNotifications.futureNotificationIDs(
+            for: pet,
+            passedAwayAt: date,
+            context: context
+        )
         RainbowBridgeService().markPassedAway(pet: pet, date: date, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: date)
-        return persistLifecycleMutation(
+        let result = persistLifecycleMutation(
             entityID: pet.id,
             kind: EntityKind.pet.rawValue,
             action: "passed.mark",
             context: context
         )
+        if result.didPersist {
+            MemberLifecycleActiveScheduleNotifications.cancel(notificationIDs)
+        }
+        return result
     }
 
     @discardableResult
     @MainActor
     static func undoPetPassedAway(
         _ pet: Pet,
-        context: ModelContext
+        context: ModelContext,
+        personalAccessLevel: PersonalAccessLevel = .personal
     ) -> MemberLifecycleCommandResult {
         guard MemberLifecycleGate.disposition(pet: pet, writeKind: .lifecycle(.undoPassedAway)).isAllowed else {
             return .noOp(entityID: pet.id, kind: EntityKind.pet.rawValue)
+        }
+        if !MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects {
+            do {
+                if let denial = try personalDenial(
+                    for: .addActivePet(),
+                    accessLevel: personalAccessLevel,
+                    context: context
+                ) {
+                    return MemberLifecycleCommandResult(
+                        entityID: pet.id,
+                        kind: EntityKind.pet.rawValue,
+                        action: "no-op",
+                        personalDenial: denial
+                    )
+                }
+            } catch {
+                return .failed(
+                    entityID: pet.id,
+                    kind: EntityKind.pet.rawValue,
+                    action: "passed.undo",
+                    error: "Could not verify the current Ohana Personal allowance: \(error.localizedDescription)"
+                )
+            }
         }
         RainbowBridgeService().undoPassedAway(pet: pet, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context)
@@ -100,25 +151,57 @@ enum MemberLifecycleCommandService {
         guard MemberLifecycleGate.disposition(human: human, writeKind: .lifecycle(.markPassedAway)).isAllowed else {
             return .noOp(entityID: human.id, kind: EntityKind.human.rawValue)
         }
+        let notificationIDs = MemberLifecycleActiveScheduleNotifications.futureNotificationIDs(
+            for: human,
+            passedAwayAt: date,
+            context: context
+        )
         human.passedAwayDate = date
-        MemberLifecycleActiveScheduleCleanup.removeFutureSchedules(for: human, passedAwayAt: date, context: context)
         CloudSyncMutationRecorder.markModified(human, context: context, modifiedAt: date)
-        return persistLifecycleMutation(
+        let result = persistLifecycleMutation(
             entityID: human.id,
             kind: EntityKind.human.rawValue,
             action: "passed.mark",
             context: context
         )
+        if result.didPersist {
+            MemberLifecycleActiveScheduleNotifications.cancel(notificationIDs)
+        }
+        return result
     }
 
     @discardableResult
     @MainActor
     static func undoHumanPassedAway(
         _ human: Human,
-        context: ModelContext
+        context: ModelContext,
+        personalAccessLevel: PersonalAccessLevel = .personal
     ) -> MemberLifecycleCommandResult {
         guard MemberLifecycleGate.disposition(human: human, writeKind: .lifecycle(.undoPassedAway)).isAllowed else {
             return .noOp(entityID: human.id, kind: EntityKind.human.rawValue)
+        }
+        if !MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects {
+            do {
+                if let denial = try personalDenial(
+                    for: .addActiveHuman(),
+                    accessLevel: personalAccessLevel,
+                    context: context
+                ) {
+                    return MemberLifecycleCommandResult(
+                        entityID: human.id,
+                        kind: EntityKind.human.rawValue,
+                        action: "no-op",
+                        personalDenial: denial
+                    )
+                }
+            } catch {
+                return .failed(
+                    entityID: human.id,
+                    kind: EntityKind.human.rawValue,
+                    action: "passed.undo",
+                    error: "Could not verify the current Ohana Personal allowance: \(error.localizedDescription)"
+                )
+            }
         }
         human.passedAwayDate = nil
         CloudSyncMutationRecorder.markModified(human, context: context)
@@ -151,8 +234,32 @@ enum MemberLifecycleCommandService {
     @MainActor
     static func restorePlant(
         _ plant: Plant,
-        context: ModelContext
+        context: ModelContext,
+        personalAccessLevel: PersonalAccessLevel = .personal
     ) -> MemberLifecycleCommandResult {
+        if plant.isArchived {
+            do {
+                if let denial = try personalDenial(
+                    for: .addActivePlant(),
+                    accessLevel: personalAccessLevel,
+                    context: context
+                ) {
+                    return MemberLifecycleCommandResult(
+                        entityID: plant.id,
+                        kind: EntityKind.plant.rawValue,
+                        action: "no-op",
+                        personalDenial: denial
+                    )
+                }
+            } catch {
+                return .failed(
+                    entityID: plant.id,
+                    kind: EntityKind.plant.rawValue,
+                    action: "archive.restore",
+                    error: "Could not verify the current Ohana Personal allowance: \(error.localizedDescription)"
+                )
+            }
+        }
         let result = PlantLifecycleService.restore(plant, context: context)
         return MemberLifecycleCommandResult(
             entityID: plant.id,
@@ -336,27 +443,45 @@ struct MemberCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
     let questManager: QuestManager
+    let personalAccessLevel: PersonalAccessLevel
 
     init(context: ModelContext) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher(), questManager: QuestManager())
+        self.init(
+            context: context,
+            revisions: SharedDomainRevisionPublisher(),
+            questManager: QuestManager(),
+            personalAccessLevel: .personal
+        )
     }
 
     init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
         self.init(
             context: context,
             revisions: SharedDomainRevisionPublisher(center: revisionCenter),
-            questManager: QuestManager()
+            questManager: QuestManager(),
+            personalAccessLevel: .personal
         )
     }
 
     init(context: ModelContext, services: AppServices) {
-        self.init(context: context, revisions: services.domainRevisions, questManager: services.questManager)
+        self.init(
+            context: context,
+            revisions: services.domainRevisions,
+            questManager: services.questManager,
+            personalAccessLevel: services.commerce.personalAccessLevel
+        )
     }
 
-    init(context: ModelContext, revisions: DomainRevisionPublishing, questManager: QuestManager) {
+    init(
+        context: ModelContext,
+        revisions: DomainRevisionPublishing,
+        questManager: QuestManager,
+        personalAccessLevel: PersonalAccessLevel = .personal
+    ) {
         self.context = context
         self.revisions = revisions
         self.questManager = questManager
+        self.personalAccessLevel = personalAccessLevel
     }
 
     @discardableResult
@@ -416,7 +541,11 @@ struct MemberCommandExecutor {
 
     @discardableResult
     func undoPetPassedAway(_ pet: Pet, note: String) -> MemberLifecycleCommandResult {
-        let result = MemberLifecycleCommandService.undoPetPassedAway(pet, context: context)
+        let result = MemberLifecycleCommandService.undoPetPassedAway(
+            pet,
+            context: context,
+            personalAccessLevel: personalAccessLevel
+        )
         revisions.publishMemberLifecycle(result, note: note)
         return result
     }
@@ -441,7 +570,11 @@ struct MemberCommandExecutor {
 
     @discardableResult
     func undoHumanPassedAway(_ human: Human, note: String) -> MemberLifecycleCommandResult {
-        let result = MemberLifecycleCommandService.undoHumanPassedAway(human, context: context)
+        let result = MemberLifecycleCommandService.undoHumanPassedAway(
+            human,
+            context: context,
+            personalAccessLevel: personalAccessLevel
+        )
         revisions.publishMemberLifecycle(result, note: note)
         return result
     }
@@ -455,7 +588,11 @@ struct MemberCommandExecutor {
 
     @discardableResult
     func restorePlant(_ plant: Plant, note: String) -> MemberLifecycleCommandResult {
-        let result = MemberLifecycleCommandService.restorePlant(plant, context: context)
+        let result = MemberLifecycleCommandService.restorePlant(
+            plant,
+            context: context,
+            personalAccessLevel: personalAccessLevel
+        )
         revisions.publishMemberLifecycle(result, note: note)
         return result
     }

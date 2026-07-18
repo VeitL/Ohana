@@ -140,6 +140,40 @@ struct StarterGiftServiceTests {
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
     }
 
+    @Test func zenFirstPlantUsesTheSameHouseholdGiftAndCannotDoubleClaimThroughStandard() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
+        context.insert(Plant(name: "Monstera", species: "Monstera deliciosa"))
+        context.safeSave()
+
+        #expect(StarterGiftService.evaluateZenEligibility(
+            context: context,
+            defaults: defaults
+        ) == .readyToClaim(recipient: .island, amount: StarterGiftService.giftAmount))
+        #expect(StarterGiftService.claimZenStarterGift(
+            context: context,
+            defaults: defaults
+        ) == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
+
+        context.insert(Pet(name: "Momo", species: "cat"))
+        context.safeSave()
+        #expect(StarterGiftService.claimStarterGift(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults
+        ) == .alreadyHandled)
+        #expect(CoconutWalletService.balance(
+            accountKey: CoconutAccountKey.islandReserve,
+            context: context
+        ) == StarterGiftService.giftAmount)
+        #expect(try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>()) == 1)
+    }
+
     @Test func persistedGiftRecoversDefaultsWithoutMintingTwice() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -387,7 +421,7 @@ struct StarterGiftServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV64.models)
+        let schema = Schema(ArkSchemaV94.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

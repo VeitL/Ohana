@@ -584,6 +584,7 @@ enum AppPerformanceFlows {
     static let calendarModeSwitch = "flow.calendar.mode_switch"
     static let calendarFilter = "flow.calendar.filter"
     static let calendarAddEventSheet = "flow.calendar.add_event_sheet"
+    static let settingsOpen = "flow.settings.open"
     static let oasisOpen = "flow.oasis.open"
     static let backupExport = "flow.backup.export"
     static let walkSession = "flow.walk.session"
@@ -688,6 +689,8 @@ private enum AppPerformanceSignposts {
             emit("flow.calendar.filter", phase: phase, valueMS: valueMS, note: note)
         case AppPerformanceFlows.calendarAddEventSheet:
             emit("flow.calendar.add_event_sheet", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.settingsOpen:
+            emit("flow.settings.open", phase: phase, valueMS: valueMS, note: note)
         case AppPerformanceFlows.oasisOpen:
             emit("flow.oasis.open", phase: phase, valueMS: valueMS, note: note)
         case AppPerformanceFlows.backupExport:

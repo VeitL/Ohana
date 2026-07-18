@@ -245,8 +245,39 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         restoreFaultInjector: DataBackupRestoreFaultInjector? = nil,
         restoreTransaction: DataBackupRestoreTransaction = { context, changes in
             try context.transaction(block: changes)
-        }
+        },
+        settleShopPurchases: (() -> Void)? = nil
     ) async throws {
+        try ShopPurchaseBackupFence.withExclusiveAccess(
+            context: context,
+            unavailable: { throw BackupError.pendingShopPurchase },
+            operation: {
+                settleShopPurchases?()
+                try importJSONWhileFenced(
+                    from: url,
+                    context: context,
+                    projectionManager: projectionManager,
+                    password: password,
+                    schedulePlantNotifications: schedulePlantNotifications,
+                    plantNotifications: plantNotifications,
+                    restoreFaultInjector: restoreFaultInjector,
+                    restoreTransaction: restoreTransaction
+                )
+            }
+        )
+    }
+
+    @MainActor
+    private func importJSONWhileFenced(
+        from url: URL,
+        context: ModelContext,
+        projectionManager: CoconutProjectionManaging?,
+        password: String?,
+        schedulePlantNotifications: Bool,
+        plantNotifications: ReminderNotificationScheduling,
+        restoreFaultInjector: DataBackupRestoreFaultInjector?,
+        restoreTransaction: DataBackupRestoreTransaction
+    ) throws {
         let packageURL = try Self.packageURLIfNeeded(url)
         let fileData: Data
         let mediaResolver: DataBackupMediaResolving?
@@ -267,7 +298,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        try applyBackup(
+        try applyBackupWhileFenced(
             backup,
             context: context,
             projectionManager: projectionManager,
@@ -287,6 +318,31 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         mediaPackageEncrypted: Bool = false,
         scope: DataBackupExportScope = .manualExternalRestricted
     ) throws -> OhanaBackup {
+        try ShopPurchaseBackupFence.withExclusiveAccess(
+            context: context,
+            unavailable: { throw BackupError.pendingShopPurchase },
+            operation: {
+                try buildBackupWhileFenced(
+                    context: context,
+                    mediaWriter: mediaWriter,
+                    mediaPackageEncrypted: mediaPackageEncrypted,
+                    scope: scope
+                )
+            }
+        )
+    }
+
+    private func buildBackupWhileFenced(
+        context: ModelContext,
+        mediaWriter: DataBackupMediaWriting? = nil,
+        mediaPackageEncrypted: Bool = false,
+        scope: DataBackupExportScope = .manualExternalRestricted
+    ) throws -> OhanaBackup {
+        // Purchase attempts coordinate SwiftData wallet facts with local device
+        // effects and are deliberately excluded from external backup. Never
+        // export the debited wallet while that coordination is still live.
+        try ensureNoUnresolvedShopPurchases(context: context)
+
         let pets = try context.fetch(FetchDescriptor<Pet>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let humans = try context.fetch(FetchDescriptor<Human>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let events = try context.fetch(FetchDescriptor<Event>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
@@ -344,6 +400,11 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let gachaOwnedItems = try context.fetch(FetchDescriptor<GachaOwnedItem>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let gachaDrawLogs = try context.fetch(FetchDescriptor<GachaDrawLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let shopPurchaseRecords = try context.fetch(FetchDescriptor<ShopPurchaseRecord>()) // smoothness: explicit backup/export scan only
+        let presenceCheckIns = try context.fetch(FetchDescriptor<PresenceCheckIn>()) // smoothness: explicit backup/export scan only
+        let presenceParticipationPeriods = try context.fetch(FetchDescriptor<PresenceParticipationPeriod>()) // smoothness: explicit backup/export scan only
+        let presenceRewardReceipts = try context.fetch(FetchDescriptor<PresenceRewardReceipt>()) // smoothness: explicit backup/export scan only
+        let achievementUnlocks = try context.fetch(FetchDescriptor<AchievementUnlock>()) // smoothness: explicit backup/export scan only
+        let achievementRewardReceipts = try context.fetch(FetchDescriptor<AchievementRewardReceipt>()) // smoothness: explicit backup/export scan only
 
         let ud = defaults
         let purchasedShopItems = ShopPurchaseRecordStore
@@ -380,6 +441,27 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let backupFamilyTasks = scope.excludesHumanHealthData
             ? []
             : familyTasks
+        // Human health/movement achievement IDs can reveal private weight,
+        // medication, or workout facts. Restricted exports omit those exact
+        // categories while retaining privacy-safe profile, economy, and tenure
+        // receipts so a restore cannot make a claimed reward claimable again.
+        // Unknown Human-scoped IDs fail closed in the privacy filter.
+        let backupAchievementUnlocks = scope.excludesHumanHealthData
+            ? achievementUnlocks.filter {
+                !Self.isHumanHealthAchievement(
+                    scopeKindRaw: $0.scopeKindRaw,
+                    achievementID: $0.achievementID
+                )
+            }
+            : achievementUnlocks
+        let backupAchievementRewardReceipts = scope.excludesHumanHealthData
+            ? achievementRewardReceipts.filter {
+                !Self.isHumanHealthAchievement(
+                    scopeKindRaw: $0.scopeKindRaw,
+                    achievementID: $0.achievementID
+                )
+            }
+            : achievementRewardReceipts
         let coconutLogProjection = backupCoconutLedgerEntries
             .sorted { $0.occurredAt > $1.occurredAt }
             .prefix(200)
@@ -392,6 +474,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             }
             return string
         }()
+        let shopInventorySnapshot = ShopInventoryStateStore.snapshot(defaults: ud)
         let appState = AppStateBackup(
             coconutCount: coconutAccounts.reduce(0) { $0 + $1.balance },
             coconutLogsJSON: coconutLogsJSON,
@@ -401,10 +484,10 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             gachaHistoryJSON: ud.string(forKey: "gachaHistory") ?? "[]",
             celebratedMilestoneDays: ud.string(forKey: "celebratedMilestoneDays") ?? "",
             shopConsumableInventory: ShopConsumableInventoryBackup(
-                backdatePassCount: ud.integer(forKey: CheckInStreakStore.makeupPackKey),
-                avatar2DExtraPassCount: ud.integer(forKey: ShopInventoryDefaultsKeys.avatar2DExtraPassInventory),
-                doubleRewardBoostActive: ud.bool(forKey: ShopInventoryDefaultsKeys.doubleRewardBoost),
-                streakShieldExpiry: d(ud.object(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry) as? Date)
+                backdatePassCount: shopInventorySnapshot.backdatePassCount,
+                avatar2DExtraPassCount: shopInventorySnapshot.avatar2DExtraPassCount,
+                doubleRewardBoostActive: shopInventorySnapshot.isDoubleRewardBoostActive,
+                streakShieldExpiry: d(shopInventorySnapshot.streakShieldExpiry)
             ),
             plantReminderPreferences: makePlantReminderPreferencesBackup(defaults: ud, plants: plants)
         )
@@ -487,11 +570,35 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             gachaOwnedItems: gachaOwnedItems.map(encodeGachaOwnedItem),
             gachaDrawLogs: gachaDrawLogs.map(encodeGachaDrawLog),
             shopPurchaseRecords: shopPurchaseRecords.map(encodeShopPurchaseRecord),
+            presenceCheckIns: presenceCheckIns.map { encodePresenceCheckIn($0) },
+            presenceParticipationPeriods: presenceParticipationPeriods.map {
+                encodePresenceParticipationPeriod($0)
+            },
+            presenceRewardReceipts: presenceRewardReceipts.map {
+                encodePresenceRewardReceipt($0)
+            },
+            achievementUnlocks: backupAchievementUnlocks.map(encodeAchievementUnlock),
+            achievementRewardReceipts: backupAchievementRewardReceipts.map(encodeAchievementRewardReceipt),
             appState: appState
         )
     }
 
     // MARK: - Apply Backup
+
+    private func ensureNoUnresolvedShopPurchases(context: ModelContext) throws {
+        let fulfilledAttempt = ShopPurchaseAttemptState.fulfilled.rawValue
+        let refundedAttempt = ShopPurchaseAttemptState.refunded.rawValue
+        var descriptor = FetchDescriptor<ShopPurchaseAttempt>(
+            predicate: #Predicate<ShopPurchaseAttempt> { attempt in
+                attempt.stateRaw != fulfilledAttempt &&
+                    attempt.stateRaw != refundedAttempt
+            }
+        )
+        descriptor.fetchLimit = 1
+        guard try context.fetch(descriptor).isEmpty else {
+            throw BackupError.pendingShopPurchase
+        }
+    }
 
     @MainActor
     private func existingIds<T: PersistentModel>(
@@ -524,6 +631,36 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             try context.transaction(block: changes)
         }
     ) throws {
+        try ShopPurchaseBackupFence.withExclusiveAccess(
+            context: context,
+            unavailable: { throw BackupError.pendingShopPurchase },
+            operation: {
+                try applyBackupWhileFenced(
+                    backup,
+                    context: context,
+                    projectionManager: projectionManager,
+                    schedulePlantNotifications: schedulePlantNotifications,
+                    plantNotifications: plantNotifications,
+                    mediaResolver: mediaResolver,
+                    restoreFaultInjector: restoreFaultInjector,
+                    restoreTransaction: restoreTransaction
+                )
+            }
+        )
+    }
+
+    @MainActor
+    private func applyBackupWhileFenced(
+        _ backup: OhanaBackup,
+        context: ModelContext,
+        projectionManager: CoconutProjectionManaging?,
+        schedulePlantNotifications: Bool,
+        plantNotifications: ReminderNotificationScheduling,
+        mediaResolver: DataBackupMediaResolving?,
+        restoreFaultInjector: DataBackupRestoreFaultInjector?,
+        restoreTransaction: DataBackupRestoreTransaction
+    ) throws {
+        try ensureNoUnresolvedShopPurchases(context: context)
         guard !context.hasChanges else {
             throw BackupError.invalidRestoreData(.pendingChanges)
         }
@@ -956,6 +1093,43 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 purchasedShopItemsRaw: backup.appState.purchasedShopItems,
                 context: context
             )
+        }
+        // Restore presence facts and idempotency receipts as facts only. This
+        // path never invokes the live check-in command and therefore cannot
+        // mint rewards while importing or re-importing a package.
+        for dto in backup.presenceCheckIns ?? [] {
+            try PresenceRehydrateWriter.upsert(
+                try decodePresenceCheckInSnapshot(dto),
+                context: context
+            )
+        }
+        for dto in backup.presenceParticipationPeriods ?? [] {
+            let exportedAt = iso.date(from: backup.exportedAt)
+            guard let exportedAt else {
+                throw BackupError.invalidRestoreData(.date)
+            }
+            try PresenceRehydrateWriter.upsert(
+                normalizeActivePresenceParticipationForRestore(
+                    try decodePresenceParticipationPeriodSnapshot(dto),
+                    exportedAt: exportedAt,
+                    checkIns: backup.presenceCheckIns ?? []
+                ),
+                context: context
+            )
+        }
+        for dto in backup.presenceRewardReceipts ?? [] {
+            try PresenceRehydrateWriter.upsert(
+                try decodePresenceRewardReceiptSnapshot(dto),
+                context: context
+            )
+        }
+        // Achievement imports are facts only. Do not call the live command or
+        // reconstruct wallet/stardust rewards during restore.
+        for dto in backup.achievementUnlocks ?? [] {
+            try AchievementFactRehydrateWriter.upsertUnlock(dto, context: context, iso: iso)
+        }
+        for dto in backup.achievementRewardReceipts ?? [] {
+            try AchievementFactRehydrateWriter.upsertReceipt(dto, context: context, iso: iso)
         }
         try restoreBoundary(.extendedDataPrepared)
         _ = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(

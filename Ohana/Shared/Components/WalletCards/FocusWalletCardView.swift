@@ -221,7 +221,7 @@ struct FocusWalletCardView: View {
 
     private var electronicPetNeedsCare: Bool {
         switch electronicPetState {
-        case .healthy, .dead:
+        case .healthy, .sleeping, .dead:
             false
         case .needsCare, .atRisk, .sick, .critical:
             true
@@ -232,7 +232,7 @@ struct FocusWalletCardView: View {
         switch electronicPetState {
         case .healthy:
             Color.goPrimary
-        case .dead:
+        case .dead, .sleeping:
             Color.ohanaTertiaryText
         case .needsCare, .atRisk, .sick, .critical:
             Color.goRed

@@ -48,6 +48,7 @@ struct PlantDetailContentView: View {
     @State var failedDetailQuickCareTypes: Set<PlantCareType> = []
     @State var showingArchiveConfirm = false
     @State var showingRestoreConfirm = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var isDeletePending = false
     @State var isDeleteCommitting = false
     @State var deleteUndoTask: Task<Void, Never>?
@@ -850,6 +851,10 @@ struct PlantDetailContentView: View {
         }
         .sheet(isPresented: $showingEditSheet) {
             EditPlantSheet(plant: plant)
+        }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
         }
         .sheet(isPresented: $showingPhotoGallery) {
             PlantPhotoGallerySheet(

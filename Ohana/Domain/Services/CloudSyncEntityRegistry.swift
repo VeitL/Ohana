@@ -59,7 +59,23 @@ nonisolated enum CloudSyncEntityRegistry {
         // Human notes are private local-first content. The legacy Human.notes
         // string remains authoritative for compatibility; this sidecar only
         // preserves per-entry local attribution.
-        String(describing: HumanNoteRecord.self)
+        String(describing: HumanNoteRecord.self),
+        // Local shop outbox coordinates UserDefaults and system App Icon
+        // effects. It must never replay fulfillment on another device.
+        String(describing: ShopPurchaseAttempt.self),
+        // Zen presence is part of restricted backup v32 but is deliberately
+        // excluded from the current Solo CloudSync runtime. Family sync ships
+        // only with the later account/member-permission phase.
+        String(describing: PresenceCheckIn.self),
+        String(describing: PresenceParticipationPeriod.self),
+        String(describing: PresenceRewardReceipt.self),
+        // Solo achievement progression and reward receipts are local-first.
+        // They enter restricted backup v33 but not the deferred sync surface.
+        String(describing: AchievementUnlock.self),
+        String(describing: AchievementRewardReceipt.self),
+        // Phone numbers and local safety-message configuration never enter the
+        // current backup or CloudSync payload.
+        String(describing: SafetyContact.self)
     ]
 
     static let descriptors: [CloudSyncEntityDescriptor] = [

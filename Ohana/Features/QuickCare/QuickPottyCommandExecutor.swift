@@ -44,7 +44,8 @@ struct QuickPottyCommandResult: Equatable {
 private func fetchQuickPottyModelsOrLog<T: PersistentModel>(
     _ descriptor: FetchDescriptor<T>,
     context: ModelContext,
-    operation: String
+    operation: String,
+    fallback: [T] = []
 ) -> [T] {
     do {
         return try context.fetch(descriptor)
@@ -53,7 +54,7 @@ private func fetchQuickPottyModelsOrLog<T: PersistentModel>(
             "QuickPottyCommandExecutor failed to \(operation): \(error.localizedDescription)",
             category: "Care"
         )
-        return []
+        return fallback
     }
 }
 
@@ -65,6 +66,7 @@ struct QuickPottyCommandExecutor {
     private let careEvents: CareEventRecording
     private let derivations: CareDerivationExecutor
     private let revisions: DomainRevisionPublishing
+    private let personalAccessLevel: PersonalAccessLevel
 
     init(context: ModelContext) {
         self.init(
@@ -85,12 +87,82 @@ struct QuickPottyCommandExecutor {
     init(
         context: ModelContext,
         careEvents: CareEventRecording,
-        revisions: DomainRevisionPublishing
+        revisions: DomainRevisionPublishing,
+        personalAccessLevel: PersonalAccessLevel = .personal
     ) {
         self.context = context
         self.careEvents = careEvents
         self.revisions = revisions
         derivations = CareDerivationExecutor(revisions: revisions)
+        self.personalAccessLevel = personalAccessLevel
+    }
+
+    func syncScoopPlans(
+        pets: [Pet],
+        allEvents: [Event],
+        intervalDays: Int,
+        enabled: Bool,
+        anchor: Date
+    ) throws -> [Event] {
+        let targets = pets.filter { !$0.hasPassedAway }
+        let currentEvents = fetchQuickPottyModelsOrLog(
+            FetchDescriptor<Event>(),
+            context: context,
+            operation: "fetch scoop plans for quota",
+            fallback: allEvents
+        )
+        let replacingPlans = targets.flatMap { target in
+            currentEvents.filter { CarePlanCalendarSync.isStoredPlan($0, kind: "scoop", pet: target) }
+        }
+        try PersonalPlanQuotaCommandGate.requirePlanChange(
+            context: context,
+            personalAccessLevel: personalAccessLevel,
+            addingActivePlanCount: enabled && intervalDays > 0 ? targets.count : 0,
+            replacingPlans: replacingPlans
+        )
+        return targets.compactMap {
+            CarePlanCalendarSync.syncScoopPlan(
+                pet: $0,
+                context: context,
+                intervalDays: intervalDays,
+                enabled: enabled,
+                anchor: anchor
+            )
+        }
+    }
+
+    func syncLitterFullChangePlans(
+        pets: [Pet],
+        allEvents: [Event],
+        intervalDays: Int,
+        enabled: Bool,
+        cycleAnchor: Date
+    ) throws -> [Event] {
+        let targets = pets.filter { !$0.hasPassedAway }
+        let currentEvents = fetchQuickPottyModelsOrLog(
+            FetchDescriptor<Event>(),
+            context: context,
+            operation: "fetch litter-change plans for quota",
+            fallback: allEvents
+        )
+        let replacingPlans = targets.flatMap { target in
+            currentEvents.filter { CarePlanCalendarSync.isStoredPlan($0, kind: "litterFull", pet: target) }
+        }
+        try PersonalPlanQuotaCommandGate.requirePlanChange(
+            context: context,
+            personalAccessLevel: personalAccessLevel,
+            addingActivePlanCount: enabled && intervalDays > 0 ? targets.count : 0,
+            replacingPlans: replacingPlans
+        )
+        return targets.compactMap {
+            CarePlanCalendarSync.syncLitterFullChangePlan(
+                pet: $0,
+                context: context,
+                intervalDays: intervalDays,
+                enabled: enabled,
+                cycleAnchor: cycleAnchor
+            )
+        }
     }
 
     func record(

@@ -8,6 +8,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 // MARK: - Sparkline Data
 private struct SparkPoint: Identifiable {
@@ -90,6 +91,7 @@ struct IslandWeightDashboardContentView: View {
     @State private var selectedSeriesID: String? = nil
     @State private var chartRevealProgress: CGFloat = 0
     @State private var activeWeightEntryRoute: IslandWeightEntryRoute? = nil
+    @State private var showingPersonalPlan = false
 
     enum WeightTimeFilter: String, CaseIterable, Identifiable {
         case days7 = "7"
@@ -97,6 +99,10 @@ struct IslandWeightDashboardContentView: View {
         case days90 = "90"
         case all
         var id: String { rawValue }
+
+        var requiresPersonal: Bool {
+            self == .days90 || self == .all
+        }
 
         var dayCount: Int? {
             switch self {
@@ -205,13 +211,26 @@ struct IslandWeightDashboardContentView: View {
 
     var body: some View {
         dashboardBody
+            .sheet(isPresented: $showingPersonalPlan) {
+                PersonalPlanView()
+                    .ohanaSheetPagePresentation()
+            }
+            .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+                if weightTimeRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                    weightTimeRange = .days30
+                }
+            }
             .onAppear { reloadDashboard() }
             .onChange(of: pets.count) { _, _ in reloadDashboard() }
             .onChange(of: humans.count) { _, _ in reloadDashboard() }
             .onChange(of: activeHumanIdStr) { _, _ in reloadDashboard() }
             .onChange(of: visibleWeightHumanSignature) { _, _ in reloadDashboard() }
     }
+}
 
+// MARK: - Dashboard Content
+
+extension IslandWeightDashboardContentView {
     private func reloadDashboard() {
         if let selectedSeriesID,
            selectedSeriesID.hasPrefix("human:"),
@@ -562,12 +581,23 @@ struct IslandWeightDashboardContentView: View {
         HStack(spacing: 5) {
             ForEach(WeightTimeFilter.allCases) { range in
                 Button {
+                    guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                        showingPersonalPlan = true
+                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                        return
+                    }
                     withAnimation(GoMotion.feedback) {
                         weightTimeRange = range
                     }
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
-                    Text(range.localizedTitle(l))
+                    HStack(spacing: 2) {
+                        Text(range.localizedTitle(l))
+                        if range.requiresPersonal && !appServices.commerce.allows(.extendedTrends) {
+                            Image(systemName: "lock.fill").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 7, weight: .black))
+                        }
+                    }
                         .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(weightTimeRange == range ? Color.arkInk : primaryText)
                         .frame(minWidth: range == .all ? 42 : 30)
@@ -578,7 +608,11 @@ struct IslandWeightDashboardContentView: View {
             }
         }
     }
+}
 
+// MARK: - Dashboard Trends and Rows
+
+extension IslandWeightDashboardContentView {
     private var filteredWeightAbsolutes: [WeightAbsolutePoint] {
         let now = Date()
         let cal = Calendar.current

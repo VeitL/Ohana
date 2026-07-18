@@ -123,14 +123,13 @@ extension PetHealthDetailContentView {
                     healthPlusDestination = .heatCycle
                 }
             }
-            healthToolButton(title: "PDF", icon: "doc.richtext", tint: chromeAccent, identifier: "pet-health-tool-pdf-action") {
-                guard !isRenderingPDF else { return }
-                isRenderingPDF = true
-                Task {
-                    pdfURL = await PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)
-                    isRenderingPDF = false
-                    if pdfURL != nil { showingPDFPreview = true }
-                }
+            healthToolButton(
+                title: appServices.commerce.allows(.vetSummaryPDF) ? "PDF" : "PDF · Personal",
+                icon: appServices.commerce.allows(.vetSummaryPDF) ? "doc.richtext" : "lock.fill",
+                tint: chromeAccent,
+                identifier: "pet-health-tool-pdf-action"
+            ) {
+                renderHealthPDF()
             }
         }
     }

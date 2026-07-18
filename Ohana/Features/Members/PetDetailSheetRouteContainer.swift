@@ -54,6 +54,7 @@ struct AppPetDetailSheetRouteContainer: View {
     let destination: AppPetDetailSheetDestination
     let onMissing: () -> Void
     let onDismiss: () -> Void
+    let showsFoodCloseButton: Bool
     let onOpenFeatureDestination: ((UUID, PetAllFeatureDestination) -> Void)?
     let onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
@@ -62,6 +63,7 @@ struct AppPetDetailSheetRouteContainer: View {
         destination: AppPetDetailSheetDestination,
         onMissing: @escaping () -> Void,
         onDismiss: @escaping () -> Void = {},
+        showsFoodCloseButton: Bool = false,
         onOpenFeatureDestination: ((UUID, PetAllFeatureDestination) -> Void)? = nil,
         onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
     ) {
@@ -71,6 +73,7 @@ struct AppPetDetailSheetRouteContainer: View {
         self.destination = destination
         self.onMissing = onMissing
         self.onDismiss = onDismiss
+        self.showsFoodCloseButton = showsFoodCloseButton
         self.onOpenFeatureDestination = onOpenFeatureDestination
         self.onPresentCoconutLog = onPresentCoconutLog
     }
@@ -111,7 +114,13 @@ struct AppPetDetailSheetRouteContainer: View {
             case .basicInfo:
                 NavigationStack { PetBasicInfoDetailView(pet: pet) }
             case .food:
-                NavigationStack { PetFoodManagementView(pet: pet) }
+                NavigationStack {
+                    PetFoodManagementView(
+                        pet: pet,
+                        onClose: onDismiss,
+                        showsCloseButton: showsFoodCloseButton
+                    )
+                }
             case .weightQuick:
                 GenericWeightEntrySheet(
                     target: .pet(pet),

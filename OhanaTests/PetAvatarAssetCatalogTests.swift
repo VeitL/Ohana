@@ -948,6 +948,61 @@ struct PetAvatarAssetCatalogTests {
         )
     }
 
+    @Test func supportedBreedWithoutCoatUsesItsDefaultAppearance() {
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "狗",
+                breed: "柴犬",
+                gender: "boy",
+                coatColor: ""
+            ) == "dog_shiba_inu_boy_red.webp"
+        )
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "dog",
+                breed: "Shiba Inu",
+                gender: "girl",
+                coatColor: ""
+            ) == "dog_shiba_inu_girl_red.webp"
+        )
+        #expect(
+            PetAvatarAssetCatalog.avatarFilename(
+                species: "dog",
+                breed: "柴犬",
+                gender: "",
+                coatColor: ""
+            ) == nil
+        )
+    }
+
+    @Test func memberAvatarCandidatesNeverCrossPetBreeds() {
+        var draft = MemberCreationDraft(kind: .pet)
+        draft.species = "dog"
+        draft.breed = "柴犬"
+
+        #expect(Avatar2DCandidateProvider.candidates(for: draft, l: L10n("en")).isEmpty)
+
+        draft.petGender = "boy"
+        let defaultCandidates = Avatar2DCandidateProvider.candidates(for: draft, l: L10n("en"))
+        #expect(defaultCandidates.map(\.filename) == ["dog_shiba_inu_boy_red.webp"])
+        #expect(!defaultCandidates.contains { $0.filename.contains("afghan_hound") })
+
+        draft.petGender = "girl"
+        draft.coatColor = "黑褐色"
+        #expect(
+            Avatar2DCandidateProvider.candidates(for: draft, l: L10n("en")).map(\.filename)
+                == ["dog_shiba_inu_girl_black_tan.webp"]
+        )
+
+        draft.breed = "未覆盖犬种"
+        draft.petGender = "boy"
+        draft.coatColor = ""
+        #expect(
+            Avatar2DCandidateProvider.candidates(for: draft, l: L10n("en")).map(\.filename)
+                == ["dog_boy_standard.webp"]
+        )
+    }
+
     @Test func devonRexAvatarAssetsAreBundled() {
         for coat in ["黑色", "白色", "蓝灰色", "奶油色", "棕虎斑", "黑白", "海豹重点色", "蓝重点色", "巧克力重点色", "火焰重点色"] {
             #expect(

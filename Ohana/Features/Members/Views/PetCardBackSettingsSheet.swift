@@ -21,6 +21,7 @@ struct PetCardBackSettingsSheet: View {
     @State private var showRainbowAlert = false
     @State private var rainbowDate = Date()
     @State private var showUndoPassingAlert = false
+    @State private var personalUpgradePrompt: PersonalUpgradePrompt?
 
     @State private var showClearConfirm = false
     @State private var showDeleteConfirm = false
@@ -45,6 +46,10 @@ struct PetCardBackSettingsSheet: View {
             }
             .sheet(isPresented: $showEditPet) { EditPetSheet(pet: pet) }
             .sheet(isPresented: $showSitterCard) { SitterCardPreviewSheet(pet: pet) }
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
+                    .ohanaSheetPagePresentation()
+            }
             .alert(l.tr(zh: "确认标记离世", en: "Confirm Passing", de: "Abschied bestätigen"), isPresented: $showRainbowAlert) {
                 Button(l.tr(zh: "确认", en: "Confirm", de: "Bestätigen"), role: .destructive) {
                     markPetPassedAway()
@@ -185,6 +190,11 @@ struct PetCardBackSettingsSheet: View {
                 pet,
                 note: "pet.cardBack.passed.undo"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }

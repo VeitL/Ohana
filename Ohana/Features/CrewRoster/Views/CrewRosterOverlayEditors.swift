@@ -38,6 +38,7 @@ struct CrewRosterProfilePanel: View {
     @State private var showingHumanDeleteSheet = false
     @State private var showingPlantDeleteAlert = false
     @State private var passedDate = Date()
+    @State private var personalUpgradePrompt: PersonalUpgradePrompt?
 
     @State private var name = ""
     @State private var avatarImageData: Data?
@@ -196,8 +197,16 @@ struct CrewRosterProfilePanel: View {
             )
             .ohanaCompactSheetPresentation(detents: [.height(360), .medium])
         }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
+        }
     }
+}
 
+// MARK: - Profile Content
+
+extension CrewRosterProfilePanel {
     private var detailScroll: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
@@ -594,7 +603,11 @@ struct CrewRosterProfilePanel: View {
             }
         }
     }
+}
 
+// MARK: - Profile Formatting and Actions
+
+extension CrewRosterProfilePanel {
     private var displayName: String {
         if isEditing, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return name }
         return pet?.name ?? human?.name ?? plant?.name ?? card.name
@@ -886,6 +899,11 @@ struct CrewRosterProfilePanel: View {
                 pet,
                 note: "crew.member.lifecycle.pet.passed.undo"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             guard result.didPersist else {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return
@@ -935,6 +953,11 @@ struct CrewRosterProfilePanel: View {
                 human,
                 note: "crew.member.lifecycle.human.passed.undo"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             guard result.didPersist else {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return
