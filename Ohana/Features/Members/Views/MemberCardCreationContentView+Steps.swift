@@ -93,7 +93,6 @@ extension MemberCardCreationContentView {
                     )
                     .accessibilityIdentifier("member-pet-custom-breed-input")
                 }
-
             }
         }
     }

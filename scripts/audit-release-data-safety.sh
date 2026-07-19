@@ -66,7 +66,7 @@ data_backup_atomic_tests="OhanaTests/DataBackupAtomicRestoreTests.swift"
 v90_migration_fixture="OhanaTests/Fixtures/ArkSchemaV90/default.store"
 v90_migration_manifest="OhanaTests/Fixtures/ArkSchemaV90/manifest.json"
 settings_backup="Ohana/Features/Settings/Views/SettingsView+Backup.swift"
-settings_chrome="Ohana/Features/Settings/Views/SettingsView+Chrome.swift"
+settings_reset="Ohana/Features/Settings/Views/SettingsView+Backup.swift"
 
 failures=()
 
@@ -138,6 +138,8 @@ reject_backup_pattern() {
 # deliberate exemption. This prevents new @Model types from silently falling out
 # of user-owned export/restore coverage.
 backup_contract_entries=(
+  "AchievementRewardReceipt|struct AchievementRewardReceiptBackup"
+  "AchievementUnlock|struct AchievementUnlockBackup"
   "CareLedgerEvent|struct CareLedgerEventBackup"
   "CloudSyncRecordState|EXEMPT:local CloudKit sync metadata, rebuilt by sync runtime"
   "CoconutAccount|struct CoconutAccountBackup"
@@ -223,8 +225,8 @@ for entry in "${backup_contract_entries[@]}"; do
     "SwiftData model $model should have a matching backup DTO, or a documented exemption if intentionally excluded."
 done
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV93\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV93 model set."
+require_pattern "$shared_container" 'Schema\(ArkSchemaV94\.models\)' \
+  "SharedModelContainer should open the current ArkSchemaV94 model set."
 
 require_pattern "$local_backup_exclusion" 'values\.isExcludedFromBackup = true' \
   "Local persistence must set URLResourceValues.isExcludedFromBackup before storing private data."
@@ -311,7 +313,7 @@ require_pattern "$app_runtime_adapters" 'await automaticBackups\.removeManagedAu
 require_pattern "$app_services" 'automaticBackups: automaticBackups' \
   "AppServices must inject one AutomaticBackupService instance into both lifecycle backup and Reset ownership."
 
-require_pattern "$settings_chrome" 'try await appServices\.appReset\.reset\(context: modelContext\)' \
+require_pattern "$settings_reset" 'try await appServices\.appReset\.reset\(context: modelContext\)' \
   "Settings Delete-All must await the coordinated asynchronous Reset result."
 
 require_pattern "OhanaTests/AutomaticBackupServiceTests.swift" 'resetDuringNonCooperativeExportFencesOldGenerationAndAllowsANewBackup' \
@@ -331,11 +333,11 @@ while IFS= read -r localized_strings; do
     "Localized resources must not retain the obsolete claim that backups include all Human health records."
 done < <(find Ohana -name Localizable.strings -type f -print)
 
-require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 32' \
-  "OhanaBackup.schemaVersion should be 32 after adding presence and safety-contact data."
+require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 33' \
+  "OhanaBackup.schemaVersion should be 33 after adding achievement unlock and reward-receipt data."
 
-require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 32' \
-  "Restore preflight should accept supported backup schema versions through 32."
+require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 33' \
+  "Restore preflight should accept supported backup schema versions through 33."
 
 require_pattern "$data_backup_dtos" 'struct BackupMediaPackageInfo' \
   "OhanaBackup should describe the out-of-line backup media package."
@@ -469,7 +471,7 @@ require_pattern "$data_backup_dtos" 'var humanHealthMetricLogs: \[HumanHealthMet
 require_backup_pattern 'FetchDescriptor<HumanHealthMetricLog>' \
   "DataBackupManager should fetch HumanHealthMetricLog during backup/import."
 
-require_backup_pattern 'humanHealthMetricLogs: humanHealthMetricLogs\.map\(encodeHumanHealthMetricLog\)' \
+require_backup_pattern 'humanHealthMetricLogs: source\.humanHealthMetricLogs\.map\(encodeHumanHealthMetricLog\)' \
   "buildBackup should encode human health metric logs."
 
 require_backup_pattern 'insertHumanHealthMetricLogIfNeeded' \
@@ -502,7 +504,7 @@ require_pattern "$data_backup_dtos" 'var coconutAccounts: \[CoconutAccountBackup
 require_pattern "$data_backup_dtos" 'var coconutLedgerEntries: \[CoconutLedgerEntryBackup\]\?' \
   "OhanaBackup should include V58 CoconutLedgerEntry backups."
 
-require_backup_pattern 'coconutAccounts: coconutAccounts\.map\(encodeCoconutAccount\)' \
+require_backup_pattern 'coconutAccounts: source\.coconutAccounts\.map\(encodeCoconutAccount\)' \
   "buildBackup should export V58 CoconutAccount rows."
 
 require_backup_pattern 'let backupCoconutLedgerEntries = scope\.excludesHumanHealthData' \
@@ -520,7 +522,7 @@ require_backup_pattern 'economyBudgetUsageEvents: backupEconomyBudgetUsageEvents
 require_backup_pattern 'let backupFamilyTasks = scope\.excludesHumanHealthData' \
   "Restricted exports must explicitly scope free-text family tasks."
 
-require_backup_pattern 'let coconutLogProjection = backupCoconutLedgerEntries' \
+require_backup_pattern 'source\.shopPurchaseRecords, source\.coconutAccounts, backupCoconutLedgerEntries, source\.plants' \
   "Legacy wallet-log projection must use the same restricted wallet scope."
 
 require_backup_pattern 'insertCoconutAccountIfNeeded' \

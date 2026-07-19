@@ -690,6 +690,25 @@ struct GachaRollResult: Equatable {
 }
 
 enum GachaDrawService {
+    private struct DrawRequest {
+        let seriesID: String
+        let requestID: UUID?
+        let now: Date
+        let forcedRoll: Int?
+        let forcedCommonPreferenceRoll: Int?
+        let forcedCommonItemIndex: Int?
+        let approvedFunding: GachaFundingPreview?
+    }
+
+    private struct DrawFacts {
+        let item: GachaItemEntry?
+        let instantResult: GachaInstantResultEntry?
+        let owned: GachaOwnedItem?
+        let log: GachaDrawLog
+        let instantCoconutDelta: Int
+        let stardustDelta: Int
+    }
+
     static let oddsVersion = 2
     static let costPerDraw = DomainGachaDrawDefaults.costPerDraw
     static let commonDuplicateStardust = 20
@@ -870,7 +889,9 @@ enum GachaDrawService {
             )
         )
     }
+}
 
+extension GachaDrawService {
     @MainActor
     static func draw(
         seriesId: String = GachaSeriesCatalog.defaultSeriesId,
@@ -891,15 +912,17 @@ enum GachaDrawService {
             unavailable: { throw GachaDrawError.backupOrRestoreInProgress },
             operation: {
                 try drawWhileFenced(
-                    seriesId: seriesId,
+                    request: DrawRequest(
+                        seriesID: seriesId,
+                        requestID: requestID,
+                        now: now,
+                        forcedRoll: forcedRoll,
+                        forcedCommonPreferenceRoll: forcedCommonPreferenceRoll,
+                        forcedCommonItemIndex: forcedCommonItemIndex,
+                        approvedFunding: approvedFunding
+                    ),
                     human: human,
                     context: context,
-                    requestID: requestID,
-                    now: now,
-                    forcedRoll: forcedRoll,
-                    forcedCommonPreferenceRoll: forcedCommonPreferenceRoll,
-                    forcedCommonItemIndex: forcedCommonItemIndex,
-                    approvedFunding: approvedFunding,
                     wallet: providedWallet,
                     careLedger: providedCareLedger,
                     projectionManager: projectionManager
@@ -910,19 +933,17 @@ enum GachaDrawService {
 
     @MainActor
     private static func drawWhileFenced(
-        seriesId: String,
+        request: DrawRequest,
         human: Human?,
         context: ModelContext,
-        requestID: UUID?,
-        now: Date,
-        forcedRoll: Int?,
-        forcedCommonPreferenceRoll: Int?,
-        forcedCommonItemIndex: Int?,
-        approvedFunding: GachaFundingPreview?,
         wallet providedWallet: CoconutWalletManaging?,
         careLedger providedCareLedger: CareLedgerRecording?,
         projectionManager: QuestManager?
     ) throws -> GachaDrawOutcome {
+        let seriesId = request.seriesID
+        let requestID = request.requestID
+        let now = request.now
+        let approvedFunding = request.approvedFunding
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         guard let human else { throw GachaDrawError.missingHuman }
@@ -969,34 +990,12 @@ enum GachaDrawService {
             ownedItems: allOwnedItems,
             logs: history
         )
-        let ownedRollbackState = allOwnedItems.map {
-            (model: $0, ownedCount: $0.ownedCount, latestObtainedAt: $0.latestObtainedAt)
-        }
-        let fragmentRollbackState = try context.fetch(FetchDescriptor<OasisCritterFragmentBalance>()).map {
-            (model: $0, amount: $0.amount, updatedAt: $0.updatedAt)
-        }
-        let humanRollbackState = fundingPlan.contributions.map {
-            (model: $0.human, coconutBalance: $0.human.coconutBalance)
-        }
-        let restoreInMemoryState = {
-            // SwiftData rolls the persistent transaction back, but live @Model
-            // instances can retain their last assigned values until the next
-            // refresh. Restore those view-visible values too, then clear the
-            // restoration edits so a later unrelated save cannot persist them.
-            context.rollback()
-            for state in ownedRollbackState {
-                state.model.ownedCount = state.ownedCount
-                state.model.latestObtainedAt = state.latestObtainedAt
-            }
-            for state in fragmentRollbackState {
-                state.model.amount = state.amount
-                state.model.updatedAt = state.updatedAt
-            }
-            for state in humanRollbackState {
-                state.model.coconutBalance = state.coconutBalance
-            }
-            context.rollback()
-        }
+        let restoreInMemoryState = try makeRestoreInMemoryState(
+            ownedItems: allOwnedItems,
+            fundingPlan: fundingPlan,
+            context: context,
+            wallet: wallet
+        )
         let seriesOwnedIDs = ownedItemIDs(
             humanId: human.id.uuidString,
             seriesId: series.id,
@@ -1004,205 +1003,47 @@ enum GachaDrawService {
         )
         let missingCommonItems = series.commonItems.filter { !seriesOwnedIDs.contains($0.id) }
         let guaranteeKind = nextGuarantee(from: status)
-        let rollResult: GachaRollResult = switch guaranteeKind {
-        case .hiddenHardPity:
-            GachaRollResult(kind: .collectible, item: series.hiddenItem, instantResult: nil)
-        case .newCommonPity:
-            GachaRollResult(
-                kind: .collectible,
-                item: selectItem(from: missingCommonItems, forcedIndex: forcedCommonItemIndex),
-                instantResult: nil
-            )
-        case .completedCollectionPity:
-            GachaRollResult(
-                kind: .collectible,
-                item: selectItem(from: series.commonItems, forcedIndex: forcedCommonItemIndex),
-                instantResult: nil
-            )
-        case .none:
-            roll(
-                in: series,
-                forcedRoll: forcedRoll,
-                allowsHidden: status.hiddenUnlocked,
-                missingCommonItems: missingCommonItems,
-                forcedCommonPreferenceRoll: forcedCommonPreferenceRoll,
-                forcedCommonItemIndex: forcedCommonItemIndex
-            )
-        }
+        let rollResult = rollResult(
+            guaranteeKind: guaranteeKind,
+            series: series,
+            status: status,
+            missingCommonItems: missingCommonItems,
+            request: request
+        )
 
         let dailyLogs = try dailyDrawLogs(for: human.id.uuidString, context: context, now: now)
         let usedToday = dailyDrawCount(for: human.id.uuidString, in: dailyLogs, now: now)
         do {
-            let item = rollResult.item
-            var isNew = false
-            var stardustDelta = 0
-            var owned: GachaOwnedItem?
-            if let item {
-                let existing = allOwnedItems.first {
-                    $0.ownerHumanId == human.id.uuidString &&
-                        $0.seriesId == series.id &&
-                        $0.itemId == item.id
-                }
-                isNew = existing == nil
-                if let existing {
-                    existing.ownedCount += 1
-                    existing.latestObtainedAt = now
-                    stardustDelta = item.isHidden ? hiddenDuplicateStardust : commonDuplicateStardust
-                    owned = existing
-                } else {
-                    let created = GachaOwnedItem(
-                        ownerHumanId: human.id.uuidString,
-                        seriesId: series.id,
-                        itemId: item.id,
-                        rarity: item.rarity,
-                        isHidden: item.isHidden,
-                        ownedCount: 1,
-                        firstObtainedAt: now,
-                        latestObtainedAt: now
-                    )
-                    context.insert(created)
-                    owned = created
-                }
-            }
-
-            let instantCoconutDelta = rollResult.instantResult?.coconutDelta ?? 0
-            let log = GachaDrawLog(
-                ownerHumanId: human.id.uuidString,
-                ownerName: human.name,
-                seriesId: series.id,
-                itemId: item?.id ?? "",
-                rarity: item?.rarity ?? .common,
-                isHidden: item?.isHidden ?? false,
-                isNew: isNew,
-                outcomeKind: rollResult.kind,
-                instantResult: rollResult.instantResult,
-                costCoconuts: costPerDraw,
-                dailySequence: usedToday + 1,
-                oddsVersion: oddsVersion,
+            let facts = try prepareDrawFacts(
+                rollResult: rollResult,
+                ownedItems: allOwnedItems,
+                human: human,
+                series: series,
                 guaranteeKind: guaranteeKind,
-                stardustDelta: stardustDelta,
-                drawDate: now
+                usedToday: usedToday,
+                requestID: requestID,
+                now: now,
+                context: context
             )
-            if let requestID {
-                log.id = requestID
-            }
-            context.insert(log)
-            if stardustDelta > 0 {
-                try creditStardust(stardustDelta, at: now, context: context)
-            }
-            if let owned {
-                CloudSyncMutationRecorder.markModified(owned, context: context, modifiedAt: now)
-            }
-            CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: now)
-
-            let cofundingMetadata = usesCofunding
-                ? ",\"cofunded\":true,\"fundingSourceCount\":\(fundingPlan.contributions.count)"
-                : ""
-            let baseMetadata = "\"seriesId\":\"\(series.id)\",\"oddsVersion\":\(oddsVersion),\"guaranteeKind\":\"\(guaranteeKind.rawValue)\",\"outcomeKind\":\"\(rollResult.kind.rawValue)\",\"itemId\":\"\(item?.id ?? "")\",\"instantResultId\":\"\(rollResult.instantResult?.id ?? "")\",\"instantCoconutDelta\":\(instantCoconutDelta),\"stardustDelta\":\(stardustDelta),\"rarity\":\"\(item?.rarity.rawValue ?? "")\",\"hidden\":\(item?.isHidden ?? false)\(cofundingMetadata)"
-
-            let costLedger = careLedger.record(
-                occurredAt: now,
-                actorKind: .human,
-                actorId: human.id.uuidString,
-                subjectKind: .system,
-                subjectId: nil,
-                eventKind: .coconut,
-                actionType: "gachaDrawCost",
-                amountValue: Double(costPerDraw),
-                amountUnit: "coconut",
-                note: "Blind box cost · \(series.id)",
-                source: .economy,
-                sourceEventId: nil,
-                sourceReminderId: nil,
-                legacyModelName: "GachaDrawLog",
-                legacyModelId: log.id.uuidString,
-                coconutDelta: -costPerDraw,
-                rewardLogId: nil,
-                privacyFieldRaw: nil,
-                metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"cost\"}",
+            try persistDrawEconomy(
+                facts: facts,
+                human: human,
+                series: series,
+                guaranteeKind: guaranteeKind,
+                usesCofunding: usesCofunding,
+                fundingPlan: fundingPlan,
+                careLedger: careLedger,
                 context: context,
-                save: false
-            )
-            var walletDeltas: [CoconutWalletDelta] = fundingPlan.contributions.map { contribution in
-                let isBuyer = contribution.human.id == human.id
-                return .human(
-                    contribution.human,
-                    delta: -contribution.amount,
-                    entryKind: isBuyer ? .spend : .transferOut,
-                    source: .gacha,
-                    title: isBuyer ? "盲盒抽取" : "合资补差：盲盒抽取",
-                    emoji: "🥥",
-                    actorId: contribution.human.id.uuidString,
-                    actorName: contribution.human.name,
-                    subjectKind: isBuyer ? .system : .human,
-                    subjectId: isBuyer ? nil : human.id.uuidString,
-                    sourceModelName: "GachaDrawLog",
-                    sourceModelId: log.id.uuidString,
-                    careLedgerEventId: costLedger.id.uuidString,
-                    metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"cost\"}",
-                    transactionKey: usesCofunding
-                        ? "gacha:\(log.id.uuidString):cost:\(contribution.human.id.uuidString)"
-                        : "gacha:\(log.id.uuidString):cost"
-                )
-            }
-            if instantCoconutDelta > 0 {
-                let instantLedger = careLedger.record(
-                    occurredAt: now,
-                    actorKind: .human,
-                    actorId: human.id.uuidString,
-                    subjectKind: .system,
-                    subjectId: nil,
-                    eventKind: .coconut,
-                    actionType: "gachaInstantReward",
-                    amountValue: Double(instantCoconutDelta),
-                    amountUnit: "coconut",
-                    note: rollResult.instantResult?.id ?? "instantReward",
-                    source: .economy,
-                    sourceEventId: nil,
-                    sourceReminderId: nil,
-                    legacyModelName: "GachaDrawLog",
-                    legacyModelId: log.id.uuidString,
-                    coconutDelta: instantCoconutDelta,
-                    rewardLogId: nil,
-                    privacyFieldRaw: nil,
-                    metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"instantReward\"}",
-                    context: context,
-                    save: false
-                )
-                walletDeltas.append(.human(
-                    human,
-                    delta: instantCoconutDelta,
-                    entryKind: .reward,
-                    source: .gacha,
-                    title: rollResult.instantResult?.title.translations["zh"] ?? "盲盒即时返还",
-                    emoji: rollResult.instantResult?.symbol ?? "🥥",
-                    actorId: human.id.uuidString,
-                    actorName: human.name,
-                    subjectKind: .system,
-                    subjectId: nil,
-                    sourceModelName: "GachaDrawLog",
-                    sourceModelId: log.id.uuidString,
-                    careLedgerEventId: instantLedger.id.uuidString,
-                    metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"instantReward\"}",
-                    transactionKey: "gacha:\(log.id.uuidString):instantReward"
-                ))
-            }
-
-            try wallet.apply(
-                deltas: walletDeltas,
-                context: context,
-                save: false,
-                postsRewardFeedback: true,
-                updatesProjection: true,
+                wallet: wallet,
                 projectionManager: projectionManager
             )
             try saveDrawChanges(context: context)
 
             return GachaDrawOutcome(
-                item: item,
+                item: facts.item,
                 instantResult: rollResult.instantResult,
-                ownedItem: owned,
-                log: log
+                ownedItem: facts.owned,
+                log: facts.log
             )
         } catch let error as GachaDrawError {
             restoreInMemoryState()
@@ -1213,6 +1054,263 @@ enum GachaDrawService {
             wallet.refreshQuestProjection(context: context, manager: projectionManager)
             throw GachaDrawError.persistenceFailed
         }
+    }
+
+    private static func makeRestoreInMemoryState(
+        ownedItems: [GachaOwnedItem],
+        fundingPlan: CoconutWalletFundingPlan,
+        context: ModelContext,
+        wallet: CoconutWalletManaging
+    ) throws -> () -> Void {
+        let ownedState = ownedItems.map {
+            (model: $0, ownedCount: $0.ownedCount, latestObtainedAt: $0.latestObtainedAt)
+        }
+        let fragmentState = try context.fetch(FetchDescriptor<OasisCritterFragmentBalance>()).map {
+            (model: $0, amount: $0.amount, updatedAt: $0.updatedAt)
+        }
+        let humanBalances = Dictionary(uniqueKeysWithValues: fundingPlan.contributions.map {
+            ($0.human.id, $0.human.coconutBalance)
+        })
+        return {
+            context.rollback()
+            for state in ownedState {
+                state.model.ownedCount = state.ownedCount
+                state.model.latestObtainedAt = state.latestObtainedAt
+            }
+            for state in fragmentState {
+                state.model.amount = state.amount
+                state.model.updatedAt = state.updatedAt
+            }
+            wallet.restoreCachedHumanBalances(humanBalances, context: context)
+            context.rollback()
+        }
+    }
+
+    private static func rollResult(
+        guaranteeKind: GachaGuaranteeKind,
+        series: GachaSeriesEntry,
+        status: GachaGuaranteeStatus,
+        missingCommonItems: [GachaItemEntry],
+        request: DrawRequest
+    ) -> GachaRollResult {
+        switch guaranteeKind {
+        case .hiddenHardPity:
+            GachaRollResult(kind: .collectible, item: series.hiddenItem, instantResult: nil)
+        case .newCommonPity:
+            GachaRollResult(
+                kind: .collectible,
+                item: selectItem(from: missingCommonItems, forcedIndex: request.forcedCommonItemIndex),
+                instantResult: nil
+            )
+        case .completedCollectionPity:
+            GachaRollResult(
+                kind: .collectible,
+                item: selectItem(from: series.commonItems, forcedIndex: request.forcedCommonItemIndex),
+                instantResult: nil
+            )
+        case .none:
+            roll(
+                in: series,
+                forcedRoll: request.forcedRoll,
+                allowsHidden: status.hiddenUnlocked,
+                missingCommonItems: missingCommonItems,
+                forcedCommonPreferenceRoll: request.forcedCommonPreferenceRoll,
+                forcedCommonItemIndex: request.forcedCommonItemIndex
+            )
+        }
+    }
+
+    private static func prepareDrawFacts(
+        rollResult: GachaRollResult,
+        ownedItems: [GachaOwnedItem],
+        human: Human,
+        series: GachaSeriesEntry,
+        guaranteeKind: GachaGuaranteeKind,
+        usedToday: Int,
+        requestID: UUID?,
+        now: Date,
+        context: ModelContext
+    ) throws -> DrawFacts {
+        let item = rollResult.item
+        var isNew = false
+        var stardustDelta = 0
+        var owned: GachaOwnedItem?
+        if let item {
+            let existing = ownedItems.first {
+                $0.ownerHumanId == human.id.uuidString &&
+                    $0.seriesId == series.id &&
+                    $0.itemId == item.id
+            }
+            isNew = existing == nil
+            if let existing {
+                existing.ownedCount += 1
+                existing.latestObtainedAt = now
+                stardustDelta = item.isHidden ? hiddenDuplicateStardust : commonDuplicateStardust
+                owned = existing
+            } else {
+                let created = GachaOwnedItem(
+                    ownerHumanId: human.id.uuidString,
+                    seriesId: series.id,
+                    itemId: item.id,
+                    rarity: item.rarity,
+                    isHidden: item.isHidden,
+                    ownedCount: 1,
+                    firstObtainedAt: now,
+                    latestObtainedAt: now
+                )
+                context.insert(created)
+                owned = created
+            }
+        }
+        let instantCoconutDelta = rollResult.instantResult?.coconutDelta ?? 0
+        let log = GachaDrawLog(
+            ownerHumanId: human.id.uuidString,
+            ownerName: human.name,
+            seriesId: series.id,
+            itemId: item?.id ?? "",
+            rarity: item?.rarity ?? .common,
+            isHidden: item?.isHidden ?? false,
+            isNew: isNew,
+            outcomeKind: rollResult.kind,
+            instantResult: rollResult.instantResult,
+            costCoconuts: costPerDraw,
+            dailySequence: usedToday + 1,
+            oddsVersion: oddsVersion,
+            guaranteeKind: guaranteeKind,
+            stardustDelta: stardustDelta,
+            drawDate: now
+        )
+        if let requestID { log.id = requestID }
+        context.insert(log)
+        if stardustDelta > 0 {
+            try creditStardust(stardustDelta, at: now, context: context)
+        }
+        if let owned {
+            CloudSyncMutationRecorder.markModified(owned, context: context, modifiedAt: now)
+        }
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: now)
+        return DrawFacts(
+            item: item,
+            instantResult: rollResult.instantResult,
+            owned: owned,
+            log: log,
+            instantCoconutDelta: instantCoconutDelta,
+            stardustDelta: stardustDelta
+        )
+    }
+
+    private static func persistDrawEconomy(
+        facts: DrawFacts,
+        human: Human,
+        series: GachaSeriesEntry,
+        guaranteeKind: GachaGuaranteeKind,
+        usesCofunding: Bool,
+        fundingPlan: CoconutWalletFundingPlan,
+        careLedger: CareLedgerRecording,
+        context: ModelContext,
+        wallet: CoconutWalletManaging,
+        projectionManager: QuestManager?
+    ) throws {
+        let rollResult = facts.log.outcomeKind
+        let cofundingMetadata = usesCofunding
+            ? ",\"cofunded\":true,\"fundingSourceCount\":\(fundingPlan.contributions.count)"
+            : ""
+        let baseMetadata = "\"seriesId\":\"\(series.id)\",\"oddsVersion\":\(oddsVersion),\"guaranteeKind\":\"\(guaranteeKind.rawValue)\",\"outcomeKind\":\"\(rollResult.rawValue)\",\"itemId\":\"\(facts.item?.id ?? "")\",\"instantResultId\":\"\(facts.instantResult?.id ?? "")\",\"instantCoconutDelta\":\(facts.instantCoconutDelta),\"stardustDelta\":\(facts.stardustDelta),\"rarity\":\"\(facts.item?.rarity.rawValue ?? "")\",\"hidden\":\(facts.item?.isHidden ?? false)\(cofundingMetadata)"
+        let costLedger = careLedger.record(
+            occurredAt: facts.log.drawDate,
+            actorKind: .human,
+            actorId: human.id.uuidString,
+            subjectKind: .system,
+            subjectId: nil,
+            eventKind: .coconut,
+            actionType: "gachaDrawCost",
+            amountValue: Double(costPerDraw),
+            amountUnit: "coconut",
+            note: "Blind box cost · \(series.id)",
+            source: .economy,
+            sourceEventId: nil,
+            sourceReminderId: nil,
+            legacyModelName: "GachaDrawLog",
+            legacyModelId: facts.log.id.uuidString,
+            coconutDelta: -costPerDraw,
+            rewardLogId: nil,
+            privacyFieldRaw: nil,
+            metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"cost\"}",
+            context: context,
+            save: false
+        )
+        var walletDeltas: [CoconutWalletDelta] = fundingPlan.contributions.map { contribution in
+            let isBuyer = contribution.human.id == human.id
+            return .human(
+                contribution.human,
+                delta: -contribution.amount,
+                entryKind: isBuyer ? .spend : .transferOut,
+                source: .gacha,
+                title: isBuyer ? "盲盒抽取" : "合资补差：盲盒抽取",
+                emoji: "🥥",
+                actorId: contribution.human.id.uuidString,
+                actorName: contribution.human.name,
+                subjectKind: isBuyer ? .system : .human,
+                subjectId: isBuyer ? nil : human.id.uuidString,
+                sourceModelName: "GachaDrawLog",
+                sourceModelId: facts.log.id.uuidString,
+                careLedgerEventId: costLedger.id.uuidString,
+                metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"cost\"}",
+                transactionKey: usesCofunding
+                    ? "gacha:\(facts.log.id.uuidString):cost:\(contribution.human.id.uuidString)"
+                    : "gacha:\(facts.log.id.uuidString):cost"
+            )
+        }
+        if facts.instantCoconutDelta > 0 {
+            let instantLedger = careLedger.record(
+                occurredAt: facts.log.drawDate,
+                actorKind: .human,
+                actorId: human.id.uuidString,
+                subjectKind: .system,
+                subjectId: nil,
+                eventKind: .coconut,
+                actionType: "gachaInstantReward",
+                amountValue: Double(facts.instantCoconutDelta),
+                amountUnit: "coconut",
+                note: facts.instantResult?.id ?? "instantReward",
+                source: .economy,
+                sourceEventId: nil,
+                sourceReminderId: nil,
+                legacyModelName: "GachaDrawLog",
+                legacyModelId: facts.log.id.uuidString,
+                coconutDelta: facts.instantCoconutDelta,
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"instantReward\"}",
+                context: context,
+                save: false
+            )
+            walletDeltas.append(.human(
+                human,
+                delta: facts.instantCoconutDelta,
+                entryKind: .reward,
+                source: .gacha,
+                title: facts.instantResult?.title.translations["zh"] ?? "盲盒即时返还",
+                emoji: facts.instantResult?.symbol ?? "🥥",
+                actorId: human.id.uuidString,
+                actorName: human.name,
+                subjectKind: .system,
+                subjectId: nil,
+                sourceModelName: "GachaDrawLog",
+                sourceModelId: facts.log.id.uuidString,
+                careLedgerEventId: instantLedger.id.uuidString,
+                metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"instantReward\"}",
+                transactionKey: "gacha:\(facts.log.id.uuidString):instantReward"
+            ))
+        }
+        try wallet.apply(
+            deltas: walletDeltas,
+            context: context,
+            save: false,
+            postsRewardFeedback: true,
+            updatesProjection: true,
+            projectionManager: projectionManager
+        )
     }
 
     static func roll(

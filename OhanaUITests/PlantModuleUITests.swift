@@ -436,7 +436,7 @@ final class PlantModuleUITests: XCTestCase {
                 "-OHANA_UI_TEST_SEED_HUMAN_BASELINE",
                 "-OHANA_UI_TEST_HUMAN_BASELINE_NAME",
                 "Codex Plant Module Human",
-                "-OHANA_UI_TEST_SEED_MEMBER_CARD_BASELINE",
+                "-OHANA_UI_TEST_SEED_MEMBER_CARD_BASELINE"
             ]
         }
         if enableProductionOverlays {
@@ -922,7 +922,7 @@ final class PlantModuleUITests: XCTestCase {
         let prefix = "home-plants-room-stack-"
         let excludedIdentifiers = Set([
             "home-plants-room-stack-close",
-            "home-plants-room-stack-overview",
+            "home-plants-room-stack-overview"
         ])
         let stacks = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
         var identifiers: [String] = []

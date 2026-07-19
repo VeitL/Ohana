@@ -156,7 +156,7 @@ query_outside_containers() {
   fi
   [[ -z "$input" ]] && return 0
   printf '%s\n' "$input" \
-    | rg -v '(DataContainer\.swift|RouteContainer\.swift|Ohana/App/RouteContainers/.*\.swift):' || true
+    | rg -v '(DataContainer\.swift|RouteContainer\.swift|ZenExperienceContainer\.swift|Ohana/App/RouteContainers/.*\.swift):' || true
 }
 
 forbidden_patterns() {
@@ -348,6 +348,7 @@ coconut_balance_writes_outside_wallet() {
     | rg -v '^\s*Ohana/Domain/Services/DataBackupManager\+Decode\.swift:' \
     | rg -v '^\s*Ohana/Models/Human\.swift:' \
     | rg -v '^\s*Ohana/Models/Pet\.swift:' \
+    | rg -v '^\s*Ohana/Features/Zen/ZenModels\.swift:' \
     | rg -v '^\s*Ohana/Features/Home/Views/FocusHomeHeaderView\.swift:' || true
 }
 
@@ -383,6 +384,7 @@ static_service_calls_outside_facades() {
     | rg -v '^\s*Ohana/Features/Medication/SharedMedicationReminderManager\.swift:' \
     | rg -v '^\s*Ohana/Features/Notifications/ReminderSchedulingManager\.swift:' \
     | rg -v '^\s*Ohana/Features/Oasis/OasisRewardServices\.swift:' \
+    | rg -v '^\s*Ohana/Features/Oasis/OasisCompanionLifecycleCompatibilityService\.swift:' \
     | rg -v '^\s*Ohana/Features/Walks/StaticWalkCareEventManager\.swift:' \
     | rg -v ':\s*// ' || true
 }

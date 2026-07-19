@@ -45,6 +45,7 @@ final class AppServices {
     let reminderActions: ReminderActionHandling
     let reminderScheduling: ReminderSchedulingManaging
     let reminderCompletion: ReminderCompleting
+    let presenceSafety: PresenceSafetyManaging
     let onboardingJourney: OnboardingJourneyCoordinating
     let humanRequirements: HumanRequirementResolving
     let todayFocus: TodayFocusManaging
@@ -100,29 +101,16 @@ final class AppServices {
         let familyTasks = StaticFamilyTaskManager(wallet: coconutWallet, careLedger: careLedger, questManager: questManager)
         let reminderScheduling = ReminderSchedulingManager(careLedger: careLedger)
         let medicationReminders = SharedMedicationReminderManager(careLedger: careLedger)
-        let reminderCompletion = ReminderCompletionService(
-            careLedger: careLedger,
-            familyTasks: familyTasks,
-            reminderScheduling: reminderScheduling,
-            notifications: notificationManager
+        let reminderCompletion = AppServices.makeReminderCompletion(
+            careLedger, familyTasks, reminderScheduling, notificationManager
         )
-        let quickActionReminderCompletion = QuickActionReminderCompletionSyncService(reminderCompletion: reminderCompletion)
-        let careEventDependencies = CareEventServiceDependencies(
-            economy: careEventEconomy,
-            careLedger: careLedger,
-            reminderCompletion: reminderCompletion,
-            quickActionReminderCompletion: quickActionReminderCompletion,
-            familyTasks: familyTasks,
-            revisions: domainRevisions,
-            notifications: notificationManager
+        let careEventDependencies = AppServices.makeCareEventDependencies(
+            careEventEconomy, careLedger, reminderCompletion, familyTasks,
+            domainRevisions, notificationManager
         )
-        DomainServiceDependencyRegistry.register(
-            careEventDependencies: { careEventDependencies },
-            careEventEconomy: { careEventEconomy },
-            familyTasks: { familyTasks },
-            reminderScheduling: { _ in reminderScheduling },
-            medicationReminders: { _ in medicationReminders },
-            reminderCompletion: { _ in reminderCompletion }
+        AppServices.registerDomainDependencies(
+            careEventDependencies, careEventEconomy, familyTasks,
+            reminderScheduling, medicationReminders, reminderCompletion
         )
         let walkingManager = AppServices.makeWalker(locationManager, questManager, careLedger, careEventDependencies, activeHumanSelection)
         AppWorkloadPolicy.shared.hasRunningWalkProvider = { walkingManager.hasActiveLocationWalk }
@@ -190,6 +178,75 @@ final class AppServices {
             cloudSync: AppServices.makeCloudSyncService(),
             commerce: commerce
         )
+        configureLiveRuntime(
+            backupAdapter: backupAdapter,
+            automaticBackups: automaticBackups,
+            oasisTreeManager: oasisTreeManager,
+            avatarPipeline: avatarPipeline,
+            notificationManager: notificationManager
+        )
+    }
+
+    private static func registerDomainDependencies(
+        _ careEventDependencies: CareEventServiceDependencies,
+        _ careEventEconomy: CareEventEconomyAwarding,
+        _ familyTasks: FamilyTaskManaging,
+        _ reminderScheduling: ReminderSchedulingManaging,
+        _ medicationReminders: MedicationReminderManaging,
+        _ reminderCompletion: ReminderCompleting
+    ) {
+        DomainServiceDependencyRegistry.register(
+            careEventDependencies: { careEventDependencies },
+            careEventEconomy: { careEventEconomy },
+            familyTasks: { familyTasks },
+            reminderScheduling: { _ in reminderScheduling },
+            medicationReminders: { _ in medicationReminders },
+            reminderCompletion: { _ in reminderCompletion }
+        )
+    }
+
+    private static func makeReminderCompletion(
+        _ careLedger: CareLedgerRecording,
+        _ familyTasks: FamilyTaskManaging,
+        _ reminderScheduling: ReminderSchedulingManaging,
+        _ notifications: ReminderNotificationScheduling
+    ) -> ReminderCompletionService {
+        ReminderCompletionService(
+            careLedger: careLedger,
+            familyTasks: familyTasks,
+            reminderScheduling: reminderScheduling,
+            notifications: notifications
+        )
+    }
+
+    private static func makeCareEventDependencies(
+        _ economy: CareEventEconomyAwarding,
+        _ careLedger: CareLedgerRecording,
+        _ reminderCompletion: ReminderCompleting,
+        _ familyTasks: FamilyTaskManaging,
+        _ revisions: DomainRevisionPublishing,
+        _ notifications: ReminderNotificationScheduling
+    ) -> CareEventServiceDependencies {
+        CareEventServiceDependencies(
+            economy: economy,
+            careLedger: careLedger,
+            reminderCompletion: reminderCompletion,
+            quickActionReminderCompletion: QuickActionReminderCompletionSyncService(
+                reminderCompletion: reminderCompletion
+            ),
+            familyTasks: familyTasks,
+            revisions: revisions,
+            notifications: notifications
+        )
+    }
+
+    private func configureLiveRuntime(
+        backupAdapter: SharedDataBackupManagerAdapter,
+        automaticBackups: AutomaticBackupService,
+        oasisTreeManager: OasisTreeManager,
+        avatarPipeline: AvatarPipeline,
+        notificationManager: NotificationManager
+    ) {
         backupAdapter.registerShopPurchaseSettlement { [weak self] context in
             guard let self else { return }
             _ = ShopPurchaseRecoveryService.settleRecoverable(
@@ -290,6 +347,7 @@ final class AppServices {
         reminderActions: ReminderActionHandling,
         reminderScheduling: ReminderSchedulingManaging,
         reminderCompletion: ReminderCompleting,
+        presenceSafety: PresenceSafetyManaging? = nil,
         onboardingJourney: OnboardingJourneyCoordinating,
         humanRequirements: HumanRequirementResolving,
         todayFocus: TodayFocusManaging,
@@ -334,6 +392,7 @@ final class AppServices {
         self.reminderActions = reminderActions
         self.reminderScheduling = reminderScheduling
         self.reminderCompletion = reminderCompletion
+        self.presenceSafety = presenceSafety ?? LivePresenceSafetyManager()
         self.onboardingJourney = onboardingJourney
         self.humanRequirements = humanRequirements
         self.todayFocus = todayFocus

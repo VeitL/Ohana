@@ -84,6 +84,111 @@ struct RootView: View {
     }
 
     private func rootContent(_ experienceController: AppExperienceController) -> some View {
+        rootStack(experienceController)
+            .buttonStyle(ScaleButtonStyle())
+            .toggleStyle(OhanaPillToggleStyle())
+            .environment(\.hasSupporterPackEntitlement, appServices.commerce.allows(.supporterAppearance))
+            .islandToastOverlay()
+            .onAppear {
+                sharedCareUndo.configure(context: modelContext, appServices: appServices)
+                startupMaintenance.startAfterFirstRender(context: modelContext, services: appServices)
+                schedulePlantBatchCareRewardSettlement()
+                scheduleAutomaticBackupFailureReminder()
+                resumeOnboardingHomeSnapshotRecoveryIfNeeded()
+                evaluateSupporterIconAccessAfterVerification()
+            }
+            .onChange(of: appServices.commerce.entitlementStatus) { _, status in
+                if status == .notOwnedVerified {
+                    evaluateSupporterIconAccessAfterVerification()
+                } else if status == .ownedVerified,
+                          case .requiresDefault? = supporterIconAccessNotice {
+                    supporterIconAccessNotice = nil
+                }
+            }
+            .onChange(of: hasOnboarded) { _, isComplete in
+                guard isComplete else { return }
+                cancelOnboardingHomeSnapshotRecovery()
+                guard isOnboardingHomePreflightMounted else { return }
+                var handoff = onboardingPetSnapshotHandoff
+                handoff.resetAfterCompletion()
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    onboardingPetSnapshotHandoff = handoff
+                    isOnboardingHomePreflightMounted = false
+                }
+            }
+            .onChange(of: experienceController.mode) { previousMode, currentMode in
+                handleExperienceModeChange(from: previousMode, to: currentMode)
+            }
+            .onDisappear {
+                sharedCareUndo.pauseDeadlineTimer()
+                startupMaintenance.cancel()
+                plantBatchCareRewardSettlementTask?.cancel()
+                plantBatchCareRewardSettlementTask = nil
+                automaticBackupReminderTask?.cancel()
+                automaticBackupReminderTask = nil
+                cancelOnboardingHomeSnapshotRecovery()
+            }
+            .onReceive(appServices.notificationRoutes.reminderActionEvents) { event in
+                appServices.notificationRoutes.acknowledgeReminderActionEvent(id: event.id)
+                if handlePresenceReminderAction(event, experienceController: experienceController) {
+                    return
+                }
+                appServices.reminderActions.handle(
+                    userInfo: event.userInfo,
+                    currentActiveHumanId: currentActiveHumanId,
+                    context: modelContext,
+                    careEvents: appServices.careEvents,
+                    reminderCompletion: appServices.reminderCompletion,
+                    careLedger: appServices.careLedger,
+                    questManager: appServices.questManager,
+                    medicationReminders: appServices.medicationReminders,
+                    domainRevisions: appServices.domainRevisions
+                )
+            }
+            .onReceive(PersistenceSaveFailureCenter.events.receive(on: RunLoop.main)) { event in
+                showPersistenceSaveFailureToast(event)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+                appSwitcherSnapshotCoverRequested = true
+                sharedCareUndo.pauseDeadlineTimer()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                appSwitcherSnapshotCoverRequested = false
+                sharedCareUndo.recover()
+                schedulePlantBatchCareRewardSettlement()
+                scheduleAutomaticBackupFailureReminder()
+            }
+            .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
+                if PlantBatchCareRewardSettlementPolicy.shouldSchedule(for: revision) {
+                    schedulePlantBatchCareRewardSettlement()
+                }
+            }
+            .onReceive(OnlineFeatureGateNoticeCenter.notices) { reason in
+                onlineGateNoticeReason = reason
+            }
+            .alert(Text(onlineGateNoticeTitle), isPresented: onlineGateNoticeBinding) {
+                Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {
+                    onlineGateNoticeReason = nil
+                }
+            } message: {
+                Text(onlineGateNoticeMessage)
+            }
+            .alert(Text(supporterIconAccessNoticeTitle), isPresented: supporterIconAccessNoticeBinding) {
+                supporterIconAccessNoticeButtons
+            } message: {
+                Text(supporterIconAccessNoticeMessage)
+            }
+            .sheet(isPresented: $showingZenSettings) {
+                AppSettingsSheetRouteContainer {
+                    showingZenSettings = false
+                }
+                .ohanaSheetPagePresentation()
+            }
+    }
+
+    private func rootStack(_ experienceController: AppExperienceController) -> some View {
         ZStack {
             if !experienceController.requiresInitialSelection,
                hasOnboarded || (experienceController.mode == .standard && isOnboardingHomePreflightMounted) {
@@ -164,118 +269,22 @@ struct RootView: View {
                     .zIndex(1000)
             }
         }
-        .buttonStyle(ScaleButtonStyle())
-        .toggleStyle(OhanaPillToggleStyle())
-        .environment(\.hasSupporterPackEntitlement, appServices.commerce.allows(.supporterAppearance))
-        .islandToastOverlay()
-        .onAppear {
-            sharedCareUndo.configure(context: modelContext, appServices: appServices)
-            startupMaintenance.startAfterFirstRender(context: modelContext, services: appServices)
-            schedulePlantBatchCareRewardSettlement()
-            scheduleAutomaticBackupFailureReminder()
-            resumeOnboardingHomeSnapshotRecoveryIfNeeded()
-            evaluateSupporterIconAccessAfterVerification()
-        }
-        .onChange(of: appServices.commerce.entitlementStatus) { _, status in
-            if status == .notOwnedVerified {
-                evaluateSupporterIconAccessAfterVerification()
-            } else if status == .ownedVerified,
-                      case .requiresDefault? = supporterIconAccessNotice {
+    }
+
+    @ViewBuilder
+    private var supporterIconAccessNoticeButtons: some View {
+        if case .requiresDefault? = supporterIconAccessNotice {
+            Button(l.tr(
+                zh: "恢复默认图标",
+                en: "Use default icon",
+                de: "Standardsymbol verwenden"
+            )) {
+                applyDefaultIconAfterSupporterRevocation()
+            }
+        } else {
+            Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {
                 supporterIconAccessNotice = nil
             }
-        }
-        .onChange(of: hasOnboarded) { _, isComplete in
-            guard isComplete else { return }
-            cancelOnboardingHomeSnapshotRecovery()
-            guard isOnboardingHomePreflightMounted else { return }
-            var handoff = onboardingPetSnapshotHandoff
-            handoff.resetAfterCompletion()
-            var transaction = Transaction(animation: nil)
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                onboardingPetSnapshotHandoff = handoff
-                isOnboardingHomePreflightMounted = false
-            }
-        }
-        .onChange(of: experienceController.mode) { previousMode, currentMode in
-            handleExperienceModeChange(from: previousMode, to: currentMode)
-        }
-        .onDisappear {
-            sharedCareUndo.pauseDeadlineTimer()
-            startupMaintenance.cancel()
-            plantBatchCareRewardSettlementTask?.cancel()
-            plantBatchCareRewardSettlementTask = nil
-            automaticBackupReminderTask?.cancel()
-            automaticBackupReminderTask = nil
-            cancelOnboardingHomeSnapshotRecovery()
-        }
-        .onReceive(appServices.notificationRoutes.reminderActionEvents) { event in
-            appServices.notificationRoutes.acknowledgeReminderActionEvent(id: event.id)
-            if handlePresenceReminderAction(event, experienceController: experienceController) {
-                return
-            }
-            appServices.reminderActions.handle(
-                userInfo: event.userInfo,
-                currentActiveHumanId: currentActiveHumanId,
-                context: modelContext,
-                careEvents: appServices.careEvents,
-                reminderCompletion: appServices.reminderCompletion,
-                careLedger: appServices.careLedger,
-                questManager: appServices.questManager,
-                medicationReminders: appServices.medicationReminders,
-                domainRevisions: appServices.domainRevisions
-            )
-        }
-        .onReceive(PersistenceSaveFailureCenter.events.receive(on: RunLoop.main)) { event in
-            showPersistenceSaveFailureToast(event)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            appSwitcherSnapshotCoverRequested = true
-            sharedCareUndo.pauseDeadlineTimer()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            appSwitcherSnapshotCoverRequested = false
-            sharedCareUndo.recover()
-            schedulePlantBatchCareRewardSettlement()
-            scheduleAutomaticBackupFailureReminder()
-        }
-        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
-            if PlantBatchCareRewardSettlementPolicy.shouldSchedule(for: revision) {
-                schedulePlantBatchCareRewardSettlement()
-            }
-        }
-        .onReceive(OnlineFeatureGateNoticeCenter.notices) { reason in
-            onlineGateNoticeReason = reason
-        }
-        .alert(Text(onlineGateNoticeTitle), isPresented: onlineGateNoticeBinding) {
-            Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {
-                onlineGateNoticeReason = nil
-            }
-        } message: {
-            Text(onlineGateNoticeMessage)
-        }
-        .alert(Text(supporterIconAccessNoticeTitle), isPresented: supporterIconAccessNoticeBinding) {
-            if case .requiresDefault? = supporterIconAccessNotice {
-                Button(l.tr(
-                    zh: "恢复默认图标",
-                    en: "Use default icon",
-                    de: "Standardsymbol verwenden"
-                )) {
-                    applyDefaultIconAfterSupporterRevocation()
-                }
-            } else {
-                Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {
-                    supporterIconAccessNotice = nil
-                }
-            }
-        } message: {
-            Text(supporterIconAccessNoticeMessage)
-        }
-        .sheet(isPresented: $showingZenSettings) {
-            AppSettingsSheetRouteContainer {
-                showingZenSettings = false
-            }
-            .ohanaSheetPagePresentation()
         }
     }
 

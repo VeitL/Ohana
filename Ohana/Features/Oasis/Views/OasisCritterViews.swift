@@ -27,7 +27,7 @@ struct OasisCritterIllustration: View {
                     .scaledToFit()
                     .frame(width: size, height: size)
             } else {
-                Image(systemName: "pawprint.fill")
+                Image(systemName: "pawprint.fill") // a11y: allow fallback artwork is labeled by its parent critter view
                     .resizable()
                     .scaledToFit()
                     .padding(size * 0.25)

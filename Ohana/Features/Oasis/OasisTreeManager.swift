@@ -397,7 +397,9 @@ final class OasisTreeManager {
     }
 
     // MARK: - Load Energy from ModelContext
+}
 
+extension OasisTreeManager {
     func refreshPreviewEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant] = []) {
         _ = plants
         let snapshot = Self.ledgerEnergySnapshot(

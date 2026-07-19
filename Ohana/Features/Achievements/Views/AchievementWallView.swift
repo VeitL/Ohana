@@ -284,11 +284,10 @@ struct AchievementWallContentView: View {
     }
 
     var achievements: [Achievement] {
-        let computed: [Achievement]
-        if let human = activeHuman {
-            computed = humanAchievements(for: human)
+        let computed: [Achievement] = if let human = activeHuman {
+            humanAchievements(for: human)
         } else {
-            computed = screenModel.petAchievements(for: activePet)
+            screenModel.petAchievements(for: activePet)
         }
         return computed.map { badge in
             let scope = screenModel.isGlobalAchievement(badge)

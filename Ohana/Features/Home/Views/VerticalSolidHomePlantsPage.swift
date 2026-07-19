@@ -531,7 +531,7 @@ struct VerticalSolidHomePlantsPage: View {
             } label: {
                 Image(systemName: "chevron.left") // a11y: allow parent Button supplies the localized back label
                     .font(OhanaFont.adaptive(size: 13, weight: .black))
-                    .frame(width: 42, height: 42)
+                    .frame(width: 44, height: 44)
                     .background(Color.ohanaControlFill, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())

@@ -211,7 +211,66 @@ enum AchievementRewardCommandService {
 
         let totalAmount = claimable.count * amountPerBadge
         let questManager = providedQuestManager ?? QuestManager()
-        let walletDeltas: [CoconutWalletDelta] = claimable.map { claim in
+        let walletDeltas = achievementWalletDeltas(
+            claimable,
+            amountPerBadge: amountPerBadge,
+            human: human,
+            pet: pet,
+            entityKind: entityKind
+        )
+        do {
+            try wallet.apply(
+                deltas: walletDeltas,
+                context: context,
+                save: false,
+                postsRewardFeedback: true,
+                updatesProjection: true,
+                projectionManager: questManager
+            )
+            try persistAchievementFacts(
+                claimable,
+                amountPerBadge: amountPerBadge,
+                human: human,
+                pet: pet,
+                context: context
+            )
+            try saveRewardEconomyChanges(context: context)
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            #if DEBUG
+                OhanaLog.error("[AchievementRewardCommandService] wallet write failed: \(error.localizedDescription)", category: "Economy")
+            #endif
+            return AchievementRewardCommandResult(
+                entityID: entityID,
+                entityKind: entityKind,
+                badgeIDs: claims.map(\.badgeID),
+                totalAmount: 0,
+                updatedClaimedRewardRaw: claimedRewardRaw,
+                didClaim: false
+            )
+        }
+        let updatedRaw = claimedIDs.sorted().joined(separator: ",")
+        UserDefaults.standard.set(updatedRaw, forKey: "achievement_claimedRewardIDs")
+
+        return AchievementRewardCommandResult(
+            entityID: entityID,
+            entityKind: entityKind,
+            badgeIDs: claimable.map(\.badgeID),
+            totalAmount: totalAmount,
+            updatedClaimedRewardRaw: updatedRaw,
+            didClaim: true
+        )
+    }
+
+    private static func achievementWalletDeltas(
+        _ claims: [AchievementRewardClaim],
+        amountPerBadge: Int,
+        human: Human?,
+        pet: Pet,
+        entityKind: String
+    ) -> [CoconutWalletDelta] {
+        claims.map { claim in
             if let human {
                 return .human(
                     human,
@@ -247,36 +306,36 @@ enum AchievementRewardCommandService {
                 transactionKey: "achievement:\(claim.rewardKey)"
             )
         }
-        do {
-            try wallet.apply(
-                deltas: walletDeltas,
-                context: context,
-                save: false,
-                postsRewardFeedback: true,
-                updatesProjection: true,
-                projectionManager: questManager
-            )
-            let now = Date()
-            let stardustAmount = claimable.reduce(0) { total, claim in
+    }
+
+    private static func persistAchievementFacts(
+        _ claims: [AchievementRewardClaim],
+        amountPerBadge: Int,
+        human: Human?,
+        pet: Pet,
+        context: ModelContext
+    ) throws {
+        let now = Date()
+        let stardustAmount = claims.reduce(0) { total, claim in
                 total + (AchievementDefinitionCatalog.definition(id: claim.badgeID)?.reward.stardust ?? 0)
             }
-            if stardustAmount > 0 {
-                let catalogID = OasisCompanionCurrency.stardustCatalogID
-                var descriptor = FetchDescriptor<OasisCritterFragmentBalance>(
-                    predicate: #Predicate { $0.catalogId == catalogID }
-                )
-                descriptor.fetchLimit = 1
-                let balance: OasisCritterFragmentBalance
-                if let existing = try context.fetch(descriptor).first {
-                    balance = existing
-                } else {
-                    balance = OasisCritterFragmentBalance(catalogId: catalogID, updatedAt: now)
-                    context.insert(balance)
-                }
-                balance.amount += stardustAmount
-                balance.updatedAt = now
+        if stardustAmount > 0 {
+            let catalogID = OasisCompanionCurrency.stardustCatalogID
+            var descriptor = FetchDescriptor<OasisCritterFragmentBalance>(
+                predicate: #Predicate { $0.catalogId == catalogID }
+            )
+            descriptor.fetchLimit = 1
+            let balance: OasisCritterFragmentBalance
+            if let existing = try context.fetch(descriptor).first {
+                balance = existing
+            } else {
+                balance = OasisCritterFragmentBalance(catalogId: catalogID, updatedAt: now)
+                context.insert(balance)
             }
-            for claim in claimable {
+            balance.amount += stardustAmount
+            balance.updatedAt = now
+        }
+        for claim in claims {
                 let rewardKey = claim.rewardKey
                 let scopeKind: AchievementScopeKind
                 let scopeID: String
@@ -322,34 +381,7 @@ enum AchievementRewardCommandService {
                         createdAt: now
                     )
                 )
-            }
-            try saveRewardEconomyChanges(context: context)
-        } catch {
-            context.rollback()
-            wallet.refreshQuestProjection(context: context, manager: questManager)
-            #if DEBUG
-                OhanaLog.error("[AchievementRewardCommandService] wallet write failed: \(error.localizedDescription)", category: "Economy")
-            #endif
-            return AchievementRewardCommandResult(
-                entityID: entityID,
-                entityKind: entityKind,
-                badgeIDs: claims.map(\.badgeID),
-                totalAmount: 0,
-                updatedClaimedRewardRaw: claimedRewardRaw,
-                didClaim: false
-            )
         }
-        let updatedRaw = claimedIDs.sorted().joined(separator: ",")
-        UserDefaults.standard.set(updatedRaw, forKey: "achievement_claimedRewardIDs")
-
-        return AchievementRewardCommandResult(
-            entityID: entityID,
-            entityKind: entityKind,
-            badgeIDs: claimable.map(\.badgeID),
-            totalAmount: totalAmount,
-            updatedClaimedRewardRaw: updatedRaw,
-            didClaim: true
-        )
     }
 }
 
@@ -487,6 +519,20 @@ nonisolated struct ShopPurchaseFulfillmentPayload: Codable, Equatable, Sendable 
 }
 
 enum ShopPurchaseCommandService {
+    private enum PurchasePreflight {
+        case ready(ShopItem, Human)
+        case finished(ShopPurchaseCommandResult)
+    }
+
+    private struct PurchasePreparation {
+        let transactionKey: String
+        let purchasedAt: Date
+        let ledger: CareLedgerEvent
+        let walletMutations: [CoconutHumanWalletMutation]
+        let contributionSnapshots: [ShopPurchaseFundingContribution]
+        let attempt: ShopPurchaseAttempt?
+    }
+
     @discardableResult
     @MainActor
     static func purchase(
@@ -537,6 +583,93 @@ enum ShopPurchaseCommandService {
         wallet: CoconutWalletManaging,
         careLedger: CareLedgerRecording
     ) -> ShopPurchaseCommandResult {
+        let item: ShopItem
+        let readyBuyer: Human
+        switch purchasePreflight(item: submittedItem, buyer: buyer, context: context) {
+        case let .ready(readyItem, resolvedBuyer):
+            item = readyItem
+            readyBuyer = resolvedBuyer
+        case let .finished(result):
+            return result
+        }
+        let buyer = readyBuyer
+        let fundingPlan = CoconutWalletFundingPlanner.humanCofundingPlan(
+            cost: item.cost,
+            primaryHuman: buyer,
+            context: context,
+            logPrefix: "ShopPurchaseCommandService"
+        )
+        guard fundingPlan.missing == 0 else {
+            return purchaseFailure(
+                item: item,
+                humanID: buyer.id,
+                failure: .insufficientBalance(missing: fundingPlan.missing)
+            )
+        }
+
+        let preparation = preparePurchase(
+            item: item,
+            buyer: buyer,
+            itemName: itemName,
+            fundingPlan: fundingPlan,
+            careLedger: careLedger,
+            context: context
+        )
+        do {
+            try CoconutWalletMutationWriter.applyHumanMutations(
+                preparation.walletMutations,
+                wallet: wallet,
+                context: context,
+                save: false,
+                postsRewardFeedback: true,
+                updatesProjection: true,
+                projectionManager: providedQuestManager ?? QuestManager()
+            )
+            if let attempt = preparation.attempt {
+                context.insert(attempt)
+            } else {
+                try ShopPurchaseRecordStore.insertOwnershipRecordIfNeeded(
+                    item: item,
+                    buyer: buyer,
+                    transactionKey: preparation.transactionKey,
+                    context: context,
+                    purchasedAt: preparation.purchasedAt
+                )
+            }
+            try saveRewardEconomyChanges(context: context)
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: providedQuestManager)
+            let failure: ShopPurchaseFailure = if let walletError = error as? CoconutWalletError,
+                                                  case let .insufficientBalance(_, missing) = walletError {
+                .insufficientBalance(missing: missing)
+            } else if let walletError = error as? CoconutWalletError,
+                      case .walletFrozen = walletError {
+                .walletFrozen
+            } else {
+                .persistenceFailed
+            }
+            return purchaseFailure(item: item, humanID: buyer.id, failure: failure)
+        }
+
+        return ShopPurchaseCommandResult(
+            attemptID: preparation.attempt?.id,
+            humanID: buyer.id,
+            itemID: item.id,
+            cost: item.cost,
+            didPurchase: true,
+            failure: nil,
+            ledgerEventID: preparation.ledger.id,
+            transactionKey: preparation.transactionKey,
+            fundingContributions: preparation.contributionSnapshots
+        )
+    }
+
+    private static func purchasePreflight(
+        item submittedItem: ShopItem,
+        buyer: Human?,
+        context: ModelContext
+    ) -> PurchasePreflight {
         guard let item = ShopCatalog.item(id: submittedItem.id),
               submittedItem.emoji == item.emoji,
               submittedItem.nameText == item.nameText,
@@ -545,7 +678,7 @@ enum ShopPurchaseCommandService {
               submittedItem.category == item.category,
               submittedItem.isConsumable == item.isConsumable,
               submittedItem.appIcon == item.appIcon else {
-            return ShopPurchaseCommandResult(
+            return .finished(ShopPurchaseCommandResult(
                 attemptID: nil,
                 humanID: buyer?.id,
                 itemID: submittedItem.id,
@@ -555,10 +688,10 @@ enum ShopPurchaseCommandService {
                 ledgerEventID: nil,
                 transactionKey: nil,
                 fundingContributions: []
-            )
+            ))
         }
         guard item.cost > 0 else {
-            return ShopPurchaseCommandResult(
+            return .finished(ShopPurchaseCommandResult(
                 attemptID: nil,
                 humanID: buyer?.id,
                 itemID: item.id,
@@ -568,10 +701,10 @@ enum ShopPurchaseCommandService {
                 ledgerEventID: nil,
                 transactionKey: nil,
                 fundingContributions: []
-            )
+            ))
         }
         guard let buyer else {
-            return ShopPurchaseCommandResult(
+            return .finished(ShopPurchaseCommandResult(
                 attemptID: nil,
                 humanID: nil,
                 itemID: item.id,
@@ -581,10 +714,10 @@ enum ShopPurchaseCommandService {
                 ledgerEventID: nil,
                 transactionKey: nil,
                 fundingContributions: []
-            )
+            ))
         }
         guard EconomyWalletWritePolicy.canWrite(buyer) else {
-            return ShopPurchaseCommandResult(
+            return .finished(ShopPurchaseCommandResult(
                 attemptID: nil,
                 humanID: buyer.id,
                 itemID: item.id,
@@ -594,12 +727,12 @@ enum ShopPurchaseCommandService {
                 ledgerEventID: nil,
                 transactionKey: nil,
                 fundingContributions: []
-            )
+            ))
         }
         if !item.isConsumable {
             do {
                 if try ShopPurchaseRecordStore.isOwned(itemID: item.id, context: context) {
-                    return ShopPurchaseCommandResult(
+                    return .finished(ShopPurchaseCommandResult(
                         attemptID: nil,
                         humanID: buyer.id,
                         itemID: item.id,
@@ -609,14 +742,14 @@ enum ShopPurchaseCommandService {
                         ledgerEventID: nil,
                         transactionKey: nil,
                         fundingContributions: []
-                    )
+                    ))
                 }
                 if item.appIcon != nil,
                    let pending = try pendingAttempt(itemID: item.id, context: context) {
-                    return pendingResult(for: pending)
+                    return .finished(pendingResult(for: pending))
                 }
             } catch {
-                return ShopPurchaseCommandResult(
+                return .finished(ShopPurchaseCommandResult(
                     attemptID: nil,
                     humanID: buyer.id,
                     itemID: item.id,
@@ -626,16 +759,16 @@ enum ShopPurchaseCommandService {
                     ledgerEventID: nil,
                     transactionKey: nil,
                     fundingContributions: []
-                )
+                ))
             }
         }
         if item.isConsumable {
             do {
                 if let pending = try pendingAttempt(itemID: item.id, context: context) {
-                    return pendingResult(for: pending)
+                    return .finished(pendingResult(for: pending))
                 }
             } catch {
-                return ShopPurchaseCommandResult(
+                return .finished(ShopPurchaseCommandResult(
                     attemptID: nil,
                     humanID: buyer.id,
                     itemID: item.id,
@@ -645,29 +778,20 @@ enum ShopPurchaseCommandService {
                     ledgerEventID: nil,
                     transactionKey: nil,
                     fundingContributions: []
-                )
+                ))
             }
         }
-        let fundingPlan = CoconutWalletFundingPlanner.humanCofundingPlan(
-            cost: item.cost,
-            primaryHuman: buyer,
-            context: context,
-            logPrefix: "ShopPurchaseCommandService"
-        )
-        guard fundingPlan.missing == 0 else {
-            return ShopPurchaseCommandResult(
-                attemptID: nil,
-                humanID: buyer.id,
-                itemID: item.id,
-                cost: item.cost,
-                didPurchase: false,
-                failure: .insufficientBalance(missing: fundingPlan.missing),
-                ledgerEventID: nil,
-                transactionKey: nil,
-                fundingContributions: []
-            )
-        }
+        return .ready(item, buyer)
+    }
 
+    private static func preparePurchase(
+        item: ShopItem,
+        buyer: Human,
+        itemName: String,
+        fundingPlan: CoconutWalletFundingPlan,
+        careLedger: CareLedgerRecording,
+        context: ModelContext
+    ) -> PurchasePreparation {
         let purchaseID = UUID()
         let purchasedAt = Date()
         let transactionKey = "shop:\(item.id):\(buyer.id.uuidString):\(purchaseID.uuidString)"
@@ -742,63 +866,31 @@ enum ShopPurchaseCommandService {
         } else {
             nil
         }
-        do {
-            try CoconutWalletMutationWriter.applyHumanMutations(
-                walletMutations,
-                wallet: wallet,
-                context: context,
-                save: false,
-                postsRewardFeedback: true,
-                updatesProjection: true,
-                projectionManager: providedQuestManager ?? QuestManager()
-            )
-            if let attempt {
-                context.insert(attempt)
-            } else {
-                try ShopPurchaseRecordStore.insertOwnershipRecordIfNeeded(
-                    item: item,
-                    buyer: buyer,
-                    transactionKey: transactionKey,
-                    context: context,
-                    purchasedAt: purchasedAt
-                )
-            }
-            try saveRewardEconomyChanges(context: context)
-        } catch {
-            context.rollback()
-            wallet.refreshQuestProjection(context: context, manager: providedQuestManager)
-            let failure: ShopPurchaseFailure = if let walletError = error as? CoconutWalletError,
-                                                  case let .insufficientBalance(_, missing) = walletError {
-                .insufficientBalance(missing: missing)
-            } else if let walletError = error as? CoconutWalletError,
-                      case .walletFrozen = walletError {
-                .walletFrozen
-            } else {
-                .persistenceFailed
-            }
-            return ShopPurchaseCommandResult(
-                attemptID: nil,
-                humanID: buyer.id,
-                itemID: item.id,
-                cost: item.cost,
-                didPurchase: false,
-                failure: failure,
-                ledgerEventID: nil,
-                transactionKey: nil,
-                fundingContributions: []
-            )
-        }
+        return PurchasePreparation(
+            transactionKey: transactionKey,
+            purchasedAt: purchasedAt,
+            ledger: ledger,
+            walletMutations: walletMutations,
+            contributionSnapshots: contributionSnapshots,
+            attempt: attempt
+        )
+    }
 
-        return ShopPurchaseCommandResult(
-            attemptID: attempt?.id,
-            humanID: buyer.id,
+    private static func purchaseFailure(
+        item: ShopItem,
+        humanID: UUID?,
+        failure: ShopPurchaseFailure
+    ) -> ShopPurchaseCommandResult {
+        ShopPurchaseCommandResult(
+            attemptID: nil,
+            humanID: humanID,
             itemID: item.id,
             cost: item.cost,
-            didPurchase: true,
-            failure: nil,
-            ledgerEventID: ledger.id,
-            transactionKey: transactionKey,
-            fundingContributions: contributionSnapshots
+            didPurchase: false,
+            failure: failure,
+            ledgerEventID: nil,
+            transactionKey: nil,
+            fundingContributions: []
         )
     }
 

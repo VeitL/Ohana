@@ -747,9 +747,9 @@ struct HouseholdStarterJourneyServiceTests {
             marker.createdAt = timestamp
         }
         try context.save()
-        #expect(markers.filter {
+        #expect(markers.count(where: {
             $0.legacyModelId == activeAppearanceKey || $0.legacyModelId == activeOptionalKey
-        }.count == 2)
+        }) == 2)
 
         let reference = try await TaskCenterRouteDataActor(modelContainer: container).load(
             loadPlants: false,

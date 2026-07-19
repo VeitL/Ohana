@@ -13,10 +13,10 @@ struct AppExperienceIntroductionBanner: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "leaf.fill")
+            Image(systemName: "leaf.fill") // a11y: allow decorative mode glyph is hidden below
                 .font(OhanaFont.adaptive(size: 17, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 38, height: 38)
+                .frame(width: 38, height: 38) // a11y: allow non-interactive decorative glyph
                 .background(Color.goPrimary, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
@@ -50,10 +50,10 @@ struct AppExperienceIntroductionBanner: View {
             }
             Spacer(minLength: 4)
             Button(action: onDismiss) {
-                Image(systemName: "xmark")
+                Image(systemName: "xmark") // a11y: allow parent Button supplies the localized dismiss label
                     .font(OhanaFont.adaptive(size: 12, weight: .black))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow parent Button owns the padded hit target
                     .background(Color.ohanaControlFill, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -70,11 +70,7 @@ struct AppExperienceIntroductionBanner: View {
             ))
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.ohanaDivider, lineWidth: 1)
-        }
+        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.card, style: .continuous))
         .accessibilityIdentifier("zen-introduction-banner")
     }
 }
@@ -94,7 +90,7 @@ struct AppExperienceSelectionView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 24) {
                         VStack(spacing: 9) {
-                            Image(systemName: "leaf.fill")
+                            Image(systemName: "leaf.fill") // a11y: allow decorative mode glyph is hidden below
                                 .font(OhanaFont.adaptive(size: 34, weight: .black))
                                 .foregroundStyle(Color.arkInk)
                                 .frame(width: 82, height: 82)
@@ -181,16 +177,16 @@ struct AppExperienceSelectionView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.right") // a11y: allow decorative chevron is hidden below
                     .font(OhanaFont.adaptive(size: 13, weight: .black))
                     .foregroundStyle(Color.goCardWhite.opacity(0.54))
                     .accessibilityHidden(true)
             }
             .padding(15)
             .frame(maxWidth: .infinity, minHeight: 76)
-            .background(Color.goCardWhite.opacity(0.09), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color.goCardWhite.opacity(0.09), in: RoundedRectangle(cornerRadius: OhanaRadius.card, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.card, style: .continuous)
                     .strokeBorder(Color.goCardWhite.opacity(0.13), lineWidth: 1)
             }
         }
@@ -208,7 +204,7 @@ struct ZenOwnerSelectionView: View {
 
     var body: some View {
         ownerGateShell {
-            Image(systemName: "person.crop.circle.badge.checkmark")
+            Image(systemName: "person.crop.circle.badge.checkmark") // a11y: allow decorative owner glyph is hidden below
                 .font(OhanaFont.adaptive(size: 36, weight: .black))
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
@@ -258,13 +254,13 @@ struct ZenOwnerSelectionView: View {
                                 .font(OhanaFont.headline(.bold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Spacer()
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.right") // a11y: allow decorative chevron is hidden below
                                 .foregroundStyle(Color.ohanaTertiaryText)
                                 .accessibilityHidden(true)
                         }
                         .padding(.horizontal, 14)
                         .frame(maxWidth: .infinity, minHeight: 64)
-                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityIdentifier("zen-owner-\(human.id.uuidString)")
@@ -305,7 +301,7 @@ struct ZenOwnerUnavailableView: View {
 
     var body: some View {
         ownerGateShell {
-            Image(systemName: "person.crop.circle.badge.exclamationmark")
+            Image(systemName: "person.crop.circle.badge.exclamationmark") // a11y: allow decorative unavailable-state glyph is hidden below
                 .font(OhanaFont.adaptive(size: 36, weight: .black))
                 .foregroundStyle(Color.goOrange)
                 .accessibilityHidden(true)

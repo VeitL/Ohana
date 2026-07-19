@@ -622,14 +622,18 @@ final class PresenceCheckInCommandService {
             guard let human = try context.fetch(descriptor).first else {
                 throw PresenceCheckInCommandError.missingSubject(subject)
             }
-            guard !human.hasPassedAway else { throw PresenceCheckInCommandError.inactiveSubject(subject) }
+            guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+                throw PresenceCheckInCommandError.inactiveSubject(subject)
+            }
         case .pet:
             var descriptor = FetchDescriptor<Pet>(predicate: #Predicate { $0.id == subject.id })
             descriptor.fetchLimit = 1
             guard let pet = try context.fetch(descriptor).first else {
                 throw PresenceCheckInCommandError.missingSubject(subject)
             }
-            guard !pet.hasPassedAway else { throw PresenceCheckInCommandError.inactiveSubject(subject) }
+            guard MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects else {
+                throw PresenceCheckInCommandError.inactiveSubject(subject)
+            }
         case .plant:
             var descriptor = FetchDescriptor<Plant>(predicate: #Predicate { $0.id == subject.id })
             descriptor.fetchLimit = 1

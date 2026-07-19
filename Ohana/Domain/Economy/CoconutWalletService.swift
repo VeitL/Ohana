@@ -58,6 +58,19 @@ nonisolated enum CoconutWalletPersistence {
     }
 }
 
+extension CoconutWalletService {
+    @MainActor
+    static func restoreCachedHumanBalances(_ balances: [UUID: Int], context: ModelContext) {
+        guard !balances.isEmpty else { return }
+        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? []
+        for human in humans {
+            if let balance = balances[human.id] {
+                human.coconutBalance = balance
+            }
+        }
+    }
+}
+
 struct CoconutWalletReconciliationSummary: Equatable {
     let correctedAccountCount: Int
     let createdAccountCount: Int

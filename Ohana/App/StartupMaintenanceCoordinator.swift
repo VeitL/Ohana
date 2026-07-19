@@ -67,10 +67,15 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 note: "startup maintenance deferred"
             )
 
-            guard await runStep("input_warmup", delayMilliseconds: 700, operation: {
+            await runMaintenanceSequence(context: context, services: services)
+            maintenanceTask = nil
+        }
+    }
+
+    private func runMaintenanceSequence(context: ModelContext, services: AppServices) async {
+        guard await runStep("input_warmup", delayMilliseconds: 700, operation: {
                 InputLatencyWarmupService.warmUpOnce()
             }) else {
-                maintenanceTask = nil
                 return
             }
 
@@ -86,7 +91,6 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                     note: "settled=\(results.count)"
                 )
             }) else {
-                maintenanceTask = nil
                 return
             }
 
@@ -108,14 +112,12 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                     )
                 }
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("auto_feeder_materialization", delayMilliseconds: 2500, operation: {
                 await self.materializeAutoFeederLogsIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
@@ -127,21 +129,18 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                     self.defaults.set(Date().timeIntervalSince1970, forKey: Keys.reminderMaintenanceLastRunAt)
                 }
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("media_attachment_presence_backfill", delayMilliseconds: 2500, requiresExpensiveBudget: true, operation: {
                 await self.backfillMediaAttachmentPresenceIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("member_theme_normalization", delayMilliseconds: 5000, requiresExpensiveBudget: true, operation: {
                 await self.normalizeMemberThemeColorsIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
@@ -158,40 +157,32 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                     note: "\(result.removedEventCount) events, \(result.removedReminderCount) reminders, \(result.cleanedPreferencePlantCount) pref scopes"
                 )
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("care_ledger_backfill", delayMilliseconds: 45000, requiresExpensiveBudget: true, operation: {
                 await self.runCareLedgerBackfillIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("shared_care_note_cleanup", delayMilliseconds: 5000, requiresExpensiveBudget: true, operation: {
                 await self.cleanLegacySharedCareNotesIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("shop_purchase_defaults_migration", delayMilliseconds: 5000, requiresExpensiveBudget: true, operation: {
                 await self.migrateLegacyShopPurchasesIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("avatar_asset_compaction", delayMilliseconds: 90000, requiresExpensiveBudget: true, operation: {
                 await self.compactAvatarAssetsIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
-
-            maintenanceTask = nil
-        }
     }
 
     func cancel() {

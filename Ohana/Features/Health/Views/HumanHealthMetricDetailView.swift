@@ -92,7 +92,6 @@ struct HumanHealthMetricDetailView: View {
                 addButton
                     .padding(.bottom, 28)
             }
-
         }
         .navigationTitle(metric.displayName(l))
         .navigationBarTitleDisplayMode(.inline)

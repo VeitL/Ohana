@@ -84,7 +84,7 @@ struct ZenOasisView: View {
 
     private var starterGiftCard: some View {
         HStack(spacing: 12) {
-            Image(systemName: "gift.fill")
+            Image(systemName: "gift.fill") // a11y: allow decorative gift glyph is hidden below
                 .font(OhanaFont.adaptive(size: 24, weight: .bold))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(Color.goPrimary)
@@ -236,7 +236,7 @@ struct ZenOasisView: View {
                             .controlSize(.small)
                             .tint(Color.ohanaPrimaryActionText)
                     } else {
-                        Image(systemName: "bolt.fill")
+                        Image(systemName: "bolt.fill") // a11y: allow adjacent text labels the energy Button
                     }
                     Text(l.tr(
                         zh: "注入能量 · \(OasisTreeEnergyInjectionPolicy.starterPackageCost) 椰子",

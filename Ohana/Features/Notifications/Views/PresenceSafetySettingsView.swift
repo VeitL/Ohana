@@ -262,7 +262,7 @@ struct PresenceSafetySettingsView: View {
             Button {
                 composeMessage(to: contact)
             } label: {
-                Image(systemName: "message.fill")
+                Image(systemName: "message.fill") // a11y: allow parent Button supplies contact-specific compose label
                     .font(OhanaFont.body(.semibold))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -422,7 +422,7 @@ struct PresenceSafetySettingsView: View {
 
     private func reloadContacts() {
         do {
-            contacts = try SafetyContactCommandService.snapshots(context: modelContext)
+            contacts = try appServices.presenceSafety.contacts(context: modelContext)
         } catch {
             notice = PresenceSafetySettingsNotice(title: copy.title, message: copy.genericError)
         }
@@ -442,7 +442,7 @@ struct PresenceSafetySettingsView: View {
         let effectiveCapabilities = validationCapabilities(for: proposed)
         isSaving = true
         Task { @MainActor in
-            let result = await PresenceReminderActivationCoordinator.applyAfterUserRequest(
+            let result = await appServices.presenceSafety.activateReminder(
                 proposed,
                 capabilities: effectiveCapabilities,
                 title: notificationTitle,
@@ -463,7 +463,7 @@ struct PresenceSafetySettingsView: View {
         guard let ownerID = UserDefaultsPresenceOwnerSelection().ownerHumanId else { return }
         let now = Date()
         do {
-            let snapshot = try PresenceCheckInReadService.homeSnapshot(
+            let snapshot = try appServices.presenceSafety.homeSnapshot(
                 context: modelContext,
                 ownerHumanId: ownerID,
                 now: now
@@ -619,6 +619,7 @@ private struct PresenceContactEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var name: String
     @State private var phoneNumber: String
@@ -716,7 +717,7 @@ private struct PresenceContactEditorView: View {
     private func save() {
         do {
             if let contact {
-                try SafetyContactCommandService.update(
+                try appServices.presenceSafety.updateContact(
                     id: contact.id,
                     name: name,
                     phoneNumber: phoneNumber,
@@ -724,7 +725,7 @@ private struct PresenceContactEditorView: View {
                     context: modelContext
                 )
             } else {
-                try SafetyContactCommandService.create(
+                try appServices.presenceSafety.createContact(
                     name: name,
                     phoneNumber: phoneNumber,
                     capabilities: capabilities,
@@ -742,7 +743,7 @@ private struct PresenceContactEditorView: View {
     private func deleteContact() {
         guard let contact else { return }
         do {
-            try SafetyContactCommandService.delete(id: contact.id, context: modelContext)
+            try appServices.presenceSafety.deleteContact(id: contact.id, context: modelContext)
             dismiss()
         } catch {
             errorMessage = copy.genericError

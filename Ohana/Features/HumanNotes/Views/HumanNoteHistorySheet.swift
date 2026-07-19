@@ -80,7 +80,6 @@ struct HumanNoteHistoryContent: View {
                         .padding(.trailing, 18)
                         .padding(.bottom, 24)
                 }
-
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showAddSheet) {

@@ -37,10 +37,8 @@ extension OasisUpgradeRewardService {
     ) throws -> OasisCritterInteractionOutcome {
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let questManager = providedQuestManager ?? QuestManager()
-        normalizeLifecycle(for: critter, context: context)
-        if critter.lifeState == .dead || critter.lifeState == .critical || critter.lifeState == .sleeping,
-           action != .rescue {
-            return deadInteractionOutcome(for: critter, action: action)
+        if let unavailableOutcome = unavailableInteractionOutcome(critter, action, context) {
+            return unavailableOutcome
         }
         let wish = dailyWish(for: critter, context: context)
         let wasWishCompleted = isDailyWishCompleted(for: critter, wish: wish, context: context)
@@ -190,6 +188,17 @@ extension OasisUpgradeRewardService {
             completedWish: completedWish,
             awardedWishCoconuts: awardedWishCoconuts
         )
+    }
+
+    private static func unavailableInteractionOutcome(
+        _ critter: OasisElectronicPet,
+        _ action: OasisCritterAction,
+        _ context: ModelContext
+    ) -> OasisCritterInteractionOutcome? {
+        normalizeLifecycle(for: critter, context: context)
+        guard critter.lifeState == .dead || critter.lifeState == .critical || critter.lifeState == .sleeping,
+              action != .rescue else { return nil }
+        return deadInteractionOutcome(for: critter, action: action)
     }
 
     static func canInteract(

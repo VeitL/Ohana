@@ -37,6 +37,7 @@ protocol CoconutWalletManaging {
     func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?)
     func bootstrapIfNeeded(context: ModelContext, projectionManager: CoconutProjectionManaging?) throws
     func stageLegacyBootstrapIfNeeded(context: ModelContext) throws
+    func restoreCachedHumanBalances(_ balances: [UUID: Int], context: ModelContext)
 }
 
 extension CoconutWalletManaging {
@@ -88,6 +89,10 @@ extension CoconutWalletManaging {
     /// stage. The production wallet overrides this so a command can include
     /// compatibility opening entries in its own transaction.
     func stageLegacyBootstrapIfNeeded(context _: ModelContext) throws {}
+
+    func restoreCachedHumanBalances(_ balances: [UUID: Int], context: ModelContext) {
+        CoconutWalletService.restoreCachedHumanBalances(balances, context: context)
+    }
 }
 
 @MainActor

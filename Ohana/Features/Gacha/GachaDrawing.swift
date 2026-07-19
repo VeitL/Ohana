@@ -17,6 +17,16 @@ protocol GachaDrawing {
         ownedItems: [GachaOwnedItem]
     ) -> Bool
 
+    func guaranteeStatus(
+        humanId: String,
+        series: GachaSeriesEntry,
+        ownedItems: [GachaOwnedItem],
+        logs: [GachaDrawLog]
+    ) -> GachaGuaranteeStatus
+
+    func fundingPreview(human: Human, context: ModelContext) -> GachaFundingPreview
+    func stardustBalance(context: ModelContext) -> Int
+
     func draw(
         seriesId: String,
         human: Human?,
@@ -75,6 +85,28 @@ final class StaticGachaDrawer: GachaDrawing {
             humanId: humanId,
             ownedItems: ownedItems
         )
+    }
+
+    func guaranteeStatus(
+        humanId: String,
+        series: GachaSeriesEntry,
+        ownedItems: [GachaOwnedItem],
+        logs: [GachaDrawLog]
+    ) -> GachaGuaranteeStatus {
+        GachaDrawService.guaranteeStatus(
+            humanId: humanId,
+            series: series,
+            ownedItems: ownedItems,
+            logs: logs
+        )
+    }
+
+    func fundingPreview(human: Human, context: ModelContext) -> GachaFundingPreview {
+        GachaDrawService.fundingPreview(human: human, context: context)
+    }
+
+    func stardustBalance(context: ModelContext) -> Int {
+        GachaDrawService.stardustBalance(context: context)
     }
 
     func draw(

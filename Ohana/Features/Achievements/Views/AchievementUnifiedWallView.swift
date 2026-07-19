@@ -299,7 +299,7 @@ struct AchievementUnifiedWallView: View {
                     if isClaiming {
                         ProgressView().controlSize(.small)
                     } else {
-                        Image(systemName: "gift.fill")
+                        Image(systemName: "gift.fill") // a11y: allow adjacent claim text labels the Button
                     }
                     Text(l.tr(
                         zh: "领取当前 \(claimable.count) 项奖励",
@@ -343,7 +343,7 @@ struct AchievementUnifiedWallView: View {
                         .lineLimit(2)
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.right") // a11y: allow decorative chevron is hidden below
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .accessibilityHidden(true)
             }

@@ -77,7 +77,6 @@ struct HumanHealthCheckupView: View {
                 }
                 .scrollBounceBehavior(.basedOnSize)
             }
-
         }
         .navigationTitle(l.tr(zh: "体检指标", en: "Checkup Metrics", de: "Check-up-Werte"))
         .navigationBarTitleDisplayMode(.inline)

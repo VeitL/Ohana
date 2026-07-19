@@ -149,7 +149,7 @@ private struct GachaOddsRulesSheet: View {
                         de: "Duplikate erhöhen weiterhin die Anzahl. Begleiter-Sternlicht bezahlt keine Blindboxen und ist nicht in Kokosnüsse tauschbar."
                     ))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             .navigationTitle(l.tr(zh: "概率与规则", en: "Odds & rules", de: "Chancen & Regeln"))
@@ -270,7 +270,7 @@ struct GachaView: View {
     }
 
     private var guaranteeStatus: GachaGuaranteeStatus {
-        GachaDrawService.guaranteeStatus(
+        appServices.gacha.guaranteeStatus(
             humanId: currentHuman?.id.uuidString ?? "",
             series: series,
             ownedItems: ownedItems,
@@ -1195,7 +1195,7 @@ extension GachaView {
 
     private func requestDraw() {
         guard !isDrawing, let currentHuman else { return }
-        let preview = GachaDrawService.fundingPreview(human: currentHuman, context: modelContext)
+        let preview = appServices.gacha.fundingPreview(human: currentHuman, context: modelContext)
         guard preview.missing == 0 else {
             feedbackText = message(for: .insufficientBalance(missing: preview.missing))
             OhanaFeedback.error()
@@ -1472,7 +1472,7 @@ extension GachaView {
     }
 
     private func refreshStardustBalance() {
-        displayedStardustBalance = GachaDrawService.stardustBalance(context: modelContext)
+        displayedStardustBalance = appServices.gacha.stardustBalance(context: modelContext)
     }
 
     private func announceOutcome(_ outcome: GachaDrawOutcome) {

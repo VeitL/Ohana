@@ -10,6 +10,12 @@ import SwiftData
 
 @MainActor
 enum CoconutEconomyBootstrapService {
+    private struct BootstrapPreparation {
+        var memberTotal = 0
+        var backfilledOpeningEntries: [CoconutLedgerEntry] = []
+        var deltas: [CoconutWalletDelta] = []
+    }
+
     static func bootstrapIfNeeded(
         context: ModelContext,
         defaults: UserDefaults = .standard,
@@ -80,10 +86,65 @@ enum CoconutEconomyBootstrapService {
         ).mapValues { entries in
             entries.reduce(0) { $0 + $1.delta }
         }
-        var backfilledOpeningEntries: [CoconutLedgerEntry] = []
-        var deltas: [CoconutWalletDelta] = []
+        var preparation = BootstrapPreparation()
+        prepareHumanBalances(
+            humans,
+            existingAccountByKey: existingAccountByKey,
+            existingDeltaByAccountKey: existingDeltaByAccountKey,
+            existingTransactionKeys: existingTransactionKeys,
+            legacyIslandCount: legacyIslandCount,
+            preparation: &preparation
+        )
+        preparePetBalances(
+            pets,
+            existingAccountByKey: existingAccountByKey,
+            existingDeltaByAccountKey: existingDeltaByAccountKey,
+            existingTransactionKeys: existingTransactionKeys,
+            legacyIslandCount: legacyIslandCount,
+            preparation: &preparation
+        )
 
-        var memberTotal = 0
+        let systemBalance = max(0, legacyIslandCount - preparation.memberTotal)
+        let mismatch = legacyIslandCount < preparation.memberTotal
+        preparation.deltas.append(.system(
+            delta: systemBalance,
+            entryKind: .openingBalance,
+            source: .legacyUserDefaults,
+            title: "Imported island coconut balance",
+            emoji: "🥥",
+            metadataJSON: "{\"legacyIslandCount\":\(legacyIslandCount),\"memberTotal\":\(preparation.memberTotal),\"mismatch\":\(mismatch)}",
+            transactionKey: "bootstrap:v58:opening:\(CoconutAccountKey.legacySystem)"
+        ))
+
+        try CoconutWalletService.apply(
+            deltas: preparation.deltas,
+            context: context,
+            save: false,
+            postsRewardFeedback: false,
+            updatesProjection: false
+        )
+        for entry in preparation.backfilledOpeningEntries {
+            context.insert(entry)
+        }
+        CloudSyncMutationRecorder.markModified(preparation.backfilledOpeningEntries, context: context)
+
+        try importLegacyHistory(legacyLogs, humans: humans, pets: pets, context: context)
+        if saveChanges {
+            try CoconutWalletPersistence.save(context: context)
+        }
+        if updatesProjection {
+            CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
+        }
+    }
+
+    private static func prepareHumanBalances(
+        _ humans: [Human],
+        existingAccountByKey: [String: CoconutAccount],
+        existingDeltaByAccountKey: [String: Int],
+        existingTransactionKeys: Set<String>,
+        legacyIslandCount: Int,
+        preparation: inout BootstrapPreparation
+    ) {
         for human in humans {
             let accountKey = CoconutAccountKey.human(human.id)
             if let existingAccount = existingAccountByKey[accountKey] {
@@ -94,7 +155,7 @@ enum CoconutEconomyBootstrapService {
                     0,
                     existingAccount.balance - (existingDeltaByAccountKey[accountKey] ?? 0)
                 )
-                memberTotal += max(0, legacyBaseline)
+                preparation.memberTotal += max(0, legacyBaseline)
                 backfillOpeningEntryIfNeeded(
                     account: existingAccount,
                     ownerKind: .human,
@@ -104,14 +165,14 @@ enum CoconutEconomyBootstrapService {
                     legacyIslandCount: legacyIslandCount,
                     occurredAt: human.createdAt,
                     existingTransactionKeys: existingTransactionKeys,
-                    preparedEntries: &backfilledOpeningEntries
+                    preparedEntries: &preparation.backfilledOpeningEntries
                 )
                 continue
             }
             let originalBalance = human.coconutBalance
             let balance = max(0, originalBalance)
-            memberTotal += balance
-            deltas.append(.human(
+            preparation.memberTotal += balance
+            preparation.deltas.append(.human(
                 human,
                 delta: balance,
                 entryKind: .openingBalance,
@@ -123,7 +184,7 @@ enum CoconutEconomyBootstrapService {
                 transactionKey: "bootstrap:v58:opening:\(CoconutAccountKey.human(human.id))"
             ))
             if originalBalance < 0 {
-                deltas.append(negativeAdjustment(
+                preparation.deltas.append(negativeAdjustment(
                     ownerKey: CoconutAccountKey.human(human.id),
                     ownerKind: .human,
                     ownerId: human.id.uuidString,
@@ -132,7 +193,16 @@ enum CoconutEconomyBootstrapService {
                 ))
             }
         }
+    }
 
+    private static func preparePetBalances(
+        _ pets: [Pet],
+        existingAccountByKey: [String: CoconutAccount],
+        existingDeltaByAccountKey: [String: Int],
+        existingTransactionKeys: Set<String>,
+        legacyIslandCount: Int,
+        preparation: inout BootstrapPreparation
+    ) {
         for pet in pets {
             let accountKey = CoconutAccountKey.pet(pet.id)
             if let existingAccount = existingAccountByKey[accountKey] {
@@ -140,7 +210,7 @@ enum CoconutEconomyBootstrapService {
                     0,
                     existingAccount.balance - (existingDeltaByAccountKey[accountKey] ?? 0)
                 )
-                memberTotal += max(0, legacyBaseline)
+                preparation.memberTotal += max(0, legacyBaseline)
                 backfillOpeningEntryIfNeeded(
                     account: existingAccount,
                     ownerKind: .pet,
@@ -150,14 +220,14 @@ enum CoconutEconomyBootstrapService {
                     legacyIslandCount: legacyIslandCount,
                     occurredAt: pet.createdAt,
                     existingTransactionKeys: existingTransactionKeys,
-                    preparedEntries: &backfilledOpeningEntries
+                    preparedEntries: &preparation.backfilledOpeningEntries
                 )
                 continue
             }
             let originalBalance = pet.coconutBalance
             let balance = max(0, originalBalance)
-            memberTotal += balance
-            deltas.append(.pet(
+            preparation.memberTotal += balance
+            preparation.deltas.append(.pet(
                 pet,
                 delta: balance,
                 entryKind: .openingBalance,
@@ -169,7 +239,7 @@ enum CoconutEconomyBootstrapService {
                 transactionKey: "bootstrap:v58:opening:\(CoconutAccountKey.pet(pet.id))"
             ))
             if originalBalance < 0 {
-                deltas.append(negativeAdjustment(
+                preparation.deltas.append(negativeAdjustment(
                     ownerKey: CoconutAccountKey.pet(pet.id),
                     ownerKind: .pet,
                     ownerId: pet.id.uuidString,
@@ -177,38 +247,6 @@ enum CoconutEconomyBootstrapService {
                     originalBalance: originalBalance
                 ))
             }
-        }
-
-        let systemBalance = max(0, legacyIslandCount - memberTotal)
-        let mismatch = legacyIslandCount < memberTotal
-        deltas.append(.system(
-            delta: systemBalance,
-            entryKind: .openingBalance,
-            source: .legacyUserDefaults,
-            title: "Imported island coconut balance",
-            emoji: "🥥",
-            metadataJSON: "{\"legacyIslandCount\":\(legacyIslandCount),\"memberTotal\":\(memberTotal),\"mismatch\":\(mismatch)}",
-            transactionKey: "bootstrap:v58:opening:\(CoconutAccountKey.legacySystem)"
-        ))
-
-        try CoconutWalletService.apply(
-            deltas: deltas,
-            context: context,
-            save: false,
-            postsRewardFeedback: false,
-            updatesProjection: false
-        )
-        for entry in backfilledOpeningEntries {
-            context.insert(entry)
-        }
-        CloudSyncMutationRecorder.markModified(backfilledOpeningEntries, context: context)
-
-        try importLegacyHistory(legacyLogs, humans: humans, pets: pets, context: context)
-        if saveChanges {
-            try CoconutWalletPersistence.save(context: context)
-        }
-        if updatesProjection {
-            CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
         }
     }
 

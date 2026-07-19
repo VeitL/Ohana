@@ -136,6 +136,11 @@ final class AppExperienceController {
     ) {
         guard selectedMode != mode else { return }
         pendingSwitchTask?.cancel()
+        if delayMilliseconds == 0 {
+            pendingSwitchTask = nil
+            apply(selectedMode)
+            return
+        }
         pendingMode = selectedMode
         pendingSwitchTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: delayMilliseconds * 1_000_000)

@@ -110,7 +110,7 @@ enum SafetyContactCommandService {
         guard let contact = try contact(id: id, context: context) else {
             throw SafetyContactCommandError.contactNotFound
         }
-        context.delete(contact)
+        context.delete(contact) // derived-state: allow SafetyContact is intentionally device-local and has no synced derivatives
         try saveOrRollback(context)
     }
 

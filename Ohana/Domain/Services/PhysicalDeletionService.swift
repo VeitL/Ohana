@@ -596,8 +596,12 @@ nonisolated enum PhysicalDeletionService {
         let receipts = fetchAll(AchievementRewardReceipt.self, context: context).filter {
             $0.scopeKindRaw == kind && idsMatch($0.scopeIDRaw, scopeID)
         }
-        for unlock in unlocks { context.delete(unlock) }
-        for receipt in receipts { context.delete(receipt) }
+        for unlock in unlocks {
+            context.delete(unlock)
+        }
+        for receipt in receipts {
+            context.delete(receipt)
+        }
         return unlocks.count + receipts.count
     }
 
@@ -694,7 +698,9 @@ nonisolated enum PhysicalDeletionService {
                 abs(lhs.date.timeIntervalSince(careLog.date)) < abs(rhs.date.timeIntervalSince(careLog.date))
             }
     }
+}
 
+extension PhysicalDeletionService {
     static func deleteCareLedgerEvents(
         legacyModelName: String,
         legacyModelId: String,

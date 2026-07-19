@@ -250,15 +250,18 @@ struct OhanaNotificationsSchedulingTests {
         })
         let allowedFiles: Set<String> = [
             "Ohana/Features/Notifications/NotificationManager.swift",
+            "Ohana/Features/Notifications/PresenceReminderScheduler.swift",
             "Ohana/Features/Medication/MedicationReminderService.swift",
             "Ohana/Features/FamilyReports/FamilyWeeklyReportService.swift"
         ]
 
         #expect(filesAddingRequests == allowedFiles)
         let notificationManagerSource = try source("Ohana/Features/Notifications/NotificationManager.swift")
+        let presenceReminderSource = try source("Ohana/Features/Notifications/PresenceReminderScheduler.swift")
         let medicationReminderSource = try source("Ohana/Features/Medication/MedicationReminderService.swift")
         let weeklyReportSource = try source("Ohana/Features/FamilyReports/FamilyWeeklyReportService.swift")
         #expect(notificationManagerSource.contains("NotificationPendingBudget.hasCapacity"))
+        #expect(presenceReminderSource.contains("PresenceNotificationPendingPolicy.availableRequestCount"))
         #expect(medicationReminderSource.contains("MedicationNotificationBudget.reserve"))
         #expect(weeklyReportSource.contains("family_weekly_report_sunday_2000"))
     }
@@ -442,7 +445,9 @@ struct OhanaNotificationsSchedulingTests {
         #expect(managerSource.contains("actions: [completeAction, skipAction, snoozeAction]"))
         #expect(managerSource.contains("case UNNotificationDefaultActionIdentifier:"))
         #expect(managerSource.contains("self.routeCenter.requestReminderRoute(payload)"))
-        #expect(managerSource.contains("case \"COMPLETE\", \"SKIP\", \"SNOOZE\":"))
+        #expect(managerSource.contains(
+            "case \"COMPLETE\", \"SKIP\", \"SNOOZE\", PresenceReminderRequestFactory.okayActionIdentifier:"
+        ))
         #expect(managerSource.contains("self.routeCenter.publishReminderAction(payload)"))
 
         for key in [

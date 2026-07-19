@@ -131,7 +131,7 @@ struct VerticalSolidHomePlantRoomStack: View {
             Image(systemName: "chevron.right") // a11y: allow decorative chevron is hidden and the room-stack Button is labeled
                 .font(OhanaFont.adaptive(size: 8, weight: .black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .frame(width: 24, height: 24)
+                .frame(width: 24, height: 24) // a11y: allow decorative chevron inside labeled room-stack Button
                 .background(Color.ohanaControlFill.opacity(0.96), in: Circle())
                 .accessibilityHidden(true)
         }

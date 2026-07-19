@@ -678,7 +678,8 @@ struct OnboardingView: View {
 
     private func recoverInterruptedFlow() {
         guard !hasOnboarded else { return }
-        if experienceMode == .zen, let humanID = firstLivingHumanID() {
+        if experienceMode == .zen,
+           let humanID = appServices.humanRequirements.firstLivingHumanID(context: modelContext) {
             currentActiveHumanId = humanID.uuidString
             onFirstHumanSaved?(humanID)
             finishOnboarding(playsFeedback: false)
@@ -715,25 +716,6 @@ struct OnboardingView: View {
         } else {
             currentActiveHumanId = ""
             step = .humanName
-        }
-    }
-
-    private func firstLivingHumanID() -> UUID? {
-        var descriptor = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { human in
-                human.passedAwayDate == nil
-            },
-            sortBy: [SortDescriptor(\Human.createdAt, order: .forward)]
-        )
-        descriptor.fetchLimit = 1
-        do {
-            return try modelContext.fetch(descriptor).first?.id
-        } catch {
-            OhanaLog.warning(
-                "Zen onboarding could not recover its Human: \(error.localizedDescription)",
-                category: "Onboarding"
-            )
-            return nil
         }
     }
 

@@ -1939,8 +1939,10 @@ struct OhanaTests {
     @Test func reminderSchedulingServiceSkipsPastDueAndWritesLedger() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
-        let event = Event(title: "过期提醒", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let pet = Pet(name: "Momo")
+        let event = Event(title: "过期提醒", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: pet.id.uuidString)
         let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(-60))
+        context.insert(pet)
         context.insert(event)
         context.insert(reminder)
 
@@ -2701,8 +2703,10 @@ struct OhanaTests {
         let missingResult = await ReminderSchedulingService.scheduleIfNeeded(reminder: orphan, context: context)
         #expect(missingResult == .missingEvent)
 
-        let event = Event(title: "喂水", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let pet = Pet(name: "Momo")
+        let event = Event(title: "喂水", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: pet.id.uuidString)
         let duplicate = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3600))
+        context.insert(pet)
         context.insert(event)
         context.insert(duplicate)
         let duplicateResult = await ReminderSchedulingService.scheduleIfNeeded(

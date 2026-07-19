@@ -98,7 +98,7 @@ struct ZenHomeView: View {
                     }
                 }
             } label: {
-                Image(systemName: "plus")
+                Image(systemName: "plus") // a11y: allow parent Menu supplies localized add label
             }
             .accessibilityLabel(l.tr(
                 zh: "添加",
@@ -114,7 +114,7 @@ struct ZenHomeView: View {
             .accessibilityIdentifier("zen-home-add-menu")
 
             Button(action: actions.onOpenSettings) {
-                Image(systemName: "gearshape.fill")
+                Image(systemName: "gearshape.fill") // a11y: allow parent Button supplies localized settings label
             }
             .accessibilityLabel(l.tr(
                 zh: "设置",
@@ -577,7 +577,7 @@ private struct ZenPresenceCard: View {
                     ), systemImage: "slider.horizontal.3")
                 }
             } label: {
-                Image(systemName: "ellipsis")
+                Image(systemName: "ellipsis") // a11y: allow parent Menu supplies localized manage label
                     .font(OhanaFont.callout(.bold))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -790,7 +790,7 @@ private struct ZenStatusPickerSheet: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 if subject.status == status {
-                    Image(systemName: "checkmark")
+                    Image(systemName: "checkmark") // a11y: allow decorative selected-state glyph is hidden below
                         .foregroundStyle(Color.goPrimary)
                         .accessibilityHidden(true)
                 }

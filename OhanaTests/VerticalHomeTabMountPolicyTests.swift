@@ -235,7 +235,7 @@ struct VerticalHomeTabMountPolicyTests {
         let host = try source("Ohana/Features/Oasis/Views/OasisHomeTabHost.swift")
         let homeUtilities = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Utilities.swift")
 
-        #expect(frozenStage.contains("interactiveFeatures: [.shop]"))
+        #expect(frozenStage.contains("interactiveFeatures: Set(OasisBentoFeature.allCases)"))
         #expect(frozenStage.contains("onOpenShop(snapshot.shopInitialCategory)"))
         #expect(host.contains("VerticalSolidHomeOasisFrozenTreeStage("))
         #expect(host.contains("onOpenShop: onOpenShop"))

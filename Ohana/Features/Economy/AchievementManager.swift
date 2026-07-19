@@ -412,27 +412,8 @@ final class AchievementManager {
         let calendar = Calendar.current
         let now = Date()
         let today = calendar.startOfDay(for: now)
-        let allPets = context.allPets.isEmpty ? [pet] : context.allPets
-        let livePets = allPets.filter { !$0.hasPassedAway }
-        let liveHumans = context.allHumans.filter { !$0.hasPassedAway }
         let careLedgerSummary = context.careLedgerSummary(for: pet)
         let petActivitySummary = context.petActivitySummary(for: pet)
-
-        // 预计算"今天"标志（用于多个成就复用）
-        let hasTodayHealth = careLedgerSummary.hasTodayRecord(kind: .health, calendar: calendar, now: now)
-        let hasTodayHygiene = careLedgerSummary.hasTodayRecord(kind: .hygiene, calendar: calendar, now: now)
-        let hasTodayPotty = careLedgerSummary.hasTodayRecord(kind: .potty, calendar: calendar, now: now)
-        let hasTodayCare = careLedgerSummary.hasTodayCareRecord(calendar: calendar, now: now)
-        let hasTodayWalk = careLedgerSummary.hasTodayRecord(kind: .walk, calendar: calendar, now: now)
-        let hasTodayWeight = careLedgerSummary.hasTodayRecord(kind: .weight, calendar: calendar, now: now)
-        let allRecordDates = careLedgerSummary.recordDates
-            + petActivitySummary.foodRecordDates
-            + petActivitySummary.photoDates
-            + petActivitySummary.milestoneDates
-
-        func hasAnyRecord(on day: Date) -> Bool {
-            allRecordDates.contains { calendar.isDate($0, inSameDayAs: day) }
-        }
 
         // 1. 🔥 钢铁肠胃：连续 7 天每天有 perfectPoop
         let ironGut: Achievement = {
@@ -528,6 +509,34 @@ final class AchievementManager {
                                color: AchievementColorPalette.cardCyan, isUnlocked: hasAny)
         }()
 
+        var achievements = [
+            ironGut, ironPaw, walkStreak, healthHero, nutritionist, happyBirthday,
+            hundredDays, firstRecord
+        ]
+        achievements += dailyPetAchievements(for: pet, context: context)
+        achievements += expandedPetAchievements(for: pet, context: context)
+        achievements += longTermPetAchievements(for: pet, context: context)
+        if context.includesGlobalAchievements {
+            achievements += globalAchievements(for: pet, context: context)
+        }
+        return achievements
+    }
+
+    private nonisolated static func dailyPetAchievements(
+        for pet: Pet,
+        context: AchievementComputationContext
+    ) -> [Achievement] {
+        let calendar = Calendar.current
+        let now = Date()
+        let careLedgerSummary = context.careLedgerSummary(for: pet)
+        let petActivitySummary = context.petActivitySummary(for: pet)
+        let hasTodayHealth = careLedgerSummary.hasTodayRecord(kind: .health, calendar: calendar, now: now)
+        let hasTodayHygiene = careLedgerSummary.hasTodayRecord(kind: .hygiene, calendar: calendar, now: now)
+        let hasTodayPotty = careLedgerSummary.hasTodayRecord(kind: .potty, calendar: calendar, now: now)
+        let hasTodayCare = careLedgerSummary.hasTodayCareRecord(calendar: calendar, now: now)
+        let hasTodayWalk = careLedgerSummary.hasTodayRecord(kind: .walk, calendar: calendar, now: now)
+        let hasTodayWeight = careLedgerSummary.hasTodayRecord(kind: .weight, calendar: calendar, now: now)
+
         // 9. ✅ 今日全勤：今天完成了至少一次打卡
         let dayOneCheckin = Achievement(id: "day_one_checkin", emoji: "✅", title: copy(zh: "今日全勤", en: "Checked In Today"),
                                         description: copy(zh: "今天至少完成了一次打卡记录", en: "Complete at least one check-in today."),
@@ -572,6 +581,19 @@ final class AchievementManager {
         let weightManager = Achievement(id: "weight_manager", emoji: "🏋️", title: copy(zh: "体重管理师", en: "Weight Keeper"),
                                         description: copy(zh: "坚持记录体重，累计超过 7 条记录", en: "Keep tracking weight for more than 7 records."),
                                         color: AchievementColorPalette.cardBlue, isUnlocked: careLedgerSummary.weightEvents.count >= 7)
+
+        return [
+            dayOneCheckin, oldFriend, longRunner, medicationComplete,
+            photoEnthusiast, expenseTracker, weightManager
+        ]
+    }
+
+    private nonisolated static func expandedPetAchievements(
+        for pet: Pet,
+        context: AchievementComputationContext
+    ) -> [Achievement] {
+        let careLedgerSummary = context.careLedgerSummary(for: pet)
+        let petActivitySummary = context.petActivitySummary(for: pet)
 
         // 16. 💧 喝水伙伴：累计喂水 14 次
         let hydrationBuddy = Achievement(
@@ -673,6 +695,30 @@ final class AchievementManager {
             isUnlocked: petActivitySummary.symptomCount >= 3
         )
 
+        return [
+            hydrationBuddy, playChampion, cleanKeeper, treatScout, foodKindExplorer,
+            autoFeederPilot, stockKeeper, protectionReady, vaccineKeeper, symptomWatcher
+        ]
+    }
+
+    private nonisolated static func longTermPetAchievements(
+        for pet: Pet,
+        context: AchievementComputationContext
+    ) -> [Achievement] {
+        let calendar = Calendar.current
+        let now = Date()
+        let today = calendar.startOfDay(for: now)
+        let careLedgerSummary = context.careLedgerSummary(for: pet)
+        let petActivitySummary = context.petActivitySummary(for: pet)
+        let allRecordDates = careLedgerSummary.recordDates
+            + petActivitySummary.foodRecordDates
+            + petActivitySummary.photoDates
+            + petActivitySummary.milestoneDates
+
+        func hasAnyRecord(on day: Date) -> Bool {
+            allRecordDates.contains { calendar.isDate($0, inSameDayAs: day) }
+        }
+
         // 26. 🧭 照护连线：连续 14 天任意记录
         let careStreakKeeper: Achievement = {
             var streak = true
@@ -743,6 +789,20 @@ final class AchievementManager {
             color: AchievementColorPalette.primary,
             isUnlocked: pet.daysTogether >= 365
         )
+
+        return [
+            careStreakKeeper, mealArchivist, waterGuardian,
+            memoryCollector, weightRhythm, yearCompanion
+        ]
+    }
+
+    private nonisolated static func globalAchievements(
+        for pet: Pet,
+        context: AchievementComputationContext
+    ) -> [Achievement] {
+        let allPets = context.allPets.isEmpty ? [pet] : context.allPets
+        let livePets = allPets.filter { !$0.hasPassedAway }
+        let liveHumans = context.allHumans.filter { !$0.hasPassedAway }
 
         // 32. 🏝️ Ohana 小队：家里有 2 位以上成员/宠物进入卡片宇宙
         let islandCrew = Achievement(
@@ -854,20 +914,11 @@ final class AchievementManager {
             isUnlocked: context.gachaDrawLogs.contains { $0.instantCoconutDelta >= 500 }
         )
 
-        let petAchievements = [ironGut, ironPaw, walkStreak, healthHero, nutritionist, happyBirthday, hundredDays,
-                               firstRecord, dayOneCheckin, oldFriend,
-                               longRunner, medicationComplete, photoEnthusiast, expenseTracker, weightManager,
-                               hydrationBuddy, playChampion, cleanKeeper, treatScout, foodKindExplorer, autoFeederPilot,
-                               stockKeeper, protectionReady, vaccineKeeper, symptomWatcher,
-                               careStreakKeeper, mealArchivist, waterGuardian, memoryCollector, weightRhythm, yearCompanion]
-
-        guard context.includesGlobalAchievements else {
-            return petAchievements
-        }
-
-        let globalAchievements = [islandCrew, firstCritter, legendaryCritter, critterCollector, critterStar, critterCaretaker,
-                                  firstBlindBox, blindBoxCollector, secretBlindBox, seriesComplete, gachaJackpot]
-        return petAchievements + globalAchievements
+        return [
+            islandCrew, firstCritter, legendaryCritter, critterCollector,
+            critterStar, critterCaretaker, firstBlindBox, blindBoxCollector,
+            secretBlindBox, seriesComplete, gachaJackpot
+        ]
     }
 
     static func isGlobalAchievement(_ badge: Achievement) -> Bool {

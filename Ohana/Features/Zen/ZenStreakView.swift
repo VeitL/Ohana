@@ -127,7 +127,7 @@ struct ZenStreakView: View {
                                 Text(subject.name)
                                     .lineLimit(1)
                                 if subject.isOwner {
-                                    Image(systemName: "person.crop.circle.badge.checkmark")
+                                    Image(systemName: "person.crop.circle.badge.checkmark") // a11y: allow decorative owner marker is hidden below
                                         .accessibilityHidden(true)
                                 }
                             }
@@ -287,7 +287,7 @@ struct ZenStreakView: View {
             Button {
                 moveMonth(by: -1)
             } label: {
-                Image(systemName: "chevron.left")
+                Image(systemName: "chevron.left") // a11y: allow parent Button supplies localized previous-month label
                     .frame(width: 44, height: 44)
             }
             .accessibilityLabel(l.tr(
@@ -316,7 +316,7 @@ struct ZenStreakView: View {
             Button {
                 moveMonth(by: 1)
             } label: {
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.right") // a11y: allow parent Button supplies localized next-month label
                     .frame(width: 44, height: 44)
             }
             .disabled(isDisplayingCurrentMonth)
@@ -428,7 +428,7 @@ struct ZenStreakView: View {
                     .font(OhanaFont.adaptive(size: 8, weight: .black))
                     .foregroundStyle(usesSecondarySymbol ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText)
             }
-            .frame(width: 18, height: 18)
+            .frame(width: 18, height: 18) // a11y: allow non-interactive legend glyph
             Text(title)
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -492,7 +492,7 @@ struct ZenStreakView: View {
                 }
 
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.right") // a11y: allow decorative chevron is hidden below
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .accessibilityHidden(true)
             }
@@ -591,7 +591,7 @@ private struct ZenCalendarDayCell: View {
                     .offset(y: 13)
                     .accessibilityHidden(true)
             } else if effectiveParticipation == .notParticipating, !isFuture {
-                Image(systemName: "minus")
+                Image(systemName: "minus") // a11y: allow decorative day status is hidden below
                     .font(OhanaFont.adaptive(size: 8, weight: .black))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .offset(y: 12)
@@ -601,7 +601,7 @@ private struct ZenCalendarDayCell: View {
                       !isFuture {
                 Circle()
                     .strokeBorder(Color.ohanaSecondaryText, lineWidth: 1)
-                    .frame(width: 5, height: 5)
+                    .frame(width: 5, height: 5) // a11y: allow non-interactive day status dot
                     .offset(y: 13)
                     .accessibilityHidden(true)
             }

@@ -309,6 +309,63 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             restoreTransaction: restoreTransaction
         )
     }
+}
+
+extension DataBackupManager {
+    private struct BackupSource {
+        let pets: [Pet]
+        let humans: [Human]
+        let events: [Event]
+        let reminders: [Reminder]
+        let households: [Household]
+        let plants: [Plant]
+        let petRelationships: [PetRelationship]
+        let plantCareLogs: [PlantCareLog]
+        let careLogs: [PetCareLog]
+        let pottyLogs: [PetPottyLog]
+        let walkLogs: [PetWalkLog]
+        let weightLogs: [PetWeightLog]
+        let expLogs: [PetExpenseLog]
+        let healthLogs: [PetHealthLog]
+        let hygLogs: [PetHygieneLog]
+        let foodRecs: [PetFoodRecord]
+        let docs: [PetDocument]
+        let milestones: [PetMilestone]
+        let photos: [PetPhotoLog]
+        let insurances: [PetInsurance]
+        let claims: [InsuranceClaim]
+        let petMeds: [PetMedication]
+        let symptoms: [SymptomLog]
+        let heatCycles: [HeatCycleLog]
+        let hWeightLogs: [HumanWeightLog]
+        let hWorkouts: [HumanWorkoutLog]
+        let humanMeds: [HumanMedication]
+        let humanMedLogs: [HumanMedicationLog]
+        let humanHealthMetricLogs: [HumanHealthMetricLog]
+        let humanHealthRecords: (reports: [HumanHealthReport], noteRecords: [HumanNoteRecordBackup])
+        let waterLogs: [WaterLog]
+        let wishlist: [WishlistItem]
+        let ledger: [CareLedgerEvent]
+        let coconutAccounts: [CoconutAccount]
+        let coconutLedgerEntries: [CoconutLedgerEntry]
+        let economyBudgetUsageEvents: [EconomyBudgetUsageEvent]
+        let familyTasks: [FamilyCollaborationTask]
+        let sharedCareSessions: [SharedCareSession]
+        let exchanges: [CoconutExchangeRequest]
+        let oasisUpgradeCoconuts: [OasisUpgradeCoconut]
+        let oasisElectronicPets: [OasisElectronicPet]
+        let oasisFragments: [OasisCritterFragmentBalance]
+        let oasisUnlocks: [OasisUnlock]
+        let oasisCritterActionLogs: [OasisCritterActionLog]
+        let gachaOwnedItems: [GachaOwnedItem]
+        let gachaDrawLogs: [GachaDrawLog]
+        let shopPurchaseRecords: [ShopPurchaseRecord]
+        let presenceCheckIns: [PresenceCheckIn]
+        let presenceParticipationPeriods: [PresenceParticipationPeriod]
+        let presenceRewardReceipts: [PresenceRewardReceipt]
+        let achievementUnlocks: [AchievementUnlock]
+        let achievementRewardReceipts: [AchievementRewardReceipt]
+    }
 
     // MARK: - Build Backup
 
@@ -343,171 +400,66 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         // export the debited wallet while that coordination is still live.
         try ensureNoUnresolvedShopPurchases(context: context)
 
-        let pets = try context.fetch(FetchDescriptor<Pet>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let humans = try context.fetch(FetchDescriptor<Human>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let events = try context.fetch(FetchDescriptor<Event>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let reminders = try context.fetch(FetchDescriptor<Reminder>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let households = try context.fetch(FetchDescriptor<Household>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let plants = try context.fetch(FetchDescriptor<Plant>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let petRelationships = try context.fetch(FetchDescriptor<PetRelationship>()) // smoothness: explicit backup/export scan only
-        let plantCareLogs = try context.fetch(FetchDescriptor<PlantCareLog>()) // smoothness: explicit backup/export scan only
-        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let walkLogs = try context.fetch(FetchDescriptor<PetWalkLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let weightLogs = try context.fetch(FetchDescriptor<PetWeightLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let expLogs = try context.fetch(FetchDescriptor<PetExpenseLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let healthLogs = try context.fetch(FetchDescriptor<PetHealthLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let hygLogs = try context.fetch(FetchDescriptor<PetHygieneLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let foodRecs = try context.fetch(FetchDescriptor<PetFoodRecord>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let docs = try context.fetch(FetchDescriptor<PetDocument>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let milestones = try context.fetch(FetchDescriptor<PetMilestone>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let photos = try context.fetch(FetchDescriptor<PetPhotoLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let insurances = try context.fetch(FetchDescriptor<PetInsurance>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let claims = try context.fetch(FetchDescriptor<InsuranceClaim>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let petMeds = try context.fetch(FetchDescriptor<PetMedication>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let symptoms = try context.fetch(FetchDescriptor<SymptomLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let heatCycles = try context.fetch(FetchDescriptor<HeatCycleLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let hWeightLogs = scope.excludesHumanHealthData
-            ? []
-            : try context.fetch(FetchDescriptor<HumanWeightLog>()) // smoothness: explicit manual-export scan only
-        let hWorkouts = scope.excludesHumanHealthData
-            ? []
-            : try context.fetch(FetchDescriptor<HumanWorkoutLog>()) // smoothness: explicit manual-export scan only
-        let humanMeds = scope.excludesHumanHealthData
-            ? []
-            : try context.fetch(FetchDescriptor<HumanMedication>()) // smoothness: explicit manual-export scan only
-        let humanMedLogs = scope.excludesHumanHealthData
-            ? []
-            : try context.fetch(FetchDescriptor<HumanMedicationLog>()) // smoothness: explicit manual-export scan only
-        let humanHealthMetricLogs = scope.excludesHumanHealthData
-            ? []
-            : try context.fetch(FetchDescriptor<HumanHealthMetricLog>()) // smoothness: explicit manual-export scan only
-        let humanHealthRecords = try backupHumanHealthRecords(context: context, scope: scope)
-        let waterLogs = try context.fetch(FetchDescriptor<WaterLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let wishlist = try context.fetch(FetchDescriptor<WishlistItem>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let coconutAccounts = try context.fetch(FetchDescriptor<CoconutAccount>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let coconutLedgerEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let economyBudgetUsageEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()) // smoothness: explicit backup/export scan only
-        let familyTasks = try context.fetch(FetchDescriptor<FamilyCollaborationTask>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let sharedCareSessions = try context.fetch(FetchDescriptor<SharedCareSession>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let exchanges = try context.fetch(FetchDescriptor<CoconutExchangeRequest>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let oasisUpgradeCoconuts = try context.fetch(FetchDescriptor<OasisUpgradeCoconut>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let oasisElectronicPets = try context.fetch(FetchDescriptor<OasisElectronicPet>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let oasisFragments = try context.fetch(FetchDescriptor<OasisCritterFragmentBalance>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let oasisUnlocks = try context.fetch(FetchDescriptor<OasisUnlock>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let oasisCritterActionLogs = try context.fetch(FetchDescriptor<OasisCritterActionLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let gachaOwnedItems = try context.fetch(FetchDescriptor<GachaOwnedItem>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let gachaDrawLogs = try context.fetch(FetchDescriptor<GachaDrawLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        let shopPurchaseRecords = try context.fetch(FetchDescriptor<ShopPurchaseRecord>()) // smoothness: explicit backup/export scan only
-        let presenceCheckIns = try context.fetch(FetchDescriptor<PresenceCheckIn>()) // smoothness: explicit backup/export scan only
-        let presenceParticipationPeriods = try context.fetch(FetchDescriptor<PresenceParticipationPeriod>()) // smoothness: explicit backup/export scan only
-        let presenceRewardReceipts = try context.fetch(FetchDescriptor<PresenceRewardReceipt>()) // smoothness: explicit backup/export scan only
-        let achievementUnlocks = try context.fetch(FetchDescriptor<AchievementUnlock>()) // smoothness: explicit backup/export scan only
-        let achievementRewardReceipts = try context.fetch(FetchDescriptor<AchievementRewardReceipt>()) // smoothness: explicit backup/export scan only
+        let source = try fetchBackupSource(context: context, scope: scope)
 
-        let ud = defaults
-        let purchasedShopItems = ShopPurchaseRecordStore
-            .ownedItemIDs(from: shopPurchaseRecords)
-            .sorted()
-            .joined(separator: ",")
         let backupEvents = scope.excludesHumanHealthData
-            ? events.filter { !Self.isHumanHealthEvent($0) }
-            : events
+            ? source.events.filter { !Self.isHumanHealthEvent($0) }
+            : source.events
         let backupEventIDs = Set(backupEvents.map(\.id))
         let backupReminders = scope.excludesHumanHealthData
-            ? reminders.filter { reminder in
+            ? source.reminders.filter { reminder in
                 guard let event = reminder.event else { return true }
                 return backupEventIDs.contains(event.id)
             }
-            : reminders
+            : source.reminders
         let backupLedger = scope.excludesHumanHealthData
-            ? ledger.filter { !Self.isHumanHealthLedgerEvent($0) }
-            : ledger
+            ? source.ledger.filter { !Self.isHumanHealthLedgerEvent($0) }
+            : source.ledger
         // Wallet and budget records carry free-form titles and metadata. Their
         // historical schema has no complete, durable health-source link, so a
         // restricted external package omits the entire derived economy sidecar
         // instead of trying to infer which records might repeat health facts.
         let backupCoconutLedgerEntries = scope.excludesHumanHealthData
             ? []
-            : coconutLedgerEntries
+            : source.coconutLedgerEntries
         let backupEconomyBudgetUsageEvents = scope.excludesHumanHealthData
             ? []
-            : economyBudgetUsageEvents
+            : source.economyBudgetUsageEvents
         // Family-task titles and notes are free-form and older tasks can have
         // no durable event/reminder link at all. A restricted external package
         // therefore omits the full task sidecar rather than inferring whether
         // a personal-health fact was written into the task text.
         let backupFamilyTasks = scope.excludesHumanHealthData
             ? []
-            : familyTasks
+            : source.familyTasks
         // Human health/movement achievement IDs can reveal private weight,
         // medication, or workout facts. Restricted exports omit those exact
         // categories while retaining privacy-safe profile, economy, and tenure
         // receipts so a restore cannot make a claimed reward claimable again.
         // Unknown Human-scoped IDs fail closed in the privacy filter.
-        let backupAchievementUnlocks = scope.excludesHumanHealthData
-            ? achievementUnlocks.filter {
-                !Self.isHumanHealthAchievement(
-                    scopeKindRaw: $0.scopeKindRaw,
-                    achievementID: $0.achievementID
-                )
-            }
-            : achievementUnlocks
-        let backupAchievementRewardReceipts = scope.excludesHumanHealthData
-            ? achievementRewardReceipts.filter {
-                !Self.isHumanHealthAchievement(
-                    scopeKindRaw: $0.scopeKindRaw,
-                    achievementID: $0.achievementID
-                )
-            }
-            : achievementRewardReceipts
-        let coconutLogProjection = backupCoconutLedgerEntries
-            .sorted { $0.occurredAt > $1.occurredAt }
-            .prefix(200)
-            .filter { $0.delta != 0 }
-            .map { $0.asCoconutLogEntry() }
-        let coconutLogsJSON: String = {
-            guard let data = try? JSONEncoder().encode(Array(coconutLogProjection)),
-                  let string = String(data: data, encoding: .utf8) else {
-                return "[]"
-            }
-            return string
-        }()
-        let shopInventorySnapshot = ShopInventoryStateStore.snapshot(defaults: ud)
-        let appState = AppStateBackup(
-            coconutCount: coconutAccounts.reduce(0) { $0 + $1.balance },
-            coconutLogsJSON: coconutLogsJSON,
-            bountyTasksJSON: ud.string(forKey: "bountyTasks") ?? "[]",
-            purchasedShopItems: purchasedShopItems,
-            selectedAppIcon: ud.string(forKey: AppIconCatalog.selectedIconKey),
-            gachaHistoryJSON: ud.string(forKey: "gachaHistory") ?? "[]",
-            celebratedMilestoneDays: ud.string(forKey: "celebratedMilestoneDays") ?? "",
-            shopConsumableInventory: ShopConsumableInventoryBackup(
-                backdatePassCount: shopInventorySnapshot.backdatePassCount,
-                avatar2DExtraPassCount: shopInventorySnapshot.avatar2DExtraPassCount,
-                doubleRewardBoostActive: shopInventorySnapshot.isDoubleRewardBoostActive,
-                streakShieldExpiry: d(shopInventorySnapshot.streakShieldExpiry)
-            ),
-            plantReminderPreferences: makePlantReminderPreferencesBackup(defaults: ud, plants: plants)
+        let achievementFacts = filteredAchievementFacts(
+            source.achievementUnlocks, source.achievementRewardReceipts, scope
+        )
+        let appState = makeAppStateBackup(
+            source.shopPurchaseRecords, source.coconutAccounts, backupCoconutLedgerEntries, source.plants
         )
 
-        let petBackups = try pets.map { try encodePet($0, mediaWriter: mediaWriter) }
-        let humanBackups = try humans.map {
+        let petBackups = try source.pets.map { try encodePet($0, mediaWriter: mediaWriter) }
+        let humanBackups = try source.humans.map {
             try encodeHuman(
                 $0,
                 mediaWriter: mediaWriter,
                 redactingHealthData: scope.excludesHumanHealthData
             )
         }
-        let plantBackups = try plants.map { try encodePlant($0, mediaWriter: mediaWriter) }
-        let plantCareLogBackups = try plantCareLogs.map { try encodePlantCareLog($0, mediaWriter: mediaWriter) }
-        let petWalkLogBackups = try walkLogs.map { try encodeWalkLog($0, mediaWriter: mediaWriter) }
-        let petDocumentBackups = try docs.map { try encodeDocument($0, mediaWriter: mediaWriter) }
-        let petDocumentAttachmentBackups = try docs.flatMap { try encodeDocumentAttachments($0, mediaWriter: mediaWriter) }
-        let petMilestoneBackups = try milestones.map { try encodeMilestone($0, mediaWriter: mediaWriter) }
-        let petPhotoLogBackups = try photos.map { try encodePhotoLog($0, mediaWriter: mediaWriter) }
-        let symptomLogBackups = try symptoms.map { try encodeSymptomLog($0, mediaWriter: mediaWriter) }
+        let plantBackups = try source.plants.map { try encodePlant($0, mediaWriter: mediaWriter) }
+        let plantCareLogBackups = try source.plantCareLogs.map { try encodePlantCareLog($0, mediaWriter: mediaWriter) }
+        let petWalkLogBackups = try source.walkLogs.map { try encodeWalkLog($0, mediaWriter: mediaWriter) }
+        let petDocumentBackups = try source.docs.map { try encodeDocument($0, mediaWriter: mediaWriter) }
+        let petDocumentAttachmentBackups = try source.docs.flatMap { try encodeDocumentAttachments($0, mediaWriter: mediaWriter) }
+        let petMilestoneBackups = try source.milestones.map { try encodeMilestone($0, mediaWriter: mediaWriter) }
+        let petPhotoLogBackups = try source.photos.map { try encodePhotoLog($0, mediaWriter: mediaWriter) }
+        let symptomLogBackups = try source.symptoms.map { try encodeSymptomLog($0, mediaWriter: mediaWriter) }
         let mediaPackage = (mediaWriter as? DataBackupMediaPackageWriter).map {
             BackupMediaPackageInfo(
                 format: "com.guanchen.li.ohana.backup.package.v1",
@@ -525,61 +477,180 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             humans: humanBackups,
             events: backupEvents.map(encodeEvent),
             reminders: backupReminders.map(encodeReminder),
-            households: households.map(encodeHousehold),
+            households: source.households.map(encodeHousehold),
             plants: plantBackups,
-            petRelationships: petRelationships.map(encodePetRelationship),
+            petRelationships: source.petRelationships.map(encodePetRelationship),
             plantCareLogs: plantCareLogBackups,
-            petCareLogs: careLogs.map(encodeCareLog),
-            petPottyLogs: pottyLogs.map(encodePottyLog),
+            petCareLogs: source.careLogs.map(encodeCareLog),
+            petPottyLogs: source.pottyLogs.map(encodePottyLog),
             petWalkLogs: petWalkLogBackups,
-            petWeightLogs: weightLogs.map(encodeWeightLog),
-            petExpenseLogs: expLogs.map(encodeExpenseLog),
-            petHealthLogs: healthLogs.map(encodeHealthLog),
-            petHygieneLogs: hygLogs.map(encodeHygieneLog),
-            petFoodRecords: foodRecs.map(encodeFoodRecord),
+            petWeightLogs: source.weightLogs.map(encodeWeightLog),
+            petExpenseLogs: source.expLogs.map(encodeExpenseLog),
+            petHealthLogs: source.healthLogs.map(encodeHealthLog),
+            petHygieneLogs: source.hygLogs.map(encodeHygieneLog),
+            petFoodRecords: source.foodRecs.map(encodeFoodRecord),
             petDocuments: petDocumentBackups,
             petDocumentAttachments: petDocumentAttachmentBackups,
             petMilestones: petMilestoneBackups,
             petPhotoLogs: petPhotoLogBackups,
-            petInsurances: insurances.map(encodeInsurance),
-            insuranceClaims: claims.map(encodeInsuranceClaim),
-            petMedications: petMeds.map(encodePetMedication),
+            petInsurances: source.insurances.map(encodeInsurance),
+            insuranceClaims: source.claims.map(encodeInsuranceClaim),
+            petMedications: source.petMeds.map(encodePetMedication),
             symptomLogs: symptomLogBackups,
-            heatCycleLogs: heatCycles.map(encodeHeatCycleLog),
-            humanWeightLogs: hWeightLogs.map(encodeHumanWeight),
-            humanWorkoutLogs: hWorkouts.map(encodeHumanWorkout),
-            humanMedications: humanMeds.map(encodeHumanMedication),
-            humanMedicationLogs: humanMedLogs.map(encodeHumanMedicationLog),
-            humanHealthMetricLogs: humanHealthMetricLogs.map(encodeHumanHealthMetricLog),
-            humanHealthReports: humanHealthRecords.reports.map(encodeHumanHealthReport),
-            humanNoteRecords: humanHealthRecords.noteRecords,
-            waterLogs: waterLogs.map(encodeWaterLog),
-            wishlistItems: wishlist.map(encodeWishlist),
+            heatCycleLogs: source.heatCycles.map(encodeHeatCycleLog),
+            humanWeightLogs: source.hWeightLogs.map(encodeHumanWeight),
+            humanWorkoutLogs: source.hWorkouts.map(encodeHumanWorkout),
+            humanMedications: source.humanMeds.map(encodeHumanMedication),
+            humanMedicationLogs: source.humanMedLogs.map(encodeHumanMedicationLog),
+            humanHealthMetricLogs: source.humanHealthMetricLogs.map(encodeHumanHealthMetricLog),
+            humanHealthReports: source.humanHealthRecords.reports.map(encodeHumanHealthReport),
+            humanNoteRecords: source.humanHealthRecords.noteRecords,
+            waterLogs: source.waterLogs.map(encodeWaterLog),
+            wishlistItems: source.wishlist.map(encodeWishlist),
             careLedgerEvents: backupLedger.map(encodeCareLedgerEvent),
-            coconutAccounts: coconutAccounts.map(encodeCoconutAccount),
+            coconutAccounts: source.coconutAccounts.map(encodeCoconutAccount),
             coconutLedgerEntries: backupCoconutLedgerEntries.map(encodeCoconutLedgerEntry),
             economyBudgetUsageEvents: backupEconomyBudgetUsageEvents.map(encodeEconomyBudgetUsageEvent),
             familyCollaborationTasks: backupFamilyTasks.map(encodeFamilyCollaborationTask),
-            sharedCareSessions: sharedCareSessions.map(encodeSharedCareSession),
-            coconutExchangeRequests: exchanges.map(encodeCoconutExchangeRequest),
-            oasisUpgradeCoconuts: oasisUpgradeCoconuts.map(encodeOasisUpgradeCoconut),
-            oasisElectronicPets: oasisElectronicPets.map(encodeOasisElectronicPet),
-            oasisCritterFragments: oasisFragments.map(encodeOasisCritterFragment),
-            oasisUnlocks: oasisUnlocks.map(encodeOasisUnlock),
-            oasisCritterActionLogs: oasisCritterActionLogs.map(encodeOasisCritterActionLog),
-            gachaOwnedItems: gachaOwnedItems.map(encodeGachaOwnedItem),
-            gachaDrawLogs: gachaDrawLogs.map(encodeGachaDrawLog),
-            shopPurchaseRecords: shopPurchaseRecords.map(encodeShopPurchaseRecord),
-            presenceCheckIns: presenceCheckIns.map { encodePresenceCheckIn($0) },
-            presenceParticipationPeriods: presenceParticipationPeriods.map {
+            sharedCareSessions: source.sharedCareSessions.map(encodeSharedCareSession),
+            coconutExchangeRequests: source.exchanges.map(encodeCoconutExchangeRequest),
+            oasisUpgradeCoconuts: source.oasisUpgradeCoconuts.map(encodeOasisUpgradeCoconut),
+            oasisElectronicPets: source.oasisElectronicPets.map(encodeOasisElectronicPet),
+            oasisCritterFragments: source.oasisFragments.map(encodeOasisCritterFragment),
+            oasisUnlocks: source.oasisUnlocks.map(encodeOasisUnlock),
+            oasisCritterActionLogs: source.oasisCritterActionLogs.map(encodeOasisCritterActionLog),
+            gachaOwnedItems: source.gachaOwnedItems.map(encodeGachaOwnedItem),
+            gachaDrawLogs: source.gachaDrawLogs.map(encodeGachaDrawLog),
+            shopPurchaseRecords: source.shopPurchaseRecords.map(encodeShopPurchaseRecord),
+            presenceCheckIns: source.presenceCheckIns.map { encodePresenceCheckIn($0) },
+            presenceParticipationPeriods: source.presenceParticipationPeriods.map {
                 encodePresenceParticipationPeriod($0)
             },
-            presenceRewardReceipts: presenceRewardReceipts.map {
+            presenceRewardReceipts: source.presenceRewardReceipts.map {
                 encodePresenceRewardReceipt($0)
             },
-            achievementUnlocks: backupAchievementUnlocks.map(encodeAchievementUnlock),
-            achievementRewardReceipts: backupAchievementRewardReceipts.map(encodeAchievementRewardReceipt),
+            achievementUnlocks: achievementFacts.unlocks.map(encodeAchievementUnlock),
+            achievementRewardReceipts: achievementFacts.receipts.map(encodeAchievementRewardReceipt),
             appState: appState
+        )
+    }
+
+    private func filteredAchievementFacts(
+        _ unlocks: [AchievementUnlock],
+        _ receipts: [AchievementRewardReceipt],
+        _ scope: DataBackupExportScope
+    ) -> (unlocks: [AchievementUnlock], receipts: [AchievementRewardReceipt]) {
+        guard scope.excludesHumanHealthData else { return (unlocks, receipts) }
+        return (
+            unlocks.filter {
+                !Self.isHumanHealthAchievement(
+                    scopeKindRaw: $0.scopeKindRaw,
+                    achievementID: $0.achievementID
+                )
+            },
+            receipts.filter {
+                !Self.isHumanHealthAchievement(
+                    scopeKindRaw: $0.scopeKindRaw,
+                    achievementID: $0.achievementID
+                )
+            }
+        )
+    }
+
+    private func fetchBackupSource(
+        context: ModelContext,
+        scope: DataBackupExportScope
+    ) throws -> BackupSource {
+        BackupSource(
+            pets: try context.fetch(FetchDescriptor<Pet>()),
+            humans: try context.fetch(FetchDescriptor<Human>()),
+            events: try context.fetch(FetchDescriptor<Event>()),
+            reminders: try context.fetch(FetchDescriptor<Reminder>()),
+            households: try context.fetch(FetchDescriptor<Household>()),
+            plants: try context.fetch(FetchDescriptor<Plant>()),
+            petRelationships: try context.fetch(FetchDescriptor<PetRelationship>()),
+            plantCareLogs: try context.fetch(FetchDescriptor<PlantCareLog>()),
+            careLogs: try context.fetch(FetchDescriptor<PetCareLog>()),
+            pottyLogs: try context.fetch(FetchDescriptor<PetPottyLog>()),
+            walkLogs: try context.fetch(FetchDescriptor<PetWalkLog>()),
+            weightLogs: try context.fetch(FetchDescriptor<PetWeightLog>()),
+            expLogs: try context.fetch(FetchDescriptor<PetExpenseLog>()),
+            healthLogs: try context.fetch(FetchDescriptor<PetHealthLog>()),
+            hygLogs: try context.fetch(FetchDescriptor<PetHygieneLog>()),
+            foodRecs: try context.fetch(FetchDescriptor<PetFoodRecord>()),
+            docs: try context.fetch(FetchDescriptor<PetDocument>()),
+            milestones: try context.fetch(FetchDescriptor<PetMilestone>()),
+            photos: try context.fetch(FetchDescriptor<PetPhotoLog>()),
+            insurances: try context.fetch(FetchDescriptor<PetInsurance>()),
+            claims: try context.fetch(FetchDescriptor<InsuranceClaim>()),
+            petMeds: try context.fetch(FetchDescriptor<PetMedication>()),
+            symptoms: try context.fetch(FetchDescriptor<SymptomLog>()),
+            heatCycles: try context.fetch(FetchDescriptor<HeatCycleLog>()),
+            hWeightLogs: scope.excludesHumanHealthData ? [] : try context.fetch(FetchDescriptor<HumanWeightLog>()),
+            hWorkouts: scope.excludesHumanHealthData ? [] : try context.fetch(FetchDescriptor<HumanWorkoutLog>()),
+            humanMeds: scope.excludesHumanHealthData ? [] : try context.fetch(FetchDescriptor<HumanMedication>()),
+            humanMedLogs: scope.excludesHumanHealthData ? [] : try context.fetch(FetchDescriptor<HumanMedicationLog>()),
+            humanHealthMetricLogs: scope.excludesHumanHealthData ? [] : try context.fetch(FetchDescriptor<HumanHealthMetricLog>()),
+            humanHealthRecords: try backupHumanHealthRecords(context: context, scope: scope),
+            waterLogs: try context.fetch(FetchDescriptor<WaterLog>()),
+            wishlist: try context.fetch(FetchDescriptor<WishlistItem>()),
+            ledger: try context.fetch(FetchDescriptor<CareLedgerEvent>()),
+            coconutAccounts: try context.fetch(FetchDescriptor<CoconutAccount>()),
+            coconutLedgerEntries: try context.fetch(FetchDescriptor<CoconutLedgerEntry>()),
+            economyBudgetUsageEvents: try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()),
+            familyTasks: try context.fetch(FetchDescriptor<FamilyCollaborationTask>()),
+            sharedCareSessions: try context.fetch(FetchDescriptor<SharedCareSession>()),
+            exchanges: try context.fetch(FetchDescriptor<CoconutExchangeRequest>()),
+            oasisUpgradeCoconuts: try context.fetch(FetchDescriptor<OasisUpgradeCoconut>()),
+            oasisElectronicPets: try context.fetch(FetchDescriptor<OasisElectronicPet>()),
+            oasisFragments: try context.fetch(FetchDescriptor<OasisCritterFragmentBalance>()),
+            oasisUnlocks: try context.fetch(FetchDescriptor<OasisUnlock>()),
+            oasisCritterActionLogs: try context.fetch(FetchDescriptor<OasisCritterActionLog>()),
+            gachaOwnedItems: try context.fetch(FetchDescriptor<GachaOwnedItem>()),
+            gachaDrawLogs: try context.fetch(FetchDescriptor<GachaDrawLog>()),
+            shopPurchaseRecords: try context.fetch(FetchDescriptor<ShopPurchaseRecord>()),
+            presenceCheckIns: try context.fetch(FetchDescriptor<PresenceCheckIn>()),
+            presenceParticipationPeriods: try context.fetch(FetchDescriptor<PresenceParticipationPeriod>()),
+            presenceRewardReceipts: try context.fetch(FetchDescriptor<PresenceRewardReceipt>()),
+            achievementUnlocks: try context.fetch(FetchDescriptor<AchievementUnlock>()),
+            achievementRewardReceipts: try context.fetch(FetchDescriptor<AchievementRewardReceipt>())
+        )
+    }
+
+    private func makeAppStateBackup(
+        _ shopPurchaseRecords: [ShopPurchaseRecord],
+        _ coconutAccounts: [CoconutAccount],
+        _ coconutLedgerEntries: [CoconutLedgerEntry],
+        _ plants: [Plant]
+    ) -> AppStateBackup {
+        let coconutLogProjection = coconutLedgerEntries
+            .sorted { $0.occurredAt > $1.occurredAt }
+            .prefix(200)
+            .filter { $0.delta != 0 }
+            .map { $0.asCoconutLogEntry() }
+        let coconutLogsJSON: String = {
+            guard let data = try? JSONEncoder().encode(Array(coconutLogProjection)),
+                  let string = String(data: data, encoding: .utf8) else {
+                return "[]"
+            }
+            return string
+        }()
+        let shopInventorySnapshot = ShopInventoryStateStore.snapshot(defaults: defaults)
+        return AppStateBackup(
+            coconutCount: coconutAccounts.reduce(0) { $0 + $1.balance },
+            coconutLogsJSON: coconutLogsJSON,
+            bountyTasksJSON: defaults.string(forKey: "bountyTasks") ?? "[]",
+            purchasedShopItems: ShopPurchaseRecordStore.ownedItemIDs(from: shopPurchaseRecords).sorted().joined(separator: ","),
+            selectedAppIcon: defaults.string(forKey: AppIconCatalog.selectedIconKey),
+            gachaHistoryJSON: defaults.string(forKey: "gachaHistory") ?? "[]",
+            celebratedMilestoneDays: defaults.string(forKey: "celebratedMilestoneDays") ?? "",
+            shopConsumableInventory: ShopConsumableInventoryBackup(
+                backdatePassCount: shopInventorySnapshot.backdatePassCount,
+                avatar2DExtraPassCount: shopInventorySnapshot.avatar2DExtraPassCount,
+                doubleRewardBoostActive: shopInventorySnapshot.isDoubleRewardBoostActive,
+                streakShieldExpiry: d(shopInventorySnapshot.streakShieldExpiry)
+            ),
+            plantReminderPreferences: makePlantReminderPreferencesBackup(defaults: defaults, plants: plants)
         )
     }
 
@@ -1094,48 +1165,9 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 context: context
             )
         }
-        // Restore presence facts and idempotency receipts as facts only. This
-        // path never invokes the live check-in command and therefore cannot
-        // mint rewards while importing or re-importing a package.
-        for dto in backup.presenceCheckIns ?? [] {
-            try PresenceRehydrateWriter.upsert(
-                try decodePresenceCheckInSnapshot(dto),
-                context: context
-            )
-        }
-        for dto in backup.presenceParticipationPeriods ?? [] {
-            let exportedAt = iso.date(from: backup.exportedAt)
-            guard let exportedAt else {
-                throw BackupError.invalidRestoreData(.date)
-            }
-            try PresenceRehydrateWriter.upsert(
-                normalizeActivePresenceParticipationForRestore(
-                    try decodePresenceParticipationPeriodSnapshot(dto),
-                    exportedAt: exportedAt,
-                    checkIns: backup.presenceCheckIns ?? []
-                ),
-                context: context
-            )
-        }
-        for dto in backup.presenceRewardReceipts ?? [] {
-            try PresenceRehydrateWriter.upsert(
-                try decodePresenceRewardReceiptSnapshot(dto),
-                context: context
-            )
-        }
-        // Achievement imports are facts only. Do not call the live command or
-        // reconstruct wallet/stardust rewards during restore.
-        for dto in backup.achievementUnlocks ?? [] {
-            try AchievementFactRehydrateWriter.upsertUnlock(dto, context: context, iso: iso)
-        }
-        for dto in backup.achievementRewardReceipts ?? [] {
-            try AchievementFactRehydrateWriter.upsertReceipt(dto, context: context, iso: iso)
-        }
+        try restorePresenceAndAchievementFacts(backup, context: context)
         try restoreBoundary(.extendedDataPrepared)
-        _ = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(
-            context: context,
-            persistChanges: false
-        )
+        _ = SharedCareSessionMaintenance.cleanLegacyNoteMetadata(context: context, persistChanges: false)
 
         let s = backup.appState
         let isLegacyCoconutBackup = backup.coconutAccounts?.isEmpty != false
@@ -1166,6 +1198,44 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             notificationIDsToCancel: rehydrateNotificationIdsToCancel,
             plantReconciliation: plantReconciliation
         )
+    }
+
+    private func restorePresenceAndAchievementFacts(
+        _ backup: OhanaBackup,
+        context: ModelContext
+    ) throws {
+        // Facts only: restore must never invoke live commands or mint rewards.
+        for dto in backup.presenceCheckIns ?? [] {
+            try PresenceRehydrateWriter.upsert(
+                try decodePresenceCheckInSnapshot(dto),
+                context: context
+            )
+        }
+        for dto in backup.presenceParticipationPeriods ?? [] {
+            guard let exportedAt = iso.date(from: backup.exportedAt) else {
+                throw BackupError.invalidRestoreData(.date)
+            }
+            try PresenceRehydrateWriter.upsert(
+                normalizeActivePresenceParticipationForRestore(
+                    try decodePresenceParticipationPeriodSnapshot(dto),
+                    exportedAt: exportedAt,
+                    checkIns: backup.presenceCheckIns ?? []
+                ),
+                context: context
+            )
+        }
+        for dto in backup.presenceRewardReceipts ?? [] {
+            try PresenceRehydrateWriter.upsert(
+                try decodePresenceRewardReceiptSnapshot(dto),
+                context: context
+            )
+        }
+        for dto in backup.achievementUnlocks ?? [] {
+            try AchievementFactRehydrateWriter.upsertUnlock(dto, context: context, iso: iso)
+        }
+        for dto in backup.achievementRewardReceipts ?? [] {
+            try AchievementFactRehydrateWriter.upsertReceipt(dto, context: context, iso: iso)
+        }
     }
 
     private func insertLegacyShopPurchaseRecords(

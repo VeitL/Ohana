@@ -152,7 +152,7 @@ struct PresenceCheckInCommandServiceTests {
         )
 
         #expect(streak.days.first?.dayKey == "2026-07-05")
-        #expect(streak.days.first { $0.dayKey == "2026-07-04" } == nil)
+        #expect(!streak.days.contains { $0.dayKey == "2026-07-04" })
         #expect(streak.days.first { $0.dayKey == "2026-07-05" }?.isParticipating == true)
         #expect(streak.days.first { $0.dayKey == "2026-07-06" }?.isParticipating == true)
     }
