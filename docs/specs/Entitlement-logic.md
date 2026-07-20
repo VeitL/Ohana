@@ -73,7 +73,7 @@ Personal 解锁以下语义能力；只有已实现、已验收的条目才能�
 - 90 天、1 年、全部时间趋势与本地交叉比较；
 - 高级周报、月报、年度回顾、兽医 PDF、健康护照和 CSV；
 - 全历史搜索、高级筛选、自定义照护动作、批量记录、文档扫描和附件；
-- Widget、Shortcuts 与快捷记录；
+- 已实现的隐私精简、只读“今日照护”Widget；Shortcuts 与快捷记录只有实现并验收后才可加入付费宣传；
 - 多版本自动 iCloud Drive 备份与恢复点；
 - Founding 徽章、3 个 Supporter 背景、`AppIconNeonSmile` 立即使用权和 Founding 周报海报。
 

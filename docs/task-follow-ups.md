@@ -9,11 +9,11 @@
 
 ## Current Read
 
-- Last compacted: 2026-07-18.
-- Open follow-ups: 11 total: P1 = 6, P2 = 4, P3 = 1.
+- Last compacted: 2026-07-20.
+- Open follow-ups: 12 total: P1 = 7, P2 = 4, P3 = 1.
 - Open P0: 0.
-- First-release repository blocker: no known P0 defect, and one
-  release-reachable P1 implementation/proof gap remains. Human-first/D28
+- First-release repository blocker: no known P0 defect, and two
+  release-reachable P1 implementation/proof gaps remain. Human-first/D28
   repository and Simulator proof closed on 2026-07-18: the final repair batch
   passed 57/57 focused tests and 15/15 after its last warning-only isolation
   annotation; the complete release-static lane passed; optimized and WMO
@@ -26,8 +26,14 @@
   grandfathering, downgrade protection, paid capability gates, and the paywall;
   its App + UI target compiles and its focused Unit artifact reports 67/67
   passing. Complete nine-language in-app commerce copy and real App Store /
-  Sandbox acceptance remain open. The earlier storage and conflict-copy build
-  Swift-source build blockers are cleared.
+  Sandbox acceptance remain open. The 2026-07-20 worktree also implements a
+  privacy-bounded Personal Today Widget and a Free/Personal walk Live Activity
+  with Dynamic Island presentation; 89 focused tests pass and clean plus final
+  incremental optimized Simulator Release builds embed and validate the
+  extension. Registering the two App
+  Groups, producing a signed current package, and physical-device Widget /
+  Dynamic Island acceptance remain open. The earlier storage and conflict-copy
+  build Swift-source build blockers are cleared.
 - First-release product/configuration gap: 1.0 is now Free plus Personal.
   Free allows 1 active Pet, 2 active Humans, 5 active Plants, and 3 ordinary
   active logical plans while preserving basic records, existing history,
@@ -37,8 +43,8 @@
   account, login, developer backend, Family, Care+, or ads. D24 still approves
   iPhone-only, iOS 26.2+, with native
   iPad/watchOS deferred.
-- Current decision: close TFU-20260715-003 before resuming final signed-device
-  RC acceptance. The remaining CloudKit P1 is explicitly
+- Current decision: close TFU-20260715-003 and TFU-20260720-001 before final
+  signed-device RC acceptance. The remaining CloudKit P1 is explicitly
   deferred and unreachable in the local-only first release. The future
   account design is recorded in
   `docs/planning/account-backend-extension.md`; the requested family invitation
@@ -93,6 +99,40 @@
   subscription, Lifetime, second-device restore, trial/expiration, and
   refund/revocation pass; agreements, tax/banking, metadata, review materials,
   and submission are ready and recorded in the active release dashboard.
+
+### TFU-20260720-001 - Sign And Validate Widget And Walk Live Activity
+
+- Priority / bucket: P1, current first-release capability and physical-device
+  acceptance.
+- Progress: the current worktree adds an embedded WidgetKit extension with a
+  bounded Personal Today Widget, accessory presentation, typed deep links, and
+  a walk Live Activity covering Lock Screen plus Dynamic Island expanded,
+  compact, and minimal regions. The app owns the SwiftData projection, writes
+  at most three minimized task DTOs through a dedicated App Group JSON file,
+  preserves a recoverable active walk across relaunch, removes stale
+  activities, and routes all update frequency through `AppWorkloadPolicy`.
+  Seven focused suites execute 89/89 tests, and the unsigned Simulator and
+  LocalDevice lanes compile and embed both app and extension. A clean-cache
+  dual-architecture optimized Release build and the final incremental recheck also pass
+  `ValidateEmbeddedBinary` for the extension.
+- Blocker: `group.com.guanchen.li.Ohana` and
+  `group.com.guanchen.li.Ohana.LocalDevice` have not been registered and
+  approved in Developer Portal provisioning for both app and extension. No
+  signed current Archive or physical-device run has therefore proved shared
+  snapshot access, Home/Lock Screen Widget rendering, Dynamic Island behavior,
+  foreground/background location handoff, or locked-device privacy.
+- Next action: register each App Group on its matching app and Widget extension
+  identifiers, regenerate profiles, then install one signed current Release.
+  Exercise Personal, Free, downgrade, locked/redacted, stale, reset, and deep
+  link Widget states; then run an active dog walk through start, pause, resume,
+  distance/poop updates, relaunch, background/lock, deep link, and finish on a
+  Dynamic Island-capable iPhone.
+- Close when: the signed package embeds the extension with exact matching
+  entitlements; all Widget families render current, locked, empty, and stale
+  states without leaking deleted, deceased, health, or free-form task data;
+  links restore the intended route from cold and warm launch; one active walk
+  survives relaunch without duplication and ends cleanly; key long-language,
+  Dynamic Type, Reduce Motion, Low Power, and locked-screen states are recorded.
 
 ### TFU-20260614-014 - Validate CloudSync Live-Apply Policy When Family Enables
 

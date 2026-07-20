@@ -23,6 +23,19 @@
 		<string>ko</string>
 		<string>it</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.guanchen.li.Ohana.system-surfaces</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ohana</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>用于在你主动拍照时创建成员或宠物头像、时刻照片或收据附件。</string>
 	<key>NSFaceIDUsageDescription</key>

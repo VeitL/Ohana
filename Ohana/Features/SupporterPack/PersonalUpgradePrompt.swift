@@ -137,6 +137,18 @@ nonisolated struct PersonalUpgradePrompt: Identifiable, Equatable, Sendable {
                 ko: "연락 메시지 사용자 지정",
                 it: "Personalizza il messaggio di contatto"
             )
+        case .feature(.systemWidgets):
+            l.tr(
+                zh: "在桌面查看今日照护",
+                en: "See today’s care on your Home Screen",
+                de: "Heutige Pflege auf dem Home-Bildschirm",
+                es: "Consulta el cuidado de hoy en la pantalla de inicio",
+                pt: "Veja os cuidados de hoje na tela de Início",
+                fr: "Consultez les soins du jour sur l’écran d’accueil",
+                ja: "ホーム画面で今日のケアを確認",
+                ko: "홈 화면에서 오늘의 돌봄 확인",
+                it: "Consulta le cure di oggi nella schermata Home"
+            )
         }
     }
 
@@ -257,6 +269,18 @@ nonisolated struct PersonalUpgradePrompt: Identifiable, Equatable, Sendable {
                 ja: "Freeでは固定の控えめな文面を使用します。Personalでは端末上で編集し、連絡先を3人まで保存できます。SMSの送信は毎回あなたが確認します。",
                 ko: "Free는 신중한 고정 문구를 사용합니다. Personal은 기기에서 문구를 편집하고 연락처를 최대 3명까지 저장할 수 있습니다. 문자 전송은 매번 직접 확인합니다.",
                 it: "Free usa un messaggio fisso e prudente. Personal permette di modificarlo sul dispositivo e conservare fino a tre contatti. Confermi comunque ogni SMS."
+            )
+        case .systemWidgets:
+            l.tr(
+                zh: "Ohana Personal 可在主屏幕与锁屏显示精简的今日照护进度；原始记录仍只保存在你的设备上。",
+                en: "Ohana Personal shows a compact daily-care summary on the Home and Lock Screens. Your original records stay on your device.",
+                de: "Ohana Personal zeigt eine kompakte Pflegeübersicht auf Home- und Sperrbildschirm. Deine Originaleinträge bleiben auf deinem Gerät.",
+                es: "Ohana Personal muestra un resumen compacto del cuidado diario en las pantallas de inicio y bloqueo. Tus registros originales permanecen en tu dispositivo.",
+                pt: "O Ohana Personal mostra um resumo compacto dos cuidados diários nas telas de Início e Bloqueio. Seus registros originais permanecem no dispositivo.",
+                fr: "Ohana Personal affiche un résumé compact des soins quotidiens sur les écrans d’accueil et verrouillé. Vos données d’origine restent sur votre appareil.",
+                ja: "Ohana Personalでは、ホーム画面とロック画面に今日のケア概要を表示できます。元の記録は端末内に保存されたままです。",
+                ko: "Ohana Personal은 홈 및 잠금 화면에 간결한 오늘의 돌봄 요약을 표시합니다. 원본 기록은 기기에 그대로 보관됩니다.",
+                it: "Ohana Personal mostra un riepilogo compatto delle cure quotidiane nelle schermate Home e di blocco. I dati originali restano sul dispositivo."
             )
         }
     }

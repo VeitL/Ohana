@@ -158,6 +158,7 @@ struct ContentView: View {
             restoreLegacyStarterGiftCeremonyRequestIfNeeded()
             synchronizeHomeSurfaceLanguageIfAllowed(routeLanguageCode)
             synchronizeRouteSurfaceLanguageIfAllowed(routeLanguageCode)
+            appServices.systemSurfaces.scheduleRefresh(reason: "contentAppear")
             scheduleRootAppearHandoff()
             applyOnboardingFirstPetIDIfNeeded()
             scheduleUITestHumanProfileRouteIfNeeded()
@@ -192,6 +193,7 @@ struct ContentView: View {
         .onChange(of: routeLanguageCode) { _, newValue in
             synchronizeHomeSurfaceLanguageIfAllowed(newValue)
             synchronizeRouteSurfaceLanguageIfAllowed(newValue)
+            appServices.systemSurfaces.scheduleRefresh(reason: "languageChanged")
         }
         .onChange(of: appRoutes.sheet) { _, newValue in
             guard newValue != .settings else {
@@ -263,6 +265,12 @@ struct ContentView: View {
         )
         .onChange(of: currentActiveHumanId) { _, newValue in
             scheduleActiveHumanReaction(newValue)
+            appServices.systemSurfaces.scheduleRefresh(reason: "activeHumanChanged")
+        }
+        .onChange(of: appServices.systemSurfaceRoutes.pendingRequest, initial: true) { _, request in
+            guard let request else { return }
+            appRoutes.handleExternalRoute(request.route)
+            appServices.systemSurfaceRoutes.consume(request.id)
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {

@@ -109,7 +109,7 @@ enum EventType: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    func localizedLabel(_ l: L10n) -> String {
+    nonisolated func localizedLabel(_ l: L10n) -> String {
         switch self {
         case .birthday:
             l.tr(zh: "生日", en: "Birthday", de: "Geburtstag")

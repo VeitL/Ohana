@@ -147,6 +147,49 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.sheet?.id == "task-center-all-all")
     }
 
+    @Test func widgetDeepLinkOpensAndFocusesTaskCenterItem() throws {
+        let coordinator = AppRouteCoordinator()
+        coordinator.presentSettings()
+
+        let handled = coordinator.handleExternalURL(
+            OhanaExternalRoute.taskCenter(focusedItemID: "event:water").url
+        )
+
+        #expect(handled)
+        guard case let .taskCenter(context) = try #require(coordinator.sheet) else {
+            Issue.record("Expected the task center sheet")
+            return
+        }
+        #expect(context.scope == .all)
+        #expect(context.focusedItemID == "event:water")
+        #expect(context.focusRequestID != nil)
+        #expect(coordinator.fullScreen == nil)
+    }
+
+    @Test func liveActivityDeepLinkReplacesExistingPresentationWithWalk() {
+        let coordinator = AppRouteCoordinator()
+        let petID = UUID()
+        coordinator.presentSettings()
+
+        let handled = coordinator.handleExternalURL(
+            OhanaExternalRoute.activeWalk(petID: petID).url
+        )
+
+        #expect(handled)
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.fullScreen == .walk(petID: petID))
+    }
+
+    @Test func foreignExternalURLLeavesRouteStateUntouched() {
+        let coordinator = AppRouteCoordinator()
+        coordinator.presentSettings()
+
+        let handled = coordinator.handleExternalURL(URL(string: "https://example.com")!)
+
+        #expect(!handled)
+        #expect(coordinator.sheet == .settings)
+    }
+
     @Test func profileAndFocusedTaskRoutesCarryTypedTaskCenterContext() {
         let petID = UUID()
         let humanID = UUID()

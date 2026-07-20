@@ -14,19 +14,22 @@
 
 ## Current Release Read
 
-- Last compacted: 2026-07-18.
-- Release bar: **known Open P0 = 0; first-release-reachable implementation / proof P1 = 1**.
-- Active phase: **finish Free / Personal Storefront acceptance, then resume
-  final signed-device RC acceptance**. The Human-first/D28 repository and
+- Last compacted: 2026-07-20.
+- Release bar: **known Open P0 = 0; first-release-reachable implementation / proof P1 = 2**.
+- Active phase: **finish Free / Personal Storefront acceptance and sign the
+  Widget / Dynamic Island capability set, then resume final signed-device RC
+  acceptance**. The Human-first/D28 repository and
   Simulator lane closed on 2026-07-18 after final targeted tests, a complete
   release-static pass, optimized Release compilation, and protected Dogfood
   existing-user acceptance.
-- Open follow-ups: 11 total in `docs/task-follow-ups.md`.
-- Open P1: 6 total: 1 current first-release implementation/proof gap, 1
-  deferred CloudKit 1.x item, and 4 physical-device validation items.
+- Open follow-ups: 12 total in `docs/task-follow-ups.md`.
+- Open P1: 7 total: 1 current Free / Personal implementation and Storefront
+  gap, 1 current system-surface capability/device proof gap, 1 deferred
+  CloudKit 1.x item, and 4 other physical-device validation items.
 - Current decision: the 2026-07-11 Pet-first evidence is historical for the
   superseded route. Do not submit to App Store or call the app RC-ready until
-  TFU-20260715-003 and the physical-device P1 items are dispositioned.
+  TFU-20260715-003, TFU-20260720-001, and the other physical-device P1 items
+  are dispositioned.
 
 ## Evidence Reconciliation
 
@@ -35,6 +38,7 @@ single “all tests pass” claim:
 
 | Evidence date | Surface | Result | Current meaning |
 | --- | --- | --- | --- |
+| 2026-07-20 Widget and walk system surfaces | Current app, embedded WidgetKit extension, shared bounded snapshot contract, typed cold/warm deep links, Personal feature gate, walk Live Activity/Dynamic Island lifecycle, and centralized runtime budgets | Seven selected suites executed 89/89 tests with no failures or skips. Final artifact: `.build/DerivedData/tests/Logs/Test/Test-OhanaUnitTests-2026.07.21_00-39-23-+0200.xcresult`. The unsigned Simulator and LocalDevice lanes compiled and embedded `OhanaWidgets.appex`; a clean-cache dual-architecture `-O` `scripts/build-release-fast.sh` build and the final incremental recheck both succeeded, including `ValidateEmbeddedBinary`. Tests cover snapshot versioning/freshness/minimization and sensitive-category exclusion, foreign URL rejection, cold-launch buffering, route replacement, entitlement mapping/localization, walk lifecycle/recovery/discard handoff, reset generation fencing, and normal/low-power/critical update budgets. Scoped V4 UI, accessibility, runtime, localization, SwiftFormat, plist, and status-ledger audits also pass. | Current repository and unsigned Simulator evidence for the new surfaces. It does not prove registered App Groups, signed provisioning, SpringBoard/Home/Lock Screen rendering, locked-device privacy, background location, or physical Dynamic Island behavior. Those remain under TFU-20260720-001. |
 | 2026-07-18 Human-first/D28 repository and Simulator closure | Final Task Center refactor, starter-journey read path, Plant room-stack geometry, static governance, optimized Simulator Release, and the pinned existing-user Dogfood lane | Five focused suites executed 57/57 tests; after the final warning-only isolation annotation, `HouseholdStarterJourneyServiceTests` executed 15/15 with artifact `.build/DerivedData/tests/Logs/Test/Test-OhanaUnitTests-2026.07.18_01-05-51-+0200.xcresult`. The complete `scripts/release-hardening-check.sh --static-only` passed on the final source: complexity scanned 1,025 production files with 74 grandfathered declarations and no new/growing hotspot; V4 UI, accessibility, smoothness, route, runtime, data-safety, localization, resource, secret, and Git-size checks all passed. Resource integrity retained only the non-blocking `Assets.xcassets` 65.92 MiB review advisory. `scripts/build-release-fast.sh` produced the final 399 MiB unsigned `-O` app. The guarded Dogfood launcher then built and overlaid the exact WMO Release app, preserved its sealed store identity, and normal UI proved the Task Center card guide, real nested editor cancel, `Not sure yet` branch, 1/3 to 2/3 progression, relaunch resume at `petBodyProfile`, and unchanged 162-coconut balance. Final read-only status remained ready with 1 Human, 1 Pet, 17 ledger facts, and zero test artifacts; `overlay=pass` was recorded at `2026-07-17T23:23:41+00:00`. | Closes TFU-20260715-002 at the repository and Simulator level. It is risk-targeted current-source evidence, not a current full-Unit replay, signed Archive, physical-device, Storefront, notification, background, energy, or assistive-technology claim. Those external lanes remain separately owned. |
 | 2026-07-18 local storage and conflict-copy cleanup | Authorized cleanup of verified conflict copies that had repeatedly filled the disk | Removed 244 invalid spaced Git-object copies and 12 byte-identical untracked/ignored LaunchMark conflict children, reclaiming 5,360,891,808 bytes. `.git` fell from about 6.0 GiB to 1.0 GiB; `git fsck --full --no-dangling` passed, the canonical static Git-size check reports zero garbage, and 48 GiB is free after the final Release/Dogfood builds. The three stable DerivedData roots and all user product data were preserved. | The recurring 5 GiB growth cause is removed and the build environment is healthy. This is storage integrity evidence, not product behavior evidence. |
 | 2026-07-18 focused Human-first/D28 Unit/Integration | Current App + Unit source on guarded `iPhone 17 Tests` across onboarding coordinator, handoff responsiveness, starter gift, household journey, Task Center snapshot/guide, reset, growth unlock, and compatibility | Nine selected suites executed 97/97 tests with 0 failures or skips. Artifact: `.build/DerivedData/tests/Logs/Test/Test-OhanaUnitTests-2026.07.17_23-58-13-+0200.xcresult`; source hash `ce6b0d8f52f63d80bec1db3682c857d4e2e6a732ff4d91b6ba8c315afd516459`, contract hash `6665d5759e7e900bb0bc33460902840a52ef4f809bb9fcd86fd8931fbcb37b2a`. | Current focused domain evidence for TFU-20260715-002, not a full Unit-suite, full release-hardening, or signed-device claim. The build also surfaced existing Swift 6 concurrency warnings that remain debt rather than test failures. |
@@ -97,6 +101,7 @@ single “all tests pass” claim:
 | Surface | Follow-up | Required evidence |
 | --- | --- | --- |
 | Free / Personal 1.0 | TFU-20260715-003 | Free quota/domain-command enforcement and logical-plan deduplication; Personal monthly/yearly/Lifetime plus legacy Supporter grandfather; trial, downgrade, over-quota data protection, paid capability mapping, StoreKit lifecycle, nine-language/accessibility, App Store Connect, Sandbox, second-device, and signed Storefront evidence |
+| Today Widget + walk Live Activity | TFU-20260720-001 | Register matching standard/local App Groups for app and extension; signed package inspection; Personal/Free/downgrade/stale/privacy Widget states; typed cold/warm links; active-walk relaunch/background/end; Lock Screen and physical Dynamic Island acceptance |
 | Future CloudKit live apply | TFU-20260614-014 | Two-device shared-zone conflict/delete proof after capability enablement |
 | Memorial | TFU-20260612-017 | Real-device UI and notification acceptance |
 | Notifications | TFU-20260612-016 | Real-device delivery/action/privacy acceptance |

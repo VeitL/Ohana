@@ -80,6 +80,7 @@ private struct OhanaBootstrapRootView: View {
     @State private var launchRevealProgress: CGFloat = 0
     @State private var isLaunchOverlayVisible = true
     @State private var commerce = CommerceEntitlementService()
+    @State private var pendingExternalURL: URL?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -128,6 +129,7 @@ private struct OhanaBootstrapRootView: View {
             guard isReady else { return }
             beginLaunchRevealIfReady()
         }
+        .onOpenURL(perform: handleExternalURL)
         .onDisappear {
             bootstrapTask?.cancel()
             bootstrapTask = nil
@@ -152,6 +154,7 @@ private struct OhanaBootstrapRootView: View {
                 payload.appServices.lifecycle.handle(.didBecomeActive)
                 Task { @MainActor in
                     await payload.appServices.commerce.refreshEntitlements()
+                    payload.appServices.systemSurfaces.scheduleRefresh(reason: "entitlementsRefreshed")
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
@@ -237,11 +240,24 @@ private struct OhanaBootstrapRootView: View {
             AppPerformanceMonitor.shared.record("App init", valueMS: initDurationMS, note: "BGTask + deferred container")
             AppPerformanceMonitor.shared.record("进程到 App init 完成", startedAt: ohanaProcessStartTime)
             services.metricKit.start()
+            if let pendingExternalURL {
+                _ = services.systemSurfaceRoutes.submit(pendingExternalURL)
+                self.pendingExternalURL = nil
+            }
             payload = OhanaBootstrapPayload(modelContainer: modelContainer, appServices: services)
             OhanaStartupProbe.mark("bootstrap.payload-set")
             bootstrapWatchdogTask?.cancel()
             bootstrapWatchdogTask = nil
             bootstrapTask = nil
+        }
+    }
+
+    private func handleExternalURL(_ url: URL) {
+        guard OhanaExternalRoute.parse(url) != nil else { return }
+        if let payload {
+            _ = payload.appServices.systemSurfaceRoutes.submit(url)
+        } else {
+            pendingExternalURL = url
         }
     }
 

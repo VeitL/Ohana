@@ -177,6 +177,47 @@ struct AppWorkloadPolicyTests {
         #expect(!criticalBudget.hasWorkCapacity)
         #expect(criticalBudget.isDeferred)
     }
+
+    @Test func systemSurfaceBudgetsFollowCentralRuntimePolicy() {
+        let normal = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        #expect(
+            normal.walkLiveActivityUpdateBudget() == OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 50,
+                maximumUpdateInterval: 30,
+                allowsAutomaticUpdates: true
+            )
+        )
+        #expect(normal.systemSurfaceSnapshotDebounceMilliseconds() == 350)
+
+        let lowPower = AppWorkloadPolicy(
+            lowPowerModeProvider: { true },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        #expect(
+            lowPower.walkLiveActivityUpdateBudget() == OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 100,
+                maximumUpdateInterval: 90,
+                allowsAutomaticUpdates: true
+            )
+        )
+        #expect(lowPower.systemSurfaceSnapshotDebounceMilliseconds() == 1200)
+
+        let critical = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .critical }
+        )
+        #expect(!critical.walkLiveActivityUpdateBudget().allowsAutomaticUpdates)
+        #expect(critical.systemSurfaceSnapshotDebounceMilliseconds() == 2500)
+    }
 }
 
 private final class ThermalStateProbe {

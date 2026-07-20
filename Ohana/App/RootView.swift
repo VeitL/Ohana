@@ -98,6 +98,7 @@ struct RootView: View {
                 evaluateSupporterIconAccessAfterVerification()
             }
             .onChange(of: appServices.commerce.entitlementStatus) { _, status in
+                appServices.systemSurfaces.scheduleRefresh(reason: "entitlementChanged")
                 if status == .notOwnedVerified {
                     evaluateSupporterIconAccessAfterVerification()
                 } else if status == .ownedVerified,

@@ -63,6 +63,8 @@ final class AppServices {
     let cloudSync: CloudSyncManaging
     let commerce: CommerceEntitlementService
     let sharedCareUndo: SharedCareUndoRegistering
+    let systemSurfaces: SystemSurfaceSnapshotRefreshing
+    let systemSurfaceRoutes: SystemSurfaceRouteInbox
     var walkingPresentationRevision = 0
 
     convenience init(
@@ -81,6 +83,7 @@ final class AppServices {
         let domainRevisions = SharedDomainRevisionPublisher(center: revisionCenter)
         let questManager = QuestManager(wallet: coconutWallet, revisions: domainRevisions)
         let locationManager = LocationManager()
+        let walkActivityPresenter = LiveWalkActivityPresenter()
         let careLedger = CareLedgerService()
         let automaticBackups = AutomaticBackupService()
         let backupAdapter = SharedDataBackupManagerAdapter(projectionManager: questManager)
@@ -112,7 +115,25 @@ final class AppServices {
             careEventDependencies, careEventEconomy, familyTasks,
             reminderScheduling, medicationReminders, reminderCompletion
         )
-        let walkingManager = AppServices.makeWalker(locationManager, questManager, careLedger, careEventDependencies, activeHumanSelection)
+        let walkingManager = AppServices.makeWalker(
+            locationManager,
+            questManager,
+            careLedger,
+            careEventDependencies,
+            activeHumanSelection,
+            walkActivityPresenter
+        )
+        let systemSurfaces: SystemSurfaceSnapshotRefreshing = if let modelContainer {
+            SystemSurfaceSnapshotCoordinator(
+                modelContainer: modelContainer,
+                activeHumanSelection: activeHumanSelection,
+                commerce: commerce,
+                revisions: domainRevisions
+            )
+        } else {
+            NoopSystemSurfaceSnapshotCoordinator()
+        }
+        walkActivityPresenter.dismissStaleActivities()
         AppWorkloadPolicy.shared.hasRunningWalkProvider = { walkingManager.hasActiveLocationWalk }
         self.init(
             careEvents: CareEventService(dependencies: careEventDependencies),
@@ -145,7 +166,11 @@ final class AppServices {
             automaticBackups: automaticBackups,
             appReset: StaticAppResetter(
                 questManager: questManager,
-                automaticBackups: automaticBackups
+                automaticBackups: automaticBackups,
+                prepareRuntimeForReset: {
+                    walkingManager.reset()
+                    walkActivityPresenter.endAll(immediate: true)
+                }
             ),
             medicationReminders: medicationReminders,
             userNotifications: SharedUserNotificationManager(manager: notificationManager),
@@ -176,7 +201,9 @@ final class AppServices {
                 modelContainer: modelContainer
             )),
             cloudSync: AppServices.makeCloudSyncService(),
-            commerce: commerce
+            commerce: commerce,
+            systemSurfaces: systemSurfaces,
+            systemSurfaceRoutes: SystemSurfaceRouteInbox()
         )
         configureLiveRuntime(
             backupAdapter: backupAdapter,
@@ -185,6 +212,7 @@ final class AppServices {
             avatarPipeline: avatarPipeline,
             notificationManager: notificationManager
         )
+        self.systemSurfaces.start()
     }
 
     private static func registerDomainDependencies(
@@ -296,7 +324,8 @@ final class AppServices {
         _ quests: QuestManager,
         _ ledger: CareLedgerRecording,
         _ careEvents: CareEventServiceDependencies,
-        _ activeHuman: ActiveHumanSelecting
+        _ activeHuman: ActiveHumanSelecting,
+        _ activityPresenter: WalkActivityPresenting
     ) -> PetWalkingManager {
         PetWalkingManager(
             locationManager: location,
@@ -304,7 +333,8 @@ final class AppServices {
             careEconomy: careEvents.economy,
             careLedger: ledger,
             walkCareEvents: StaticWalkCareEventManager(dependencies: careEvents),
-            activeHumanSelection: activeHuman
+            activeHumanSelection: activeHuman,
+            activityPresenter: activityPresenter
         )
     }
 
@@ -364,7 +394,9 @@ final class AppServices {
         lifecycle: AppLifecycleHandling,
         cloudSync: CloudSyncManaging,
         commerce: CommerceEntitlementService? = nil,
-        sharedCareUndo: SharedCareUndoRegistering? = nil
+        sharedCareUndo: SharedCareUndoRegistering? = nil,
+        systemSurfaces: SystemSurfaceSnapshotRefreshing? = nil,
+        systemSurfaceRoutes: SystemSurfaceRouteInbox? = nil
     ) {
         self.careEvents = careEvents
         self.activeHumanSelection = activeHumanSelection
@@ -410,6 +442,8 @@ final class AppServices {
         self.cloudSync = cloudSync
         self.commerce = commerce ?? CommerceEntitlementService()
         self.sharedCareUndo = sharedCareUndo ?? SharedCareUndoCoordinator.shared
+        self.systemSurfaces = systemSurfaces ?? NoopSystemSurfaceSnapshotCoordinator()
+        self.systemSurfaceRoutes = systemSurfaceRoutes ?? SystemSurfaceRouteInbox()
     }
 
     func publishWalkingPresentationChange() {

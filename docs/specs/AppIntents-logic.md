@@ -1,8 +1,8 @@
 # App Intents And System Surfaces Logic
 
-> Status: system-surface rulebook. It governs future App Intents, Shortcuts,
-> Siri, Spotlight, widgets, controls, and notification/widget action reuse. It
-> does not claim that Ohana currently ships App Intents.
+> Status: active system-surface rulebook. Ohana currently ships a read-only
+> Today Care Widget and a walk Live Activity / Dynamic Island. App Intents,
+> Shortcuts, Siri, Spotlight, and controls remain unimplemented.
 
 ## Purpose
 
@@ -27,6 +27,22 @@ Out of scope:
   or locked data through system suggestions.
 - Cloud collaboration or shared household entry points before the product
   foundation allows online multi-user behavior.
+
+## Current Shipped Surfaces
+
+- The Personal Today Care Widget reads one versioned App Group snapshot with at
+  most three items. It uses generic care labels instead of free-form household
+  titles, omits health/medication details, expires stale Personal content, and
+  opens either the typed Task Center route or Settings. It never writes a care
+  fact inline.
+- The Free and Personal walk Live Activity carries a stable session and pet ID,
+  pet display name, phase, elapsed time, distance, and potty count. It opens the
+  typed active-walk route and exposes no completion, reward, or persistence
+  action. Missing, deleted, deceased, or ineligible pets are rejected by the
+  normal walk route container.
+- Neither surface reads live SwiftData models in the extension. The app owns
+  projection and domain invariants; WidgetKit and ActivityKit receive only
+  bounded value data.
 
 ## Invariants
 

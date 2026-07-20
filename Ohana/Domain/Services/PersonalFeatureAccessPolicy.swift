@@ -16,6 +16,7 @@ nonisolated enum PersonalFeature: String, CaseIterable, Hashable, Sendable {
     case presenceDataExport
     case presenceAdvancedReminders
     case presenceEditableMessageTemplate
+    case systemWidgets
 }
 
 nonisolated enum PersonalFeatureAccessPolicy {

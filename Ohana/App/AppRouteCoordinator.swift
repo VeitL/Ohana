@@ -501,6 +501,31 @@ final class AppRouteCoordinator: ObservableObject {
         }
     }
 
+    @discardableResult
+    func handleExternalURL(_ url: URL) -> Bool {
+        guard let route = OhanaExternalRoute.parse(url) else { return false }
+        handleExternalRoute(route)
+        return true
+    }
+
+    func handleExternalRoute(_ route: OhanaExternalRoute) {
+        resetToHome()
+        switch route {
+        case let .taskCenter(focusedItemID):
+            presentTaskCenter(
+                context: TaskCenterRouteContext(
+                    scope: .all,
+                    focusedItemID: focusedItemID,
+                    focusRequestID: focusedItemID == nil ? nil : UUID()
+                )
+            )
+        case let .activeWalk(petID):
+            presentWalk(petID: petID)
+        case .settings:
+            presentSettings()
+        }
+    }
+
     func resetToHome(rebuildRoot: Bool = false) {
         if !path.isEmpty {
             path.removeAll()

@@ -1,6 +1,6 @@
 # Privacy & Store Compliance
 
-Last reviewed: 2026-07-16
+Last reviewed: 2026-07-20
 
 Ohana stores sensitive local data (health, medication, insurance, documents,
 photos, location traces, family member info). Because the app ships with German
@@ -61,9 +61,18 @@ in-app member-privacy/PIN rules in `docs/app-architecture-governance.md`.
   or background mode that the code does not actually use. The local-only Free /
   Personal profile keeps
   CloudDocuments for the restricted iCloud Drive backup and HealthKit for the
-  read-only Human Workout view. It declares no Sign in with Apple, APNs,
-  `remote-notification` background mode, CloudKit sharing service, or App Group.
-  Remove or implement any future mismatch.
+  read-only Human Workout view. It also uses one App Group shared only with the
+  embedded Widget Extension for a bounded, versioned Today Care JSON snapshot.
+  The snapshot excludes free-form household titles, health/medication detail,
+  attachments, location traces, and business facts; it is excluded from backup,
+  expires in WidgetKit, and is removed by App Reset. The profile still declares
+  no Sign in with Apple, APNs, `remote-notification` background mode, or CloudKit
+  sharing service. Remove or implement any future mismatch.
+- **Live Activity minimization:** The walk Live Activity carries only its local
+  session/pet identifiers, a privacy-sensitive pet name, start/phase/timing,
+  aggregate distance, and potty count. It never carries route coordinates,
+  health/medication content, notes, rewards, or write actions. Discarding a
+  recovery checkpoint and resetting the app end the matching system surface.
 - **Encryption export compliance:** Set `ITSAppUsesNonExemptEncryption`
   appropriately in `Info.plist`/App Store Connect (standard OS crypto only ⇒
   typically exempt).

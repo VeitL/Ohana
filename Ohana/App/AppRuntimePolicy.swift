@@ -58,6 +58,12 @@ enum OhanaRefreshBudget: Equatable {
     case paused
 }
 
+nonisolated struct OhanaLiveActivityUpdateBudget: Equatable, Sendable {
+    let minimumDistanceDeltaMeters: Double
+    let maximumUpdateInterval: TimeInterval
+    let allowsAutomaticUpdates: Bool
+}
+
 enum OhanaVisualEffectsBudget: Equatable {
     case full
     case efficient
@@ -403,6 +409,37 @@ final class AppWorkloadPolicy: ObservableObject {
         case .live: liveInterval
         case .throttled: throttledInterval
         case .paused: pausedInterval
+        }
+    }
+
+    func walkLiveActivityUpdateBudget() -> OhanaLiveActivityUpdateBudget {
+        switch refreshBudget(isVisible: true, allowDuringActiveWalk: true) {
+        case .live:
+            OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 50,
+                maximumUpdateInterval: 30,
+                allowsAutomaticUpdates: true
+            )
+        case .throttled:
+            OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 100,
+                maximumUpdateInterval: 90,
+                allowsAutomaticUpdates: true
+            )
+        case .paused:
+            OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: .infinity,
+                maximumUpdateInterval: .infinity,
+                allowsAutomaticUpdates: false
+            )
+        }
+    }
+
+    func systemSurfaceSnapshotDebounceMilliseconds() -> Int64 {
+        switch refreshBudget(isVisible: true) {
+        case .live: 350
+        case .throttled: 1200
+        case .paused: 2500
         }
     }
 

@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import UserNotifications
+import WidgetKit
 
 @MainActor
 enum AppResetService {
@@ -134,6 +135,12 @@ enum AppResetService {
         let humanNoteAttachmentCleanup = options.deleteHumanNoteAttachments
             ? HumanNoteAttachmentStore.deleteAll(storage: attachmentStorage)
             : .notRequired
+        let systemSurfaceStore = SystemSurfaceSnapshotStore.live
+        try? systemSurfaceStore.write(
+            TodayCareWidgetSnapshot.unavailable(languageCode: AppLanguage.code)
+        )
+        try? systemSurfaceStore.removeSnapshotIfPresent()
+        WidgetCenter.shared.reloadTimelines(ofKind: OhanaSystemSurfaceConstants.todayCareWidgetKind)
 
         resetLocalDefaults(defaults, preservedValues: preservedDefaults)
         // AutomaticBackupStatusStore exclusively owns its prefix so reset does

@@ -102,19 +102,22 @@ final class StaticAppResetter: AppResetting {
     private let defaults: UserDefaults
     private let attachmentStorage: HumanNoteAttachmentStorage
     private let deletePersistentData: (ModelContainer) throws -> Void
+    private let prepareRuntimeForReset: () -> Void
 
     init(
         questManager: QuestManager,
         automaticBackups: AutomaticBackupManaging,
         defaults: UserDefaults = .standard,
         attachmentStorage: HumanNoteAttachmentStorage = .live,
-        deletePersistentData: @escaping (ModelContainer) throws -> Void = { $0.deleteAllData() }
+        deletePersistentData: @escaping (ModelContainer) throws -> Void = { $0.deleteAllData() },
+        prepareRuntimeForReset: @escaping () -> Void = {}
     ) {
         self.questManager = questManager
         self.automaticBackups = automaticBackups
         self.defaults = defaults
         self.attachmentStorage = attachmentStorage
         self.deletePersistentData = deletePersistentData
+        self.prepareRuntimeForReset = prepareRuntimeForReset
     }
 
     func reset(context: ModelContext) async throws -> AppResetService.ResetResult {
@@ -122,6 +125,7 @@ final class StaticAppResetter: AppResetting {
     }
 
     func reset(context: ModelContext, options: AppResetService.Options) async throws -> AppResetService.ResetResult {
+        prepareRuntimeForReset()
         if options.cleanUpAutomaticBackups {
             await automaticBackups.prepareForAppReset()
         }
@@ -149,6 +153,7 @@ final class StaticAppResetter: AppResetting {
     }
 
     func resetForUITests(context: ModelContext) throws {
+        prepareRuntimeForReset()
         try AppResetService.reset(
             context: context,
             defaults: defaults,

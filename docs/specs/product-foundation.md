@@ -4,7 +4,7 @@ Status: Active product source of truth
 
 Owner: Product owner
 
-Last reviewed: 2026-07-18
+Last reviewed: 2026-07-20
 
 地位声明：本文档是 Ohana 的产品宪法，是所有模块规则书（docs/specs/<模块>-logic.md）、测试验收、对抗复审的最高裁判标准。模块行为与本文冲突即为 bug。本文的每条决策由产品主人拍板；修改本文必须经产品主人逐条确认，AI 会话不得自行改写决策条款。
 
@@ -136,7 +136,7 @@ Personal 的购买理由不能只有装饰。它必须对单人、单宠用户�
 | 趋势与洞察 | 90 天、1 年和全部时间趋势；体重、饮水、排便、活动、用药和花费的本地交叉比较 |
 | 报告与导出 | 高级周报、月报和年度回顾；可分享的兽医就诊 PDF、健康护照和 CSV；但原始数据手动导出继续免费 |
 | 整理效率 | 全历史搜索与高级筛选、自定义照护动作、批量记录、文档扫描与附件整理 |
-| 系统接入 | 符合首发平台边界的 Widget、Shortcuts 和快捷记录；未实现前不得宣传 |
+| 系统接入 | Personal：隐私精简、只读的“今日照护”主屏幕 / 锁屏 Widget；基础遛狗 Live Activity / Dynamic Island 保持 Free 可用。Shortcuts、Siri、Spotlight 与系统内快捷记录尚未实现，不得宣传 |
 | 数据安全 | 多版本自动 iCloud Drive 备份和恢复点 |
 | 视觉权益 | Founding Ohana 徽章、3 个 Supporter 背景、`AppIconNeonSmile` 立即使用权和 Founding 周报海报；原有椰子商店所有权独立保留 |
 
@@ -188,7 +188,7 @@ Care+ 不进入 1.0。它必须包含 Personal，但是否同时包含 Family、
 ### 4.7 付费墙、恢复与降级策略
 
 * 不在首次打开 app、Onboarding、健康紧急场景、备份失败、导出已有数据或纪念模式中强弹付费墙。
-* Personal 在用户自然遇到价值时介绍：达到免费活跃数量上限、创建第 4 个普通活跃提醒 / 计划、打开 90 天或更长趋势、生成高级报告、使用高级用药计划、自定义、Widget / Shortcuts 或备份版本历史。
+* Personal 在用户自然遇到价值时介绍：达到免费活跃数量上限、创建第 4 个普通活跃提醒 / 计划、打开 90 天或更长趋势、生成高级报告、使用高级用药计划、自定义、Widget 或备份版本历史。Shortcuts 只有在实现并验收后才可进入此列表。
 * 年付是主推选项，但不得预选、隐藏月付 / Lifetime、使用虚假倒计时或制造数据焦虑。
 * 设置和 Personal 页面必须持续提供清晰的“恢复购买”，同时恢复三个 Personal 商品与旧 Supporter Pack grandfather。
 * 商品加载、购买、验证或恢复失败时，Free 能力继续可用；已有数据的查看、编辑、手动导出与健康关键提醒不能等待 StoreKit。
@@ -236,7 +236,7 @@ Family 上线前还必须单独批准过期后的主家庭、其他设备显式 
 | 模块 | 存在理由 |
 | --- | --- |
 | Feeding | 喂食、粮仓、断粮提醒、自动投喂——最高频的照护事实 |
-| Walks | 遛狗 + GPS 轨迹；唯一允许后台定位的首发场景 |
+| Walks | 遛狗 + GPS 轨迹；唯一允许后台定位的首发场景；进行中状态可通过只读 Live Activity / Dynamic Island 延伸到锁屏 |
 | Hygiene / PetCare / CatCare | 清洁、便便、护理、猫砂等日常事实 |
 | Health / Medication | 体重、症状、疫苗、用药——健康事实 |
 | HumanHealth / Workouts / HumanNotes | 人类侧轻照护记录；首发低调保留 |

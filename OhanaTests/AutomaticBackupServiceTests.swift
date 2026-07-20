@@ -159,11 +159,13 @@ struct AutomaticBackupServiceTests {
         let context = container.mainContext
         context.insert(Pet(name: "Miso"))
         try context.save()
+        var didPrepareRuntimeForReset = false
         let resetter = StaticAppResetter(
             questManager: QuestManager(),
             automaticBackups: service,
             defaults: defaults,
-            deletePersistentData: scopedPetDeletion(in: context)
+            deletePersistentData: scopedPetDeletion(in: context),
+            prepareRuntimeForReset: { didPrepareRuntimeForReset = true }
         )
 
         let oldRun = Task { @MainActor in
@@ -177,6 +179,7 @@ struct AutomaticBackupServiceTests {
         )
 
         #expect(resetResult.automaticBackupCleanup == .removed)
+        #expect(didPrepareRuntimeForReset)
         #expect(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
         #expect(fileStore.cleanupCount == 1)
         #expect(fileStore.writeCount == 0)
