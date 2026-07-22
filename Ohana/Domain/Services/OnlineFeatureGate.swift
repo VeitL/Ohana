@@ -16,11 +16,11 @@ enum OnlineFeatureGate {
     nonisolated static func allows(_ feature: OnlineFeature) -> Bool {
         switch feature {
         case .onlineCollaboration:
-            return AppCapabilityProfile.shipsCloudFamilyCapabilities && false
+            AppCapabilityProfile.shipsCloudFamilyCapabilities && false
         case .guardianSafety:
             // The build contains the client, but the shipped Info.plist keeps
             // this off until the signed backend/APNs release gate is complete.
-            return GuardianSafetyConfiguration.current != nil
+            GuardianSafetyConfiguration.current != nil
         }
     }
 }

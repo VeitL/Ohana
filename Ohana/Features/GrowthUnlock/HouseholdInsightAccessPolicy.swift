@@ -87,12 +87,12 @@ nonisolated enum HouseholdInsightTab: String, CaseIterable, Identifiable, Hashab
     func fullTitle(language: String) -> String {
         switch self {
         case .weeklyReport:
-            return AppLocalizedText(
+            AppLocalizedText(
                 zh: "家庭周报", en: "Weekly Report", de: "Wochenbericht", es: "Informe semanal",
                 pt: "Relatório semanal", fr: "Rapport hebdomadaire", ja: "週間レポート", ko: "주간 보고서", it: "Rapporto settimanale"
             ).resolve(language)
         default:
-            return title(language: language)
+            title(language: language)
         }
     }
 

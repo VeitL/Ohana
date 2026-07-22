@@ -48,7 +48,7 @@ nonisolated struct CareLedgerAnalysisSnapshot: Equatable, Sendable {
 
 @ModelActor
 actor CareLedgerAnalysisDataActor {
-    private static let maximumAggregateEventCount = 20_000
+    private static let maximumAggregateEventCount = 20000
 
     func load(
         range: CareLedgerRangeFilter,
@@ -157,7 +157,7 @@ actor CareLedgerAnalysisDataActor {
             predicate: #Predicate<Plant> { $0.archivedAt == nil },
             sortBy: [SortDescriptor(\.createdAt)]
         )
-        plantDescriptor.fetchLimit = 1_000
+        plantDescriptor.fetchLimit = 1000
         result.append(contentsOf: try modelContext.fetch(plantDescriptor).map { plant in // route-first-frame: allow deferred-fetch
             CareLedgerAnalysisSubjectSnapshot(
                 id: "plant:\(plant.id.uuidString)",

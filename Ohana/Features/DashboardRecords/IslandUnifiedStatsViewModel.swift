@@ -384,7 +384,7 @@ final class IslandUnifiedStatsViewModel {
         let eventKindRaw = eventKind.rawValue
         let petIDs = Set(pets.map(\.id.uuidString))
         guard !petIDs.isEmpty else { return ([:], false) }
-        let maximumResultCount = 20_000
+        let maximumResultCount = 20000
         var descriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.subjectKind == petSubjectKind &&
@@ -427,7 +427,7 @@ final class IslandUnifiedStatsViewModel {
     ) -> (entries: [UUID: [HumanWeightMetricEntry]], isTruncated: Bool) {
         let humanIDs = Set(humans.map(\.id))
         guard !humanIDs.isEmpty else { return ([:], false) }
-        let maximumResultCount = 20_000
+        let maximumResultCount = 20000
         var descriptor = FetchDescriptor<HumanWeightLog>(
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )

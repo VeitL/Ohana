@@ -259,7 +259,7 @@ nonisolated enum GuardianSafetyEvaluationPolicy {
         calendar: Calendar = .autoupdatingCurrent
     ) -> Date {
         let latest = calendar.date(byAdding: .day, value: maximumPauseDays, to: now)
-            ?? now.addingTimeInterval(Double(maximumPauseDays) * 86_400)
+            ?? now.addingTimeInterval(Double(maximumPauseDays) * 86400)
         return min(max(requested, now), latest)
     }
 }

@@ -357,5 +357,4 @@ struct GrowthUnlockRoadmapView: View {
         .padding(.top, 14)
         .padding(.bottom, 10)
     }
-
 }

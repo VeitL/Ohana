@@ -273,13 +273,13 @@ actor GuardianSafetyAPIClient {
         method: String,
         accessToken: String
     ) async throws -> Response {
-        try await send(path: path, method: method, body: Optional<GuardianEmptyRequest>.none, accessToken: accessToken)
+        try await send(path: path, method: method, body: GuardianEmptyRequest?.none, accessToken: accessToken)
     }
 
-    private func send<Body: Encodable, Response: Decodable>(
+    private func send<Response: Decodable>(
         path: String,
         method: String,
-        body: Body?,
+        body: (some Encodable)?,
         accessToken: String
     ) async throws -> Response {
         let (data, _) = try await data(
@@ -294,10 +294,10 @@ actor GuardianSafetyAPIClient {
         return value
     }
 
-    private func sendWithoutResponse<Body: Encodable>(
+    private func sendWithoutResponse(
         path: String,
         method: String,
-        body: Body,
+        body: some Encodable,
         accessToken: String
     ) async throws {
         _ = try await data(path: path, method: method, body: Optional(body), accessToken: accessToken)
@@ -311,15 +311,15 @@ actor GuardianSafetyAPIClient {
         _ = try await data(
             path: path,
             method: method,
-            body: Optional<GuardianEmptyRequest>.none,
+            body: GuardianEmptyRequest?.none,
             accessToken: accessToken
         )
     }
 
-    private func data<Body: Encodable>(
+    private func data(
         path: String,
         method: String,
-        body: Body?,
+        body: (some Encodable)?,
         accessToken: String
     ) async throws -> (Data, HTTPURLResponse) {
         let url = configuration.apiBaseURL.appending(path: path)

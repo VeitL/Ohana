@@ -64,7 +64,7 @@ nonisolated struct FamilyLongTermReviewSnapshot: Equatable, Sendable {
 
 @ModelActor
 actor FamilyLongTermReviewDataActor {
-    private static let eventLimit = 8_000
+    private static let eventLimit = 8000
     private static let memoryLimit = 800
 
     func load(
@@ -140,14 +140,13 @@ actor FamilyLongTermReviewDataActor {
     }
 
     private func fetchEvents(cutoff: Date?) throws -> (records: [CareLedgerEvent], isTruncated: Bool) {
-        var descriptor: FetchDescriptor<CareLedgerEvent>
-        if let cutoff {
-            descriptor = FetchDescriptor<CareLedgerEvent>(
+        var descriptor: FetchDescriptor<CareLedgerEvent> = if let cutoff {
+            FetchDescriptor<CareLedgerEvent>(
                 predicate: #Predicate<CareLedgerEvent> { $0.occurredAt >= cutoff },
                 sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
             )
         } else {
-            descriptor = FetchDescriptor<CareLedgerEvent>(
+            FetchDescriptor<CareLedgerEvent>(
                 sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
             )
         }
@@ -157,14 +156,13 @@ actor FamilyLongTermReviewDataActor {
     }
 
     private func fetchMemories(cutoff: Date?) throws -> (records: [PetPhotoLog], isTruncated: Bool) {
-        var descriptor: FetchDescriptor<PetPhotoLog>
-        if let cutoff {
-            descriptor = FetchDescriptor<PetPhotoLog>(
+        var descriptor: FetchDescriptor<PetPhotoLog> = if let cutoff {
+            FetchDescriptor<PetPhotoLog>(
                 predicate: #Predicate<PetPhotoLog> { $0.date >= cutoff },
                 sortBy: [SortDescriptor(\.date, order: .reverse)]
             )
         } else {
-            descriptor = FetchDescriptor<PetPhotoLog>(
+            FetchDescriptor<PetPhotoLog>(
                 sortBy: [SortDescriptor(\.date, order: .reverse)]
             )
         }
@@ -186,7 +184,7 @@ actor FamilyLongTermReviewDataActor {
             names["human:\(human.id.uuidString)"] = human.name
         }
         var plantDescriptor = FetchDescriptor<Plant>(sortBy: [SortDescriptor(\.createdAt)])
-        plantDescriptor.fetchLimit = 1_000
+        plantDescriptor.fetchLimit = 1000
         for plant in try modelContext.fetch(plantDescriptor) { // route-first-frame: allow deferred-fetch
             names["plant:\(plant.id.uuidString)"] = plant.name
         }

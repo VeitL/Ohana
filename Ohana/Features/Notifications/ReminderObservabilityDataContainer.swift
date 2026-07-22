@@ -80,7 +80,7 @@ actor ReminderObservabilityDataActor {
         let failedRaw = ReminderStatus.failed.rawValue
         let completedRaw = ReminderStatus.completed.rawValue
         let weekCutoff = Calendar.current.date(byAdding: .day, value: -7, to: now)
-            ?? now.addingTimeInterval(-7 * 86_400)
+            ?? now.addingTimeInterval(-7 * 86400)
 
         var reminderDescriptor = FetchDescriptor<Reminder>(
             predicate: #Predicate<Reminder> { reminder in
@@ -102,7 +102,7 @@ actor ReminderObservabilityDataActor {
 
         let reminderKind = CareLedgerEventKind.reminder.rawValue
         let ledgerCutoff = Calendar.current.date(byAdding: .day, value: -90, to: now)
-            ?? now.addingTimeInterval(-90 * 86_400)
+            ?? now.addingTimeInterval(-90 * 86400)
         var ledgerDescriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.eventKind == reminderKind && event.occurredAt >= ledgerCutoff

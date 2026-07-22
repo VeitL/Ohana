@@ -28,7 +28,7 @@ nonisolated struct WeightInsightSnapshot: Equatable, Sendable {
 
 @ModelActor
 actor WeightInsightDataActor {
-    private static let maximumRecordCount = 20_000
+    private static let maximumRecordCount = 20000
 
     func load(
         dayCount: Int?,
@@ -159,28 +159,27 @@ actor WeightInsightDataActor {
         shouldFetch: Bool
     ) throws -> (records: [HumanWeightLog], isTruncated: Bool) {
         guard shouldFetch else { return ([], false) }
-        var descriptor: FetchDescriptor<HumanWeightLog>
-        if let selectedHumanID {
+        var descriptor: FetchDescriptor<HumanWeightLog> = if let selectedHumanID {
             if let cutoff {
-                descriptor = FetchDescriptor<HumanWeightLog>(
+                FetchDescriptor<HumanWeightLog>(
                     predicate: #Predicate<HumanWeightLog> { log in
                         log.human?.id == selectedHumanID && log.date >= cutoff
                     },
                     sortBy: [SortDescriptor(\.date, order: .reverse)]
                 )
             } else {
-                descriptor = FetchDescriptor<HumanWeightLog>(
+                FetchDescriptor<HumanWeightLog>(
                     predicate: #Predicate<HumanWeightLog> { $0.human?.id == selectedHumanID },
                     sortBy: [SortDescriptor(\.date, order: .reverse)]
                 )
             }
         } else if let cutoff {
-            descriptor = FetchDescriptor<HumanWeightLog>(
+            FetchDescriptor<HumanWeightLog>(
                 predicate: #Predicate<HumanWeightLog> { $0.date >= cutoff },
                 sortBy: [SortDescriptor(\.date, order: .reverse)]
             )
         } else {
-            descriptor = FetchDescriptor<HumanWeightLog>(
+            FetchDescriptor<HumanWeightLog>(
                 sortBy: [SortDescriptor(\.date, order: .reverse)]
             )
         }

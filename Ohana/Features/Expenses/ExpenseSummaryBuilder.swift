@@ -111,7 +111,7 @@ enum ExpenseSummaryBuilder {
         logs.filter { $0.amount < 0 }
     }
 
-    static func totals<Log: ExpenseSummaryRecord>(from logs: [Log]) -> ExpenseTotals {
+    static func totals(from logs: [some ExpenseSummaryRecord]) -> ExpenseTotals {
         guard !logs.isEmpty else { return .empty }
         let spentLogs = positiveLogs(logs)
         let refunds = reimbursementLogs(logs)
@@ -127,7 +127,7 @@ enum ExpenseSummaryBuilder {
         )
     }
 
-    static func categoryBreakdown<Log: ExpenseSummaryRecord>(from logs: [Log]) -> [ExpenseCategoryBreakdown] {
+    static func categoryBreakdown(from logs: [some ExpenseSummaryRecord]) -> [ExpenseCategoryBreakdown] {
         let positiveLogs = positiveLogs(logs)
         let grandTotal = max(1, positiveLogs.reduce(0) { $0 + $1.amount })
         var totalsByCategory: [ExpenseCategory: Double] = [:]
@@ -143,7 +143,7 @@ enum ExpenseSummaryBuilder {
             .sorted { $0.total > $1.total }
     }
 
-    static func topCategory<Log: ExpenseSummaryRecord>(from logs: [Log]) -> ExpenseCategoryBreakdown? {
+    static func topCategory(from logs: [some ExpenseSummaryRecord]) -> ExpenseCategoryBreakdown? {
         categoryBreakdown(from: logs).first
     }
 }

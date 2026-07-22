@@ -80,9 +80,9 @@ struct HouseholdInsightSnapshotTests {
         let container = try makeContainer()
         let context = container.mainContext
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let overdue = Reminder(scheduledAt: now.addingTimeInterval(-3_600))
-        let upcoming = Reminder(scheduledAt: now.addingTimeInterval(3_600))
-        let failed = Reminder(scheduledAt: now.addingTimeInterval(-7_200))
+        let overdue = Reminder(scheduledAt: now.addingTimeInterval(-3600))
+        let upcoming = Reminder(scheduledAt: now.addingTimeInterval(3600))
+        let failed = Reminder(scheduledAt: now.addingTimeInterval(-7200))
         failed.statusEnum = .failed
         context.insert(overdue)
         context.insert(upcoming)

@@ -121,7 +121,7 @@ struct GuardianSafetyPolicyTests {
 
     @Test func pauseIsClampedToThirtyDays() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let requested = now.addingTimeInterval(90 * 86_400)
+        let requested = now.addingTimeInterval(90 * 86400)
         let clamped = GuardianSafetyEvaluationPolicy.clampedPauseUntil(
             requested: requested,
             now: now,
@@ -163,7 +163,7 @@ struct GuardianSafetyPolicyTests {
 
         #expect(occurrence.dayKey == "2026-03-29")
         #expect(berlin.component(.hour, from: occurrence.deadline) == 3)
-        #expect(occurrence.evaluationTime.timeIntervalSince(occurrence.deadline) == 3_600)
+        #expect(occurrence.evaluationTime.timeIntervalSince(occurrence.deadline) == 3600)
     }
 
     @Test func fallDSTOverlapUsesTheFirstMatchingDeadline() throws {

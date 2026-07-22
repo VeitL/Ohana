@@ -32,7 +32,7 @@ nonisolated struct ExpenseInsightSnapshot: Equatable, Sendable {
 
 @ModelActor
 actor ExpenseInsightDataActor {
-    private static let maximumAggregateRecordCount = 20_000
+    private static let maximumAggregateRecordCount = 20000
 
     func load(
         range: ExpenseDashboardRange,
@@ -218,7 +218,7 @@ struct IslandExpenseDashboard: View {
         let range = requestedRange
         let subjectKey = requestedSubjectKey
         let petIDs = Set(pets.map(\.id))
-        let humanIDs = Set(humans.map { $0.id.uuidString })
+        let humanIDs = Set(humans.map(\.id.uuidString))
         loadTask = Task { @MainActor in
             await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 80)
             guard !Task.isCancelled else { return }
