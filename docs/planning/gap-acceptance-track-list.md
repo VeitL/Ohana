@@ -369,7 +369,7 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
 
 ## GAP-12 植物功能门
 
-人工验收目标：首发支持本地免费基础植物，但只在 Lv.4「家庭树冠」解锁；已有植物数据在低等级 grandfather。Lv.1–3 不抢占宠物核心习惯，联机、订阅、CloudKit、AI 或天气能力都不是基础植物前置。
+人工验收目标：首发支持本地免费基础植物，但只在 Lv.4「生命树冠」解锁；已有植物数据在低等级 grandfather。Lv.1–3 不抢占宠物核心习惯，联机、订阅、CloudKit、AI 或天气能力都不是基础植物前置。
 
 当前自动边界见 `docs/specs/PlantFeatureGate-logic.md`：`PlantFeatureGate` 表示 build 支持，`PlantUnlockPolicy` 独占可见性；Lv.1–3 隐藏入口并 redirect Growth Roadmap，Lv.4 开放基础植物，已有数据 grandfather。旧 2026-06-16 “首发恒关”证据已被 D19 后续产品决定取代，不再作为当前验收标准。
 

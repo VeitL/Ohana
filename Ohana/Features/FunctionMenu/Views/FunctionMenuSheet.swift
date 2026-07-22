@@ -34,6 +34,7 @@ struct FunctionMenuSheet: View {
              .plantCareAggregate,
              .growthRoadmap,
              .familyWeeklyReport,
+             .familyLongTermReview,
              .careLedgerAnalysis,
              .reminderObservability,
              .coconutShop,
@@ -48,7 +49,8 @@ struct FunctionMenuSheet: View {
     private var initialRoutedDestination: FMDest? {
         AppFeatureRouteGuard.visibleFunctionDestination(
             initialDestination,
-            currentLevel: appServices.oasisTree.treeLevel.rawValue
+            currentLevel: appServices.oasisTree.treeLevel.rawValue,
+            plan: appServices.commerce.ohanaPlanLevel
         )
     }
 
@@ -199,6 +201,7 @@ struct FunctionMenuSheet: View {
              .plantCareAggregate,
              .growthRoadmap,
              .familyWeeklyReport,
+             .familyLongTermReview,
              .careLedgerAnalysis,
              .reminderObservability,
              .bountyBoard:
@@ -243,6 +246,8 @@ struct FunctionMenuSheet: View {
             (feature.title(l: l), feature.icon)
         case .familyWeeklyReport:
             (l.tr(zh: "家庭周报", en: "Weekly Report", de: "Wochenbericht"), "chart.bar.xaxis")
+        case .familyLongTermReview:
+            (l.tr(zh: "长期回顾", en: "Long-term Review", de: "Langzeitrückblick"), "book.closed.fill")
         case .careLedgerAnalysis:
             (l.tr(zh: "照护账本", en: "Care Ledger", de: "Pflegebuch"), "list.bullet.rectangle.fill")
         case .reminderObservability:

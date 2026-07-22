@@ -32,6 +32,7 @@ nonisolated enum SupporterPackCatalog {
     static let personalMonthlyProductID = "com.guanchen.li.Ohana.personal.monthly"
     static let personalYearlyProductID = "com.guanchen.li.Ohana.personal.yearly"
     static let personalLifetimeProductID = "com.guanchen.li.Ohana.personal.lifetime"
+    static let familyYearlyProductID = "com.guanchen.li.Ohana.family.yearly"
 
     static let personalSubscriptionGroupID = "A4E5CF33-6538-4A3E-8DB6-9DF8E472FD9D"
 
@@ -43,6 +44,9 @@ nonisolated enum SupporterPackCatalog {
         personalLifetimeProductID
     ])
     static let personalEntitlementProductIDs = purchasablePersonalProductIDs.union([productID])
+    static let familySubscriptionProductIDs: Set<String> = [familyYearlyProductID]
+    static let purchasableProductIDs = purchasablePersonalProductIDs.union(familySubscriptionProductIDs)
+    static let entitlementProductIDs = personalEntitlementProductIDs.union(familySubscriptionProductIDs)
 
     static func purchaseChoice(for productID: String) -> PersonalPurchaseChoice? {
         switch productID {
@@ -75,4 +79,5 @@ nonisolated enum CommerceEntitlementCache {
     /// Supporter owners keep access during the migration. This is only an
     /// offline grace; StoreKit remains the ownership authority.
     static let supporterPackKeychainAccount = "commerce.entitlement.supporterPack.v1"
+    static let familyKeychainAccount = "commerce.entitlement.family.v1"
 }

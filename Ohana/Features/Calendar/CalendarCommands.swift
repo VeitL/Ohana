@@ -68,6 +68,7 @@ struct CalendarEventPlanCommandResult: Equatable {
 enum CalendarCommandError: LocalizedError, Equatable {
     case persistenceFailed(String?)
     case personalUpgradeRequired(PersonalFreeLimitDenial)
+    case familyTaskProjectionRequiresCollaboration
 
     var errorDescription: String? {
         switch self {
@@ -78,6 +79,8 @@ enum CalendarCommandError: LocalizedError, Equatable {
             return "日历保存失败，请稍后重试。"
         case let .personalUpgradeRequired(denial):
             return "Ohana Free supports up to \(denial.limit) active ordinary plans. Ohana Personal removes this limit."
+        case .familyTaskProjectionRequiresCollaboration:
+            return "This calendar entry is managed by its household task occurrence."
         }
     }
 }
@@ -187,6 +190,9 @@ enum CalendarEventPlanCommandService {
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
         now: Date = Date()
     ) throws -> CalendarEventPlanCommandResult? {
+        guard CalendarEventInteractionPolicy.allowsDirectMutation(for: event) else {
+            throw CalendarCommandError.familyTaskProjectionRequiresCollaboration
+        }
         guard !input.cleanTitle.isEmpty else { return nil }
         let newPlanIsOrdinaryAndActive = PersonalPlanQuotaClassifier.quotaClass(for: input.eventType) == .ordinary &&
             (input.recurrenceDays > 0 || input.reminderLeadMinutes != nil)
@@ -606,6 +612,9 @@ enum CalendarEventCommandService {
         scope: CalendarEventDeletionScope,
         context: ModelContext
     ) throws -> CalendarEventDeletionOutcome {
+        guard CalendarEventInteractionPolicy.allowsDirectMutation(for: event) else {
+            throw CalendarCommandError.familyTaskProjectionRequiresCollaboration
+        }
         let outcome: CalendarEventDeletionOutcome
         switch scope {
         case .wholeEvent:

@@ -34,6 +34,7 @@ struct AppRuntimeHost<Content: View>: View {
     @State private var achievementReconciliationTask: Task<Void, Never>?
     @State private var ownerReconciliationTask: Task<Void, Never>?
     @State private var presenceReminderTask: Task<Void, Never>?
+    @State private var familyTaskMaterializationTask: Task<Void, Never>?
     @State private var hasStartedRuntime = false
     @State private var hasCompletedPersistentBootstrap = false
     @State private var persistentBootstrapAttempt = 0
@@ -72,6 +73,8 @@ struct AppRuntimeHost<Content: View>: View {
                 ownerReconciliationTask = nil
                 presenceReminderTask?.cancel()
                 presenceReminderTask = nil
+                familyTaskMaterializationTask?.cancel()
+                familyTaskMaterializationTask = nil
             }
             .onChange(of: hasOnboarded) { wasComplete, isComplete in
                 if isComplete {
@@ -128,7 +131,11 @@ struct AppRuntimeHost<Content: View>: View {
                 if hasCompletedPersistentBootstrap {
                     scheduleAchievementReconciliation(reason: .foreground)
                 }
+                scheduleFamilyTaskMaterialization()
                 scheduleOwnerReconciliation()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                scheduleFamilyTaskMaterialization()
             }
             .onReceive(appServices.domainRevisions.domainMutationEvents) { mutation in
                 if hasOnboarded, hasCompletedPersistentBootstrap {
@@ -159,7 +166,76 @@ struct AppRuntimeHost<Content: View>: View {
             reconcileActiveHumanSelection()
             scheduleOwnerReconciliation()
             scheduleWalletBootstrap()
+            scheduleFamilyTaskMaterialization(delayMilliseconds: 220)
             runtimeStartTask = nil
+        }
+    }
+
+    private func scheduleFamilyTaskMaterialization(delayMilliseconds: UInt64 = 80) {
+        guard hasOnboarded, familyTaskMaterializationTask == nil else { return }
+        let container = modelContext.container
+        familyTaskMaterializationTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: delayMilliseconds)
+            guard !Task.isCancelled else {
+                familyTaskMaterializationTask = nil
+                return
+            }
+            let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+                operation: "family_task_materialization",
+                requestedItemCount: FamilyTaskPlanMaterializationActor.maximumOccurrencesPerPlan
+            )
+            guard budget.hasWorkCapacity else {
+                familyTaskMaterializationTask = nil
+                return
+            }
+            do {
+                let actor = FamilyTaskPlanMaterializationActor(modelContainer: container)
+                let upgrade = try await actor.upgradeLegacyRecurringTasks()
+                for notificationID in upgrade.notificationIDsToCancel {
+                    OhanaNotifications.current.cancel(notificationId: notificationID)
+                }
+                let result = try await actor.materializeAll(
+                    maximumPlanCount: budget.maximumItemCount
+                )
+                await scheduleFamilyTaskReminders(ids: result.reminderIDs)
+                if result.insertedOccurrenceCount > 0 || result.summarizedMissedCount > 0 {
+                    appServices.domainRevisions.publish(
+                        DomainMutationResult(
+                            command: .command("familyTasks", "materialize"),
+                            affectedEntityIDs: Set([result.planID].compactMap(\.self)),
+                            note: "inserted=\(result.insertedOccurrenceCount), summarized=\(result.summarizedMissedCount)"
+                        )
+                    )
+                }
+            } catch is CancellationError {
+                // A later lifecycle trigger will resume the idempotent window.
+            } catch {
+                OhanaLog.error(
+                    "Family task materialization failed: \(error.localizedDescription)",
+                    category: "FamilyTasks"
+                )
+            }
+            familyTaskMaterializationTask = nil
+        }
+    }
+
+    private func scheduleFamilyTaskReminders(ids: [UUID]) async {
+        guard !ids.isEmpty else { return }
+        let scheduling = ReminderSchedulingManager(careLedger: CareLedgerService())
+        for id in ids {
+            var descriptor = FetchDescriptor<Reminder>(
+                predicate: #Predicate<Reminder> { $0.id == id }
+            )
+            descriptor.fetchLimit = 1
+            guard let reminder = try? modelContext.fetch(descriptor).first else { continue }
+            await scheduling.scheduleIfNeeded(
+                reminder: reminder,
+                context: modelContext,
+                source: .service,
+                existingNotificationIds: nil,
+                operation: "familyTaskForegroundMaterialization",
+                saveLedger: true
+            )
         }
     }
 
@@ -331,6 +407,9 @@ struct AppRuntimeHost<Content: View>: View {
             activeZenParticipationOwnerID = ownerID
             pendingZenParticipationSource = nil
             resumePresenceRemindersIfAuthorized()
+            Task { @MainActor in
+                await appServices.guardianSafety.flushOutbox()
+            }
         } catch {
             activeZenParticipationOwnerID = nil
             OhanaLog.warning(
@@ -348,6 +427,9 @@ struct AppRuntimeHost<Content: View>: View {
         }
         do {
             try makePresenceCommandService().endParticipation()
+            Task { @MainActor in
+                await appServices.guardianSafety.flushOutbox()
+            }
         } catch {
             OhanaLog.warning(
                 "AppRuntimeHost could not end Zen participation: \(error.localizedDescription)",

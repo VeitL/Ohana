@@ -64,6 +64,21 @@ nonisolated struct PresenceCheckInCommandResult: Equatable, Sendable {
     var awardedCoconuts: Int { rewards.reduce(0) { $0 + $1.awardedAmount } }
 }
 
+/// Undo intentionally removes only today's presence fact. Any coconut already
+/// earned remains represented by its durable receipt, so checking in again on
+/// the same natural day can never award the same reward twice.
+nonisolated struct PresenceUndoCheckInResult: Equatable, Sendable {
+    let removedCheckIn: PresenceCheckInFactSnapshot
+}
+
+/// A remembered score for a past missed day. It intentionally has no reward
+/// payload because this command never enters the economy pipeline.
+nonisolated struct PresenceRetrospectiveStatusResult: Equatable, Sendable {
+    let fact: PresenceCheckInFactSnapshot
+    let didCreate: Bool
+    let didChangeStatus: Bool
+}
+
 nonisolated struct PresenceParticipationSnapshot: Equatable, Sendable {
     let id: UUID
     let ownerHumanId: UUID
@@ -80,6 +95,11 @@ nonisolated enum PresenceCheckInCommandError: LocalizedError, Equatable, Sendabl
     case missingSubject(PresenceSubjectRef)
     case inactiveSubject(PresenceSubjectRef)
     case missingTodayCheckIn(PresenceSubjectRef)
+    case invalidHistoricalDay
+    case historicalDayMustBePast
+    case historicalDayNotParticipating
+    case subjectNotActiveOnHistoricalDay(PresenceSubjectRef)
+    case historicalDayAlreadyCheckedIn(PresenceSubjectRef)
     case rewardPersistenceFailed(String)
     case persistenceFailed(String)
 
@@ -97,6 +117,16 @@ nonisolated enum PresenceCheckInCommandError: LocalizedError, Equatable, Sendabl
             "Memorial or archived cards cannot be checked in."
         case .missingTodayCheckIn:
             "Check in this card before choosing today's status."
+        case .invalidHistoricalDay:
+            "The selected calendar day is invalid."
+        case .historicalDayMustBePast:
+            "Only a past missed day can receive a remembered status."
+        case .historicalDayNotParticipating:
+            "Statuses can only be remembered for days that participated in Zen mode."
+        case .subjectNotActiveOnHistoricalDay:
+            "This card was not active on the selected day."
+        case .historicalDayAlreadyCheckedIn:
+            "This day already has a real check-in."
         case let .rewardPersistenceFailed(message), let .persistenceFailed(message):
             message
         }
@@ -288,6 +318,7 @@ final class PresenceCheckInCommandService {
     private let context: ModelContext
     private let ownerSelection: PresenceOwnerSelecting
     private let rewardAwarder: PresenceRewardAwarding
+    private let guardianSafetyOutbox: GuardianSafetyOutboxStaging
     private let timeZoneProvider: () -> TimeZone
     private let migratesLegacyBeforeCommands: Bool
 
@@ -297,6 +328,7 @@ final class PresenceCheckInCommandService {
         rewardAwarder: PresenceRewardAwarding? = nil,
         wallet: CoconutWalletManaging? = nil,
         projectionManager: CoconutProjectionManaging? = nil,
+        guardianSafetyOutbox: GuardianSafetyOutboxStaging? = nil,
         migratesLegacyBeforeCommands: Bool = true,
         timeZoneProvider: @escaping () -> TimeZone = { .current }
     ) {
@@ -306,6 +338,7 @@ final class PresenceCheckInCommandService {
             wallet: wallet,
             projectionManager: projectionManager
         )
+        self.guardianSafetyOutbox = guardianSafetyOutbox ?? LiveGuardianSafetyOutboxStager()
         self.migratesLegacyBeforeCommands = migratesLegacyBeforeCommands
         self.timeZoneProvider = timeZoneProvider
     }
@@ -333,6 +366,15 @@ final class PresenceCheckInCommandService {
             return participationSnapshot(matching)
         }
         for period in active {
+            if let previousOwnerID = period.ownerHumanId {
+                try guardianSafetyOutbox.stageMonitoringStopped(
+                    ownerHumanId: previousOwnerID,
+                    reason: .ownerChanged,
+                    occurredAt: now,
+                    timeZone: timeZoneProvider(),
+                    context: context
+                )
+            }
             try closeParticipation(period, now: now)
         }
         let timeZone = timeZoneProvider()
@@ -351,10 +393,22 @@ final class PresenceCheckInCommandService {
     }
 
     @discardableResult
-    func endParticipation(now: Date = Date()) throws -> [PresenceParticipationSnapshot] {
+    func endParticipation(
+        reason: GuardianSafetyStopReason = .leftZenMode,
+        now: Date = Date()
+    ) throws -> [PresenceParticipationSnapshot] {
         let active = try activeParticipationPeriods()
         guard !active.isEmpty else { return [] }
         for period in active {
+            if let ownerID = period.ownerHumanId {
+                try guardianSafetyOutbox.stageMonitoringStopped(
+                    ownerHumanId: ownerID,
+                    reason: reason,
+                    occurredAt: now,
+                    timeZone: timeZoneProvider(),
+                    context: context
+                )
+            }
             try closeParticipation(period, now: now)
         }
         try save()
@@ -363,7 +417,33 @@ final class PresenceCheckInCommandService {
 
     @discardableResult
     func autoCheckInOwner(now: Date = Date()) throws -> PresenceCheckInCommandResult {
-        try checkInOwner(source: .automaticForeground, now: now)
+        let owner = try requireOwner()
+        try requireActiveParticipation(ownerHumanId: owner.id)
+        let ownerSubject = PresenceSubjectRef(kind: .human, id: owner.id)
+        let dayKey = PresenceDayKeyPolicy.key(for: now, timeZone: timeZoneProvider())
+
+        // A durable daily receipt with no matching fact means the user
+        // explicitly withdrew today's automatic check-in. Keep that choice
+        // stable across subsequent foreground entries; a card tap can still
+        // create the fact again without duplicating its reward.
+        if try fetchCheckIn(subject: ownerSubject, dayKey: dayKey) == nil,
+           try fetchReceipt(key: Self.ownerDailyReceiptKey(dayKey: dayKey)) != nil {
+            return PresenceCheckInCommandResult(
+                checkIns: [],
+                rewards: [],
+                didCreateCheckIn: false,
+                didChangeStatus: false
+            )
+        }
+
+        return try performCheckIn(
+            subjects: [ownerSubject],
+            status: nil,
+            source: .automaticForeground,
+            now: now,
+            owner: owner,
+            batchId: nil
+        )
     }
 
     @discardableResult
@@ -453,6 +533,111 @@ final class PresenceCheckInCommandService {
         )
     }
 
+    /// Records or updates a score for a past missed day without converting it
+    /// into a check-in. This deliberately bypasses every reward and streak
+    /// write path; projections distinguish it through its source.
+    @discardableResult
+    func recordRetrospectiveStatus(
+        subject: PresenceSubjectRef,
+        dayKey: String,
+        status: PresenceStatus,
+        now: Date = Date()
+    ) throws -> PresenceRetrospectiveStatusResult {
+        let owner = try requireOwner()
+        try requireActiveParticipation(ownerHumanId: owner.id)
+        let stableTimeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        guard let parsedDay = PresenceDayKeyPolicy.parse(dayKey),
+              PresenceDayKeyPolicy.key(for: parsedDay, timeZone: stableTimeZone) == dayKey
+        else {
+            throw PresenceCheckInCommandError.invalidHistoricalDay
+        }
+
+        let timeZone = timeZoneProvider()
+        let todayKey = PresenceDayKeyPolicy.key(for: now, timeZone: timeZone)
+        guard dayKey < todayKey else {
+            throw PresenceCheckInCommandError.historicalDayMustBePast
+        }
+        try requireHistoricalParticipation(
+            ownerHumanId: owner.id,
+            subject: subject,
+            dayKey: dayKey,
+            through: todayKey
+        )
+        try validateSubject(subject, activeOn: dayKey, timeZone: timeZone)
+
+        if let existing = try fetchCheckIn(subject: subject, dayKey: dayKey) {
+            guard existing.source == .retrospectiveStatus else {
+                throw PresenceCheckInCommandError.historicalDayAlreadyCheckedIn(subject)
+            }
+            let didChange = existing.status != status
+            if didChange {
+                existing.status = status
+                existing.updatedAt = now
+                try save()
+            }
+            return PresenceRetrospectiveStatusResult(
+                fact: factSnapshot(existing),
+                didCreate: false,
+                didChangeStatus: didChange
+            )
+        }
+
+        let fact = PresenceCheckIn(
+            uniqueKey: Self.checkInKey(subject: subject, dayKey: dayKey),
+            subject: subject,
+            ownerHumanId: owner.id,
+            isOwner: subject == PresenceSubjectRef(kind: .human, id: owner.id),
+            dayKey: dayKey,
+            timeZoneIdentifier: timeZone.identifier,
+            checkedInAt: now,
+            source: .retrospectiveStatus,
+            status: status,
+            operatorHumanId: owner.id
+        )
+        context.insert(fact)
+        do {
+            try save()
+        } catch {
+            context.rollback()
+            if let presenceError = error as? PresenceCheckInCommandError {
+                throw presenceError
+            }
+            throw PresenceCheckInCommandError.persistenceFailed(error.localizedDescription)
+        }
+        return PresenceRetrospectiveStatusResult(
+            fact: factSnapshot(fact),
+            didCreate: true,
+            didChangeStatus: true
+        )
+    }
+
+    @discardableResult
+    func undoTodayCheckIn(
+        subject: PresenceSubjectRef,
+        now: Date = Date()
+    ) throws -> PresenceUndoCheckInResult {
+        let owner = try requireOwner()
+        try requireActiveParticipation(ownerHumanId: owner.id)
+        try validateActiveSubject(subject)
+        let dayKey = PresenceDayKeyPolicy.key(for: now, timeZone: timeZoneProvider())
+        guard let checkIn = try fetchCheckIn(subject: subject, dayKey: dayKey) else {
+            throw PresenceCheckInCommandError.missingTodayCheckIn(subject)
+        }
+        let removed = factSnapshot(checkIn)
+        try guardianSafetyOutbox.stageOwnerUndo(checkIn, occurredAt: now, context: context)
+        context.delete(checkIn) // derived-state: allow local-only fact; outbox records undo and bounded reads rebuild streaks
+        do {
+            try save()
+        } catch {
+            context.rollback()
+            if let presenceError = error as? PresenceCheckInCommandError {
+                throw presenceError
+            }
+            throw PresenceCheckInCommandError.persistenceFailed(error.localizedDescription)
+        }
+        return PresenceUndoCheckInResult(removedCheckIn: removed)
+    }
+
     private func performCheckIn(
         subjects: [PresenceSubjectRef],
         status: PresenceStatus?,
@@ -499,6 +684,10 @@ final class PresenceCheckInCommandService {
             context.insert(checkIn)
             checkIns.append(checkIn)
             createdCheckIns.append(checkIn)
+        }
+
+        if let ownerCheckIn = createdCheckIns.first(where: \.isOwner) {
+            try guardianSafetyOutbox.stageOwnerCheckIn(ownerCheckIn, context: context)
         }
 
         var requests: [PresenceRewardRequest] = []
@@ -641,6 +830,80 @@ final class PresenceCheckInCommandService {
                 throw PresenceCheckInCommandError.missingSubject(subject)
             }
             guard !plant.isArchived else { throw PresenceCheckInCommandError.inactiveSubject(subject) }
+        }
+    }
+
+    private func validateSubject(
+        _ subject: PresenceSubjectRef,
+        activeOn dayKey: String,
+        timeZone: TimeZone
+    ) throws {
+        func requireActiveInterval(createdAt: Date, inactiveAt: Date?) throws {
+            let createdDayKey = PresenceDayKeyPolicy.key(for: createdAt, timeZone: timeZone)
+            guard createdDayKey <= dayKey else {
+                throw PresenceCheckInCommandError.subjectNotActiveOnHistoricalDay(subject)
+            }
+            if let inactiveAt {
+                let inactiveDayKey = PresenceDayKeyPolicy.key(for: inactiveAt, timeZone: timeZone)
+                guard dayKey <= inactiveDayKey else {
+                    throw PresenceCheckInCommandError.subjectNotActiveOnHistoricalDay(subject)
+                }
+            }
+        }
+
+        switch subject.kind {
+        case .human:
+            var descriptor = FetchDescriptor<Human>(predicate: #Predicate { $0.id == subject.id })
+            descriptor.fetchLimit = 1
+            guard let human = try context.fetch(descriptor).first else {
+                throw PresenceCheckInCommandError.missingSubject(subject)
+            }
+            try requireActiveInterval(createdAt: human.createdAt, inactiveAt: human.passedAwayDate)
+        case .pet:
+            var descriptor = FetchDescriptor<Pet>(predicate: #Predicate { $0.id == subject.id })
+            descriptor.fetchLimit = 1
+            guard let pet = try context.fetch(descriptor).first else {
+                throw PresenceCheckInCommandError.missingSubject(subject)
+            }
+            try requireActiveInterval(createdAt: pet.createdAt, inactiveAt: pet.passedAwayDate)
+        case .plant:
+            var descriptor = FetchDescriptor<Plant>(predicate: #Predicate { $0.id == subject.id })
+            descriptor.fetchLimit = 1
+            guard let plant = try context.fetch(descriptor).first else {
+                throw PresenceCheckInCommandError.missingSubject(subject)
+            }
+            try requireActiveInterval(createdAt: plant.createdAt, inactiveAt: plant.archivedAt)
+        }
+    }
+
+    private func requireHistoricalParticipation(
+        ownerHumanId: UUID,
+        subject: PresenceSubjectRef,
+        dayKey: String,
+        through todayKey: String
+    ) throws {
+        let ownerSubject = PresenceSubjectRef(kind: .human, id: ownerHumanId)
+        let periods = if subject == ownerSubject {
+            try PresenceCheckInReadService.participationPeriods(
+                context: context,
+                ownerHumanId: ownerHumanId
+            )
+        } else {
+            try PresenceCheckInReadService.participationPeriods(context: context)
+        }
+        let calculatorPeriods = periods.map {
+            PresenceStreakCalculator.Period(
+                startedDayKey: $0.startedDayKey,
+                lastParticipatingDayKey: $0.lastParticipatingDayKey,
+                isActive: $0.isActive
+            )
+        }
+        let participatingDays = PresenceStreakCalculator.participatingDays(
+            periods: calculatorPeriods,
+            through: todayKey
+        )
+        guard participatingDays.contains(dayKey) else {
+            throw PresenceCheckInCommandError.historicalDayNotParticipating
         }
     }
 

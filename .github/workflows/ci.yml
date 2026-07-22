@@ -142,6 +142,29 @@ jobs:
           fi
 
   # ----------------------------------------------------------------------------
+  # Optional Family guardian backend: pure rule tests, Python syntax, and the
+  # deployable CloudFormation/SAM contract. This does not deploy resources or
+  # require AWS/Apple credentials.
+  # ----------------------------------------------------------------------------
+  backend-guardian:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/guardian/requirements-dev.txt
+      - name: Install backend validation tools
+        run: python -m pip install --disable-pip-version-check -r backend/guardian/requirements-dev.txt
+      - name: Compile guardian backend
+        run: python -m compileall -q backend/guardian/src
+      - name: Guardian rule tests
+        run: python -m unittest discover -s backend/guardian/tests -v
+      - name: CloudFormation lint
+        run: cfn-lint backend/guardian/template.yaml
+
+  # ----------------------------------------------------------------------------
   # Build + test on the pinned-by-name simulator.
   #
   # NOTE: Ohana targets iOS 26.x, so this job REQUIRES a runner image whose

@@ -7,22 +7,26 @@ import SwiftData
 import SwiftUI
 
 enum HomeToolbarPrimaryActionPolicy {
-    static func homeDestination(currentLevel: Int) -> FMDest {
-        isHouseholdInsightsAvailable(currentLevel: currentLevel)
+    static func homeDestination(currentLevel: Int, plan: OhanaPlanLevel = .free) -> FMDest {
+        isHouseholdInsightsAvailable(currentLevel: currentLevel, plan: plan)
             ? .featureGroup(.householdHub)
             : .growthRoadmap
     }
 
-    static func homeIcon(currentLevel: Int) -> String {
-        isHouseholdInsightsAvailable(currentLevel: currentLevel)
+    static func homeIcon(currentLevel: Int, plan: OhanaPlanLevel = .free) -> String {
+        isHouseholdInsightsAvailable(currentLevel: currentLevel, plan: plan)
             ? "chart.bar.xaxis"
             : "tree.fill"
     }
 
-    static func isHouseholdInsightsAvailable(currentLevel: Int) -> Bool {
+    static func isHouseholdInsightsAvailable(
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
+    ) -> Bool {
         AppFeatureRouteGuard.isVisibleFunctionDestination(
             .featureGroup(.householdHub),
-            currentLevel: currentLevel
+            currentLevel: currentLevel,
+            plan: plan
         )
     }
 }
@@ -221,7 +225,8 @@ extension VerticalSolidHomeView {
     func openFunctionMenu(destination: FMDest?) {
         routeCoordinator.openFunctionMenu(
             destination: destination,
-            currentLevel: appServices.oasisTree.treeLevel.rawValue
+            currentLevel: appServices.oasisTree.treeLevel.rawValue,
+            plan: appServices.commerce.ohanaPlanLevel
         )
     }
 
@@ -229,7 +234,8 @@ extension VerticalSolidHomeView {
         switch controller.selectedTab {
         case .home:
             openFunctionMenu(destination: HomeToolbarPrimaryActionPolicy.homeDestination(
-                currentLevel: appServices.oasisTree.treeLevel.rawValue
+                currentLevel: appServices.oasisTree.treeLevel.rawValue,
+                plan: appServices.commerce.ohanaPlanLevel
             ))
         case .calendar:
             calendarAddEventTrigger += 1
@@ -244,7 +250,8 @@ extension VerticalSolidHomeView {
         switch controller.selectedTab {
         case .home:
             HomeToolbarPrimaryActionPolicy.homeIcon(
-                currentLevel: appServices.oasisTree.treeLevel.rawValue
+                currentLevel: appServices.oasisTree.treeLevel.rawValue,
+                plan: appServices.commerce.ohanaPlanLevel
             )
         case .calendar:
             "plus"
@@ -259,7 +266,8 @@ extension VerticalSolidHomeView {
         switch controller.selectedTab {
         case .home:
             if HomeToolbarPrimaryActionPolicy.isHouseholdInsightsAvailable(
-                currentLevel: appServices.oasisTree.treeLevel.rawValue
+                currentLevel: appServices.oasisTree.treeLevel.rawValue,
+                plan: appServices.commerce.ohanaPlanLevel
             ) {
                 l.tr(zh: "查看家庭洞察", en: "View household insights", de: "Haushaltseinblicke anzeigen")
             } else {

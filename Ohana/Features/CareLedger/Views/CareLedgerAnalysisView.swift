@@ -5,17 +5,16 @@
 //  Analysis surface for the unified care ledger.
 //
 
-import SwiftData
 import SwiftUI
 import UIKit
 
 struct CareLedgerAnalysisContentView: View {
-    let ledgerEvents: [CareLedgerEvent]
-    let pets: [Pet]
-    let humans: [Human]
+    let snapshot: CareLedgerAnalysisSnapshot
+    let onFilterChange: (CareLedgerRangeFilter, String?) -> Void
 
     @State private var screenModel = CareLedgerAnalysisScreenModel()
     @State private var showingPersonalPlan = false
+    @State private var preparedCSV = "date,event,action,actor,subject,coconut_delta"
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     private var l: L10n { L10n(appLanguage) }
@@ -26,6 +25,7 @@ struct CareLedgerAnalysisContentView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard
+                    analysisLimitNotice
                     filterCard
                     dailyTrendCard
                     kindBreakdownCard
@@ -43,22 +43,45 @@ struct CareLedgerAnalysisContentView: View {
                 .ohanaSheetPagePresentation()
         }
         .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
-            if screenModel.selectedRange == .all, !appServices.commerce.allows(.extendedTrends) {
+            if screenModel.selectedRange.requiresPersonal,
+               !appServices.commerce.allows(.extendedTrends) {
                 screenModel.selectedRange = .month
+                onFilterChange(.month, screenModel.selectedSubjectKey)
             }
+            reconcileSubjectAccess()
         }
         .onAppear(perform: syncScreenModel)
-        .onChange(of: ledgerEvents.count) { syncScreenModel() }
-        .onChange(of: pets.count) { syncScreenModel() }
-        .onChange(of: humans.count) { syncScreenModel() }
+        .onChange(of: snapshot.revisionID) { syncScreenModel() }
+        .onChange(of: appLanguage) { prepareExport() }
     }
 
     private func syncScreenModel() {
         screenModel.applyQuerySnapshot(
-            ledgerEvents: ledgerEvents,
-            pets: pets,
-            humans: humans
+            ledgerEvents: snapshot.events,
+            subjects: snapshot.subjects
         )
+        reconcileSubjectAccess()
+        prepareExport()
+    }
+
+    @ViewBuilder
+    private var analysisLimitNotice: some View {
+        if snapshot.isTruncated {
+            Label(
+                l.tr(
+                    zh: "记录很多：当前分析显示最近 20,000 条；原始照护记录仍完整保留。",
+                    en: "Large history: this analysis shows the latest 20,000 events. Raw care records remain intact.",
+                    de: "Viele Einträge: Diese Analyse zeigt die neuesten 20.000 Ereignisse. Die Rohdaten bleiben erhalten."
+                ),
+                systemImage: "info.circle.fill"
+            )
+            .font(OhanaFont.footnote(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge))
+            .accessibilityIdentifier("care-analysis-truncated-notice")
+        }
     }
 
     private var headerCard: some View {
@@ -89,6 +112,20 @@ struct CareLedgerAnalysisContentView: View {
             ))
                 .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
+
+            if appServices.commerce.allows(.extendedTrends) {
+                ShareLink(item: preparedCSV) {
+                    Label(
+                        l.tr(zh: "导出当前照护数据", en: "Export current care data", de: "Aktuelle Pflegedaten exportieren"),
+                        systemImage: "square.and.arrow.up"
+                    )
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(Color.ohanaControlFill, in: Capsule())
+                }
+                .accessibilityIdentifier("care-analysis-export")
+            }
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
@@ -97,17 +134,15 @@ struct CareLedgerAnalysisContentView: View {
     private var filterCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(l.tr(zh: "筛选", en: "Filter", de: "Filter"), icon: "line.3.horizontal.decrease.circle.fill")
-            Picker(l.tr(zh: "范围", en: "Range", de: "Zeitraum"), selection: personalRangeSelection) {
-                ForEach(CareLedgerRangeFilter.allCases, id: \.self) { range in
-                    Text(
-                        range == .all && !appServices.commerce.allows(.extendedTrends)
-                            ? "\(range.title(l: l)) · Personal"
-                            : range.title(l: l)
-                    )
-                    .tag(range)
-                }
+            DashboardRangePicker(
+                ranges: CareLedgerRangeFilter.allCases,
+                selection: personalRangeSelection,
+                isLocked: { $0.requiresPersonal && !appServices.commerce.allows(.extendedTrends) }
+            ) { range in
+                range.title(l: l)
             }
-            .pickerStyle(.segmented)
+
+            subjectSelector
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -124,18 +159,100 @@ struct CareLedgerAnalysisContentView: View {
         .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
+    private var subjectSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                subjectChip(
+                    id: nil,
+                    title: l.tr(zh: "全部对象", en: "All subjects", de: "Alle Objekte"),
+                    isLocked: !appServices.commerce.allows(.extendedTrends)
+                )
+                ForEach(screenModel.availableSubjects) { subject in
+                    subjectChip(id: subject.id, title: subject.name)
+                }
+            }
+        }
+        .accessibilityIdentifier("care-analysis-subject-selector")
+    }
+
+    private func subjectChip(
+        id: String?,
+        title: String,
+        isLocked: Bool = false
+    ) -> some View {
+        let isSelected = screenModel.selectedSubjectKey == id
+        return Button {
+            guard !isLocked else {
+                showingPersonalPlan = true
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
+            withAnimation(GoMotion.feedback) {
+                screenModel.selectedSubjectKey = id
+            }
+            onFilterChange(screenModel.selectedRange, id)
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            HStack(spacing: 5) {
+                Text(title).lineLimit(1)
+                if isLocked {
+                    Image(systemName: "lock.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 8, weight: .black))
+                }
+            }
+            .font(OhanaFont.caption(.black))
+            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaSecondaryText)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 36)
+            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(isLocked ? "\(title), Ohana Personal" : title)
+        .accessibilityValue(isSelected
+            ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
+            : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
+    }
+
+    private func reconcileSubjectAccess() {
+        let validIDs = Set(screenModel.availableSubjects.map(\.id))
+        if let selected = screenModel.selectedSubjectKey, !validIDs.contains(selected) {
+            screenModel.selectedSubjectKey = nil
+            onFilterChange(screenModel.selectedRange, nil)
+        }
+        guard !appServices.commerce.allows(.extendedTrends),
+              screenModel.selectedSubjectKey == nil else { return }
+        screenModel.selectedSubjectKey = screenModel.availableSubjects.first?.id
+        onFilterChange(screenModel.selectedRange, screenModel.selectedSubjectKey)
+    }
+
     private var personalRangeSelection: Binding<CareLedgerRangeFilter> {
         Binding(
             get: { screenModel.selectedRange },
             set: { range in
-                guard range != .all || appServices.commerce.allows(.extendedTrends) else {
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
                     showingPersonalPlan = true
                     UINotificationFeedbackGenerator().notificationOccurred(.warning)
                     return
                 }
                 screenModel.selectedRange = range
+                onFilterChange(range, screenModel.selectedSubjectKey)
             }
         )
+    }
+
+    private func prepareExport() {
+        var lines = ["date,event,action,actor,subject,coconut_delta"]
+        lines.append(contentsOf: screenModel.filteredEvents.map { event in
+            [
+                HouseholdInsightExport.csvCell(HouseholdInsightExport.iso8601(event.occurredAt)),
+                HouseholdInsightExport.csvCell(event.eventKind),
+                HouseholdInsightExport.csvCell(event.actionType),
+                HouseholdInsightExport.csvCell(screenModel.actorName(for: event.actorId, kind: event.actorKind, l: l)),
+                HouseholdInsightExport.csvCell(screenModel.subjectName(for: event.subjectId, kind: event.subjectKind, l: l)),
+                String(event.coconutDelta)
+            ].joined(separator: ",")
+        })
+        preparedCSV = lines.joined(separator: "\n")
     }
 
     private var kindBreakdownCard: some View {
@@ -225,13 +342,13 @@ struct CareLedgerAnalysisContentView: View {
             } else {
                 ForEach(screenModel.filteredEvents.prefix(20)) { event in
                     HStack(spacing: 10) {
-                        Image(systemName: event.eventKindEnum.icon)
+                        Image(systemName: event.kind.icon)
                             .font(OhanaFont.adaptive(size: 13, weight: .bold))
-                            .foregroundStyle(event.eventKindEnum.color)
+                            .foregroundStyle(event.kind.color)
                             .frame(width: 30, height: 30) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                            .background(event.eventKindEnum.color.opacity(0.14), in: Circle())
+                            .background(event.kind.color.opacity(0.14), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("\(event.eventKindEnum.displayName(l: l)) · \(event.actionType)")
+                            Text("\(event.kind.displayName(l: l)) · \(event.actionType)")
                                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                 .lineLimit(1)
                             Text("\(screenModel.actorName(for: event.actorId, kind: event.actorKind, l: l)) → \(screenModel.subjectName(for: event.subjectId, kind: event.subjectKind, l: l))")
@@ -257,6 +374,7 @@ struct CareLedgerAnalysisContentView: View {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) { // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 screenModel.selectedKind = kind
             }
+            prepareExport()
         } label: {
             Text(title)
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
@@ -309,6 +427,12 @@ struct CareLedgerAnalysisContentView: View {
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private extension CareLedgerAnalysisEventSnapshot {
+    var kind: CareLedgerEventKind {
+        CareLedgerEventKind(rawValue: eventKind) ?? .unknown
     }
 }
 

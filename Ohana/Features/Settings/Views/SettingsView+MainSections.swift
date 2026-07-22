@@ -8,12 +8,12 @@ import SwiftUI
 extension SettingsView {
     @ViewBuilder
     var settingsBodySections: some View {
+        settingsExperienceSection
         if SettingsDebugTools.isRunningUITests {
             settingsUITestShortcutSection
         }
         settingsDataSections
         settingsDeferredHeavySections
-        settingsExperienceSection
         settingsPersonalSection
         settingsCategorySection
     }
@@ -47,57 +47,14 @@ extension SettingsView {
             ko: "사용 모드",
             it: "Modalità d’uso"
         )) {
-            HStack(spacing: 12) {
-                settingsIcon(
-                    experienceMode == .zen ? "leaf.fill" : "square.grid.2x2.fill",
-                    color: experienceMode == .zen ? Color.goPrimary : Color.goBlue
-                )
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(l.tr(
-                        zh: "App 模式",
-                        en: "App mode",
-                        de: "App-Modus",
-                        es: "Modo de la app",
-                        pt: "Modo do app",
-                        fr: "Mode de l’app",
-                        ja: "Appモード",
-                        ko: "앱 모드",
-                        it: "Modalità app"
-                    ))
-                        .font(OhanaFont.body(.semibold))
-                    Text(experienceMode.subtitle(l))
-                        .font(OhanaFont.caption2(.semibold))
-                        .foregroundStyle(tertiaryText)
-                        .fixedSize(horizontal: false, vertical: true)
+            SettingsExperienceModeSelector(
+                selection: experienceMode,
+                l: l,
+                onSelect: { mode in
+                    guard mode != experienceMode else { return }
+                    onRequestExperienceModeChange?(mode)
                 }
-                Spacer(minLength: 8)
-                Picker(
-                    l.tr(
-                        zh: "App 模式",
-                        en: "App mode",
-                        de: "App-Modus",
-                        es: "Modo de la app",
-                        pt: "Modo do app",
-                        fr: "Mode de l’app",
-                        ja: "Appモード",
-                        ko: "앱 모드",
-                        it: "Modalità app"
-                    ),
-                    selection: Binding(
-                        get: { experienceMode },
-                        set: { onRequestExperienceModeChange?($0) }
-                    )
-                ) {
-                    ForEach(AppExperienceMode.allCases) { mode in
-                        Text(mode.title(l)).tag(mode)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .accessibilityIdentifier("settings-experience-mode-picker")
-            }
-            .foregroundStyle(primaryText)
-            .frame(minHeight: 54)
+            )
 
             if experienceMode == .zen, !livingSettingsHumans.isEmpty {
                 HStack(spacing: 12) {
@@ -278,5 +235,102 @@ extension SettingsView {
         if OnlineFeatureGate.allows(.onlineCollaboration) {
             householdSyncSection
         }
+    }
+}
+
+private struct SettingsExperienceModeSelector: View {
+    let selection: AppExperienceMode
+    let l: L10n
+    let onSelect: (AppExperienceMode) -> Void
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(l.tr(
+                zh: "选择 Ohana 的使用方式；资料、椰子与 Oasis 都会原样保留。",
+                en: "Choose how Ohana feels. Your records, coconuts, and Oasis stay unchanged.",
+                de: "Wähle, wie sich Ohana anfühlt. Daten, Kokosnüsse und Oasis bleiben unverändert.",
+                es: "Elige cómo usar Ohana. Tus datos, cocos y Oasis no cambian.",
+                pt: "Escolha como usar o Ohana. Seus dados, cocos e Oasis não mudam.",
+                fr: "Choisissez votre façon d’utiliser Ohana. Vos données, cocos et Oasis restent intacts.",
+                ja: "Ohanaの使い方を選べます。記録、ココナッツ、Oasisはそのままです。",
+                ko: "Ohana 사용 방식을 선택하세요. 기록, 코코넛과 Oasis는 그대로 유지됩니다.",
+                it: "Scegli come usare Ohana. Dati, cocco e Oasis restano invariati."
+            ))
+            .font(OhanaFont.footnote(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(spacing: 10) { modeButtons }
+                } else {
+                    HStack(alignment: .top, spacing: 10) { modeButtons }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var modeButtons: some View {
+        ForEach(AppExperienceMode.allCases) { mode in
+            modeButton(mode)
+        }
+    }
+
+    private func modeButton(_ mode: AppExperienceMode) -> some View {
+        let isSelected = selection == mode
+        let icon = mode == .zen ? "leaf.fill" : "square.grid.2x2.fill"
+
+        return Button {
+            onSelect(mode)
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: icon)
+                        .font(OhanaFont.adaptive(size: 17, weight: .black))
+                        .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.goPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(isSelected ? Color.goPrimary : Color.goPrimary.opacity(0.12), in: Circle())
+                        .accessibilityHidden(true)
+
+                    Spacer(minLength: 6)
+
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(OhanaFont.adaptive(size: 18, weight: .bold))
+                        .foregroundStyle(isSelected ? Color.goPrimary : Color.ohanaTertiaryText)
+                        .accessibilityHidden(true)
+                }
+
+                Text(mode.title(l))
+                    .font(OhanaFont.headline(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+
+                Text(mode.subtitle(l))
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 126, alignment: .topLeading)
+            .padding(14)
+            .background(
+                isSelected ? Color.goPrimary.opacity(0.10) : Color.ohanaControlFill.opacity(0.72),
+                in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
+                    .strokeBorder(isSelected ? Color.goPrimary : Color.ohanaDivider, lineWidth: isSelected ? 2 : 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(mode.title(l))
+        .accessibilityValue(isSelected
+            ? l.tr(zh: "已选择", en: "Selected", de: "Ausgewählt", es: "Seleccionado", pt: "Selecionado", fr: "Sélectionné", ja: "選択中", ko: "선택됨", it: "Selezionato")
+            : l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt", es: "No seleccionado", pt: "Não selecionado", fr: "Non sélectionné", ja: "未選択", ko: "선택 안 됨", it: "Non selezionato"))
+        .accessibilityHint(mode.subtitle(l))
+        .accessibilityIdentifier("settings-experience-mode-\(mode.rawValue)")
     }
 }

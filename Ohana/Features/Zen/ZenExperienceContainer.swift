@@ -9,17 +9,28 @@
 import SwiftData
 import SwiftUI
 
+private nonisolated struct ZenAvatarLoadRequest: Sendable {
+    let subject: PresenceSubjectRef
+    let modelID: PersistentIdentifier
+    let signature: String
+}
+
 @MainActor
 struct ZenExperienceContainer: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(AppExperienceController.self) private var experienceController
     @Environment(\.appPersistentBootstrapReady) private var persistentBootstrapReady
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @Namespace private var profileTransitionNamespace
 
     @State private var snapshot = ZenPresenceSnapshot.empty
     @State private var oasisSnapshot = ZenOasisSnapshot.empty
     @State private var presentedRoute: ZenExperienceRoute?
     @State private var refreshTask: Task<Void, Never>?
+    @State private var avatarLoadTask: Task<Void, Never>?
     @State private var didLoadStreak = false
     @State private var didLoadOasis = false
     @State private var errorMessage: String?
@@ -34,9 +45,10 @@ struct ZenExperienceContainer: View {
         ZenShell(
             snapshot: $snapshot,
             oasisSnapshot: $oasisSnapshot,
-            actions: actions
+            actions: actions,
+            profileTransitionNamespace: profileTransitionNamespace
         )
-        .task(id: "\(experienceController.zenOwnerHumanID):\(persistentBootstrapReady)") {
+        .task(id: "\(experienceController.zenOwnerHumanID):\(persistentBootstrapReady):\(appLanguage)") {
             await prepareExperience()
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
@@ -48,9 +60,11 @@ struct ZenExperienceContainer: View {
         .onDisappear {
             refreshTask?.cancel()
             refreshTask = nil
+            avatarLoadTask?.cancel()
+            avatarLoadTask = nil
         }
         .sheet(item: $presentedRoute) { route in
-            routeDestination(route)
+            transitionedRouteDestination(route)
                 .ohanaSheetPagePresentation()
         }
         .alert(
@@ -99,11 +113,16 @@ struct ZenExperienceContainer: View {
     private var actions: ZenShellActions {
         ZenShellActions(
             onAutoCheckInOwner: {
-                await runPresenceCommand { try commandService.autoCheckInOwner() }
+                await runAutoCheckInOwner()
             },
-            onCheckIn: { subjectID, kind in
+            onCheckIn: { subjectID, kind, status in
                 guard let subject = presenceSubject(id: subjectID, kind: kind) else { return }
-                await runPresenceCommand { try commandService.checkIn(subject: subject) }
+                await runPresenceCommand {
+                    try commandService.checkIn(
+                        subject: subject,
+                        status: status.map(presenceStatus)
+                    )
+                }
             },
             onUpdateStatus: { subjectID, kind, status in
                 guard let subject = presenceSubject(id: subjectID, kind: kind) else { return }
@@ -112,6 +131,22 @@ struct ZenExperienceContainer: View {
                         subject: subject,
                         status: status.map(presenceStatus)
                     )
+                }
+            },
+            onRecordRetrospectiveStatus: { subjectID, kind, dayKey, status in
+                guard let subject = presenceSubject(id: subjectID, kind: kind) else { return }
+                await runRetrospectiveStatusCommand {
+                    try commandService.recordRetrospectiveStatus(
+                        subject: subject,
+                        dayKey: dayKey,
+                        status: presenceStatus(status)
+                    )
+                }
+            },
+            onUndoCheckIn: { subjectID, kind in
+                guard let subject = presenceSubject(id: subjectID, kind: kind) else { return }
+                await runUndoPresenceCommand {
+                    try commandService.undoTodayCheckIn(subject: subject)
                 }
             },
             onCheckInAll: {
@@ -129,7 +164,7 @@ struct ZenExperienceContainer: View {
             onAdd: { kind in
                 presentedRoute = .add(entityType(kind))
             },
-            onManage: { subject in
+            onOpenProfile: { subject in
                 guard let id = UUID(uuidString: subject.id) else { return }
                 presentedRoute = switch subject.kind {
                 case .human: .human(id)
@@ -137,15 +172,25 @@ struct ZenExperienceContainer: View {
                 case .plant: .plant(id)
                 }
             },
+            onOpenMembers: {
+                presentedRoute = .members
+            },
+            onOpenCoconutLog: {
+                presentedRoute = .coconutLog
+            },
             onOpenSettings: onRequestModeSwitch,
             onOpenPersonalAnalytics: {
                 presentedRoute = appServices.commerce.allows(.presenceLongRangeAnalytics)
                     ? .analytics
                     : .personalPlan
             },
-            onOpenShop: {
+            onOpenShop: { category in
                 guard lockedLevel(for: .coconutShop(.appIcon)) == nil else { return }
-                presentedRoute = .shop
+                presentedRoute = .shop(category)
+            },
+            onOpenAchievements: {
+                guard lockedLevel(for: .achievements) == nil else { return }
+                presentedRoute = .achievements
             },
             onOpenGacha: {
                 guard lockedLevel(for: .gacha) == nil else { return }
@@ -154,6 +199,9 @@ struct ZenExperienceContainer: View {
             onOpenCritters: {
                 guard lockedLevel(for: .critterCodex) == nil else { return }
                 presentedRoute = .critters
+            },
+            onOpenGrowthRoadmap: {
+                presentedRoute = .growthRoadmap
             },
             onInjectEnergy: {
                 _ = appServices.oasisTree.injectEnergy(
@@ -213,6 +261,43 @@ struct ZenExperienceContainer: View {
         refresh(streak: didLoadStreak)
     }
 
+    private func runUndoPresenceCommand(
+        _ operation: () throws -> PresenceUndoCheckInResult
+    ) async {
+        do {
+            _ = try operation()
+        } catch {
+            present(error)
+        }
+        refresh(streak: didLoadStreak)
+    }
+
+    private func runRetrospectiveStatusCommand(
+        _ operation: () throws -> PresenceRetrospectiveStatusResult
+    ) async {
+        do {
+            _ = try operation()
+        } catch {
+            present(error)
+        }
+        refresh(streak: didLoadStreak)
+    }
+
+    private func runAutoCheckInOwner() async -> Bool {
+        do {
+            let result = try commandService.autoCheckInOwner()
+            if let ownerCheckIn = result.checkIns.first(where: \.isOwner) {
+                await SystemPresenceReminderScheduler().cancelToday(now: ownerCheckIn.checkedInAt)
+            }
+            refresh(streak: didLoadStreak)
+            return result.didCreateCheckIn
+        } catch {
+            present(error)
+            refresh(streak: didLoadStreak)
+            return false
+        }
+    }
+
     private func scheduleRefresh(delayMilliseconds: UInt64 = 100) {
         refreshTask?.cancel()
         refreshTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
@@ -231,7 +316,8 @@ struct ZenExperienceContainer: View {
         do {
             let home = try PresenceCheckInReadService.homeSnapshot(
                 context: modelContext,
-                ownerHumanId: ownerID
+                ownerHumanId: ownerID,
+                localization: L10n(appLanguage)
             )
             let todayCheckIns = try todayCheckIns(dayKey: home.dayKey)
             let todayBySubject = Dictionary(
@@ -255,6 +341,10 @@ struct ZenExperienceContainer: View {
                             ? anonymousHistoryName(for: subject.subject.kind)
                             : subject.name,
                         avatarAssetName: nil,
+                        avatarEmoji: subject.avatarEmoji,
+                        avatarThumbnailSignature: subject.avatarThumbnailSignature,
+                        createdAt: subject.createdAt,
+                        inactiveAt: subject.inactiveAt,
                         themeHex: subject.themeColorHex,
                         isOwner: subject.isOwner,
                         sortIndex: index,
@@ -278,6 +368,7 @@ struct ZenExperienceContainer: View {
                             dayKey: day.dayKey,
                             checkedIn: day.isCheckedIn,
                             status: day.status.map(zenStatus),
+                            isRetrospectiveStatus: day.isRetrospectiveStatus,
                             participation: day.isParticipating ? .participating : .notParticipating
                         )
                     }
@@ -294,11 +385,16 @@ struct ZenExperienceContainer: View {
                         kind: zenKind(subject.subject.kind),
                         name: subject.name,
                         avatarAssetName: nil,
+                        avatarEmoji: subject.avatarEmoji,
+                        avatarThumbnailSignature: subject.avatarThumbnailSignature,
+                        createdAt: subject.createdAt,
                         themeHex: subject.themeColorHex,
                         isOwner: subject.isOwner,
                         sortIndex: index,
                         isActive: true,
                         isAnonymousHistory: false,
+                        expandedProfile: subject.expandedProfile,
+                        currentDisplayStreak: subject.currentDisplayStreak,
                         checkedToday: subject.isCheckedInToday,
                         status: subject.status.map(zenStatus),
                         checkedAt: today?.checkedInAt
@@ -311,13 +407,61 @@ struct ZenExperienceContainer: View {
                 longestStreak: longestStreak,
                 days: days,
                 coconutBalance: balance,
-                personalAccessLevel: appServices.commerce.personalAccessLevel
+                personalAccessLevel: appServices.commerce.personalAccessLevel,
+                avatarCacheRevision: snapshot.avatarCacheRevision
             )
+            scheduleAvatarPreload(for: home.subjects)
             if didLoadOasis {
                 refreshOasis(balance: balance)
             }
         } catch {
             present(error)
+        }
+    }
+
+    private func scheduleAvatarPreload(for subjects: [PresenceSubjectSnapshot]) {
+        let requests = subjects.compactMap { subject -> ZenAvatarLoadRequest? in
+            guard let modelID = subject.avatarModelID,
+                  !subject.avatarThumbnailSignature.isEmpty,
+                  FocusWalletAvatarCache.cachedEntry(
+                    for: subject.subject.id,
+                    signature: subject.avatarThumbnailSignature
+                  ) == nil else {
+                return nil
+            }
+            return ZenAvatarLoadRequest(
+                subject: subject.subject,
+                modelID: modelID,
+                signature: subject.avatarThumbnailSignature
+            )
+        }
+        guard !requests.isEmpty else { return }
+
+        avatarLoadTask?.cancel()
+        let container = modelContext.container
+        avatarLoadTask = Task { @MainActor in
+            let loader = SwiftDataMediaBlobLoader(modelContainer: container)
+            var payloads: [FocusWalletAvatarCache.Payload] = []
+            for request in requests {
+                guard !Task.isCancelled else { return }
+                let data: Data? = switch request.subject.kind {
+                case .human:
+                    await loader.humanAvatarImageData(modelID: request.modelID)
+                case .pet:
+                    await loader.petAvatarImageData(modelID: request.modelID)
+                case .plant:
+                    await loader.plantAvatarImageData(modelID: request.modelID)
+                }
+                guard !Task.isCancelled else { return }
+                if data.map({ FocusWalletAvatarCache.signature(for: $0) }) == request.signature {
+                    payloads.append(.init(id: request.subject.id, data: data))
+                }
+            }
+            guard !Task.isCancelled else { return }
+            if await FocusWalletAvatarCache.preload(payloads: payloads) {
+                snapshot.avatarCacheRevision &+= 1
+            }
+            avatarLoadTask = nil
         }
     }
 
@@ -347,6 +491,7 @@ struct ZenExperienceContainer: View {
             canInjectEnergy: balance >= OasisTreeEnergyInjectionPolicy.starterPackageCost &&
                 appServices.oasisTree.canUseInjectionPackage(cost: OasisTreeEnergyInjectionPolicy.starterPackageCost),
             shopLockedLevel: lockedLevel(for: .coconutShop(.appIcon), currentLevel: level),
+            achievementsLockedLevel: lockedLevel(for: .achievements, currentLevel: level),
             gachaLockedLevel: lockedLevel(for: .gacha, currentLevel: level),
             crittersLockedLevel: lockedLevel(for: .critterCodex, currentLevel: level),
             starterGiftState: giftState
@@ -354,9 +499,10 @@ struct ZenExperienceContainer: View {
     }
 
     private func todayCheckIns(dayKey: String) throws -> [PresenceCheckIn] {
-        try modelContext.fetch(FetchDescriptor<PresenceCheckIn>(
+        let retrospectiveSourceRaw = PresenceCheckInSource.retrospectiveStatus.rawValue
+        return try modelContext.fetch(FetchDescriptor<PresenceCheckIn>(
             predicate: #Predicate {
-                $0.dayKey == dayKey
+                $0.dayKey == dayKey && $0.sourceRaw != retrospectiveSourceRaw
             },
             sortBy: [SortDescriptor(\.checkedInAt)]
         ))
@@ -371,6 +517,20 @@ struct ZenExperienceContainer: View {
             return nil
         }
         return required
+    }
+
+    @ViewBuilder
+    private func transitionedRouteDestination(_ route: ZenExperienceRoute) -> some View {
+        if let sourceID = route.profileTransitionSourceID,
+           !reduceMotion,
+           !workloadPolicy.shouldReduceWork() {
+            routeDestination(route)
+                .environment(\.memberProfileExperienceStyle, .zen)
+                .navigationTransition(.zoom(sourceID: sourceID, in: profileTransitionNamespace))
+        } else {
+            routeDestination(route)
+                .environment(\.memberProfileExperienceStyle, .zen)
+        }
     }
 
     @ViewBuilder
@@ -391,19 +551,26 @@ struct ZenExperienceContainer: View {
                 id: id,
                 destination: .basicInfo,
                 onMissing: closeRoute,
-                onDismiss: closeRoute
+                onDismiss: closeAndRefreshRoute
             )
         case let .pet(id):
             AppPetDetailSheetRouteContainer(
                 id: id,
                 destination: .basicInfo,
                 onMissing: closeRoute,
-                onDismiss: closeRoute
+                onDismiss: closeAndRefreshRoute
             )
         case let .plant(id):
-            ZenPlantManagementRoute(id: id, onClose: closeAndRefreshRoute)
-        case .shop:
-            NavigationStack { CoconutShopRouteContainer() }
+            AppPlantRouteContainer(
+                id: id,
+                destination: .basicInfo,
+                onDismiss: closeRoute,
+                onChanged: closeAndRefreshRoute
+            )
+        case let .shop(category):
+            NavigationStack { CoconutShopRouteContainer(initialCategory: category) }
+        case .achievements:
+            FunctionMenuSheet(initialDestination: .featureAggregate(.achievements))
         case .gacha:
             GachaRouteContainer(
                 drawsBackground: true,
@@ -414,10 +581,24 @@ struct ZenExperienceContainer: View {
             NavigationStack {
                 OasisCritterCodexRouteContainer(mode: .codex, onClose: closeRoute)
             }
+        case .growthRoadmap:
+            FunctionMenuSheet(initialDestination: .growthRoadmap)
         case .analytics:
             NavigationStack { ZenPersonalAnalyticsView(snapshot: snapshot) }
         case .personalPlan:
             PersonalPlanView(prompt: PersonalUpgradePrompt(feature: .presenceLongRangeAnalytics))
+        case .members:
+            ZenMembersRouteContainer(
+                subjects: snapshot.subjects,
+                avatarCacheRevision: snapshot.avatarCacheRevision,
+                onRefresh: { scheduleRefresh(delayMilliseconds: 80) }
+            )
+        case .coconutLog:
+            CoconutLogView(
+                subject: nil,
+                onClose: closeRoute,
+                historyContentDelayMilliseconds: 80
+            )
         }
     }
 
@@ -460,11 +641,12 @@ struct ZenExperienceContainer: View {
     }
 
     private func zenStatus(_ status: PresenceStatus) -> ZenPresenceStatus {
-        ZenPresenceStatus(rawValue: status.rawValue) ?? .okay
+        (ZenPresenceStatus(rawValue: status.rawValue) ?? ZenPresenceStatus(score: status.score))
+            .currentPresentationStatus
     }
 
     private func presenceStatus(_ status: ZenPresenceStatus) -> PresenceStatus {
-        PresenceStatus(rawValue: status.rawValue) ?? .okay
+        PresenceStatus(rawValue: status.rawValue) ?? PresenceStatus(score: status.score)
     }
 
     private func anonymousHistoryName(for kind: PresenceSubjectKind) -> String {
@@ -509,256 +691,20 @@ struct ZenExperienceContainer: View {
     }
 }
 
-@MainActor
-private struct ZenPlantManagementRoute: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AppServices.self) private var appServices
-    @Query private var plants: [Plant]
-    @State private var showingEditor = false
-    @State private var showingArchiveConfirmation = false
-    @State private var showingDeleteConfirmation = false
-
-    let onClose: () -> Void
-
-    init(id: UUID, onClose: @escaping () -> Void) {
-        _plants = Query(filter: #Predicate<Plant> { $0.id == id })
-        self.onClose = onClose
-    }
-
-    var body: some View {
-        NavigationStack {
-            Group {
-                if let plant = plants.first {
-                    List {
-                        Button {
-                            showingEditor = true
-                        } label: {
-                            Label(
-                                L10n.current.tr(
-                                    zh: "编辑资料",
-                                    en: "Edit profile",
-                                    de: "Profil bearbeiten",
-                                    es: "Editar perfil",
-                                    pt: "Editar perfil",
-                                    fr: "Modifier le profil",
-                                    ja: "プロフィールを編集",
-                                    ko: "프로필 편집",
-                                    it: "Modifica profilo"
-                                ),
-                                systemImage: "pencil"
-                            )
-                        }
-                        .accessibilityIdentifier("zen-plant-edit-action")
-
-                        Button(role: .destructive) {
-                            showingArchiveConfirmation = true
-                        } label: {
-                            Label(
-                                L10n.current.tr(
-                                    zh: "归档植物",
-                                    en: "Archive plant",
-                                    de: "Pflanze archivieren",
-                                    es: "Archivar planta",
-                                    pt: "Arquivar planta",
-                                    fr: "Archiver la plante",
-                                    ja: "植物をアーカイブ",
-                                    ko: "식물 보관",
-                                    it: "Archivia pianta"
-                                ),
-                                systemImage: "archivebox"
-                            )
-                        }
-                        .accessibilityIdentifier("zen-plant-archive-action")
-
-                        Button(role: .destructive) {
-                            showingDeleteConfirmation = true
-                        } label: {
-                            Label(
-                                L10n.current.tr(
-                                    zh: "删除植物",
-                                    en: "Delete plant",
-                                    de: "Pflanze löschen",
-                                    es: "Eliminar planta",
-                                    pt: "Excluir planta",
-                                    fr: "Supprimer la plante",
-                                    ja: "植物を削除",
-                                    ko: "식물 삭제",
-                                    it: "Elimina pianta"
-                                ),
-                                systemImage: "trash"
-                            )
-                        }
-                        .accessibilityIdentifier("zen-plant-delete-action")
-                    }
-                    .sheet(isPresented: $showingEditor) {
-                        EditPlantSheet(plant: plant)
-                            .ohanaSheetPagePresentation()
-                    }
-                    .alert(
-                        L10n.current.tr(
-                            zh: "归档植物？",
-                            en: "Archive plant?",
-                            de: "Pflanze archivieren?",
-                            es: "¿Archivar la planta?",
-                            pt: "Arquivar a planta?",
-                            fr: "Archiver la plante ?",
-                            ja: "植物をアーカイブしますか？",
-                            ko: "식물을 보관할까요?",
-                            it: "Archiviare la pianta?"
-                        ),
-                        isPresented: $showingArchiveConfirmation
-                    ) {
-                        Button(L10n.current.tr(
-                            zh: "取消",
-                            en: "Cancel",
-                            de: "Abbrechen",
-                            es: "Cancelar",
-                            pt: "Cancelar",
-                            fr: "Annuler",
-                            ja: "キャンセル",
-                            ko: "취소",
-                            it: "Annulla"
-                        ), role: .cancel) {}
-                        Button(L10n.current.tr(
-                            zh: "归档",
-                            en: "Archive",
-                            de: "Archivieren",
-                            es: "Archivar",
-                            pt: "Arquivar",
-                            fr: "Archiver",
-                            ja: "アーカイブ",
-                            ko: "보관",
-                            it: "Archivia"
-                        ), role: .destructive) {
-                            archive(plant)
-                        }
-                    } message: {
-                        Text(L10n.current.tr(
-                            zh: "档案与历史会保留，之后不再出现在佛系首页。",
-                            en: "The profile and history stay, and this plant leaves Zen Home.",
-                            de: "Profil und Verlauf bleiben erhalten; die Pflanze verschwindet von Zen Home.",
-                            es: "El perfil y el historial se conservarán, pero la planta dejará de aparecer en Inicio zen.",
-                            pt: "O perfil e o histórico serão mantidos, mas a planta sairá do Início zen.",
-                            fr: "Le profil et l’historique seront conservés, mais la plante quittera l’accueil Zen.",
-                            ja: "プロフィールと履歴は残りますが、植物は佛系ホームに表示されなくなります。",
-                            ko: "프로필과 기록은 유지되지만 식물은 마음 편한 홈에서 사라져요.",
-                            it: "Il profilo e la cronologia resteranno, ma la pianta non apparirà più nella Home Zen."
-                        ))
-                    }
-                    .alert(
-                        L10n.current.tr(
-                            zh: "删除植物？",
-                            en: "Delete plant?",
-                            de: "Pflanze löschen?",
-                            es: "¿Eliminar la planta?",
-                            pt: "Excluir a planta?",
-                            fr: "Supprimer la plante ?",
-                            ja: "植物を削除しますか？",
-                            ko: "식물을 삭제할까요?",
-                            it: "Eliminare la pianta?"
-                        ),
-                        isPresented: $showingDeleteConfirmation
-                    ) {
-                        Button(L10n.current.tr(
-                            zh: "取消",
-                            en: "Cancel",
-                            de: "Abbrechen",
-                            es: "Cancelar",
-                            pt: "Cancelar",
-                            fr: "Annuler",
-                            ja: "キャンセル",
-                            ko: "취소",
-                            it: "Annulla"
-                        ), role: .cancel) {}
-                        Button(L10n.current.tr(
-                            zh: "删除",
-                            en: "Delete",
-                            de: "Löschen",
-                            es: "Eliminar",
-                            pt: "Excluir",
-                            fr: "Supprimer",
-                            ja: "削除",
-                            ko: "삭제",
-                            it: "Elimina"
-                        ), role: .destructive) {
-                            delete(plant)
-                        }
-                    }
-                } else {
-                    ContentUnavailableView(
-                        L10n.current.tr(
-                            zh: "植物已不可用",
-                            en: "Plant unavailable",
-                            de: "Pflanze nicht verfügbar",
-                            es: "Planta no disponible",
-                            pt: "Planta indisponível",
-                            fr: "Plante indisponible",
-                            ja: "植物を利用できません",
-                            ko: "식물을 사용할 수 없어요",
-                            it: "Pianta non disponibile"
-                        ),
-                        systemImage: "leaf"
-                    )
-                }
-            }
-            .navigationTitle(plants.first?.name ?? L10n.current.tr(
-                zh: "管理植物",
-                en: "Manage plant",
-                de: "Pflanze verwalten",
-                es: "Gestionar planta",
-                pt: "Gerenciar planta",
-                fr: "Gérer la plante",
-                ja: "植物を管理",
-                ko: "식물 관리",
-                it: "Gestisci pianta"
-            ))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.current.tr(
-                        zh: "完成",
-                        en: "Done",
-                        de: "Fertig",
-                        es: "Listo",
-                        pt: "Concluído",
-                        fr: "Terminé",
-                        ja: "完了",
-                        ko: "완료",
-                        it: "Fatto"
-                    ), action: onClose)
-                }
-            }
-        }
-    }
-
-    private func archive(_ plant: Plant) {
-        let result = MemberCommandExecutor(context: modelContext, services: appServices).archivePlant(
-            plant,
-            date: Date(),
-            note: "zen.plant.archive"
-        )
-        if result.didPersist { onClose() }
-    }
-
-    private func delete(_ plant: Plant) {
-        let result = MemberCommandExecutor(context: modelContext, services: appServices).deletePlant(
-            plant,
-            note: "zen.plant.delete"
-        )
-        if result.didPersist { onClose() }
-    }
-}
-
 private enum ZenExperienceRoute: Identifiable, Equatable {
     case add(EntityType)
     case human(UUID)
     case pet(UUID)
     case plant(UUID)
-    case shop
+    case shop(ShopItem.ShopCategory)
+    case achievements
     case gacha
     case critters
+    case growthRoadmap
     case analytics
     case personalPlan
+    case members
+    case coconutLog
 
     var id: String {
         switch self {
@@ -766,11 +712,26 @@ private enum ZenExperienceRoute: Identifiable, Equatable {
         case let .human(id): "human:\(id.uuidString)"
         case let .pet(id): "pet:\(id.uuidString)"
         case let .plant(id): "plant:\(id.uuidString)"
-        case .shop: "shop"
+        case let .shop(category): "shop:\(category.rawValue)"
+        case .achievements: "achievements"
         case .gacha: "gacha"
         case .critters: "critters"
+        case .growthRoadmap: "growth-roadmap"
         case .analytics: "analytics"
         case .personalPlan: "personal-plan"
+        case .members: "members"
+        case .coconutLog: "coconut-log"
+        }
+    }
+
+    var profileTransitionSourceID: String? {
+        switch self {
+        case let .human(id): "profile:human:\(id.uuidString)"
+        case let .pet(id): "profile:pet:\(id.uuidString)"
+        case let .plant(id): "profile:plant:\(id.uuidString)"
+        case .add, .shop, .achievements, .gacha, .critters, .growthRoadmap,
+             .analytics, .personalPlan, .members, .coconutLog:
+            nil
         }
     }
 }

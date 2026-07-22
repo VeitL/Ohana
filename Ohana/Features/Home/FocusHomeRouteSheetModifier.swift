@@ -303,7 +303,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private func openFunctionMenu(destination: FMDest?) {
         routes.openFunctionMenu(
             destination: destination,
-            currentLevel: appServices.oasisTree.treeLevel.rawValue
+            currentLevel: appServices.oasisTree.treeLevel.rawValue,
+            plan: appServices.commerce.ohanaPlanLevel
         )
     }
 

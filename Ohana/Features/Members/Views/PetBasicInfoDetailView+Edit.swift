@@ -9,8 +9,35 @@ import SwiftData
 import SwiftUI
 
 extension PetBasicInfoDetailView {
+    var profileEditAccent: Color {
+        guard profileExperienceStyle == .zen else { return Color.goPrimary }
+        let value = eThemeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? Color.goPrimary : Color(hex: value)
+    }
+
+    var profileEditAccentForeground: Color {
+        guard profileExperienceStyle == .zen else { return Color.arkInk }
+        let value = eThemeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hex = value.isEmpty ? "C8F34A" : value
+        return WalletPetCardTheme.prefersDarkForeground(for: hex)
+            ? Color.arkInk
+            : Color.goCardWhite
+    }
+
     var editContent: some View {
-        VStack(spacing: 14) {
+        Form {
+            Section {
+                EditableProfileAvatarPicker(
+                    avatarImageData: $eAvatarImageData,
+                    fallbackEmoji: pet.avatarEmoji,
+                    accentColor: Color(hex: eThemeColorHex),
+                    cropSpecies: eSpecies,
+                    silhouetteSystemName: nil
+                )
+            } header: {
+                Label(l.tr(zh: "头像", en: "Photo", de: "Foto"), systemImage: "photo")
+            }
+
             // 基本信息
             editSection(title: l.tr(zh: "基本信息", en: "Basic info", de: "Basisdaten"), icon: "pawprint.fill", iconColor: Color.goPrimary) {
                 editField(l.tr(zh: "名字", en: "Name", de: "Name"), text: $eName, identifier: "pet-basic-info-name-input")
@@ -19,17 +46,13 @@ extension PetBasicInfoDetailView {
                 HStack {
                     editLabel(l.tr(zh: "物种", en: "Species", de: "Art"))
                     Spacer()
-                    Picker("", selection: $eSpecies) {
+                    Picker("", selection: speciesSelection) {
                         ForEach(speciesOptions, id: \.self) { species in
                             Text(Pet.localizedSpeciesName(species, l: l)).tag(species)
                         }
-                    }.pickerStyle(.menu).tint(Color.goPrimary)
-                        .onChange(of: eSpecies) { _, _ in
-                            let firstBreed = PetBreedDatabase.breeds(for: eSpecies).first
-                            eBreed = firstBreed?.name ?? ""
-                            eCoatColor = firstBreed?.coatColors.first?.name ?? ""
-                            if let hex = firstBreed?.suggestedThemeHex { eThemeColorHex = hex }
-                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(profileEditAccent)
                 }
                 Divider().opacity(0.1)
                 optionPickerRow(l.tr(zh: "品种", en: "Breed", de: "Rasse"), selection: $eBreed, options: breedOptions)
@@ -48,27 +71,27 @@ extension PetBasicInfoDetailView {
                 Divider().opacity(0.1)
                 Toggle(isOn: $eIsNeutered) {
                     editLabel(l.tr(zh: "已绝育", en: "Neutered", de: "Kastriert"))
-                }.tint(Color.goPrimary)
+                }.tint(profileEditAccent)
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasBirthday) {
                     editLabel(l.tr(zh: "设置生日", en: "Set birthday", de: "Geburtstag festlegen"))
                 }
-                .tint(Color.goPrimary)
+                .tint(profileEditAccent)
                 .accessibilityIdentifier("pet-basic-info-birthday-toggle")
                 if eHasBirthday {
                     DatePicker("", selection: $eBirthday, in: ...Date(), displayedComponents: .date)
-                        .datePickerStyle(.compact).tint(Color.goPrimary).labelsHidden()
+                        .datePickerStyle(.compact).tint(profileEditAccent).labelsHidden()
                         .accessibilityIdentifier("pet-basic-info-birthday-date-picker")
                 }
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasHomeDate) {
                     editLabel(l.tr(zh: "设置到家日", en: "Set home date", de: "Einzugstag festlegen"))
                 }
-                .tint(Color.goPrimary)
+                .tint(profileEditAccent)
                 .accessibilityIdentifier("pet-basic-info-home-date-toggle")
                 if eHasHomeDate {
                     DatePicker("", selection: $eHomeDate, displayedComponents: .date)
-                        .datePickerStyle(.compact).tint(Color.goPrimary).labelsHidden()
+                        .datePickerStyle(.compact).tint(profileEditAccent).labelsHidden()
                         .accessibilityIdentifier("pet-basic-info-home-date-picker")
                 }
             }
@@ -96,10 +119,10 @@ extension PetBasicInfoDetailView {
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasPassportExpiry) {
                     editLabel(l.tr(zh: "护照有效期", en: "Passport expiry", de: "Pass gueltig bis"))
-                }.tint(Color.goYellow)
+                }.tint(profileExperienceStyle == .zen ? profileEditAccent : Color.goYellow)
                 if eHasPassportExpiry {
                     DatePicker("", selection: $ePassportExpiry, displayedComponents: .date)
-                        .datePickerStyle(.compact).tint(Color.goYellow).labelsHidden()
+                        .datePickerStyle(.compact).tint(profileExperienceStyle == .zen ? profileEditAccent : Color.goYellow).labelsHidden()
                 }
             }
             // 血统
@@ -139,66 +162,68 @@ extension PetBasicInfoDetailView {
                 TextField(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)"), text: $eNotes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .tint(Color.goOrange)
+                    .tint(profileExperienceStyle == .zen ? profileEditAccent : Color.goOrange)
                     .lineLimit(3 ... 6)
                     .accessibilityIdentifier("pet-basic-info-notes-input")
             }
         }
+        .scrollContentBackground(.hidden)
+        .tint(profileEditAccent)
+        .background(OhanaAppBackground())
     }
 
     // MARK: - Avatar Section
     var avatarSection: some View {
-        VStack(spacing: 12) {
-            ZStack(alignment: .topTrailing) {
-                VStack(spacing: 10) {
-                    profileAvatarImage(
-                        data: isEditing ? eAvatarImageData : nil,
-                        fallbackEmoji: pet.avatarEmoji,
-                        accent: isEditing ? Color(hex: eThemeColorHex) : Color(hex: pet.safeThemeColorHex),
-                        size: 84
-                    )
-                    VStack(spacing: 4) {
-                        Text(isEditing ? (eName.isEmpty ? pet.name : eName) : pet.name)
-                            .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.65)
-                            .accessibilityIdentifier("pet-basic-info-name-readback")
-                        Text(Pet.localizedSpeciesBreedSummary(
-                            species: isEditing ? eSpecies : pet.species,
-                            breed: isEditing ? eBreed : pet.breed,
-                            l: l
-                        ))
-                            .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-
-                if isEditing {
-                    Text(l.tr(zh: "编辑中", en: "Editing", de: "Bearbeitung"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.goPrimary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.goPrimary.opacity(0.15), in: Capsule())
-                }
-            }
-
-            if isEditing {
-                EditableProfileAvatarPicker(
-                    avatarImageData: $eAvatarImageData,
-                    fallbackEmoji: pet.avatarEmoji,
-                    accentColor: Color(hex: eThemeColorHex),
-                    cropSpecies: eSpecies,
-                    silhouetteSystemName: nil
-                )
+        ProfileIdentityHero(
+            name: pet.name,
+            subtitle: Pet.localizedSpeciesBreedSummary(
+                species: pet.species,
+                breed: pet.breed,
+                l: l
+            ),
+            themeColorHex: pet.safeThemeColorHex,
+            fallbackColor: Color.goPrimary,
+            statusTitle: pet.hasPassedAway
+                ? l.tr(zh: "彩虹桥纪念", en: "Rainbow Bridge memorial", de: "Regenbogenbrücke")
+                : nil,
+            avatarAccessibilityLabel: l.tr(
+                zh: "\(pet.name) 的头像",
+                en: "Avatar for \(pet.name)",
+                de: "Avatar von \(pet.name)"
+            ),
+            nameAccessibilityIdentifier: "pet-basic-info-name-readback",
+            onAvatarTap: pet.hasAvatarImageAttachment ? { presentedSheet = .avatarPreview } : nil
+        ) {
+            PetAvatarPortraitView(
+                cacheID: pet.id,
+                imageSignature: pet.avatarThumbnailSignature,
+                petModelID: pet.persistentModelID,
+                fallbackText: pet.avatarEmoji,
+                themeColor: Color(hex: pet.safeThemeColorHex),
+                size: 88,
+                backgroundOpacity: 0.25,
+                transparentScale: 0.78
+            )
+        } badges: {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { petProfileBadges }
+                VStack(spacing: 8) { petProfileBadges }
             }
         }
-        .padding(16)
-        .goTranslucentCard(cornerRadius: OhanaRadius.input)
+    }
+
+    @ViewBuilder
+    private var petProfileBadges: some View {
+        if let primaryTagID = pet.personalityTagIdList.first {
+            ProfileBadge(
+                title: PetPersonalityTag.displayTitle(for: primaryTagID, l: l),
+                systemImage: PetPersonalityTag.lookup(primaryTagID)?.sfSymbol
+            )
+        }
+        ProfileBadge(
+            title: localizedPetDays(pet.daysTogether),
+            systemImage: "calendar"
+        )
     }
 
     func profileAvatarImage(data: Data?, fallbackEmoji: String, accent: Color, size: CGFloat) -> some View {
@@ -214,45 +239,23 @@ extension PetBasicInfoDetailView {
 
     // MARK: - Helpers
     func infoSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: icon).font(OhanaFont.adaptive(size: 13, weight: .bold)).foregroundStyle(iconColor) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                Text(title)
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            content()
-        }
-        .padding(16).goTranslucentCard(cornerRadius: OhanaRadius.input)
+        ProfileInfoSection(title: title, systemImage: icon, tint: iconColor, content: content)
     }
 
     func editSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: icon).font(OhanaFont.adaptive(size: 13, weight: .bold)).foregroundStyle(iconColor) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                Text(title).font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+        Section {
+            VStack(alignment: .leading, spacing: 14) {
+                content()
             }
-            content()
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } header: {
+            Label(title, systemImage: icon)
+                .foregroundStyle(profileExperienceStyle == .zen ? profileEditAccent : iconColor)
         }
-        .padding(16).goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     func infoRow(label: String, value: String) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                infoRowLabel(label)
-                    .frame(minWidth: 72, maxWidth: 128, alignment: .leading)
-                infoRowValue(value, alignment: .trailing, textAlignment: .trailing)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                infoRowLabel(label)
-                infoRowValue(value, alignment: .leading, textAlignment: .leading)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        ProfileInfoRow(label: label, value: value)
     }
 
     func infoRowLabel(_ label: String) -> some View {
@@ -311,7 +314,7 @@ extension PetBasicInfoDetailView {
         TextField(label, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText)
-            .tint(Color.goPrimary)
+            .tint(profileEditAccent)
             .multilineTextAlignment(.trailing)
             .accessibilityIdentifier(identifier ?? editFieldIdentifier(for: label))
     }
@@ -332,6 +335,22 @@ extension PetBasicInfoDetailView {
 
     var selectedBreedInfo: BreedInfo? {
         PetBreedDatabase.breeds(for: eSpecies).first { $0.name == eBreed }
+    }
+
+    var speciesSelection: Binding<String> {
+        Binding(
+            get: { eSpecies },
+            set: { newSpecies in
+                guard newSpecies != eSpecies else { return }
+                eSpecies = newSpecies
+                let firstBreed = PetBreedDatabase.breeds(for: newSpecies).first
+                eBreed = firstBreed?.name ?? ""
+                eCoatColor = firstBreed?.coatColors.first?.name ?? ""
+                if let hex = firstBreed?.suggestedThemeHex {
+                    eThemeColorHex = hex
+                }
+            }
+        )
     }
 
     var breedOptions: [String] {
@@ -385,7 +404,7 @@ extension PetBasicInfoDetailView {
                 }
             }
             .pickerStyle(.menu)
-            .tint(Color.goPrimary)
+            .tint(profileEditAccent)
             .frame(maxWidth: .infinity, alignment: .trailing)
         } stackedContent: {
             Picker("", selection: selection) {
@@ -394,7 +413,7 @@ extension PetBasicInfoDetailView {
                 }
             }
             .pickerStyle(.menu)
-            .tint(Color.goPrimary)
+            .tint(profileEditAccent)
         }
     }
 
@@ -429,12 +448,18 @@ extension PetBasicInfoDetailView {
                             }
                         }
                         .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(isSelected ? Color.goPrimary : Color.ohanaPrimaryText.opacity(0.82))
+                        .foregroundStyle(
+                            isSelected
+                                ? (profileExperienceStyle == .zen ? profileEditAccent : Color.goPrimary)
+                                : Color.ohanaPrimaryText.opacity(0.82)
+                        )
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .background(
-                            isSelected ? Color.goPrimary.opacity(0.16) : Color.ohanaPrimaryText.opacity(0.06),
+                            isSelected
+                                ? (profileExperienceStyle == .zen ? profileEditAccent.opacity(0.16) : Color.goPrimary.opacity(0.16))
+                                : Color.ohanaPrimaryText.opacity(0.06),
                             in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                         )
                     }
@@ -483,10 +508,19 @@ extension PetBasicInfoDetailView {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
                         }
-                        .foregroundStyle(selection.wrappedValue == item.name ? Color.arkInk : .primary.opacity(0.82))
+                        .foregroundStyle(
+                            selection.wrappedValue == item.name
+                                ? profileEditAccentForeground
+                                : Color.ohanaPrimaryText.opacity(0.82)
+                        )
                         .padding(.horizontal, 9)
                         .padding(.vertical, 7)
-                        .background(selection.wrappedValue == item.name ? Color.goPrimary : Color.primary.opacity(0.07), in: Capsule())
+                        .background(
+                            selection.wrappedValue == item.name
+                                ? (profileExperienceStyle == .zen ? profileEditAccent : Color.goPrimary)
+                                : Color.ohanaPrimaryText.opacity(0.07),
+                            in: Capsule()
+                        )
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }

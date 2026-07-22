@@ -721,6 +721,22 @@ private struct AppSheetRouteDestination: View {
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
+        case let .guardianSafety(invitationCode, incidentID):
+            NavigationStack {
+                GuardianSafetyDashboardView(
+                    initialInviteCode: invitationCode,
+                    initialIncidentID: incidentID
+                )
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(action: onDismiss) {
+                            Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
+                                .labelStyle(.iconOnly)
+                        }
+                    }
+                }
+            }
+            .ohanaSheetPagePresentation()
         case .requiredAccountSwitch:
             AppAccountSwitcherRouteContainer(allowsDismiss: false, onSwitched: onDismiss)
                 .interactiveDismissDisabled(true)

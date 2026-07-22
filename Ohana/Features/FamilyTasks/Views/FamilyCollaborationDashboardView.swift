@@ -65,6 +65,7 @@ struct FamilyCollaborationDashboardView: View {
     @State var selectedTaskScope: TaskScope = .mine
     @State var activeSheetRoute: FamilyCollaborationSheetRoute?
     @State var activeEditor: FamilyCollaborationEditorRoute?
+    @State var activeTaskDetail: FamilyCollaborationTaskDetailRoute?
     @State var inlineEditorVisible = false
     @State var inlineEditorDragOffset: CGFloat = 0
     @State var isVisible = false
@@ -98,7 +99,7 @@ struct FamilyCollaborationDashboardView: View {
 
     var activeFamilyTasks: [FamilyCollaborationTask] {
         familyTasks
-            .filter { !$0.isFinished }
+            .filter { !$0.isFinished || $0.status == .declined }
             .sorted { ($0.dueAt ?? $0.createdAt) < ($1.dueAt ?? $1.createdAt) }
     }
 
@@ -107,6 +108,11 @@ struct FamilyCollaborationDashboardView: View {
         return activeFamilyTasks.filter { task in
             if task.status == .pendingReview {
                 return task.createdById == currentHumanRecordID
+            }
+            if task.status == .declined {
+                return task.createdById == currentHumanRecordID ||
+                    task.assignedToId == currentHumanRecordID ||
+                    task.claimedById == currentHumanRecordID
             }
             return task.assignedToId == currentHumanRecordID || task.claimedById == currentHumanRecordID
         }
@@ -208,6 +214,9 @@ struct FamilyCollaborationDashboardView: View {
         }) { route in
             nativeTaskEditorSheet(route)
         }
+        .sheet(item: $activeTaskDetail) { route in
+            familyTaskDetailSheet(route)
+        }
         .onAppear {
             scheduleLegacyBountySync()
             if selectedPetId == nil {
@@ -227,6 +236,9 @@ struct FamilyCollaborationDashboardView: View {
         .onChange(of: createTaskTrigger) { _, newValue in
             guard newValue != 0 else { return }
             presentEditor(.create)
+        }
+        .onChange(of: activeHumanId) { _, _ in
+            closeRoleScopedRoutes()
         }
         .familyCollaborationPresentations(
             sheetRoute: $activeSheetRoute,

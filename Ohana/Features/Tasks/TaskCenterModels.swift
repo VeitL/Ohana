@@ -74,6 +74,7 @@ nonisolated enum TaskCenterWorkflowStatus: String, Equatable, Sendable {
     case scheduled
     case active
     case claimed
+    case declined
     case pendingReview
     case completed
     case cancelled
@@ -89,39 +90,144 @@ nonisolated enum TaskCenterAvailableAction: String, Hashable, Sendable {
 
 nonisolated enum TaskCenterMemberFilter: String, CaseIterable, Identifiable, Hashable, Sendable {
     case all
+
+    // Compatibility storage cases. New call sites should use the semantic aliases
+    // below so existing exhaustive switches keep compiling while the UI migrates.
     case currentMember
     case waitingForOthers
     case pendingReview
 
-    var id: String { rawValue }
+    static let actionRequired: Self = .currentMember
+    static let waitingForFamily: Self = .waitingForOthers
+
+    /// Pending review is an action for its creator, not a peer filter. Keep the
+    /// legacy case readable, but do not expose it in the selectable filter list.
+    static var allCases: [Self] { [.actionRequired, .waitingForFamily, .all] }
+
+    var id: String {
+        switch normalized {
+        case .all:
+            "all"
+        case .currentMember:
+            "actionRequired"
+        case .waitingForOthers:
+            "waitingForFamily"
+        case .pendingReview:
+            // `normalized` never preserves this compatibility case.
+            "actionRequired"
+        }
+    }
+
+    var normalized: Self {
+        switch self {
+        case .all:
+            .all
+        case .currentMember, .pendingReview:
+            .actionRequired
+        case .waitingForOthers:
+            .waitingForFamily
+        }
+    }
+}
+
+nonisolated struct TaskCenterMemberFilterSummary: Equatable, Sendable {
+    let actionRequiredCount: Int
+    let waitingForFamilyCount: Int
+    let allCount: Int
+    let systemJourneyCount: Int
+
+    static let empty = TaskCenterMemberFilterSummary(
+        actionRequiredCount: 0,
+        waitingForFamilyCount: 0,
+        allCount: 0,
+        systemJourneyCount: 0
+    )
+
+    var otherCount: Int {
+        max(0, allCount - actionRequiredCount - waitingForFamilyCount - systemJourneyCount)
+    }
+
+    func count(for filter: TaskCenterMemberFilter) -> Int {
+        switch filter.normalized {
+        case .all:
+            allCount
+        case .currentMember:
+            actionRequiredCount + systemJourneyCount
+        case .waitingForOthers:
+            waitingForFamilyCount + systemJourneyCount
+        case .pendingReview:
+            // `normalized` never preserves this compatibility case.
+            actionRequiredCount + systemJourneyCount
+        }
+    }
 }
 
 nonisolated struct TaskCenterMemberFilterContext: Equatable, Sendable {
     let activeHumanName: String?
     let showsFilters: Bool
-    let currentMemberItemIDs: Set<String>
-    let waitingForOthersItemIDs: Set<String>
-    let pendingReviewItemIDs: Set<String>
+    let actionRequiredItemIDs: Set<String>
+    let waitingForFamilyItemIDs: Set<String>
+    let systemJourneyItemIDs: Set<String>
+    let summary: TaskCenterMemberFilterSummary
 
     static let hidden = TaskCenterMemberFilterContext(
         activeHumanName: nil,
         showsFilters: false,
-        currentMemberItemIDs: [],
-        waitingForOthersItemIDs: [],
-        pendingReviewItemIDs: []
+        actionRequiredItemIDs: [],
+        waitingForFamilyItemIDs: [],
+        systemJourneyItemIDs: [],
+        allItemIDs: []
     )
 
+    init(
+        activeHumanName: String?,
+        showsFilters: Bool,
+        actionRequiredItemIDs: Set<String>,
+        waitingForFamilyItemIDs: Set<String>,
+        systemJourneyItemIDs: Set<String>,
+        allItemIDs: Set<String>
+    ) {
+        self.activeHumanName = activeHumanName
+        self.showsFilters = showsFilters
+        self.actionRequiredItemIDs = actionRequiredItemIDs
+        self.waitingForFamilyItemIDs = waitingForFamilyItemIDs
+        self.systemJourneyItemIDs = systemJourneyItemIDs
+        self.summary = TaskCenterMemberFilterSummary(
+            actionRequiredCount: actionRequiredItemIDs.count,
+            waitingForFamilyCount: waitingForFamilyItemIDs.count,
+            allCount: allItemIDs.count,
+            systemJourneyCount: systemJourneyItemIDs.count
+        )
+    }
+
+    /// Compatibility names for readers that have not migrated to action queues.
+    var currentMemberItemIDs: Set<String> { actionRequiredItemIDs }
+    var waitingForOthersItemIDs: Set<String> { waitingForFamilyItemIDs }
+    var pendingReviewItemIDs: Set<String> { actionRequiredItemIDs }
+
     func itemIDs(for filter: TaskCenterMemberFilter) -> Set<String>? {
-        switch filter {
+        switch filter.normalized {
         case .all:
             nil
         case .currentMember:
-            currentMemberItemIDs
+            actionRequiredItemIDs
         case .waitingForOthers:
-            waitingForOthersItemIDs
+            waitingForFamilyItemIDs
         case .pendingReview:
-            pendingReviewItemIDs
+            // `normalized` never preserves this compatibility case.
+            actionRequiredItemIDs
         }
+    }
+
+    func restricted(to includedItemIDs: Set<String>) -> TaskCenterMemberFilterContext {
+        TaskCenterMemberFilterContext(
+            activeHumanName: activeHumanName,
+            showsFilters: showsFilters,
+            actionRequiredItemIDs: actionRequiredItemIDs.intersection(includedItemIDs),
+            waitingForFamilyItemIDs: waitingForFamilyItemIDs.intersection(includedItemIDs),
+            systemJourneyItemIDs: systemJourneyItemIDs.intersection(includedItemIDs),
+            allItemIDs: includedItemIDs
+        )
     }
 }
 
@@ -251,13 +357,17 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
         memberFilterContext.showsFilters
     }
 
-    /// The list follows the current local member until the user explicitly chooses
-    /// another visible filter. Hidden collaboration controls always mean the full list.
+    var memberFilterSummary: TaskCenterMemberFilterSummary {
+        memberFilterContext.summary
+    }
+
+    /// Multi-member households default to work that needs the current actor now.
+    /// Hidden collaboration controls always mean the full list.
     func resolvedMemberFilter(
         explicitSelection: TaskCenterMemberFilter?
     ) -> TaskCenterMemberFilter {
         guard showsMemberFilters else { return .all }
-        return explicitSelection ?? .currentMember
+        return (explicitSelection ?? .actionRequired).normalized
     }
 
     func filtered(for scope: TaskCenterScope) -> TaskCenterSnapshot {
@@ -276,14 +386,20 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
                 }
             }
             let scopedToday = today.filter(includes)
+            let scopedOverdue = overdue.filter(includes)
+            let scopedUpcoming = upcoming.filter(includes)
+            let scopedUnscheduled = unscheduled.filter(includes)
+            let scopedItemIDs = Set(
+                (scopedOverdue + scopedToday + scopedUpcoming + scopedUnscheduled).map(\.id)
+            )
             return TaskCenterSnapshot(
-                overdue: overdue.filter(includes),
+                overdue: scopedOverdue,
                 today: scopedToday,
-                upcoming: upcoming.filter(includes),
-                unscheduled: unscheduled.filter(includes),
+                upcoming: scopedUpcoming,
+                unscheduled: scopedUnscheduled,
                 todayCompletedCount: 0,
                 todayTotalCount: scopedToday.count,
-                memberFilterContext: memberFilterContext,
+                memberFilterContext: memberFilterContext.restricted(to: scopedItemIDs),
                 starterJourney: starterJourney
             )
         }
@@ -295,7 +411,9 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
               let includedItemIDs = memberFilterContext.itemIDs(for: memberFilter) else {
             return self
         }
-        let includes: (TaskCenterItemSnapshot) -> Bool = { includedItemIDs.contains($0.id) }
+        let includes: (TaskCenterItemSnapshot) -> Bool = {
+            $0.source == .systemJourney || includedItemIDs.contains($0.id)
+        }
         let filteredToday = today.filter(includes)
         return TaskCenterSnapshot(
             overdue: overdue.filter(includes),

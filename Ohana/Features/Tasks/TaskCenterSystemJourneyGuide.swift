@@ -23,6 +23,31 @@ nonisolated enum TaskCenterSystemJourneySheetMode: Equatable, Sendable {
     }
 }
 
+nonisolated enum TaskCenterSystemJourneyRowAction: Equatable, Sendable {
+    case openDestination
+    case claimReward
+}
+
+nonisolated enum TaskCenterSystemJourneyRowActionPolicy {
+    static func resolve(
+        destination: TaskCenterSystemDestination?,
+        presentationState: TaskCenterSystemJourneyPresentationState?
+    ) -> TaskCenterSystemJourneyRowAction {
+        guard presentationState == .rewardReady else { return .openDestination }
+        switch destination {
+        case .completeHumanProfile,
+             .completeFirstPetProfile,
+             .confirmPetIdentityProtection,
+             .confirmPetPreventiveCare,
+             .configureFirstCarePlan,
+             .recordFirstCare:
+            return .claimReward
+        case .createFirstPet, .claimStarterGift, nil:
+            return .openDestination
+        }
+    }
+}
+
 nonisolated enum TaskCenterSystemJourneyEditorCompletionPolicy {
     static func shouldDismissEditor(
         task: HouseholdStarterJourneyTask,
@@ -47,6 +72,8 @@ nonisolated struct TaskCenterSystemJourneyGuide: Equatable, Sendable {
     let task: HouseholdStarterJourneyTask
     let requiredCheckpointCount: Int
     let persistedCompletedCheckpointCount: Int
+    let persistedCompletionPercent: Int?
+    let requiredCompletionPercent: Int?
     let completedCheckpoints: Set<HouseholdStarterJourneyCheckpoint>
     let availableResolutionCheckpoints: Set<HouseholdStarterJourneyCheckpoint>
 
@@ -54,6 +81,8 @@ nonisolated struct TaskCenterSystemJourneyGuide: Equatable, Sendable {
         task: HouseholdStarterJourneyTask,
         requiredCheckpointCount: Int? = nil,
         persistedCompletedCheckpointCount: Int = 0,
+        persistedCompletionPercent: Int? = nil,
+        requiredCompletionPercent: Int? = nil,
         completedCheckpoints: Set<HouseholdStarterJourneyCheckpoint> = [],
         availableResolutionCheckpoints: Set<HouseholdStarterJourneyCheckpoint> = []
     ) {
@@ -61,6 +90,8 @@ nonisolated struct TaskCenterSystemJourneyGuide: Equatable, Sendable {
         self.requiredCheckpointCount = requiredCheckpointCount
             ?? HouseholdStarterJourneyPolicy.requiredCheckpointCount(for: task)
         self.persistedCompletedCheckpointCount = max(0, persistedCompletedCheckpointCount)
+        self.persistedCompletionPercent = persistedCompletionPercent.map { min(100, max(0, $0)) }
+        self.requiredCompletionPercent = requiredCompletionPercent
         self.completedCheckpoints = completedCheckpoints
         self.availableResolutionCheckpoints = availableResolutionCheckpoints
     }
@@ -73,6 +104,8 @@ nonisolated struct TaskCenterSystemJourneyGuide: Equatable, Sendable {
             task: state.task,
             requiredCheckpointCount: state.requiredCheckpointCount,
             persistedCompletedCheckpointCount: state.completedCheckpointCount,
+            persistedCompletionPercent: state.completionPercent,
+            requiredCompletionPercent: state.requiredCompletionPercent,
             completedCheckpoints: state.completedCheckpoints.union(locallyCompletedCheckpoints),
             availableResolutionCheckpoints: state.availableResolutionCheckpoints
         )
@@ -96,7 +129,18 @@ nonisolated struct TaskCenterSystemJourneyGuide: Equatable, Sendable {
     }
 
     var isComplete: Bool {
-        completedCheckpointCount >= requiredCheckpointCount
+        if let completionPercent, let requiredCompletionPercent {
+            return completionPercent >= requiredCompletionPercent
+        }
+        return completedCheckpointCount >= requiredCheckpointCount
+    }
+
+    var completionPercent: Int? {
+        guard requiredCompletionPercent != nil else { return nil }
+        return min(
+            100,
+            max(persistedCompletionPercent ?? 0, completedCheckpoints.count * 25)
+        )
     }
 
     var initialQuestionIndex: Int {
@@ -132,7 +176,8 @@ nonisolated struct TaskCenterSystemJourneyGuide: Equatable, Sendable {
 
     func systemDestination(for question: Question) -> TaskCenterSystemDestination {
         switch question.checkpoint {
-        case .humanAppearance, .humanOptionalDetails:
+        case .humanAppearance, .humanLifeStage, .humanBodyProfile,
+             .humanPersonalityContext, .humanOptionalDetails:
             .completeHumanProfile
         case .petLifeStage, .petBodyProfile, .petPersonalityAppearance:
             .completeFirstPetProfile

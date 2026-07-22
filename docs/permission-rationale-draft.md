@@ -3,7 +3,7 @@
 Status: Draft for App Store review notes, in-app rationale copy, and
 `Info.plist` usage-description review.
 
-Last updated: 2026-07-12
+Last updated: 2026-07-22
 
 ## Current Permission Inventory
 
@@ -13,11 +13,12 @@ Last updated: 2026-07-12
 | Photo Library | `NSPhotoLibraryUsageDescription`, `PhotosPicker` | User chooses an avatar or attachment image | Import only the user-selected image(s). Current PhotosPicker paths do not scan the full library. |
 | Location When In Use | `NSLocationWhenInUseUsageDescription`, `LocationManager.requestWhenInUseAuthorization()` | User starts a walk or asks for a one-shot location | Record a walk route or attach the current place to a user-created Moment. |
 | Location Always | `NSLocationAlwaysAndWhenInUseUsageDescription`, `requestAlwaysAuthorization()` | User upgrades while walk background tracking is needed | Continue recording the current walk route when Ohana is backgrounded or the screen is locked. |
-| Notifications | `UNUserNotificationCenter.requestAuthorization` | User creates reminder/care/medication notification flows | Deliver local reminders and allow notification actions such as Done, Skip, or Tomorrow. |
+| Notifications | `UNUserNotificationCenter.requestAuthorization` | User enables a local reminder or Family guardian | Deliver local reminders/actions and, only for enabled Family guardian, ordinary APNs incident updates. |
 | Face ID / Biometrics | `NSFaceIDUsageDescription`, `LAContext.evaluatePolicy` | User enables or uses member-gate biometrics | Let the device verify the current user as a shortcut to a local member PIN. Ohana receives only success/failure. |
 | Apple Health / HealthKit | `NSHealthShareUsageDescription`, `HKHealthStore.requestAuthorization` | User taps the Apple Health setup action in Human Workout | Read steps, walking/running distance, active energy, exercise and stand time, Activity Summary goals, and workouts for the selected Human's read-only local summary. |
 | iCloud Drive backup | iCloud ubiquity entitlement and `ICloudDriveAutomaticBackupFileStore` | Automatic backup is enabled or user taps Back Up Now | Save a backup file to the user's own iCloud Drive container. Developer does not receive it. |
-| Remote notifications / CloudKit | Not declared by the Solo capability profile; dormant CloudKit code remains | Not reachable in the Solo release | Future-only. Adding APNs, `remote-notification`, CloudKit sharing, or remote sync requires an explicit capability change, policy update, and release validation. |
+| Sign in with Apple / remote notifications | Sign in with Apple, APNs development entitlement and `remote-notification` are declared; guardian runtime flag defaults false | Only after user chooses Family guardian and release configuration is complete | Authenticate the minimum-data guardian account and refresh / display guardian events. No marketing, Critical Alerts, or remote care-data sync. |
+| CloudKit sharing | No CloudKit service entitlement; `onlineCollaboration` gate remains false | Not reachable | Future-only; separate from Family guardian APNs. |
 
 ## Recommended System Purpose Strings
 
@@ -145,12 +146,17 @@ English:
 
 > Ohana can remind you about feeding, water, medication, tasks, and care routines you create or enable. You can turn notifications off in Settings.
 
+Family-specific addition shown before enabling guardian service:
+
+> Family guardian uses ordinary notifications to share missed-check-in events with Ohana users who accepted your invitation. Delivery is not guaranteed, and you can stop guardian service at any time.
+
 Review rationale:
 
-- Notifications are for local reminders and user-enabled care flows.
+- Notifications are for local reminders and explicitly enabled Family guardian events.
 - Medication notification privacy can hide detailed pet medication content.
-- No marketing push should be sent unless a future policy explicitly adds it and
-  obtains appropriate consent.
+- Family push contains no names, scores, health, pet, plant, expense or care details,
+  and never claims emergency delivery.
+- No marketing push is sent.
 
 ### Apple Health / HealthKit
 
@@ -204,15 +210,18 @@ Review rationale:
 
 Suggested short review note for the current release:
 
-> Ohana is local-first and does not send user data to the developer. Camera,
+> Ohana is local-first. Free and Personal do not require an Ohana account or send
+> care data to the developer. Camera,
 > photo, location, local notification, Face ID, Apple Health read access, and iCloud
 > Drive backup features are user initiated. Apple Health access is read-only and
 > used to show the selected Human's local workout summary and history. Location
 > Always is used only during an active walk to continue recording the route in the
-> background. Family CloudKit collaboration code is gated off in the current
-> release by `OnlineFeatureGate.allows(.onlineCollaboration) == false`. The Solo
-> target does not declare APNs, the `remote-notification` background mode, or a
-> CloudKit service entitlement or Sign in with Apple capability.
+> background. Family CloudKit collaboration remains gated off by
+> `OnlineFeatureGate.allows(.onlineCollaboration) == false`. The target declares
+> Sign in with Apple, APNs and remote-notification only for optional Family guardian;
+> its runtime and purchase entry remain disabled until the backend, Universal Link,
+> privacy, StoreKit and two-device APNs gates pass. Family guardian sends only
+> minimum account, device, entitlement and guardian-event data, never care records.
 
 ## Must Not Claim Yet
 
@@ -221,8 +230,10 @@ Do not claim the following until implemented and revalidated:
 - Production CloudKit family sync. The code exists, but the current gate is
   false, the Solo capability profile does not declare the required capabilities,
   and real-device CloudKit validation is still deferred.
-- Developer-hosted accounts, account sync, or uploads of health, care, route,
-  note, photo, document, PIN, or economy-ledger data.
+- Any account sync beyond the minimum Family guardian account, or uploads of
+  health, care, route, note, photo, document, PIN, or economy-ledger data.
+- Family guardian as live or guaranteed until production AWS, Associated Domains,
+  App Store Server Notifications, Sandbox and two-device APNs evidence exists.
 - Analytics, advertising, tracking, support upload, or third-party crash-report
   collection.
 
@@ -238,9 +249,10 @@ Do not claim the following until implemented and revalidated:
   with the default Chinese `Info.plist` wording.
 - `docs/privacy-policy.md` is published at the Settings privacy-policy URL
   before App Store submission.
-- App Store Connect privacy answers are updated if an account backend, CloudKit
-  sync, analytics, tracking, support upload, or any third-party SDK data
-  collection is enabled.
+- App Store Connect privacy answers disclose the optional Family guardian's linked
+  User ID, Device ID, Purchase History and Product Interaction for App Functionality,
+  with no tracking; any CloudKit sync, analytics, support upload or third-party SDK
+  collection requires another update.
 
 ## Sources Used For This Draft
 

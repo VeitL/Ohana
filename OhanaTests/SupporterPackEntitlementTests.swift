@@ -59,6 +59,78 @@ struct SupporterPackEntitlementTests {
         }
     }
 
+    @Test func familyYearlyInheritsPersonalAndUsesAnIndependentVerifiedCache() async {
+        let storefront = TestCommerceStorefront()
+        let family = CommerceStorefrontTransaction(
+            id: 119,
+            productID: SupporterPackCatalog.familyYearlyProductID,
+            kind: .autoRenewableSubscription,
+            revocationDate: nil,
+            expirationDate: .distantFuture
+        )
+        await storefront.setPurchaseResult(.success(.verified(family)))
+        let cache = TestCommerceEntitlementCache(initialValue: false)
+        let service = CommerceEntitlementService(
+            storefront: storefront,
+            persistence: cache,
+            familyPurchasesEnabled: { true }
+        )
+
+        await service.start()
+        let outcome = await service.purchaseFamilyYearly()
+
+        #expect(outcome == .purchased)
+        #expect(service.hasFamilyEntitlement)
+        #expect(service.hasPersonalEntitlement)
+        #expect(service.ohanaPlanLevel == .family)
+        #expect(service.familyDisplayPrice == "$39.99")
+        #expect(service.activeFamilyProductIDs == [SupporterPackCatalog.familyYearlyProductID])
+        #expect(cache.cachedFamilyEntitlement())
+        #expect(!cache.cachedSupporterPackEntitlement())
+    }
+
+    @Test func familyPurchaseIsFailClosedWhenGuardianRuntimeIsDisabled() async {
+        let storefront = TestCommerceStorefront()
+        let service = CommerceEntitlementService(
+            storefront: storefront,
+            persistence: TestCommerceEntitlementCache(initialValue: false),
+            familyPurchasesEnabled: { false }
+        )
+
+        await service.start()
+        let outcome = await service.purchaseFamilyYearly()
+
+        #expect(outcome == .failed)
+        #expect(!service.hasFamilyEntitlement)
+        #expect(service.familyDisplayPrice == nil)
+        #expect(await storefront.purchaseInvocations().isEmpty)
+    }
+
+    @Test func expiredFamilyFallsBackToAnIndependentPersonalLifetimeEntitlement() async {
+        let storefront = TestCommerceStorefront()
+        let expiredFamily = CommerceStorefrontTransaction(
+            id: 121,
+            productID: SupporterPackCatalog.familyYearlyProductID,
+            kind: .autoRenewableSubscription,
+            revocationDate: nil,
+            expirationDate: .distantPast
+        )
+        await storefront.setCurrentEntitlements([
+            .verified(expiredFamily),
+            .verified(activeTransaction(id: 122))
+        ])
+        let service = CommerceEntitlementService(
+            storefront: storefront,
+            persistence: TestCommerceEntitlementCache(initialValue: false)
+        )
+
+        await service.start()
+
+        #expect(!service.hasFamilyEntitlement)
+        #expect(service.hasPersonalEntitlement)
+        #expect(service.ohanaPlanLevel == .personal)
+    }
+
     @Test func legacySupporterPackIsGrandfatheredAsPersonalLifetime() async {
         let storefront = TestCommerceStorefront()
         let legacy = CommerceStorefrontTransaction(
@@ -650,9 +722,11 @@ private nonisolated enum TestCommerceError: LocalizedError {
 private final nonisolated class TestCommerceEntitlementCache: CommerceEntitlementPersisting, @unchecked Sendable {
     private let lock = NSLock()
     private var value: Bool
+    private var familyValue: Bool
 
-    init(initialValue: Bool) {
+    init(initialValue: Bool, familyValue: Bool = false) {
         value = initialValue
+        self.familyValue = familyValue
     }
 
     func cachedSupporterPackEntitlement() -> Bool {
@@ -661,6 +735,14 @@ private final nonisolated class TestCommerceEntitlementCache: CommerceEntitlemen
 
     func setCachedSupporterPackEntitlement(_ isEntitled: Bool) {
         lock.withLock { value = isEntitled }
+    }
+
+    func cachedFamilyEntitlement() -> Bool {
+        lock.withLock { familyValue }
+    }
+
+    func setCachedFamilyEntitlement(_ isEntitled: Bool) {
+        lock.withLock { familyValue = isEntitled }
     }
 }
 
@@ -681,6 +763,7 @@ private actor TestCommerceStorefront: CommerceStorefrontClient {
     private var monthlyDisplayPrice = "$2.99"
     private var yearlyDisplayPrice = "$14.99"
     private var lifetimeDisplayPrice = "$49.99"
+    private var familyDisplayPrice = "$39.99"
     private let storefrontUpdateStream: AsyncStream<Void>
     private let storefrontUpdateContinuation: AsyncStream<Void>.Continuation
     private let updateStream: AsyncStream<CommerceStorefrontVerification>
@@ -713,6 +796,11 @@ private actor TestCommerceStorefront: CommerceStorefrontClient {
             CommerceStorefrontProduct(
                 id: SupporterPackCatalog.personalLifetimeProductID,
                 displayPrice: lifetimeDisplayPrice
+            ),
+            CommerceStorefrontProduct(
+                id: SupporterPackCatalog.familyYearlyProductID,
+                displayPrice: familyDisplayPrice,
+                kind: .autoRenewableSubscription
             )
         ]
         return products.filter { identifiers.contains($0.id) }

@@ -16,10 +16,10 @@ struct PresenceSafetySettingsView: View {
     @State private var originalConfiguration = PresenceReminderConfiguration.initial
     @State private var contacts: [SafetyContactSnapshot] = []
     @State private var usesWeekdaySchedules = false
-    @State private var activeSheet: PresenceSafetySettingsSheet?
     @State private var notice: PresenceSafetySettingsNotice?
     @State private var didLoad = false
     @State private var isSaving = false
+    @State private var isShowingLegacyCleanupConfirmation = false
 
     private let configurationStore = PresenceReminderConfigurationStore()
     private let scheduler = SystemPresenceReminderScheduler()
@@ -43,8 +43,10 @@ struct PresenceSafetySettingsView: View {
     var body: some View {
         Form {
             reminderSection
-            messageSection
-            contactsSection
+            guardianSection
+            if !contacts.isEmpty {
+                legacyContactsSection
+            }
         }
         .formStyle(.grouped)
         .scrollDismissesKeyboard(.interactively)
@@ -64,22 +66,37 @@ struct PresenceSafetySettingsView: View {
         .task {
             loadIfNeeded()
         }
-        .sheet(item: $activeSheet, onDismiss: reloadContacts) { sheet in
-            switch sheet {
-            case .addContact:
-                PresenceContactEditorView(contact: nil, capabilities: capabilities)
-            case let .editContact(contact):
-                PresenceContactEditorView(contact: contact, capabilities: capabilities)
-            case let .compose(draft):
-                PresenceMessageComposerView(draft: draft) { outcome in
-                    activeSheet = nil
-                    handleMessageOutcome(outcome)
-                }
-                .ignoresSafeArea()
-            case let .copyFallback(contact, draft):
-                PresenceMessageCopyFallbackView(contact: contact, draft: draft)
-                    .presentationDetents([.medium, .large])
+        .confirmationDialog(
+            copy.text(
+                zh: "清除旧联系人？",
+                en: "Clear legacy contacts?",
+                de: "Alte Kontakte löschen?",
+                es: "¿Borrar contactos anteriores?",
+                pt: "Limpar contatos antigos?",
+                fr: "Effacer les anciens contacts ?",
+                ja: "以前の連絡先を削除しますか？",
+                ko: "이전 연락처를 지울까요?",
+                it: "Eliminare i vecchi contatti?"
+            ),
+            isPresented: $isShowingLegacyCleanupConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(copy.delete, role: .destructive) {
+                clearLegacyContacts()
             }
+            Button(copy.cancel, role: .cancel) {}
+        } message: {
+            Text(copy.text(
+                zh: "这会永久删除仅保存在本机的旧姓名和电话号码。不会影响 App 内守护关系。",
+                en: "This permanently removes legacy names and phone numbers stored only on this device. App guardian relationships are unaffected.",
+                de: "Dabei werden nur auf diesem Gerät gespeicherte alte Namen und Telefonnummern dauerhaft gelöscht. App-Schutzbeziehungen bleiben erhalten.",
+                es: "Esto elimina de forma permanente los nombres y teléfonos antiguos guardados solo en este dispositivo. No afecta a los guardianes de la app.",
+                pt: "Isso remove permanentemente nomes e telefones antigos salvos apenas neste aparelho. As relações de proteção no app não mudam.",
+                fr: "Cette action supprime définitivement les anciens noms et numéros stockés uniquement sur cet appareil. Les relations de garde dans l’app restent intactes.",
+                ja: "このデバイスだけに保存された以前の名前と電話番号を完全に削除します。App内の見守り関係には影響しません。",
+                ko: "이 기기에만 저장된 이전 이름과 전화번호를 영구 삭제합니다. 앱 내 보호 관계에는 영향이 없습니다.",
+                it: "Rimuove definitivamente nomi e numeri precedenti salvati solo su questo dispositivo. Le relazioni di protezione nell’app non cambiano."
+            ))
         }
         .alert(item: $notice) { notice in
             Alert(
@@ -155,55 +172,186 @@ struct PresenceSafetySettingsView: View {
         }
     }
 
-    private var messageSection: some View {
+    private var guardianSection: some View {
         Section {
-            if capabilities.contacts.allowsEditableMessageTemplate,
-               !hasGrandfatheredAdvancedConfiguration {
-                TextEditor(text: $configuration.messageTemplate)
-                    .frame(minHeight: 92)
-                    .accessibilityLabel(copy.messageSection)
-                    .accessibilityIdentifier("presence-message-template")
-            } else {
-                Text(effectiveMessageTemplate)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
+            NavigationLink {
+                GuardianSafetyDashboardView()
+            } label: {
+                Label {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(copy.text(
+                            zh: "App 内亲友守护",
+                            en: "In-app guardian circle",
+                            de: "Schutzkreis in der App",
+                            es: "Círculo de guardianes en la app",
+                            pt: "Círculo de proteção no app",
+                            fr: "Cercle de proches dans l’app",
+                            ja: "App内の見守りサークル",
+                            ko: "앱 내 보호자 모임",
+                            it: "Cerchia di protezione nell’app"
+                        ))
+                        Text(guardianSummary)
+                            .font(OhanaFont.footnote())
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } icon: {
+                    Image(systemName: "person.2.badge.shield.checkmark.fill").accessibilityHidden(true)
+                        .foregroundStyle(Color.goPrimary)
+                }
             }
+            .accessibilityIdentifier("guardian-safety-entry")
         } header: {
-            Text(copy.messageSection)
+            Text(copy.text(
+                zh: "Ohana Family",
+                en: "Ohana Family",
+                de: "Ohana Family",
+                es: "Ohana Family",
+                pt: "Ohana Family",
+                fr: "Ohana Family",
+                ja: "Ohana Family",
+                ko: "Ohana Family",
+                it: "Ohana Family"
+            ))
         } footer: {
-            Text(copy.messageExplanation)
+            Text(copy.text(
+                zh: "只有安装 Ohana、使用 Apple 登录、接受邀请并允许通知的人才能收到守护推送。不使用短信、电话或邮箱。",
+                en: "Only people who install Ohana, sign in with Apple, accept the invitation, and allow notifications can receive guardian alerts. No text messages, phone calls, or email are used.",
+                de: "Nur Personen, die Ohana installieren, sich mit Apple anmelden, die Einladung annehmen und Mitteilungen erlauben, können Schutzmeldungen erhalten. Keine SMS, Anrufe oder E-Mails.",
+                es: "Solo quienes instalen Ohana, inicien sesión con Apple, acepten la invitación y permitan notificaciones pueden recibir avisos. No se usan SMS, llamadas ni correo.",
+                pt: "Só quem instalar o Ohana, iniciar sessão com a Apple, aceitar o convite e permitir notificações poderá receber avisos. Não usamos SMS, chamadas ou e-mail.",
+                fr: "Seules les personnes ayant installé Ohana, utilisé Connexion avec Apple, accepté l’invitation et autorisé les notifications peuvent recevoir les alertes. Aucun SMS, appel ou e-mail.",
+                ja: "Ohanaをインストールし、Appleでサインインして招待を承認し、通知を許可した人だけが見守り通知を受け取れます。SMS・電話・メールは使いません。",
+                ko: "Ohana를 설치하고 Apple로 로그인한 뒤 초대를 수락하고 알림을 허용한 사람만 보호 알림을 받을 수 있습니다. 문자, 전화, 이메일은 사용하지 않습니다.",
+                it: "Solo chi installa Ohana, accede con Apple, accetta l’invito e consente le notifiche può ricevere avvisi. Non vengono usati SMS, chiamate o email."
+            ))
         }
     }
 
-    private var contactsSection: some View {
+    private var legacyContactsSection: some View {
         Section {
-            ForEach(contacts) { contact in
-                contactRow(contact)
-            }
-
-            Button {
-                activeSheet = .addContact
+            LabeledContent(
+                copy.text(
+                    zh: "仅存于本机",
+                    en: "Stored on this device",
+                    de: "Auf diesem Gerät gespeichert",
+                    es: "Guardados en este dispositivo",
+                    pt: "Salvos neste aparelho",
+                    fr: "Stockés sur cet appareil",
+                    ja: "このデバイス内に保存",
+                    ko: "이 기기에 저장됨",
+                    it: "Salvati su questo dispositivo"
+                ),
+                value: "\(contacts.count)"
+            )
+            Button(role: .destructive) {
+                isShowingLegacyCleanupConfirmation = true
             } label: {
-                Label(copy.addContact, systemImage: "person.badge.plus")
+                Label(
+                    copy.text(
+                        zh: "清除旧联系人数据",
+                        en: "Clear legacy contact data",
+                        de: "Alte Kontaktdaten löschen",
+                        es: "Borrar datos de contactos anteriores",
+                        pt: "Limpar dados de contatos antigos",
+                        fr: "Effacer les anciennes coordonnées",
+                        ja: "以前の連絡先データを削除",
+                        ko: "이전 연락처 데이터 지우기",
+                        it: "Elimina i vecchi dati di contatto"
+                    ),
+                    systemImage: "trash"
+                )
             }
-            .disabled(contacts.count >= capabilities.contacts.maximumLocalContacts)
-            .accessibilityIdentifier("presence-contact-add")
-
-            if contacts.count >= capabilities.contacts.maximumLocalContacts {
-                Text(copy.contactLimit(limit: capabilities.contacts.maximumLocalContacts))
-                    .font(OhanaFont.footnote())
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .accessibilityIdentifier("presence-legacy-contacts-clear")
         } header: {
-            HStack {
-                Text(copy.contactsSection)
-                Spacer()
-                Text("\(contacts.count)/\(capabilities.contacts.maximumLocalContacts)")
-                    .accessibilityLabel("\(contacts.count) / \(capabilities.contacts.maximumLocalContacts)")
-            }
+            Text(copy.text(
+                zh: "旧版联系人",
+                en: "Legacy contacts",
+                de: "Alte Kontakte",
+                es: "Contactos anteriores",
+                pt: "Contatos antigos",
+                fr: "Anciens contacts",
+                ja: "以前の連絡先",
+                ko: "이전 연락처",
+                it: "Vecchi contatti"
+            ))
         } footer: {
-            Text(copy.localOnlyContactsHint)
+            Text(copy.text(
+                zh: "旧版号码不会上传，也不再用于发送消息。",
+                en: "Legacy numbers are never uploaded and are no longer used to send messages.",
+                de: "Alte Nummern werden nie hochgeladen und nicht mehr zum Senden von Nachrichten verwendet.",
+                es: "Los números anteriores nunca se suben ni se usan para enviar mensajes.",
+                pt: "Os números antigos nunca são enviados e não são mais usados para mensagens.",
+                fr: "Les anciens numéros ne sont jamais téléversés et ne servent plus à envoyer des messages.",
+                ja: "以前の電話番号はアップロードされず、メッセージ送信にも使われません。",
+                ko: "이전 번호는 업로드되지 않으며 메시지 전송에도 더 이상 사용되지 않습니다.",
+                it: "I vecchi numeri non vengono mai caricati e non sono più usati per inviare messaggi."
+            ))
+        }
+    }
+
+    private var guardianSummary: String {
+        switch appServices.guardianSafety.dashboardState {
+        case .unavailable:
+            copy.text(
+                zh: "云端服务尚未通过上线门禁，本机提醒不受影响",
+                en: "Cloud service is still behind its release gate; local reminders are unaffected",
+                de: "Der Clouddienst ist noch durch die Freigabe gesperrt; lokale Erinnerungen bleiben verfügbar",
+                es: "El servicio en la nube sigue bloqueado hasta su lanzamiento; los recordatorios locales no cambian",
+                pt: "O serviço em nuvem ainda está bloqueado para lançamento; lembretes locais não mudam",
+                fr: "Le service cloud reste bloqué jusqu’à sa validation ; les rappels locaux restent disponibles",
+                ja: "クラウド機能は公開前のため停止中です。デバイス内通知には影響しません",
+                ko: "클라우드 서비스는 출시 검증 전까지 닫혀 있으며 기기 내 알림에는 영향이 없습니다",
+                it: "Il servizio cloud resta dietro il gate di rilascio; i promemoria locali non cambiano"
+            )
+        case .signedOut:
+            copy.text(
+                zh: "登录后邀请最多 3 位已安装 App 的守护人",
+                en: "Sign in to invite up to three guardians who use the app",
+                de: "Anmelden und bis zu drei App-Nutzer als Vertrauenspersonen einladen",
+                es: "Inicia sesión para invitar hasta tres guardianes que usen la app",
+                pt: "Entre para convidar até três pessoas que usam o app",
+                fr: "Connectez-vous pour inviter jusqu’à trois proches utilisant l’app",
+                ja: "サインインしてApp利用者を最大3人まで招待できます",
+                ko: "로그인하고 앱 사용자 보호자를 최대 3명 초대하세요",
+                it: "Accedi per invitare fino a tre persone che usano l’app"
+            )
+        case .loading:
+            copy.text(
+                zh: "正在同步守护状态…",
+                en: "Syncing guardian status…",
+                de: "Schutzstatus wird synchronisiert…",
+                es: "Sincronizando el estado…",
+                pt: "Sincronizando o estado…",
+                fr: "Synchronisation de l’état…",
+                ja: "見守り状態を同期中…",
+                ko: "보호 상태 동기화 중…",
+                it: "Sincronizzazione dello stato…"
+            )
+        case .loaded:
+            copy.text(
+                zh: "查看守护人、邀请、暂停与漏签事件",
+                en: "View guardians, invitations, pauses, and missed check-in incidents",
+                de: "Vertrauenspersonen, Einladungen, Pausen und Ereignisse ansehen",
+                es: "Consulta guardianes, invitaciones, pausas e incidencias",
+                pt: "Veja pessoas, convites, pausas e ocorrências",
+                fr: "Voir les proches, invitations, pauses et incidents",
+                ja: "見守り相手・招待・一時停止・未着イベントを確認",
+                ko: "보호자, 초대, 일시 중지, 미수신 사건 보기",
+                it: "Visualizza persone, inviti, pause ed eventi"
+            )
+        case .failed:
+            copy.text(
+                zh: "守护服务需要处理",
+                en: "Guardian service needs attention",
+                de: "Schutzdienst benötigt Aufmerksamkeit",
+                es: "El servicio requiere atención",
+                pt: "O serviço precisa de atenção",
+                fr: "Le service nécessite votre attention",
+                ja: "見守りサービスを確認してください",
+                ko: "보호 서비스를 확인해 주세요",
+                it: "Il servizio richiede attenzione"
+            )
         }
     }
 
@@ -221,66 +369,6 @@ struct PresenceSafetySettingsView: View {
                 .accessibilityLabel("\(copy.weekday(weekday)) · \(copy.reminderTime)")
             }
         }
-    }
-
-    private func contactRow(_ contact: SafetyContactSnapshot) -> some View {
-        HStack(spacing: 12) {
-            Button {
-                activeSheet = .editContact(contact)
-            } label: {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(contact.name)
-                            .font(OhanaFont.body(.semibold))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        if !contact.isEnabled {
-                            Text(copy.text(
-                                zh: "已停用",
-                                en: "Off",
-                                de: "Aus",
-                                es: "Inactivo",
-                                pt: "Inativo",
-                                fr: "Désactivé",
-                                ja: "オフ",
-                                ko: "꺼짐",
-                                it: "Disattivo"
-                            ))
-                            .font(OhanaFont.caption2(.semibold))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                        }
-                    }
-                    Text(contact.phoneNumber)
-                        .font(OhanaFont.footnote())
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(copy.editContact): \(contact.name), \(contact.phoneNumber)")
-
-            Button {
-                composeMessage(to: contact)
-            } label: {
-                Image(systemName: "message.fill") // a11y: allow parent Button supplies contact-specific compose label
-                    .font(OhanaFont.body(.semibold))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(contact.isEnabled ? Color.goPrimary : Color.ohanaTertiaryText)
-            .disabled(!contact.isEnabled)
-            .accessibilityLabel("\(copy.composeMessage): \(contact.name)")
-            .accessibilityHint(copy.messageExplanation)
-        }
-    }
-
-    private var effectiveMessageTemplate: String {
-        let clean = configuration.messageTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
-        if clean.isEmpty || clean == PresenceReminderConfiguration.fixedMessageTemplate {
-            return copy.fixedMessageTemplate
-        }
-        return clean
     }
 
     private var reminderFooter: String {
@@ -409,13 +497,8 @@ struct PresenceSafetySettingsView: View {
         guard !didLoad else { return }
         didLoad = true
         let stored = configurationStore.load()
-        var presented = stored
-        if capabilities.contacts.allowsEditableMessageTemplate,
-           stored.messageTemplate == PresenceReminderConfiguration.fixedMessageTemplate {
-            presented.messageTemplate = copy.fixedMessageTemplate
-        }
-        configuration = presented
-        originalConfiguration = presented
+        configuration = stored
+        originalConfiguration = stored
         usesWeekdaySchedules = stored.schedules.contains { $0.weekday != nil }
         reloadContacts()
     }
@@ -435,10 +518,10 @@ struct PresenceSafetySettingsView: View {
         }
 
         var proposed = configuration
-        proposed.messageTemplate = !capabilities.contacts.allowsEditableMessageTemplate &&
-            !hasGrandfatheredAdvancedConfiguration
-            ? PresenceReminderConfiguration.fixedMessageTemplate
-            : effectiveMessageTemplate
+        // The field remains decodable for old device settings, but all new
+        // saves use the fixed local-reminder contract. Cross-device guarding
+        // never uploads or sends this text through SMS.
+        proposed.messageTemplate = PresenceReminderConfiguration.fixedMessageTemplate
         let effectiveCapabilities = validationCapabilities(for: proposed)
         isSaving = true
         Task { @MainActor in
@@ -456,6 +539,29 @@ struct PresenceSafetySettingsView: View {
             }
             isSaving = false
             handleActivationResult(result, proposed: proposed)
+        }
+    }
+
+    private func clearLegacyContacts() {
+        do {
+            let removedCount = try appServices.guardianSafety.deleteLegacySafetyContacts()
+            reloadContacts()
+            notice = PresenceSafetySettingsNotice(
+                title: copy.title,
+                message: copy.text(
+                    zh: "已从本机清除 \(removedCount) 位旧联系人。",
+                    en: "Cleared \(removedCount) legacy contacts from this device.",
+                    de: "\(removedCount) alte Kontakte wurden von diesem Gerät gelöscht.",
+                    es: "Se borraron \(removedCount) contactos anteriores de este dispositivo.",
+                    pt: "\(removedCount) contatos antigos foram removidos deste aparelho.",
+                    fr: "\(removedCount) anciens contacts ont été supprimés de cet appareil.",
+                    ja: "このデバイスから以前の連絡先を\(removedCount)件削除しました。",
+                    ko: "이 기기에서 이전 연락처 \(removedCount)명을 지웠습니다.",
+                    it: "Eliminati \(removedCount) vecchi contatti da questo dispositivo."
+                )
+            )
+        } catch {
+            notice = PresenceSafetySettingsNotice(title: copy.title, message: copy.genericError)
         }
     }
 
@@ -511,27 +617,6 @@ struct PresenceSafetySettingsView: View {
         }
     }
 
-    private func composeMessage(to contact: SafetyContactSnapshot) {
-        let draft = PresenceSafetyMessageDraft(
-            recipients: [contact.phoneNumber],
-            configuredTemplate: effectiveMessageTemplate
-        )
-        activeSheet = PresenceMessageComposerView.canSendText
-            ? .compose(draft: draft)
-            : .copyFallback(contact: contact, draft: draft)
-    }
-
-    private func handleMessageOutcome(_ outcome: PresenceMessageComposerOutcome) {
-        switch outcome {
-        case .sent:
-            notice = PresenceSafetySettingsNotice(title: copy.title, message: copy.messageSent)
-        case .failed:
-            notice = PresenceSafetySettingsNotice(title: copy.title, message: copy.messageFailed)
-        case .cancelled:
-            break
-        }
-    }
-
     private var notificationTitle: String {
         copy.text(
             zh: "今天打卡了吗？",
@@ -561,8 +646,10 @@ struct PresenceSafetySettingsView: View {
     }
 
     private static func requiresPersonal(_ configuration: PresenceReminderConfiguration) -> Bool {
-        PresenceReminderConfigurationPolicy.denial(
-            for: configuration,
+        var normalized = configuration
+        normalized.messageTemplate = PresenceReminderConfiguration.fixedMessageTemplate
+        return PresenceReminderConfigurationPolicy.denial(
+            for: normalized,
             capabilities: .make(for: .free)
         ) != nil
     }
@@ -573,8 +660,7 @@ struct PresenceSafetySettingsView: View {
         PresenceReminderPaidFields(
             schedules: configuration.schedules,
             gracePeriodMinutes: configuration.gracePeriodMinutes,
-            sendsSecondLocalReminder: configuration.sendsSecondLocalReminder,
-            messageTemplate: configuration.messageTemplate
+            sendsSecondLocalReminder: configuration.sendsSecondLocalReminder
         )
     }
 }
@@ -583,183 +669,10 @@ private nonisolated struct PresenceReminderPaidFields: Equatable {
     let schedules: [PresenceReminderSchedule]
     let gracePeriodMinutes: Int?
     let sendsSecondLocalReminder: Bool
-    let messageTemplate: String
-}
-
-private nonisolated enum PresenceSafetySettingsSheet: Identifiable {
-    case addContact
-    case editContact(SafetyContactSnapshot)
-    case compose(draft: PresenceSafetyMessageDraft)
-    case copyFallback(contact: SafetyContactSnapshot, draft: PresenceSafetyMessageDraft)
-
-    var id: String {
-        switch self {
-        case .addContact:
-            "add-contact"
-        case let .editContact(contact):
-            "edit-contact-\(contact.id.uuidString)"
-        case .compose:
-            "compose-message"
-        case let .copyFallback(contact, _):
-            "copy-fallback-\(contact.id.uuidString)"
-        }
-    }
 }
 
 private nonisolated struct PresenceSafetySettingsNotice: Identifiable {
     let id = UUID()
     let title: String
     let message: String
-}
-
-@MainActor
-private struct PresenceContactEditorView: View {
-    let contact: SafetyContactSnapshot?
-    let capabilities: OhanaPlanCapabilities
-
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AppServices.self) private var appServices
-    @Environment(\.ohanaAppLanguageCode) private var appLanguage
-    @State private var name: String
-    @State private var phoneNumber: String
-    @State private var isEnabled: Bool
-    @State private var errorMessage: String?
-    @State private var isShowingDeleteConfirmation = false
-
-    init(contact: SafetyContactSnapshot?, capabilities: OhanaPlanCapabilities) {
-        self.contact = contact
-        self.capabilities = capabilities
-        _name = State(initialValue: contact?.name ?? "")
-        _phoneNumber = State(initialValue: contact?.phoneNumber ?? "")
-        _isEnabled = State(initialValue: contact?.isEnabled ?? true)
-    }
-
-    private var copy: PresenceSafetySettingsCopy {
-        PresenceSafetySettingsCopy(languageCode: appLanguage)
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField(copy.contactName, text: $name)
-                        .textContentType(.name)
-                        .accessibilityIdentifier("presence-contact-name")
-                    TextField(copy.phoneNumber, text: $phoneNumber)
-                        .keyboardType(.phonePad)
-                        .textContentType(.telephoneNumber)
-                        .accessibilityIdentifier("presence-contact-phone")
-                    Toggle(copy.contactEnabled, isOn: $isEnabled)
-                        .tint(Color.goPrimary)
-                }
-
-                if contact != nil {
-                    Section {
-                        Button(copy.delete, role: .destructive) {
-                            isShowingDeleteConfirmation = true
-                        }
-                    }
-                }
-            }
-            .navigationTitle(contact == nil ? copy.addContact : copy.editContact)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(copy.cancel) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(copy.save) { save() }
-                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                            phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-            .alert(copy.delete, isPresented: $isShowingDeleteConfirmation) {
-                Button(copy.cancel, role: .cancel) {}
-                Button(copy.delete, role: .destructive) { deleteContact() }
-            } message: {
-                Text(copy.text(
-                    zh: "此操作只会从本机删除这位联系人。",
-                    en: "This removes the contact from this device only.",
-                    de: "Dadurch wird der Kontakt nur von diesem Gerät entfernt.",
-                    es: "Esto elimina el contacto solo de este dispositivo.",
-                    pt: "Isso remove o contato apenas deste dispositivo.",
-                    fr: "Cette action supprime le contact de cet appareil uniquement.",
-                    ja: "このデバイスからのみ連絡先を削除します。",
-                    ko: "이 기기에서만 연락처를 삭제합니다.",
-                    it: "Rimuove il contatto solo da questo dispositivo."
-                ))
-            }
-            .alert(
-                copy.title,
-                isPresented: Binding(
-                    get: { errorMessage != nil },
-                    set: { if !$0 { errorMessage = nil } }
-                )
-            ) {
-                Button(copy.text(
-                    zh: "好",
-                    en: "OK",
-                    de: "OK",
-                    es: "Aceptar",
-                    pt: "OK",
-                    fr: "OK",
-                    ja: "OK",
-                    ko: "확인",
-                    it: "OK"
-                )) { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? copy.genericError)
-            }
-        }
-    }
-
-    private func save() {
-        do {
-            if let contact {
-                try appServices.presenceSafety.updateContact(
-                    id: contact.id,
-                    name: name,
-                    phoneNumber: phoneNumber,
-                    isEnabled: isEnabled,
-                    context: modelContext
-                )
-            } else {
-                try appServices.presenceSafety.createContact(
-                    name: name,
-                    phoneNumber: phoneNumber,
-                    capabilities: capabilities,
-                    context: modelContext
-                )
-            }
-            dismiss()
-        } catch let error as SafetyContactCommandError {
-            errorMessage = message(for: error)
-        } catch {
-            errorMessage = copy.genericError
-        }
-    }
-
-    private func deleteContact() {
-        guard let contact else { return }
-        do {
-            try appServices.presenceSafety.deleteContact(id: contact.id, context: modelContext)
-            dismiss()
-        } catch {
-            errorMessage = copy.genericError
-        }
-    }
-
-    private func message(for error: SafetyContactCommandError) -> String {
-        switch error {
-        case .invalidName:
-            copy.invalidName
-        case .invalidPhoneNumber:
-            copy.invalidPhone
-        case let .contactLimitReached(limit):
-            copy.contactLimit(limit: limit)
-        case .contactNotFound, .persistenceFailed:
-            copy.genericError
-        }
-    }
 }

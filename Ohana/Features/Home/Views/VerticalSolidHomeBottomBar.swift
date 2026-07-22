@@ -513,6 +513,8 @@ private extension HomeFabFunctionShortcut {
                 return "wealth"
             case .familyWeeklyReport:
                 return "weeklyReport"
+            case .familyLongTermReview:
+                return "longTermReview"
             case .careLedgerAnalysis:
                 return "careLedgerAnalysis"
             case .reminderObservability:

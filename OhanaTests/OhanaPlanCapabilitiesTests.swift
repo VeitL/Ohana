@@ -16,14 +16,16 @@ struct OhanaPlanCapabilitiesTests {
         let family = OhanaPlanCapabilities.make(for: .family)
 
         #expect(free.analytics == .rawCalendar)
-        #expect(free.contacts.maximumLocalContacts == 1)
+        #expect(free.contacts.maximumLocalContacts == 0)
         #expect(!free.contacts.allowsEditableMessageTemplate)
+        #expect(free.contacts.maximumAcceptedGuardians == 0)
         #expect(free.reminders.maximumScheduleCount == 1)
         #expect(!free.reminders.allowsGracePeriod)
 
         #expect(personal.analytics == .longRange)
-        #expect(personal.contacts.maximumLocalContacts == 3)
-        #expect(personal.contacts.allowsEditableMessageTemplate)
+        #expect(personal.contacts.maximumLocalContacts == 0)
+        #expect(!personal.contacts.allowsEditableMessageTemplate)
+        #expect(personal.contacts.maximumAcceptedGuardians == 0)
         #expect(personal.reminders.allowsWeekdaySchedules)
         #expect(personal.reminders.allowsSecondLocalReminder)
         #expect(!personal.reminders.allowsServerGuardianEscalation)
@@ -31,6 +33,7 @@ struct OhanaPlanCapabilitiesTests {
         #expect(family.analytics == .familyAudit)
         #expect(family.reminders.allowsServerGuardianEscalation)
         #expect(family.contacts.allowsAcceptedFamilyGuardians)
+        #expect(family.contacts.maximumAcceptedGuardians == 3)
         #expect(!family.contacts.allowsAutomaticExternalMessaging)
     }
 

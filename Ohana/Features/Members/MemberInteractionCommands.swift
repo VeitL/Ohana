@@ -156,6 +156,21 @@ enum MemberLifecycleCommandService {
             passedAwayAt: date,
             context: context
         )
+        do {
+            try PhysicalDeletionService.stageGuardianOwnerUnavailableIfNeeded(
+                ownerHumanID: human.id,
+                occurredAt: Date(),
+                context: context
+            )
+        } catch {
+            context.rollback()
+            return .failed(
+                entityID: human.id,
+                kind: EntityKind.human.rawValue,
+                action: "passed.mark",
+                error: error.localizedDescription
+            )
+        }
         human.passedAwayDate = date
         CloudSyncMutationRecorder.markModified(human, context: context, modifiedAt: date)
         let result = persistLifecycleMutation(

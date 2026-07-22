@@ -30,6 +30,9 @@ extension CalendarEventCommandService {
         now: Date = Date(),
         options: CalendarEventCompletionOptions = CalendarEventCompletionOptions()
     ) throws -> CalendarEventCompletionResult {
+        guard CalendarEventInteractionPolicy.allowsDirectMutation(for: event) else {
+            throw CalendarCommandError.familyTaskProjectionRequiresCollaboration
+        }
         let reminderCompletion = options.reminderCompletion ?? ReminderCompletionService()
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         let affectedSubjectIDs = affectedSubjectIDs(for: event, context: context)

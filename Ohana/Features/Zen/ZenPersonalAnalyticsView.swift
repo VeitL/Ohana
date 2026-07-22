@@ -141,17 +141,17 @@ struct ZenPersonalAnalyticsView: View {
             )
             Divider().frame(height: 42)
             analyticsMetric(
-                value: "\(analytics.statusCount)",
+                value: averageScoreText,
                 title: l.tr(
-                    zh: "状态记录",
-                    en: "Statuses",
-                    de: "Statusangaben",
-                    es: "Estados",
-                    pt: "Status",
-                    fr: "États",
-                    ja: "状態記録",
-                    ko: "상태 기록",
-                    it: "Stati"
+                    zh: "平均分",
+                    en: "Average score",
+                    de: "Durchschnitt",
+                    es: "Puntuación media",
+                    pt: "Pontuação média",
+                    fr: "Score moyen",
+                    ja: "平均スコア",
+                    ko: "평균 점수",
+                    it: "Punteggio medio"
                 )
             )
         }
@@ -302,9 +302,12 @@ struct ZenPersonalAnalyticsView: View {
                 emptyAnalyticsMessage
             } else {
                 VStack(spacing: 10) {
-                    ForEach(ZenPresenceStatus.allCases) { status in
-                        let count = analytics.participatingDays.count(where: { $0.status == status })
-                        statusDistributionRow(status: status, count: count, total: statusTotal)
+                    ForEach(ZenPresenceScoreBand.allCases) { band in
+                        let count = analytics.participatingDays.count(where: {
+                            guard let score = $0.status?.score else { return false }
+                            return band.scoreRange.contains(score)
+                        })
+                        statusDistributionRow(band: band, count: count, total: statusTotal)
                     }
                 }
             }
@@ -312,19 +315,19 @@ struct ZenPersonalAnalyticsView: View {
     }
 
     private func statusDistributionRow(
-        status: ZenPresenceStatus,
+        band: ZenPresenceScoreBand,
         count: Int,
         total: Int
     ) -> some View {
         let fraction = total > 0 ? Double(count) / Double(total) : 0
         return VStack(spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: status.icon)
+                Image(systemName: band.icon)
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(status.zenColor)
+                    .foregroundStyle(band.zenColor)
                     .frame(width: 20)
                     .accessibilityHidden(true)
-                Text(status.title(l))
+                Text("\(band.scoreRange.lowerBound)–\(band.scoreRange.upperBound) · \(band.title(l))")
                     .font(OhanaFont.footnote(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
@@ -334,9 +337,16 @@ struct ZenPersonalAnalyticsView: View {
                     .monospacedDigit()
             }
             ProgressView(value: fraction)
-                .tint(status.zenColor)
+                .tint(band.zenColor)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private var averageScoreText: String {
+        let scores = analytics.participatingDays.compactMap { $0.status?.score }
+        guard !scores.isEmpty else { return "—" }
+        let average = Double(scores.reduce(0, +)) / Double(scores.count)
+        return average.formatted(.number.precision(.fractionLength(1)))
     }
 
     private var comparisonSection: some View {

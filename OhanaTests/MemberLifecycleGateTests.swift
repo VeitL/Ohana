@@ -3617,21 +3617,23 @@ struct MemberLifecycleGateTests {
 
     @Test func islandWeightDashboardUsesPetLedgerMetricsInsteadOfPetRelationships() throws {
         let rootURL = repositoryRootURL()
-        let viewModelSource = try source("Ohana/Features/DashboardRecords/IslandUnifiedStatsViewModel.swift", rootURL: rootURL)
+        let dataSource = try source("Ohana/Features/DashboardRecords/IslandWeightDashboardDataContainer.swift", rootURL: rootURL)
         let viewSource = try source("Ohana/Features/DashboardRecords/Views/IslandWeightDashboard.swift", rootURL: rootURL)
 
-        #expect(viewModelSource.contains("FetchDescriptor<CareLedgerEvent>"))
-        #expect(viewModelSource.contains("eventKind: .weight"))
-        #expect(viewModelSource.contains("eventKind: .walk"))
+        #expect(dataSource.contains("@ModelActor"))
+        #expect(dataSource.contains("FetchDescriptor<CareLedgerEvent>"))
+        #expect(dataSource.contains("CareLedgerEventKind.weight.rawValue"))
+        #expect(dataSource.contains("selectedPetID"))
+        #expect(dataSource.contains("cutoff"))
         #expect(viewSource.contains("weightAbsolutePoints(for: seriesID)"))
-        #expect(!viewModelSource.contains("pet.weightLogs"))
-        #expect(!viewModelSource.contains("pet.walkLogs"))
+        #expect(!dataSource.contains("PetWeightLog"))
+        #expect(!dataSource.contains("PetWalkLog"))
         #expect(!viewSource.contains("pet.weightLogs"))
         #expect(!viewSource.contains("pet.walkLogs"))
     }
 
     @MainActor
-    @Test func islandUnifiedStatsUsesPetLedgerMetricsInsteadOfLegacyPetRelationships() throws {
+    @Test func islandUnifiedStatsUsesScopedLedgerSnapshotInsteadOfLegacyPetRelationships() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = Date()
@@ -3668,13 +3670,18 @@ struct MemberLifecycleGateTests {
         ))
         try context.save()
 
+        let snapshot = try await WeightInsightDataActor(modelContainer: container).load(
+            dayCount: nil,
+            subjectKey: "pet:\(pet.id.uuidString)",
+            pets: [WeightInsightSubjectDescriptor(id: pet.id, name: pet.name, isHuman: false)],
+            humans: [],
+            now: now
+        )
         let viewModel = IslandUnifiedStatsViewModel()
-        viewModel.load(modelContext: context, pets: [pet], humans: [])
+        viewModel.applyWeightInsightSnapshot(snapshot, pets: [pet], humans: [])
 
         #expect(viewModel.weightAbsolutes.map(\.weight) == [4.0, 4.8])
         #expect(!viewModel.weightAbsolutes.contains { $0.weight == 99 })
-        #expect(abs(viewModel.totalWeeklyExplorationKm - 1.2) < 0.001)
-        #expect(viewModel.weeklyExplorationCount == 1)
         #expect(viewModel.gainChampion?.entityName == "Momo")
     }
 

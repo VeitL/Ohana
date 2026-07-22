@@ -38,6 +38,7 @@ extension VerticalSolidHomeView {
                 progressToNextLevel: treeManager.progressToNextLevel,
                 totalEnergy: treeManager.totalEnergy,
                 nextLevelThreshold: treeManager.nextLevelThreshold,
+                coconutBalance: islandCoconutBalance,
                 shopLockedLevel: treeLevel >= shopUnlockLevel ? nil : shopUnlockLevel,
                 shopInitialCategory: shopInitialCategory,
                 achievementsLockedLevel: treeLevel >= achievementsUnlockLevel ? nil : achievementsUnlockLevel,
@@ -45,6 +46,15 @@ extension VerticalSolidHomeView {
                 gachaLockedLevel: treeLevel >= gachaUnlockLevel ? nil : gachaUnlockLevel
             ),
             injectEnergyTrigger: oasisInjectEnergyTrigger,
+            allowsAmbientMotion: workloadPolicy
+                .ambientMotionBudget(isVisible: lifecycle.isVisible)
+                .allowsMotion,
+            allowsInteractionMotion: workloadPolicy
+                .interactionMotionBudget(isVisible: lifecycle.isVisible)
+                .allowsMotion,
+            usesFullVisualEffects: workloadPolicy
+                .visualEffectsBudget(isVisible: lifecycle.isVisible)
+                .usesFullEffects,
             onPresentCoconutLog: onPresentCoconutLog,
             onInjectEnergy: injectEmbeddedOasisEnergy,
             onOpenShop: { category in
@@ -58,6 +68,9 @@ extension VerticalSolidHomeView {
             },
             onOpenGacha: {
                 openFunctionMenu(destination: .gacha)
+            },
+            onOpenGrowthRoadmap: {
+                openFunctionMenu(destination: .growthRoadmap)
             }
         )
     }

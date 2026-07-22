@@ -59,7 +59,6 @@ struct EditPetContentSheet: View {
                         formField(l.tr(zh: "名字", en: "Name", de: "Name"), text: $name)
                         formField(l.tr(zh: "物种", en: "Species", de: "Tierart"), text: $species)
                         formField(l.tr(zh: "品种", en: "Breed", de: "Rasse"), text: $breed)
-                        formField(l.tr(zh: "头像 Emoji", en: "Avatar emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
 
                         Picker(l.tr(zh: "主性格", en: "Primary vibe", de: "Hauptcharakter"), selection: $primaryPersonalityTagID) {
                             if primaryPersonalityTagID.isEmpty {

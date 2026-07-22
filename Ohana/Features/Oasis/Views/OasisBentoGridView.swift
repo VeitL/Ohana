@@ -115,6 +115,10 @@ struct OasisBentoGridView: View {
         }
 
         VStack(spacing: isCompact ? 6 : 8) {
+            if let nextLockedFeature {
+                nextUnlockSummary(feature: nextLockedFeature.feature, level: nextLockedFeature.level)
+            }
+
             HStack(spacing: isCompact ? 6 : 8) {
                 bentoMiniCard(
                     feature: .shop,
@@ -122,6 +126,7 @@ struct OasisBentoGridView: View {
                     accent: Color.goYellow,
                     allowsInteraction: interactiveFeatures.contains(.shop),
                     lockedLevel: shopLockedLevel,
+                    isNextUnlock: isNextUnlock(feature: .shop, level: shopLockedLevel),
                     showsNewFeature: showsPendingFeature(.shop),
                     action: onOpenShop
                 )
@@ -132,6 +137,7 @@ struct OasisBentoGridView: View {
                     isEnabled: !snapshot.achievementsLocked,
                     allowsInteraction: interactiveFeatures.contains(.achievements),
                     lockedLevel: achievementsLockedLevel,
+                    isNextUnlock: isNextUnlock(feature: .achievements, level: achievementsLockedLevel),
                     unavailableLabel: snapshot.achievementsLocked
                         ? localization.tr(zh: "暂无宠物", en: "No pets", de: "Keine Haustiere")
                         : nil,
@@ -147,20 +153,61 @@ struct OasisBentoGridView: View {
                     accent: Color.goTeal,
                     allowsInteraction: interactiveFeatures.contains(.critters),
                     lockedLevel: crittersLockedLevel,
+                    isNextUnlock: isNextUnlock(feature: .critters, level: crittersLockedLevel),
                     showsNewFeature: showsPendingFeature(.critters),
                     action: onOpenCritters
                 )
                 bentoMiniCard(
                     feature: .gacha,
-                    metric: "80",
+                    metric: "80🥥",
                     accent: Color.goPrimary,
                     allowsInteraction: interactiveFeatures.contains(.gacha),
                     lockedLevel: gachaLockedLevel,
+                    isNextUnlock: isNextUnlock(feature: .gacha, level: gachaLockedLevel),
                     showsNewFeature: showsPendingFeature(.gacha),
                     action: onOpenGacha
                 )
             }
         }
+    }
+
+    private var nextLockedFeature: (feature: OasisBentoFeature, level: Int)? {
+        let candidates: [(feature: OasisBentoFeature, level: Int)] = [
+            shopLockedLevel.map { (.shop, $0) },
+            achievementsLockedLevel.map { (.achievements, $0) },
+            crittersLockedLevel.map { (.critters, $0) },
+            gachaLockedLevel.map { (.gacha, $0) }
+        ].compactMap(\.self)
+        return candidates.min { lhs, rhs in
+            if lhs.level != rhs.level { return lhs.level < rhs.level }
+            return (OasisBentoFeature.allCases.firstIndex(of: lhs.feature) ?? 0)
+                < (OasisBentoFeature.allCases.firstIndex(of: rhs.feature) ?? 0)
+        }
+    }
+
+    private func isNextUnlock(feature: OasisBentoFeature, level: Int?) -> Bool {
+        guard let level, let nextLockedFeature else { return false }
+        return nextLockedFeature.feature == feature && nextLockedFeature.level == level
+    }
+
+    private func nextUnlockSummary(feature: OasisBentoFeature, level: Int) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.up.forward.circle.fill") // a11y: allow decorative status glyph; the combined summary text carries the meaning
+                .accessibilityHidden(true)
+            Text(localization.tr(zh: "下一解锁", en: "Next unlock", de: "Nächste Freigabe"))
+            Text("·")
+                .foregroundStyle(Color.ohanaSecondaryText)
+            Text(feature.title(localization))
+            Spacer(minLength: 6)
+            Text("Lv.\(level)")
+                .monospacedDigit()
+        }
+        .font(OhanaFont.caption2(.black))
+        .foregroundStyle(Color.goPrimary)
+        .padding(.horizontal, 4)
+        .lineLimit(1)
+        .minimumScaleFactor(0.78)
+        .accessibilityElement(children: .combine)
     }
 
     private func bentoMiniCard(
@@ -170,6 +217,7 @@ struct OasisBentoGridView: View {
         isEnabled: Bool = true,
         allowsInteraction: Bool = true,
         lockedLevel: Int? = nil,
+        isNextUnlock: Bool = false,
         unavailableLabel: String? = nil,
         showsNewFeature: Bool = false,
         action: @escaping () -> Void
@@ -180,8 +228,25 @@ struct OasisBentoGridView: View {
         let iconFrame: CGFloat = isCompact ? 30 : 34
         let iconFontSize: CGFloat = isCompact ? 16 : 18
         let titleFontSize: CGFloat = isCompact ? 11 : 12
-        let metricFontSize: CGFloat = isCompact ? 14 : 16
+        let metricFontSize: CGFloat = isCompact ? 12 : 14
         let contentSpacing: CGFloat = isCompact ? 8 : 10
+        let supportingText: String = if let lockedLevel {
+            isNextUnlock
+                ? localization.tr(
+                    zh: "下一目标 · Lv.\(lockedLevel)",
+                    en: "Next · Lv.\(lockedLevel)",
+                    de: "Als Nächstes · Lv.\(lockedLevel)"
+                )
+                : localization.tr(
+                    zh: "Lv.\(lockedLevel) 解锁",
+                    en: "Unlocks at Lv.\(lockedLevel)",
+                    de: "Ab Lv.\(lockedLevel)"
+                )
+        } else if let unavailableLabel, !isEnabled {
+            unavailableLabel
+        } else {
+            metric
+        }
         return Button {
             guard isInteractive, allowsInteraction else { return }
             if isLocked || !isEnabled {
@@ -202,35 +267,35 @@ struct OasisBentoGridView: View {
                     Image(systemName: feature.systemName)
                         .font(OhanaFont.adaptive(size: iconFontSize, weight: .black))
                         .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(isUnavailable ? Color.ohanaSecondaryText : Color.goPrimary)
+                        .foregroundStyle(isNextUnlock ? Color.goPrimary : (isUnavailable ? Color.ohanaSecondaryText : Color.goPrimary))
                         .frame(width: iconFrame, height: iconFrame) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                        .background(isUnavailable ? Color.ohanaControlFill.opacity(0.72) : Color.ohanaControlFill, in: Circle())
+                        .background(
+                            isNextUnlock ? Color.goPrimary.opacity(0.13) : Color.ohanaControlFill.opacity(isUnavailable ? 0.72 : 1),
+                            in: Circle()
+                        )
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
                             .font(OhanaFont.adaptive(size: titleFontSize, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(metric)
+                        Text(supportingText)
                             .font(OhanaFont.adaptive(size: metricFontSize, weight: .black, design: .rounded))
-                            .foregroundStyle(isUnavailable ? Color.ohanaSecondaryText : accent)
+                            .foregroundStyle(isNextUnlock ? Color.goPrimary : (isUnavailable ? Color.ohanaSecondaryText : accent))
                             .monospacedDigit()
                             .lineLimit(1)
+                            .minimumScaleFactor(0.72)
                     }
 
                     Spacer(minLength: 0)
 
-                    Image(systemName: "chevron.right").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 10, weight: .semibold))
+                    Image(systemName: isLocked ? "info.circle" : "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: isLocked ? 12 : 10, weight: .semibold))
                         .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .foregroundStyle(isNextUnlock ? Color.goPrimary : Color.ohanaSecondaryText)
                 }
-                .opacity(isUnavailable ? 0.74 : 1)
+                .opacity(isNextUnlock ? 1 : (isUnavailable ? 0.72 : 1))
 
-                if let lockedLevel {
-                    lockedBadge(level: lockedLevel)
-                } else if let unavailableLabel, !isEnabled {
-                    unavailableBadge(title: unavailableLabel)
-                } else if showsNewFeature, isInteractive {
+                if showsNewFeature, isInteractive, !isLocked {
                     GrowthNewFeatureDot(size: isCompact ? 8 : 9)
                         .offset(x: 4, y: -4)
                 }
@@ -239,55 +304,29 @@ struct OasisBentoGridView: View {
             .padding(.vertical, isCompact ? 7 : 11)
             .frame(maxWidth: .infinity, minHeight: isCompact ? 44 : 0)
             .background(
-                isUnavailable ? Color.ohanaControlFill.opacity(0.72) : Color.ohanaCardSurface,
+                isNextUnlock
+                    ? Color.goPrimary.opacity(0.10)
+                    : (isUnavailable ? Color.ohanaControlFill.opacity(0.72) : Color.ohanaCardSurface),
                 in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
-                    .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
+                    .strokeBorder(isNextUnlock ? Color.goPrimary.opacity(0.42) : Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(!isInteractive || !allowsInteraction)
         .opacity(isInteractive ? 1 : 0.55)
-        .saturation(isUnavailable ? 0.12 : 1)
+        .saturation(isNextUnlock ? 0.72 : (isUnavailable ? 0.12 : 1))
         .accessibilityLabel(accessibilityLabel(title: title, lockedLevel: lockedLevel, unavailableLabel: unavailableLabel))
+        .accessibilityHint(isLocked
+            ? localization.tr(
+                zh: "轻点查看功能说明",
+                en: "Tap to preview this feature",
+                de: "Tippen, um die Funktion anzusehen"
+            )
+            : "")
         .accessibilityIdentifier("oasis-bento-\(feature.id)")
-    }
-
-    private func lockedBadge(level: Int) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: "lock.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
-                .font(OhanaFont.caption2(.black))
-                .accessibilityHidden(true)
-            Text(localization.tr(zh: "Lv.\(level) 解锁", en: "Lv.\(level)", de: "Lv.\(level)"))
-                .font(isCompact ? OhanaFont.caption2(.black) : OhanaFont.caption(.black))
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-        }
-        .foregroundStyle(Color.ohanaPrimaryText)
-        .padding(.horizontal, isCompact ? 6 : 8)
-        .padding(.vertical, isCompact ? 4 : 6)
-        .background(Color.ohanaCardSurfaceElevated.opacity(0.92), in: Capsule())
-        .overlay {
-            Capsule()
-                .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
-        }
-    }
-
-    private func unavailableBadge(title: String) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: "minus.circle.fill").accessibilityHidden(true)
-                .font(OhanaFont.caption2(.black))
-            Text(title)
-                .font(isCompact ? OhanaFont.caption2(.black) : OhanaFont.caption(.black))
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-        }
-        .foregroundStyle(Color.ohanaPrimaryText)
-        .padding(.horizontal, isCompact ? 6 : 8)
-        .padding(.vertical, isCompact ? 4 : 6)
-        .background(Color.ohanaControlFill, in: Capsule())
     }
 
     private func accessibilityLabel(title: String, lockedLevel: Int?, unavailableLabel: String?) -> String {

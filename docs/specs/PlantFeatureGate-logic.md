@@ -5,14 +5,14 @@
 
 ## Purpose
 
-`PlantFeatureGate` 是 D19 / GAP-12 的产品/构建支持判定点；`PlantUnlockPolicy` 是用户可见性判定点。首发版本定位为“家中所有生命”，但基础植物照护不在 Lv.1 立即暴露，而在 Lv.4「家庭树冠」作为成长解锁出现。
+`PlantFeatureGate` 是 D19 / GAP-12 的产品/构建支持判定点；`PlantUnlockPolicy` 是用户可见性判定点。首发版本定位为“家中所有生命”，但基础植物照护不在 Lv.1 立即暴露，而在 Lv.4「生命树冠」作为成长解锁出现。
 
 植物门与 `OnlineFeatureGate` 互不耦合：联机关闭不代表植物关闭，植物关闭也不代表联机关闭。基础植物照护永久免费、无限数量、本地可用，只受椰子树成长节奏控制，不作为付费墙；未来 Care+ 可在不改变基础免费边界的前提下增加 AI 识别、病虫害智能诊断、天气联动和季节计划。
 
 ## Growth Unlock Semantics
 
 - `PlantFeatureGate.allows(.plants)` 在当前 build 恒为开启，表示 app 支持植物数据、服务、备份、恢复和本地提醒。
-- 用户是否看到基础植物模块由 `PlantUnlockPolicy` 决定：椰子树 Lv.4「家庭树冠」解锁；若本机已经存在植物数据，则 grandfather，低于 Lv.4 也可继续进入植物列表和详情。
+- 用户是否看到基础植物模块由 `PlantUnlockPolicy` 决定：椰子树 Lv.4「生命树冠」解锁；若本机已经存在植物数据，则 grandfather，低于 Lv.4 也可继续进入植物列表和详情。
 - Lv.1–3 不显示植物 tab、不显示添加植物入口、不生成植物 quest、不展示植物负反馈信号；植物 route / FunctionMenu 入口必须 redirect 到 Growth Roadmap。
 - Lv.4 后开放添加植物、植物 Dashboard、详情、护理计划、日志、照片、资料库、本地提醒和待办中的植物事项。
 - Lv.5 不是基础植物管理前置，只用于植物与绿洲/岛屿氛围、装饰或收益反馈的后续联动。

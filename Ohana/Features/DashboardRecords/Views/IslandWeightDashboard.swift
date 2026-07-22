@@ -78,9 +78,11 @@ struct IslandWeightDashboardContentView: View {
     var standalone: Bool = true
     let pets: [Pet]
     let humans: [Human]
+    let snapshot: WeightInsightSnapshot
+    let onFilterChange: (WeightTimeFilter, String?) -> Void
+    let onRefresh: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
@@ -92,16 +94,18 @@ struct IslandWeightDashboardContentView: View {
     @State private var chartRevealProgress: CGFloat = 0
     @State private var activeWeightEntryRoute: IslandWeightEntryRoute? = nil
     @State private var showingPersonalPlan = false
+    @State private var preparedWeightCSV = "date,subject_id,subject_name,kilograms"
 
-    enum WeightTimeFilter: String, CaseIterable, Identifiable {
+    nonisolated enum WeightTimeFilter: String, CaseIterable, Identifiable, Sendable {
         case days7 = "7"
         case days30 = "30"
         case days90 = "90"
+        case year = "365"
         case all
         var id: String { rawValue }
 
         var requiresPersonal: Bool {
-            self == .days90 || self == .all
+            self == .days90 || self == .year || self == .all
         }
 
         var dayCount: Int? {
@@ -109,6 +113,7 @@ struct IslandWeightDashboardContentView: View {
             case .days7: 7
             case .days30: 30
             case .days90: 90
+            case .year: 365
             case .all: nil
             }
         }
@@ -155,7 +160,7 @@ struct IslandWeightDashboardContentView: View {
 
     private var visibleWeightHumanSignature: String {
         visibleWeightHumans
-            .map { "\($0.id.uuidString):\(HumanLocalPrivacyPolicy.isEnabled ? $0.privateFieldsRaw : ""):\($0.weightLogs.count)" }
+            .map { "\($0.id.uuidString):\(HumanLocalPrivacyPolicy.isEnabled ? $0.privateFieldsRaw : "")" }
             .joined(separator: "|")
     }
 
@@ -211,6 +216,7 @@ struct IslandWeightDashboardContentView: View {
 
     var body: some View {
         dashboardBody
+            .accessibilityIdentifier("household-weight-insight-screen")
             .sheet(isPresented: $showingPersonalPlan) {
                 PersonalPlanView()
                     .ohanaSheetPagePresentation()
@@ -218,13 +224,22 @@ struct IslandWeightDashboardContentView: View {
             .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
                 if weightTimeRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
                     weightTimeRange = .days30
+                    onFilterChange(.days30, selectedSeriesID)
                 }
+                reconcileComparisonAccess()
             }
-            .onAppear { reloadDashboard() }
+            .onAppear {
+                reconcileComparisonAccess()
+                reloadDashboard()
+            }
             .onChange(of: pets.count) { _, _ in reloadDashboard() }
             .onChange(of: humans.count) { _, _ in reloadDashboard() }
             .onChange(of: activeHumanIdStr) { _, _ in reloadDashboard() }
             .onChange(of: visibleWeightHumanSignature) { _, _ in reloadDashboard() }
+            .onChange(of: selectedSeriesID) { prepareWeightExport() }
+            .onChange(of: weightTimeRange) { prepareWeightExport() }
+            .onChange(of: appLanguage) { prepareWeightExport() }
+            .onChange(of: snapshot.revisionID) { reloadDashboard() }
     }
 }
 
@@ -232,12 +247,20 @@ struct IslandWeightDashboardContentView: View {
 
 extension IslandWeightDashboardContentView {
     private func reloadDashboard() {
-        if let selectedSeriesID,
-           selectedSeriesID.hasPrefix("human:"),
-           !visibleWeightHumans.contains(where: { selectedSeriesID == "human:\($0.id.uuidString)" }) {
+        if let selectedSeriesID, !visibleSeriesIDs.contains(selectedSeriesID) {
             self.selectedSeriesID = nil
+            onFilterChange(weightTimeRange, nil)
         }
-        vm.load(modelContext: modelContext, pets: pets, humans: visibleWeightHumans)
+        vm.applyWeightInsightSnapshot(snapshot, pets: pets, humans: visibleWeightHumans)
+        reconcileComparisonAccess()
+        prepareWeightExport()
+    }
+
+    private func reconcileComparisonAccess() {
+        guard !appServices.commerce.allows(.extendedTrends), selectedSeriesID == nil else { return }
+        selectedSeriesID = visiblePets.first.map { "pet:\($0.id.uuidString)" }
+            ?? visibleWeightHumans.first.map { "human:\($0.id.uuidString)" }
+        onFilterChange(weightTimeRange, selectedSeriesID)
     }
 
     @ViewBuilder
@@ -261,10 +284,16 @@ extension IslandWeightDashboardContentView {
             VStack(spacing: 18) {
                 if standalone { navBar }
                 privateWeightNotice
+                analysisLimitNotice
                 weightPlanetHero
                 memberSelector
+                if appServices.commerce.allows(.extendedTrends) {
+                    weightExportButton
+                }
                 weightHeroCard
-                weightBadgeStrip
+                if appServices.commerce.allows(.extendedTrends) {
+                    weightBadgeStrip
+                }
                 individualSparklineCard
                 Color.clear.frame(height: 40)
             }
@@ -276,7 +305,7 @@ extension IslandWeightDashboardContentView {
                 GenericWeightEntrySheet(
                     target: activeWeightEntryRoute.target,
                     onSaved: {
-                        reloadDashboard()
+                        onRefresh()
                     },
                     onDismiss: {
                         withAnimation(GoMotion.feedback) {
@@ -319,9 +348,16 @@ extension IslandWeightDashboardContentView {
                     title: l.tr(zh: "全部", en: "All", de: "Alle"),
                     icon: "sparkles",
                     tint: Color.goPrimary,
-                    isSelected: selectedSeriesID == nil
+                    isSelected: selectedSeriesID == nil,
+                    isLocked: !appServices.commerce.allows(.extendedTrends)
                 ) {
+                    guard appServices.commerce.allows(.extendedTrends) else {
+                        showingPersonalPlan = true
+                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                        return
+                    }
                     selectedSeriesID = nil
+                    onFilterChange(weightTimeRange, nil)
                 }
 
                 ForEach(visiblePets) { pet in
@@ -333,6 +369,7 @@ extension IslandWeightDashboardContentView {
                         isSelected: selectedSeriesID == seriesID
                     ) {
                         selectedSeriesID = seriesID
+                        onFilterChange(weightTimeRange, seriesID)
                     }
                 }
 
@@ -345,6 +382,7 @@ extension IslandWeightDashboardContentView {
                         isSelected: selectedSeriesID == seriesID
                     ) {
                         selectedSeriesID = seriesID
+                        onFilterChange(weightTimeRange, seriesID)
                     }
                 }
             }
@@ -390,11 +428,59 @@ extension IslandWeightDashboardContentView {
         return l.tr(zh: "\(names) 的体重只会在本人账户下显示，其他成员看不到。", en: "\(names)'s weight only appears in their own account. Other members cannot see it.", de: "Das Gewicht von \(names) erscheint nur im eigenen Konto. Andere Mitglieder sehen es nicht.")
     }
 
+    @ViewBuilder
+    private var analysisLimitNotice: some View {
+        if vm.isWeightDataTruncated {
+            Label(
+                l.tr(
+                    zh: "记录很多：当前图表显示最近 20,000 条；对象历史中的原始记录仍完整保留。",
+                    en: "Large history: this chart shows the latest 20,000 records. Raw records remain available in each subject's history.",
+                    de: "Viele Einträge: Dieses Diagramm zeigt die neuesten 20.000. Die Rohdaten bleiben im Verlauf jedes Objekts erhalten."
+                ),
+                systemImage: "info.circle.fill"
+            )
+            .font(OhanaFont.footnote(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge))
+            .accessibilityIdentifier("weight-analysis-truncated-notice")
+        }
+    }
+
+    private var weightExportButton: some View {
+        ShareLink(item: preparedWeightCSV) {
+            Label(
+                l.tr(zh: "导出当前体重数据", en: "Export current weight data", de: "Aktuelle Gewichtsdaten exportieren"),
+                systemImage: "square.and.arrow.up"
+            )
+            .font(OhanaFont.callout(.black))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(Color.ohanaControlFill, in: Capsule())
+        }
+        .accessibilityIdentifier("weight-insight-export")
+    }
+
+    private func prepareWeightExport() {
+        var lines = ["date,subject_id,subject_name,kilograms"]
+        lines.append(contentsOf: filteredWeightAbsolutes.map { point in
+            [
+                HouseholdInsightExport.csvCell(HouseholdInsightExport.iso8601(point.date)),
+                HouseholdInsightExport.csvCell(point.seriesID),
+                HouseholdInsightExport.csvCell(point.displayName),
+                HouseholdInsightExport.decimal(point.weight, fractionDigits: 3)
+            ].joined(separator: ",")
+        })
+        preparedWeightCSV = lines.joined(separator: "\n")
+    }
+
     private func weightEntityChip(
         title: String,
         icon: String,
         tint: Color,
         isSelected: Bool,
+        isLocked: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -404,6 +490,11 @@ extension IslandWeightDashboardContentView {
                     .frame(width: 26, height: 26) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(isSelected ? Color.arkInk.opacity(0.16) : tint.opacity(0.18), in: Circle())
                 weightEntityChipText(title: title, isSelected: isSelected)
+                if isLocked {
+                    Image(systemName: "lock.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 8, weight: .black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
             }
             .padding(.leading, 8)
             .padding(.trailing, 14)
@@ -411,6 +502,10 @@ extension IslandWeightDashboardContentView {
             .background(isSelected ? tint : Color.ohanaControlFill.opacity(0.74), in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(isLocked ? "\(title), Ohana Personal" : title)
+        .accessibilityValue(isSelected
+            ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
+            : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
     }
 
     private func weightEntityChip(
@@ -431,6 +526,9 @@ extension IslandWeightDashboardContentView {
             .background(isSelected ? tint : Color.ohanaControlFill.opacity(0.74), in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityValue(isSelected
+            ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
+            : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
     }
 
     private func weightEntityChipText(title: String, isSelected: Bool) -> some View {
@@ -438,7 +536,7 @@ extension IslandWeightDashboardContentView {
             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .lineLimit(1)
             .minimumScaleFactor(0.72)
-            .foregroundStyle(isSelected ? .black : .white)
+            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
     }
 
     // MARK: - 首屏：体重星球
@@ -578,33 +676,36 @@ extension IslandWeightDashboardContentView {
     }
 
     private var rangeSelector: some View {
-        HStack(spacing: 5) {
-            ForEach(WeightTimeFilter.allCases) { range in
-                Button {
-                    guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
-                        showingPersonalPlan = true
-                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                        return
-                    }
-                    withAnimation(GoMotion.feedback) {
-                        weightTimeRange = range
-                    }
-                    UISelectionFeedbackGenerator().selectionChanged()
-                } label: {
-                    HStack(spacing: 2) {
-                        Text(range.localizedTitle(l))
-                        if range.requiresPersonal && !appServices.commerce.allows(.extendedTrends) {
-                            Image(systemName: "lock.fill").accessibilityHidden(true)
-                                .font(OhanaFont.adaptive(size: 7, weight: .black))
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 5) {
+                ForEach(WeightTimeFilter.allCases) { range in
+                    Button {
+                        guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                            showingPersonalPlan = true
+                            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                            return
                         }
-                    }
+                        withAnimation(GoMotion.feedback) {
+                            weightTimeRange = range
+                        }
+                        onFilterChange(range, selectedSeriesID)
+                        UISelectionFeedbackGenerator().selectionChanged()
+                    } label: {
+                        HStack(spacing: 2) {
+                            Text(range.localizedTitle(l))
+                            if range.requiresPersonal && !appServices.commerce.allows(.extendedTrends) {
+                                Image(systemName: "lock.fill").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 7, weight: .black))
+                            }
+                        }
                         .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(weightTimeRange == range ? Color.arkInk : primaryText)
                         .frame(minWidth: range == .all ? 42 : 30)
                         .padding(.vertical, 7)
                         .background(weightTimeRange == range ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
                 }
-                .buttonStyle(ScaleButtonStyle())
             }
         }
     }
@@ -1059,6 +1160,8 @@ private extension IslandWeightDashboardContentView.WeightTimeFilter {
             "30"
         case .days90:
             "90"
+        case .year:
+            l.tr(zh: "1年", en: "1Y", de: "1J")
         case .all:
             l.tr(zh: "全部", en: "All", de: "Alle")
         }

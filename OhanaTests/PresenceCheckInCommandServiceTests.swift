@@ -17,7 +17,7 @@ struct PresenceCheckInCommandServiceTests {
             String(describing: SafetyContact.self)
         ])
         #expect(v92.subtracting(v93).isEmpty)
-        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV94.self))
+        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV96.self))
     }
 
     @Test func ownerAutoCheckInCheckAllAndStatusRewardsAreIdempotent() throws {
@@ -41,12 +41,12 @@ struct PresenceCheckInCommandServiceTests {
         let all = try service.checkInAll(now: now.addingTimeInterval(60))
         let firstStatus = try service.updateTodayStatus(
             subject: .init(kind: .pet, id: pet.id),
-            status: .great,
+            status: .score10,
             now: now.addingTimeInterval(90)
         )
         let changedStatus = try service.updateTodayStatus(
             subject: .init(kind: .pet, id: pet.id),
-            status: .poor,
+            status: .score1,
             now: now.addingTimeInterval(120)
         )
         let clearedStatus = try service.updateTodayStatus(
@@ -75,6 +75,72 @@ struct PresenceCheckInCommandServiceTests {
             try context.fetch(FetchDescriptor<PresenceCheckIn>()).first { $0.uniqueKey == petKey }
         )
         #expect(petCheckIn.status == nil)
+    }
+
+    @Test func undoKeepsRewardReceiptsAndSuppressesLaterAutomaticForegroundCheckIn() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        context.insert(owner)
+        try context.save()
+
+        let awarder = RecordingPresenceRewardAwarder()
+        let service = makeService(context: context, ownerId: owner.id, awarder: awarder)
+        let now = date(2026, 7, 22)
+        try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: now)
+
+        let first = try service.autoCheckInOwner(now: now)
+        let removed = try service.undoTodayCheckIn(
+            subject: .init(kind: .human, id: owner.id),
+            now: now.addingTimeInterval(60)
+        )
+        let laterForeground = try service.autoCheckInOwner(now: now.addingTimeInterval(120))
+
+        #expect(first.didCreateCheckIn)
+        #expect(removed.removedCheckIn.dayKey == "2026-07-22")
+        #expect(!laterForeground.didCreateCheckIn)
+        #expect(laterForeground.checkIns.isEmpty)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 1)
+
+        let manualRecheck = try service.checkIn(
+            subject: .init(kind: .human, id: owner.id),
+            source: .card,
+            now: now.addingTimeInterval(180)
+        )
+
+        #expect(manualRecheck.didCreateCheckIn)
+        #expect(manualRecheck.awardedCoconuts == 0)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 1)
+        #expect(awardedKinds(awarder) == [.ownerDaily])
+    }
+
+    @Test func zenActiveSubjectSnapshotCarriesMediaIdentityAndDerivesZodiacFromBirthday() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        owner.birthday = date(1992, 4, 12)
+        let pet = Pet(name: "Miso", species: "cat")
+        pet.birthday = date(2024, 4, 12)
+        context.insert(owner)
+        context.insert(pet)
+        try context.save()
+
+        let subjects = try PresenceCheckInReadService.activeSubjects(
+            context: context,
+            ownerHumanId: owner.id,
+            now: date(2026, 7, 22),
+            localization: L10n("en")
+        )
+        let ownerSnapshot = try #require(subjects.first { $0.subject.id == owner.id })
+        let petSnapshot = try #require(subjects.first { $0.subject.id == pet.id })
+        let expectedZodiac = Human.westernZodiacDisplay(for: owner.birthday!, l: L10n("en"))
+
+        #expect(ownerSnapshot.avatarModelID == owner.persistentModelID)
+        #expect(petSnapshot.avatarModelID == pet.persistentModelID)
+        #expect(ownerSnapshot.expandedProfile?.metrics.first { $0.kind == .zodiac }?.value == expectedZodiac)
+        #expect(petSnapshot.expandedProfile?.metrics.first { $0.kind == .zodiac }?.value == expectedZodiac)
     }
 
     @Test func ownerStreakSkipsNormalModeGapAndAwardsFamilyMilestoneOnce() throws {
@@ -119,6 +185,96 @@ struct PresenceCheckInCommandServiceTests {
         #expect(milestoneReceipts.first?.milestoneDays == 3)
     }
 
+    @Test func retrospectiveStatusIsEditableButNeverRepairsCheckInStreakOrRewards() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        owner.createdAt = date(2026, 1, 1)
+        context.insert(owner)
+        try context.save()
+
+        let awarder = RecordingPresenceRewardAwarder()
+        let service = makeService(context: context, ownerId: owner.id, awarder: awarder)
+        try service.startParticipation(
+            ownerHumanId: owner.id,
+            source: .settings,
+            now: date(2026, 7, 1)
+        )
+        let subject = PresenceSubjectRef(kind: .human, id: owner.id)
+        for dayKey in ["2026-07-01", "2026-07-03"] {
+            context.insert(PresenceCheckIn(
+                uniqueKey: PresenceCheckInCommandService.checkInKey(subject: subject, dayKey: dayKey),
+                subject: subject,
+                ownerHumanId: owner.id,
+                isOwner: true,
+                dayKey: dayKey,
+                timeZoneIdentifier: utc.identifier,
+                checkedInAt: try #require(PresenceDayKeyPolicy.parse(dayKey)),
+                source: .card
+            ))
+        }
+        try context.save()
+
+        let first = try service.recordRetrospectiveStatus(
+            subject: subject,
+            dayKey: "2026-07-02",
+            status: .score8,
+            now: date(2026, 7, 4)
+        )
+        let update = try service.recordRetrospectiveStatus(
+            subject: subject,
+            dayKey: "2026-07-02",
+            status: .score4,
+            now: date(2026, 7, 4).addingTimeInterval(60)
+        )
+        let streak = try PresenceCheckInReadService.streakSnapshot(
+            context: context,
+            ownerHumanId: owner.id,
+            subject: subject,
+            now: date(2026, 7, 4),
+            timeZone: utc
+        )
+        let rememberedDay = try #require(streak.days.first { $0.dayKey == "2026-07-02" })
+
+        #expect(first.didCreate)
+        #expect(first.fact.source == .retrospectiveStatus)
+        #expect(update.didCreate == false)
+        #expect(update.didChangeStatus)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 3)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 0)
+        #expect(awarder.requests.isEmpty)
+        #expect(streak.currentStreak == 1)
+        #expect(streak.longestStreak == 1)
+        #expect(!rememberedDay.isCheckedIn)
+        #expect(rememberedDay.status == .score4)
+        #expect(rememberedDay.isRetrospectiveStatus)
+
+        #expect(throws: PresenceCheckInCommandError.historicalDayAlreadyCheckedIn(subject)) {
+            try service.recordRetrospectiveStatus(
+                subject: subject,
+                dayKey: "2026-07-01",
+                status: .score9,
+                now: date(2026, 7, 4)
+            )
+        }
+        #expect(throws: PresenceCheckInCommandError.historicalDayMustBePast) {
+            try service.recordRetrospectiveStatus(
+                subject: subject,
+                dayKey: "2026-07-04",
+                status: .score9,
+                now: date(2026, 7, 4)
+            )
+        }
+        #expect(throws: PresenceCheckInCommandError.historicalDayNotParticipating) {
+            try service.recordRetrospectiveStatus(
+                subject: subject,
+                dayKey: "2026-06-30",
+                status: .score9,
+                now: date(2026, 7, 4)
+            )
+        }
+    }
+
     @Test func nonOwnerCalendarNeverCountsDaysBeforeTheSubjectExisted() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -155,6 +311,113 @@ struct PresenceCheckInCommandServiceTests {
         #expect(!streak.days.contains { $0.dayKey == "2026-07-04" })
         #expect(streak.days.first { $0.dayKey == "2026-07-05" }?.isParticipating == true)
         #expect(streak.days.first { $0.dayKey == "2026-07-06" }?.isParticipating == true)
+    }
+
+    @Test func homeDisplayStreaksArePerSubjectSkipStandardModeAndKeepYesterdayUntilDayEnd() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        let pet = Pet(name: "Miso", species: "cat")
+        pet.createdAt = date(2026, 7, 2)
+        let plant = Plant(name: "Fern")
+        plant.createdAt = date(2026, 7, 10)
+        context.insert(owner)
+        context.insert(pet)
+        context.insert(plant)
+
+        context.insert(PresenceParticipationPeriod(
+            ownerHumanId: owner.id,
+            startedAt: date(2026, 7, 1),
+            startedDayKey: "2026-07-01",
+            startedTimeZoneIdentifier: utc.identifier,
+            endedAt: date(2026, 7, 4),
+            lastParticipatingDayKey: "2026-07-03",
+            endedTimeZoneIdentifier: utc.identifier,
+            source: .settings
+        ))
+        context.insert(PresenceParticipationPeriod(
+            ownerHumanId: owner.id,
+            startedAt: date(2026, 7, 10),
+            startedDayKey: "2026-07-10",
+            startedTimeZoneIdentifier: utc.identifier,
+            source: .settings
+        ))
+
+        let facts: [(PresenceSubjectRef, Bool, [String])] = [
+            (.init(kind: .human, id: owner.id), true, [
+                "2026-07-01", "2026-07-02", "2026-07-03", "2026-07-10", "2026-07-11"
+            ]),
+            (.init(kind: .pet, id: pet.id), false, [
+                "2026-07-02", "2026-07-03", "2026-07-10", "2026-07-11"
+            ]),
+            (.init(kind: .plant, id: plant.id), false, ["2026-07-10"])
+        ]
+        for (subject, isOwner, dayKeys) in facts {
+            for dayKey in dayKeys {
+                context.insert(PresenceCheckIn(
+                    uniqueKey: PresenceCheckInCommandService.checkInKey(
+                        subject: subject,
+                        dayKey: dayKey
+                    ),
+                    subject: subject,
+                    ownerHumanId: owner.id,
+                    isOwner: isOwner,
+                    dayKey: dayKey,
+                    timeZoneIdentifier: utc.identifier,
+                    checkedInAt: try #require(PresenceDayKeyPolicy.parse(dayKey)),
+                    source: .card
+                ))
+            }
+        }
+        try context.save()
+
+        let snapshot = try PresenceCheckInReadService.homeSnapshot(
+            context: context,
+            ownerHumanId: owner.id,
+            now: date(2026, 7, 12),
+            timeZone: utc
+        )
+
+        #expect(snapshot.subjects.first { $0.subject.id == owner.id }?.currentDisplayStreak == 5)
+        #expect(snapshot.subjects.first { $0.subject.id == pet.id }?.currentDisplayStreak == 4)
+        #expect(snapshot.subjects.first { $0.subject.id == plant.id }?.currentDisplayStreak == 0)
+        #expect(snapshot.subjects.allSatisfy { !$0.isCheckedInToday })
+    }
+
+    @Test func nonOwnerDisplayStreakNeverCreatesMilestoneRewards() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        let pet = Pet(name: "Miso", species: "cat")
+        pet.createdAt = date(2026, 7, 1)
+        context.insert(owner)
+        context.insert(pet)
+        try context.save()
+        let awarder = RecordingPresenceRewardAwarder()
+        let service = makeService(context: context, ownerId: owner.id, awarder: awarder)
+        try service.startParticipation(
+            ownerHumanId: owner.id,
+            source: .settings,
+            now: date(2026, 7, 1)
+        )
+
+        for day in 1 ... 3 {
+            _ = try service.checkIn(
+                subject: .init(kind: .pet, id: pet.id),
+                now: date(2026, 7, day)
+            )
+        }
+        let home = try PresenceCheckInReadService.homeSnapshot(
+            context: context,
+            ownerHumanId: owner.id,
+            now: date(2026, 7, 3),
+            timeZone: utc
+        )
+        let receipts = try context.fetch(FetchDescriptor<PresenceRewardReceipt>())
+
+        #expect(home.subjects.first { $0.subject.id == pet.id }?.currentDisplayStreak == 3)
+        #expect(!receipts.contains { $0.rewardKind == .streakMilestone })
+        #expect(!awarder.requests.contains { $0.kind == .streakMilestone })
     }
 
     @Test func allSevenStreakMilestonesAreAutomaticAndUseTheApprovedValues() throws {
@@ -824,7 +1087,7 @@ struct PresenceCheckInCommandServiceTests {
             try container.mainContext.save()
         }
 
-        let schema = Schema(ArkSchemaV94.models)
+        let schema = Schema(ArkSchemaV96.models)
         let configuration = ModelConfiguration(
             "PresenceV93Target",
             schema: schema,

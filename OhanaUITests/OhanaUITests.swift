@@ -384,19 +384,22 @@ final class OhanaUITests: XCTestCase {
         assertMemberCardProgress("0/2", in: app)
 
         tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-open-humanAppearance"], in: app)
-        let avatarField = app.textFields["human-basic-info-avatar-emoji-input"]
-        XCTAssertTrue(avatarField.waitForExistence(timeout: 12), "The member-card editor did not start in edit mode.")
-        let originalAvatar = String(describing: avatarField.value ?? "")
-        avatarField.tap()
-        avatarField.typeText("🐶")
-        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
+        let nameField = app.textFields["human-basic-info-name-input"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 12), "The member-card editor did not start in edit mode.")
+        XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].exists)
+        XCTAssertTrue(app.buttons["profile-avatar-photos-action"].exists)
+        XCTAssertFalse(app.textFields["human-basic-info-avatar-emoji-input"].exists)
+        let originalName = String(describing: nameField.value ?? "")
+        nameField.tap()
+        nameField.typeText(" Unsaved")
+        discardHumanBasicInfoChanges(in: app)
 
         tapWhenHittable(app.buttons["human-basic-info-edit-action"], timeout: 8)
-        XCTAssertTrue(avatarField.waitForExistence(timeout: 8))
+        XCTAssertTrue(nameField.waitForExistence(timeout: 8))
         XCTAssertEqual(
-            String(describing: avatarField.value ?? ""),
-            originalAvatar,
-            "Cancel persisted the edited Human avatar."
+            String(describing: nameField.value ?? ""),
+            originalName,
+            "Cancel persisted an unrelated profile edit."
         )
         tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
         tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
@@ -425,7 +428,7 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testMemberCardAvatarSaveReturnsAndCompletesAppearance() throws {
+    func testMemberCardAvatarEditorUsesPhotoControlsWithoutExposingFallbackEmoji() throws {
         let app = launchEnglishApp(
             seedMemberCardBaseline: true,
             enableProductionOverlays: true
@@ -446,41 +449,34 @@ final class OhanaUITests: XCTestCase {
             timeout: 8
         )
         let editor = app.descendants(matching: .any)["human-basic-info-screen"]
-        let avatarField = app.textFields["human-basic-info-avatar-emoji-input"]
         XCTAssertTrue(editor.waitForExistence(timeout: 12))
-        XCTAssertTrue(avatarField.waitForExistence(timeout: 8))
-
-        avatarField.tap()
-        avatarField.typeText("🐶")
-        tapWhenHittable(app.buttons["human-basic-info-save-action"], timeout: 8)
-
-        XCTAssertTrue(
-            waitUntil(timeout: 12) { !editor.exists },
-            "Saving the avatar did not return to the member-card journey."
+        XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["profile-avatar-paste-action"].exists)
+        XCTAssertTrue(app.buttons["profile-avatar-photos-action"].exists)
+        XCTAssertTrue(app.buttons["profile-avatar-camera-action"].exists)
+        XCTAssertFalse(
+            app.textFields["human-basic-info-avatar-emoji-input"].exists,
+            "The internal fallback emoji must not be exposed as editable profile data."
         )
-        XCTAssertTrue(
-            optionalQuestion.waitForExistence(timeout: 12),
-            "Saving a non-default avatar did not complete Appearance and advance."
+
+        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
+        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanAppearance-reviewed"],
+            in: app
         )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("1/2", in: app)
-
-        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
-        reopenMemberCardJourney(in: app)
-        XCTAssertTrue(
-            optionalQuestion.waitForExistence(timeout: 8),
-            "Reopening did not preserve the saved Appearance checkpoint."
-        )
-        assertMemberCardProgress("1/2", in: app)
-
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-resolution-humanOptionalDetails-preferNotToSay"],
             in: app
         )
         assertMemberCardJourneyComplete(in: app)
     }
-
     @MainActor
-    func testMemberCardPrivateAppearanceThenRealAvatarSupersedesResolutionAcrossRelaunch() throws {
+    func testMemberCardPrivateAppearanceSurvivesPhotoEditorCancelAcrossRelaunch() throws {
         let app = launchEnglishApp(
             seedMemberCardBaseline: true,
             enableProductionOverlays: true
@@ -506,8 +502,6 @@ final class OhanaUITests: XCTestCase {
 
         openMemberCardJourney(in: app)
         XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 12))
-        assertMemberCardProgress("0/2", in: app)
-
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-resolution-humanAppearance-preferNotToSay"],
             in: app
@@ -521,8 +515,7 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
         XCTAssertTrue(completedAppearance.waitForExistence(timeout: 8))
         XCTAssertTrue(
-            accessibilityText(for: completedAppearance).localizedCaseInsensitiveContains("Prefer not to say"),
-            "The initial private Appearance answer was not shown before replacement."
+            accessibilityText(for: completedAppearance).localizedCaseInsensitiveContains("Prefer not to say")
         )
 
         tapGuidedJourneyControlAfterSemanticScroll(
@@ -530,32 +523,17 @@ final class OhanaUITests: XCTestCase {
             in: app
         )
         let editor = app.descendants(matching: .any)["human-basic-info-screen"]
-        let avatarField = app.textFields["human-basic-info-avatar-emoji-input"]
         XCTAssertTrue(editor.waitForExistence(timeout: 12))
-        XCTAssertTrue(avatarField.waitForExistence(timeout: 8))
-        avatarField.tap()
-        avatarField.typeText("🦊")
-        tapWhenHittable(app.buttons["human-basic-info-save-action"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.textFields["human-basic-info-avatar-emoji-input"].exists)
+        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
+        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
 
-        XCTAssertTrue(
-            waitUntil(timeout: 12) { !editor.exists },
-            "Saving the real avatar did not return to the guided journey."
-        )
-        XCTAssertTrue(
-            appearanceQuestion.waitForExistence(timeout: 12),
-            "Saving from an already-completed Appearance question did not return to that question for review."
-        )
-        assertMemberCardProgress("1/2", in: app)
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 12))
         XCTAssertTrue(completedAppearance.waitForExistence(timeout: 8))
         XCTAssertTrue(
-            accessibilityText(for: completedAppearance)
-                .localizedCaseInsensitiveContains("existing information"),
-            "The real avatar did not replace the private Appearance resolution."
-        )
-        XCTAssertFalse(
-            accessibilityText(for: completedAppearance)
-                .localizedCaseInsensitiveContains("Prefer not to say"),
-            "The private Appearance resolution remained visible after saving a real avatar."
+            accessibilityText(for: completedAppearance).localizedCaseInsensitiveContains("Prefer not to say"),
+            "Cancelling the photo editor replaced the explicit private Appearance answer."
         )
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-question-next"],
@@ -580,30 +558,10 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
         XCTAssertTrue(completedAppearance.waitForExistence(timeout: 8))
         XCTAssertTrue(
-            accessibilityText(for: completedAppearance)
-                .localizedCaseInsensitiveContains("existing information"),
-            "Relaunch did not preserve the real Appearance answer."
+            accessibilityText(for: completedAppearance).localizedCaseInsensitiveContains("Prefer not to say"),
+            "Relaunch lost the explicit private Appearance answer."
         )
-        XCTAssertFalse(
-            accessibilityText(for: completedAppearance)
-                .localizedCaseInsensitiveContains("Prefer not to say"),
-            "Relaunch restored the superseded private Appearance resolution."
-        )
-
-        tapGuidedJourneyControlAfterSemanticScroll(
-            app.buttons["task-center-starter-journey-open-humanAppearance"],
-            in: app
-        )
-        XCTAssertTrue(editor.waitForExistence(timeout: 12))
-        XCTAssertTrue(avatarField.waitForExistence(timeout: 8))
-        XCTAssertTrue(
-            String(describing: avatarField.value ?? "").contains("🦊"),
-            "Relaunch did not read back the saved real avatar."
-        )
-        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
-        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
     }
-
     @MainActor
     func testMemberCardReviewedOptionalThenRealBirthdaySupersedesResolutionAcrossRelaunchAndRewardsOnce() throws {
         let app = launchEnglishApp(
@@ -840,7 +798,7 @@ final class OhanaUITests: XCTestCase {
         tapGuidedJourneyControlAfterSemanticScroll(birthdayToggle, in: app)
         XCTAssertTrue(waitUntil(timeout: 8) { self.isToggleOn(birthdayToggle) })
 
-        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
+        discardHumanBasicInfoChanges(in: app)
         let closeEditor = app.buttons["human-basic-info-close-action"]
         XCTAssertTrue(closeEditor.waitForExistence(timeout: 8), "Cancel did not expose the Human editor close action.")
         tapWhenHittable(closeEditor, timeout: 8)
@@ -1469,7 +1427,7 @@ final class OhanaUITests: XCTestCase {
             "Enabling the birthday did not reveal its date picker."
         )
 
-        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        discardPetBasicInfoChanges(in: app)
         let close = app.buttons["pet-basic-info-close-action"]
         XCTAssertTrue(close.waitForExistence(timeout: 8), "Cancel did not expose a clear return action.")
         tapWhenHittable(close, timeout: 8)
@@ -2815,7 +2773,7 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(draftPhoneField, timeout: 8)
         draftPhoneField.typeText(cancelledDraftPhone)
         dismissKeyboardIfPresent(in: app)
-        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        discardPetBasicInfoChanges(in: app)
         let closeEditor = app.buttons["pet-basic-info-close-action"]
         XCTAssertTrue(closeEditor.waitForExistence(timeout: 8))
         tapWhenHittable(closeEditor, timeout: 8)
@@ -4283,24 +4241,23 @@ final class OhanaUITests: XCTestCase {
         )
         let balanceBeforeFirstCareClaim = Int(numericLabel(coconutBalance.label)) ?? -1
 
-        let firstCareSheet = app.descendants(matching: .any)[
-            "task-center-starter-journey-sheet-recordFirstCare"
+        let firstCareDirectClaim = app.buttons[
+            "task-center-system-claim-recordFirstCare-household-starter-v1-firstCare"
         ]
-        let firstCareClaim = app.buttons["task-center-starter-journey-claim-recordFirstCare"]
-        tapWhenHittable(firstCareAction, timeout: 8)
-        XCTAssertTrue(firstCareSheet.waitForExistence(timeout: 12), "The claimable First Care sheet did not open.")
-        assertMemberCardProgress("1/1", in: app)
         XCTAssertTrue(
-            firstCareClaim.waitForExistence(timeout: 8),
-            "Externally completed First Care did not expose its explicit Claim action."
+            firstCareDirectClaim.waitForExistence(timeout: 8),
+            "Externally completed First Care did not expose its direct Claim action."
         )
         XCTAssertFalse(
-            app.buttons["task-center-starter-journey-finish"].exists,
-            "Externally completed First Care incorrectly required Finish before Claim."
+            app.descendants(matching: .any)["task-center-starter-journey-sheet-recordFirstCare"].exists,
+            "The direct First Care Claim unexpectedly opened a details sheet."
         )
 
-        tapWhenHittable(firstCareClaim, timeout: 8)
-        XCTAssertTrue(waitUntil(timeout: 12) { !firstCareSheet.exists })
+        tapWhenHittable(firstCareDirectClaim, timeout: 8)
+        XCTAssertFalse(
+            app.descendants(matching: .any)["task-center-starter-journey-sheet-recordFirstCare"].exists,
+            "Claiming First Care should stay in the Task Center."
+        )
         XCTAssertTrue(waitUntil(timeout: 12) { !firstCareAction.exists })
         XCTAssertTrue(
             waitUntil(timeout: 12) {
@@ -4533,7 +4490,8 @@ final class OhanaUITests: XCTestCase {
     func testZenFreshInstallCreatesOnlyAHumanAndOpensTheThreeTabShell() throws {
         let app = launchEnglishApp(
             seedHumanBaseline: false,
-            initialExperienceMode: "zen"
+            initialExperienceMode: "zen",
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
         )
         let nameField = app.textFields["onboarding-human-name-input"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 25), "Zen onboarding did not ask for the Human name.")
@@ -4551,13 +4509,16 @@ final class OhanaUITests: XCTestCase {
             NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
         ).firstMatch
         XCTAssertTrue(ownerCard.waitForExistence(timeout: 12), "Zen Home did not show the bound owner card.")
-        let checkInAll = app.buttons["zen-home-check-in-all-action"]
+        let allCompleteStatus = app.descendants(matching: .any)["zen-home-all-complete-status"]
         XCTAssertTrue(
-            waitUntil(timeout: 12) { checkInAll.exists && !checkInAll.isEnabled },
+            allCompleteStatus.waitForExistence(timeout: 12),
             "Opening the active Zen shell did not automatically check in its only owner."
         )
+        XCTAssertFalse(app.buttons["zen-home-check-in-all-action"].exists)
+        let autoCheckInToast = app.descendants(matching: .any)["zen-home-auto-check-in-toast"]
+        XCTAssertTrue(autoCheckInToast.waitForExistence(timeout: 8))
 
-        let coconutBalance = app.buttons["zen-home-coconut-balance"]
+        let coconutBalance = app.buttons["zen-toolbar-coconut-log"]
         XCTAssertTrue(
             waitUntil(timeout: 12) {
                 Int(self.numericLabel(coconutBalance.label)) == 1
@@ -4565,25 +4526,190 @@ final class OhanaUITests: XCTestCase {
             "The fresh Zen owner's automatic check-in did not grant exactly one coconut before status selection."
         )
         let balanceBeforeStatus = try XCTUnwrap(Int(numericLabel(coconutBalance.label)))
+        XCTAssertFalse(
+            app.descendants(matching: .any)["zen-status-picker"].exists,
+            "Automatic check-in must not open the removed status popup."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                (ownerCard.value as? String)?.contains("Neutral status background") == true
+            },
+            "The automatically checked-in owner card did not reveal its neutral checked state."
+        )
         tapWhenHittable(ownerCard, timeout: 8)
-        let greatStatus = app.buttons["zen-status-option-great"]
-        XCTAssertTrue(greatStatus.waitForExistence(timeout: 8), "The optional Zen status picker did not open.")
-        tapWhenHittable(greatStatus, timeout: 8)
+        let alreadyCheckedToast = app.descendants(matching: .any)["zen-home-already-checked-toast"]
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertFalse(
+            alreadyCheckedToast.exists,
+            "Tapping an already checked-in card must only raise it in the deck, without showing a notice."
+        )
+        let scoreGestureStart = ownerCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: 0.74)
+        )
+        let scoreGestureEnd = ownerCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: -0.12)
+        )
+        scoreGestureStart.press(forDuration: 0.65, thenDragTo: scoreGestureEnd)
         var observedCardLabel = ownerCard.label
         var observedBalanceLabel = coconutBalance.label
         let didReflectStatusReward = waitUntil(timeout: 12) {
             observedCardLabel = app.buttons.matching(
                 NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
             ).firstMatch.label
-            observedBalanceLabel = app.buttons["zen-home-coconut-balance"].label
-            return observedCardLabel.contains("Great") &&
+            observedBalanceLabel = app.buttons["zen-toolbar-coconut-log"].label
+            let observedCardValue = app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
+            ).firstMatch.value as? String ?? ""
+            return observedCardLabel.contains("10/10 · Great") &&
+                observedCardValue.contains("Status background: 10/10 · Great") &&
                 Int(self.numericLabel(observedBalanceLabel)) == balanceBeforeStatus + 1
         }
         XCTAssertTrue(
             didReflectStatusReward,
-            "Selecting the first explicit daily status did not update the card and grant exactly one coconut. " +
+            "Holding and sliding to the first explicit daily status did not update the card and grant exactly one coconut. " +
                 "Before: \(balanceBeforeStatus); card: \(observedCardLabel); balance: \(observedBalanceLabel)."
         )
+
+        XCTAssertFalse(
+            app.descendants(matching: .any)["zen-status-picker"].exists,
+            "Tapping an already checked-in wallet card must not reopen the removed status popup."
+        )
+        XCTAssertTrue(waitUntil(timeout: 6) { !autoCheckInToast.exists }, "The automatic check-in toast did not dismiss.")
+
+        let expandButton = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-expand-human-")
+        ).firstMatch
+        XCTAssertTrue(expandButton.waitForExistence(timeout: 8), "The collapsed Zen card did not expose its expand action.")
+        tapWhenHittable(expandButton, timeout: 8)
+
+        let expandedCard = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-collapse-human-")
+        ).firstMatch
+        XCTAssertTrue(expandedCard.waitForExistence(timeout: 8), "The Zen card did not expand with the shared wallet-card presentation.")
+        XCTAssertTrue(
+            app.descendants(matching: .any).matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-expanded-card-details-")
+            ).firstMatch.waitForExistence(timeout: 8),
+            "The expanded Zen card did not expose its type-specific profile and recent-status details."
+        )
+        let expandedAttachment = XCTAttachment(screenshot: app.screenshot())
+        expandedAttachment.name = "Zen expanded card — premium profile details"
+        expandedAttachment.lifetime = .keepAlways
+        add(expandedAttachment)
+        let profileButton = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-profile-human-")
+        ).firstMatch
+        XCTAssertTrue(profileButton.waitForExistence(timeout: 8), "The expanded card did not expose its profile action.")
+        tapWhenHittable(profileButton, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["human-basic-info-screen"].waitForExistence(timeout: 12),
+            "The expanded Zen card did not open the editable Human profile."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["profile-completion-card"].waitForExistence(timeout: 8),
+            "The Human profile did not show its four-category completion card."
+        )
+        tapWhenHittable(app.buttons["human-basic-info-edit-action"], timeout: 8)
+        let editedOwnerName = "Codex Zen Human Edited"
+        let nameInput = app.textFields["human-basic-info-name-input"]
+        XCTAssertTrue(nameInput.waitForExistence(timeout: 8), "Human profile edit mode did not expose its name field.")
+        XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].exists)
+        XCTAssertFalse(app.textFields["human-basic-info-avatar-emoji-input"].exists)
+        clearTextField(nameInput, in: app)
+        nameInput.typeText(editedOwnerName)
+        dismissKeyboardIfPresent(in: app)
+
+        let firstMBTIChoice = app.buttons["member-mbti-energy-i"]
+        scrollToElement(firstMBTIChoice, in: app, maxSwipes: 6)
+        XCTAssertTrue(firstMBTIChoice.waitForExistence(timeout: 8), "The Human editor did not expose four MBTI dimensions.")
+        for identifier in [
+            "member-mbti-energy-i", "member-mbti-energy-e",
+            "member-mbti-information-s", "member-mbti-information-n",
+            "member-mbti-decision-t", "member-mbti-decision-f",
+            "member-mbti-lifestyle-j", "member-mbti-lifestyle-p"
+        ] {
+            XCTAssertTrue(app.buttons[identifier].exists, "Missing MBTI binary choice: \(identifier)")
+        }
+        tapWhenHittable(app.buttons["human-basic-info-save-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                app.descendants(matching: .any)["human-basic-info-name-readback"].label.contains(editedOwnerName)
+            },
+            "The Human profile edit did not read back the saved name."
+        )
+        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any).matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-collapse-human-")
+            ).firstMatch.waitForExistence(timeout: 10),
+            "Closing the profile did not return to the expanded Zen card."
+        )
+        tapWhenHittable(
+            app.descendants(matching: .any).matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-collapse-human-")
+            ).firstMatch,
+            timeout: 8
+        )
+        XCTAssertTrue(
+            app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-expand-human-")
+            ).firstMatch.waitForExistence(timeout: 8),
+            "Tapping the expanded card did not collapse it."
+        )
+
+        tapWhenHittable(app.buttons["zen-toolbar-coconut-log"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["coconut-log-screen"].waitForExistence(timeout: 12),
+            "The Zen coconut balance did not open coconut history."
+        )
+        tapWhenHittable(app.buttons["coconut-log-close-action"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 10))
+
+        tapWhenHittable(app.buttons["zen-toolbar-members"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["zen-members-screen"].waitForExistence(timeout: 12),
+            "The shared Zen toolbar did not open the lightweight members page."
+        )
+        XCTAssertTrue(app.buttons["zen-members-add-menu"].waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-members-row-human-")
+            ).firstMatch.waitForExistence(timeout: 8),
+            "The Zen members page did not list its active Human."
+        )
+
+        let addedMemberName = "Codex Zen Member"
+        tapWhenHittable(app.buttons["zen-members-add-menu"], timeout: 8)
+        tapWhenHittable(app.buttons["zen-members-add-human-action"], timeout: 8)
+        let addedMemberNameField = app.textFields["member-name-input"]
+        XCTAssertTrue(
+            addedMemberNameField.waitForExistence(timeout: 12),
+            "The Zen members page did not open the shared Human creation flow."
+        )
+        addedMemberNameField.tap()
+        addedMemberNameField.typeText(addedMemberName)
+        addedMemberNameField.typeText("\n")
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        tapThroughMemberCreationSteps(in: app)
+
+        let addedMemberRow = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                "zen-members-row-human-",
+                addedMemberName
+            )
+        ).firstMatch
+        XCTAssertTrue(
+            addedMemberRow.waitForExistence(timeout: 20),
+            "Saving a Human from Zen members did not return to the member list with refreshed data."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["zen-members-screen"].exists,
+            "Saving from Zen members unexpectedly left the members page."
+        )
+        tapWhenHittable(app.buttons["zen-members-close-action"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 10))
 
         for tab in ["home", "streak", "oasis"] {
             XCTAssertTrue(
@@ -4595,8 +4721,179 @@ final class OhanaUITests: XCTestCase {
 
         tapWhenHittable(app.descendants(matching: .any)["zen-tab-streak"], timeout: 8)
         XCTAssertTrue(app.descendants(matching: .any)["zen-streak-screen"].waitForExistence(timeout: 12))
+        for action in ["zen-toolbar-coconut-log", "zen-toolbar-members", "zen-toolbar-settings"] {
+            XCTAssertTrue(app.buttons[action].exists, "Streak is missing the shared toolbar action: \(action)")
+        }
+        let nextMonth = app.buttons["zen-streak-next-month"]
+        XCTAssertFalse(nextMonth.isEnabled)
+        let monthPager = app.descendants(matching: .any)["zen-streak-month-pager"]
+        XCTAssertTrue(monthPager.waitForExistence(timeout: 8))
+        monthPager.swipeRight()
+        XCTAssertTrue(waitUntil(timeout: 8) { nextMonth.isEnabled }, "Swiping did not move the Zen calendar to the previous month.")
+        let streakAttachment = XCTAttachment(screenshot: app.screenshot())
+        streakAttachment.name = "Zen Streak — semantic calendar card"
+        streakAttachment.lifetime = .keepAlways
+        add(streakAttachment)
         tapWhenHittable(app.descendants(matching: .any)["zen-tab-oasis"], timeout: 8)
         XCTAssertTrue(app.descendants(matching: .any)["zen-oasis-screen"].waitForExistence(timeout: 12))
+        for action in ["zen-toolbar-coconut-log", "zen-toolbar-members", "zen-toolbar-settings"] {
+            XCTAssertTrue(app.buttons[action].exists, "Oasis is missing the shared toolbar action: \(action)")
+        }
+        XCTAssertTrue(
+            app.descendants(matching: .any)["oasis-tree-level-control"].waitForExistence(timeout: 8),
+            "Zen Oasis did not render the shared standard tree card."
+        )
+        let oasisAttachment = XCTAttachment(screenshot: app.screenshot())
+        oasisAttachment.name = "Zen Oasis — shared standard composition"
+        oasisAttachment.lifetime = .keepAlways
+        add(oasisAttachment)
+
+        tapWhenHittable(app.descendants(matching: .any)["zen-tab-home"], timeout: 8)
+        let balanceBeforeUndo = try XCTUnwrap(
+            Int(numericLabel(app.buttons["zen-toolbar-coconut-log"].label))
+        )
+        let checkedHumanCard = try XCTUnwrap(app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
+        ).allElementsBoundByIndex.first {
+            ($0.value as? String)?.contains("Status background") == true
+        })
+        let checkedHumanIdentifier = checkedHumanCard.identifier
+        let checkedHumanExpandIdentifier = checkedHumanIdentifier.replacingOccurrences(
+            of: "zen-home-subject-",
+            with: "zen-home-expand-"
+        )
+        let expandBeforeUndo = app.buttons.matching(
+            NSPredicate(format: "identifier == %@", checkedHumanExpandIdentifier)
+        ).firstMatch
+        tapWhenHittable(expandBeforeUndo, timeout: 8)
+        let undoCheckIn = app.buttons["zen-expanded-undo-check-in"]
+        XCTAssertTrue(undoCheckIn.waitForExistence(timeout: 8), "The expanded checked card did not expose Undo.")
+        tapWhenHittable(undoCheckIn, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { !undoCheckIn.exists }, "Undo did not remove today's check-in state.")
+        tapWhenHittable(
+            app.descendants(matching: .any).matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-collapse-human-")
+            ).firstMatch,
+            timeout: 8
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 20))
+        let withdrawnOwnerCard = app.buttons[checkedHumanIdentifier]
+        XCTAssertTrue(withdrawnOwnerCard.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                (withdrawnOwnerCard.value as? String)?.contains("Frosted glass cover") == true
+            },
+            "Foreground auto check-in ignored the user's same-day withdrawal."
+        )
+        tapWhenHittable(withdrawnOwnerCard, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                let value = withdrawnOwnerCard.value as? String ?? ""
+                let balance = Int(self.numericLabel(app.buttons["zen-toolbar-coconut-log"].label))
+                return value.contains("Neutral status background") && balance == balanceBeforeUndo
+            },
+            "Manual re-check-in after Undo did not restore the fact without duplicating coconut rewards."
+        )
+    }
+
+    @MainActor
+    func testZenCardTapChecksInAndPressDragSelectsStatusWithoutPopup() throws {
+        let app = launchEnglishApp(
+            matureHouseholdPetName: "Codex Zen Pet",
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
+        )
+        let introduction = app.buttons["zen-introduction-banner"]
+        if introduction.waitForExistence(timeout: 5) {
+            tapWhenHittable(introduction, timeout: 8)
+        }
+        openSettingsFromHomeChrome(in: app)
+        tapWhenHittable(app.buttons["settings-experience-mode-zen"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 20),
+            "The mature Zen household did not reach its lightweight Home shell."
+        )
+
+        XCTAssertFalse(app.descendants(matching: .any)["zen-status-picker"].exists)
+
+        let petCard = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-pet-")
+        ).firstMatch
+        XCTAssertTrue(petCard.waitForExistence(timeout: 12), "Zen Home did not show its active Pet card.")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                (petCard.value as? String)?.contains("Frosted glass cover") == true
+            },
+            "The unchecked Pet card did not expose its frosted-glass pending state."
+        )
+
+        let pendingAttachment = XCTAttachment(screenshot: app.screenshot())
+        pendingAttachment.name = "Zen pending card — frosted glass"
+        pendingAttachment.lifetime = .keepAlways
+        add(pendingAttachment)
+
+        let humanCard = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
+        ).firstMatch
+        XCTAssertTrue(humanCard.waitForExistence(timeout: 8), "Zen Home did not show its active Human card.")
+        humanCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: 0.64)
+        ).press(forDuration: 1.2)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                let currentHumanCard = app.buttons.matching(
+                    NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
+                ).firstMatch
+                let label = currentHumanCard.label
+                let value = currentHumanCard.value as? String ?? ""
+                return label.contains("5/10 · Steady") && value.contains("Status background: 5/10 · Steady")
+            },
+            "Holding the differently rotated Human card did not save its centered default score."
+        )
+
+        let quickTapCoordinate = petCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: 0.62)
+        )
+        quickTapCoordinate.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["zen-home-all-complete-status"]
+                .waitForExistence(timeout: 12),
+            "A quick tap did not check in the Pet without a status."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["zen-status-picker"].exists,
+            "Quick check-in unexpectedly opened the removed status popup."
+        )
+
+        let neutralAttachment = XCTAttachment(screenshot: app.screenshot())
+        neutralAttachment.name = "Zen checked card — quick check-in without status"
+        neutralAttachment.lifetime = .keepAlways
+        add(neutralAttachment)
+
+        let scoreGestureStart = petCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: 0.74)
+        )
+        let scoreGestureEnd = petCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: -0.12)
+        )
+        scoreGestureStart.press(forDuration: 0.65, thenDragTo: scoreGestureEnd)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                let currentPetCard = app.buttons.matching(
+                    NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-pet-")
+                ).firstMatch
+                let label = currentPetCard.label
+                let value = currentPetCard.value as? String ?? ""
+                return label.contains("10/10 · Great") && value.contains("Status background: 10/10 · Great")
+            },
+            "Holding and sliding upward did not save 10/10 and reveal the Pet card's green checked state."
+        )
+
+        let checkedAttachment = XCTAttachment(screenshot: app.screenshot())
+        checkedAttachment.name = "Zen checked card — 10 out of 10"
+        checkedAttachment.lifetime = .keepAlways
+        add(checkedAttachment)
     }
 
     @MainActor
@@ -5691,6 +5988,82 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testHouseholdInsightsKeepAllSixTabsVisibleAtLevelSix() throws {
+        let petName = "Codex Insight Pet \(Int(Date().timeIntervalSince1970))"
+        let app = launchEnglishApp(
+            matureHouseholdPetName: petName,
+            enableProductionOverlays: true,
+            unlockRewardTier: true
+        )
+        XCTAssertTrue(app.buttons["home-tab-home"].waitForExistence(timeout: 20))
+
+        let primaryAction = app.buttons["home-primary-action"]
+        XCTAssertTrue(primaryAction.waitForExistence(timeout: 12))
+        primaryAction.press(forDuration: 0.6)
+        let allFeatures = app.buttons["home-all-features-action"]
+        XCTAssertTrue(
+            tapWhenFrameReady(allFeatures, timeout: 8),
+            "Long-pressing Home did not produce a frame-ready All Features action."
+        )
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["function-menu-root"].waitForExistence(timeout: 12)
+        )
+        let household = app.buttons["function-menu-group-householdHub"]
+        XCTAssertTrue(
+            household.waitForExistence(timeout: 16),
+            "Level 6 did not expose Household Insights in More."
+        )
+        tapWhenHittable(household, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["function-menu-group-screen-householdHub"]
+                .waitForExistence(timeout: 12)
+        )
+        let segmentIDs = [
+            "feature-weight",
+            "feature-expense",
+            "weekly-report",
+            "care-ledger",
+            "reminder-observability",
+            "long-term-review"
+        ]
+        for id in segmentIDs {
+            XCTAssertTrue(
+                app.buttons["function-menu-group-segment-\(id)"].waitForExistence(timeout: 8),
+                "Household Insights hid the \(id) tab instead of keeping it visible."
+            )
+        }
+
+        let weight = app.buttons["function-menu-group-segment-feature-weight"]
+        let weekly = app.buttons["function-menu-group-segment-weekly-report"]
+        XCTAssertTrue(
+            String(describing: weight.value).contains("Selected"),
+            "Weight was not the available first Household Insight at Level 6."
+        )
+        XCTAssertFalse(
+            String(describing: weekly.value).contains("Lv."),
+            "Weekly Report should be available at Level 6."
+        )
+        let care = app.buttons["function-menu-group-segment-care-ledger"]
+        let reminder = app.buttons["function-menu-group-segment-reminder-observability"]
+        let review = app.buttons["function-menu-group-segment-long-term-review"]
+        XCTAssertTrue(String(describing: care.value).contains("Lv.8"))
+        XCTAssertTrue(String(describing: reminder.value).contains("Lv.8"))
+        XCTAssertTrue(String(describing: review.value).contains("Lv.9"))
+
+        let expense = app.buttons["function-menu-group-segment-feature-expense"]
+        tapWhenHittable(expense, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8, condition: {
+                String(describing: expense.value).contains("Selected")
+                    && String(describing: weight.value).contains("Not selected")
+            }),
+            "The independent Expense tab did not become the selected dashboard."
+        )
+    }
+
+    @MainActor
     func testFeedingManualPlanAndHomeQuickActionSmoke() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         createFirstHuman(from: app)
@@ -6136,7 +6509,7 @@ final class OhanaUITests: XCTestCase {
         openPetBasicInfoFromHome(in: app, petName: petName)
         openPetBasicInfoEditMode(in: app)
         enterPetBasicInfoNote(cancelledNote, in: app)
-        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        discardPetBasicInfoChanges(in: app)
         XCTAssertFalse(
             app.staticTexts["pet-basic-info-notes-readback"].waitForExistence(timeout: 2),
             "Cancelling dog long-session Basic Info edit persisted an unsaved note."
@@ -8063,7 +8436,7 @@ final class OhanaUITests: XCTestCase {
         openPetBasicInfoFromHome(in: app, petName: petName)
         openPetBasicInfoEditMode(in: app)
         enterPetBasicInfoNote(cancelledNote, in: app)
-        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        discardPetBasicInfoChanges(in: app)
         XCTAssertFalse(
             app.textFields["pet-basic-info-notes-input"].waitForExistence(timeout: 3),
             "Cancelling pet basic info edit left the edit note field visible."
@@ -8612,7 +8985,7 @@ final class OhanaUITests: XCTestCase {
         // synthesized tap while its rendering pipelines are still warming.
         // The selection action is idempotent while this picker remains on
         // screen, so verify the handoff and retry its center once if needed.
-        if !waitUntil(timeout: 2) { !selection.exists },
+        if !waitUntil(timeout: 2, condition: { !selection.exists }),
            action.exists,
            action.isEnabled {
             action.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
@@ -11031,21 +11404,24 @@ final class OhanaUITests: XCTestCase {
             "Pet Basic Info did not enter edit mode."
         )
         let saveAction = app.buttons["pet-basic-info-save-action"]
-        if !saveAction.isEnabled {
-            let genderLabels = ["♂ Boy", "♂ 男孩", "♂ Junge"]
-            let genderOption = app.buttons.matching(NSPredicate(format: "label IN %@", genderLabels)).firstMatch
-            scrollTowardElement(genderOption, in: app, maxSwipes: 8)
-            tapFirstAvailableButton(
-                genderLabels,
-                in: app,
-                timeout: 4,
-                context: "pet basic info required gender"
-            )
-        }
-        XCTAssertTrue(
-            waitUntil(timeout: 4) { saveAction.isEnabled },
-            "Pet Basic Info save stayed disabled after satisfying the required gender field."
-        )
+        XCTAssertTrue(saveAction.waitForExistence(timeout: 8), "Pet Basic Info did not expose Save.")
+        XCTAssertFalse(saveAction.isEnabled, "Save must stay disabled until the draft changes.")
+    }
+
+    @MainActor
+    private func discardPetBasicInfoChanges(in app: XCUIApplication) {
+        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        let discard = app.buttons["pet-basic-info-discard-changes-action"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), "Dirty Pet profile cancel did not ask for confirmation.")
+        tapWhenHittable(discard, timeout: 8)
+    }
+
+    @MainActor
+    private func discardHumanBasicInfoChanges(in app: XCUIApplication) {
+        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
+        let discard = app.buttons["human-basic-info-discard-changes-action"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), "Dirty Human profile cancel did not ask for confirmation.")
+        tapWhenHittable(discard, timeout: 8)
     }
 
     @MainActor

@@ -69,6 +69,23 @@ extension CoconutWalletService {
             }
         }
     }
+
+    /// Restores in-memory wallet projections after an uncommitted transaction
+    /// is rolled back. Persisted balances still roll back through ModelContext;
+    /// this keeps the current render pass from observing transient values.
+    @MainActor
+    static func restoreUncommittedBalances(
+        humans: [(model: Human, balance: Int)],
+        accounts: [(model: CoconutAccount, balance: Int, updatedAt: Date)]
+    ) {
+        for snapshot in humans {
+            snapshot.model.coconutBalance = snapshot.balance
+        }
+        for snapshot in accounts {
+            snapshot.model.balance = snapshot.balance
+            snapshot.model.updatedAt = snapshot.updatedAt
+        }
+    }
 }
 
 struct CoconutWalletReconciliationSummary: Equatable {

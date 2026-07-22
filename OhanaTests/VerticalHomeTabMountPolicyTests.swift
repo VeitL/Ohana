@@ -257,7 +257,8 @@ struct VerticalHomeTabMountPolicyTests {
             level: 4,
             progressToNextLevel: .nan,
             totalEnergy: -20,
-            nextLevelThreshold: -100
+            nextLevelThreshold: -100,
+            coconutBalance: -3
         )
 
         #expect(low.level == 0)
@@ -268,6 +269,8 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(invalid.progressToNextLevel == 0)
         #expect(invalid.totalEnergy == 0)
         #expect(invalid.nextLevelThreshold == 0)
+        #expect(invalid.coconutBalance == 0)
+        #expect(low.coconutBalance == nil)
         #expect(invalid.shopInitialCategory == .effect)
 
         let shopDecor = OasisTreeRenderSnapshot(
@@ -592,7 +595,9 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(toolbarSource.contains("if selectedTab == .home"))
         #expect(toolbarSource.contains("} else if selectedTab != .oasis {"))
         #expect(componentsSource.contains(".accessibilityIdentifier(\"oasis-inject-energy-action\")"))
-        #expect(componentsSource.contains(".buttonStyle(.borderedProminent)"))
+        #expect(componentsSource.contains(".buttonStyle(ScaleButtonStyle())"))
+        #expect(componentsSource.contains(".background(Color.goPrimary, in: Capsule())"))
+        #expect(componentsSource.contains(".frame(maxWidth: 236)"))
         #expect(oasisHostSource.contains("onInjectEnergy: onInjectEnergy"))
     }
 

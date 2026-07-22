@@ -8,6 +8,22 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+enum MemberProfileExperienceStyle: Equatable, Sendable {
+    case standard
+    case zen
+}
+
+private struct MemberProfileExperienceStyleKey: EnvironmentKey {
+    static let defaultValue = MemberProfileExperienceStyle.standard
+}
+
+extension EnvironmentValues {
+    var memberProfileExperienceStyle: MemberProfileExperienceStyle {
+        get { self[MemberProfileExperienceStyleKey.self] }
+        set { self[MemberProfileExperienceStyleKey.self] = newValue }
+    }
+}
+
 private enum AvatarImageEditingSupport {
     nonisolated static func downsample(_ image: UIImage, maxDim: CGFloat) -> UIImage {
         let size = image.size
@@ -51,13 +67,20 @@ struct EditableProfileAvatarPicker: View {
     @State private var cropPresentationTask: Task<Void, Never>? = nil
     @State private var isPasting = false
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @Environment(\.memberProfileExperienceStyle) private var experienceStyle
 
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(spacing: 10) {
+            avatarPreview
+
             HStack(spacing: 8) {
-                avatarActionButton(icon: "doc.on.clipboard.fill", title: l.tr(zh: "粘贴", en: "Paste", de: "Einfuegen")) {
+                avatarActionButton(
+                    icon: "doc.on.clipboard.fill",
+                    title: l.tr(zh: "粘贴", en: "Paste", de: "Einfuegen"),
+                    identifier: "profile-avatar-paste-action"
+                ) {
                     pastePasteboardImage()
                 }
 
@@ -67,8 +90,13 @@ struct EditableProfileAvatarPicker: View {
                     avatarActionLabel(icon: "photo.on.rectangle.angled", title: l.tr(zh: "相册", en: "Photos", de: "Fotos"))
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("profile-avatar-photos-action")
 
-                avatarActionButton(icon: "camera.fill", title: l.tr(zh: "拍照", en: "Camera", de: "Kamera")) {
+                avatarActionButton(
+                    icon: "camera.fill",
+                    title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"),
+                    identifier: "profile-avatar-camera-action"
+                ) {
                     presentCamera()
                 }
             }
@@ -82,6 +110,7 @@ struct EditableProfileAvatarPicker: View {
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("profile-avatar-remove-action")
             }
         }
         .disabled(isPasting)
@@ -147,11 +176,114 @@ struct EditableProfileAvatarPicker: View {
         }
     }
 
-    private func avatarActionButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
+    private var avatarPreview: some View {
+        Group {
+            if experienceStyle == .zen {
+                portraitAvatarPreview
+            } else {
+                circularAvatarPreview
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(l.tr(
+            zh: "当前头像",
+            en: "Current avatar",
+            de: "Aktueller Avatar",
+            es: "Avatar actual",
+            pt: "Avatar atual",
+            fr: "Avatar actuel",
+            ja: "現在のアバター",
+            ko: "현재 아바타",
+            it: "Avatar attuale"
+        ))
+        .accessibilityIdentifier("profile-avatar-current-preview")
+    }
+
+    private var circularAvatarPreview: some View {
+        ZStack {
+            Circle()
+                .fill(accentColor.opacity(0.16))
+                .frame(width: 76, height: 76)
+
+            if let avatarImageData {
+                AsyncDecodedImageView(data: avatarImageData) { image in
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    ProgressView()
+                        .tint(accentColor)
+                }
+                .frame(width: 76, height: 76)
+                .clipShape(Circle())
+            } else if let silhouetteSystemName {
+                Image(systemName: silhouetteSystemName)
+                    .font(OhanaFont.adaptive(size: 34, weight: .semibold))
+                    .foregroundStyle(accentColor)
+            } else {
+                Text(fallbackEmoji.isEmpty ? "🐾" : fallbackEmoji)
+                    .font(OhanaFont.adaptive(size: 38))
+            }
+        }
+        .overlay {
+            Circle()
+                .strokeBorder(accentColor.opacity(0.28), lineWidth: 1)
+        }
+    }
+
+    private var portraitAvatarPreview: some View {
+        let width: CGFloat = 148
+        let height = width * MemberAvatarImageProcessor.portraitAspect
+        let shape = RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
+        return ZStack {
+            shape.fill(
+                LinearGradient(
+                    colors: [accentColor.opacity(0.40), accentColor.opacity(0.13)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+
+            if let avatarImageData {
+                AsyncDecodedImageView(data: avatarImageData) { image in
+                    Image(uiImage: image)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFill()
+                } placeholder: {
+                    ProgressView()
+                        .tint(accentColor)
+                }
+                .frame(width: width, height: height)
+                .clipShape(shape)
+            } else if let silhouetteSystemName {
+                Image(systemName: silhouetteSystemName)
+                    .font(OhanaFont.adaptive(size: 54, weight: .semibold))
+                    .foregroundStyle(accentColor)
+            } else {
+                Text(fallbackEmoji.isEmpty ? "🐾" : fallbackEmoji)
+                    .font(OhanaFont.adaptive(size: 52))
+            }
+        }
+        .frame(width: width, height: height)
+        .clipShape(shape)
+        .overlay {
+            shape.strokeBorder(accentColor.opacity(0.30), lineWidth: 1)
+        }
+    }
+
+    private func avatarActionButton(
+        icon: String,
+        title: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             avatarActionLabel(icon: icon, title: title)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier(identifier)
     }
 
     private func avatarActionLabel(icon: String, title: String) -> some View {
@@ -162,10 +294,17 @@ struct EditableProfileAvatarPicker: View {
             Text(title)
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
-        .foregroundStyle(Color.arkInk)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
+        .foregroundStyle(avatarActionForeground)
+        .frame(maxWidth: .infinity, minHeight: 44)
         .background(accentColor, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
+    }
+
+    private var avatarActionForeground: Color {
+        guard experienceStyle == .zen,
+              let hex = accentColor.toHex() else { return Color.arkInk }
+        return WalletPetCardTheme.prefersDarkForeground(for: hex)
+            ? Color.arkInk
+            : Color.goCardWhite
     }
 
     private func handlePhotosPickerItemChanged(_ item: PhotosPickerItem?) {

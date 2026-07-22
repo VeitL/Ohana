@@ -8,6 +8,299 @@
 import Foundation
 import SwiftData
 
+/// `ModelContext.rollback()` discards pending persistence work, but SwiftData
+/// keeps already-mutated model instances alive for the current render pass.
+/// Commands restore their occurrence object before rolling the context back so
+/// a failed atomic write cannot leak a transient state into role capabilities
+/// or the visible task detail.
+struct FamilyTaskStateRollbackSnapshot {
+    let title: String
+    let note: String
+    let kindRaw: String
+    let statusRaw: String
+    let subjectKindRaw: String
+    let subjectId: String?
+    let relatedPetId: String?
+    let relatedEventId: String?
+    let relatedReminderId: String?
+    let planId: String?
+    let occurrenceKey: String?
+    let nominalAt: Date?
+    let scheduleVersion: Int
+    let createdById: String
+    let createdByName: String
+    let assignedToId: String?
+    let assignedToName: String?
+    let claimedById: String?
+    let claimedByName: String?
+    let completedById: String?
+    let completedByName: String?
+    let rewardCoconuts: Int
+    let dueAt: Date?
+    let completedAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+    let emoji: String
+
+    @MainActor
+    init(task: FamilyCollaborationTask) {
+        title = task.title
+        note = task.note
+        kindRaw = task.kindRaw
+        statusRaw = task.statusRaw
+        subjectKindRaw = task.subjectKindRaw
+        subjectId = task.subjectId
+        relatedPetId = task.relatedPetId
+        relatedEventId = task.relatedEventId
+        relatedReminderId = task.relatedReminderId
+        planId = task.planId
+        occurrenceKey = task.occurrenceKey
+        nominalAt = task.nominalAt
+        scheduleVersion = task.scheduleVersion
+        createdById = task.createdById
+        createdByName = task.createdByName
+        assignedToId = task.assignedToId
+        assignedToName = task.assignedToName
+        claimedById = task.claimedById
+        claimedByName = task.claimedByName
+        completedById = task.completedById
+        completedByName = task.completedByName
+        rewardCoconuts = task.rewardCoconuts
+        dueAt = task.dueAt
+        completedAt = task.completedAt
+        createdAt = task.createdAt
+        updatedAt = task.updatedAt
+        emoji = task.emoji
+    }
+
+    @MainActor
+    func restore(_ task: FamilyCollaborationTask) {
+        task.title = title
+        task.note = note
+        task.kindRaw = kindRaw
+        task.statusRaw = statusRaw
+        task.subjectKindRaw = subjectKindRaw
+        task.subjectId = subjectId
+        task.relatedPetId = relatedPetId
+        task.relatedEventId = relatedEventId
+        task.relatedReminderId = relatedReminderId
+        task.planId = planId
+        task.occurrenceKey = occurrenceKey
+        task.nominalAt = nominalAt
+        task.scheduleVersion = scheduleVersion
+        task.createdById = createdById
+        task.createdByName = createdByName
+        task.assignedToId = assignedToId
+        task.assignedToName = assignedToName
+        task.claimedById = claimedById
+        task.claimedByName = claimedByName
+        task.completedById = completedById
+        task.completedByName = completedByName
+        task.rewardCoconuts = rewardCoconuts
+        task.dueAt = dueAt
+        task.completedAt = completedAt
+        task.createdAt = createdAt
+        task.updatedAt = updatedAt
+        task.emoji = emoji
+    }
+
+    @MainActor
+    func rollback(_ task: FamilyCollaborationTask, context: ModelContext) {
+        restore(task)
+        context.rollback()
+    }
+}
+
+struct FamilyTaskScheduleRollbackSnapshot {
+    private struct EventState {
+        let event: Event
+        let title: String
+        let startDate: Date
+        let endDate: Date?
+        let isAllDay: Bool
+        let eventType: String
+        let relatedEntityType: String
+        let relatedEntityId: String
+        let recurrenceDays: Int
+        let recurrenceEndDate: Date?
+        let isCompleted: Bool
+        let completedOccurrences: [String]
+        let assigneeId: String?
+        let taskCareKindRaw: String
+        let familyTaskPlanId: String?
+        let familyTaskOccurrenceKey: String?
+
+        @MainActor
+        init(event: Event) {
+            self.event = event
+            title = event.title
+            startDate = event.startDate
+            endDate = event.endDate
+            isAllDay = event.isAllDay
+            eventType = event.eventType
+            relatedEntityType = event.relatedEntityType
+            relatedEntityId = event.relatedEntityId
+            recurrenceDays = event.recurrenceDays
+            recurrenceEndDate = event.recurrenceEndDate
+            isCompleted = event.isCompleted
+            completedOccurrences = event.completedOccurrences
+            assigneeId = event.assigneeId
+            taskCareKindRaw = event.taskCareKindRaw
+            familyTaskPlanId = event.familyTaskPlanId
+            familyTaskOccurrenceKey = event.familyTaskOccurrenceKey
+        }
+
+        @MainActor
+        func restore() {
+            event.title = title
+            event.startDate = startDate
+            event.endDate = endDate
+            event.isAllDay = isAllDay
+            event.eventType = eventType
+            event.relatedEntityType = relatedEntityType
+            event.relatedEntityId = relatedEntityId
+            event.recurrenceDays = recurrenceDays
+            event.recurrenceEndDate = recurrenceEndDate
+            event.isCompleted = isCompleted
+            event.completedOccurrences = completedOccurrences
+            event.assigneeId = assigneeId
+            event.taskCareKindRaw = taskCareKindRaw
+            event.familyTaskPlanId = familyTaskPlanId
+            event.familyTaskOccurrenceKey = familyTaskOccurrenceKey
+        }
+    }
+
+    private struct ReminderState {
+        let reminder: Reminder
+        let occurrenceAt: Date?
+        let scheduledAt: Date
+        let status: String
+        let completedAt: Date?
+        let completedBy: String
+
+        @MainActor
+        init(reminder: Reminder) {
+            self.reminder = reminder
+            occurrenceAt = reminder.occurrenceAt
+            scheduledAt = reminder.scheduledAt
+            status = reminder.status
+            completedAt = reminder.completedAt
+            completedBy = reminder.completedBy
+        }
+
+        @MainActor
+        func restore() {
+            DomainScheduleWriter.restoreUncommittedReminder(
+                reminder,
+                occurrenceAt: occurrenceAt,
+                scheduledAt: scheduledAt,
+                status: status,
+                completedAt: completedAt,
+                completedBy: completedBy
+            )
+        }
+    }
+
+    private let eventState: EventState?
+    private let reminderState: ReminderState?
+
+    @MainActor
+    init(reminder: Reminder?, event: Event?) {
+        reminderState = reminder.map(ReminderState.init)
+        eventState = (event ?? reminder?.event).map(EventState.init)
+    }
+
+    @MainActor
+    func restore() {
+        reminderState?.restore()
+        eventState?.restore()
+    }
+}
+
+struct FamilyTaskCommandRollbackSnapshot {
+    private let taskState: FamilyTaskStateRollbackSnapshot
+    private let scheduleState: FamilyTaskScheduleRollbackSnapshot
+
+    @MainActor
+    init(task: FamilyCollaborationTask, reminder: Reminder? = nil, event: Event? = nil) {
+        taskState = FamilyTaskStateRollbackSnapshot(task: task)
+        scheduleState = FamilyTaskScheduleRollbackSnapshot(reminder: reminder, event: event)
+    }
+
+    @MainActor
+    func rollback(_ task: FamilyCollaborationTask, context: ModelContext) {
+        taskState.restore(task)
+        scheduleState.restore()
+        context.rollback()
+    }
+}
+
+private struct FamilyTaskRewardRollbackSnapshot {
+    private struct HumanBalance {
+        let human: Human
+        let value: Int
+    }
+
+    private struct AccountBalance {
+        let account: CoconutAccount
+        let value: Int
+        let updatedAt: Date
+    }
+
+    let task: FamilyTaskStateRollbackSnapshot
+    private let schedule: FamilyTaskScheduleRollbackSnapshot
+    private let humanBalances: [HumanBalance]
+    private let accountBalances: [AccountBalance]
+
+    @MainActor
+    init(
+        task: FamilyCollaborationTask,
+        humans: [Human],
+        reminder: Reminder?,
+        event: Event?,
+        context: ModelContext
+    ) {
+        self.task = FamilyTaskStateRollbackSnapshot(task: task)
+        schedule = FamilyTaskScheduleRollbackSnapshot(reminder: reminder, event: event)
+
+        var seenHumanIDs = Set<UUID>()
+        let uniqueHumans = humans.filter { seenHumanIDs.insert($0.id).inserted }
+        humanBalances = uniqueHumans.map { HumanBalance(human: $0, value: $0.coconutBalance) }
+
+        var snapshots: [AccountBalance] = []
+        for human in uniqueHumans {
+            let accountKey = CoconutAccountKey.human(human.id)
+            var descriptor = FetchDescriptor<CoconutAccount>(
+                predicate: #Predicate<CoconutAccount> { account in
+                    account.accountKey == accountKey
+                }
+            )
+            descriptor.fetchLimit = 1
+            if let account = try? context.fetch(descriptor).first {
+                snapshots.append(
+                    AccountBalance(
+                        account: account,
+                        value: account.balance,
+                        updatedAt: account.updatedAt
+                    )
+                )
+            }
+        }
+        accountBalances = snapshots
+    }
+
+    @MainActor
+    func rollback(_ occurrence: FamilyCollaborationTask, context: ModelContext) {
+        task.restore(occurrence)
+        schedule.restore()
+        CoconutWalletService.restoreUncommittedBalances(
+            humans: humanBalances.map { ($0.human, $0.value) },
+            accounts: accountBalances.map { ($0.account, $0.value, $0.updatedAt) }
+        )
+        context.rollback()
+    }
+}
+
 enum FamilyTaskService {
     nonisolated static let rewardCap = FamilyTaskRewardPolicy.cap
 
@@ -53,6 +346,30 @@ enum FamilyTaskService {
         )
     }
 
+    private struct TaskUpdatePriorState {
+        let updatedAt: Date
+        let assigneeID: String?
+        let claimedID: String?
+        let status: FamilyCollaborationTaskStatus
+        let dueAt: Date?
+
+        @MainActor
+        init(task: FamilyCollaborationTask) {
+            updatedAt = task.updatedAt
+            assigneeID = task.assignedToId
+            claimedID = task.claimedById
+            status = task.status
+            dueAt = task.dueAt
+        }
+    }
+
+    private struct TaskUpdateFollowUp {
+        let isValid: Bool
+        let pendingSchedule: PendingFamilyTaskReminderSchedule?
+    }
+}
+
+extension FamilyTaskService {
     @MainActor
     static func persistMutation(
         context: ModelContext,
@@ -198,6 +515,17 @@ enum FamilyTaskService {
                 return nil
             }
         }
+        guard FamilyTaskActivityService.stage(
+            kind: .assigned,
+            task: task,
+            actor: funding.creator,
+            recipientHumanID: human.id.uuidString,
+            idempotencyKey: "family-task:\(task.id.uuidString):assigned:\(task.updatedAt.timeIntervalSinceReferenceDate.bitPattern)",
+            context: context
+        ) else {
+            context.rollback()
+            return nil
+        }
         return persistMutation(context: context) ? task : nil
     }
 
@@ -274,6 +602,17 @@ enum FamilyTaskService {
             emoji: emoji,
             context: context
         )
+        guard FamilyTaskActivityService.stage(
+            kind: .assigned,
+            task: task,
+            actor: funding.creator,
+            recipientHumanID: human.id.uuidString,
+            idempotencyKey: "family-task:\(task.id.uuidString):assigned:\(task.createdAt.timeIntervalSinceReferenceDate.bitPattern)",
+            context: context
+        ) else {
+            context.rollback()
+            return nil
+        }
         return persistMutation(context: context) ? task : nil
     }
 
@@ -292,37 +631,194 @@ enum FamilyTaskService {
     ) -> Bool {
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let reward = cappedReward(rewardCoconuts)
+        let prior = TaskUpdatePriorState(task: task)
+        guard let write = authorizeTaskUpdate(
+            task,
+            normalizedTitle: normalizedTitle,
+            assignee: human,
+            reward: reward,
+            editor: editor,
+            context: context
+        ) else { return false }
+        let linkedReminder = reminder(for: task, context: context)
+        let linkedEvent = linkedReminder?.event ?? linkedEvent(for: task, context: context)
+        let rollbackSnapshot = FamilyTaskCommandRollbackSnapshot(
+            task: task,
+            reminder: linkedReminder,
+            event: linkedEvent
+        )
+        guard updateLinkedSchedule(
+            for: task,
+            title: normalizedTitle,
+            assignee: human,
+            dueAt: dueAt,
+            priorDueAt: prior.dueAt,
+            reminder: linkedReminder,
+            event: linkedEvent,
+            context: context
+        ) else {
+            rollbackSnapshot.rollback(task, context: context)
+            return false
+        }
+        applyTaskUpdate(
+            task,
+            write: write,
+            title: normalizedTitle,
+            note: note,
+            assignee: human,
+            reward: reward,
+            dueAt: dueAt,
+            emoji: emoji,
+            context: context
+        )
+        let followUp = taskUpdateFollowUp(
+            task: task,
+            prior: prior,
+            dueAt: dueAt,
+            reminder: linkedReminder,
+            editor: editor,
+            write: write,
+            context: context
+        )
+        guard followUp.isValid,
+              stageTaskEditActivities(task, prior: prior, editor: editor, context: context) else {
+            rollbackSnapshot.rollback(task, context: context)
+            return false
+        }
+        return persistMutation(
+            context: context,
+            onSuccess: { followUp.pendingSchedule?.run() },
+            onFailure: { rollbackSnapshot.rollback(task, context: context) }
+        )
+    }
+
+    @MainActor
+    private static func authorizeTaskUpdate(
+        _ task: FamilyCollaborationTask,
+        normalizedTitle: String,
+        assignee: Human?,
+        reward: Int,
+        editor: Human?,
+        context: ModelContext
+    ) -> AuthorizedDomainMemberFactWrite? {
+        let hasValidFunding = if task.planId != nil {
+            assignee != nil
+        } else {
+            FamilyTaskFundingPolicy.resolve(
+                createdById: task.createdById,
+                assignedTo: assignee,
+                rewardCoconuts: reward,
+                context: context
+            ) != nil
+        }
         guard !normalizedTitle.isEmpty,
               editor?.id.uuidString == task.createdById,
-              FamilyTaskFundingPolicy.resolve(
-                  createdById: task.createdById,
-                  assignedTo: human,
-                  rewardCoconuts: reward,
-                  context: context
-              ) != nil,
-              canWriteCollaboration(for: human),
+              hasValidFunding,
+              canWriteCollaboration(for: assignee),
               canWriteSubject(for: task, context: context),
               canWriteCollaboration(forHumanId: task.createdById, context: context),
               canWriteCollaboration(forHumanId: task.claimedById, context: context) else {
-            return false
+            return nil
         }
-        guard let write = authorizedCollaborationWrite(
-            subjectRequest: taskSubjectRequest(for: task, assigneeId: human?.id.uuidString, context: context),
+        return authorizedCollaborationWrite(
+            subjectRequest: taskSubjectRequest(
+                for: task,
+                assigneeId: assignee?.id.uuidString,
+                context: context
+            ),
             actor: editor,
             context: context
+        )
+    }
+
+    @MainActor
+    private static func updateLinkedSchedule(
+        for task: FamilyCollaborationTask,
+        title: String,
+        assignee: Human?,
+        dueAt: Date?,
+        priorDueAt: Date?,
+        reminder: Reminder?,
+        event: Event?,
+        context: ModelContext
+    ) -> Bool {
+        if let event, task.planId != nil || event.recurrenceDays <= 0 {
+            let intent = DomainScheduleCreateIntent(
+                title: title,
+                startDate: dueAt ?? event.startDate,
+                endDate: event.endDate,
+                isAllDay: event.isAllDay,
+                eventType: event.eventType,
+                relatedEntityType: event.relatedEntityType,
+                relatedEntityId: event.relatedEntityId,
+                recurrenceDays: event.recurrenceDays,
+                recurrenceEndDate: event.recurrenceEndDate,
+                assigneeId: assignee?.id.uuidString,
+                taskCareKindRaw: event.taskCareKindRaw,
+                familyTaskPlanId: event.familyTaskPlanId,
+                familyTaskOccurrenceKey: event.familyTaskOccurrenceKey,
+                writeKind: .collaboration,
+                source: .domainService
+            )
+            guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventUpdate(
+                event: event,
+                intent: intent,
+                writeKind: .collaboration,
+                source: .domainService,
+                context: context
+            ), DomainScheduleWriter.updateEvent(event, intent: intent, mutation: mutation) else {
+                return false
+            }
+        }
+        guard let reminder, let priorDueAt, let dueAt, priorDueAt != dueAt else { return true }
+        let lead = max(0, priorDueAt.timeIntervalSince(reminder.scheduledAt))
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .collaboration,
+            source: .domainService,
+            context: context
         ) else { return false }
+        return DomainScheduleWriter.rescheduleReminderDelivery(
+            reminder,
+            scheduledAt: dueAt.addingTimeInterval(-lead),
+            mutation: mutation,
+            modifiedAt: Date(),
+            context: context
+        )
+    }
+
+    @MainActor
+    private static func applyTaskUpdate(
+        _ task: FamilyCollaborationTask,
+        write: AuthorizedDomainMemberFactWrite,
+        title: String,
+        note: String,
+        assignee: Human?,
+        reward: Int,
+        dueAt: Date?,
+        emoji: String,
+        context: ModelContext
+    ) {
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
-            task.title = normalizedTitle
+            let assigneeChanged = task.assignedToId != assignee?.id.uuidString
+            task.title = title
             task.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
-            task.assignedToId = human?.id.uuidString
-            task.assignedToName = human?.name
+            task.assignedToId = assignee?.id.uuidString
+            task.assignedToName = assignee?.name
             task.rewardCoconuts = reward
             task.kind = task.relatedReminderId == nil
                 ? (reward > 0 ? .bounty : .householdTask)
                 : (reward > 0 ? .bounty : .careReminder)
             task.dueAt = dueAt
             task.emoji = emoji
-            if task.status == .pendingReview {
+            if assigneeChanged {
+                task.claimedById = nil
+                task.claimedByName = nil
+                task.status = .active
+                task.completedAt = nil
+                task.completedById = nil
+                task.completedByName = nil
+            } else if task.status == .pendingReview || task.status == .declined {
                 task.status = task.claimedById == nil ? .active : .claimed
                 task.completedAt = nil
                 task.completedById = nil
@@ -330,7 +826,71 @@ enum FamilyTaskService {
             }
             task.touch()
         }
-        return persistMutation(context: context)
+    }
+
+    @MainActor
+    private static func taskUpdateFollowUp(
+        task: FamilyCollaborationTask,
+        prior: TaskUpdatePriorState,
+        dueAt: Date?,
+        reminder: Reminder?,
+        editor: Human?,
+        write: AuthorizedDomainMemberFactWrite,
+        context: ModelContext
+    ) -> TaskUpdateFollowUp {
+        if prior.status == .pendingReview || prior.status == .declined {
+            if let reminder, !reminder.isPending {
+                return TaskUpdateFollowUp(
+                    isValid: true,
+                    pendingSchedule: reopenRelatedReminder(
+                        reminder,
+                        by: editor?.id.uuidString,
+                        plan: write,
+                        context: context,
+                        careLedger: CareLedgerService()
+                    )
+                )
+            }
+            guard reminder != nil || setLinkedEventCompletion(
+                for: task,
+                isCompleted: false,
+                modifiedAt: Date(),
+                context: context
+            ) else {
+                return TaskUpdateFollowUp(isValid: false, pendingSchedule: nil)
+            }
+        } else if prior.dueAt != dueAt, let reminder {
+            return TaskUpdateFollowUp(
+                isValid: true,
+                pendingSchedule: PendingFamilyTaskReminderSchedule(
+                    reminder: reminder,
+                    careLedger: CareLedgerService(),
+                    context: context
+                )
+            )
+        }
+        return TaskUpdateFollowUp(isValid: true, pendingSchedule: nil)
+    }
+
+    @MainActor
+    private static func stageTaskEditActivities(
+        _ task: FamilyCollaborationTask,
+        prior: TaskUpdatePriorState,
+        editor: Human?,
+        context: ModelContext
+    ) -> Bool {
+        let recipients = Set([prior.assigneeID, prior.claimedID, task.assignedToId].compactMap(\.self))
+        for recipient in recipients where recipient != editor?.id.uuidString {
+            guard FamilyTaskActivityService.stage(
+                kind: .edited,
+                task: task,
+                actor: editor,
+                recipientHumanID: recipient,
+                idempotencyKey: "\(FamilyTaskActivityService.transitionKey(task: task, action: "edited", priorUpdatedAt: prior.updatedAt)):\(recipient)",
+                context: context
+            ) else { return false }
+        }
+        return true
     }
 
     @MainActor
@@ -455,6 +1015,13 @@ enum FamilyTaskService {
             actor: human,
             context: context
         ) else { return false }
+        let linkedReminder = reminder(for: task, context: context)
+        let rollbackSnapshot = FamilyTaskCommandRollbackSnapshot(
+            task: task,
+            reminder: linkedReminder,
+            event: linkedReminder?.event ?? linkedEvent(for: task, context: context)
+        )
+        let priorUpdatedAt = task.updatedAt
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.status = .completed
             task.completedAt = Date()
@@ -462,17 +1029,41 @@ enum FamilyTaskService {
             task.completedByName = human?.name
             task.touch()
         }
+        guard FamilyTaskActivityService.stage(
+            kind: .completed,
+            task: task,
+            actor: human,
+            recipientHumanID: task.createdById,
+            idempotencyKey: FamilyTaskActivityService.transitionKey(
+                task: task,
+                action: "completed",
+                priorUpdatedAt: priorUpdatedAt
+            ),
+            context: context
+        ) else {
+            rollbackSnapshot.rollback(task, context: context)
+            return false
+        }
 
         var notificationIDToCancel: String?
-        if let reminder = reminder(for: task, context: context), !reminder.isCompleted {
+        if let linkedReminder, !linkedReminder.isCompleted {
             notificationIDToCancel = markRelatedReminderCompleted(
-                reminder,
+                linkedReminder,
                 by: human?.id.uuidString,
                 actionType: "familyTaskCompleteReminder",
                 plan: write,
                 context: context,
                 careLedger: careLedger
             )
+        } else if linkedReminder == nil,
+                  !setLinkedEventCompletion(
+                      for: task,
+                      isCompleted: true,
+                      modifiedAt: task.completedAt ?? Date(),
+                      context: context
+                  ) {
+            rollbackSnapshot.rollback(task, context: context)
+            return false
         }
 
         return persistMutation(
@@ -481,7 +1072,8 @@ enum FamilyTaskService {
                 if let notificationIDToCancel {
                     OhanaNotifications.current.cancel(notificationId: notificationIDToCancel)
                 }
-            }
+            },
+            onFailure: { rollbackSnapshot.rollback(task, context: context) }
         )
     }
 
@@ -506,6 +1098,13 @@ enum FamilyTaskService {
             actor: human,
             context: context
         ) else { return false }
+        let linkedReminder = reminder(for: task, context: context)
+        let rollbackSnapshot = FamilyTaskCommandRollbackSnapshot(
+            task: task,
+            reminder: linkedReminder,
+            event: linkedReminder?.event ?? linkedEvent(for: task, context: context)
+        )
+        let priorUpdatedAt = task.updatedAt
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.status = .pendingReview
             task.completedAt = Date()
@@ -513,11 +1112,26 @@ enum FamilyTaskService {
             task.completedByName = human?.name
             task.touch()
         }
+        guard FamilyTaskActivityService.stage(
+            kind: .submittedForReview,
+            task: task,
+            actor: human,
+            recipientHumanID: task.createdById,
+            idempotencyKey: FamilyTaskActivityService.transitionKey(
+                task: task,
+                action: "submittedForReview",
+                priorUpdatedAt: priorUpdatedAt
+            ),
+            context: context
+        ) else {
+            rollbackSnapshot.rollback(task, context: context)
+            return false
+        }
 
         var notificationIDToCancel: String?
-        if let reminder = reminder(for: task, context: context), !reminder.isCompleted {
+        if let linkedReminder, !linkedReminder.isCompleted {
             notificationIDToCancel = markRelatedReminderCompleted(
-                reminder,
+                linkedReminder,
                 by: human?.id.uuidString,
                 completedAt: task.completedAt ?? Date(),
                 actionType: "submitReview",
@@ -526,6 +1140,15 @@ enum FamilyTaskService {
                 careLedger: careLedger,
                 recordsLedgerState: true
             )
+        } else if linkedReminder == nil,
+                  !setLinkedEventCompletion(
+                      for: task,
+                      isCompleted: true,
+                      modifiedAt: task.completedAt ?? Date(),
+                      context: context
+                  ) {
+            rollbackSnapshot.rollback(task, context: context)
+            return false
         }
 
         DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -560,7 +1183,8 @@ enum FamilyTaskService {
                 if let notificationIDToCancel {
                     OhanaNotifications.current.cancel(notificationId: notificationIDToCancel)
                 }
-            }
+            },
+            onFailure: { rollbackSnapshot.rollback(task, context: context) }
         )
     }
 
@@ -595,8 +1219,20 @@ enum FamilyTaskService {
             actor: reviewer,
             context: context
         ) else { return false }
-        let originalStatus = task.status
-        let originalCompletedAt = task.completedAt
+        let rewardHumans = [
+            reviewer,
+            human(id: task.createdById, context: context),
+            human(id: task.completedById, context: context)
+        ].compactMap(\.self)
+        let linkedReminder = reminder(for: task, context: context)
+        let rollbackSnapshot = FamilyTaskRewardRollbackSnapshot(
+            task: task,
+            humans: rewardHumans,
+            reminder: linkedReminder,
+            event: linkedReminder?.event ?? linkedEvent(for: task, context: context),
+            context: context
+        )
+        let priorUpdatedAt = task.updatedAt
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.status = .completed
             if task.completedAt == nil { task.completedAt = Date() }
@@ -604,7 +1240,7 @@ enum FamilyTaskService {
         }
 
         var notificationIDToCancel: String?
-        if let reminder = reminder(for: task, context: context), !reminder.isCompleted {
+        if let reminder = linkedReminder, !reminder.isCompleted {
             notificationIDToCancel = markRelatedReminderCompleted(
                 reminder,
                 by: task.completedById,
@@ -627,10 +1263,26 @@ enum FamilyTaskService {
             projectionManager: projectionManager
         )
         guard rewardTransfer.didPrepare else {
-            DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
-                task.status = originalStatus
-                task.completedAt = originalCompletedAt
-            }
+            rollbackSnapshot.rollback(task, context: context)
+            CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
+            return false
+        }
+        let recipient = task.completedById ?? task.claimedById ?? task.assignedToId
+        if let recipient,
+           !FamilyTaskActivityService.stage(
+               kind: task.rewardCoconuts > 0 ? .rewarded : .approved,
+               task: task,
+               actor: reviewer,
+               recipientHumanID: recipient,
+               idempotencyKey: FamilyTaskActivityService.transitionKey(
+                   task: task,
+                   action: task.rewardCoconuts > 0 ? "rewarded" : "approved",
+                   priorUpdatedAt: priorUpdatedAt
+               ),
+               context: context
+           ) {
+            rollbackSnapshot.rollback(task, context: context)
+            CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
             return false
         }
         return persistMutation(
@@ -645,6 +1297,7 @@ enum FamilyTaskService {
                 )
             },
             onFailure: {
+                rollbackSnapshot.rollback(task, context: context)
                 CoconutWalletService.refreshQuestProjection(context: context, manager: projectionManager)
             }
         )
@@ -673,6 +1326,14 @@ enum FamilyTaskService {
             actor: reviewer,
             context: context
         ) else { return false }
+        let linkedReminder = reminder(for: task, context: context)
+        let rollbackSnapshot = FamilyTaskCommandRollbackSnapshot(
+            task: task,
+            reminder: linkedReminder,
+            event: linkedReminder?.event ?? linkedEvent(for: task, context: context)
+        )
+        let priorUpdatedAt = task.updatedAt
+        let recipient = task.completedById ?? task.claimedById ?? task.assignedToId
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.status = task.claimedById == nil ? .active : .claimed
             task.completedAt = nil
@@ -680,16 +1341,41 @@ enum FamilyTaskService {
             task.completedByName = nil
             task.touch()
         }
+        if let recipient,
+           !FamilyTaskActivityService.stage(
+               kind: .returnedForRedo,
+               task: task,
+               actor: reviewer,
+               recipientHumanID: recipient,
+               idempotencyKey: FamilyTaskActivityService.transitionKey(
+                   task: task,
+                   action: "returnedForRedo",
+                   priorUpdatedAt: priorUpdatedAt
+               ),
+               context: context
+           ) {
+            rollbackSnapshot.rollback(task, context: context)
+            return false
+        }
 
         var pendingSchedule: PendingFamilyTaskReminderSchedule?
-        if let reminder = reminder(for: task, context: context), reminder.isCompleted {
+        if let linkedReminder, linkedReminder.isCompleted {
             pendingSchedule = reopenRelatedReminder(
-                reminder,
+                linkedReminder,
                 by: reviewer?.id.uuidString,
                 plan: write,
                 context: context,
                 careLedger: careLedger
             )
+        } else if linkedReminder == nil,
+                  !setLinkedEventCompletion(
+                      for: task,
+                      isCompleted: false,
+                      modifiedAt: Date(),
+                      context: context
+                  ) {
+            rollbackSnapshot.rollback(task, context: context)
+            return false
         }
 
         DomainMemberFactEffectsDispatcher.run(plan: write) { _ in
@@ -722,7 +1408,8 @@ enum FamilyTaskService {
             context: context,
             onSuccess: {
                 pendingSchedule?.run()
-            }
+            },
+            onFailure: { rollbackSnapshot.rollback(task, context: context) }
         )
     }
 
@@ -773,6 +1460,50 @@ enum FamilyTaskService {
     @MainActor
     static func humanName(id: String?, context: ModelContext) -> String? {
         human(id: id, context: context)?.name
+    }
+
+    @MainActor
+    private static func linkedEvent(
+        for task: FamilyCollaborationTask,
+        context: ModelContext
+    ) -> Event? {
+        guard let rawID = task.relatedEventId,
+              let eventID = UUID(uuidString: rawID) else { return nil }
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { $0.id == eventID }
+        )
+        descriptor.fetchLimit = 1
+        return fetchOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch linked event for family task"
+        ).first
+    }
+
+    @MainActor
+    private static func setLinkedEventCompletion(
+        for task: FamilyCollaborationTask,
+        isCompleted: Bool,
+        modifiedAt: Date,
+        context: ModelContext
+    ) -> Bool {
+        guard let event = linkedEvent(for: task, context: context) else { return true }
+        let occurrenceDate = task.dueAt ?? task.nominalAt ?? event.startDate
+        guard event.isOccurrenceMarkedComplete(on: occurrenceDate) != isCompleted else { return true }
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .collaboration,
+            source: .domainService,
+            context: context
+        ) else { return false }
+        return DomainScheduleWriter.setEventOccurrenceCompletion(
+            event,
+            occurrenceDate: occurrenceDate,
+            isCompleted: isCompleted,
+            mutation: mutation,
+            context: context,
+            modifiedAt: modifiedAt
+        )
     }
 
     @MainActor

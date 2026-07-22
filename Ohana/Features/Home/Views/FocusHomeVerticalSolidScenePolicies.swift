@@ -98,6 +98,47 @@ nonisolated enum FocusHomeVerticalSolidExpandedVerticalPlacement {
     case viewportTop(topInset: CGFloat, scrollOffsetY: CGFloat)
 }
 
+nonisolated enum FocusHomeVerticalSolidExpandedLayoutPolicy {
+    static func frame(
+        in size: CGSize,
+        visibleCenterX: CGFloat,
+        safeTop: CGFloat,
+        safeBottom: CGFloat,
+        embedsQuickActionsInCard: Bool,
+        placement: FocusHomeVerticalSolidExpandedVerticalPlacement,
+        collapsedFrame: CGRect? = nil
+    ) -> CGRect {
+        let aspectRatio = FocusHomeVerticalSolidCollapsedLayoutPolicy.cardAspectRatio
+        let maxWidth: CGFloat = embedsQuickActionsInCard ? 386 : 390
+        let horizontalInset: CGFloat = embedsQuickActionsInCard ? 18 : 22
+        let bottomInset = embedsQuickActionsInCard ? CGFloat(0) : safeBottom + 28
+        let availableWidth = max(220, size.width - horizontalInset)
+        let availableHeight = max(320, size.height - safeTop - bottomInset)
+        let width = min(availableWidth, maxWidth, availableHeight / aspectRatio)
+        let height = width * aspectRatio
+        let centeredTargetY = safeTop + availableHeight / 2 - (embedsQuickActionsInCard ? 2 : 0)
+        let minimumY = safeTop + height / 2
+        let maximumY = safeTop + availableHeight - height / 2
+        let targetY: CGFloat
+        switch placement {
+        case .sceneCenter:
+            targetY = centeredTargetY
+        case .collapsedCardCenter:
+            let anchoredY = collapsedFrame?.midY ?? centeredTargetY
+            targetY = min(max(anchoredY, minimumY), max(minimumY, maximumY))
+        case let .viewportTop(topInset, scrollOffsetY):
+            let anchoredY = max(0, scrollOffsetY) + max(0, topInset) + height / 2
+            targetY = min(max(anchoredY, minimumY), max(minimumY, maximumY))
+        }
+        return CGRect(
+            x: visibleCenterX - width / 2,
+            y: targetY - height / 2,
+            width: width,
+            height: height
+        )
+    }
+}
+
 nonisolated enum VerticalSolidHomeMemberWalletScrollPolicy {
     static let extendedLayoutMinimumCardCount = 8
     static let bottomContentInset: CGFloat = 28
@@ -182,6 +223,110 @@ nonisolated enum FocusHomeVerticalSolidCollapsedLayoutPolicy {
         let yValues = offsets.map(\.height)
         let ySpan = (yValues.max() ?? 0) - (yValues.min() ?? 0)
         return ceil((ySpan + cardAspectRatio) * scrollExtendedCardWidthEstimate + scrollExtendedVerticalPadding)
+    }
+
+    static func minimumSceneHeight(
+        cardCount: Int,
+        containerWidth: CGFloat,
+        collapsedTopInset: CGFloat = 0,
+        mode: FocusHomeVerticalSolidCollapsedLayoutMode = .balanced
+    ) -> CGFloat {
+        guard cardCount > 0 else { return 0 }
+        if mode == .scrollExtended, cardCount >= 8 {
+            return max(0, collapsedTopInset) + scrollExtendedMinimumSceneHeight(cardCount: cardCount)
+        }
+
+        let offsets = offsets(count: cardCount, mode: mode)
+        let horizontalSpan = normalizedHorizontalSpan(offsets)
+        let verticalSpan = normalizedVerticalSpan(offsets)
+        let width = unconstrainedCardWidth(
+            containerWidth: containerWidth,
+            count: cardCount,
+            horizontalSpan: horizontalSpan
+        )
+        return ceil(max(0, collapsedTopInset) + max(260, verticalSpan * width + 18))
+    }
+
+    static func frame(
+        index: Int,
+        count: Int,
+        in size: CGSize,
+        collapsedTopInset: CGFloat = 0,
+        collapsedVerticalBias: CGFloat = defaultVerticalBias,
+        mode: FocusHomeVerticalSolidCollapsedLayoutMode = .balanced
+    ) -> CGRect {
+        let availableHeight = max(260, size.height - collapsedTopInset)
+        let offsets = offsets(count: count, mode: mode)
+        let safeIndex = min(max(index, 0), max(offsets.count - 1, 0))
+        let offset = offsets[safeIndex]
+        let horizontalSpan = normalizedHorizontalSpan(offsets)
+        let verticalSpan = normalizedVerticalSpan(offsets)
+        let preferredWidth = preferredCardWidth(containerWidth: size.width, count: count)
+        let width = max(
+            104,
+            min(
+                preferredWidth,
+                max(104, (size.width - 24) / horizontalSpan),
+                max(104, (availableHeight - 18) / verticalSpan)
+            )
+        )
+        let height = width * cardAspectRatio
+        let verticalBias = availableHeight * clampedVerticalBias(collapsedVerticalBias)
+        let center = CGPoint(
+            x: size.width / 2,
+            y: collapsedTopInset + availableHeight / 2 + verticalBias
+        )
+        let x = center.x + offset.width * width
+        let y = center.y + offset.height * width
+        return CGRect(x: x - width / 2, y: y - height / 2, width: width, height: height)
+    }
+
+    static func rotation(index: Int) -> Double {
+        let rotations: [Double] = [-10.5, 7.4, -4.2, 10.8, -6.6, 5.1, 2.9, -12.0, 8.2, -2.6, 11.4, -7.8]
+        return rotations[index % rotations.count]
+    }
+
+    static func zIndex(
+        index: Int,
+        count: Int,
+        mode: FocusHomeVerticalSolidCollapsedLayoutMode = .balanced
+    ) -> Double {
+        if count >= 5 {
+            let offsets = offsets(count: count, mode: mode)
+            let safeIndex = min(max(index, 0), max(offsets.count - 1, 0))
+            return Double(offsets[safeIndex].height * 100) + Double(safeIndex) * 0.01
+        }
+
+        let depths: [Double] = [6, 5, 4, 3, 2, 1]
+        return depths[index % depths.count]
+    }
+
+    private static func preferredCardWidth(containerWidth: CGFloat, count: Int) -> CGFloat {
+        min(max(containerWidth * (count <= 1 ? 0.43 : 0.37), 112), count >= 5 ? 144 : 166)
+    }
+
+    private static func unconstrainedCardWidth(
+        containerWidth: CGFloat,
+        count: Int,
+        horizontalSpan: CGFloat
+    ) -> CGFloat {
+        max(
+            104,
+            min(
+                preferredCardWidth(containerWidth: containerWidth, count: count),
+                max(104, (containerWidth - 24) / horizontalSpan)
+            )
+        )
+    }
+
+    private static func normalizedHorizontalSpan(_ offsets: [CGSize]) -> CGFloat {
+        let xValues = offsets.map(\.width)
+        return max(1.0, (xValues.max() ?? 0) - (xValues.min() ?? 0) + 1.0)
+    }
+
+    private static func normalizedVerticalSpan(_ offsets: [CGSize]) -> CGFloat {
+        let yValues = offsets.map(\.height)
+        return max(cardAspectRatio, (yValues.max() ?? 0) - (yValues.min() ?? 0) + cardAspectRatio)
     }
 
     private static func scrollExtendedOffsets(count: Int) -> [CGSize] {

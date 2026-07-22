@@ -1,10 +1,16 @@
+import Foundation
 import Testing
 @testable import Ohana
 
 struct TaskCenterSystemJourneyGuideTests {
     @Test func everyStarterTaskProducesAStableQuestionFlow() {
         let expected: [HouseholdStarterJourneyTask: [HouseholdStarterJourneyCheckpoint?]] = [
-            .humanProfile: [.humanAppearance, .humanOptionalDetails],
+            .humanProfile: [
+                .humanAppearance,
+                .humanLifeStage,
+                .humanBodyProfile,
+                .humanPersonalityContext
+            ],
             .petProfile: [.petLifeStage, .petBodyProfile, .petPersonalityAppearance, .petDailyCare],
             .identityProtection: [.petIdentityDocuments, .petEmergencyContact],
             .healthProtection: [.petHealthProtection],
@@ -47,13 +53,13 @@ struct TaskCenterSystemJourneyGuideTests {
     @Test func privacyChoicesStayCheckpointScopedAndFirstCareHasNoShortcut() throws {
         let human = TaskCenterSystemJourneyGuide(
             task: .humanProfile,
-            availableResolutionCheckpoints: [.humanAppearance, .humanOptionalDetails]
+            availableResolutionCheckpoints: Set(HouseholdStarterJourneyTask.humanProfile.checkpoints)
         )
         let appearance = try #require(human.questions.first)
         #expect(human.allowedResolutions(for: appearance) == [.reviewed, .preferNotToSay])
 
         let optionalDetails = try #require(human.questions.last)
-        #expect(human.allowedResolutions(for: optionalDetails) == [.reviewed, .unknown, .preferNotToSay])
+        #expect(human.allowedResolutions(for: optionalDetails) == [.reviewed, .unknown, .notApplicable, .preferNotToSay])
 
         let firstCare = TaskCenterSystemJourneyGuide(task: .firstCare)
         let action = try #require(firstCare.questions.first)
@@ -67,7 +73,10 @@ struct TaskCenterSystemJourneyGuideTests {
             HouseholdStarterJourneyCheckpoint: [HouseholdStarterJourneyResolution]
         ] = [
             .humanAppearance: [.reviewed, .preferNotToSay],
-            .humanOptionalDetails: [.reviewed, .unknown, .preferNotToSay],
+            .humanLifeStage: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
+            .humanBodyProfile: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
+            .humanPersonalityContext: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
+            .humanOptionalDetails: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
             .petLifeStage: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
             .petBodyProfile: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
             .petPersonalityAppearance: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
@@ -78,7 +87,7 @@ struct TaskCenterSystemJourneyGuideTests {
             .acceptedRecommendedCarePlan: [.reviewed]
         ]
 
-        for checkpoint in HouseholdStarterJourneyCheckpoint.allCases {
+        for checkpoint in HouseholdStarterJourneyTask.allCases.flatMap(\.checkpoints) {
             let guide = TaskCenterSystemJourneyGuide(
                 task: checkpoint.task,
                 availableResolutionCheckpoints: [checkpoint]
@@ -127,7 +136,7 @@ struct TaskCenterSystemJourneyGuideTests {
         let guide = TaskCenterSystemJourneyGuide(
             task: .humanProfile,
             completedCheckpoints: [.humanAppearance],
-            availableResolutionCheckpoints: [.humanAppearance, .humanOptionalDetails]
+            availableResolutionCheckpoints: Set(HouseholdStarterJourneyTask.humanProfile.checkpoints)
         )
 
         #expect(guide.initialQuestionIndex == 1)
@@ -139,18 +148,47 @@ struct TaskCenterSystemJourneyGuideTests {
         let guide = TaskCenterSystemJourneyGuide(
             task: .humanProfile,
             persistedCompletedCheckpointCount: 1,
-            completedCheckpoints: [.humanAppearance, .humanOptionalDetails],
-            availableResolutionCheckpoints: [.humanAppearance, .humanOptionalDetails]
+            completedCheckpoints: [.humanAppearance, .humanLifeStage, .humanBodyProfile],
+            availableResolutionCheckpoints: Set(HouseholdStarterJourneyTask.humanProfile.checkpoints)
         )
 
-        #expect(guide.completedCheckpointCount == 2)
+        #expect(guide.completedCheckpointCount == 3)
         #expect(guide.isComplete)
+    }
+
+    @Test func profileGuideReportsRealPercentageAndCompletesAtSeventyFivePercent() {
+        let state = HouseholdStarterJourneyTaskState(
+            task: .humanProfile,
+            status: .actionRequired,
+            rewardCoconuts: 100,
+            completedCheckpointCount: 2,
+            requiredCheckpointCount: 3,
+            completionPercent: 50,
+            requiredCompletionPercent: 75,
+            targetID: UUID(),
+            completedCheckpoints: [.humanAppearance, .humanLifeStage],
+            checkpointResolutions: [:],
+            availableResolutionCheckpoints: Set(HouseholdStarterJourneyTask.humanProfile.checkpoints)
+        )
+
+        let pending = TaskCenterSystemJourneyGuide(state: state)
+        #expect(pending.completionPercent == 50)
+        #expect(!pending.isComplete)
+
+        let complete = TaskCenterSystemJourneyGuide(
+            state: state,
+            locallyCompletedCheckpoints: [.humanBodyProfile]
+        )
+        #expect(complete.completionPercent == 75)
+        #expect(complete.isComplete)
     }
 
     @Test func eachQuestionRoutesToThePageThatCanAnswerIt() throws {
         let expected: [HouseholdStarterJourneyCheckpoint: TaskCenterSystemDestination] = [
             .humanAppearance: .completeHumanProfile,
-            .humanOptionalDetails: .completeHumanProfile,
+            .humanLifeStage: .completeHumanProfile,
+            .humanBodyProfile: .completeHumanProfile,
+            .humanPersonalityContext: .completeHumanProfile,
             .petLifeStage: .completeFirstPetProfile,
             .petBodyProfile: .completeFirstPetProfile,
             .petPersonalityAppearance: .completeFirstPetProfile,
@@ -161,7 +199,7 @@ struct TaskCenterSystemJourneyGuideTests {
             .acceptedRecommendedCarePlan: .configureFirstCarePlan
         ]
 
-        for checkpoint in HouseholdStarterJourneyCheckpoint.allCases {
+        for checkpoint in HouseholdStarterJourneyTask.allCases.flatMap(\.checkpoints) {
             let guide = TaskCenterSystemJourneyGuide(task: checkpoint.task)
             let question = try #require(guide.questions.first(where: { $0.checkpoint == checkpoint }))
             #expect(guide.systemDestination(for: question) == expected[checkpoint])
@@ -209,6 +247,33 @@ struct TaskCenterSystemJourneyGuideTests {
                 guideIsComplete: false
             ) == .questions
         )
+    }
+
+    @Test func rewardReadyStarterRowsClaimDirectlyWhileSetupAndStarterGiftStillOpenTheirDestinations() {
+        let directClaimDestinations: [TaskCenterSystemDestination] = [
+            .completeHumanProfile,
+            .completeFirstPetProfile,
+            .confirmPetIdentityProtection,
+            .confirmPetPreventiveCare,
+            .configureFirstCarePlan,
+            .recordFirstCare
+        ]
+
+        for destination in directClaimDestinations {
+            #expect(TaskCenterSystemJourneyRowActionPolicy.resolve(
+                destination: destination,
+                presentationState: .rewardReady
+            ) == .claimReward)
+            #expect(TaskCenterSystemJourneyRowActionPolicy.resolve(
+                destination: destination,
+                presentationState: .actionRequired
+            ) == .openDestination)
+        }
+
+        #expect(TaskCenterSystemJourneyRowActionPolicy.resolve(
+            destination: .claimStarterGift,
+            presentationState: .rewardReady
+        ) == .openDestination)
     }
 
     @Test func editorReturnsOnlyAfterItsRealCheckpointCompletes() {

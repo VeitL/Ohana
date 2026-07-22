@@ -183,7 +183,7 @@
           ],
           "displayPrice" : "2.99",
           "familyShareable" : false,
-          "groupNumber" : 1,
+          "groupNumber" : 2,
           "internalID" : "90975122-54FA-4E60-ACA5-1BFEC28FEC71",
           "introductoryOffer" : null,
           "localizations" : [
@@ -251,7 +251,7 @@
           ],
           "displayPrice" : "14.99",
           "familyShareable" : false,
-          "groupNumber" : 1,
+          "groupNumber" : 2,
           "internalID" : "86FB7EA8-6AF8-40DB-9B17-2ADC1F5A0B8E",
           "introductoryOffer" : {
             "displayPrice" : "0",
@@ -309,6 +309,74 @@
           "productID" : "com.guanchen.li.Ohana.personal.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Ohana Personal Yearly",
+          "subscriptionGroupID" : "A4E5CF33-6538-4A3E-8DB6-9DF8E472FD9D",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "39.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "ED1373E1-E47A-45F9-A5E1-E7CEFB03647D",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "App alerts for three accepted guardians.",
+              "displayName" : "Ohana Family Yearly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "App-Hinweise für drei Vertrauenspersonen.",
+              "displayName" : "Ohana Family jährlich",
+              "locale" : "de_DE"
+            },
+            {
+              "description" : "Avisos para hasta tres guardianes aceptados.",
+              "displayName" : "Ohana Family anual",
+              "locale" : "es_ES"
+            },
+            {
+              "description" : "Avisos para até três guardiões aceitos.",
+              "displayName" : "Ohana Family anual",
+              "locale" : "pt_BR"
+            },
+            {
+              "description" : "Alertes pour trois proches acceptés.",
+              "displayName" : "Ohana Family annuel",
+              "locale" : "fr_FR"
+            },
+            {
+              "description" : "承認済みの見守り相手3人までアプリ内通知を送れます",
+              "displayName" : "Ohana Family 年額",
+              "locale" : "ja_JP"
+            },
+            {
+              "description" : "수락한 보호자 최대 3명에게 앱 알림을 보냅니다.",
+              "displayName" : "Ohana Family 연간",
+              "locale" : "ko_KR"
+            },
+            {
+              "description" : "Avvisi per un massimo di tre guardiani.",
+              "displayName" : "Ohana Family annuale",
+              "locale" : "it_IT"
+            },
+            {
+              "description" : "最多向 3 位已接受邀请的守护人发送 App 内通知",
+              "displayName" : "Ohana Family 年付",
+              "locale" : "zh_CN"
+            }
+          ],
+          "productID" : "com.guanchen.li.Ohana.family.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Ohana Family Yearly",
           "subscriptionGroupID" : "A4E5CF33-6538-4A3E-8DB6-9DF8E472FD9D",
           "type" : "RecurringSubscription",
           "winbackOffers" : [

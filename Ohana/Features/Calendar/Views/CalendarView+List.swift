@@ -445,11 +445,13 @@ extension CalendarView {
             .flatMap { plantId in plants.first(where: { $0.id == plantId }) }
             .map { Color(hex: $0.themeColorHex) }
         let allowsUserEventDetail = CalendarEventInteractionPolicy.allowsUserEventDetail(for: event, pets: pets)
+        let allowsDirectMutation = CalendarEventInteractionPolicy.allowsDirectMutation(for: event)
         return SwipeableEventRow(
             event: event,
             occurrenceDate: occurrenceDate,
             petThemeColor: relatedPetColor,
             allowsUserEventDetail: allowsUserEventDetail,
+            allowsMutation: allowsDirectMutation,
             onComplete: {
                 toggleEventCompletion(event, occurrenceDate: occurrenceDate)
             },
@@ -460,7 +462,7 @@ extension CalendarView {
                 openEventDetail(
                     event,
                     occurrenceDate: occurrenceDate,
-                    allowsEditing: allowsUserEventDetail
+                    allowsEditing: allowsUserEventDetail && allowsDirectMutation
                 )
             },
             onOpenRelated: {
@@ -478,6 +480,7 @@ extension CalendarView {
     }
 
     func toggleEventCompletion(_ event: Event, occurrenceDate: Date) -> Bool {
+        guard CalendarEventInteractionPolicy.allowsDirectMutation(for: event) else { return false }
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         if shouldComplete, event.requiresTodayFocusActionHuman {
             return requestActionHumanForEventCompletion(event, occurrenceDate: occurrenceDate)
@@ -513,6 +516,7 @@ extension CalendarView {
         occurrenceDate: Date,
         executorID: String?
     ) -> Bool {
+        guard CalendarEventInteractionPolicy.allowsDirectMutation(for: event) else { return false }
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         if shouldComplete, let onCompleteEvent {
             if onCompleteEvent(event, occurrenceDate, executorID) {

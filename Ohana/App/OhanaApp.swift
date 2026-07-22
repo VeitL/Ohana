@@ -29,6 +29,12 @@ struct OhanaApp: App {
     @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem: String = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency: String = AppCurrency.fallbackCode
+    #if DEBUG
+        @AppStorage(OhanaPrimaryAccentPreferences.lightStorageKey)
+        private var debugLightPrimaryAccent = OhanaPrimaryAccentPreferences.defaultLight.rawValue
+        @AppStorage(OhanaPrimaryAccentPreferences.darkStorageKey)
+        private var debugDarkPrimaryAccent = OhanaPrimaryAccentPreferences.defaultDark.rawValue
+    #endif
 
     init() {
         #if DEBUG
@@ -48,12 +54,24 @@ struct OhanaApp: App {
         }
     }
 
+    private var primaryAccent: Color {
+        #if DEBUG
+            OhanaPrimaryAccentPreferences.adaptivePrimaryColor(
+                lightRawValue: debugLightPrimaryAccent,
+                darkRawValue: debugDarkPrimaryAccent
+            )
+        #else
+            Color.goPrimary
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             OhanaBootstrapRootView(
                 cloudSharingAppDelegate: cloudSharingAppDelegate,
                 preferredScheme: preferredScheme,
-                appLanguage: appLanguage
+                appLanguage: appLanguage,
+                primaryAccent: primaryAccent
             )
             .onChange(of: appCountry) { _, _ in }
             .onChange(of: appCurrency) { _, _ in }
@@ -71,6 +89,7 @@ private struct OhanaBootstrapRootView: View {
     let cloudSharingAppDelegate: OhanaCloudSharingAppDelegate
     let preferredScheme: ColorScheme?
     let appLanguage: String
+    let primaryAccent: Color
 
     @State private var payload: OhanaBootstrapPayload?
     @State private var bootstrapStatus: OhanaBootstrapStatus = .preparing
@@ -116,7 +135,7 @@ private struct OhanaBootstrapRootView: View {
             }
         }
         .background(ohanaLaunchCanvasColor.ignoresSafeArea())
-        .tint(Color.goPrimary)
+        .tint(primaryAccent)
         .preferredColorScheme(preferredScheme)
         .onAppear {
             Task { @MainActor in
@@ -154,6 +173,14 @@ private struct OhanaBootstrapRootView: View {
                 payload.appServices.lifecycle.handle(.didBecomeActive)
                 Task { @MainActor in
                     await payload.appServices.commerce.refreshEntitlements()
+                    await payload.appServices.guardianSafety.start()
+                    if payload.appServices.commerce.hasFamilyEntitlement {
+                        await payload.appServices.guardianSafety.flushOutbox()
+                        await payload.appServices.guardianSafety.syncFamilyEntitlement()
+                        await payload.appServices.guardianSafety.notificationReachabilityChanged()
+                    } else {
+                        await payload.appServices.guardianSafety.stopMonitoringForEntitlementLoss()
+                    }
                     payload.appServices.systemSurfaces.scheduleRefresh(reason: "entitlementsRefreshed")
                 }
             }
@@ -233,7 +260,14 @@ private struct OhanaBootstrapRootView: View {
             seedPlantBaselineForUITestsIfNeeded(modelContainer: modelContainer, services: services)
 #endif
             OhanaStartupProbe.mark("bootstrap.services-ready")
-            cloudSharingAppDelegate.configure(modelContainer: modelContainer, cloudSync: services.cloudSync)
+            cloudSharingAppDelegate.configure(
+                modelContainer: modelContainer,
+                cloudSync: services.cloudSync,
+                guardianSafety: services.guardianSafety
+            )
+            Task { @MainActor in
+                await services.guardianSafety.start()
+            }
             let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1000
             let containerDurationMS = (CFAbsoluteTimeGetCurrent() - containerStartedAt) * 1000
             AppPerformanceMonitor.shared.record("SwiftData container ready", valueMS: containerDurationMS, note: "Deferred after first shell")

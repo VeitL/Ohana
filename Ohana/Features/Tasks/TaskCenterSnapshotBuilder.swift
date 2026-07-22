@@ -67,7 +67,9 @@ nonisolated enum TaskCenterSnapshotBuilder {
         var buckets = ItemBuckets()
         var representedFamilyTaskIDs: Set<UUID> = []
     }
+}
 
+nonisolated extension TaskCenterSnapshotBuilder {
     static func make(
         events: [Event],
         allEvents: [Event],
@@ -102,8 +104,8 @@ nonisolated enum TaskCenterSnapshotBuilder {
         let allKnownReminders = uniqueReminders(reminders + allKnownEvents.flatMap(\.reminders))
         let remindersByID = Dictionary(uniqueKeysWithValues: allKnownReminders.map { ($0.id, $0) })
         let eventsByID = Dictionary(uniqueKeysWithValues: allKnownEvents.map { ($0.id, $0) })
-        let openFamilyTasks = familyTasks.filter { !$0.isFinished }
-        let familyTasksByEventID = Dictionary(grouping: openFamilyTasks.compactMap { task -> (UUID, FamilyCollaborationTask)? in
+        let visibleFamilyTasks = familyTasks.filter { !$0.isFinished || $0.status == .declined }
+        let familyTasksByEventID = Dictionary(grouping: visibleFamilyTasks.compactMap { task -> (UUID, FamilyCollaborationTask)? in
             guard let eventID = linkedEventID(for: task, remindersByID: remindersByID) else { return nil }
             return (eventID, task)
         }, by: \.0).mapValues { $0.map(\.1) }
@@ -133,7 +135,7 @@ nonisolated enum TaskCenterSnapshotBuilder {
             context: context
         )
         appendStandaloneFamilyTasks(
-            openFamilyTasks,
+            visibleFamilyTasks,
             excluding: projection.representedFamilyTaskIDs,
             today: today,
             context: context,
@@ -287,7 +289,7 @@ nonisolated enum TaskCenterSnapshotBuilder {
             state.todayTaskKeys.insert(metricKey)
             if task.status == .completed {
                 state.completedTodayTaskKeys.insert(metricKey)
-            } else if !task.isFinished {
+            } else if !task.isFinished || task.status == .declined {
                 state.completedTodayTaskKeys.remove(metricKey)
             }
         }
@@ -360,7 +362,7 @@ nonisolated enum TaskCenterSnapshotBuilder {
             scheduledAt: scheduledAt,
             dueAt: scheduledAt,
             isAllDay: event.isAllDay,
-            isRecurring: event.recurrenceDays > 0,
+            isRecurring: familyTask?.planId != nil || event.familyTaskPlanId != nil || event.recurrenceDays > 0,
             urgency: urgency,
             workflowStatus: familyTask.map(workflowStatus) ?? .scheduled,
             availableActions: availableActions(
@@ -433,7 +435,7 @@ nonisolated enum TaskCenterSnapshotBuilder {
             scheduledAt: scheduledAt,
             dueAt: dueAt,
             isAllDay: event?.isAllDay ?? false,
-            isRecurring: event.map { $0.recurrenceDays > 0 } ?? false,
+            isRecurring: task.planId != nil || event?.familyTaskPlanId != nil || (event.map { $0.recurrenceDays > 0 } ?? false),
             urgency: urgency,
             workflowStatus: workflowStatus(task),
             availableActions: availableActions(
@@ -593,6 +595,8 @@ nonisolated enum TaskCenterSnapshotBuilder {
             .active
         case .claimed:
             .claimed
+        case .declined:
+            .declined
         case .pendingReview:
             .pendingReview
         case .completed:
@@ -617,7 +621,7 @@ nonisolated enum TaskCenterSnapshotBuilder {
             switch task.status {
             case .active, .claimed:
                 return task.hasReward ? [] : [.complete]
-            case .pendingReview, .completed, .cancelled:
+            case .declined, .pendingReview, .completed, .cancelled:
                 return []
             }
         }
@@ -643,7 +647,7 @@ nonisolated enum TaskCenterSnapshotBuilder {
         case .pendingReview:
             guard task.createdById == activeHumanId else { return [] }
             return [.approve, .reject]
-        case .completed, .cancelled:
+        case .declined, .completed, .cancelled:
             return []
         }
     }
@@ -655,71 +659,123 @@ nonisolated enum TaskCenterSnapshotBuilder {
         humans: [Human],
         activeHumanId: String?
     ) -> TaskCenterMemberFilterContext {
+        let allItemIDs = Set(items.map(\.id))
+        let systemJourneyItemIDs = Set(items.lazy.filter { $0.source == .systemJourney }.map(\.id))
         let activeHumans = humans.filter { !$0.hasPassedAway }
-        guard activeHumans.count > 1 else { return .hidden }
+        guard activeHumans.count > 1 else {
+            return TaskCenterMemberFilterContext(
+                activeHumanName: activeHumans.first?.name,
+                showsFilters: false,
+                actionRequiredItemIDs: [],
+                waitingForFamilyItemIDs: [],
+                systemJourneyItemIDs: systemJourneyItemIDs,
+                allItemIDs: allItemIDs
+            )
+        }
         let selectedHuman = activeHumanId.flatMap { activeID in
             activeHumans.first { $0.id.uuidString == activeID }
         } ?? activeHumans.first
-        guard let selectedHuman else { return .hidden }
+        guard let selectedHuman else {
+            return TaskCenterMemberFilterContext(
+                activeHumanName: nil,
+                showsFilters: false,
+                actionRequiredItemIDs: [],
+                waitingForFamilyItemIDs: [],
+                systemJourneyItemIDs: systemJourneyItemIDs,
+                allItemIDs: allItemIDs
+            )
+        }
 
         var familyTasksByID: [UUID: FamilyCollaborationTask] = [:]
         for task in familyTasks {
             familyTasksByID[task.id] = task
         }
-        var currentMemberItemIDs: Set<String> = []
-        var waitingForOthersItemIDs: Set<String> = []
-        var pendingReviewItemIDs: Set<String> = []
+        var actionRequiredItemIDs: Set<String> = []
+        var waitingForFamilyItemIDs: Set<String> = []
 
-        for item in items {
-            if item.source == .systemJourney {
-                currentMemberItemIDs.insert(item.id)
-                continue
-            }
-            if item.workflowStatus == .pendingReview {
-                pendingReviewItemIDs.insert(item.id)
-                if item.createdByMember?.id == selectedHuman.id,
-                   item.availableActions.contains(.approve) {
-                    currentMemberItemIDs.insert(item.id)
-                }
-            }
-            guard let responsibleHumanID = responsibleHumanID(
+        for item in items where item.source != .systemJourney {
+            switch memberQueue(
                 for: item,
                 familyTasksByID: familyTasksByID,
-                eventsByID: eventsByID
-            ) else { continue }
-            if responsibleHumanID == selectedHuman.id {
-                currentMemberItemIDs.insert(item.id)
-            } else if item.workflowStatus != .pendingReview {
-                waitingForOthersItemIDs.insert(item.id)
+                eventsByID: eventsByID,
+                selectedHumanID: selectedHuman.id.uuidString
+            ) {
+            case .actionRequired:
+                actionRequiredItemIDs.insert(item.id)
+            case .waitingForFamily:
+                waitingForFamilyItemIDs.insert(item.id)
+            case .allOnly:
+                break
             }
         }
 
         return TaskCenterMemberFilterContext(
             activeHumanName: selectedHuman.name,
             showsFilters: true,
-            currentMemberItemIDs: currentMemberItemIDs,
-            waitingForOthersItemIDs: waitingForOthersItemIDs,
-            pendingReviewItemIDs: pendingReviewItemIDs
+            actionRequiredItemIDs: actionRequiredItemIDs,
+            waitingForFamilyItemIDs: waitingForFamilyItemIDs,
+            systemJourneyItemIDs: systemJourneyItemIDs,
+            allItemIDs: allItemIDs
         )
     }
 
-    private static func responsibleHumanID(
+    private enum MemberQueue {
+        case actionRequired
+        case waitingForFamily
+        case allOnly
+    }
+
+    private static func memberQueue(
         for item: TaskCenterItemSnapshot,
         familyTasksByID: [UUID: FamilyCollaborationTask],
-        eventsByID: [UUID: Event]
-    ) -> UUID? {
+        eventsByID: [UUID: Event],
+        selectedHumanID: String
+    ) -> MemberQueue {
         if let familyTaskID = item.familyTaskID,
-           let task = familyTasksByID[familyTaskID],
-           let rawID = task.claimedById ?? task.assignedToId,
-           let humanID = UUID(uuidString: rawID) {
-            return humanID
+           let task = familyTasksByID[familyTaskID] {
+            return memberQueue(for: task, selectedHumanID: selectedHumanID)
         }
         if let eventID = item.eventID,
-           let rawID = eventsByID[eventID]?.assigneeId,
-           let humanID = UUID(uuidString: rawID) {
-            return humanID
+           eventsByID[eventID]?.assigneeId == selectedHumanID {
+            return .actionRequired
         }
-        return nil
+        return .allOnly
+    }
+
+    private static func memberQueue(
+        for task: FamilyCollaborationTask,
+        selectedHumanID: String
+    ) -> MemberQueue {
+        let isCreator = task.createdById == selectedHumanID
+        let isAssignee = task.assignedToId == selectedHumanID
+        let isClaimant = task.claimedById == selectedHumanID
+        let isCompleter = task.completedById == selectedHumanID
+        let isResponsible = (task.claimedById ?? task.assignedToId) == selectedHumanID
+
+        switch task.status {
+        case .active:
+            if task.isOpen || isResponsible {
+                return .actionRequired
+            }
+            return isCreator ? .waitingForFamily : .allOnly
+        case .claimed:
+            if isResponsible {
+                return .actionRequired
+            }
+            return isCreator ? .waitingForFamily : .allOnly
+        case .pendingReview:
+            if isCreator {
+                return .actionRequired
+            }
+            return isAssignee || isClaimant || isCompleter ? .waitingForFamily : .allOnly
+        case .declined:
+            if isCreator {
+                return .actionRequired
+            }
+            return isAssignee || isClaimant ? .waitingForFamily : .allOnly
+        case .completed, .cancelled:
+            return .allOnly
+        }
     }
 
     private static func participantHumanIDs(

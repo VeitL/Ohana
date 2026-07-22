@@ -3,7 +3,7 @@ import Testing
 @testable import Ohana
 
 struct SupporterPackConfigurationTests {
-    @Test("Local StoreKit products match the Personal catalog contract")
+    @Test("Local StoreKit products match the Personal and Family catalog contract")
     func storeKitConfigurationMatchesCatalog() throws {
         let rootURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -45,13 +45,15 @@ struct SupporterPackConfigurationTests {
         })
         #expect(Set(subscriptionsByID.keys) == Set([
             SupporterPackCatalog.personalMonthlyProductID,
-            SupporterPackCatalog.personalYearlyProductID
+            SupporterPackCatalog.personalYearlyProductID,
+            SupporterPackCatalog.familyYearlyProductID
         ]))
 
         let monthly = subscriptionsByID[SupporterPackCatalog.personalMonthlyProductID]
         try assertProduct(monthly, type: "RecurringSubscription", price: "2.99")
         #expect(monthly?["recurringSubscriptionPeriod"] as? String == "P1M")
         #expect(monthly?["introductoryOffer"] is NSNull)
+        #expect(monthly?["groupNumber"] as? Int == 2)
 
         let annual = subscriptionsByID[SupporterPackCatalog.personalYearlyProductID]
         try assertProduct(annual, type: "RecurringSubscription", price: "14.99")
@@ -61,9 +63,19 @@ struct SupporterPackConfigurationTests {
         #expect(trial["displayPrice"] as? String == "0")
         #expect(trial["paymentMode"] as? String == "free")
         #expect(trial["subscriptionPeriod"] as? String == "P2W")
+        #expect(annual?["groupNumber"] as? Int == 2)
+
+        let family = subscriptionsByID[SupporterPackCatalog.familyYearlyProductID]
+        try assertProduct(family, type: "RecurringSubscription", price: "39.99")
+        #expect(family?["referenceName"] as? String == "Ohana Family Yearly")
+        #expect(family?["recurringSubscriptionPeriod"] as? String == "P1Y")
+        #expect(family?["introductoryOffer"] is NSNull)
+        #expect(family?["groupNumber"] as? Int == 1)
 
         let allProductIDs = Set(productsByID.keys).union(subscriptionsByID.keys)
-        #expect(!allProductIDs.contains(where: { $0.localizedCaseInsensitiveContains("family") }))
+        #expect(Set(allProductIDs.filter { $0.localizedCaseInsensitiveContains("family") }) == Set([
+            SupporterPackCatalog.familyYearlyProductID
+        ]))
         #expect(!allProductIDs.contains(where: { $0.localizedCaseInsensitiveContains("care") }))
     }
 

@@ -6,83 +6,45 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct SafetyContactCommandServiceTests {
-    @Test func freeAllowsOneContactAndPersonalAllowsThree() throws {
+    @Test func newPhoneContactsAreDisabledForEveryPlan() throws {
         let container = try makeContainer()
         let context = container.mainContext
 
-        let first = try SafetyContactCommandService.create(
-            name: "Alex",
-            phoneNumber: "+49 111",
-            capabilities: .make(for: .free),
-            context: context
-        )
-        #expect(first.sortOrder == 0)
-        #expect(throws: SafetyContactCommandError.contactLimitReached(limit: 1)) {
-            try SafetyContactCommandService.create(
-                name: "Sam",
-                phoneNumber: "+49 222",
-                capabilities: .make(for: .free),
-                context: context
-            )
+        for plan in OhanaPlanLevel.allCases {
+            #expect(throws: SafetyContactCommandError.contactLimitReached(limit: 0)) {
+                try SafetyContactCommandService.create(
+                    name: "Legacy contact",
+                    phoneNumber: "+49 111",
+                    capabilities: .make(for: plan),
+                    context: context
+                )
+            }
         }
-
-        _ = try SafetyContactCommandService.create(
-            name: "Sam",
-            phoneNumber: "+49 222",
-            capabilities: .make(for: .personal),
-            context: context
-        )
-        _ = try SafetyContactCommandService.create(
-            name: "Jo",
-            phoneNumber: "+49 333",
-            capabilities: .make(for: .personal),
-            context: context
-        )
-        #expect(try SafetyContactCommandService.snapshots(context: context).count == 3)
-        #expect(throws: SafetyContactCommandError.contactLimitReached(limit: 3)) {
-            try SafetyContactCommandService.create(
-                name: "Fourth",
-                phoneNumber: "+49 444",
-                capabilities: .make(for: .personal),
-                context: context
-            )
-        }
+        #expect(try SafetyContactCommandService.snapshots(context: context).isEmpty)
     }
 
-    @Test func downgradeKeepsAndAllowsEditingExistingContactsButBlocksGrowth() throws {
+    @Test func legacyContactsRemainEditableAndDeletableButCannotGrow() throws {
         let container = try makeContainer()
         let context = container.mainContext
-        let personal = OhanaPlanCapabilities.make(for: .personal)
-        let first = try SafetyContactCommandService.create(
-            name: "First",
+        let legacyContact = SafetyContact(
+            name: "Legacy",
             phoneNumber: "111",
-            capabilities: personal,
-            context: context
+            createdAt: Date(timeIntervalSince1970: 1)
         )
-        _ = try SafetyContactCommandService.create(
-            name: "Second",
-            phoneNumber: "222",
-            capabilities: personal,
-            context: context
-        )
-        _ = try SafetyContactCommandService.create(
-            name: "Third",
-            phoneNumber: "333",
-            capabilities: personal,
-            context: context
-        )
+        context.insert(legacyContact)
+        try context.save()
 
         let edited = try SafetyContactCommandService.update(
-            id: first.id,
-            name: "First updated",
+            id: legacyContact.id,
+            name: "Legacy updated",
             phoneNumber: "999",
             isEnabled: false,
             context: context
         )
-        #expect(edited.name == "First updated")
+        #expect(edited.name == "Legacy updated")
         #expect(!edited.isEnabled)
-        #expect(try SafetyContactCommandService.snapshots(context: context).count == 3)
-        #expect(throws: SafetyContactCommandError.contactLimitReached(limit: 1)) {
+        #expect(try SafetyContactCommandService.snapshots(context: context).count == 1)
+        #expect(throws: SafetyContactCommandError.contactLimitReached(limit: 0)) {
             try SafetyContactCommandService.create(
                 name: "Blocked",
                 phoneNumber: "444",
@@ -90,6 +52,8 @@ struct SafetyContactCommandServiceTests {
                 context: context
             )
         }
+        try SafetyContactCommandService.delete(id: legacyContact.id, context: context)
+        #expect(try SafetyContactCommandService.snapshots(context: context).isEmpty)
     }
 
     @Test func invalidFieldsAndMissingRowsFailWithoutPersisting() throws {

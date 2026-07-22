@@ -13,10 +13,12 @@ struct ZenShell: View {
     @Binding var snapshot: ZenPresenceSnapshot
     @Binding var oasisSnapshot: ZenOasisSnapshot
     let actions: ZenShellActions
+    let profileTransitionNamespace: Namespace.ID
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: ZenTab = .home
+    @State private var requestedAutoCheckInToastSubjectID: String?
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -26,6 +28,7 @@ struct ZenShell: View {
                 Tab(value: tab) {
                     NavigationStack {
                         page(for: tab)
+                            .toolbar { zenToolbar }
                     }
                 } label: {
                     Label(tab.title(l), systemImage: tab.icon)
@@ -56,8 +59,9 @@ struct ZenShell: View {
         case .home:
             ZenHomeView(
                 snapshot: $snapshot,
+                requestedAutoCheckInToastSubjectID: $requestedAutoCheckInToastSubjectID,
                 actions: actions,
-                onOpenOasis: { selectedTab = .oasis }
+                profileTransitionNamespace: profileTransitionNamespace
             )
         case .streak:
             ZenStreakView(
@@ -69,6 +73,62 @@ struct ZenShell: View {
                 snapshot: oasisSnapshot,
                 actions: actions
             )
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var zenToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            CoconutBalanceCapsule(
+                balance: snapshot.coconutBalance,
+                showsDeltaAnimation: true,
+                deltaAnimationContext: "zen-\(selectedTab.rawValue)",
+                onTap: actions.onOpenCoconutLog
+            )
+            .accessibilityLabel(l.tr(
+                zh: "椰子余额 \(snapshot.coconutBalance)，打开椰子记录",
+                en: "Coconut balance \(snapshot.coconutBalance), open coconut history",
+                de: "Kokosnuss-Guthaben \(snapshot.coconutBalance), Verlauf öffnen",
+                es: "Saldo de cocos \(snapshot.coconutBalance), abrir historial",
+                pt: "Saldo de cocos \(snapshot.coconutBalance), abrir histórico",
+                fr: "Solde de noix de coco : \(snapshot.coconutBalance), ouvrir l’historique",
+                ja: "ココナッツ残高 \(snapshot.coconutBalance)、履歴を開く",
+                ko: "코코넛 잔액 \(snapshot.coconutBalance), 기록 열기",
+                it: "Saldo noci di cocco \(snapshot.coconutBalance), apri la cronologia"
+            ))
+            .accessibilityIdentifier("zen-toolbar-coconut-log")
+
+            Button(action: actions.onOpenMembers) {
+                Image(systemName: "person.2.fill").accessibilityHidden(true)
+            }
+            .accessibilityLabel(l.tr(
+                zh: "成员",
+                en: "Members",
+                de: "Mitglieder",
+                es: "Miembros",
+                pt: "Membros",
+                fr: "Membres",
+                ja: "メンバー",
+                ko: "구성원",
+                it: "Membri"
+            ))
+            .accessibilityIdentifier("zen-toolbar-members")
+
+            Button(action: actions.onOpenSettings) {
+                Image(systemName: "gearshape.fill").accessibilityHidden(true)
+            }
+            .accessibilityLabel(l.tr(
+                zh: "设置",
+                en: "Settings",
+                de: "Einstellungen",
+                es: "Ajustes",
+                pt: "Ajustes",
+                fr: "Réglages",
+                ja: "設定",
+                ko: "설정",
+                it: "Impostazioni"
+            ))
+            .accessibilityIdentifier("zen-toolbar-settings")
         }
     }
 
@@ -84,7 +144,10 @@ struct ZenShell: View {
 
         snapshot.subjects[index].checkedToday = true
         snapshot.subjects[index].checkedAt = Date()
-        await actions.onAutoCheckInOwner()
+        let didCreateCheckIn = await actions.onAutoCheckInOwner()
+        guard didCreateCheckIn else { return }
+        selectedTab = .home
+        requestedAutoCheckInToastSubjectID = ownerID
     }
 }
 
@@ -94,7 +157,7 @@ struct ZenShell: View {
             isReady: true,
             subjects: [
                 ZenPresenceSubjectDTO(
-                    id: "preview-owner",
+                    id: "00000000-0000-0000-0000-000000000001",
                     kind: .human,
                     name: "Alex",
                     isOwner: true,
@@ -103,13 +166,13 @@ struct ZenShell: View {
                     checkedAt: Date(timeIntervalSince1970: 1_752_844_400)
                 ),
                 ZenPresenceSubjectDTO(
-                    id: "preview-pet",
+                    id: "00000000-0000-0000-0000-000000000002",
                     kind: .pet,
                     name: "Milo",
                     sortIndex: 1
                 ),
                 ZenPresenceSubjectDTO(
-                    id: "preview-plant",
+                    id: "00000000-0000-0000-0000-000000000003",
                     kind: .plant,
                     name: "Monstera",
                     sortIndex: 2,
@@ -117,7 +180,7 @@ struct ZenShell: View {
                     status: .okay
                 )
             ],
-            ownerID: "preview-owner",
+            ownerID: "00000000-0000-0000-0000-000000000001",
             dayKey: "2026-07-18",
             currentStreak: 7,
             longestStreak: 18,
@@ -140,21 +203,36 @@ struct ZenShell: View {
         )
     }
 
+    private struct ZenShellPreviewHost: View {
+        let snapshot: ZenPresenceSnapshot
+        let oasisSnapshot: ZenOasisSnapshot
+        let languageCode: String
+        @Namespace private var profileTransitionNamespace
+
+        var body: some View {
+            ZenShell(
+                snapshot: .constant(snapshot),
+                oasisSnapshot: .constant(oasisSnapshot),
+                actions: .noop,
+                profileTransitionNamespace: profileTransitionNamespace
+            )
+            .ohanaLocalizedEnvironment(languageCode)
+        }
+    }
+
     #Preview("Zen · Loaded") {
-        ZenShell(
-            snapshot: .constant(.zenPreview),
-            oasisSnapshot: .constant(.zenPreview),
-            actions: .noop
+        ZenShellPreviewHost(
+            snapshot: .zenPreview,
+            oasisSnapshot: .zenPreview,
+            languageCode: "zh"
         )
-        .ohanaLocalizedEnvironment("zh")
     }
 
     #Preview("Zen · Loading") {
-        ZenShell(
-            snapshot: .constant(.empty),
-            oasisSnapshot: .constant(.empty),
-            actions: .noop
+        ZenShellPreviewHost(
+            snapshot: .empty,
+            oasisSnapshot: .empty,
+            languageCode: "de"
         )
-        .ohanaLocalizedEnvironment("de")
     }
 #endif

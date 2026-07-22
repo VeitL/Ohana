@@ -32,6 +32,7 @@ struct MemberCardCreationContentView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.memberCreationCardFlipProgress) var memberCreationCardFlipProgress
+    @Environment(\.memberProfileExperienceStyle) var profileExperienceStyle
     @Environment(AppServices.self) var appServices
     @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
@@ -70,6 +71,8 @@ struct MemberCardCreationContentView: View {
     @State var mbtiDecision = ""
     @State var mbtiLifestyle = ""
     @State var usesCustomResidenceCity = false
+    @State var usesCustomNationality = false
+    @State var usesCustomResidenceCountry = false
     @State var isJoinHandoffRunning = false
     @State var joinHandoffProgress: CGFloat = 0
     @State var joinHandoffSnapshot: MemberCardRenderSnapshot?

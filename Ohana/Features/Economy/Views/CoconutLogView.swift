@@ -461,6 +461,7 @@ struct CoconutLogContentView: View {
                     Text(l.tr(zh: "椰子历史", en: "Coconut History", de: "Kokosnuss-Historie"))
                         .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
+                        .accessibilityIdentifier("coconut-log-screen")
                 }
                 Text((isContentReady ? subjectName : nil) ?? l.tr(zh: "每一笔收支", en: "Every coconut change", de: "Jede Bewegung"))
                     .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -494,6 +495,7 @@ struct CoconutLogContentView: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+            .accessibilityIdentifier("coconut-log-close-action")
         }
     }
 

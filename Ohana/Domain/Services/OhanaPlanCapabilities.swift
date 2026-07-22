@@ -9,8 +9,8 @@ import Foundation
 
 /// Product tiers stay orthogonal to the selected app experience mode.
 ///
-/// `family` is intentionally a domain value only in the Solo build. No current
-/// StoreKit product maps to it and no network runtime is enabled by this type.
+/// Online guardian runtime remains independently feature-flagged. Owning a
+/// Family product never turns network work on by itself.
 nonisolated enum OhanaPlanLevel: String, Codable, CaseIterable, Hashable, Sendable {
     case free
     case personal
@@ -52,6 +52,7 @@ nonisolated struct PresenceContactCapabilities: Equatable, Sendable {
     let allowsEditableMessageTemplate: Bool
     let allowsAcceptedFamilyGuardians: Bool
     let allowsAutomaticExternalMessaging: Bool
+    let maximumAcceptedGuardians: Int
 }
 
 nonisolated struct OhanaPlanCapabilities: Equatable, Sendable {
@@ -76,10 +77,11 @@ nonisolated struct OhanaPlanCapabilities: Equatable, Sendable {
                     allowsServerGuardianEscalation: false
                 ),
                 contacts: PresenceContactCapabilities(
-                    maximumLocalContacts: 1,
+                    maximumLocalContacts: 0,
                     allowsEditableMessageTemplate: false,
                     allowsAcceptedFamilyGuardians: false,
-                    allowsAutomaticExternalMessaging: false
+                    allowsAutomaticExternalMessaging: false,
+                    maximumAcceptedGuardians: 0
                 )
             )
         case .personal:
@@ -94,10 +96,11 @@ nonisolated struct OhanaPlanCapabilities: Equatable, Sendable {
                     allowsServerGuardianEscalation: false
                 ),
                 contacts: PresenceContactCapabilities(
-                    maximumLocalContacts: 3,
-                    allowsEditableMessageTemplate: true,
+                    maximumLocalContacts: 0,
+                    allowsEditableMessageTemplate: false,
                     allowsAcceptedFamilyGuardians: false,
-                    allowsAutomaticExternalMessaging: false
+                    allowsAutomaticExternalMessaging: false,
+                    maximumAcceptedGuardians: 0
                 )
             )
         case .family:
@@ -112,10 +115,11 @@ nonisolated struct OhanaPlanCapabilities: Equatable, Sendable {
                     allowsServerGuardianEscalation: true
                 ),
                 contacts: PresenceContactCapabilities(
-                    maximumLocalContacts: 3,
-                    allowsEditableMessageTemplate: true,
+                    maximumLocalContacts: 0,
+                    allowsEditableMessageTemplate: false,
                     allowsAcceptedFamilyGuardians: true,
-                    allowsAutomaticExternalMessaging: false
+                    allowsAutomaticExternalMessaging: false,
+                    maximumAcceptedGuardians: 3
                 )
             )
         }
@@ -123,11 +127,9 @@ nonisolated struct OhanaPlanCapabilities: Equatable, Sendable {
 }
 
 extension CommerceEntitlementService {
-    /// Shipping builds currently map only existing Free and Personal products.
-    /// A future Family entitlement resolver can compose this value without
-    /// changing presence-domain decisions.
     var ohanaPlanLevel: OhanaPlanLevel {
-        hasPersonalEntitlement ? .personal : .free
+        if hasFamilyEntitlement { return .family }
+        return hasPersonalEntitlement ? .personal : .free
     }
 
     var ohanaPlanCapabilities: OhanaPlanCapabilities {

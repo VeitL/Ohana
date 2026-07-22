@@ -35,6 +35,39 @@ struct SettingsRouteContainerTests {
         #expect(!sections.contains("AnyView(backupSection)"))
     }
 
+    @Test func experienceModeIsTheFirstSettingsSectionAndUsesTwoLargeChoices() throws {
+        let sections = try source("Ohana/Features/Settings/Views/SettingsView+MainSections.swift")
+        let bodyStart = try #require(sections.range(of: "var settingsBodySections"))
+        let experience = try #require(sections.range(of: "settingsExperienceSection", range: bodyStart.upperBound ..< sections.endIndex))
+        let data = try #require(sections.range(of: "settingsDataSections", range: bodyStart.upperBound ..< sections.endIndex))
+
+        #expect(experience.lowerBound < data.lowerBound)
+        #expect(sections.contains("SettingsExperienceModeSelector("))
+        #expect(sections.contains("HStack(alignment: .top, spacing: 10) { modeButtons }"))
+        #expect(sections.contains("settings-experience-mode-\\(mode.rawValue)"))
+        #expect(sections.contains("dynamicTypeSize.isAccessibilitySize"))
+        #expect(!sections.contains("settings-experience-mode-picker"))
+        #expect(sections.contains("settings-zen-owner-picker"))
+    }
+
+    @Test func debugSettingsExposeAdaptivePrimaryAccentLab() throws {
+        let debug = try source("Ohana/Features/Settings/Views/SettingsView+Debug.swift")
+        let lab = try source("Ohana/Features/Settings/DesignLab/PrimaryAccentLabView.swift")
+        let palette = try source("Ohana/Shared/Design/OhanaPrimaryAccent.swift")
+
+        #expect(debug.contains("PrimaryAccentLabView()"))
+        #expect(debug.contains("settings-debug-primary-accent"))
+        #expect(lab.contains("primary-accent-appearance-picker"))
+        #expect(lab.contains("primary-accent-live-preview"))
+        #expect(lab.contains("primary-accent-\\(appearance.rawValue)-preview"))
+        #expect(lab.contains("ColorPicker(selection: customColor, supportsOpacity: false)"))
+        #expect(lab.contains("primary-accent-system-color-picker"))
+        #expect(lab.contains("@AppStorage(OhanaPrimaryAccentPreferences.lightStorageKey)"))
+        #expect(lab.contains("@AppStorage(OhanaPrimaryAccentPreferences.darkStorageKey)"))
+        #expect(palette.contains("#if DEBUG"))
+        #expect(palette.contains("return false"))
+    }
+
     @Test func settingsAboutUsesStaticVersionAndPublicDestinations() throws {
         let about = try source("Ohana/Features/Settings/Views/SettingsDestinationPages.swift")
         let links = try source("Ohana/App/OhanaPublicLinks.swift")

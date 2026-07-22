@@ -176,6 +176,26 @@ enum MemberDeletionCommandService {
         let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
 
         let now = Date()
+        do {
+            try PhysicalDeletionService.stageGuardianOwnerUnavailableIfNeeded(
+                ownerHumanID: humanID,
+                occurredAt: now,
+                context: context
+            )
+        } catch {
+            context.rollback()
+            return MemberDeletionCommandResult(
+                entityID: humanID,
+                kind: EntityKind.human.rawValue,
+                removedRelatedEventIDs: [],
+                removedQuickActionCount: 0,
+                requiresReplacementHuman: false,
+                requiresAccountSwitch: false,
+                clearsActiveHumanID: false,
+                didPersist: false,
+                persistenceErrorDescription: error.localizedDescription
+            )
+        }
         let relatedEvents = fetchHumanOwnedEvents(humanId: humanIDString, context: context)
         let notificationCancels = DeferredNotificationCancellationScheduler(delegate: notifications)
         for event in relatedEvents {

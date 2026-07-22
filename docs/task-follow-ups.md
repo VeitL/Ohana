@@ -9,8 +9,8 @@
 
 ## Current Read
 
-- Last compacted: 2026-07-20.
-- Open follow-ups: 12 total: P1 = 7, P2 = 4, P3 = 1.
+- Last compacted: 2026-07-22.
+- Open follow-ups: 13 total: P1 = 8, P2 = 4, P3 = 1.
 - Open P0: 0.
 - First-release repository blocker: no known P0 defect, and two
   release-reachable P1 implementation/proof gaps remain. Human-first/D28
@@ -39,17 +39,20 @@
   active logical plans while preserving basic records, existing history,
   manual export, critical-health plans, and memorials. Personal is monthly,
   yearly, or Lifetime and adds unlimited active capacity plus approved advanced
-  local tools and Supporter cosmetics. The app still deliberately has no Ohana
-  account, login, developer backend, Family, Care+, or ads. D24 still approves
+  local tools and Supporter cosmetics. The worktree now contains a fail-closed
+  optional Family guardian account/backend and annual catalog, but the runtime,
+  purchase entry and public SKU remain disabled until its dedicated external
+  gates close; ordinary Free / Personal still has no login. Care+ and ads remain
+  absent. D24 still approves
   iPhone-only, iOS 26.2+, with native
   iPad/watchOS deferred.
 - Current decision: close TFU-20260715-003 and TFU-20260720-001 before final
   signed-device RC acceptance. The remaining CloudKit P1 is explicitly
   deferred and unreachable in the local-only first release. The future
-  account design is recorded in
-  `docs/planning/account-backend-extension.md`; the requested family invitation
-  and explicit Human-linking flow is tracked below as P3 discovery only and does
-  not activate an account, backend, or online collaboration capability. Do not
+  broader account design is recorded in
+  `docs/planning/account-backend-extension.md`; the approved minimum Family
+  guardian implementation and external launch gates are tracked separately
+  below and do not activate CloudKit or full online collaboration. Do not
   claim RC/App Store readiness until all release-reachable P1 items are
   dispositioned.
 
@@ -63,6 +66,37 @@
 | P3 | Future improvement with no current release impact. |
 
 ## Open Items
+
+### TFU-20260722-001 - Deploy And Validate Family App Guardian
+
+- Priority / bucket: P1 for any Family release; unreachable and non-blocking
+  while the local Free / Personal release keeps the guardian flag false.
+- Progress: the worktree contains V96 local projections and reliable Presence
+  outbox, Sign in with Apple / Cognito client flow, per-installation APNs endpoint
+  registration, invitations, guardian dashboard, annual Family StoreKit catalog,
+  server-side JWS / App Store Server Notifications V2 verification, and an AWS
+  SAM stack for API Gateway, Lambda, DynamoDB, EventBridge Scheduler, SQS / DLQ
+  and SNS in `eu-central-1`. Guardian rules, privacy and safety-contract tests
+  pass 17/17; the
+  affected iOS selection passes 353 tests in 9 suites; cfn-lint and production
+  dependency imports pass. Runtime configuration and Family purchase remain
+  fail-closed.
+- Blocker: no production AWS deployment, controlled HTTPS invite host /
+  Associated Domains, Cognito Apple configuration, production and sandbox SNS
+  platform apps, APNs delivery evidence, App Store Server Notifications V2,
+  App Store Connect Family SKU, privacy questionnaire, Sandbox lifecycle, or
+  two-account / two-device acceptance exists. Simulator cannot prove notification
+  permission, actual delivery, uninstall token invalidation or recovery.
+- Next action: deploy the guarded stack in `eu-central-1`, configure Apple and
+  AWS secrets without logging them, add the verified invite host to Associated
+  Domains, configure App Store Server Notifications and Family Yearly, update
+  the App Store privacy label, then run the two-device matrix in
+  `docs/specs/GuardianSafety-logic.md`.
+- Close when: day 2 initial, day 3 single follow-up, recovery, guardian
+  acknowledgement, pause, revoke, entitlement loss, offline outbox, invalid
+  token and account deletion all pass on two signed physical devices; server
+  logs contain no names, scores or care data; nine languages and accessibility
+  pass; only then may `OHANAGuardianSafetyEnabled` and the Family SKU be enabled.
 
 ### TFU-20260715-003 - Ship And Validate Free / Personal 1.0
 
@@ -138,8 +172,9 @@
 
 - Priority / bucket: P1, deferred CloudKit 1.x / first-release-unreachable.
 - Blocker: local tests cover delete-wins, parent lifecycle, and natural identity,
-  but the Solo target has no CloudKit/APNs capability and uses
-  `cloudKitDatabase: .none`.
+  but the target has no CloudKit service entitlement and uses
+  `cloudKitDatabase: .none`. Family guardian APNs is a separate service and does
+  not satisfy CloudKit evidence.
 - Next action: run shared-zone conflict/deletion validation only when the Family
   product gate and capability profile are explicitly enabled.
 - Close when: two-device CloudKit evidence confirms convergence without
@@ -221,12 +256,12 @@
   increase. The preserved 59🥥 Oasis regression is therefore device-verified.
   A 2026-07-12 device-local Apple identity prototype and a later provider-neutral
   backend prototype were evaluated but never became the product. On 2026-07-12
-  both were removed: the current target has no Sign in with Apple entitlement,
+  both were removed: at that checkpoint the target had no Sign in with Apple entitlement,
   login UI, Auth SDK, Supabase project, or account data collection. Their signed
   Archive and simulator tests remain historical evidence only and cannot be used
   to describe or approve the current build. Future design is retained solely in
   `docs/planning/account-backend-extension.md`.
-  Later on 2026-07-12, the current local-only worktree produced and verified
+  Later on 2026-07-12, that local-only worktree produced and verified
   `/tmp/OhanaArchives/2026-07-12-180306/Ohana-c2aa2af859-dirty.xcarchive`.
   The signed arm64/iPhone-only/iOS 26.2+ App contains HealthKit + CloudDocuments
   only and no Sign in with Apple, CloudKit, APNs, App Group, remote notification,

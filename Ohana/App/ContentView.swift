@@ -93,9 +93,6 @@ struct ContentView: View {
                                     appRoutes.presentTaskCenter(context: context)
                                 }
                             )
-                            .globalTaskCenterToolbar {
-                                appRoutes.presentTaskCenter(context: route.taskCenterContext)
-                            }
                         }
                         .navigationTransition(.zoom(sourceID: route.sourceID, in: heroNS))
                     }
@@ -232,9 +229,22 @@ struct ContentView: View {
         }
         .onReceive(appServices.notificationRoutes.routeEvents) { published in
             appServices.notificationRoutes.acknowledgeRouteEvent(id: published.id)
+            if case let .guardianIncidentAcknowledgementRequested(incidentID) = published.event {
+                Task { @MainActor in
+                    await appServices.guardianSafety.acknowledgeIncident(id: incidentID)
+                }
+            }
+            if case let .guardianSafetyRouteRequested(_, incidentID?) = published.event {
+                Task { @MainActor in
+                    await appServices.guardianSafety.markIncidentOpened(id: incidentID)
+                }
+            }
             scheduleHomeCardStateResetIfNeeded(for: published.event)
             handleRouteNotificationOutcome(
-                appRoutes.handleNotificationEvent(published.event)
+                appRoutes.handleNotificationEvent(
+                    published.event,
+                    plan: appServices.commerce.ohanaPlanLevel
+                )
             )
         }
         .appRoutePresentationHost(
@@ -373,7 +383,10 @@ struct ContentView: View {
                 appRoutes.presentCrewRoster(mode: mode)
             },
             onPresentFunctionMenu: { destination in
-                appRoutes.presentFunctionMenu(destination: destination)
+                appRoutes.presentFunctionMenu(
+                    destination: destination,
+                    plan: appServices.commerce.ohanaPlanLevel
+                )
             },
             onPresentHumanWeightQuick: { humanID in
                 appRoutes.presentHumanWeightQuick(humanID: humanID)
@@ -881,7 +894,11 @@ private extension ContentView {
         switch event {
         case .humanDeleted:
             homeCardStateResetToken = UUID()
-        case .reminderRouteRequested, .plantBatchCareRouteRequested:
+        case .reminderRouteRequested,
+             .familyWeeklyReportRouteRequested,
+             .plantBatchCareRouteRequested,
+             .guardianSafetyRouteRequested,
+             .guardianIncidentAcknowledgementRequested:
             break
         }
     }

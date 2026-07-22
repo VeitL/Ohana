@@ -25,13 +25,27 @@ private struct TaskCenterSystemJourneyEditorRoute: Identifiable, Equatable {
     }
 }
 
+struct TaskCenterFamilyTaskDetailRoute: Identifiable {
+    let snapshot: TaskCenterFamilyTaskDetailSnapshot
+
+    var id: String {
+        "family-task-\(snapshot.taskID.uuidString)"
+    }
+}
+
+private struct TaskCenterFamilyTaskInboxRoute: Identifiable, Equatable {
+    let humanID: UUID
+
+    var id: UUID { humanID }
+}
+
 struct TaskCenterRouteContainer: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage(StarterGiftStorageKey.ceremonySeen) private var starterGiftCeremonySeen = false
 
     @State private var selectedSurface: TaskCenterSurface
-    @State private var routeData = TaskCenterRouteData()
+    @State var routeData = TaskCenterRouteData()
     @State private var routeDataGeneration = 0
     @State private var dataLoadTask: Task<Void, Never>?
     @State private var revisionReloadTask: Task<Void, Never>?
@@ -39,7 +53,12 @@ struct TaskCenterRouteContainer: View {
     @State private var showingAddEvent = false
     @State private var showingAddChoice = false
     @State private var didAutoPresentCreation = false
-    @State private var familyTaskEditorRoute: FamilyCollaborationEditorRoute?
+    @State private var familyTaskActivities: [FamilyTaskActivitySnapshot] = []
+    @State private var familyTaskUnreadActivityCount = 0
+    @State private var familyTaskInboxRoute: TaskCenterFamilyTaskInboxRoute?
+    @State private var familyTaskDetailRoute: TaskCenterFamilyTaskDetailRoute?
+    @State var familyTaskEditorRoute: FamilyCollaborationEditorRoute?
+    @State private var selectedMemberFilter: TaskCenterMemberFilter?
     @State private var pendingActionHumanConfirmation: ActionHumanConfirmationDraft?
     @State private var systemJourneyItemPresentation: TaskCenterItemSnapshot?
     @State private var systemJourneyEditorPresentation: TaskCenterSystemJourneyEditorRoute?
@@ -100,71 +119,112 @@ struct TaskCenterRouteContainer: View {
     }
 
     var body: some View {
+        lifecycleContent
+    }
+
+    private var taskCenterContent: some View {
         ZStack {
-            if presentation == .sheet {
-                OhanaAppBackground()
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
-
-            VStack(spacing: 0) {
-                TaskCenterHeader(
-                    selectedSurface: $selectedSurface,
-                    snapshot: visibleSnapshot,
-                    isLoading: !routeData.hasLoaded,
-                    showsAddButton: true,
-                    showsCloseButton: presentation == .sheet,
-                    filterLabel: scopeLabel,
-                    onAdd: requestAdd,
-                    onClose: onDismiss
-                )
-
-                Group {
-                    switch selectedSurface {
-                    case .tasks:
-                        TaskCenterView(
-                            snapshot: visibleSnapshot,
-                            isLoading: !routeData.hasLoaded,
-                            bottomClearance: presentation == .embeddedHome ? 190 : 42,
-                            showsDailyProgress: routeContext.scope == .all,
-                            focusedItemID: focusedItemID,
-                            focusRequestID: routeContext.focusRequestID,
-                            onAction: { item, action in
-                                performTaskAction(item, action: action)
-                            },
-                            onOpen: openTask,
-                            onScrollOffsetChange: onEmbeddedScrollOffsetChange
-                        )
-                    case .calendar:
-                        VStack(spacing: 0) {
-                            TaskCenterCalendarWorkflowStrip(
-                                items: calendarWorkflowItems,
-                                onOpen: openTask,
-                                onAction: { item, action in
-                                    performTaskAction(item, action: action)
-                                }
-                            )
-                            CalendarRouteContainer(
-                                preselectedPetId: effectivePreselectedPetID,
-                                preselectedHumanId: effectivePreselectedHumanID,
-                                hideToolbar: true,
-                                showsEmbeddedControls: true,
-                                isEmbeddedPrepared: isEmbeddedPrepared,
-                                isEmbeddedVisible: isEmbeddedVisible,
-                                isEmbeddedActive: isEmbeddedActive,
-                                onRequestAddEvent: onRequestAddEvent,
-                                onPlantsLoaded: onPlantsLoaded,
-                                onEmbeddedScrollOffsetChange: onEmbeddedScrollOffsetChange,
-                                onOpenEventDestination: onOpenEventDestination,
-                                onPresentCoconutLog: onPresentCoconutLog,
-                                onCompleteEvent: completeEvent
-                            )
-                        }
-                    }
-                }
-                .contentTransition(.opacity)
-            }
+            taskCenterBackground
+            taskCenterStack
         }
+    }
+
+    @ViewBuilder
+    private var taskCenterBackground: some View {
+        if presentation == .sheet {
+            OhanaAppBackground()
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var taskCenterStack: some View {
+        VStack(spacing: 0) {
+            taskCenterHeader
+            taskCenterSelectedSurface
+                .contentTransition(.opacity)
+        }
+    }
+
+    private var taskCenterHeader: some View {
+        TaskCenterHeader(
+            selectedSurface: $selectedSurface,
+            snapshot: headerSnapshot,
+            isLoading: !routeData.hasLoaded,
+            showsAddButton: true,
+            showsCloseButton: presentation == .sheet,
+            filterLabel: scopeLabel,
+            inboxUnreadCount: familyTaskUnreadActivityCount,
+            onOpenInbox: taskCenterInboxAction,
+            onAdd: requestAdd,
+            onClose: onDismiss
+        )
+    }
+
+    private var taskCenterInboxAction: (() -> Void)? {
+        guard selectedActiveHumanID != nil else { return nil }
+        return { openFamilyTaskInbox() }
+    }
+
+    @ViewBuilder
+    private var taskCenterSelectedSurface: some View {
+        switch selectedSurface {
+        case .tasks:
+            taskListSurface
+        case .calendar:
+            taskCalendarSurface
+        }
+    }
+
+    private var taskListSurface: some View {
+        TaskCenterView(
+            selectedMemberFilter: $selectedMemberFilter,
+            snapshot: visibleSnapshot,
+            isLoading: !routeData.hasLoaded,
+            bottomClearance: presentation == .embeddedHome ? 190 : 42,
+            showsDailyProgress: routeContext.scope == .all,
+            focusedItemID: focusedItemID,
+            focusRequestID: routeContext.focusRequestID,
+            onAction: { item, action in
+                performTaskAction(item, action: action)
+            },
+            onClaimSystemJourneyReward: { item in
+                claimStarterJourneyReward(for: item)
+            },
+            onOpen: openTask,
+            onScrollOffsetChange: onEmbeddedScrollOffsetChange
+        )
+    }
+
+    private var taskCalendarSurface: some View {
+        VStack(spacing: 0) {
+            TaskCenterCalendarWorkflowStrip(
+                items: calendarWorkflowItems,
+                onOpen: openTask,
+                onAction: { item, action in
+                    performTaskAction(item, action: action)
+                }
+            )
+            CalendarRouteContainer(
+                preselectedPetId: effectivePreselectedPetID,
+                preselectedHumanId: effectivePreselectedHumanID,
+                hideToolbar: true,
+                showsEmbeddedControls: true,
+                isEmbeddedPrepared: isEmbeddedPrepared,
+                isEmbeddedVisible: isEmbeddedVisible,
+                isEmbeddedActive: isEmbeddedActive,
+                onRequestAddEvent: onRequestAddEvent,
+                onPlantsLoaded: onPlantsLoaded,
+                onEmbeddedScrollOffsetChange: onEmbeddedScrollOffsetChange,
+                onOpenEventDestination: onOpenEventDestination,
+                onPresentCoconutLog: onPresentCoconutLog,
+                onCompleteEvent: completeEvent
+            )
+        }
+    }
+
+    private var modalContent: some View {
+        taskCenterContent
         .fullScreenCover(item: $eventDetailPresentation) { presentation in
             CalendarEventDetailPage(
                 event: presentation.event,
@@ -198,6 +258,26 @@ struct TaskCenterRouteContainer: View {
                 preselectedEntityId: routeContext.preselectedEntityId,
                 taskCreationPreset: routeContext.creationPreset
             )
+        }
+        .sheet(item: $familyTaskDetailRoute) { route in
+            familyTaskDetail(route)
+                .presentationDetents([.medium, .large])
+                .presentationContentInteraction(.scrolls)
+        }
+        .sheet(item: $familyTaskInboxRoute) { route in
+            FamilyTaskInboxView(
+                activities: familyTaskActivities,
+                unreadCount: familyTaskUnreadActivityCount,
+                memberName: familyTaskInboxMemberName(route.humanID),
+                onOpen: { activity in
+                    openFamilyTaskActivity(activity, inboxHumanID: route.humanID)
+                },
+                onMarkAllRead: {
+                    markAllFamilyTaskActivitiesRead(inboxHumanID: route.humanID)
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.scrolls)
         }
         .sheet(item: $familyTaskEditorRoute) { route in
             familyTaskEditor(route)
@@ -235,6 +315,10 @@ struct TaskCenterRouteContainer: View {
             .presentationDetents([.large])
             .presentationContentInteraction(.scrolls)
         }
+    }
+
+    private var lifecycleContent: some View {
+        modalContent
         .confirmationDialog(
             L10n.current.tr(zh: "添加待办", en: "Add task", de: "Aufgabe hinzufügen"),
             isPresented: $showingAddChoice,
@@ -251,6 +335,7 @@ struct TaskCenterRouteContainer: View {
         .actionHumanConfirmationDialog(draft: $pendingActionHumanConfirmation)
         .onAppear {
             scheduleRouteDataLoad(delayMilliseconds: routeDataLoadDelayMilliseconds)
+            refreshFamilyTaskActivities()
             if routeContext.creationPreset != nil, !didAutoPresentCreation {
                 didAutoPresentCreation = true
                 showingAddEvent = true
@@ -284,6 +369,14 @@ struct TaskCenterRouteContainer: View {
                 scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
             }
         }
+        .onChange(of: appServices.activeHumanSelection.currentHumanId) { _, _ in
+            selectedMemberFilter = nil
+            familyTaskDetailRoute = nil
+            familyTaskInboxRoute = nil
+            familyTaskEditorRoute = nil
+            refreshFamilyTaskActivities()
+            scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
+        }
         .onDisappear {
             dataLoadTask?.cancel()
             dataLoadTask = nil
@@ -300,7 +393,7 @@ struct TaskCenterRouteContainer: View {
         return isEmbeddedPrepared ? 96 : 180
     }
 
-    private func scheduleRouteDataLoad(delayMilliseconds: UInt64, force: Bool = false) {
+    func scheduleRouteDataLoad(delayMilliseconds: UInt64, force: Bool = false) {
         guard presentation == .sheet || isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive else { return }
         guard force || !routeData.hasLoaded else { return }
         if force {
@@ -332,8 +425,10 @@ struct TaskCenterRouteContainer: View {
                 guard !Task.isCancelled, generation == routeDataGeneration else { return }
                 let loaded = TaskCenterRouteData(reference: reference, context: modelContext)
                 routeData = loaded
+                refreshFamilyTaskActivities()
                 onPlantsLoaded?(loaded.plants)
-                onBadgeChange?(TaskCenterBadgeSnapshot(snapshot: loaded.snapshot))
+                let actionableSnapshot = loaded.snapshot.filtered(for: .actionRequired)
+                onBadgeChange?(TaskCenterBadgeSnapshot(snapshot: actionableSnapshot))
             } catch is CancellationError {
                 return
             } catch {
@@ -529,11 +624,12 @@ struct TaskCenterRouteContainer: View {
             }
             return
         }
+        if let familyTaskID = item.familyTaskID {
+            presentFamilyTaskDetail(taskID: familyTaskID, preferredItem: item)
+            return
+        }
         guard let eventID = item.eventID,
               let event = routeData.events.first(where: { $0.id == eventID }) else {
-            if let familyTaskID = item.familyTaskID {
-                familyTaskEditorRoute = .editTask(familyTaskID)
-            }
             return
         }
         let allowsEditing = CalendarEventInteractionPolicy.allowsUserEventDetail(
@@ -568,7 +664,7 @@ struct TaskCenterRouteContainer: View {
         )
     }
 
-    private var activeHumans: [Human] {
+    var activeHumans: [Human] {
         routeData.humans.filter { !$0.hasPassedAway }
     }
 
@@ -584,13 +680,19 @@ struct TaskCenterRouteContainer: View {
         return nil
     }
 
-    private var currentHuman: Human? {
+    var currentHuman: Human? {
         let selectedID = appServices.activeHumanSelection.currentHumanId
         return activeHumans.first { $0.id.uuidString == selectedID } ?? activeHumans.first
     }
 
     private var visibleSnapshot: TaskCenterSnapshot {
         routeData.snapshot.filtered(for: routeContext.scope)
+    }
+
+    private var headerSnapshot: TaskCenterSnapshot {
+        guard selectedSurface == .tasks else { return visibleSnapshot }
+        let filter = visibleSnapshot.resolvedMemberFilter(explicitSelection: selectedMemberFilter)
+        return visibleSnapshot.filtered(for: filter)
     }
 
     private var scopeLabel: String? {
@@ -912,94 +1014,364 @@ private extension TaskCenterRouteContainer {
     }
 }
 
-// MARK: - Family task editor
+// MARK: - Family task detail
+
+extension TaskCenterRouteContainer {
+    func familyTaskDetail(_ route: TaskCenterFamilyTaskDetailRoute) -> some View {
+        FamilyTaskDetailView(
+            snapshot: route.snapshot,
+            onEdit: route.snapshot.capabilities.canEdit ? {
+                presentFamilyTaskEditorAfterDetail(taskID: route.snapshot.taskID)
+            } : nil,
+            onTaskAction: { action in
+                performFamilyTaskDetailAction(taskID: route.snapshot.taskID, action: action)
+            },
+            onDecline: { reason in
+                declineFamilyTask(taskID: route.snapshot.taskID, reason: reason)
+            },
+            onPostpone: { dueAt in
+                postponeFamilyTask(taskID: route.snapshot.taskID, to: dueAt)
+            },
+            onComment: { body in
+                commentOnFamilyTask(taskID: route.snapshot.taskID, body: body)
+            },
+            onCancel: { scope in
+                await cancelFamilyTask(taskID: route.snapshot.taskID, scope: scope)
+            }
+        )
+    }
+
+    func presentFamilyTaskDetail(
+        taskID: UUID,
+        preferredItem: TaskCenterItemSnapshot? = nil
+    ) {
+        guard let task = familyTaskModel(id: taskID) else { return }
+        familyTaskDetailRoute = makeFamilyTaskDetailRoute(task: task, preferredItem: preferredItem)
+    }
+
+    func makeFamilyTaskDetailRoute(
+        task: FamilyCollaborationTask,
+        preferredItem: TaskCenterItemSnapshot?
+    ) -> TaskCenterFamilyTaskDetailRoute {
+        let latestItem = preferredItem.flatMap { preferred in
+            routeData.snapshot.allItems.first(where: { $0.id == preferred.id }) ?? preferred
+        } ?? routeData.snapshot.allItems.first(where: { $0.familyTaskID == task.id })
+        let capabilities = FamilyTaskCapabilities.resolve(
+            task: task,
+            currentHumanID: selectedActiveHumanID
+        )
+        var actions: Set<TaskCenterAvailableAction> = []
+        if capabilities.canComplete {
+            actions.insert(task.hasReward ? .submitForReview : .complete)
+        }
+        if capabilities.canApprove { actions.insert(.approve) }
+        if capabilities.canReturnForRedo { actions.insert(.reject) }
+        if task.status == .active,
+           task.isOpen,
+           selectedActiveHumanID != nil,
+           latestItem?.availableActions.contains(.claim) == true {
+            actions.insert(.claim)
+        }
+
+        return TaskCenterFamilyTaskDetailRoute(
+            snapshot: TaskCenterFamilyTaskDetailSnapshot(
+                taskID: task.id,
+                title: task.title,
+                note: task.note,
+                emoji: task.emoji,
+                creatorName: task.createdByName,
+                assigneeName: task.claimedByName ?? task.assignedToName,
+                viewerRole: familyTaskViewerRole(for: task),
+                capabilities: capabilities,
+                status: task.status,
+                dueAt: task.dueAt ?? latestItem?.dueAt,
+                isAllDay: latestItem?.isAllDay ?? false,
+                isRecurring: latestItem?.isRecurring == true || task.planId != nil,
+                allowsThisAndFutureCancellation: task.planId != nil && task.nominalAt != nil,
+                rewardCoconuts: task.rewardCoconuts,
+                availableActions: actions,
+                isLinkedToCalendar: latestItem?.eventID != nil || task.relatedEventId != nil,
+                activities: FamilyTaskActivityService.occurrenceTimeline(
+                    taskID: task.id,
+                    context: modelContext
+                )
+            )
+        )
+    }
+
+    func familyTaskViewerRole(
+        for task: FamilyCollaborationTask
+    ) -> TaskCenterFamilyTaskViewerRole {
+        guard let selectedHumanID = selectedActiveHumanID else {
+            return .familyMember
+        }
+        if UUID(uuidString: task.createdById) == selectedHumanID {
+            return .creator
+        }
+        if task.claimedById.flatMap(UUID.init(uuidString:)) == selectedHumanID ||
+            task.assignedToId.flatMap(UUID.init(uuidString:)) == selectedHumanID {
+            return .assignee
+        }
+        return .familyMember
+    }
+
+    func canSelectedHumanEdit(_ task: FamilyCollaborationTask) -> Bool {
+        FamilyTaskCapabilities.resolve(
+            task: task,
+            currentHumanID: selectedActiveHumanID
+        ).canEdit
+    }
+
+    func presentFamilyTaskEditorAfterDetail(taskID: UUID) {
+        familyTaskDetailRoute = nil
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 160) {
+            guard let task = familyTaskModel(id: taskID),
+                  canSelectedHumanEdit(task) else { return }
+            if !routeData.familyTasks.contains(where: { $0.id == taskID }) {
+                routeData.familyTasks.append(task)
+            }
+            familyTaskEditorRoute = .editTask(taskID)
+        }
+    }
+
+    func performFamilyTaskDetailAction(
+        taskID: UUID,
+        action: TaskCenterAvailableAction
+    ) -> Bool {
+        guard let task = familyTaskModel(id: taskID),
+              let human = selectedHumanForFamilyTaskCommand() else { return false }
+        let capabilities = FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id)
+        let didSucceed: Bool
+        switch action {
+        case .complete, .submitForReview:
+            guard capabilities.canComplete else { return false }
+            didSucceed = familyTaskCommandExecutor.complete(task, by: human)
+        case .claim:
+            didSucceed = familyTaskCommandExecutor.claim(task, by: human)
+        case .approve:
+            guard capabilities.canApprove else { return false }
+            didSucceed = familyTaskCommandExecutor.confirmCompletion(task, by: human)
+        case .reject:
+            guard capabilities.canReturnForRedo else { return false }
+            didSucceed = familyTaskCommandExecutor.rejectCompletion(task, by: human)
+        }
+        return finishFamilyTaskMutation(didSucceed, taskID: taskID)
+    }
+
+    func declineFamilyTask(taskID: UUID, reason: String) -> Bool {
+        guard let task = familyTaskModel(id: taskID),
+              let human = selectedHumanForFamilyTaskCommand(),
+              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canDecline else {
+            return false
+        }
+        return finishFamilyTaskMutation(
+            familyTaskCommandExecutor.declineAssignment(task, by: human, reason: reason),
+            taskID: taskID
+        )
+    }
+
+    func postponeFamilyTask(taskID: UUID, to dueAt: Date) -> Bool {
+        guard let task = familyTaskModel(id: taskID),
+              let human = selectedHumanForFamilyTaskCommand(),
+              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canPostpone else {
+            return false
+        }
+        return finishFamilyTaskMutation(
+            familyTaskCommandExecutor.postponeOccurrence(task, to: dueAt, by: human),
+            taskID: taskID
+        )
+    }
+
+    func commentOnFamilyTask(taskID: UUID, body: String) -> Bool {
+        guard let task = familyTaskModel(id: taskID),
+              let human = selectedHumanForFamilyTaskCommand(),
+              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canComment else {
+            return false
+        }
+        let idempotencyKey = "family-task:\(taskID.uuidString):comment:\(human.id.uuidString):\(UUID().uuidString)"
+        return finishFamilyTaskMutation(
+            familyTaskCommandExecutor.addComment(
+                task,
+                body: body,
+                by: human,
+                idempotencyKey: idempotencyKey
+            ),
+            taskID: taskID
+        )
+    }
+
+    func cancelFamilyTask(
+        taskID: UUID,
+        scope: FamilyTaskEditScope
+    ) async -> Bool {
+        guard let task = familyTaskModel(id: taskID),
+              let human = selectedHumanForFamilyTaskCommand(),
+              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canCancel else {
+            return false
+        }
+        switch scope {
+        case .onlyThis:
+            return finishFamilyTaskMutation(
+                familyTaskCommandExecutor.cancelTask(task, by: human),
+                taskID: taskID
+            )
+        case .thisAndFuture:
+            guard let rawPlanID = task.planId,
+                  let planID = UUID(uuidString: rawPlanID),
+                  let nominalAt = task.nominalAt else { return false }
+            let didSucceed = await familyTaskCommandExecutor.cancelThisAndFuture(
+                planID: planID,
+                from: nominalAt,
+                by: human
+            )
+            guard didSucceed else { return false }
+            refreshFamilyTaskActivities()
+            scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
+            return true
+        }
+    }
+
+    func finishFamilyTaskMutation(_ didSucceed: Bool, taskID: UUID) -> Bool {
+        guard didSucceed else { return false }
+        if familyTaskDetailRoute?.snapshot.taskID == taskID,
+           let task = familyTaskModel(id: taskID) {
+            familyTaskDetailRoute = makeFamilyTaskDetailRoute(task: task, preferredItem: nil)
+        }
+        refreshFamilyTaskActivities()
+        scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
+        return true
+    }
+
+    var familyTaskCommandExecutor: FamilyCollaborationCommandExecutor {
+        FamilyCollaborationCommandExecutor(
+            modelContext: modelContext,
+            familyTasks: appServices.familyTasks,
+            revisions: appServices.domainRevisions
+        )
+    }
+
+    var selectedActiveHumanID: UUID? {
+        appServices.activeHumanSelection.currentHumanId.flatMap(UUID.init(uuidString:))
+    }
+
+    func selectedHumanForFamilyTaskCommand() -> Human? {
+        guard let selectedActiveHumanID else { return nil }
+        return routeData.humans.first { $0.id == selectedActiveHumanID && !$0.hasPassedAway }
+    }
+
+    func familyTaskModel(id: UUID) -> FamilyCollaborationTask? {
+        routeData.familyTasks.first { $0.id == id }
+    }
+}
+
+// MARK: - Family task inbox
 
 private extension TaskCenterRouteContainer {
-    @ViewBuilder
-    private func familyTaskEditor(_ route: FamilyCollaborationEditorRoute) -> some View {
-        let context = FamilyCollaborationEditorContext.resolve(
-            route: route,
-            reminders: routeData.reminders,
-            tasks: routeData.familyTasks
+    func refreshFamilyTaskActivities() {
+        guard let humanID = selectedActiveHumanID else {
+            familyTaskActivities = []
+            familyTaskUnreadActivityCount = 0
+            familyTaskInboxRoute = nil
+            return
+        }
+        if let route = familyTaskInboxRoute, route.humanID != humanID {
+            familyTaskInboxRoute = nil
+        }
+        familyTaskActivities = FamilyTaskActivityService.inbox(
+            recipientHumanID: humanID,
+            context: modelContext
         )
-        let commandExecutor = FamilyCollaborationCommandExecutor(modelContext: modelContext)
-        NavigationStack {
-            Group {
-                if let context {
-                    FamilyTaskEditorPanel(
-                        context: context,
-                        humans: activeHumans,
-                        currentHuman: currentHuman,
-                        pets: routeData.pets.filter { !$0.hasPassedAway },
-                        onClose: dismissFamilyTaskEditor,
-                        onAssignReminder: { reminder, human, reward, note in
-                            commandExecutor.assignReminder(
-                                reminder,
-                                to: human,
-                                by: currentHuman,
-                                rewardCoconuts: reward,
-                                note: note
-                            )
-                        },
-                        onCreateTask: { title, note, human, reward, dueAt, emoji in
-                            commandExecutor.createTask(
-                                title: title,
-                                note: note,
-                                assignedTo: human,
-                                by: currentHuman,
-                                rewardCoconuts: reward,
-                                dueAt: dueAt,
-                                emoji: emoji
-                            )
-                        },
-                        onUpdateTask: { task, title, note, human, reward, dueAt, emoji in
-                            commandExecutor.updateTask(
-                                task,
-                                title: title,
-                                note: note,
-                                assignedTo: human,
-                                rewardCoconuts: reward,
-                                dueAt: dueAt,
-                                emoji: emoji,
-                                by: currentHuman
-                            )
-                        },
-                        onDeleteTask: { task in
-                            commandExecutor.deleteTask(task, by: currentHuman)
-                        }
-                    )
-                } else {
-                    ContentUnavailableView(
-                        L10n.current.tr(zh: "任务不可用", en: "Task unavailable", de: "Aufgabe nicht verfügbar"),
-                        systemImage: "exclamationmark.triangle"
-                    )
-                }
-            }
-            .navigationTitle(editorTitle(route))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.current.cancel, action: dismissFamilyTaskEditor)
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationContentInteraction(.scrolls)
+        familyTaskUnreadActivityCount = FamilyTaskActivityService.unreadCount(
+            recipientHumanID: humanID,
+            context: modelContext
+        )
     }
 
-    private func dismissFamilyTaskEditor() {
-        familyTaskEditorRoute = nil
-        scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
+    func openFamilyTaskInbox() {
+        guard let humanID = selectedActiveHumanID else { return }
+        refreshFamilyTaskActivities()
+        familyTaskInboxRoute = TaskCenterFamilyTaskInboxRoute(humanID: humanID)
+        OhanaFeedback.light()
     }
 
-    private func editorTitle(_ route: FamilyCollaborationEditorRoute) -> String {
-        switch route {
-        case .assignReminder:
-            L10n.current.tr(zh: "分配提醒", en: "Assign reminder", de: "Erinnerung zuweisen")
-        case .editTask:
-            L10n.current.tr(zh: "编辑任务", en: "Edit task", de: "Aufgabe bearbeiten")
-        case .create:
-            L10n.current.tr(zh: "新建任务", en: "New task", de: "Neue Aufgabe")
+    func familyTaskInboxMemberName(_ humanID: UUID) -> String {
+        routeData.humans.first(where: { $0.id == humanID })?.name
+            ?? L10n.current.tr(zh: "当前成员", en: "Current member", de: "Aktuelles Mitglied")
+    }
+
+    func openFamilyTaskActivity(
+        _ activity: FamilyTaskActivitySnapshot,
+        inboxHumanID: UUID
+    ) {
+        guard selectedActiveHumanID == inboxHumanID,
+              activity.recipientHumanID == inboxHumanID else { return }
+        if activity.isUnread {
+            _ = FamilyTaskActivityService.markRead(
+                activityID: activity.id,
+                recipientHumanID: inboxHumanID,
+                context: modelContext
+            )
         }
+        refreshFamilyTaskActivities()
+        if let task = familyTaskModel(for: activity) {
+            presentFamilyTaskActivity(task, inboxHumanID: inboxHumanID)
+            return
+        }
+
+        Task { @MainActor in
+            let loader = TaskCenterRouteDataActor(modelContainer: modelContext.container)
+            let modelID = try? await loader.resolveFamilyTaskModelID(
+                taskID: activity.taskID,
+                occurrenceKey: activity.occurrenceKey,
+                planID: activity.planID
+            )
+            guard !Task.isCancelled,
+                  selectedActiveHumanID == inboxHumanID,
+                  familyTaskInboxRoute?.humanID == inboxHumanID,
+                  let modelID,
+                  let task = modelContext.model(for: modelID) as? FamilyCollaborationTask else { return }
+            presentFamilyTaskActivity(task, inboxHumanID: inboxHumanID)
+        }
+    }
+
+    func presentFamilyTaskActivity(
+        _ task: FamilyCollaborationTask,
+        inboxHumanID: UUID
+    ) {
+        let nextRoute = makeFamilyTaskDetailRoute(task: task, preferredItem: nil)
+        familyTaskInboxRoute = nil
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 160) {
+            guard selectedActiveHumanID == inboxHumanID else { return }
+            familyTaskDetailRoute = nextRoute
+        }
+    }
+
+    func familyTaskModel(for activity: FamilyTaskActivitySnapshot) -> FamilyCollaborationTask? {
+        if let taskID = activity.taskID, let task = familyTaskModel(id: taskID) {
+            return task
+        }
+        if let occurrenceKey = activity.occurrenceKey {
+            if let task = routeData.familyTasks.first(where: { $0.occurrenceKey == occurrenceKey }) {
+                return task
+            }
+        }
+        guard let planID = activity.planID else { return nil }
+        let rawPlanID = planID.uuidString
+        let tasks = routeData.familyTasks
+            .filter { $0.planId == rawPlanID }
+            .sorted { ($0.nominalAt ?? .distantPast) > ($1.nominalAt ?? .distantPast) }
+        return tasks.first(where: { !$0.isFinished }) ?? tasks.first
+    }
+
+    func markAllFamilyTaskActivitiesRead(inboxHumanID: UUID) {
+        guard selectedActiveHumanID == inboxHumanID else { return }
+        for _ in 0 ..< 20 {
+            let markedCount = FamilyTaskActivityService.markAllRead(
+                recipientHumanID: inboxHumanID,
+                context: modelContext
+            )
+            if markedCount == 0 { break }
+        }
+        refreshFamilyTaskActivities()
     }
 }

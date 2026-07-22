@@ -172,6 +172,43 @@ struct OhanaNotificationsSchedulingTests {
         replaySubscription.cancel()
     }
 
+    @Test func weeklyReportDefaultTapPublishesWeeklyReportRoute() {
+        let center = OhanaNotificationRouteCenter()
+
+        center.requestDefaultRoute([
+            "notificationCategory": NotificationDeliveryCategory.weeklyReport.rawValue
+        ])
+
+        var delivery: AppRoutePublishedEvent?
+        let subscription = center.routeEvents.sink { event in
+            delivery = event
+        }
+        #expect(delivery?.event == .familyWeeklyReportRouteRequested)
+        #expect(center.pendingRoute() == nil)
+        subscription.cancel()
+    }
+
+    @Test func guardianDefaultTapAndContactedActionPublishDistinctEvents() {
+        let center = OhanaNotificationRouteCenter()
+        var deliveries: [AppRouteNotificationEvent] = []
+        let subscription = center.routeEvents.sink { event in
+            deliveries.append(event.event)
+        }
+
+        center.requestDefaultRoute([
+            GuardianRemoteNotificationContract.markerUserInfoKey: true,
+            GuardianRemoteNotificationContract.incidentIDUserInfoKey: "incident-42"
+        ])
+        center.requestGuardianIncidentAcknowledgement("incident-42")
+
+        #expect(deliveries == [
+            .guardianSafetyRouteRequested(invitationCode: nil, incidentID: "incident-42"),
+            .guardianIncidentAcknowledgementRequested(incidentID: "incident-42")
+        ])
+        #expect(center.pendingRoute() == nil)
+        subscription.cancel()
+    }
+
     @Test func reminderActionWaitsForAConsumerAndDoesNotReplayAfterAcknowledgement() {
         let center = OhanaNotificationRouteCenter()
         center.publishReminderAction(["reminderId": "reminder-123"])
@@ -444,11 +481,13 @@ struct OhanaNotificationsSchedulingTests {
         #expect(managerSource.contains("identifier: \"SNOOZE\""))
         #expect(managerSource.contains("actions: [completeAction, skipAction, snoozeAction]"))
         #expect(managerSource.contains("case UNNotificationDefaultActionIdentifier:"))
-        #expect(managerSource.contains("self.routeCenter.requestReminderRoute(payload)"))
+        #expect(managerSource.contains("self.routeCenter.requestDefaultRoute(payload)"))
         #expect(managerSource.contains(
             "case \"COMPLETE\", \"SKIP\", \"SNOOZE\", PresenceReminderRequestFactory.okayActionIdentifier:"
         ))
         #expect(managerSource.contains("self.routeCenter.publishReminderAction(payload)"))
+        #expect(managerSource.contains("private func responsePayload("))
+        #expect(managerSource.contains("let payload = responsePayload(userInfo: userInfo, action: action)"))
 
         for key in [
             "reminderId",
@@ -461,9 +500,10 @@ struct OhanaNotificationsSchedulingTests {
             "humanId",
             "medicationId",
             "humanMedicationId",
-            "scheduledAt"
+            "scheduledAt",
+            "notificationCategory"
         ] {
-            #expect(managerSource.contains("payload[\"\(key)\"]"))
+            #expect(managerSource.contains("\"\(key)\""))
         }
     }
 

@@ -30,7 +30,8 @@ may override the active sources below.
 | Open backlog | `docs/task-follow-ups.md` |
 | Status ownership | `docs/status-ledger-map.md` |
 | Deferred CloudKit work | `docs/cloud-sync-todo.md` |
-| Deferred account/backend work | `docs/planning/account-backend-extension.md` (planning only; not current product or code truth) |
+| Family App guardian | `docs/specs/GuardianSafety-logic.md` (approved minimum-data boundary; release remains fail-closed) |
+| Deferred broader account/backend work | `docs/planning/account-backend-extension.md` (planning only; excludes the approved Family guardian) |
 | Physical-device acceptance | `docs/release-true-device-test-plan.md` and `docs/planning/gap-acceptance-track-list.md` |
 | Architecture/runtime/privacy gates | `docs/*-governance.md`, `docs/*-policy.md`, and `docs/release-quality-gates.md` |
 | Feature behavior | `docs/specs/*-logic.md` |

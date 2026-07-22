@@ -39,7 +39,7 @@ struct PresenceReminderConfigurationTests {
         ) == .weekdaySchedulesRequirePersonal)
     }
 
-    @Test func personalAllowsWeekdaysGraceSecondReminderAndEditableTemplate() {
+    @Test func personalAllowsWeekdaysGraceAndSecondReminderWithFixedTemplate() {
         let configuration = PresenceReminderConfiguration(
             isEnabled: true,
             schedules: [
@@ -48,12 +48,23 @@ struct PresenceReminderConfigurationTests {
             ],
             gracePeriodMinutes: 30,
             sendsSecondLocalReminder: true,
-            messageTemplate: "Please check in."
+            messageTemplate: PresenceReminderConfiguration.fixedMessageTemplate
         )
         #expect(PresenceReminderConfigurationPolicy.denial(
             for: configuration,
             capabilities: .make(for: .personal)
         ) == nil)
+    }
+
+    @Test func appOnlyGuardianFlowRejectsEditableTemplatesForEveryPlan() {
+        for plan in OhanaPlanLevel.allCases {
+            var configuration = PresenceReminderConfiguration.initial
+            configuration.messageTemplate = "Please check in."
+            #expect(PresenceReminderConfigurationPolicy.denial(
+                for: configuration,
+                capabilities: .make(for: plan)
+            ) == .editableTemplateRequiresPersonal)
+        }
     }
 
     @Test func secondReminderWrapsToTheNextWeekday() throws {

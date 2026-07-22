@@ -404,19 +404,61 @@ extension MemberCardCreationContentView {
     var humanRegionSection: some View {
         MemberCreationSection(title: l.tr(zh: "地区", en: "Region", de: "Region"), icon: "location.fill", foreground: cardForeground) {
             VStack(alignment: .leading, spacing: 10) {
-                menuPicker(title: l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), value: draft.nationality.isEmpty ? l.tr(zh: "未设置", en: "Not set", de: "Nicht gesetzt") : draft.nationality) {
+                menuPicker(
+                    title: l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"),
+                    value: regionPickerValue(
+                        draft.nationality,
+                        usesCustomValue: usesCustomNationality
+                    )
+                ) {
                     ForEach(PetBreedDatabase.countries, id: \.self) { country in
-                        Button(country) { draft.nationality = country }
-                    }
-                }
-                menuPicker(title: l.tr(zh: "现居国家", en: "Residence", de: "Wohnort"), value: draft.residenceCountry.isEmpty ? l.tr(zh: "未设置", en: "Not set", de: "Nicht gesetzt") : draft.residenceCountry) {
-                    ForEach(PetBreedDatabase.countries, id: \.self) { country in
-                        Button(country) {
-                            draft.residenceCountry = country
-                            draft.residenceCity = ""
-                            usesCustomResidenceCity = false
+                        Button(localizedRegionOption(country)) {
+                            if profileExperienceStyle == .zen, country == "其他" {
+                                usesCustomNationality = true
+                                draft.nationality = ""
+                            } else {
+                                usesCustomNationality = false
+                                draft.nationality = country
+                            }
                         }
                     }
+                }
+                if profileExperienceStyle == .zen, usesCustomNationality {
+                    zenRegionTextField(
+                        l.tr(zh: "输入国籍", en: "Enter nationality", de: "Nationalität eingeben"),
+                        text: $draft.nationality,
+                        identifier: "member-human-custom-nationality-input"
+                    )
+                }
+
+                menuPicker(
+                    title: l.tr(zh: "现居国家", en: "Residence", de: "Wohnort"),
+                    value: regionPickerValue(
+                        draft.residenceCountry,
+                        usesCustomValue: usesCustomResidenceCountry
+                    )
+                ) {
+                    ForEach(PetBreedDatabase.countries, id: \.self) { country in
+                        Button(localizedRegionOption(country)) {
+                            if profileExperienceStyle == .zen, country == "其他" {
+                                usesCustomResidenceCountry = true
+                                draft.residenceCountry = ""
+                                usesCustomResidenceCity = true
+                            } else {
+                                usesCustomResidenceCountry = false
+                                draft.residenceCountry = country
+                                usesCustomResidenceCity = false
+                            }
+                            draft.residenceCity = ""
+                        }
+                    }
+                }
+                if profileExperienceStyle == .zen, usesCustomResidenceCountry {
+                    zenRegionTextField(
+                        l.tr(zh: "输入现居国家", en: "Enter residence country", de: "Wohnland eingeben"),
+                        text: $draft.residenceCountry,
+                        identifier: "member-human-custom-residence-country-input"
+                    )
                 }
                 MemberCompactCityPicker(
                     country: draft.residenceCountry,
@@ -425,6 +467,41 @@ extension MemberCardCreationContentView {
                 )
             }
         }
+    }
+
+    private func regionPickerValue(_ value: String, usesCustomValue: Bool) -> String {
+        if usesCustomValue {
+            return value.isEmpty
+                ? l.tr(zh: "其他", en: "Other", de: "Andere")
+                : value
+        }
+        return value.isEmpty
+            ? l.tr(zh: "未设置", en: "Not set", de: "Nicht gesetzt")
+            : value
+    }
+
+    private func localizedRegionOption(_ value: String) -> String {
+        value == "其他"
+            ? l.tr(zh: "其他", en: "Other", de: "Andere")
+            : value
+    }
+
+    private func zenRegionTextField(
+        _ title: String,
+        text: Binding<String>,
+        identifier: String
+    ) -> some View {
+        TextField(title, text: text)
+            .textInputAutocapitalization(.words)
+            .font(OhanaFont.caption(.bold))
+            .foregroundStyle(cardForeground)
+            .tint(cardAccent)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 42)
+            .background(cardControlFill, in: Capsule())
+            .overlay(Capsule().strokeBorder(cardControlStroke, lineWidth: 1))
+            .accessibilityIdentifier(identifier)
+            .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     var humanWellbeingSection: some View {

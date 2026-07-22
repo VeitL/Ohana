@@ -28,7 +28,8 @@ enum AppFeatureRouteGuard {
 
     static func functionDestinationDecision(
         _ destination: FMDest?,
-        currentLevel: Int
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
     ) -> FunctionDestinationDecision {
         guard let destination else { return .rootMenu }
         guard allowsOnlineDestination(destination) else {
@@ -38,7 +39,7 @@ enum AppFeatureRouteGuard {
             return .suppress(note: "plantGate:\(destination)")
         }
 
-        switch availability(for: destination, currentLevel: currentLevel) {
+        switch availability(for: destination, currentLevel: currentLevel, plan: plan) {
         case .visible:
             return .allow(destination)
         case .hiddenLocked:
@@ -48,43 +49,80 @@ enum AppFeatureRouteGuard {
         }
     }
 
-    static func availability(for destination: FMDest, currentLevel: Int) -> AppFeatureAvailability {
+    static func availability(
+        for destination: FMDest,
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
+    ) -> AppFeatureAvailability {
         guard allowsPlantDestination(destination) else { return .outOfScope }
         if requiresPlantFeature(destination) {
             let status = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.household, currentLevel: currentLevel)
             return PlantUnlockPolicy.isUnlocked(currentLevel: currentLevel) ? .visible(status) : .hiddenLocked(status)
         }
+        if case .featureGroup(.householdHub) = destination {
+            return householdInsightAvailability(
+                HouseholdInsightAccessPolicy.containerAccess(currentLevel: currentLevel, plan: plan),
+                destination: destination,
+                currentLevel: currentLevel
+            )
+        }
+        if let access = HouseholdInsightAccessPolicy.access(
+            for: destination,
+            currentLevel: currentLevel,
+            plan: plan
+        ) {
+            return householdInsightAvailability(
+                access,
+                destination: destination,
+                currentLevel: currentLevel
+            )
+        }
         return GrowthUnlockPolicy.availability(for: destination, currentLevel: currentLevel)
     }
 
-    static func availability(for group: FeatureGroup, currentLevel: Int) -> AppFeatureAvailability {
+    static func availability(
+        for group: FeatureGroup,
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
+    ) -> AppFeatureAvailability {
         guard allowsPlantGroup(group) else { return .outOfScope }
         if requiresPlantFeature(group) {
             let status = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.household, currentLevel: currentLevel)
             return PlantUnlockPolicy.isUnlocked(currentLevel: currentLevel) ? .visible(status) : .hiddenLocked(status)
+        }
+        if group == .householdHub {
+            let access = HouseholdInsightAccessPolicy.containerAccess(
+                currentLevel: currentLevel,
+                plan: plan
+            )
+            let status = GrowthUnlockPolicy.status(for: group, currentLevel: currentLevel)
+            return access.isAvailable ? .visible(status) : .hiddenLocked(status)
         }
         return GrowthUnlockPolicy.availability(for: group, currentLevel: currentLevel)
     }
 
     static func visibleFeatureGroups(
         from groups: [FeatureGroup],
-        currentLevel: Int
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
     ) -> [FeatureGroup] {
-        groups.filter { availability(for: $0, currentLevel: currentLevel).isVisibleInApp }
+        groups.filter { availability(for: $0, currentLevel: currentLevel, plan: plan).isVisibleInApp }
     }
 
     static func visibleFunctionDestination(
         _ destination: FMDest?,
-        currentLevel: Int
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
     ) -> FMDest? {
-        functionDestinationDecision(destination, currentLevel: currentLevel).directDestination
+        functionDestinationDecision(destination, currentLevel: currentLevel, plan: plan).directDestination
     }
 
     static func isVisibleFunctionDestination(
         _ destination: FMDest,
-        currentLevel: Int
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
     ) -> Bool {
-        if case .allow = functionDestinationDecision(destination, currentLevel: currentLevel) {
+        if case .allow = functionDestinationDecision(destination, currentLevel: currentLevel, plan: plan) {
             return true
         }
         return false
@@ -177,9 +215,13 @@ enum AppFeatureRouteGuard {
         GrowthUnlockPolicy.newlyUnlockedStages(from: previousLevel, to: currentLevel)
     }
 
-    static func recommendedDestination(for step: GrowthUnlockStep, currentLevel: Int) -> FMDest {
+    static func recommendedDestination(
+        for step: GrowthUnlockStep,
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
+    ) -> FMDest {
         let destination = GrowthUnlockPolicy.primaryDestination(for: step)
-        return visibleFunctionDestination(destination, currentLevel: currentLevel) ?? .growthRoadmap
+        return visibleFunctionDestination(destination, currentLevel: currentLevel, plan: plan) ?? .growthRoadmap
     }
 
     static func requiredLevel(for sheetRoute: AppSheetRoute) -> Int? {
@@ -240,6 +282,15 @@ enum AppFeatureRouteGuard {
 
     private static var critterCodexUnlockLevel: Int {
         OasisUpgradeRewardCatalog.critter(id: OasisUpgradeRewardCatalog.firstCritterId)?.sourceLevel ?? 10
+    }
+
+    private static func householdInsightAvailability(
+        _ access: HouseholdInsightAccess,
+        destination: FMDest,
+        currentLevel: Int
+    ) -> AppFeatureAvailability {
+        let status = GrowthUnlockPolicy.status(for: destination, currentLevel: currentLevel)
+        return access.isAvailable ? .visible(status) : .hiddenLocked(status)
     }
 
     private static func allowsOnlineDestination(_ destination: FMDest) -> Bool {

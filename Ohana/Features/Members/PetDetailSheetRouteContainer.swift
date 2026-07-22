@@ -112,7 +112,7 @@ struct AppPetDetailSheetRouteContainer: View {
                     allFeaturesActivitySummaryTask = nil
                 }
             case .basicInfo:
-                NavigationStack { PetBasicInfoDetailView(pet: pet) }
+                NavigationStack { PetBasicInfoDetailView(pet: pet, onClose: onDismiss) }
             case .food:
                 NavigationStack {
                     PetFoodManagementView(

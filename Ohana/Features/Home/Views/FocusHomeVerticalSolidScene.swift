@@ -961,35 +961,14 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     }
 
     private func collapsedFrame(index: Int, count: Int, in size: CGSize) -> CGRect {
-        let availableHeight = max(260, size.height - collapsedTopInset)
-        let offsets = collapsedOffsets(count: count)
-        let safeIndex = min(max(index, 0), max(offsets.count - 1, 0))
-        let offset = offsets[safeIndex]
-        let xValues = offsets.map(\.width)
-        let yValues = offsets.map(\.height)
-        let horizontalSpan = max(1.0, (xValues.max() ?? 0) - (xValues.min() ?? 0) + 1.0)
-        let verticalSpan = max(
-            FocusHomeVerticalSolidCollapsedLayoutPolicy.cardAspectRatio,
-            (yValues.max() ?? 0) - (yValues.min() ?? 0) + FocusHomeVerticalSolidCollapsedLayoutPolicy.cardAspectRatio
+        FocusHomeVerticalSolidCollapsedLayoutPolicy.frame(
+            index: index,
+            count: count,
+            in: size,
+            collapsedTopInset: collapsedTopInset,
+            collapsedVerticalBias: collapsedVerticalBias,
+            mode: collapsedLayoutMode
         )
-        let preferredWidth = min(max(size.width * (count <= 1 ? 0.43 : 0.37), 112), count >= 5 ? 144 : 166)
-        let width = max(
-            104,
-            min(
-                preferredWidth,
-                max(104, (size.width - 24) / horizontalSpan),
-                max(104, (availableHeight - 18) / verticalSpan)
-            )
-        )
-        let height = width * FocusHomeVerticalSolidCollapsedLayoutPolicy.cardAspectRatio
-        let verticalBias = availableHeight * FocusHomeVerticalSolidCollapsedLayoutPolicy.clampedVerticalBias(collapsedVerticalBias)
-        let center = CGPoint(
-            x: size.width / 2,
-            y: collapsedTopInset + availableHeight / 2 + verticalBias
-        )
-        let x = center.x + offset.width * width
-        let y = center.y + offset.height * width
-        return CGRect(x: x - width / 2, y: y - height / 2, width: width, height: height)
     }
 
     private func expandedFrame(
@@ -998,34 +977,14 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         visibleCenterX: CGFloat,
         collapsedFrame: CGRect? = nil
     ) -> CGRect {
-        let aspectRatio = FocusHomeVerticalSolidCollapsedLayoutPolicy.cardAspectRatio
-        let maxWidth: CGFloat = embedsQuickActionsInCard ? 386 : 390
-        let horizontalInset: CGFloat = embedsQuickActionsInCard ? 18 : 22
-        let safeTopInset = safeTop
-        let bottomInset = embedsQuickActionsInCard ? CGFloat(0) : safeBottom + 28
-        let availableWidth = max(220, size.width - horizontalInset)
-        let availableHeight = max(320, size.height - safeTopInset - bottomInset)
-        let width = min(availableWidth, maxWidth, availableHeight / aspectRatio)
-        let height = width * aspectRatio
-        let centeredTargetY = safeTopInset + availableHeight / 2 - (embedsQuickActionsInCard ? 2 : 0)
-        let minimumY = safeTopInset + height / 2
-        let maximumY = safeTopInset + availableHeight - height / 2
-        let targetY: CGFloat
-        switch expandedVerticalPlacement {
-        case .sceneCenter:
-            targetY = centeredTargetY
-        case .collapsedCardCenter:
-            let anchoredY = collapsedFrame?.midY ?? centeredTargetY
-            targetY = min(max(anchoredY, minimumY), max(minimumY, maximumY))
-        case let .viewportTop(topInset, scrollOffsetY):
-            let anchoredY = max(0, scrollOffsetY) + max(0, topInset) + height / 2
-            targetY = min(max(anchoredY, minimumY), max(minimumY, maximumY))
-        }
-        return CGRect(
-            x: visibleCenterX - width / 2,
-            y: targetY - height / 2,
-            width: width,
-            height: height
+        FocusHomeVerticalSolidExpandedLayoutPolicy.frame(
+            in: size,
+            visibleCenterX: visibleCenterX,
+            safeTop: safeTop,
+            safeBottom: safeBottom,
+            embedsQuickActionsInCard: embedsQuickActionsInCard,
+            placement: expandedVerticalPlacement,
+            collapsedFrame: collapsedFrame
         )
     }
 
@@ -1034,19 +993,15 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     }
 
     private func collapsedRotation(index: Int) -> Double {
-        let rotations: [Double] = [-10.5, 7.4, -4.2, 10.8, -6.6, 5.1, 2.9, -12.0, 8.2, -2.6, 11.4, -7.8]
-        return rotations[index % rotations.count]
+        FocusHomeVerticalSolidCollapsedLayoutPolicy.rotation(index: index)
     }
 
     private func collapsedZIndex(index: Int, count: Int) -> Double {
-        if count >= 5 {
-            let offsets = collapsedOffsets(count: count)
-            let safeIndex = min(max(index, 0), max(offsets.count - 1, 0))
-            return Double(offsets[safeIndex].height * 100) + Double(safeIndex) * 0.01
-        }
-
-        let depths: [Double] = [6, 5, 4, 3, 2, 1]
-        return depths[index % depths.count]
+        FocusHomeVerticalSolidCollapsedLayoutPolicy.zIndex(
+            index: index,
+            count: count,
+            mode: collapsedLayoutMode
+        )
     }
 
     private func floatingTransform(index: Int, isSelected: Bool) -> (x: CGFloat, y: CGFloat, rotation: Double) {

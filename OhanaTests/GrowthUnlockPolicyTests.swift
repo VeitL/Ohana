@@ -2,14 +2,20 @@ import Foundation
 import Testing
 @testable import Ohana
 
+@MainActor
 @Suite(.serialized)
 struct GrowthUnlockPolicyTests {
     @Test func dailyCareIsOpenAtLevelOne() {
         #expect(GrowthUnlockPolicy.status(for: FMDest.featureGroup(.dailyCare), currentLevel: 1).isUnlocked)
         #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.food), currentLevel: 1).isUnlocked)
         #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.potty), currentLevel: 1).isUnlocked)
-        #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.health), currentLevel: 1).isUnlocked)
-        #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.medications), currentLevel: 1).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: PetFeature.health, currentLevel: 1).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: PetFeature.medications, currentLevel: 1).isUnlocked)
+        #expect(!GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.health), currentLevel: 1).isUnlocked)
+        #expect(!GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.medications), currentLevel: 1).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.health), currentLevel: 2).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.medications), currentLevel: 2).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.weight), currentLevel: 1).isUnlocked)
         #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.expense), currentLevel: 1).isUnlocked)
     }
 
@@ -27,6 +33,20 @@ struct GrowthUnlockPolicyTests {
         #expect(HomeToolbarPrimaryActionPolicy.homeIcon(currentLevel: 0) == "tree.fill")
         #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 1) == .featureGroup(.householdHub))
         #expect(HomeToolbarPrimaryActionPolicy.homeIcon(currentLevel: 1) == "chart.bar.xaxis")
+        #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 0, plan: .personal) == .featureGroup(.householdHub))
+        #expect(HomeToolbarPrimaryActionPolicy.homeIcon(currentLevel: 0, plan: .family) == "chart.bar.xaxis")
+    }
+
+    @Test func weeklyAndLongTermReviewHaveDistinctMilestones() {
+        #expect(GrowthUnlockPolicy.status(for: FMDest.familyWeeklyReport, currentLevel: 5).step.id == .rewards)
+        #expect(!GrowthUnlockPolicy.status(for: FMDest.familyWeeklyReport, currentLevel: 5).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.familyWeeklyReport, currentLevel: 6).isUnlocked)
+        #expect(GrowthUnlockPolicy.primaryDestination(for: .rewards) == .coconutShop)
+
+        #expect(GrowthUnlockPolicy.status(for: FMDest.familyLongTermReview, currentLevel: 8).step.id == .memoryReview)
+        #expect(!GrowthUnlockPolicy.status(for: FMDest.familyLongTermReview, currentLevel: 8).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.familyLongTermReview, currentLevel: 9).isUnlocked)
+        #expect(GrowthUnlockPolicy.primaryDestination(for: .memoryReview) == .familyLongTermReview)
     }
 
     @Test func currentAndNextStagesTrackLevelProgression() {
@@ -34,6 +54,27 @@ struct GrowthUnlockPolicyTests {
         #expect(GrowthUnlockPolicy.currentStep(currentLevel: 4).id == .household)
         #expect(GrowthUnlockPolicy.nextLockedStep(currentLevel: 4)?.id == .oasisPlants)
         #expect(GrowthUnlockPolicy.nextLockedStep(currentLevel: 10) == nil)
+    }
+
+    @Test func stageExplorerStartsAtTheNextMilestoneAndLabelsTheWholePath() {
+        #expect(GrowthUnlockStageExplorerPolicy.defaultStageID(currentLevel: 0) == .dailyCare)
+        #expect(GrowthUnlockStageExplorerPolicy.defaultStageID(currentLevel: 4) == .oasisPlants)
+        #expect(GrowthUnlockStageExplorerPolicy.defaultStageID(currentLevel: 10) == .mastery)
+        #expect(
+            GrowthUnlockStageExplorerPolicy.defaultStageID(
+                currentLevel: 4,
+                preferredStageID: .advancedInsights
+            ) == .advancedInsights
+        )
+
+        let levelOne = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.dailyCare, currentLevel: 4).step
+        let levelFive = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.oasisPlants, currentLevel: 4).step
+        let levelEight = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.advancedInsights, currentLevel: 4).step
+
+        #expect(GrowthUnlockStageExplorerPolicy.displayState(for: levelOne, currentLevel: 4) == .unlocked)
+        #expect(GrowthUnlockStageExplorerPolicy.displayState(for: levelFive, currentLevel: 4) == .next(missingLevels: 1))
+        #expect(GrowthUnlockStageExplorerPolicy.displayState(for: levelEight, currentLevel: 4) == .locked(missingLevels: 4))
+        #expect(GrowthUnlockStageExplorerPolicy.unlockedStageCount(currentLevel: 4) == 4)
     }
 
     @Test func newlyUnlockedStagesOnlyReturnsCrossedThresholds() {

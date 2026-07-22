@@ -83,6 +83,10 @@ nonisolated struct CommerceStorefrontTransaction: Equatable, Sendable {
     let isDirectPurchase: Bool
     let revocationDate: Date?
     let expirationDate: Date?
+    /// Apple's signed JWS representation. Family online services submit this
+    /// to the backend for independent verification; local entitlement UI never
+    /// treats the payload itself as trusted server authority.
+    let signedTransactionInfo: String?
     /// True only when StoreKit returned this transaction from its authoritative
     /// current-entitlements sequence. This preserves Apple-granted grace and
     /// billing-retry access instead of second-guessing it with a local date.
@@ -98,7 +102,8 @@ nonisolated struct CommerceStorefrontTransaction: Equatable, Sendable {
         isDirectPurchase: Bool = true,
         revocationDate: Date?,
         expirationDate: Date? = nil,
-        isCurrentEntitlement: Bool = false
+        isCurrentEntitlement: Bool = false,
+        signedTransactionInfo: String? = nil
     ) {
         self.id = id
         self.productID = productID
@@ -107,6 +112,7 @@ nonisolated struct CommerceStorefrontTransaction: Equatable, Sendable {
         self.revocationDate = revocationDate
         self.expirationDate = expirationDate
         self.isCurrentEntitlement = isCurrentEntitlement
+        self.signedTransactionInfo = signedTransactionInfo
     }
 
     init(
@@ -116,7 +122,8 @@ nonisolated struct CommerceStorefrontTransaction: Equatable, Sendable {
         isDirectPurchase: Bool = true,
         revocationDate: Date?,
         expirationDate: Date? = nil,
-        isCurrentEntitlement: Bool = false
+        isCurrentEntitlement: Bool = false,
+        signedTransactionInfo: String? = nil
     ) {
         self.id = id
         self.productID = productID
@@ -125,6 +132,7 @@ nonisolated struct CommerceStorefrontTransaction: Equatable, Sendable {
         self.revocationDate = revocationDate
         self.expirationDate = expirationDate
         self.isCurrentEntitlement = isCurrentEntitlement
+        self.signedTransactionInfo = signedTransactionInfo
     }
 }
 
@@ -163,6 +171,8 @@ nonisolated extension CommerceStorefrontClient {
 nonisolated protocol CommerceEntitlementPersisting: AnyObject {
     func cachedSupporterPackEntitlement() -> Bool
     func setCachedSupporterPackEntitlement(_ isEntitled: Bool)
+    func cachedFamilyEntitlement() -> Bool
+    func setCachedFamilyEntitlement(_ isEntitled: Bool)
 }
 
 nonisolated extension CommerceEntitlementPersisting {
@@ -175,14 +185,41 @@ nonisolated extension CommerceEntitlementPersisting {
     func setCachedPersonalEntitlement(_ isEntitled: Bool) {
         setCachedSupporterPackEntitlement(isEntitled)
     }
+
+    /// Compatibility defaults keep test doubles and older embedding clients
+    /// source-compatible. Production Keychain storage overrides both methods.
+    func cachedFamilyEntitlement() -> Bool { false }
+
+    func setCachedFamilyEntitlement(_: Bool) {}
 }
 
 final nonisolated class KeychainCommerceEntitlementCache: CommerceEntitlementPersisting, @unchecked Sendable {
     private let service = "com.guanchen.li.Ohana.commerce"
-    private let account = CommerceEntitlementCache.supporterPackKeychainAccount
 
     func cachedSupporterPackEntitlement() -> Bool {
-        var query = baseQuery
+        cachedEntitlement(account: CommerceEntitlementCache.supporterPackKeychainAccount)
+    }
+
+    func setCachedSupporterPackEntitlement(_ isEntitled: Bool) {
+        setCachedEntitlement(
+            isEntitled,
+            account: CommerceEntitlementCache.supporterPackKeychainAccount
+        )
+    }
+
+    func cachedFamilyEntitlement() -> Bool {
+        cachedEntitlement(account: CommerceEntitlementCache.familyKeychainAccount)
+    }
+
+    func setCachedFamilyEntitlement(_ isEntitled: Bool) {
+        setCachedEntitlement(
+            isEntitled,
+            account: CommerceEntitlementCache.familyKeychainAccount
+        )
+    }
+
+    private func cachedEntitlement(account: String) -> Bool {
+        var query = baseQuery(account: account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
@@ -193,19 +230,20 @@ final nonisolated class KeychainCommerceEntitlementCache: CommerceEntitlementPer
         return value == 1
     }
 
-    func setCachedSupporterPackEntitlement(_ isEntitled: Bool) {
+    private func setCachedEntitlement(_ isEntitled: Bool, account: String) {
         let data = Data([isEntitled ? 1 : 0])
         let update: [String: Any] = [kSecValueData as String: data]
-        let status = SecItemUpdate(baseQuery as CFDictionary, update as CFDictionary)
+        let query = baseQuery(account: account)
+        let status = SecItemUpdate(query as CFDictionary, update as CFDictionary)
         guard status == errSecItemNotFound else { return }
 
-        var item = baseQuery
+        var item = query
         item[kSecValueData as String] = data
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         SecItemAdd(item as CFDictionary, nil)
     }
 
-    private var baseQuery: [String: Any] {
+    private func baseQuery(account: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -216,6 +254,7 @@ final nonisolated class KeychainCommerceEntitlementCache: CommerceEntitlementPer
 
 nonisolated enum CommerceStorefrontError: LocalizedError, Equatable {
     case productUnavailable
+    case familyUnavailable
     case verificationFailed
 
     var errorDescription: String? {
@@ -226,6 +265,12 @@ nonisolated enum CommerceStorefrontError: LocalizedError, Equatable {
                 zh: "Ohana Personal 暂时无法使用。",
                 en: "Ohana Personal is temporarily unavailable.",
                 de: "Ohana Personal ist vorübergehend nicht verfügbar."
+            )
+        case .familyUnavailable:
+            return l.tr(
+                zh: "Ohana Family 守护尚未开放。",
+                en: "Ohana Family guardian is not available yet.",
+                de: "Ohana Family-Schutz ist noch nicht verfügbar."
             )
         case .verificationFailed:
             return l.tr(
@@ -272,7 +317,7 @@ actor StoreKitCommerceStorefrontClient: CommerceStorefrontClient {
         } else {
             throw CommerceStorefrontError.productUnavailable
         }
-        guard SupporterPackCatalog.purchasablePersonalProductIDs.contains(productID),
+        guard SupporterPackCatalog.purchasableProductIDs.contains(productID),
               productMatchesCatalog(productID: productID, productType: product.type),
               !product.isFamilyShareable
         else {
@@ -387,7 +432,7 @@ actor StoreKitCommerceStorefrontClient: CommerceStorefrontClient {
         switch verification {
         case let .verified(transaction):
             if rememberForFinishing,
-               SupporterPackCatalog.personalEntitlementProductIDs.contains(transaction.productID),
+               SupporterPackCatalog.entitlementProductIDs.contains(transaction.productID),
                productMatchesCatalog(
                    productID: transaction.productID,
                    productType: transaction.productType
@@ -402,7 +447,8 @@ actor StoreKitCommerceStorefrontClient: CommerceStorefrontClient {
                 isDirectPurchase: transaction.ownershipType == .purchased,
                 revocationDate: transaction.revocationDate,
                 expirationDate: transaction.expirationDate,
-                isCurrentEntitlement: isCurrentEntitlement
+                isCurrentEntitlement: isCurrentEntitlement,
+                signedTransactionInfo: verification.jwsRepresentation
             ))
         case let .unverified(transaction, _):
             return .unverified(productID: transaction.productID)
@@ -429,7 +475,7 @@ actor StoreKitCommerceStorefrontClient: CommerceStorefrontClient {
         if SupporterPackCatalog.expectsNonConsumable(productID: productID) {
             return productType == .nonConsumable
         }
-        return SupporterPackCatalog.purchasablePersonalProductIDs.contains(productID) &&
+        return SupporterPackCatalog.purchasableProductIDs.contains(productID) &&
             productType == .autoRenewable
     }
 }
@@ -438,9 +484,13 @@ actor StoreKitCommerceStorefrontClient: CommerceStorefrontClient {
 @Observable
 final class CommerceEntitlementService {
     private(set) var hasPersonalEntitlement: Bool
+    private(set) var hasFamilyEntitlement: Bool
     private(set) var entitlementStatus: CommerceEntitlementStatus
     private(set) var activePersonalProductIDs: Set<String> = []
+    private(set) var activeFamilyProductIDs: Set<String> = []
     private(set) var personalDisplayPrices: [PersonalPurchaseChoice: String] = [:]
+    private(set) var familyDisplayPrice: String?
+    private(set) var latestVerifiedFamilyTransactionJWS: String?
     private(set) var introOfferEligiblePersonalChoices: Set<PersonalPurchaseChoice> = []
 
     /// Compatibility alias for the existing Supporter UI and cosmetic gates.
@@ -461,6 +511,7 @@ final class CommerceEntitlementService {
 
     @ObservationIgnored private let storefront: any CommerceStorefrontClient
     @ObservationIgnored private let persistence: any CommerceEntitlementPersisting
+    @ObservationIgnored private let familyPurchasesEnabled: @Sendable () -> Bool
     @ObservationIgnored private var storefrontListener: Task<Void, Never>?
     @ObservationIgnored private var transactionListener: Task<Void, Never>?
     @ObservationIgnored private var didStart = false
@@ -477,11 +528,18 @@ final class CommerceEntitlementService {
 
     init(
         storefront: any CommerceStorefrontClient = StoreKitCommerceStorefrontClient(),
-        persistence: any CommerceEntitlementPersisting = KeychainCommerceEntitlementCache()
+        persistence: any CommerceEntitlementPersisting = KeychainCommerceEntitlementCache(),
+        familyPurchasesEnabled: @escaping @Sendable () -> Bool = {
+            GuardianSafetyConfiguration.current != nil
+        }
     ) {
         self.storefront = storefront
         self.persistence = persistence
-        hasPersonalEntitlement = persistence.cachedPersonalEntitlement()
+        self.familyPurchasesEnabled = familyPurchasesEnabled
+        let cachedPersonal = persistence.cachedPersonalEntitlement()
+        let cachedFamily = persistence.cachedFamilyEntitlement()
+        hasFamilyEntitlement = cachedFamily
+        hasPersonalEntitlement = cachedPersonal || cachedFamily
         entitlementStatus = .temporarilyUnknown
     }
 
@@ -543,6 +601,21 @@ final class CommerceEntitlementService {
     }
 
     func purchasePersonal(_ choice: PersonalPurchaseChoice) async -> CommercePurchaseOutcome {
+        await purchase(productID: choice.productID, requiresFamily: false)
+    }
+
+    func purchaseFamilyYearly() async -> CommercePurchaseOutcome {
+        guard familyPurchasesEnabled() else {
+            lastErrorMessage = CommerceStorefrontError.familyUnavailable.localizedDescription
+            return .failed
+        }
+        return await purchase(productID: SupporterPackCatalog.familyYearlyProductID, requiresFamily: true)
+    }
+
+    private func purchase(
+        productID: String,
+        requiresFamily: Bool
+    ) async -> CommercePurchaseOutcome {
         if isPurchasePending { return .pending }
         guard !isPurchasing, !isRestoring else { return .failed }
         lastErrorMessage = nil
@@ -550,19 +623,21 @@ final class CommerceEntitlementService {
         defer { isPurchasing = false }
 
         do {
-            let productID = choice.productID
             let result = try await storefront.purchase(productID: productID)
             switch result {
             case let .success(verification):
                 guard case let .verified(transaction) = verification,
                       transaction.productID == productID,
-                      isValidPersonalTransaction(transaction)
+                      isValidCommerceTransaction(transaction)
                 else {
                     lastErrorMessage = CommerceStorefrontError.verificationFailed.localizedDescription
                     return .failed
                 }
                 let didReconcile = await reconcileVerifiedTransaction(transaction)
-                return didReconcile && hasPersonalEntitlement ? .purchased : .failed
+                let hasRequestedEntitlement = requiresFamily
+                    ? hasFamilyEntitlement
+                    : hasPersonalEntitlement
+                return didReconcile && hasRequestedEntitlement ? .purchased : .failed
             case .pending:
                 isPurchasePending = true
                 return .pending
@@ -612,7 +687,7 @@ final class CommerceEntitlementService {
             for await verification in updates {
                 guard !Task.isCancelled, let self else { break }
                 guard case let .verified(transaction) = verification,
-                      self.isValidPersonalTransaction(transaction)
+                      self.isValidCommerceTransaction(transaction)
                 else { continue }
                 await self.reconcileVerifiedTransaction(transaction)
             }
@@ -641,24 +716,28 @@ final class CommerceEntitlementService {
             }
         }
         do {
-            let products = try await storefront.products(
-                for: SupporterPackCatalog.purchasablePersonalProductIDs
-            )
+            let requestedProductIDs = familyPurchasesEnabled()
+                ? SupporterPackCatalog.purchasableProductIDs
+                : SupporterPackCatalog.purchasablePersonalProductIDs
+            let products = try await storefront.products(for: requestedProductIDs)
             guard loadGeneration == productLoadGeneration else { return }
             var prices: [PersonalPurchaseChoice: String] = [:]
             var introOfferEligibleChoices: Set<PersonalPurchaseChoice> = []
+            var loadedFamilyDisplayPrice: String?
             for product in products {
-                guard let choice = SupporterPackCatalog.purchaseChoice(for: product.id),
-                      choice.productID == product.id,
-                      isValidPersonalProduct(product),
-                      !product.isFamilyShareable
-                else { continue }
-                prices[choice] = product.displayPrice
-                if product.isEligibleForIntroOffer {
-                    introOfferEligibleChoices.insert(choice)
+                guard isValidCommerceProduct(product), !product.isFamilyShareable else { continue }
+                if product.id == SupporterPackCatalog.familyYearlyProductID {
+                    loadedFamilyDisplayPrice = product.displayPrice
+                } else if let choice = SupporterPackCatalog.purchaseChoice(for: product.id),
+                          choice.productID == product.id {
+                    prices[choice] = product.displayPrice
+                    if product.isEligibleForIntroOffer {
+                        introOfferEligibleChoices.insert(choice)
+                    }
                 }
             }
             personalDisplayPrices = prices
+            familyDisplayPrice = loadedFamilyDisplayPrice
             introOfferEligiblePersonalChoices = introOfferEligibleChoices
             displayPrice = prices[.lifetime]
             if prices.count == PersonalPurchaseChoice.allCases.count {
@@ -670,6 +749,7 @@ final class CommerceEntitlementService {
         } catch {
             guard loadGeneration == productLoadGeneration else { return }
             personalDisplayPrices = [:]
+            familyDisplayPrice = nil
             introOfferEligiblePersonalChoices = []
             displayPrice = nil
             if reportError {
@@ -685,12 +765,12 @@ final class CommerceEntitlementService {
         entitlementStatus = .checking
         do {
             let verifications = try await storefront.currentEntitlements(
-                productIDs: SupporterPackCatalog.personalEntitlementProductIDs
+                productIDs: SupporterPackCatalog.entitlementProductIDs
             )
             guard refreshGeneration == entitlementMutationGeneration else { return false }
             let relevantVerifiedTransactions = verifications.compactMap { verification -> CommerceStorefrontTransaction? in
                 guard case let .verified(transaction) = verification,
-                      isValidPersonalTransaction(transaction)
+                      isValidCommerceTransaction(transaction)
                 else { return nil }
                 return transaction
             }
@@ -700,9 +780,12 @@ final class CommerceEntitlementService {
                     .filter(isActive)
                     .map(\.productID)
             )
+            latestVerifiedFamilyTransactionJWS = relevantVerifiedTransactions.first {
+                SupporterPackCatalog.familySubscriptionProductIDs.contains($0.productID) && isActive($0)
+            }?.signedTransactionInfo
             if !activeProductIDs.isEmpty {
                 lastErrorMessage = nil
-                setPersonalEntitlement(
+                setEntitlements(
                     activeProductIDs: activeProductIDs,
                     status: .ownedVerified
                 )
@@ -710,7 +793,7 @@ final class CommerceEntitlementService {
                 return true
             } else if !relevantVerifiedTransactions.isEmpty || verifications.isEmpty {
                 lastErrorMessage = nil
-                setPersonalEntitlement(activeProductIDs: [], status: .notOwnedVerified)
+                setEntitlements(activeProductIDs: [], status: .notOwnedVerified)
                 return true
             } else {
                 entitlementStatus = .temporarilyUnknown
@@ -743,26 +826,38 @@ final class CommerceEntitlementService {
         return true
     }
 
-    private func setPersonalEntitlement(
+    private func setEntitlements(
         activeProductIDs: Set<String>,
         status: CommerceEntitlementStatus
     ) {
-        self.activePersonalProductIDs = activeProductIDs
-        hasPersonalEntitlement = !activeProductIDs.isEmpty
+        let familyProductIDs = activeProductIDs.intersection(
+            SupporterPackCatalog.familySubscriptionProductIDs
+        )
+        let personalProductIDs = activeProductIDs.intersection(
+            SupporterPackCatalog.personalEntitlementProductIDs
+        )
+        activeFamilyProductIDs = familyProductIDs
+        activePersonalProductIDs = personalProductIDs
+        hasFamilyEntitlement = !familyProductIDs.isEmpty
+        hasPersonalEntitlement = hasFamilyEntitlement || !personalProductIDs.isEmpty
         entitlementStatus = status
-        persistence.setCachedPersonalEntitlement(hasPersonalEntitlement)
+        persistence.setCachedPersonalEntitlement(!personalProductIDs.isEmpty)
+        persistence.setCachedFamilyEntitlement(hasFamilyEntitlement)
+        if !hasFamilyEntitlement {
+            latestVerifiedFamilyTransactionJWS = nil
+        }
     }
 
-    private func isValidPersonalProduct(_ product: CommerceStorefrontProduct) -> Bool {
+    private func isValidCommerceProduct(_ product: CommerceStorefrontProduct) -> Bool {
         if SupporterPackCatalog.expectsNonConsumable(productID: product.id) {
             return product.isNonConsumable
         }
-        return SupporterPackCatalog.purchasablePersonalProductIDs.contains(product.id) &&
+        return SupporterPackCatalog.purchasableProductIDs.contains(product.id) &&
             product.isAutoRenewableSubscription
     }
 
-    private func isValidPersonalTransaction(_ transaction: CommerceStorefrontTransaction) -> Bool {
-        guard SupporterPackCatalog.personalEntitlementProductIDs.contains(transaction.productID),
+    private func isValidCommerceTransaction(_ transaction: CommerceStorefrontTransaction) -> Bool {
+        guard SupporterPackCatalog.entitlementProductIDs.contains(transaction.productID),
               transaction.isDirectPurchase
         else { return false }
         if SupporterPackCatalog.expectsNonConsumable(productID: transaction.productID) {

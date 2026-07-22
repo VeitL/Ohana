@@ -131,7 +131,8 @@ struct FunctionMenuRootView: View {
     private var functionMenuGroups: [FeatureGroup] {
         AppFeatureRouteGuard.visibleFeatureGroups(
             from: [.dailyCare, .healthBody, .archiveMemory, .householdHub],
-            currentLevel: currentTreeLevel
+            currentLevel: currentTreeLevel,
+            plan: appServices.commerce.ohanaPlanLevel
         )
     }
 
@@ -168,13 +169,19 @@ struct FunctionMenuRootView: View {
             ToolEntry(
                 id: "gacha",
                 title: l.tr(zh: "收藏玩法", en: "Collection Play", de: "Sammlungsspiel"),
-                subtitle: l.tr(zh: "扭蛋 · 电子宠物", en: "Draws · E-critter", de: "Ziehungen · E-Critter"),
+                subtitle: l.tr(zh: "扭蛋 · 收藏", en: "Draws · Collection", de: "Ziehungen · Sammlung"),
                 icon: "circle.grid.cross.fill",
                 color: Color(hex: "F97316"),
                 destination: .gacha
             )
         ]
-        .filter { AppFeatureRouteGuard.isVisibleFunctionDestination($0.destination, currentLevel: currentTreeLevel) }
+        .filter {
+            AppFeatureRouteGuard.isVisibleFunctionDestination(
+                $0.destination,
+                currentLevel: currentTreeLevel,
+                plan: appServices.commerce.ohanaPlanLevel
+            )
+        }
     }
 
     private func subtitle(for group: FeatureGroup) -> String {
@@ -184,11 +191,11 @@ struct FunctionMenuRootView: View {
                 ? l.tr(zh: "饮食 · 清洁 · 遛狗 · 便便", en: "Food · Hygiene · Walks · Potty", de: "Futter · Pflege · Gassi · Toilette")
                 : l.tr(zh: "饮食 · 清洁 · 便便", en: "Food · Hygiene · Potty", de: "Futter · Pflege · Toilette")
         case .healthBody:
-            l.tr(zh: "健康档案 · 用药 · 体重", en: "Health · Medication · Weight", de: "Gesundheit · Medikamente · Gewicht")
+            l.tr(zh: "健康概览 · 用药趋势", en: "Health · Medication trends", de: "Gesundheit · Medikamententrends")
         case .archiveMemory:
             l.tr(zh: "成长 · 基本信息 · 证件 · 时刻", en: "Growth · Profile · Documents · Moments", de: "Wachstum · Profil · Dokumente · Momente")
         case .householdHub:
-            l.tr(zh: "花费 · 照护分析 · 提醒 · 周报", en: "Expenses · Care analysis · Reminders · Weekly", de: "Ausgaben · Pflegeanalyse · Erinnerungen · Woche")
+            l.tr(zh: "体重 · 花费 · 周报 · 回顾", en: "Weight · Expenses · Reports · Review", de: "Gewicht · Ausgaben · Berichte · Rückblick")
         case .oasisRewards:
             l.tr(zh: "\(wealthSubtitle) · 商店 · 扭蛋", en: "\(wealthSubtitle) · Shop · Gacha", de: "\(wealthSubtitle) · Shop · Gacha")
         case .plants:
@@ -213,7 +220,11 @@ struct FunctionMenuRootView: View {
     }
 
     private func select(_ destination: FMDest) {
-        switch AppFeatureRouteGuard.functionDestinationDecision(destination, currentLevel: currentTreeLevel) {
+        switch AppFeatureRouteGuard.functionDestinationDecision(
+            destination,
+            currentLevel: currentTreeLevel,
+            plan: appServices.commerce.ohanaPlanLevel
+        ) {
         case let .allow(destination):
             onSelect(destination)
         case let .redirectToRoadmap(note):

@@ -717,8 +717,8 @@ struct GrowthUnlockPopupView: View {
         case .household:
             localized(
                 zh: PlantUnlockPolicy.unlockedToastZh,
-                en: "Your family canopy has opened. You can now care for the plants at home.",
-                de: "Deine Familien-Krone hat sich geöffnet. Du kannst jetzt Pflanzen zu Hause pflegen."
+                en: "Your life canopy has opened. You can now care for the plants at home.",
+                de: "Deine Lebenskrone hat sich geöffnet. Du kannst jetzt Pflanzen zu Hause pflegen."
             )
         case .oasisPlants:
             localized(
@@ -728,9 +728,9 @@ struct GrowthUnlockPopupView: View {
             )
         case .rewards:
             localized(
-                zh: "椰子商店开放，可以把攒下的椰子换成装饰和实用道具。",
-                en: "The coconut shop is open, turning saved coconuts into cosmetics and useful items.",
-                de: "Der Kokos-Shop ist offen für Dekorationen und nützliche Gegenstände."
+                zh: "椰子商店和标准家庭周报开放，照护成果开始变得可消费、可回看。",
+                en: "The coconut shop and standard weekly report are open, making care progress spendable and easy to review.",
+                de: "Kokos-Shop und Standard-Wochenbericht sind offen: Pflegefortschritt wird nutzbar und gut rückblickbar."
             )
         case .advancedPlay:
             localized(
@@ -740,15 +740,15 @@ struct GrowthUnlockPopupView: View {
             )
         case .advancedInsights:
             localized(
-                zh: "高级洞察开放，长期照护数据会开始显示趋势和异常。",
-                en: "Advanced insights are open, showing trends and unusual care patterns.",
-                de: "Erweiterte Einsichten zeigen Trends und ungewöhnliche Pflegemuster."
+                zh: "深度照护分析和完整提醒诊断开放；安全告警始终可见。",
+                en: "Deep care analysis and full reminder diagnostics are open; safety alerts always remain visible.",
+                de: "Tiefe Pflegeanalyse und vollständige Erinnerungsdiagnose sind offen; Sicherheitswarnungen bleiben sichtbar."
             )
         case .memoryReview:
             localized(
-                zh: "成长回顾开放，可以按周期整理记忆、归档故事和查看周报。",
-                en: "Growth review is open for memory archives, stories, and weekly reports.",
-                de: "Wachstumsrückblick ist offen für Erinnerungen, Geschichten und Wochenberichte."
+                zh: "长期家庭回顾开放，按月份整理重要照护和回忆，不重复周报。",
+                en: "Long-term household review is open, organizing meaningful care and memories by month without repeating the weekly report.",
+                de: "Der Langzeitrückblick ordnet wichtige Pflege und Erinnerungen monatlich, ohne den Wochenbericht zu wiederholen."
             )
         case .mastery:
             localized(
@@ -763,13 +763,13 @@ struct GrowthUnlockPopupView: View {
         switch status.step.id {
         case .dailyCare:
             [
-                localized(zh: "成员、宠物档案、基础日历统一开放", en: "Members, pet profiles, and the basic calendar are available", de: "Mitglieder, Tierprofile und Basiskalender sind verfügbar"),
-                localized(zh: "喂食、喝水、便便、用药等日常记录可直接使用", en: "Food, water, potty, and medication logs are ready", de: "Futter, Wasser, Toilette und Medikamente sind bereit")
+                localized(zh: "成员、宠物档案、基础日历、体重和花费统一开放", en: "Profiles, the basic calendar, Weight, and Expenses are available", de: "Profile, Basiskalender, Gewicht und Ausgaben sind verfügbar"),
+                localized(zh: "日常照护及单个对象的健康、用药记录可直接使用", en: "Daily care and individual health and medication records are ready", de: "Tägliche Pflege sowie einzelne Gesundheits- und Medikamenteneinträge sind bereit")
             ]
         case .bodyHealth:
             [
-                localized(zh: "查看健康概览、体重趋势和清洁护理", en: "View health overview, weight trends, and hygiene care", de: "Gesundheit, Gewichtstrends und Hygiene ansehen"),
-                localized(zh: "从快捷操作或功能菜单进入健康管理", en: "Open health tools from shortcuts or the feature menu", de: "Gesundheit über Schnellzugriff oder Menü öffnen")
+                localized(zh: "查看健康与用药的家庭聚合面板和基础趋势", en: "View household health and medication summaries with basic trends", de: "Gesundheits- und Medikamentenübersichten mit Basistrends ansehen"),
+                localized(zh: "原始健康与用药记录仍属于 Lv.1", en: "Raw health and medication records remain a Lv.1 ability", de: "Einzelne Gesundheits- und Medikamenteneinträge bleiben eine Lv.1-Funktion")
             ]
         case .memory:
             [
@@ -789,7 +789,7 @@ struct GrowthUnlockPopupView: View {
         case .rewards:
             [
                 localized(zh: "购买装饰、树能量包和实用消耗品", en: "Buy cosmetics, tree energy packs, and consumables", de: "Dekoration, Baumenergie und Verbrauchsartikel kaufen"),
-                localized(zh: "入口：Oasis 商店卡片与功能菜单", en: "Entry: Oasis shop card and the feature menu", de: "Einstieg: Oasis-Shopkarte und Funktionsmenü")
+                localized(zh: "在家庭洞察查看标准周报", en: "Open the standard weekly report in Household Insights", de: "Standard-Wochenbericht in den Haushaltseinblicken öffnen")
             ]
         case .advancedPlay:
             [
@@ -798,17 +798,17 @@ struct GrowthUnlockPopupView: View {
             ]
         case .advancedInsights:
             [
-                localized(zh: "查看长期照护趋势和异常提醒", en: "Review long-term care trends and anomaly prompts", de: "Langzeittrends und Auffälligkeiten ansehen"),
-                localized(zh: "用数据辅助饮食、运动和健康决策", en: "Use data to support food, activity, and health decisions", de: "Daten für Futter, Aktivität und Gesundheit nutzen")
+                localized(zh: "查看深度照护事件分析", en: "Review deep care-event analysis", de: "Tiefe Pflegeereignis-Analysen ansehen"),
+                localized(zh: "查看完整提醒调度诊断；安全状态此前也始终可见", en: "Review full reminder diagnostics; safety states were always visible", de: "Vollständige Erinnerungsdiagnose ansehen; Sicherheitsstatus war stets sichtbar")
             ]
         case .memoryReview:
             [
-                localized(zh: "整理成长回顾、记忆归档和家庭周报", en: "Organize growth reviews, memory archives, and weekly reports", de: "Rückblicke, Archive und Wochenberichte organisieren"),
-                localized(zh: "把长期记录变成更容易回看的故事", en: "Turn long-term records into easier-to-review stories", de: "Langzeitdaten in gut lesbare Geschichten verwandeln")
+                localized(zh: "按月份整理长期照护事件与回忆", en: "Organize long-term care events and memories by month", de: "Langfristige Pflegeereignisse und Erinnerungen monatlich ordnen"),
+                localized(zh: "把长期记录变成独立于周报的家庭故事", en: "Turn long-term records into a household story distinct from weekly reports", de: "Langzeitdaten in eine vom Wochenbericht getrennte Familiengeschichte verwandeln")
             ]
         case .mastery:
             [
-                localized(zh: "解锁大师树外观和长期荣誉", en: "Unlock master tree styling and long-term honors", de: "Meisterbaum und Langzeit-Ehren freischalten"),
+                localized(zh: "解锁电子宠物、大师树外观和长期荣誉", en: "Unlock the e-critter, master tree styling, and long-term honors", de: "E-Critter, Meisterbaum und Langzeit-Ehren freischalten"),
                 localized(zh: "获得当前成长线的顶级被动收益", en: "Receive the top passive yield for the growth path", de: "Höchste passive Erträge dieser Wachstumslinie erhalten")
             ]
         }

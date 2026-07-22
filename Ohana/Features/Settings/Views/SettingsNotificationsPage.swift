@@ -42,15 +42,15 @@ struct SettingsNotificationsPage: View {
                                 it: "Sicurezza check-in zen"
                             ),
                             subtitle: l.tr(
-                                zh: "本机提醒、联系人和确认短信",
-                                en: "On-device reminders, contacts, and confirmed texts",
-                                de: "Lokale Erinnerungen, Kontakte und bestätigte SMS",
-                                es: "Recordatorios, contactos y SMS confirmados",
-                                pt: "Lembretes, contatos e SMS confirmados",
-                                fr: "Rappels, contacts et SMS confirmés",
-                                ja: "デバイス内通知、連絡先、確認付きSMS",
-                                ko: "기기 내 알림, 연락처, 확인 문자",
-                                it: "Promemoria, contatti e SMS confermati"
+                                zh: "本机提醒与 App 内亲友守护",
+                                en: "On-device reminders and in-app guardians",
+                                de: "Lokale Erinnerungen und App-Schutzkreis",
+                                es: "Recordatorios y guardianes en la app",
+                                pt: "Lembretes e proteção dentro do app",
+                                fr: "Rappels et proches dans l’app",
+                                ja: "デバイス内通知とApp内の見守り",
+                                ko: "기기 내 알림과 앱 내 보호자",
+                                it: "Promemoria e protezione nell’app"
                             )
                         )
                     }

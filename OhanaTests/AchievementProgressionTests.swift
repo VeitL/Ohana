@@ -15,7 +15,7 @@ struct AchievementProgressionTests {
             String(describing: AchievementRewardReceipt.self)
         ])
         #expect(v93.subtracting(v94).isEmpty)
-        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV94.self))
+        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV96.self))
         #expect(ArkMigrationPlan.stages.isEmpty)
     }
 

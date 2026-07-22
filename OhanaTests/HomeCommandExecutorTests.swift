@@ -3310,7 +3310,7 @@ struct HomeCommandExecutorTests {
         #expect(serviceSource.contains("updatesProjection: false"))
         #expect(serviceSource.contains("projectionManager?.recordWalletProjection("))
         #expect(executorSource.contains("guard familyTasks.updateTask("))
-        #expect(executorSource.contains("guard familyTasks.delete("))
+        #expect(executorSource.contains("guard familyTasks.cancelByCreator("))
         #expect(executorSource.contains("guard familyTasks.rejectCompletion("))
         #expect(executorSource.contains("guard familyTasks.confirmCompletion("))
         #expect(executorSource.contains("guard familyTasks.complete("))

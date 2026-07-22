@@ -114,6 +114,28 @@ struct AppRouteCoordinatorTests {
         #expect(reason.hasPrefix("locked:"))
     }
 
+    @Test func personalCanOpenHouseholdInsightsWithoutBypassingOtherGrowthRoutes() {
+        let coordinator = AppRouteCoordinator()
+
+        let insightDecision = coordinator.functionMenuPresentationDecision(
+            destination: .familyLongTermReview,
+            currentLevel: 0,
+            plan: .personal
+        )
+        #expect(insightDecision == .allowed(.functionMenu(destination: .familyLongTermReview)))
+
+        let shopDecision = coordinator.functionMenuPresentationDecision(
+            destination: .coconutShop,
+            currentLevel: 0,
+            plan: .personal
+        )
+        guard case let .redirected(_, to, _) = shopDecision else {
+            Issue.record("Expected Personal to keep the coconut shop behind its tree level")
+            return
+        }
+        #expect(to == .functionMenu(destination: .growthRoadmap))
+    }
+
     @Test func calendarUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
         let petID = UUID().uuidString
@@ -187,6 +209,39 @@ struct AppRouteCoordinatorTests {
         let handled = coordinator.handleExternalURL(URL(string: "https://example.com")!)
 
         #expect(!handled)
+        #expect(coordinator.sheet == .settings)
+    }
+
+    @Test func guardianInviteDeepLinkNormalizesCodeAndOpensGuardianSheet() throws {
+        let coordinator = AppRouteCoordinator()
+        let url = try #require(URL(string: "\(OhanaExternalRoute.scheme)://guardian?invite=abc123"))
+
+        #expect(coordinator.handleExternalURL(url))
+        #expect(coordinator.sheet == .guardianSafety(invitationCode: "ABC123", incidentID: nil))
+    }
+
+    @Test func guardianNotificationOpensOnlyTheRequestedIncident() {
+        let coordinator = AppRouteCoordinator()
+        coordinator.presentSettings()
+
+        let outcome = coordinator.handleNotificationEvent(
+            .guardianSafetyRouteRequested(invitationCode: nil, incidentID: "incident-7")
+        )
+
+        #expect(outcome == .none)
+        #expect(coordinator.sheet == .guardianSafety(invitationCode: nil, incidentID: "incident-7"))
+        #expect(coordinator.path.isEmpty)
+    }
+
+    @Test func guardianAcknowledgementActionDoesNotNavigateOrCreateAUiFact() {
+        let coordinator = AppRouteCoordinator()
+        coordinator.presentSettings()
+
+        let outcome = coordinator.handleNotificationEvent(
+            .guardianIncidentAcknowledgementRequested(incidentID: "incident-7")
+        )
+
+        #expect(outcome == .none)
         #expect(coordinator.sheet == .settings)
     }
 
@@ -665,6 +720,30 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.path.isEmpty)
         #expect(coordinator.sheet == nil)
         #expect(coordinator.rootIdentity == initialRoot)
+    }
+
+    @Test func weeklyReportNotificationOpensWeeklyReportSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+        let treeManager = TestOasisTreeManagerProjection.manager
+        let oldTreeManager = OasisTreeManagerRegistry.current
+        let oldIslandEnergy = treeManager.islandEnergy
+        let oldInjectedEnergy = treeManager.injectedEnergy
+        OasisTreeManagerRegistry.current = treeManager
+        defer {
+            treeManager.setEnergyForTesting(
+                islandEnergy: oldIslandEnergy,
+                injectedEnergy: oldInjectedEnergy
+            )
+            OasisTreeManagerRegistry.current = oldTreeManager
+        }
+        treeManager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 1200)
+
+        coordinator.openHuman(UUID())
+        let outcome = coordinator.handleNotificationEvent(.familyWeeklyReportRouteRequested)
+
+        #expect(outcome == .none)
+        #expect(coordinator.path.isEmpty)
+        #expect(coordinator.sheet == .functionMenu(destination: .familyWeeklyReport))
     }
 
     @Test func plantBatchCareNotificationOpensFilteredBatchSheetRoute() {

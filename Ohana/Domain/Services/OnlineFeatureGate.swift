@@ -9,17 +9,18 @@ import Foundation
 
 enum OnlineFeature: String, CaseIterable, Sendable {
     case onlineCollaboration
+    case guardianSafety
 }
 
 enum OnlineFeatureGate {
     nonisolated static func allows(_ feature: OnlineFeature) -> Bool {
-        guard AppCapabilityProfile.shipsCloudFamilyCapabilities else {
-            return false
-        }
-
         switch feature {
         case .onlineCollaboration:
-            return false
+            return AppCapabilityProfile.shipsCloudFamilyCapabilities && false
+        case .guardianSafety:
+            // The build contains the client, but the shipped Info.plist keeps
+            // this off until the signed backend/APNs release gate is complete.
+            return GuardianSafetyConfiguration.current != nil
         }
     }
 }

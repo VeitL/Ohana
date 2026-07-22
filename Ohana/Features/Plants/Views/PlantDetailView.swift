@@ -25,6 +25,7 @@ struct PlantDetailContentView: View {
 
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @State var showingEditSheet = false
+    @State var showingBasicInfo = false
     @State var showingAllFeaturesHub = false
     @State var showingPlantDetailExtras = false
     @State var showingDeleteConfirm = false
@@ -850,7 +851,16 @@ struct PlantDetailContentView: View {
             )
         }
         .sheet(isPresented: $showingEditSheet) {
-            EditPlantSheet(plant: plant)
+            EditPlantSheet(plant: plant, scope: .fullCare)
+        }
+        .sheet(isPresented: $showingBasicInfo) {
+            NavigationStack {
+                PlantBasicInfoDetailView(
+                    plant: plant,
+                    onClose: { showingBasicInfo = false },
+                    onChanged: { schedulePlantDetailRenderDataRebuild(delayMilliseconds: 0) }
+                )
+            }
         }
         .sheet(item: $personalUpgradePrompt) { prompt in
             PersonalPlanView(prompt: prompt)

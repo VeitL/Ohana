@@ -96,105 +96,7 @@ enum BackgroundTaskCoordinator {
     private static func handleReminderRefill(task: BGAppRefreshTask) {
         let completionGate = ReminderBackgroundTaskCompletionGate()
         let work = Task { @MainActor in
-            @MainActor
-            func complete(_ success: Bool) {
-                completionGate.complete(task, success: success)
-            }
-
-            let startedAt = CFAbsoluteTimeGetCurrent()
-            let budgetStartedAt = Date()
-            let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
-                operation: "background_reminder_refill",
-                requestedItemCount: 64,
-                allowWhileBackground: true
-            )
-            guard budget.hasWorkCapacity else {
-                AppPerformanceMonitor.shared.record(
-                    "background_reminder_refill_deferred",
-                    valueMS: 0,
-                    note: "runtime budget deferred"
-                )
-                ReminderMaintenanceCursorStore.markRetry()
-                scheduleReminderRefill()
-                complete(true)
-                return
-            }
-            AppPerformanceMonitor.shared.record(
-                "background_reminder_refill_started",
-                valueMS: 0,
-                note: "\(reminderRefillTaskID), batch=\(budget.maximumItemCount)"
-            )
-
-            let modelContainer: ModelContainer
-            do {
-                modelContainer = try SharedModelContainer.make()
-            } catch {
-                AppPerformanceMonitor.shared.record(
-                    "background_reminder_refill_store_unavailable",
-                    valueMS: 0,
-                    note: "primary store unavailable"
-                )
-                ReminderMaintenanceCursorStore.markRetry()
-                scheduleReminderRefill()
-                complete(false)
-                return
-            }
-            let modelContext = ModelContext(modelContainer)
-            let plan: ReminderMaintenancePlan
-            do {
-                plan = try await ReminderMaintenanceService.makeBackgroundPlan(
-                    context: modelContext,
-                    budget: budget
-                )
-            } catch is CancellationError {
-                ReminderMaintenanceCursorStore.markRetry()
-                scheduleReminderRefill()
-                complete(false)
-                return
-            } catch {
-                AppPerformanceMonitor.shared.record(
-                    "background_reminder_refill_plan_failed",
-                    valueMS: 0,
-                    note: error.localizedDescription
-                )
-                ReminderMaintenanceCursorStore.markRetry()
-                scheduleReminderRefill()
-                complete(false)
-                return
-            }
-            guard !Task.isCancelled, budget.hasTimeRemaining(since: budgetStartedAt) else {
-                ReminderMaintenanceCursorStore.record(
-                    ReminderMaintenanceRunResult(
-                        pendingCount: plan.reminderModelIDs.count,
-                        completed: false,
-                        hasMoreWork: plan.hasMoreWork
-                    ),
-                    plan: plan
-                )
-                scheduleReminderRefill()
-                complete(false)
-                return
-            }
-
-            let result = await ReminderMaintenanceService.run(plan: plan, context: modelContext)
-            ReminderMaintenanceCursorStore.record(result, plan: plan)
-            scheduleReminderRefill()
-            guard !Task.isCancelled, result.completed else {
-                AppPerformanceMonitor.shared.record(
-                    "background_reminder_refill_cancelled",
-                    valueMS: 0,
-                    note: "cancelled during maintenance"
-                )
-                complete(false)
-                return
-            }
-
-            AppPerformanceMonitor.shared.record(
-                "background_reminder_refill_completed",
-                startedAt: startedAt,
-                note: "\(result.pendingCount) pending reminders, continuation=\(result.hasMoreWork)"
-            )
-            complete(true)
+            await performReminderRefill(task: task, completionGate: completionGate)
         }
 
         task.expirationHandler = {
@@ -210,5 +112,142 @@ enum BackgroundTaskCoordinator {
                 completionGate.complete(task, success: false)
             }
         }
+    }
+
+    @MainActor
+    private static func performReminderRefill(
+        task: BGAppRefreshTask,
+        completionGate: ReminderBackgroundTaskCompletionGate
+    ) async {
+        let startedAt = CFAbsoluteTimeGetCurrent()
+        let budgetStartedAt = Date()
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "background_reminder_refill",
+            requestedItemCount: 64,
+            allowWhileBackground: true
+        )
+        guard budget.hasWorkCapacity else {
+            AppPerformanceMonitor.shared.record(
+                "background_reminder_refill_deferred",
+                valueMS: 0,
+                note: "runtime budget deferred"
+            )
+            completeRefill(task, gate: completionGate, success: true, retry: true)
+            return
+        }
+        AppPerformanceMonitor.shared.record(
+            "background_reminder_refill_started",
+            valueMS: 0,
+            note: "\(reminderRefillTaskID), batch=\(budget.maximumItemCount)"
+        )
+
+        guard let modelContainer = reminderModelContainer() else {
+            completeRefill(task, gate: completionGate, success: false, retry: true)
+            return
+        }
+        do {
+            try await materializeFamilyTasks(in: modelContainer, budget: budget)
+        } catch is CancellationError {
+            completeRefill(task, gate: completionGate, success: false, retry: true)
+            return
+        } catch {
+            AppPerformanceMonitor.shared.record(
+                "background_family_task_materialization_failed",
+                valueMS: 0,
+                note: error.localizedDescription
+            )
+        }
+
+        let modelContext = ModelContext(modelContainer)
+        let plan: ReminderMaintenancePlan
+        do {
+            plan = try await ReminderMaintenanceService.makeBackgroundPlan(
+                context: modelContext,
+                budget: budget
+            )
+        } catch is CancellationError {
+            completeRefill(task, gate: completionGate, success: false, retry: true)
+            return
+        } catch {
+            AppPerformanceMonitor.shared.record(
+                "background_reminder_refill_plan_failed",
+                valueMS: 0,
+                note: error.localizedDescription
+            )
+            completeRefill(task, gate: completionGate, success: false, retry: true)
+            return
+        }
+        guard !Task.isCancelled, budget.hasTimeRemaining(since: budgetStartedAt) else {
+            ReminderMaintenanceCursorStore.record(
+                ReminderMaintenanceRunResult(
+                    pendingCount: plan.reminderModelIDs.count,
+                    completed: false,
+                    hasMoreWork: plan.hasMoreWork
+                ),
+                plan: plan
+            )
+            completeRefill(task, gate: completionGate, success: false, retry: false)
+            return
+        }
+
+        let result = await ReminderMaintenanceService.run(plan: plan, context: modelContext)
+        ReminderMaintenanceCursorStore.record(result, plan: plan)
+        scheduleReminderRefill()
+        guard !Task.isCancelled, result.completed else {
+            AppPerformanceMonitor.shared.record(
+                "background_reminder_refill_cancelled",
+                valueMS: 0,
+                note: "cancelled during maintenance"
+            )
+            completionGate.complete(task, success: false)
+            return
+        }
+        AppPerformanceMonitor.shared.record(
+            "background_reminder_refill_completed",
+            startedAt: startedAt,
+            note: "\(result.pendingCount) pending reminders, continuation=\(result.hasMoreWork)"
+        )
+        completionGate.complete(task, success: true)
+    }
+
+    @MainActor
+    private static func reminderModelContainer() -> ModelContainer? {
+        do {
+            return try SharedModelContainer.make()
+        } catch {
+            AppPerformanceMonitor.shared.record(
+                "background_reminder_refill_store_unavailable",
+                valueMS: 0,
+                note: "primary store unavailable"
+            )
+            return nil
+        }
+    }
+
+    @MainActor
+    private static func materializeFamilyTasks(
+        in modelContainer: ModelContainer,
+        budget: OhanaBackgroundWorkBudget
+    ) async throws {
+        let materializer = FamilyTaskPlanMaterializationActor(modelContainer: modelContainer)
+        let upgrade = try await materializer.upgradeLegacyRecurringTasks()
+        for notificationID in upgrade.notificationIDsToCancel {
+            OhanaNotifications.current.cancel(notificationId: notificationID)
+        }
+        _ = try await materializer.materializeAll(maximumPlanCount: budget.maximumItemCount)
+    }
+
+    @MainActor
+    private static func completeRefill(
+        _ task: BGAppRefreshTask,
+        gate: ReminderBackgroundTaskCompletionGate,
+        success: Bool,
+        retry: Bool
+    ) {
+        if retry {
+            ReminderMaintenanceCursorStore.markRetry()
+        }
+        scheduleReminderRefill()
+        gate.complete(task, success: success)
     }
 }

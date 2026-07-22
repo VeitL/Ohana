@@ -103,6 +103,58 @@ struct HouseholdStarterJourneyServiceTests {
         #expect(!markers[0].metadataJSON.contains(human.name))
     }
 
+    @Test func legacyHumanOptionalAnswerIsReadOnlyAndMapsToThreeFocusedCategories() throws {
+        let human = Human(name: "Legacy")
+        let legacyCheckpoint = HouseholdStarterJourneyCheckpoint.humanOptionalDetails
+        let key = HouseholdStarterJourneyService.checkpointRecordKey(
+            task: .humanProfile,
+            checkpoint: legacyCheckpoint,
+            subjectID: human.id
+        )
+        let targetID = human.id.uuidString.lowercased()
+        let legacyEvent = CareLedgerEvent(
+            actorKind: .human,
+            actorId: targetID,
+            subjectKind: .household,
+            eventKind: .milestone,
+            actionType: HouseholdStarterJourneyService.checkpointActionType,
+            legacyModelName: HouseholdStarterJourneyService.checkpointSourceModelName,
+            legacyModelId: key,
+            metadataJSON: "{\"journeyKey\":\"household-starter-v1\",\"taskRaw\":\"humanProfile\",\"checkpointRaw\":\"humanOptionalDetails\",\"resolutionRaw\":\"preferNotToSay\",\"targetKindRaw\":\"human\",\"targetID\":\"\(targetID)\"}"
+        )
+
+        let snapshot = HouseholdStarterJourneyService.buildSnapshot(
+            enabled: true,
+            activeHumanID: human.id.uuidString,
+            humans: [human],
+            pets: [],
+            qualificationFacts: .empty,
+            careLedgerEvents: [legacyEvent],
+            coconutLedgerEntries: []
+        )
+        let state = try #require(snapshot.state(for: .humanProfile))
+        #expect(state.completedCheckpoints == [
+            .humanLifeStage,
+            .humanBodyProfile,
+            .humanPersonalityContext
+        ])
+        #expect(state.completionPercent == 75)
+        #expect(state.status == .claimable)
+
+        let container = try makeContainer()
+        let context = container.mainContext
+        context.insert(human)
+        try context.save()
+        #expect(HouseholdStarterJourneyService.recordResolution(
+            task: .humanProfile,
+            checkpoint: .humanOptionalDetails,
+            resolution: .preferNotToSay,
+            subjectID: human.id,
+            context: context,
+            activeHumanSelection: FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
+        ) == .invalidCheckpoint)
+    }
+
     @Test func alternateResolutionPathsReloadLatestChoiceWithoutLeakingOrCreatingDuplicateMarkers() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -687,7 +739,8 @@ struct HouseholdStarterJourneyServiceTests {
         let selection = FixedActiveHumanSelection(currentHumanId: activeHuman.id.uuidString)
         for (checkpoint, resolution) in [
             (HouseholdStarterJourneyCheckpoint.humanAppearance, HouseholdStarterJourneyResolution.reviewed),
-            (.humanOptionalDetails, .preferNotToSay)
+            (.humanLifeStage, .unknown),
+            (.humanBodyProfile, .preferNotToSay)
         ] {
             #expect(HouseholdStarterJourneyService.recordResolution(
                 task: .humanProfile,
@@ -699,22 +752,20 @@ struct HouseholdStarterJourneyServiceTests {
             ).didSucceed)
         }
         for human in noiseHumans {
-            #expect(HouseholdStarterJourneyService.recordResolution(
-                task: .humanProfile,
-                checkpoint: .humanAppearance,
-                resolution: .reviewed,
-                subjectID: human.id,
-                context: context,
-                activeHumanSelection: selection
-            ).didSucceed)
-            #expect(HouseholdStarterJourneyService.recordResolution(
-                task: .humanProfile,
-                checkpoint: .humanOptionalDetails,
-                resolution: .preferNotToSay,
-                subjectID: human.id,
-                context: context,
-                activeHumanSelection: selection
-            ).didSucceed)
+            for (checkpoint, resolution) in [
+                (HouseholdStarterJourneyCheckpoint.humanAppearance, HouseholdStarterJourneyResolution.reviewed),
+                (.humanLifeStage, .unknown),
+                (.humanBodyProfile, .preferNotToSay)
+            ] {
+                #expect(HouseholdStarterJourneyService.recordResolution(
+                    task: .humanProfile,
+                    checkpoint: checkpoint,
+                    resolution: resolution,
+                    subjectID: human.id,
+                    context: context,
+                    activeHumanSelection: selection
+                ).didSucceed)
+            }
         }
 
         let activeAppearanceKey = HouseholdStarterJourneyService.checkpointRecordKey(
@@ -722,23 +773,30 @@ struct HouseholdStarterJourneyServiceTests {
             checkpoint: .humanAppearance,
             subjectID: activeHuman.id
         )
-        let activeOptionalKey = HouseholdStarterJourneyService.checkpointRecordKey(
+        let activeLifeStageKey = HouseholdStarterJourneyService.checkpointRecordKey(
             task: .humanProfile,
-            checkpoint: .humanOptionalDetails,
+            checkpoint: .humanLifeStage,
+            subjectID: activeHuman.id
+        )
+        let activeBodyKey = HouseholdStarterJourneyService.checkpointRecordKey(
+            task: .humanProfile,
+            checkpoint: .humanBodyProfile,
             subjectID: activeHuman.id
         )
         let markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
             $0.actionType == HouseholdStarterJourneyService.checkpointActionType
         }
-        #expect(markers.count == 68)
+        #expect(markers.count == 102)
         var laterIndex = 0
         for marker in markers {
             let timestamp: Date
             switch marker.legacyModelId {
             case activeAppearanceKey:
                 timestamp = Date(timeIntervalSince1970: 1)
-            case activeOptionalKey:
+            case activeLifeStageKey:
                 timestamp = Date(timeIntervalSince1970: 2)
+            case activeBodyKey:
+                timestamp = Date(timeIntervalSince1970: 3)
             default:
                 timestamp = Date(timeIntervalSince1970: Double(100 + laterIndex))
                 laterIndex += 1
@@ -748,8 +806,10 @@ struct HouseholdStarterJourneyServiceTests {
         }
         try context.save()
         #expect(markers.count(where: {
-            $0.legacyModelId == activeAppearanceKey || $0.legacyModelId == activeOptionalKey
-        }) == 2)
+            $0.legacyModelId == activeAppearanceKey
+                || $0.legacyModelId == activeLifeStageKey
+                || $0.legacyModelId == activeBodyKey
+        }) == 3)
 
         let reference = try await TaskCenterRouteDataActor(modelContainer: container).load(
             loadPlants: false,
@@ -759,11 +819,14 @@ struct HouseholdStarterJourneyServiceTests {
         let journey = try #require(reference.snapshot.starterJourney)
         let state = try #require(journey.state(for: .humanProfile))
         #expect(state.targetID == activeHuman.id)
-        #expect(state.completedCheckpointCount == 2)
-        #expect(state.completedCheckpoints == [.humanAppearance, .humanOptionalDetails])
+        #expect(state.completedCheckpointCount == 3)
+        #expect(state.completionPercent == 75)
+        #expect(state.requiredCompletionPercent == 75)
+        #expect(state.completedCheckpoints == [.humanAppearance, .humanLifeStage, .humanBodyProfile])
         #expect(state.checkpointResolutions == [
             .humanAppearance: .reviewed,
-            .humanOptionalDetails: .preferNotToSay
+            .humanLifeStage: .unknown,
+            .humanBodyProfile: .preferNotToSay
         ])
         #expect(state.status == .claimable)
     }
@@ -1025,7 +1088,15 @@ struct HouseholdStarterJourneyServiceTests {
         )
         _ = HouseholdStarterJourneyService.recordResolution(
             task: .humanProfile,
-            checkpoint: .humanOptionalDetails,
+            checkpoint: .humanLifeStage,
+            resolution: .unknown,
+            subjectID: human.id,
+            context: context,
+            activeHumanSelection: selection
+        )
+        _ = HouseholdStarterJourneyService.recordResolution(
+            task: .humanProfile,
+            checkpoint: .humanBodyProfile,
             resolution: .preferNotToSay,
             subjectID: human.id,
             context: context,

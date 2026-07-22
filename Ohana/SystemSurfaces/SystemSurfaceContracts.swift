@@ -228,6 +228,8 @@ nonisolated enum OhanaExternalRoute: Equatable, Sendable {
     case taskCenter(focusedItemID: String?)
     case activeWalk(petID: UUID)
     case settings
+    case guardianInvite(code: String)
+    case guardianIncident(id: String)
 
     static var scheme: String {
         #if OHANA_LOCAL_DEVICE
@@ -251,15 +253,33 @@ nonisolated enum OhanaExternalRoute: Equatable, Sendable {
             components.queryItems = [URLQueryItem(name: "pet", value: petID.uuidString)]
         case .settings:
             components.host = "settings"
+        case let .guardianInvite(code):
+            components.host = "guardian"
+            components.queryItems = [URLQueryItem(name: "invite", value: code)]
+        case let .guardianIncident(id):
+            components.host = "guardian"
+            components.queryItems = [URLQueryItem(name: "incident", value: id)]
         }
         return components.url ?? URL(string: "\(Self.scheme)://task-center")!
     }
 
     static func parse(_ url: URL) -> Self? {
-        guard url.scheme?.lowercased() == scheme,
-              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let host = components.host?.lowercased()
         else { return nil }
+
+        if components.scheme?.lowercased() == "https" {
+            guard let configuredHost = configuredGuardianInviteHost,
+                  host == configuredHost
+            else { return nil }
+            let pieces = components.path.split(separator: "/").map(String.init)
+            if pieces.count == 2, ["g", "invite"].contains(pieces[0].lowercased()) {
+                return normalizedGuardianInvite(code: pieces[1])
+            }
+            return nil
+        }
+
+        guard components.scheme?.lowercased() == scheme else { return nil }
 
         switch host {
         case "task-center":
@@ -275,9 +295,38 @@ nonisolated enum OhanaExternalRoute: Equatable, Sendable {
             return .activeWalk(petID: petID)
         case "settings":
             return .settings
+        case "guardian":
+            if let code = components.queryItems?.first(where: { $0.name == "invite" })?.value {
+                return normalizedGuardianInvite(code: code)
+            }
+            if let id = components.queryItems?.first(where: { $0.name == "incident" })?.value?
+                .trimmingCharacters(in: .whitespacesAndNewlines), !id.isEmpty {
+                return .guardianIncident(id: id)
+            }
+            return nil
         default:
             return nil
         }
+    }
+
+    private static func normalizedGuardianInvite(code: String) -> Self? {
+        let normalized = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard (6 ... 32).contains(normalized.count),
+              normalized.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) })
+        else { return nil }
+        return .guardianInvite(code: normalized)
+    }
+
+    /// Keep the shared route contract independent from the main-app-only
+    /// guardian service. This file is also compiled into the widget target.
+    private static var configuredGuardianInviteHost: String? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "OHANAGuardianInviteBaseURL") as? String,
+              let url = URL(string: rawValue.trimmingCharacters(in: .whitespacesAndNewlines)),
+              url.scheme?.lowercased() == "https",
+              let host = url.host?.lowercased(),
+              !host.isEmpty
+        else { return nil }
+        return host
     }
 }
 

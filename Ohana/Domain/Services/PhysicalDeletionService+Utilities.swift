@@ -9,6 +9,74 @@ import Foundation
 import SwiftData
 
 extension PhysicalDeletionService {
+    nonisolated static func stageGuardianOwnerUnavailableIfNeeded(
+        ownerHumanID: UUID,
+        occurredAt: Date,
+        context: ModelContext
+    ) throws {
+        let policyKey = GuardianSafetyPolicyProjection.key(ownerHumanId: ownerHumanID)
+        var policyDescriptor = FetchDescriptor<GuardianSafetyPolicyProjection>(
+            predicate: #Predicate { $0.policyKey == policyKey && $0.isEnabled }
+        )
+        policyDescriptor.fetchLimit = 1
+        guard let policy = try context.fetch(policyDescriptor).first,
+              policy.serverPolicyId != nil,
+              policy.status != .stopped
+        else { return }
+
+        let revision = policy.scheduleRevision + 1
+        let eventKey = "guardian-safety:stop:\(ownerHumanID.uuidString.lowercased()):\(revision)"
+        var eventDescriptor = FetchDescriptor<GuardianSafetySyncOutbox>(
+            predicate: #Predicate { $0.eventKey == eventKey }
+        )
+        eventDescriptor.fetchLimit = 1
+        if try context.fetch(eventDescriptor).isEmpty {
+            context.insert(GuardianSafetySyncOutbox(
+                eventKey: eventKey,
+                eventKind: .monitoringStopped,
+                ownerHumanId: ownerHumanID,
+                occurredAt: occurredAt,
+                timeZoneIdentifier: TimeZone.current.identifier,
+                stopReason: .ownerUnavailable
+            ))
+        }
+        policy.isEnabled = false
+        policy.status = .stopped
+        policy.scheduleRevision = revision
+        policy.pauseUntil = nil
+        policy.updatedAt = occurredAt
+    }
+
+    @discardableResult
+    nonisolated static func deleteGuardianSafetyProjections(
+        ownerHumanID: UUID,
+        context: ModelContext
+    ) -> Int {
+        let ownerID = ownerHumanID.uuidString
+        let policies = fetchAll(GuardianSafetyPolicyProjection.self, context: context).filter {
+            idsMatch($0.ownerHumanIdRaw, ownerID)
+        }
+        let relationships = fetchAll(GuardianRelationshipProjection.self, context: context).filter {
+            idsMatch($0.ownerHumanIdRaw, ownerID)
+        }
+        let incidents = fetchAll(GuardianIncidentProjection.self, context: context).filter {
+            idsMatch($0.ownerHumanIdRaw, ownerID)
+        }
+        for value in policies {
+            context.delete(value)
+        }
+        for value in relationships {
+            context.delete(value)
+        }
+        for value in incidents {
+            context.delete(value)
+        }
+
+        // Keep the minimal outbox, including the stop signal, until the
+        // authenticated API accepts it. It contains no name or profile data.
+        return policies.count + relationships.count + incidents.count
+    }
+
     @discardableResult
     nonisolated static func deleteEvents(
         _ events: [Event],
@@ -57,21 +125,27 @@ extension PhysicalDeletionService {
         petId: String,
         context: ModelContext,
         deletedAt: Date,
-        deletedByHumanId: String?
+        deletedByHumanId: String?,
+        notifications: ReminderNotificationScheduling
     ) -> Int {
-        deleteRows(fetchAll(FamilyCollaborationTask.self, context: context).filter { task in
+        let allTasks = fetchAll(FamilyCollaborationTask.self, context: context)
+        let directlyMatchingTasks = allTasks.filter { task in
             (task.subjectKind == .pet && idsMatch(task.resolvedSubjectId, petId)) ||
                 idsMatch(task.relatedPetId, petId)
-        }, context: context) {
-            markGenericDeleted(
-                entityName: String(describing: FamilyCollaborationTask.self),
-                localRecordId: $0.id,
-                parentId: petId,
-                context: context,
-                deletedAt: deletedAt,
-                deletedByHumanId: deletedByHumanId
-            )
         }
+        let directlyMatchingPlans = fetchAll(FamilyTaskPlan.self, context: context).filter {
+            $0.subjectKind == .pet && idsMatch($0.subjectId, petId)
+        }
+        return deleteFamilyTaskGraph(
+            directlyMatchingTasks: directlyMatchingTasks,
+            directlyMatchingPlans: directlyMatchingPlans,
+            directlyMatchingActivities: [],
+            parentId: petId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
+        )
     }
 
     @discardableResult
@@ -79,20 +153,160 @@ extension PhysicalDeletionService {
         plantId: String,
         context: ModelContext,
         deletedAt: Date,
-        deletedByHumanId: String?
+        deletedByHumanId: String?,
+        notifications: ReminderNotificationScheduling
     ) -> Int {
-        deleteRows(fetchAll(FamilyCollaborationTask.self, context: context).filter { task in
+        let directlyMatchingTasks = fetchAll(FamilyCollaborationTask.self, context: context).filter { task in
             task.subjectKind == .plant && idsMatch(task.resolvedSubjectId, plantId)
-        }, context: context) {
+        }
+        let directlyMatchingPlans = fetchAll(FamilyTaskPlan.self, context: context).filter {
+            $0.subjectKind == .plant && idsMatch($0.subjectId, plantId)
+        }
+        return deleteFamilyTaskGraph(
+            directlyMatchingTasks: directlyMatchingTasks,
+            directlyMatchingPlans: directlyMatchingPlans,
+            directlyMatchingActivities: [],
+            parentId: plantId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
+        )
+    }
+
+    @discardableResult
+    nonisolated static func deleteFamilyTaskPlansAndActivitiesReferencingHuman(
+        humanId: String,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?,
+        notifications: ReminderNotificationScheduling
+    ) -> Int {
+        let directlyMatchingPlans = fetchAll(FamilyTaskPlan.self, context: context).filter { plan in
+            idsMatch(plan.createdById, humanId) ||
+                idsMatch(plan.assignedToId, humanId) ||
+                (plan.subjectKind == .human && idsMatch(plan.subjectId, humanId))
+        }
+        let directlyMatchingTasks = fetchAll(FamilyCollaborationTask.self, context: context).filter {
+            referencesHuman($0, humanId: humanId)
+        }
+        let directlyMatchingActivities = fetchAll(FamilyTaskActivity.self, context: context).filter { activity in
+            idsMatch(activity.actorHumanId, humanId) ||
+                idsMatch(activity.recipientHumanId, humanId)
+        }
+        return deleteFamilyTaskGraph(
+            directlyMatchingTasks: directlyMatchingTasks,
+            directlyMatchingPlans: directlyMatchingPlans,
+            directlyMatchingActivities: directlyMatchingActivities,
+            parentId: humanId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
+        )
+    }
+
+    /// Deletes an entire V95 collaboration graph once any plan or occurrence
+    /// references a physically removed member. A series edit may change the
+    /// plan's current subject while historical occurrences retain their old
+    /// subject, so plan identity—not the latest subject snapshot—owns the
+    /// cascade boundary.
+    @discardableResult
+    private nonisolated static func deleteFamilyTaskGraph(
+        directlyMatchingTasks: [FamilyCollaborationTask],
+        directlyMatchingPlans: [FamilyTaskPlan],
+        directlyMatchingActivities: [FamilyTaskActivity],
+        parentId: String,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?,
+        notifications: ReminderNotificationScheduling
+    ) -> Int {
+        let allPlans = fetchAll(FamilyTaskPlan.self, context: context)
+        let planIDs = Set(
+            directlyMatchingPlans.map(\.id.uuidString) +
+                directlyMatchingTasks.compactMap(\.planId)
+        )
+        let plans = unique(
+            allPlans.filter { planIDs.contains($0.id.uuidString) },
+            by: \.id
+        )
+
+        let directlyMatchingTaskIDs = Set(directlyMatchingTasks.map(\.id))
+        let tasks = unique(
+            fetchAll(FamilyCollaborationTask.self, context: context).filter { task in
+                directlyMatchingTaskIDs.contains(task.id) ||
+                    (task.planId.map(planIDs.contains) ?? false)
+            },
+            by: \.id
+        )
+        let taskIDs = Set(tasks.map(\.id.uuidString))
+        let directlyMatchingActivityIDs = Set(directlyMatchingActivities.map(\.id))
+        let activities = unique(
+            fetchAll(FamilyTaskActivity.self, context: context).filter { activity in
+                directlyMatchingActivityIDs.contains(activity.id) ||
+                    (activity.planId.map(planIDs.contains) ?? false) ||
+                    (activity.taskId.map(taskIDs.contains) ?? false)
+            },
+            by: \.id
+        )
+
+        let eventIDs = Set(
+            tasks.compactMap(\.relatedEventId) +
+                plans.compactMap(\.sourceEventId)
+        )
+        let events = unique(
+            fetchAll(Event.self, context: context).filter { event in
+                eventIDs.contains(event.id.uuidString) ||
+                    (event.familyTaskPlanId.map(planIDs.contains) ?? false)
+            },
+            by: \.id
+        )
+        let selectedEventIDs = Set(events.map(\.id))
+        let eventReminderIDs = Set(events.flatMap(\.reminders).map(\.id.uuidString))
+        let taskReminderIDs = Set(tasks.compactMap(\.relatedReminderId))
+        let detachedReminders = unique(
+            fetchAll(Reminder.self, context: context).filter { reminder in
+                (taskReminderIDs.contains(reminder.id.uuidString) ||
+                    (reminder.event.map { selectedEventIDs.contains($0.id) } ?? false)) &&
+                    !eventReminderIDs.contains(reminder.id.uuidString)
+            },
+            by: \.id
+        )
+
+        let deletedEventCount = deleteEvents(
+            events,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
+        )
+        let deletedDetachedReminderCount = detachedReminders.reduce(into: 0) { count, reminder in
+            count += deleteReminder(
+                reminder,
+                context: context,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId,
+                notifications: notifications
+            )
+        }
+        for activity in activities {
+            context.delete(activity)
+        }
+        let deletedTaskCount = deleteRows(tasks, context: context) { task in
             markGenericDeleted(
                 entityName: String(describing: FamilyCollaborationTask.self),
-                localRecordId: $0.id,
-                parentId: plantId,
+                localRecordId: task.id,
+                parentId: parentId,
                 context: context,
                 deletedAt: deletedAt,
                 deletedByHumanId: deletedByHumanId
             )
         }
+        for plan in plans {
+            context.delete(plan)
+        }
+        return deletedEventCount + deletedDetachedReminderCount + activities.count + deletedTaskCount + plans.count
     }
 
     @discardableResult

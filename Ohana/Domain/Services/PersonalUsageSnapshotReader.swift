@@ -42,10 +42,36 @@ enum PersonalUsageSnapshotReader {
                 predicate: #Predicate { !$0.isCompleted || $0.recurrenceDays > 0 }
             )
         )
+        let activePlanStatus = FamilyTaskPlanStatus.active.rawValue
+        let familyTaskPlans = try context.fetch(
+            FetchDescriptor<FamilyTaskPlan>(
+                predicate: #Predicate<FamilyTaskPlan> { $0.statusRaw == activePlanStatus }
+            )
+        )
+        let familyTaskOccurrences = try context.fetch(FetchDescriptor<FamilyCollaborationTask>())
+        let occurrencesByPlan = Dictionary(grouping: familyTaskOccurrences.compactMap { task in
+            task.planId.map { ($0, task) }
+        }, by: { $0.0 })
 
         var ordinaryActivePlanKeys = Set<String>()
         var healthCriticalActivePlanKeys = Set<String>()
+        for plan in familyTaskPlans where isActiveFamilyTaskPlan(
+            plan,
+            occurrences: occurrencesByPlan[plan.id.uuidString]?.map(\.1) ?? [],
+            now: now
+        ) {
+            let key = "family-task-plan:\(plan.id.uuidString)"
+            let quotaClass = EventType(rawValue: plan.eventTypeRaw)
+                .map(PersonalPlanQuotaClassifier.quotaClass(for:)) ?? .ordinary
+            switch quotaClass {
+            case .ordinary:
+                ordinaryActivePlanKeys.insert(key)
+            case .healthCritical:
+                healthCriticalActivePlanKeys.insert(key)
+            }
+        }
         for event in candidateEvents where isActivePlan(event, now: now) {
+            guard event.familyTaskPlanId == nil else { continue }
             let hasPendingReminder = event.reminders.contains(where: \.isPending)
             guard !CarePlanCalendarSync.isDefaultGeneratedCalendarPlan(event, pets: pets) else { continue }
             guard !PlantCarePlanScheduleService.isGeneratedCalendarPlan(event) else { continue }
@@ -86,6 +112,7 @@ enum PersonalUsageSnapshotReader {
         context: ModelContext,
         now: Date = Date()
     ) throws -> Bool {
+        guard event.familyTaskPlanId == nil else { return false }
         guard isActivePlan(event, now: now) else { return false }
         guard event.recurrenceDays > 0 || event.reminders.contains(where: \.isPending) else { return false }
         let quotaClass = event.eventTypeEnum.map(PersonalPlanQuotaClassifier.quotaClass(for:)) ?? .ordinary
@@ -102,6 +129,7 @@ enum PersonalUsageSnapshotReader {
         context: ModelContext,
         now: Date = Date()
     ) throws -> Bool {
+        guard event.familyTaskPlanId == nil else { return false }
         let quotaClass = event.eventTypeEnum.map(PersonalPlanQuotaClassifier.quotaClass(for:)) ?? .ordinary
         guard quotaClass == .ordinary else { return false }
         let pets = try context.fetch(FetchDescriptor<Pet>())
@@ -113,6 +141,9 @@ enum PersonalUsageSnapshotReader {
     }
 
     static func logicalPlanKey(for event: Event) -> String {
+        if let planID = event.familyTaskPlanId, !planID.isEmpty {
+            return "family-task-plan:\(planID)"
+        }
         if !event.feedPlanGroupId.isEmpty {
             return "feed-group:\(event.feedPlanGroupId)"
         }
@@ -132,6 +163,25 @@ enum PersonalUsageSnapshotReader {
         }
         guard !event.isCompleted else { return false }
         return event.reminders.contains(where: \.isPending)
+    }
+
+    private static func isActiveFamilyTaskPlan(
+        _ plan: FamilyTaskPlan,
+        occurrences: [FamilyCollaborationTask],
+        now: Date
+    ) -> Bool {
+        guard plan.status == .active else { return false }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = plan.timeZone
+        if let endsAt = plan.endsAt,
+           calendar.startOfDay(for: endsAt) < calendar.startOfDay(for: now) {
+            return false
+        }
+        guard plan.recurrenceRule == .once else { return true }
+        guard !occurrences.isEmpty else { return plan.anchorAt >= now }
+        return occurrences.contains { task in
+            task.status == .active || task.status == .claimed || task.status == .pendingReview || task.status == .declined
+        }
     }
 
     private static func isInformationalProjection(_ event: Event) -> Bool {

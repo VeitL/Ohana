@@ -17,6 +17,8 @@ extension PhysicalDeletionService {
         String(describing: Event.self),
         String(describing: Reminder.self),
         String(describing: FamilyCollaborationTask.self),
+        String(describing: FamilyTaskPlan.self),
+        String(describing: FamilyTaskActivity.self),
         String(describing: PlantCareLog.self),
         String(describing: CareLedgerEvent.self)
     ]
@@ -47,7 +49,8 @@ extension PhysicalDeletionService {
             plantId: plantId,
             context: context,
             deletedAt: deletedAt,
-            deletedByHumanId: deletedByHumanId
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
         )
         deletePlantCareLedgerEvents(
             plantId: plantId,

@@ -211,9 +211,9 @@ enum PlantUnlockCopy {
     static func lockedTitle(language: String) -> String {
         switch language {
         case "en":
-            "Plant care unlocks at Family Canopy Lv.4"
+            "Plant care unlocks at Life Canopy Lv.4"
         case "de":
-            "Pflanzenpflege ab Familienkrone Lv.4"
+            "Pflanzenpflege ab Lebenskrone Lv.4"
         default:
             PlantUnlockPolicy.lockedTitleZh
         }

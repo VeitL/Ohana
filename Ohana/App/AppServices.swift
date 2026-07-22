@@ -17,6 +17,35 @@ protocol SharedCareUndoRegistering {
 extension SharedCareUndoCoordinator: SharedCareUndoRegistering {}
 
 @MainActor
+private struct AppServicesLiveGraph {
+    let activeHumanSelection: UserDefaultsActiveHumanSelection
+    let notificationRouteCenter: OhanaNotificationRouteCenter
+    let notificationManager: NotificationManager
+    let avatarPipeline: AvatarPipeline
+    let coconutWallet: SwiftDataCoconutWalletManager
+    let shopInventory: UserDefaultsShopInventoryManager
+    let shopPurchaseFulfillment: ShopPurchaseFulfillmentService
+    let domainRevisions: SharedDomainRevisionPublisher
+    let questManager: QuestManager
+    let locationManager: LocationManager
+    let walkActivityPresenter: LiveWalkActivityPresenter
+    let careLedger: CareLedgerService
+    let automaticBackups: AutomaticBackupService
+    let backupAdapter: SharedDataBackupManagerAdapter
+    let oasisRewardManager: StaticOasisRewardManager
+    let oasisTreeManager: OasisTreeManager
+    let familyTasks: StaticFamilyTaskManager
+    let reminderScheduling: ReminderSchedulingManager
+    let medicationReminders: SharedMedicationReminderManager
+    let userNotifications: SharedUserNotificationManager
+    let guardianSafety: any GuardianSafetyManaging
+    let reminderCompletion: ReminderCompletionService
+    let careEventDependencies: CareEventServiceDependencies
+    let walkingManager: PetWalkingManager
+    let systemSurfaces: SystemSurfaceSnapshotRefreshing
+}
+
+@MainActor
 @Observable
 final class AppServices {
     let careEvents: CareEventRecording
@@ -46,6 +75,7 @@ final class AppServices {
     let reminderScheduling: ReminderSchedulingManaging
     let reminderCompletion: ReminderCompleting
     let presenceSafety: PresenceSafetyManaging
+    let guardianSafety: any GuardianSafetyManaging
     let onboardingJourney: OnboardingJourneyCoordinating
     let humanRequirements: HumanRequirementResolving
     let todayFocus: TodayFocusManaging
@@ -72,15 +102,108 @@ final class AppServices {
         commerce: CommerceEntitlementService? = nil
     ) {
         let commerce = commerce ?? CommerceEntitlementService()
+        let graph = AppServices.makeLiveGraph(modelContainer: modelContainer, commerce: commerce)
+        self.init(
+            careEvents: CareEventService(dependencies: graph.careEventDependencies),
+            activeHumanSelection: graph.activeHumanSelection,
+            coconutWallet: graph.coconutWallet,
+            coconutExchange: StaticCoconutExchangeManager(
+                wallet: graph.coconutWallet,
+                careLedger: graph.careLedger,
+                questManager: graph.questManager
+            ),
+            careLedger: graph.careLedger,
+            questManager: graph.questManager,
+            familyTasks: graph.familyTasks,
+            gacha: StaticGachaDrawer(
+                wallet: graph.coconutWallet,
+                careLedger: graph.careLedger,
+                questManager: graph.questManager
+            ),
+            memberCreation: AppServices.makeMemberCreationService(
+                graph.activeHumanSelection,
+                graph.coconutWallet,
+                graph.careLedger,
+                graph.domainRevisions,
+                graph.questManager,
+                graph.shopInventory,
+                graph.shopPurchaseFulfillment,
+                commerce
+            ),
+            oasisRewards: graph.oasisRewardManager,
+            privacy: StaticHumanPrivacyManager(),
+            passcodes: StaticHumanPasscodeManager(),
+            appIcons: SystemAppIconManager(),
+            shopInventory: graph.shopInventory,
+            shopPurchaseFulfillment: graph.shopPurchaseFulfillment,
+            islandToasts: IslandToastManager(),
+            metricKit: MetricKitObserver(),
+            backups: graph.backupAdapter,
+            automaticBackups: graph.automaticBackups,
+            appReset: StaticAppResetter(
+                questManager: graph.questManager,
+                automaticBackups: graph.automaticBackups,
+                prepareRuntimeForReset: {
+                    graph.walkingManager.reset()
+                    graph.walkActivityPresenter.endAll(immediate: true)
+                }
+            ),
+            medicationReminders: graph.medicationReminders,
+            userNotifications: graph.userNotifications,
+            notificationRoutes: SharedNotificationRoutePublisher(center: graph.notificationRouteCenter),
+            reminderActions: LiveReminderActionHandler(),
+            reminderScheduling: graph.reminderScheduling,
+            reminderCompletion: graph.reminderCompletion,
+            guardianSafety: graph.guardianSafety,
+            onboardingJourney: LiveOnboardingJourneyCoordinator(),
+            humanRequirements: LiveHumanRequirementResolver(),
+            todayFocus: StaticTodayFocusManager(
+                questManager: graph.questManager,
+                careLedger: graph.careLedger,
+                revisions: graph.domainRevisions
+            ),
+            plantCarePlans: StaticPlantCarePlanReader(),
+            plantReminderControls: StaticPlantReminderController(),
+            plantGrowthDiaryExports: LivePlantGrowthDiaryExporter(),
+            plantIntelligence: LocalPlantIntelligenceFallback(),
+            oasisTree: SharedOasisTreeManager(manager: graph.oasisTreeManager),
+            healthAlerts: SharedPetHealthAlertEngine(),
+            walking: SharedPetWalkingManager(manager: graph.walkingManager),
+            location: SharedLocationProvider(manager: graph.locationManager),
+            careLedgerStats: CareLedgerStatsReader(),
+            domainRevisions: graph.domainRevisions,
+            lifecycle: AppLifecycleCoordinator(dependencies: .live(
+                walkingManager: graph.walkingManager,
+                automaticBackups: graph.automaticBackups,
+                modelContainer: modelContainer
+            )),
+            cloudSync: AppServices.makeCloudSyncService(),
+            commerce: commerce,
+            systemSurfaces: graph.systemSurfaces,
+            systemSurfaceRoutes: SystemSurfaceRouteInbox()
+        )
+        configureLiveRuntime(
+            backupAdapter: graph.backupAdapter,
+            automaticBackups: graph.automaticBackups,
+            oasisTreeManager: graph.oasisTreeManager,
+            avatarPipeline: graph.avatarPipeline,
+            notificationManager: graph.notificationManager
+        )
+        self.systemSurfaces.start()
+    }
+
+    private static func makeLiveGraph(
+        modelContainer: ModelContainer?,
+        commerce: CommerceEntitlementService
+    ) -> AppServicesLiveGraph {
         let activeHumanSelection = UserDefaultsActiveHumanSelection()
         let notificationRouteCenter = OhanaNotificationRouteCenter()
         let notificationManager = NotificationManager(routeCenter: notificationRouteCenter)
-        let revisionCenter = ReadModelRevisionCenter.shared
         let avatarPipeline = AvatarPipeline()
         let coconutWallet = SwiftDataCoconutWalletManager()
         let shopInventory = UserDefaultsShopInventoryManager()
         let shopPurchaseFulfillment = ShopPurchaseFulfillmentService()
-        let domainRevisions = SharedDomainRevisionPublisher(center: revisionCenter)
+        let domainRevisions = SharedDomainRevisionPublisher(center: ReadModelRevisionCenter.shared)
         let questManager = QuestManager(wallet: coconutWallet, revisions: domainRevisions)
         let locationManager = LocationManager()
         let walkActivityPresenter = LiveWalkActivityPresenter()
@@ -101,21 +224,35 @@ final class AppServices {
             questManager: questManager,
             oasisRewards: oasisRewardManager
         )
-        let familyTasks = StaticFamilyTaskManager(wallet: coconutWallet, careLedger: careLedger, questManager: questManager)
+        let familyTasks = StaticFamilyTaskManager(
+            wallet: coconutWallet,
+            careLedger: careLedger,
+            questManager: questManager
+        )
         let reminderScheduling = ReminderSchedulingManager(careLedger: careLedger)
         let medicationReminders = SharedMedicationReminderManager(careLedger: careLedger)
-        let reminderCompletion = AppServices.makeReminderCompletion(
+        let userNotifications = SharedUserNotificationManager(manager: notificationManager)
+        let guardianSafety: any GuardianSafetyManaging = if let modelContainer {
+            GuardianSafetyCoordinator(
+                modelContainer: modelContainer,
+                commerce: commerce,
+                notifications: userNotifications
+            )
+        } else {
+            DisabledGuardianSafetyCoordinator()
+        }
+        let reminderCompletion = makeReminderCompletion(
             careLedger, familyTasks, reminderScheduling, notificationManager
         )
-        let careEventDependencies = AppServices.makeCareEventDependencies(
+        let careEventDependencies = makeCareEventDependencies(
             careEventEconomy, careLedger, reminderCompletion, familyTasks,
             domainRevisions, notificationManager
         )
-        AppServices.registerDomainDependencies(
+        registerDomainDependencies(
             careEventDependencies, careEventEconomy, familyTasks,
             reminderScheduling, medicationReminders, reminderCompletion
         )
-        let walkingManager = AppServices.makeWalker(
+        let walkingManager = makeWalker(
             locationManager,
             questManager,
             careLedger,
@@ -135,84 +272,33 @@ final class AppServices {
         }
         walkActivityPresenter.dismissStaleActivities()
         AppWorkloadPolicy.shared.hasRunningWalkProvider = { walkingManager.hasActiveLocationWalk }
-        self.init(
-            careEvents: CareEventService(dependencies: careEventDependencies),
+        return AppServicesLiveGraph(
             activeHumanSelection: activeHumanSelection,
+            notificationRouteCenter: notificationRouteCenter,
+            notificationManager: notificationManager,
+            avatarPipeline: avatarPipeline,
             coconutWallet: coconutWallet,
-            coconutExchange: StaticCoconutExchangeManager(wallet: coconutWallet, careLedger: careLedger, questManager: questManager),
-            careLedger: careLedger,
-            questManager: questManager,
-            familyTasks: familyTasks,
-            gacha: StaticGachaDrawer(wallet: coconutWallet, careLedger: careLedger, questManager: questManager),
-            memberCreation: AppServices.makeMemberCreationService(
-                activeHumanSelection,
-                coconutWallet,
-                careLedger,
-                domainRevisions,
-                questManager,
-                shopInventory,
-                shopPurchaseFulfillment,
-                commerce
-            ),
-            oasisRewards: oasisRewardManager,
-            privacy: StaticHumanPrivacyManager(),
-            passcodes: StaticHumanPasscodeManager(),
-            appIcons: SystemAppIconManager(),
             shopInventory: shopInventory,
             shopPurchaseFulfillment: shopPurchaseFulfillment,
-            islandToasts: IslandToastManager(),
-            metricKit: MetricKitObserver(),
-            backups: backupAdapter,
-            automaticBackups: automaticBackups,
-            appReset: StaticAppResetter(
-                questManager: questManager,
-                automaticBackups: automaticBackups,
-                prepareRuntimeForReset: {
-                    walkingManager.reset()
-                    walkActivityPresenter.endAll(immediate: true)
-                }
-            ),
-            medicationReminders: medicationReminders,
-            userNotifications: SharedUserNotificationManager(manager: notificationManager),
-            notificationRoutes: SharedNotificationRoutePublisher(center: notificationRouteCenter),
-            reminderActions: LiveReminderActionHandler(),
-            reminderScheduling: reminderScheduling,
-            reminderCompletion: reminderCompletion,
-            onboardingJourney: LiveOnboardingJourneyCoordinator(),
-            humanRequirements: LiveHumanRequirementResolver(),
-            todayFocus: StaticTodayFocusManager(
-                questManager: questManager,
-                careLedger: careLedger,
-                revisions: domainRevisions
-            ),
-            plantCarePlans: StaticPlantCarePlanReader(),
-            plantReminderControls: StaticPlantReminderController(),
-            plantGrowthDiaryExports: LivePlantGrowthDiaryExporter(),
-            plantIntelligence: LocalPlantIntelligenceFallback(),
-            oasisTree: SharedOasisTreeManager(manager: oasisTreeManager),
-            healthAlerts: SharedPetHealthAlertEngine(),
-            walking: SharedPetWalkingManager(manager: walkingManager),
-            location: SharedLocationProvider(manager: locationManager),
-            careLedgerStats: CareLedgerStatsReader(),
             domainRevisions: domainRevisions,
-            lifecycle: AppLifecycleCoordinator(dependencies: .live(
-                walkingManager: walkingManager,
-                automaticBackups: automaticBackups,
-                modelContainer: modelContainer
-            )),
-            cloudSync: AppServices.makeCloudSyncService(),
-            commerce: commerce,
-            systemSurfaces: systemSurfaces,
-            systemSurfaceRoutes: SystemSurfaceRouteInbox()
-        )
-        configureLiveRuntime(
-            backupAdapter: backupAdapter,
+            questManager: questManager,
+            locationManager: locationManager,
+            walkActivityPresenter: walkActivityPresenter,
+            careLedger: careLedger,
             automaticBackups: automaticBackups,
+            backupAdapter: backupAdapter,
+            oasisRewardManager: oasisRewardManager,
             oasisTreeManager: oasisTreeManager,
-            avatarPipeline: avatarPipeline,
-            notificationManager: notificationManager
+            familyTasks: familyTasks,
+            reminderScheduling: reminderScheduling,
+            medicationReminders: medicationReminders,
+            userNotifications: userNotifications,
+            guardianSafety: guardianSafety,
+            reminderCompletion: reminderCompletion,
+            careEventDependencies: careEventDependencies,
+            walkingManager: walkingManager,
+            systemSurfaces: systemSurfaces
         )
-        self.systemSurfaces.start()
     }
 
     private static func registerDomainDependencies(
@@ -378,6 +464,7 @@ final class AppServices {
         reminderScheduling: ReminderSchedulingManaging,
         reminderCompletion: ReminderCompleting,
         presenceSafety: PresenceSafetyManaging? = nil,
+        guardianSafety: (any GuardianSafetyManaging)? = nil,
         onboardingJourney: OnboardingJourneyCoordinating,
         humanRequirements: HumanRequirementResolving,
         todayFocus: TodayFocusManaging,
@@ -425,6 +512,7 @@ final class AppServices {
         self.reminderScheduling = reminderScheduling
         self.reminderCompletion = reminderCompletion
         self.presenceSafety = presenceSafety ?? LivePresenceSafetyManager()
+        self.guardianSafety = guardianSafety ?? DisabledGuardianSafetyCoordinator()
         self.onboardingJourney = onboardingJourney
         self.humanRequirements = humanRequirements
         self.todayFocus = todayFocus

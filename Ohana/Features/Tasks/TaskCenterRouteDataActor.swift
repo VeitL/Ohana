@@ -67,6 +67,42 @@ struct TaskCenterRouteData {
 actor TaskCenterRouteDataActor {
     private static let completedFamilyTaskFetchLimit = 300
 
+    func resolveFamilyTaskModelID(
+        taskID: UUID?,
+        occurrenceKey: String?,
+        planID: UUID?
+    ) throws -> PersistentIdentifier? {
+        if let taskID {
+            var descriptor = FetchDescriptor<FamilyCollaborationTask>(
+                predicate: #Predicate<FamilyCollaborationTask> { $0.id == taskID }
+            )
+            descriptor.fetchLimit = 1
+            if let task = try modelContext.fetch(descriptor).first {
+                return task.persistentModelID
+            }
+        }
+
+        if let occurrenceKey {
+            var descriptor = FetchDescriptor<FamilyCollaborationTask>(
+                predicate: #Predicate<FamilyCollaborationTask> { $0.occurrenceKey == occurrenceKey }
+            )
+            descriptor.fetchLimit = 1
+            if let task = try modelContext.fetch(descriptor).first {
+                return task.persistentModelID
+            }
+        }
+
+        guard let planID else { return nil }
+        let rawPlanID = planID.uuidString
+        var descriptor = FetchDescriptor<FamilyCollaborationTask>(
+            predicate: #Predicate<FamilyCollaborationTask> { $0.planId == rawPlanID },
+            sortBy: [SortDescriptor(\.nominalAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 64
+        let tasks = try modelContext.fetch(descriptor)
+        return (tasks.first(where: { !$0.isFinished }) ?? tasks.first)?.persistentModelID
+    }
+
     func load(
         loadPlants: Bool,
         activeHumanID: String?,
@@ -226,7 +262,9 @@ actor TaskCenterRouteDataActor {
         var values: [CareLedgerEvent] = []
 
         for humanID in humanTargetIDs {
-            for checkpoint in HouseholdStarterJourneyTask.humanProfile.checkpoints {
+            let humanCheckpoints = HouseholdStarterJourneyTask.humanProfile.checkpoints
+                + HouseholdStarterJourneyTask.humanProfile.compatibilityCheckpoints
+            for checkpoint in humanCheckpoints {
                 let recordKey = HouseholdStarterJourneyService.checkpointRecordKey(
                     task: checkpoint.task,
                     checkpoint: checkpoint,
@@ -675,11 +713,13 @@ actor TaskCenterRouteDataActor {
     private func fetchActiveFamilyTasks() -> [FamilyCollaborationTask] {
         let active = FamilyCollaborationTaskStatus.active.rawValue
         let claimed = FamilyCollaborationTaskStatus.claimed.rawValue
+        let declined = FamilyCollaborationTaskStatus.declined.rawValue
         let pendingReview = FamilyCollaborationTaskStatus.pendingReview.rawValue
         var descriptor = FetchDescriptor<FamilyCollaborationTask>(
             predicate: #Predicate<FamilyCollaborationTask> { task in
                 task.statusRaw == active ||
                     task.statusRaw == claimed ||
+                    task.statusRaw == declined ||
                     task.statusRaw == pendingReview
             },
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse), SortDescriptor(\.id)]

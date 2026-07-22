@@ -283,11 +283,16 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = nil
     }
 
-    func openFunctionMenu(destination: FMDest?, currentLevel: Int) {
+    func openFunctionMenu(
+        destination: FMDest?,
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
+    ) {
         let routedDestination: FMDest?
         switch AppFeatureRouteGuard.functionDestinationDecision(
             destination,
-            currentLevel: currentLevel
+            currentLevel: currentLevel,
+            plan: plan
         ) {
         case .rootMenu:
             routedDestination = nil

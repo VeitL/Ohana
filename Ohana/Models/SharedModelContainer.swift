@@ -1050,6 +1050,30 @@ enum ArkSchemaV94: VersionedSchema {
     }
 }
 
+// MARK: - Schema V95（家庭协作重复计划与收件人活动流）
+enum ArkSchemaV95: VersionedSchema {
+    static var versionIdentifier = Schema.Version(95, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV94.models + [
+            FamilyTaskPlan.self,
+            FamilyTaskActivity.self
+        ]
+    }
+}
+
+// MARK: - Schema V96（Family App 守护本机投影与可靠同步 outbox）
+enum ArkSchemaV96: VersionedSchema {
+    static var versionIdentifier = Schema.Version(96, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV95.models + [
+            GuardianSafetyPolicyProjection.self,
+            GuardianRelationshipProjection.self,
+            GuardianIncidentProjection.self,
+            GuardianSafetySyncOutbox.self
+        ]
+    }
+}
+
 // MARK: - Migration Plan
 // 只保留有真实 custom logic 的 stage；轻量新增字段/模型不需要显式 stage。
 // 相邻 schema hash 相同时，显式 stage 会触发 iOS 26 "model reference cannot be equal"。
@@ -1075,7 +1099,7 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV80.self, ArkSchemaV81.self, ArkSchemaV82.self, ArkSchemaV83.self, ArkSchemaV84.self,
          ArkSchemaV85.self, ArkSchemaV86.self, ArkSchemaV87.self, ArkSchemaV88.self,
          ArkSchemaV89.self, ArkSchemaV90.self, ArkSchemaV91.self, ArkSchemaV92.self,
-         ArkSchemaV93.self, ArkSchemaV94.self]
+         ArkSchemaV93.self, ArkSchemaV94.self, ArkSchemaV95.self, ArkSchemaV96.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -1147,7 +1171,7 @@ enum SharedModelContainer {
     }
 
     static func makePreview() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV94.models)
+        let schema = Schema(ArkSchemaV96.models)
         let configuration = ModelConfiguration(
             isStoredInMemoryOnly: true,
             cloudKitDatabase: .none
@@ -1157,7 +1181,7 @@ enum SharedModelContainer {
 
     private static func createPersistentContainer() throws -> ModelContainer {
         ensureApplicationSupportDirectory()
-        let schema = Schema(ArkSchemaV94.models)
+        let schema = Schema(ArkSchemaV96.models)
         let primaryConfiguration = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

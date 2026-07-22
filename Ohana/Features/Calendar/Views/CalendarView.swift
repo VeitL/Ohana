@@ -23,6 +23,7 @@ struct CalendarView: View {
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
     var onCompleteEvent: ((Event, Date, String?) -> Bool)?
     var events: [Event] = []
+    var familyTaskProjectionEvents: [Event] = []
     var pets: [Pet] = []
     var humans: [Human] = []
     var plants: [Plant] = []

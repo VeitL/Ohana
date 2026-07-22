@@ -19,6 +19,52 @@ nonisolated enum PresenceStatus: String, Codable, CaseIterable, Sendable {
     case okay
     case needsAttention
     case poor
+    case score1
+    case score2
+    case score3
+    case score4
+    case score5
+    case score6
+    case score7
+    case score8
+    case score9
+    case score10
+
+    init(score: Int) {
+        switch min(max(score, 1), 10) {
+        case 1: self = .score1
+        case 2: self = .score2
+        case 3: self = .score3
+        case 4: self = .score4
+        case 5: self = .score5
+        case 6: self = .score6
+        case 7: self = .score7
+        case 8: self = .score8
+        case 9: self = .score9
+        default: self = .score10
+        }
+    }
+
+    /// Legacy four-state facts remain byte-for-byte intact. Their score is a
+    /// presentation bridge, not a migration or a new reward-triggering write.
+    var score: Int {
+        switch self {
+        case .poor: 2
+        case .needsAttention: 4
+        case .okay: 7
+        case .great: 9
+        case .score1: 1
+        case .score2: 2
+        case .score3: 3
+        case .score4: 4
+        case .score5: 5
+        case .score6: 6
+        case .score7: 7
+        case .score8: 8
+        case .score9: 9
+        case .score10: 10
+        }
+    }
 }
 
 nonisolated enum PresenceCheckInSource: String, Codable, CaseIterable, Sendable {
@@ -26,6 +72,9 @@ nonisolated enum PresenceCheckInSource: String, Codable, CaseIterable, Sendable 
     case card
     case checkAll
     case notificationAction
+    /// A score remembered for a past missed day. This remains a distinct fact
+    /// source so reads can exclude it from check-ins, streaks, and rewards.
+    case retrospectiveStatus
     case legacy
     case legacyMakeup
     case restore

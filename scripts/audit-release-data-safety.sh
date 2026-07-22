@@ -148,6 +148,12 @@ backup_contract_entries=(
   "EconomyBudgetUsageEvent|EXEMPT:derived daily budget guardrail state, not user-authored history"
   "Event|struct EventBackup"
   "FamilyCollaborationTask|struct FamilyCollaborationTaskBackup"
+  "FamilyTaskActivity|EXEMPT:free-form family-task activity is excluded from restricted external backup"
+  "FamilyTaskPlan|EXEMPT:free-form recurring family-task plans are excluded from restricted external backup"
+  "GuardianIncidentProjection|EXEMPT:authenticated Family guardian service projection, never restored from backup"
+  "GuardianRelationshipProjection|EXEMPT:authenticated Family guardian service projection, never restored from backup"
+  "GuardianSafetyPolicyProjection|EXEMPT:authenticated Family guardian service projection, never restored from backup"
+  "GuardianSafetySyncOutbox|EXEMPT:device-local network recovery queue, unsafe to resurrect from backup"
   "HeatCycleLog|struct HeatCycleLogBackup"
   "Household|struct HouseholdBackup"
   "Human|struct HumanBackup"
@@ -225,8 +231,8 @@ for entry in "${backup_contract_entries[@]}"; do
     "SwiftData model $model should have a matching backup DTO, or a documented exemption if intentionally excluded."
 done
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV94\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV94 model set."
+require_pattern "$shared_container" 'Schema\(ArkSchemaV96\.models\)' \
+  "SharedModelContainer should open the current ArkSchemaV96 model set."
 
 require_pattern "$local_backup_exclusion" 'values\.isExcludedFromBackup = true' \
   "Local persistence must set URLResourceValues.isExcludedFromBackup before storing private data."

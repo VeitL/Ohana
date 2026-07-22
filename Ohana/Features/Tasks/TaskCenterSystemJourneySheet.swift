@@ -143,20 +143,30 @@ struct TaskCenterSystemJourneySheet: View {
     }
 
     private func progress(_ guide: TaskCenterSystemJourneyGuide) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
+        let usesCompletionPercent = guide.completionPercent != nil
+            && guide.requiredCompletionPercent != nil
+        let progressValue = usesCompletionPercent
+            ? Double(guide.completionPercent ?? 0)
+            : Double(guide.completedCheckpointCount)
+        let progressTotal = usesCompletionPercent
+            ? 100
+            : Double(max(1, guide.requiredCheckpointCount))
+        return VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Text(progressTitle(for: guide))
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
-                Text("\(guide.completedCheckpointCount)/\(guide.requiredCheckpointCount)")
+                Text(usesCompletionPercent
+                    ? "\(guide.completionPercent ?? 0)%"
+                    : "\(guide.completedCheckpointCount)/\(guide.requiredCheckpointCount)")
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.goPrimary)
                     .monospacedDigit()
             }
             ProgressView(
-                value: Double(guide.completedCheckpointCount),
-                total: Double(max(1, guide.requiredCheckpointCount))
+                value: progressValue,
+                total: progressTotal
             )
             .tint(Color.goPrimary)
         }
@@ -165,11 +175,18 @@ struct TaskCenterSystemJourneySheet: View {
     }
 
     private func progressTitle(for guide: TaskCenterSystemJourneyGuide) -> String {
-        if guide.task == .petProfile {
+        if guide.completionPercent != nil,
+           let requiredPercent = guide.requiredCompletionPercent {
             return l.tr(
-                zh: "任选完成 \(guide.requiredCheckpointCount) 项",
-                en: "Complete any \(guide.requiredCheckpointCount)",
-                de: "Beliebige \(guide.requiredCheckpointCount) abschließen"
+                zh: "资料完成度 · 达到 \(requiredPercent)% 可领取",
+                en: "Profile completion · Claim at \(requiredPercent)%",
+                de: "Profilfortschritt · Ab \(requiredPercent)% abholbar",
+                es: "Perfil · Reclama al \(requiredPercent)%",
+                pt: "Perfil · Resgate com \(requiredPercent)%",
+                fr: "Profil · Récompense à \(requiredPercent)%",
+                ja: "プロフィール完成度 · \(requiredPercent)%で受取可能",
+                ko: "프로필 완성도 · \(requiredPercent)%에서 수령",
+                it: "Profilo · Premio al \(requiredPercent)%"
             )
         }
         return l.tr(zh: "完成进度", en: "Progress", de: "Fortschritt")
@@ -393,7 +410,19 @@ struct TaskCenterSystemJourneySheet: View {
     private var rewardReadyContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label(
-                l.tr(zh: "所有问题都已完成", en: "All questions complete", de: "Alle Fragen abgeschlossen"),
+                isProfileCompletionTask
+                    ? l.tr(
+                        zh: "资料完成度已达到 75%",
+                        en: "Profile completion reached 75%",
+                        de: "Profil ist zu 75% vollständig",
+                        es: "El perfil alcanzó el 75%",
+                        pt: "O perfil chegou a 75%",
+                        fr: "Le profil a atteint 75%",
+                        ja: "プロフィール完成度が75%に到達",
+                        ko: "프로필 완성도 75% 달성",
+                        it: "Il profilo ha raggiunto il 75%"
+                    )
+                    : l.tr(zh: "所有问题都已完成", en: "All questions complete", de: "Alle Fragen abgeschlossen"),
                 systemImage: "checkmark.seal.fill"
             )
             .font(OhanaFont.headline(.black))
@@ -556,6 +585,10 @@ struct TaskCenterSystemJourneySheet: View {
         }
     }
 
+    private var isProfileCompletionTask: Bool {
+        guide?.task == .humanProfile || guide?.task == .petProfile
+    }
+
     private var sheetMode: TaskCenterSystemJourneySheetMode {
         TaskCenterSystemJourneySheetMode.resolve(
             openedAs: item.systemJourneyPresentationState,
@@ -599,6 +632,9 @@ struct TaskCenterSystemJourneySheet: View {
     private func questionSymbol(_ question: TaskCenterSystemJourneyGuide.Question) -> String {
         switch question.checkpoint {
         case .humanAppearance: "person.crop.circle"
+        case .humanLifeStage: "calendar.badge.clock"
+        case .humanBodyProfile: "person.text.rectangle"
+        case .humanPersonalityContext: "text.quote"
         case .humanOptionalDetails: "person.text.rectangle"
         case .petLifeStage: "calendar.badge.clock"
         case .petBodyProfile: "pawprint.circle"
@@ -615,7 +651,29 @@ struct TaskCenterSystemJourneySheet: View {
     private func questionPrompt(_ question: TaskCenterSystemJourneyGuide.Question) -> String {
         switch question.checkpoint {
         case .humanAppearance:
-            l.tr(zh: "你想用怎样的形象代表自己？", en: "How would you like your member card to represent you?", de: "Wie soll deine Mitgliedskarte dich darstellen?")
+            l.tr(
+                zh: "你想用怎样的形象代表自己？", en: "How would you like your member card to represent you?", de: "Wie soll deine Mitgliedskarte dich darstellen?",
+                es: "¿Cómo quieres que te represente tu tarjeta?", pt: "Como você quer ser representado no cartão?", fr: "Comment souhaitez-vous être représenté sur votre carte ?",
+                ja: "メンバーカードで自分をどう表現しますか？", ko: "멤버 카드에서 나를 어떻게 표현할까요?", it: "Come vuoi essere rappresentato sulla tua scheda?"
+            )
+        case .humanLifeStage:
+            l.tr(
+                zh: "要留下生日或年龄阶段吗？", en: "Would you like to add a birthday or life stage?", de: "Möchtest du Geburtstag oder Lebensphase ergänzen?",
+                es: "¿Quieres añadir cumpleaños o etapa vital?", pt: "Quer adicionar aniversário ou fase da vida?", fr: "Souhaitez-vous ajouter un anniversaire ou une étape de vie ?",
+                ja: "誕生日やライフステージを追加しますか？", ko: "생일이나 생애 단계를 추가할까요?", it: "Vuoi aggiungere compleanno o fase della vita?"
+            )
+        case .humanBodyProfile:
+            l.tr(
+                zh: "哪些身份或身体资料适合留下？", en: "Which identity or body details feel useful?", de: "Welche Identitäts- oder Körperdaten sind hilfreich?",
+                es: "¿Qué datos personales o físicos son útiles?", pt: "Quais dados de identidade ou corpo são úteis?", fr: "Quelles informations d’identité ou physiques sont utiles ?",
+                ja: "どの本人・身体情報を残しますか？", ko: "어떤 신원·신체 정보가 유용할까요?", it: "Quali dati personali o fisici sono utili?"
+            )
+        case .humanPersonalityContext:
+            l.tr(
+                zh: "什么最能讲出你的性格与故事？", en: "What best expresses your personality and story?", de: "Was beschreibt Persönlichkeit und Geschichte am besten?",
+                es: "¿Qué expresa mejor tu personalidad e historia?", pt: "O que melhor expressa sua personalidade e história?", fr: "Qu’est-ce qui exprime le mieux votre personnalité et votre histoire ?",
+                ja: "性格や物語を最もよく表すものは？", ko: "성격과 이야기를 가장 잘 보여주는 것은 무엇일까요?", it: "Cosa esprime meglio personalità e storia?"
+            )
         case .humanOptionalDetails:
             l.tr(zh: "哪些可选资料会让成员卡更有用？", en: "Which optional details would make your member card useful?", de: "Welche optionalen Angaben machen deine Karte nützlicher?")
         case .petLifeStage:
@@ -642,7 +700,29 @@ struct TaskCenterSystemJourneySheet: View {
     private func questionDetail(_ question: TaskCenterSystemJourneyGuide.Question) -> String {
         switch question.checkpoint {
         case .humanAppearance:
-            l.tr(zh: "设置头像或个人风格；也可以确认沿用当前形象。", en: "Set an avatar or personal style, or keep your current look.", de: "Lege Avatar oder Stil fest oder behalte das aktuelle Aussehen.")
+            l.tr(
+                zh: "设置头像或个人风格；也可以确认沿用当前形象。", en: "Set an avatar or personal style, or keep your current look.", de: "Lege Avatar oder Stil fest oder behalte das aktuelle Aussehen.",
+                es: "Elige un avatar o estilo personal, o conserva tu aspecto actual.", pt: "Escolha um avatar ou estilo pessoal, ou mantenha o visual atual.", fr: "Choisissez un avatar ou un style personnel, ou gardez l’apparence actuelle.",
+                ja: "アバターや自分らしいスタイルを設定するか、現在の外観をそのまま使えます。", ko: "아바타나 개인 스타일을 설정하거나 현재 모습을 그대로 사용할 수 있어요.", it: "Scegli un avatar o uno stile personale, oppure mantieni l’aspetto attuale."
+            )
+        case .humanLifeStage:
+            l.tr(
+                zh: "生日可用于年龄、星座与纪念日展示；不清楚或不想填写也可以明确说明。", en: "A birthday enables age, zodiac, and anniversary details. Unknown or private is a valid answer.", de: "Ein Geburtstag ermöglicht Alter, Sternzeichen und Jahrestage. Unbekannt oder privat ist ebenfalls gültig.",
+                es: "El cumpleaños permite mostrar edad, signo y aniversarios. Desconocido o privado también es válido.", pt: "O aniversário permite mostrar idade, signo e datas especiais. Desconhecido ou privado também vale.", fr: "L’anniversaire permet d’afficher l’âge, le signe et les dates marquantes. Inconnu ou privé est aussi valable.",
+                ja: "誕生日から年齢・星座・記念日を表示できます。不明や非公開でも構いません。", ko: "생일로 나이, 별자리, 기념일을 표시할 수 있어요. 모름이나 비공개도 괜찮아요.", it: "Il compleanno abilita età, segno e ricorrenze. Anche sconosciuto o privato è valido."
+            )
+        case .humanBodyProfile:
+            l.tr(
+                zh: "身份、血型与身高均为可选资料，只留下你愿意保存的内容。", en: "Identity, blood type, and height are optional. Keep only what you want to save.", de: "Identität, Blutgruppe und Größe sind optional. Speichere nur gewünschte Angaben.",
+                es: "Identidad, grupo sanguíneo y altura son opcionales. Guarda solo lo que quieras.", pt: "Identidade, tipo sanguíneo e altura são opcionais. Guarde apenas o que quiser.", fr: "Identité, groupe sanguin et taille sont facultatifs. Gardez seulement ce que vous souhaitez.",
+                ja: "本人情報・血液型・身長は任意です。残したい内容だけ保存してください。", ko: "신원, 혈액형, 키는 선택 사항이에요. 원하는 정보만 저장하세요.", it: "Identità, gruppo sanguigno e altezza sono facoltativi. Salva solo ciò che desideri."
+            )
+        case .humanPersonalityContext:
+            l.tr(
+                zh: "MBTI、地区与个人故事都可选，也可以明确暂不填写。", en: "MBTI, location, and your story are optional, and can be explicitly left blank.", de: "MBTI, Ort und Geschichte sind optional und können bewusst leer bleiben.",
+                es: "MBTI, lugar e historia son opcionales y pueden dejarse explícitamente en blanco.", pt: "MBTI, local e história são opcionais e podem ficar explicitamente em branco.", fr: "MBTI, lieu et histoire sont facultatifs et peuvent être explicitement laissés vides.",
+                ja: "MBTI・地域・ストーリーは任意で、明確に未入力を選べます。", ko: "MBTI, 지역, 이야기는 선택 사항이며 명시적으로 비워둘 수 있어요.", it: "MBTI, luogo e storia sono facoltativi e possono essere lasciati esplicitamente vuoti."
+            )
         case .humanOptionalDetails:
             l.tr(zh: "生日、身份、地区、血型、MBTI 和身高都可选，只填真正想留下的内容。", en: "Birthday, identity, location, blood type, MBTI, and height are optional. Add only what you want to keep.", de: "Geburtstag, Identität, Ort, Blutgruppe, MBTI und Größe sind optional.")
         case .petLifeStage:
@@ -669,7 +749,15 @@ struct TaskCenterSystemJourneySheet: View {
 
     private func openQuestionActionTitle(_ question: TaskCenterSystemJourneyGuide.Question) -> String {
         switch question.checkpoint {
-        case .humanAppearance: l.tr(zh: "去设置头像与形象", en: "Set avatar and look", de: "Avatar und Aussehen festlegen")
+        case .humanAppearance:
+            l.tr(
+                zh: "去设置头像与形象", en: "Set avatar and look", de: "Avatar und Aussehen festlegen",
+                es: "Configurar avatar y aspecto", pt: "Definir avatar e visual", fr: "Définir l’avatar et l’apparence",
+                ja: "アバターと外観を設定", ko: "아바타와 모습 설정", it: "Imposta avatar e aspetto"
+            )
+        case .humanLifeStage: l.tr(zh: "去填写生日资料", en: "Add birthday details", de: "Geburtstag ergänzen", es: "Añadir cumpleaños", pt: "Adicionar aniversário", fr: "Ajouter l’anniversaire", ja: "誕生日を追加", ko: "생일 정보 추가", it: "Aggiungi compleanno")
+        case .humanBodyProfile: l.tr(zh: "去填写身份与身体资料", en: "Add identity and body details", de: "Identitäts- und Körperdaten ergänzen", es: "Añadir datos personales y físicos", pt: "Adicionar dados de identidade e corpo", fr: "Ajouter les informations d’identité et physiques", ja: "本人・身体情報を追加", ko: "신원·신체 정보 추가", it: "Aggiungi dati personali e fisici")
+        case .humanPersonalityContext: l.tr(zh: "去完善性格与故事", en: "Add personality and story", de: "Persönlichkeit und Geschichte ergänzen", es: "Añadir personalidad e historia", pt: "Adicionar personalidade e história", fr: "Ajouter personnalité et histoire", ja: "性格とストーリーを追加", ko: "성격과 이야기 추가", it: "Aggiungi personalità e storia")
         case .humanOptionalDetails: l.tr(zh: "去填写可选资料", en: "Add optional details", de: "Optionale Angaben ergänzen")
         case .petLifeStage: l.tr(zh: "去填写日期资料", en: "Add dates", de: "Daten ergänzen")
         case .petBodyProfile: l.tr(zh: "去填写身体资料", en: "Add body profile", de: "Körperprofil ergänzen")

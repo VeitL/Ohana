@@ -1,12 +1,14 @@
 # Entitlement Logic
 
-> 状态：Free / Personal 的本地 catalog、StoreKit 测试配置、统一权益服务、额度门、降级保护、付费页和当前对外声明的 Personal 能力已在工作树实现；这不等于 App/Test target、九语言付费文案、App Store Connect、Sandbox、第二设备和签名 Storefront 已验收。
-> 最近核对：2026-07-18，依据 `product-foundation.md` D4、D6、D9、D22、D29–D31 与 G12。
+> 状态：Free / Personal 与 fail-closed Family 年度 catalog、StoreKit 测试配置和统一权益服务已在工作树实现；Family 商品默认不加载、不展示、不可购买，直到在线守护上线门禁完成。这不等于 App Store Connect、Sandbox、服务端或真机已验收。
+> 最近核对：2026-07-22，依据 `product-foundation.md` D4、D6、D9、D22、D25、D29–D32 与 G12。
 > 所有者：统一 Entitlement 服务与领域额度策略；任何 View、主题、图标或分享卡不得自行读取产品 ID、交易或本地布尔值决定所有权。
 
 ## Purpose
 
-1.0 商业结构固定为 Ohana Free + Ohana Personal。权益系统回答用户是否拥有 Personal，领域额度策略据此裁决是否可新增或重新激活超额对象 / 计划，各高级功能只询问语义能力。
+基础商业结构为 Ohana Free + Ohana Personal；Ohana Family 是独立年度订阅并包含
+Personal，只用于需要持续服务的 App 内亲友守护。权益系统分别回答 `hasPersonal` 与
+`hasFamily`，各功能只询问语义能力。
 
 StoreKit 不可用、网络中断、商品加载失败、购买失败或交易无法验证时，Free 基础能力必须 fail-open。任何付费状态都不能锁定原始记录、已有历史查看编辑、手动导出、健康关键提醒、纪念模式或离世档案。Ohana 不植入广告，Personal 不售卖“去广告”。
 
@@ -18,12 +20,18 @@ StoreKit 不可用、网络中断、商品加载失败、购买失败或交易�
 | Personal Yearly | Auto-Renewable Subscription | `com.guanchen.li.Ohana.personal.yearly` | €14.99 / 年；符合条件的新订阅者 14 天试用；主推 |
 | Personal Lifetime | Non-Consumable | `com.guanchen.li.Ohana.personal.lifetime` | €49.99 一次购买 |
 | Legacy Supporter Pack | Non-Consumable | `com.guanchen.li.Ohana.supporterPack` | 不再作为新用户主要商品；已验证有效的历史购买授予 Personal Lifetime |
+| Family Yearly | Auto-Renewable Subscription | `com.guanchen.li.Ohana.family.yearly` | €39.99 / 年；无试用、无 Lifetime；上线门禁完成前隐藏且不可购买 |
 
-Monthly 和 Yearly 必须位于同一 Personal 订阅组。Lifetime 是本地 Personal 能力的永久权益，不包含未来 Family 云同步、Care+ 云端 AI 或其他持续服务。Family Sharing 首发关闭；未经新的购买、恢复和家庭所有权决策不得在 App Store Connect 开启。
+Personal Monthly、Personal Yearly 与 Family Yearly 必须位于同一订阅组，以便 Apple
+管理升级和降级；Family 同时授予 Personal。Lifetime 是本地 Personal 能力的永久权益，
+不包含 Family 在线守护、Care+ 云端 AI 或其他持续服务。所有商品的 App Store Family
+Sharing 保持关闭。
 
 App 内价格、币种、税费、周期和 introductory offer 只使用 StoreKit 本地化结果。上表欧元值只是 App Store Connect 配置目标，不得硬编码。首发 Founding Lifetime €39.99 只可作为真实 Storefront offer 实验，不新建第四个 SKU；StoreKit 未返回该优惠时不得展示。
 
-三个新 Product ID、legacy Product ID、订阅组和价格语义必须在集中 catalog、本地 StoreKit 配置、测试、App Store Connect 与本文中保持一致。不得静默改名、复用 legacy SKU 卖新权益或用本地布尔值伪造购买。
+四个新 Product ID、legacy Product ID、订阅组和价格语义必须在集中 catalog、本地
+StoreKit 配置、测试、App Store Connect 与本文中保持一致。Family 本地配置仅用于测试，
+不能绕过运行开关。不得静默改名、复用 legacy SKU 卖新权益或用本地布尔值伪造购买。
 
 ## Single Decision Point
 
@@ -82,12 +90,29 @@ Personal 解锁以下语义能力；只有已实现、已验收的条目才能�
 佛系基础模式、卡片打卡、固定状态、一键全部、全部原始月份、当前/最长连续、基础
 Oasis、商店、扭蛋和电子宠物也不读 Personal entitlement。Personal 只增加佛系的
 90 天/1 年/全部时间趋势、状态分布、完成率、跨对象比较、导出、按星期提醒、
-15–180 分钟宽限、第二次本机提醒、最多三位联系人和可编辑短信模板。Free 保留一个
-每日时间、一位联系人和固定模板。任何套餐都不增加佛系奖励、椰子倍率或扭蛋概率。
+15–180 分钟宽限和第二次本机提醒。Free 保留一个每日本机提醒时间。Free / Personal
+都不发送跨设备亲友通知；任何套餐都不增加佛系奖励、椰子倍率或扭蛋概率。
 
-未来 Family 使用组合能力：Family 同时满足 `hasPersonal` 与 `hasFamily`。当前 Solo
-shipping profile 只保留这一领域协议与禁用实现，不配置 Family SKU、不展示购买入口、
-不启用 APNs/CloudKit entitlement，也不宣传家庭守护已经可用。
+Family 使用组合能力：Family 同时满足 `hasPersonal` 与 `hasFamily`。`hasFamily` 只开放
+已部署、已验收的在线守护；不自动开放 CloudKit 同步或其他未来协作。客户端完整运行
+配置缺失或开关关闭时，不请求 Family 商品、隐藏购买入口，直接购买调用也 fail-closed。
+
+### Household Insights
+
+家庭洞察固定包含“体重、花费、周报、照护分析、提醒健康、长期回顾”六个始终可见的
+Tab。Free 按椰子树等级依次开放：体重与花费 Lv.1、周报 Lv.6、照护分析与完整提醒
+诊断 Lv.8、长期回顾 Lv.9；未解锁项显示所需等级，不隐藏原始记录。健康与用药的家庭
+聚合面板仍由椰子树 Lv.2 独立解锁，不属于 Personal 提前开放范围。
+
+Personal 以及满足 `hasPersonal` 的 Family 可从 Lv.0 提前访问全部家庭洞察，并在
+体重、花费和分析中使用 90 天、1 年、全部时间、跨对象比较及导出。Free 保留全部原始
+记录、7 天与 30 天趋势和单对象查看。Personal 只绕过这六个家庭洞察 Tab 的等级门，
+不得提前开放 Lv.4 植物、Lv.5 Oasis 成长、Lv.6 商店、Lv.7 扭蛋、Lv.10 电子宠物，
+也不改变椰子收入、成长速度或抽取概率。
+
+提醒权限异常、发送失败和逾期属于安全摘要，任何家庭洞察等级与套餐门都不得隐藏；
+详细调度流水和趋势仍按 Lv.8 或 Personal 裁决。权益降级后只锁定高级范围、比较和新
+导出，原始记录以及已由当前椰子树等级开放的能力继续可用。
 
 ## State Model
 
@@ -108,6 +133,7 @@ shipping profile 只保留这一领域协议与禁用实现，不配置 Family S
 | `checking` | 正在枚举本机 StoreKit 权益；Free 基础能力全开，Personal 按最近一次已验证快照裁决 |
 | `personalSubscriptionVerified` | Monthly 或 Yearly 存在当前有效、未退款 / 撤销的已验证 entitlement；开放 Personal |
 | `personalLifetimeVerified` | Personal Lifetime 或 legacy Supporter Pack 存在未退款 / 撤销的已验证 entitlement；永久开放 Personal |
+| `familySubscriptionVerified` | Family Yearly 存在当前有效、未退款 / 撤销的已验证 entitlement；同时开放 Personal，并允许客户端向服务端验证 Family 在线权限 |
 | `freeVerified` | 已成功枚举且不存在任何有效 Personal 来源；使用 Free 额度 |
 | `temporarilyUnknown` | 枚举失败或 StoreKit 暂不可用；Free 基础能力全开，最近一次 Personal 已验证拥有者可继续 Personal，从未验证者不误解锁 |
 
@@ -120,9 +146,11 @@ shipping profile 只保留这一领域协议与禁用实现，不配置 Family S
 
 1. 先启动一个应用生命周期所有的 `Transaction.updates` 监听任务；同一进程只允许
    一个权威监听者，退出时取消。
-2. 使用集中 catalog 一次加载三个 Personal Product ID；legacy Supporter ID 仅参与权益恢复，不出现在新购页。
+2. 使用集中 catalog 加载三个 Personal Product ID；只有 Family 运行配置有效时才附加
+   Family Yearly。legacy Supporter ID 仅参与权益恢复，不出现在新购页。
 3. 枚举 `Transaction.currentEntitlements`，只消费 `.verified` transaction，并检查
-   Product ID、product type、`revocationDate`、订阅过期时间和有效所有权状态。任一有效来源均授予同一 Personal 能力集。
+   Product ID、product type、`revocationDate`、订阅过期时间和有效所有权状态。任一
+   Personal 来源均授予 Personal；有效 Family 同时授予 Personal 与 Family。
 4. 发布不可变权益快照；View 只观察快照，不持有 StoreKit transaction。
 
 以下时机重新枚举 `currentEntitlements`：
@@ -141,7 +169,9 @@ shipping profile 只保留这一领域协议与禁用实现，不配置 Family S
 
 购买只能由用户明确点击触发：
 
-1. 确认用户选择的 Monthly、Yearly 或 Lifetime 商品已由 StoreKit 成功加载；按钮显示对应 `displayPrice` 和真实周期。只有 StoreKit 返回符合条件的 introductory offer 时才显示 14 天试用。
+1. 确认用户选择的 Personal Monthly / Yearly / Lifetime 或 Family Yearly 已由 StoreKit
+   成功加载；按钮显示对应 `displayPrice` 和真实周期。只有 Personal Yearly 且 StoreKit
+   返回符合条件的 introductory offer 时才显示 14 天试用；Family 不显示试用。
 2. 防止连点并调用 `Product.purchase()`；不在购买前写任何所有权状态。
 3. 根据结果处理：
    - `.success(.verified(transaction))`：核对 Product ID 与类型，刷新
@@ -151,7 +181,12 @@ shipping profile 只保留这一领域协议与禁用实现，不配置 Family S
      `Transaction.updates` 完成交付；
    - `.userCancelled`：安静恢复按钮，不展示错误或继续追弹；
    - 其他错误：保留 Free 全部基础能力，提供可重试错误，不重复扣款猜测。
-4. 成功页只列出当前 build 已交付的 Personal 能力，明确 Lifetime 不包含 Family / Care+ 持续服务，不暗示去广告或未来全部内容。
+4. 成功页只列出当前 build 已交付的能力，明确 Lifetime 不包含 Family / Care+ 持续服务，
+   Family 不包含尚未上线的 CloudKit 协作，不暗示去广告或未来全部内容。
+
+Family 购买成功不等于服务端立即授权。客户端只暂存内存中的签名 transaction，登录后
+提交服务端以 Apple App Store Server Library 再验证；服务端 entitlement 生效后才能
+开启守护。客户端布尔值、备份或本地商品加载结果都不能授权在线调度。
 
 用户已有月 / 年订阅时购买 Lifetime，App 只能引导其在系统订阅管理中确认后续订状态；App 无权自行取消订阅，也不得说成“购买 Lifetime 后自动退订”。Monthly / Yearly 之间的切换和生效时间由同一 StoreKit 订阅组管理。
 
@@ -244,12 +279,15 @@ Personal 装饰必须使用独立、稳定的语义 ID，并与现有椰子经�
 - Apple 处理付款、账单和 Apple 账号；Ohana 不读取、保存或传输银行卡、账单地址、
   Apple ID 密码或完整支付凭据。
 - App 只读取 StoreKit 提供的商品元数据，以及 Apple 签名并验证的 transaction 和当前权益状态，用于本机交付 Personal。
-- 没有 Ohana account，因此不设置自建账号映射或把 transaction 关联到 Human、宠物、
-  植物、健康或照护记录。
+- Free / Personal 没有 Ohana account。Family 守护登录只建立匿名账号映射，并将经
+  Apple 签名的 Family transaction 交给服务端验证；不得把购买关联到 Human、Pet、
+  Plant、健康、打卡分数或其他照护记录。
 - 不为 Personal 引入广告 SDK、追踪、第三方分析或开发者托管购买后端。
 - 未验证 transaction、错误日志和测试诊断不得包含收据正文、Apple 账号信息或照护
   数据。
 - 购买状态不是照护数据；不得上传到 CloudKit、写入用户导出包或通过分享卡外泄。
+  Family 服务端只保存验证在线权益所需的最小交易标识、产品、到期和状态，不保存 JWS
+  正文或支付凭据。
 
 ## App Store Release Gate
 
@@ -289,19 +327,27 @@ Personal 装饰必须使用独立、稳定的语义 ID，并与现有椰子经�
 | 换机 / 备份恢复 | 所有权来自 StoreKit，不来自备份；legacy Supporter 恢复为 Personal Lifetime |
 | 试用结束 / 订阅过期 / 退款 / 撤销 | 降级保护成立；所有家庭数据和 Free 能力保持，椰子商品不变 |
 | Personal 能力映射 | 不限额度和每一个已对外声明的高级本地能力都有定向测试；Supporter 装饰与椰子独立所有权正确 |
+| Family 默认关闭 | 运行配置缺失时不加载商品、不展示入口、直接购买 fail-closed；不影响 Personal 恢复或普通照护 |
+| Family entitlement | 有效 Family 同时授予 Personal；服务端 JWS / ASSN V2 再验证后才允许调度；到期 / 降级立即停止新守护且本机数据不变 |
 | UI / 本地化 / 无障碍 | 九语言、动态价格、Dynamic Type、语义控件和辅助技术路径通过 |
 
 定向 StoreKit 测试编译受影响 target 后可替代单独 build；最终仍需上述 App Store
 外部证据和签名包验收。
 
-## Future Family And Care+
+## Family Release Gate And Future Care+
 
-1.0 Entitlement 服务可以预留语义枚举，但不得创建可购买的 Family/Care+ 产品、
-订阅组或隐藏入口。未来启用前必须另行批准：
+Family Yearly 已进入集中 catalog 和本地 StoreKit 测试配置，但运行开关默认关闭。以下
+完成前不得在 App Store Connect 开放销售、在 App 内加载商品或宣传守护可用：
 
-- Family 包含 Personal；年付目标 €39.99 的地区价格、月付 / 试用策略、云存储合理使用和降级 / fork / 冲突恢复仍待批准；Family 不提供 Lifetime；
+- AWS 生产栈、Sign in with Apple、Associated Domains、APNs 与 App Store Server
+  Notifications V2；
+- Family 续订、升级、降级、宽限 / 账单重试、退款、撤销与 entitlement loss；
+- 隐私标签 / 政策、九语言、Sandbox、第二账号和双真机端到端证据。
+
+详细门禁见 [`GuardianSafety-logic.md`](GuardianSafety-logic.md)。Care+ 启用前仍须另行批准：
+
 - Care+ 包含 Personal；是否同时包含 Family 或作为 Family 加购，以及 AI 成本、隐私、留存和安全
   边界；
-- 订阅升级、降级、宽限期、账单重试、退款、Family Sharing 和多设备一致性状态机。
+- Care+ 的订阅升级、降级、宽限期、账单重试、退款、Family Sharing 和多设备一致性状态机。
 
-在这些规则和服务成本没有证据前，未来产品不得借 Personal / legacy Supporter Product ID、本地布尔值或装饰购买记录提前解锁。
+任何在线产品不得借 Personal / legacy Supporter Product ID、本地布尔值或装饰购买记录提前解锁。

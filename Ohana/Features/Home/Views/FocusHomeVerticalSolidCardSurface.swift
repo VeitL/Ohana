@@ -8,6 +8,16 @@
 import SwiftUI
 import UIKit
 
+nonisolated enum FocusHomeVerticalSolidExpandedContentStyle: Equatable, Sendable {
+    case standard
+    case zenProfile
+}
+
+nonisolated enum FocusHomeVerticalSolidCardContentStyle: Equatable, Sendable {
+    case standard
+    case nameOnly
+}
+
 struct FocusHomeVerticalSolidCardSurface: View {
     let card: FocusCard
     let progress: CGFloat
@@ -15,6 +25,13 @@ struct FocusHomeVerticalSolidCardSurface: View {
     let localization: L10n
     let frozenAvatarSource: FocusHomeFrozenAvatarSource?
     var allowsLiveAvatarFallback: Bool = true
+    var showsBorder: Bool = true
+    var usesPlantSpecificBackground: Bool = true
+    var showsStatusBadge: Bool = true
+    var compactMetricValueOverride: String? = nil
+    var compactMetricUnitOverride: String? = nil
+    var expandedContentStyle: FocusHomeVerticalSolidExpandedContentStyle = .standard
+    var contentStyle: FocusHomeVerticalSolidCardContentStyle = .standard
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private var visualProgress: CGFloat {
@@ -45,7 +62,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
 
             ZStack(alignment: .topLeading) {
                 Group {
-                    if card.isPlant {
+                    if card.isPlant && usesPlantSpecificBackground {
                         WalletPlantLightBlueGlassBackground(reducesEffects: !usesFullVisualEffects)
                     } else {
                         WalletMemberHeroBackground(
@@ -57,21 +74,25 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 }
                     .clipShape(shape)
                     .overlay {
-                        shape
-                            .strokeBorder(
-                                card.isPlant
-                                    ? WalletPlantLightBlueGlassBackground.rimColor
-                                    : WalletMemberHeroPalette(
-                                        themeColorHex: card.themeColorHex,
-                                        fallbackColor: card.color
-                                    ).border,
-                                lineWidth: card.isPlant
-                                    ? WalletPlantLightBlueGlassBackground.rimWidth
-                                    : lerp(1, 1.25, p)
-                            )
+                        if showsBorder {
+                            shape
+                                .strokeBorder(
+                                    card.isPlant && usesPlantSpecificBackground
+                                        ? WalletPlantLightBlueGlassBackground.rimColor
+                                        : WalletMemberHeroPalette(
+                                            themeColorHex: card.themeColorHex,
+                                            fallbackColor: card.color
+                                        ).border,
+                                    lineWidth: card.isPlant && usesPlantSpecificBackground
+                                        ? WalletPlantLightBlueGlassBackground.rimWidth
+                                        : lerp(1, 1.25, p)
+                                )
+                        }
                     }
 
-                if let image = avatarSource.image, usesFullWidthPhoto {
+                if contentStyle == .standard,
+                   let image = avatarSource.image,
+                   usesFullWidthPhoto {
                     WalletCardVerticalPhotoBlendLayer(
                         image: image,
                         width: w,
@@ -82,36 +103,45 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .zIndex(1)
                 }
 
-                bottomQuickActionGradient(height: h, progress: p)
-                    .zIndex(2)
+                if contentStyle == .standard {
+                    bottomQuickActionGradient(height: h, progress: p)
+                        .zIndex(2)
 
-                VStack(alignment: .leading, spacing: 0) {
-                    header(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
-                        .padding(.top, lerp(16, 24, p))
-                        .padding(.horizontal, lerp(15, 22, p))
+                    VStack(alignment: .leading, spacing: 0) {
+                        header(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
+                            .padding(.top, lerp(16, 24, p))
+                            .padding(.horizontal, lerp(15, 22, p))
 
-                    Spacer(minLength: 0)
+                        Spacer(minLength: 0)
 
-                    avatar(image: avatarSource.image, transparent: avatarSource.isTransparent, width: w, height: h)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .offset(x: avatarHorizontalOffset(width: w, progress: p))
-                        .frame(height: h * lerp(0.42, 0.36, p))
-                        .padding(.leading, lerp(10, 18, p))
-                        .padding(.trailing, lerp(10, 18, p))
+                        avatar(image: avatarSource.image, transparent: avatarSource.isTransparent, width: w, height: h)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .offset(x: avatarHorizontalOffset(width: w, progress: p))
+                            .frame(height: h * lerp(0.42, 0.36, p))
+                            .padding(.leading, lerp(10, 18, p))
+                            .padding(.trailing, lerp(10, 18, p))
 
-                    bottomInfo(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
-                        .padding(.horizontal, lerp(15, 18, p))
-                        .padding(.bottom, lerp(16, 236, p))
+                        bottomInfo(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
+                            .padding(.horizontal, lerp(15, 18, p))
+                            .padding(.bottom, lerp(16, expandedBottomInset, p))
+                    }
+                    .zIndex(4)
+                } else {
+                    nameOnlyHeader
+                        .padding(.top, 16)
+                        .padding(.horizontal, 15)
+                        .zIndex(4)
                 }
-                .zIndex(4)
 
-                rightInfoColumn(
-                    width: w,
-                    height: h,
-                    progress: p,
-                    usesFullWidthPhoto: usesFullWidthPhoto
-                )
+                if contentStyle == .standard {
+                    rightInfoColumn(
+                        width: w,
+                        height: h,
+                        progress: p,
+                        usesFullWidthPhoto: usesFullWidthPhoto
+                    )
                     .zIndex(5)
+                }
             }
             .compositingGroup() // smoothness: collapse internal text/avatar shadows into one card surface before hero scaling.
             .clipShape(shape)
@@ -121,10 +151,21 @@ struct FocusHomeVerticalSolidCardSurface: View {
         }
     }
 
+    private var nameOnlyHeader: some View {
+        Text(card.name)
+            .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+            .foregroundStyle(Color.arkInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.70)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     @ViewBuilder
     private func header(progress p: CGFloat, usesFullWidthPhoto: Bool) -> some View {
         let reveal = expandedContentProgress(p)
-        let compactHeaderOpacity = Double(1 - reveal)
+        let compactHeaderOpacity = expandedContentStyle == .zenProfile
+            ? 1
+            : Double(1 - reveal)
         let primary = usesFullWidthPhoto ? Color.goCardWhite : Color.arkInk
         let secondary = primary.opacity(0.68)
         HStack(alignment: .top, spacing: 10) {
@@ -148,15 +189,20 @@ struct FocusHomeVerticalSolidCardSurface: View {
 
             Spacer(minLength: 0)
 
-            Text(statusBadge)
-                .font(.system(size: lerp(10, 12, p), weight: .black, design: .rounded))
-                .foregroundStyle(statusBadgeForeground)
-                .padding(.horizontal, lerp(9, 12, p))
-                .padding(.vertical, lerp(5, 7, p))
-                .background(statusBadgeBackground, in: Capsule())
-                .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto) && card.statusBadgeTone == .urgent, opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on urgent card status text
-                .opacity(compactHeaderOpacity)
+            if showsStatusBadge {
+                Text(statusBadge)
+                    .font(.system(size: lerp(10, 12, p), weight: .black, design: .rounded))
+                    .foregroundStyle(statusBadgeForeground)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.70)
+                    .padding(.horizontal, lerp(9, 12, p))
+                    .padding(.vertical, lerp(5, 7, p))
+                    .background(statusBadgeBackground, in: Capsule())
+                    .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto) && card.statusBadgeTone == .urgent, opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on urgent card status text
+                    .opacity(compactHeaderOpacity)
+            }
         }
+        .padding(.trailing, expandedContentStyle == .zenProfile ? 48 : 0)
     }
 
     @ViewBuilder
@@ -189,7 +235,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 .font(.system(size: width * lerp(0.43, 0.47, visualProgress), weight: .regular))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(
-                    card.isPlant
+                    card.isPlant && usesPlantSpecificBackground
                         ? Color(hex: card.themeColorHex).mix(with: .black, by: 0.22).opacity(0.88)
                         : Color.goCardWhite.opacity(0.92)
                 )
@@ -234,7 +280,9 @@ struct FocusHomeVerticalSolidCardSurface: View {
     }
 
     private func humanInfoStack(progress p: CGFloat, usesFullWidthPhoto: Bool) -> some View {
-        let details = [card.zodiacText, card.mbtiText]
+        let details = (expandedContentStyle == .zenProfile
+            ? [card.ageText, card.daysTogetherText, card.zodiacText, card.mbtiText]
+            : [card.zodiacText, card.mbtiText])
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
@@ -393,6 +441,10 @@ struct FocusHomeVerticalSolidCardSurface: View {
         smooth(progress, 0.18, 0.58)
     }
 
+    private var expandedBottomInset: CGFloat {
+        expandedContentStyle == .zenProfile ? 184 : 236
+    }
+
     private func bottomQuickActionGradient(height: CGFloat, progress p: CGFloat) -> some View {
         let reveal = smooth(p, 0.36, 0.72)
         return LinearGradient(
@@ -425,7 +477,9 @@ struct FocusHomeVerticalSolidCardSurface: View {
     }
 
     private func cardPrimaryText(usesFullWidthPhoto: Bool) -> Color {
-        card.isPlant && !usesFullWidthPhoto ? Color.arkInk : Color.goCardWhite
+        card.isPlant && usesPlantSpecificBackground && !usesFullWidthPhoto
+            ? Color.arkInk
+            : Color.goCardWhite
     }
 
     private func cardSecondaryText(usesFullWidthPhoto: Bool, opacity: Double) -> Color {
@@ -433,7 +487,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
     }
 
     private func usesTextShadows(usesFullWidthPhoto: Bool) -> Bool {
-        usesFullVisualEffects && (!card.isPlant || usesFullWidthPhoto)
+        usesFullVisualEffects && (!(card.isPlant && usesPlantSpecificBackground) || usesFullWidthPhoto)
     }
 
     private var statusBadge: String {
@@ -466,11 +520,11 @@ struct FocusHomeVerticalSolidCardSurface: View {
     }
 
     private var primaryMetric: String {
-        card.homePrimaryMetricValue
+        compactMetricValueOverride ?? card.homePrimaryMetricValue
     }
 
     private var metricUnit: String {
-        card.homePrimaryMetricUnit
+        compactMetricUnitOverride ?? card.homePrimaryMetricUnit
     }
 
     private var avatarSymbol: String {

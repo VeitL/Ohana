@@ -39,7 +39,6 @@ struct EditHumanSheet: View {
         OhanaSheetWrapper(title: l.tr(zh: "编辑成员", en: "Edit Member", de: "Mitglied bearbeiten"), onDismiss: { dismiss() }) {
             VStack(spacing: 16) {
                 formField(l.tr(zh: "姓名", en: "Name", de: "Name"), text: $name)
-                formField(l.tr(zh: "头像 Emoji", en: "Avatar Emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
 
                 Toggle(l.tr(zh: "设置生日", en: "Set Birthday", de: "Geburtstag festlegen"), isOn: $hasBirthday)
                     .tint(Color.goPrimary)

@@ -76,7 +76,7 @@ extension PlantDetailContentView {
         case .leafCleaning:
             openPlantCareFeatureDetail(for: .leafCleaning)
         case .profile:
-            showingEditSheet = true
+            showingBasicInfo = true
         case .photos:
             if galleryPhotoItems.isEmpty {
                 openCareLogSheet(.photo)

@@ -32,6 +32,18 @@ struct ExpenseCategoryBreakdown: Identifiable, Equatable {
     let pct: Double
 }
 
+protocol ExpenseSummaryRecord {
+    var date: Date { get }
+    var amount: Double { get }
+    var expenseCategory: ExpenseCategory { get }
+    var executorId: String? { get }
+    var expensePetID: UUID? { get }
+}
+
+extension PetExpenseLog: ExpenseSummaryRecord {
+    var expensePetID: UUID? { pet?.id }
+}
+
 enum ExpenseAmountPresets {
     static func defaults(for category: ExpenseCategory) -> [Double] {
         switch category {
@@ -51,55 +63,55 @@ enum ExpenseAmountPresets {
 }
 
 enum ExpenseSummaryBuilder {
-    static func sortedRecent(_ logs: [PetExpenseLog]) -> [PetExpenseLog] {
+    static func sortedRecent<Log: ExpenseSummaryRecord>(_ logs: [Log]) -> [Log] {
         logs.sorted { $0.date > $1.date }
     }
 
-    static func logs(
-        _ logs: [PetExpenseLog],
+    static func logs<Log: ExpenseSummaryRecord>(
+        _ logs: [Log],
         in range: ExpenseDashboardRange,
         now: Date = Date(),
         calendar: Calendar = .current
-    ) -> [PetExpenseLog] {
+    ) -> [Log] {
         guard let cutoff = range.startDate(now: now, calendar: calendar) else {
             return logs
         }
         return logs.filter { $0.date >= cutoff }
     }
 
-    static func logs(
-        _ logs: [PetExpenseLog],
+    static func logs<Log: ExpenseSummaryRecord>(
+        _ logs: [Log],
         category: ExpenseCategory?
-    ) -> [PetExpenseLog] {
+    ) -> [Log] {
         guard let category else { return logs }
         return logs.filter { $0.expenseCategory == category }
     }
 
-    static func paidBy(_ humanID: UUID, from logs: [PetExpenseLog]) -> [PetExpenseLog] {
+    static func paidBy<Log: ExpenseSummaryRecord>(_ humanID: UUID, from logs: [Log]) -> [Log] {
         paidBy(humanID.uuidString, from: logs)
     }
 
-    static func paidBy(_ humanID: String, from logs: [PetExpenseLog]) -> [PetExpenseLog] {
+    static func paidBy<Log: ExpenseSummaryRecord>(_ humanID: String, from logs: [Log]) -> [Log] {
         logs.filter { $0.executorId == humanID }
     }
 
-    static func linkedToPet(_ petID: UUID, from logs: [PetExpenseLog]) -> [PetExpenseLog] {
-        logs.filter { $0.pet?.id == petID }
+    static func linkedToPet<Log: ExpenseSummaryRecord>(_ petID: UUID, from logs: [Log]) -> [Log] {
+        logs.filter { $0.expensePetID == petID }
     }
 
-    static func humanDirectExpenses(_ humanID: UUID, from logs: [PetExpenseLog]) -> [PetExpenseLog] {
-        logs.filter { $0.executorId == humanID.uuidString && $0.pet == nil }
+    static func humanDirectExpenses<Log: ExpenseSummaryRecord>(_ humanID: UUID, from logs: [Log]) -> [Log] {
+        logs.filter { $0.executorId == humanID.uuidString && $0.expensePetID == nil }
     }
 
-    static func positiveLogs(_ logs: [PetExpenseLog]) -> [PetExpenseLog] {
+    static func positiveLogs<Log: ExpenseSummaryRecord>(_ logs: [Log]) -> [Log] {
         logs.filter { $0.amount > 0 }
     }
 
-    static func reimbursementLogs(_ logs: [PetExpenseLog]) -> [PetExpenseLog] {
+    static func reimbursementLogs<Log: ExpenseSummaryRecord>(_ logs: [Log]) -> [Log] {
         logs.filter { $0.amount < 0 }
     }
 
-    static func totals(from logs: [PetExpenseLog]) -> ExpenseTotals {
+    static func totals<Log: ExpenseSummaryRecord>(from logs: [Log]) -> ExpenseTotals {
         guard !logs.isEmpty else { return .empty }
         let spentLogs = positiveLogs(logs)
         let refunds = reimbursementLogs(logs)
@@ -115,7 +127,7 @@ enum ExpenseSummaryBuilder {
         )
     }
 
-    static func categoryBreakdown(from logs: [PetExpenseLog]) -> [ExpenseCategoryBreakdown] {
+    static func categoryBreakdown<Log: ExpenseSummaryRecord>(from logs: [Log]) -> [ExpenseCategoryBreakdown] {
         let positiveLogs = positiveLogs(logs)
         let grandTotal = max(1, positiveLogs.reduce(0) { $0 + $1.amount })
         var totalsByCategory: [ExpenseCategory: Double] = [:]
@@ -131,7 +143,7 @@ enum ExpenseSummaryBuilder {
             .sorted { $0.total > $1.total }
     }
 
-    static func topCategory(from logs: [PetExpenseLog]) -> ExpenseCategoryBreakdown? {
+    static func topCategory<Log: ExpenseSummaryRecord>(from logs: [Log]) -> ExpenseCategoryBreakdown? {
         categoryBreakdown(from: logs).first
     }
 }

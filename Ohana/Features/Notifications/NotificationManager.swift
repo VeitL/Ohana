@@ -10,6 +10,13 @@ import Foundation
 import SwiftData
 import UserNotifications
 
+nonisolated enum GuardianRemoteNotificationContract {
+    static let categoryIdentifier = "OHANA_GUARDIAN_INCIDENT"
+    static let contactedActionIdentifier = "GUARDIAN_CONTACTED"
+    static let incidentIDUserInfoKey = "guardian_incident_id"
+    static let markerUserInfoKey = "ohana_guardian"
+}
+
 final class NotificationManager: NSObject, @unchecked Sendable {
     // F10: 保持 @unchecked Sendable 但确保内部状态不可变
     // center 和 categoryID 均为 let，init 后不再变化，线程安全
@@ -20,6 +27,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
     private let petMedicationCategoryID = "MED_REMINDER"
     private let humanMedicationCategoryID = "HUMAN_MED_REMINDER"
     private let presenceCategoryID = PresenceReminderRequestFactory.categoryIdentifier
+    private let guardianCategoryID = GuardianRemoteNotificationContract.categoryIdentifier
     private let routeCenter: OhanaNotificationRouteCenter
 
     init(routeCenter: OhanaNotificationRouteCenter) {
@@ -82,6 +90,21 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             ),
             options: []
         )
+        let guardianContactedAction = UNNotificationAction(
+            identifier: GuardianRemoteNotificationContract.contactedActionIdentifier,
+            title: l.tr(
+                zh: "已联系到本人",
+                en: "I reached them",
+                de: "Kontakt hergestellt",
+                es: "He contactado",
+                pt: "Consegui contato",
+                fr: "J’ai pu les joindre",
+                ja: "本人に連絡できました",
+                ko: "본인과 연락했어요",
+                it: "Contatto riuscito"
+            ),
+            options: []
+        )
 
         let category = UNNotificationCategory(
             identifier: categoryID,
@@ -114,13 +137,20 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             intentIdentifiers: [],
             options: []
         )
+        let guardianCategory = UNNotificationCategory(
+            identifier: guardianCategoryID,
+            actions: [guardianContactedAction],
+            intentIdentifiers: [],
+            options: []
+        )
 
         center.setNotificationCategories([
             category,
             plantBatchCareCategory,
             petMedicationCategory,
             humanMedicationCategory,
-            presenceCategory
+            presenceCategory,
+            guardianCategory
         ])
     }
 
@@ -574,8 +604,22 @@ final class OhanaNotificationRouteCenter: ObservableObject {
         publishRouteEvent(.reminderRouteRequested)
     }
 
+    func requestDefaultRoute(_ payload: [String: Any]) {
+        if let incidentID = payload[GuardianRemoteNotificationContract.incidentIDUserInfoKey] as? String {
+            publishRouteEvent(.guardianSafetyRouteRequested(invitationCode: nil, incidentID: incidentID))
+        } else if payload["notificationCategory"] as? String == NotificationDeliveryCategory.weeklyReport.rawValue {
+            publishRouteEvent(.familyWeeklyReportRouteRequested)
+        } else {
+            requestReminderRoute(payload)
+        }
+    }
+
     func requestPlantBatchCareRoute(careType: PlantCareType?) {
         publishRouteEvent(.plantBatchCareRouteRequested(careType: careType))
+    }
+
+    func requestGuardianIncidentAcknowledgement(_ incidentID: String) {
+        publishRouteEvent(.guardianIncidentAcknowledgementRequested(incidentID: incidentID))
     }
 
     func publishRouteEvent(_ event: AppRouteNotificationEvent) {
@@ -613,6 +657,44 @@ final class OhanaNotificationRouteCenter: ObservableObject {
 
 // MARK: - UNUserNotificationCenterDelegate
 extension NotificationManager: UNUserNotificationCenterDelegate {
+    private func responsePayload(
+        userInfo: [AnyHashable: Any],
+        action: String
+    ) -> [String: Any] {
+        var payload: [String: Any] = ["action": action]
+        let stringKeys = [
+            "reminderId", "notificationId", "eventId", "eventType",
+            "relatedEntityType", "relatedEntityId", "plantId", "plantCareType",
+            "petId", "humanId", "medicationId", "humanMedicationId",
+            "presenceAction", "notificationCategory",
+            GuardianRemoteNotificationContract.incidentIDUserInfoKey
+        ]
+        for key in stringKeys {
+            if let value = userInfo[key] as? String {
+                payload[key] = value
+            }
+        }
+        let timeIntervalKeys = ["reminderCreatedAt", "scheduledAt"]
+        for key in timeIntervalKeys {
+            if let value = userInfo[key] as? TimeInterval {
+                payload[key] = value
+            }
+        }
+        if let doseIndex = userInfo["doseIndex"] as? Int {
+            payload["doseIndex"] = doseIndex
+        }
+        let booleanKeys = [
+            "plantBatchCareSummary",
+            GuardianRemoteNotificationContract.markerUserInfoKey
+        ]
+        for key in booleanKeys {
+            if let value = userInfo[key] as? Bool {
+                payload[key] = value
+            }
+        }
+        return payload
+    }
+
     func userNotificationCenter(
         _: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
@@ -621,59 +703,8 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         let userInfo = response.notification.request.content.userInfo
         let action = response.actionIdentifier
         // F8: 记录用户操作，通过 NotificationCenter 广播到 App 层处理 ModelContext
-        var payload: [String: Any] = ["action": action]
-        if let reminderId = userInfo["reminderId"] as? String {
-            payload["reminderId"] = reminderId
-        }
-        if let notificationId = userInfo["notificationId"] as? String {
-            payload["notificationId"] = notificationId
-        }
-        if let createdAt = userInfo["reminderCreatedAt"] as? TimeInterval {
-            payload["reminderCreatedAt"] = createdAt
-        }
-        if let eventId = userInfo["eventId"] as? String {
-            payload["eventId"] = eventId
-        }
-        if let eventType = userInfo["eventType"] as? String {
-            payload["eventType"] = eventType
-        }
-        if let relatedEntityType = userInfo["relatedEntityType"] as? String {
-            payload["relatedEntityType"] = relatedEntityType
-        }
-        if let relatedEntityId = userInfo["relatedEntityId"] as? String {
-            payload["relatedEntityId"] = relatedEntityId
-        }
-        if let plantId = userInfo["plantId"] as? String {
-            payload["plantId"] = plantId
-        }
-        if let plantCareType = userInfo["plantCareType"] as? String {
-            payload["plantCareType"] = plantCareType
-        }
+        let payload = responsePayload(userInfo: userInfo, action: action)
         let isPlantBatchCareSummary = userInfo["plantBatchCareSummary"] as? Bool == true
-        if isPlantBatchCareSummary {
-            payload["plantBatchCareSummary"] = true
-        }
-        if let petId = userInfo["petId"] as? String {
-            payload["petId"] = petId
-        }
-        if let humanId = userInfo["humanId"] as? String {
-            payload["humanId"] = humanId
-        }
-        if let medicationId = userInfo["medicationId"] as? String {
-            payload["medicationId"] = medicationId
-        }
-        if let humanMedicationId = userInfo["humanMedicationId"] as? String {
-            payload["humanMedicationId"] = humanMedicationId
-        }
-        if let scheduledAt = userInfo["scheduledAt"] as? TimeInterval {
-            payload["scheduledAt"] = scheduledAt
-        }
-        if let doseIndex = userInfo["doseIndex"] as? Int {
-            payload["doseIndex"] = doseIndex
-        }
-        if let presenceAction = userInfo["presenceAction"] as? String {
-            payload["presenceAction"] = presenceAction
-        }
 
         switch action {
         case UNNotificationDefaultActionIdentifier:
@@ -683,7 +714,7 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
                         careType: (payload["plantCareType"] as? String).flatMap(PlantCareType.init(rawValue:))
                     )
                 } else {
-                    self.routeCenter.requestReminderRoute(payload)
+                    self.routeCenter.requestDefaultRoute(payload)
                 }
             }
         case "OPEN_PLANT_BATCH_CARE":
@@ -695,6 +726,12 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         case "COMPLETE", "SKIP", "SNOOZE", PresenceReminderRequestFactory.okayActionIdentifier:
             DispatchQueue.main.async {
                 self.routeCenter.publishReminderAction(payload)
+            }
+        case GuardianRemoteNotificationContract.contactedActionIdentifier:
+            if let incidentID = payload[GuardianRemoteNotificationContract.incidentIDUserInfoKey] as? String {
+                DispatchQueue.main.async {
+                    self.routeCenter.requestGuardianIncidentAcknowledgement(incidentID)
+                }
             }
         default:
             break

@@ -10,6 +10,12 @@ import SwiftData
 
 // MARK: - Event Types
 enum EventType: String, Codable, CaseIterable, Identifiable, Sendable {
+    private struct LocalizedLabel: Sendable {
+        let zh: String
+        let en: String
+        let de: String
+    }
+
     // 通用
     case birthday = "生日"
     case anniversary = "纪念日"
@@ -46,6 +52,36 @@ enum EventType: String, Codable, CaseIterable, Identifiable, Sendable {
     case insurancePremium = "保险缴费"
 
     var id: String { rawValue }
+
+    private nonisolated static let localizedLabels: [EventType: LocalizedLabel] = [
+        .birthday: LocalizedLabel(zh: "生日", en: "Birthday", de: "Geburtstag"),
+        .anniversary: LocalizedLabel(zh: "纪念日", en: "Anniversary", de: "Jahrestag"),
+        .daily: LocalizedLabel(zh: "日常", en: "Daily", de: "Alltag"),
+        .health: LocalizedLabel(zh: "健康", en: "Health", de: "Gesundheit"),
+        .task: LocalizedLabel(zh: "任务", en: "Task", de: "Aufgabe"),
+        .shoppingList: LocalizedLabel(zh: "购物清单", en: "Shopping list", de: "Einkaufsliste"),
+        .chore: LocalizedLabel(zh: "家务分配", en: "Chore", de: "Haushalt"),
+        .vaccine: LocalizedLabel(zh: "疫苗", en: "Vaccine", de: "Impfung"),
+        .externalDeworming: LocalizedLabel(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung"),
+        .internalDeworming: LocalizedLabel(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung"),
+        .grooming: LocalizedLabel(zh: "洗澡美容", en: "Grooming", de: "Pflege"),
+        .vetVisit: LocalizedLabel(zh: "就医", en: "Vet visit", de: "Tierarzt"),
+        .foodChange: LocalizedLabel(zh: "换粮", en: "Food change", de: "Futterwechsel"),
+        .litterBox: LocalizedLabel(zh: "铲猫砂", en: "Litter box", de: "Katzenklo"),
+        .watering: LocalizedLabel(zh: "浇水", en: "Watering", de: "Gießen"),
+        .fertilizing: LocalizedLabel(zh: "施肥", en: "Fertilizing", de: "Düngen"),
+        .plantRepotting: LocalizedLabel(zh: "植物换盆", en: "Repotting", de: "Umtopfen"),
+        .plantPruning: LocalizedLabel(zh: "植物修剪", en: "Pruning", de: "Schneiden"),
+        .plantMisting: LocalizedLabel(zh: "植物喷雾", en: "Misting", de: "Besprühen"),
+        .plantRotation: LocalizedLabel(zh: "植物转盆", en: "Rotate plant", de: "Pflanze drehen"),
+        .plantLeafCleaning: LocalizedLabel(zh: "清洁叶片", en: "Leaf cleaning", de: "Blätter reinigen"),
+        .plantPestCheck: LocalizedLabel(zh: "病虫害检查", en: "Pest check", de: "Schädlingscheck"),
+        .plantHealthCheck: LocalizedLabel(zh: "植物状态记录", en: "Plant status", de: "Pflanzenstatus"),
+        .medication: LocalizedLabel(zh: "吃药", en: "Medication", de: "Medikament"),
+        .petMedication: LocalizedLabel(zh: "宠物用药", en: "Pet medication", de: "Tiermedikation"),
+        .petMedicationDose: LocalizedLabel(zh: "宠物喂药打卡", en: "Pet medication dose", de: "Tiermedikation erfasst"),
+        .insurancePremium: LocalizedLabel(zh: "保险缴费", en: "Insurance premium", de: "Versicherungsbeitrag")
+    ]
 
     nonisolated var emoji: String {
         switch self {
@@ -110,62 +146,8 @@ enum EventType: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     nonisolated func localizedLabel(_ l: L10n) -> String {
-        switch self {
-        case .birthday:
-            l.tr(zh: "生日", en: "Birthday", de: "Geburtstag")
-        case .anniversary:
-            l.tr(zh: "纪念日", en: "Anniversary", de: "Jahrestag")
-        case .daily:
-            l.tr(zh: "日常", en: "Daily", de: "Alltag")
-        case .health:
-            l.tr(zh: "健康", en: "Health", de: "Gesundheit")
-        case .task:
-            l.tr(zh: "任务", en: "Task", de: "Aufgabe")
-        case .shoppingList:
-            l.tr(zh: "购物清单", en: "Shopping list", de: "Einkaufsliste")
-        case .chore:
-            l.tr(zh: "家务分配", en: "Chore", de: "Haushalt")
-        case .vaccine:
-            l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
-        case .externalDeworming:
-            l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
-        case .internalDeworming:
-            l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
-        case .grooming:
-            l.tr(zh: "洗澡美容", en: "Grooming", de: "Pflege")
-        case .vetVisit:
-            l.tr(zh: "就医", en: "Vet visit", de: "Tierarzt")
-        case .foodChange:
-            l.tr(zh: "换粮", en: "Food change", de: "Futterwechsel")
-        case .litterBox:
-            l.tr(zh: "铲猫砂", en: "Litter box", de: "Katzenklo")
-        case .watering:
-            l.tr(zh: "浇水", en: "Watering", de: "Gießen")
-        case .fertilizing:
-            l.tr(zh: "施肥", en: "Fertilizing", de: "Düngen")
-        case .plantRepotting:
-            l.tr(zh: "植物换盆", en: "Repotting", de: "Umtopfen")
-        case .plantPruning:
-            l.tr(zh: "植物修剪", en: "Pruning", de: "Schneiden")
-        case .plantMisting:
-            l.tr(zh: "植物喷雾", en: "Misting", de: "Besprühen")
-        case .plantRotation:
-            l.tr(zh: "植物转盆", en: "Rotate plant", de: "Pflanze drehen")
-        case .plantLeafCleaning:
-            l.tr(zh: "清洁叶片", en: "Leaf cleaning", de: "Blätter reinigen")
-        case .plantPestCheck:
-            l.tr(zh: "病虫害检查", en: "Pest check", de: "Schädlingscheck")
-        case .plantHealthCheck:
-            l.tr(zh: "植物状态记录", en: "Plant status", de: "Pflanzenstatus")
-        case .medication:
-            l.tr(zh: "吃药", en: "Medication", de: "Medikament")
-        case .petMedication:
-            l.tr(zh: "宠物用药", en: "Pet medication", de: "Tiermedikation")
-        case .petMedicationDose:
-            l.tr(zh: "宠物喂药打卡", en: "Pet medication dose", de: "Tiermedikation erfasst")
-        case .insurancePremium:
-            l.tr(zh: "保险缴费", en: "Insurance premium", de: "Versicherungsbeitrag")
-        }
+        guard let label = Self.localizedLabels[self] else { return rawValue }
+        return l.tr(zh: label.zh, en: label.en, de: label.de)
     }
 }
 
@@ -186,6 +168,9 @@ final class Event {
     var createdAt: Date
     var assigneeId: String? // 模块4：指派给谁 (Human.id.uuidString)
     var taskCareKindRaw: String = ""
+    /// V95 provenance for Event rows materialized from a recurring family-task plan.
+    var familyTaskPlanId: String?
+    var familyTaskOccurrenceKey: String?
     var feedRuleKindRaw: String = ""
     var foodKindRaw: String = FeedFoodKind.dry.rawValue
     var feedAmountGrams: Double = 0
@@ -207,7 +192,9 @@ final class Event {
         eventType: String = EventType.daily.rawValue,
         relatedEntityType: String = "",
         relatedEntityId: String = "",
-        taskCareKindRaw: String = ""
+        taskCareKindRaw: String = "",
+        familyTaskPlanId: String? = nil,
+        familyTaskOccurrenceKey: String? = nil
     ) {
         self.id = UUID()
         self.title = title
@@ -218,6 +205,8 @@ final class Event {
         self.relatedEntityType = relatedEntityType
         self.relatedEntityId = relatedEntityId
         self.taskCareKindRaw = taskCareKindRaw
+        self.familyTaskPlanId = familyTaskPlanId
+        self.familyTaskOccurrenceKey = familyTaskOccurrenceKey
         self.recurrenceDays = 0
         self.recurrenceEndDate = nil
         self.isCompleted = false

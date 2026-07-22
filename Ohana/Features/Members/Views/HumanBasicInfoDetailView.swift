@@ -70,6 +70,7 @@ struct HumanBasicInfoDetailContentView: View {
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @Environment(\.memberProfileExperienceStyle) private var profileExperienceStyle
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -98,9 +99,16 @@ struct HumanBasicInfoDetailContentView: View {
     @State private var eBirthday = Date()
     @State private var eBloodType = ""
     @State private var eHeightText = ""
-    @State private var eMBTI = ""
+    @State private var eMBTIEnergy = ""
+    @State private var eMBTIInformation = ""
+    @State private var eMBTIDecision = ""
+    @State private var eMBTILifestyle = ""
     @State private var eNationality = ""
     @State private var eCity = ""
+    @State private var eUsesCustomNationality = false
+    @State private var eCustomNationality = ""
+    @State private var eUsesCustomResidence = false
+    @State private var eCustomResidence = ""
     @State private var eThemeColorHex = ""
     @State private var eNotes = ""
     @State private var ePrivateWeight = false
@@ -112,7 +120,6 @@ struct HumanBasicInfoDetailContentView: View {
 
     private let themePresets = ["F97316", "EC4899", "A855F7", "EF4444", "14B8A6", "FACC15", "8B5CF6", "64748B", "B45309", "DB2777"]
     private let bloodTypeOptions = ["", "A", "B", "AB", "O"]
-    private let mbtiOptions = ["", "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]
     private let genderOptions = HumanProfileOptions.genderOptions
 
     var body: some View {
@@ -258,9 +265,9 @@ private extension HumanBasicInfoDetailContentView {
             (eHasBirthday && human.birthday.map { eBirthday != $0 } == true) ||
             eBloodType != human.bloodType ||
             eHeightText != originalHeightText ||
-            eMBTI != human.mbti ||
-            eNationality != human.nationality ||
-            eCity != human.city ||
+            editedMBTI != human.mbti.uppercased() ||
+            resolvedNationality != human.nationality ||
+            resolvedResidence != human.city ||
             eThemeColorHex.uppercased() != human.safeThemeColorHex.uppercased() ||
             eNotes != displayNotes ||
             editedPrivateFieldsRaw != human.privateFields
@@ -534,12 +541,6 @@ private extension HumanBasicInfoDetailContentView {
                     accessibilityIdentifier: "human-basic-info-name-input"
                 )
                 Divider().opacity(0.1)
-                editField(
-                    l.tr(zh: "头像 Emoji", en: "Avatar Emoji", de: "Avatar-Emoji"),
-                    text: $eAvatarEmoji,
-                    accessibilityIdentifier: "human-basic-info-avatar-emoji-input"
-                )
-                Divider().opacity(0.1)
                 HStack {
                     editLabel(l.tr(
                         zh: "家庭角色", en: "Household role", de: "Rolle im Haushalt",
@@ -570,12 +571,12 @@ private extension HumanBasicInfoDetailContentView {
                 Toggle(isOn: $eHasBirthday) {
                     editLabel(l.tr(zh: "设置生日", en: "Set Birthday", de: "Geburtstag festlegen"))
                 }
-                .tint(Color.goPrimary)
+                .tint(profileEditAccent)
                 .accessibilityIdentifier("human-basic-info-birthday-toggle")
                 if eHasBirthday {
                     DatePicker("", selection: $eBirthday, in: ...Date(), displayedComponents: .date)
                         .datePickerStyle(.compact)
-                        .tint(Color.goPrimary)
+                        .tint(profileEditAccent)
                         .labelsHidden()
                         .accessibilityLabel(l.tr(
                             zh: "生日", en: "Birthday", de: "Geburtstag",
@@ -587,17 +588,50 @@ private extension HumanBasicInfoDetailContentView {
             }
 
             editSection(title: l.tr(zh: "身体资料", en: "Body Info", de: "Körperdaten"), icon: "heart.text.square.fill", iconColor: Color.goRed) {
-                optionChipGrid(title: l.tr(zh: "血型", en: "Blood Type", de: "Blutgruppe"), selection: $eBloodType, options: bloodTypeOptions, accent: Color.goRed)
+                optionChipGrid(title: l.tr(zh: "血型", en: "Blood Type", de: "Blutgruppe"), selection: $eBloodType, options: bloodTypeOptions, accent: profileEditAccent)
                 Divider().opacity(0.1)
                 heightStepperRow
                 Divider().opacity(0.1)
-                optionChipGrid(title: "MBTI", selection: $eMBTI, options: mbtiOptions, accent: Color.goOrange)
+                MemberCompactMBTIBar(
+                    energy: $eMBTIEnergy,
+                    information: $eMBTIInformation,
+                    decision: $eMBTIDecision,
+                    lifestyle: $eMBTILifestyle,
+                    foreground: Color.ohanaPrimaryText,
+                    onSelectionChanged: {}
+                )
             }
 
             editSection(title: l.tr(zh: "家庭与位置", en: "Family & Location", de: "Familie & Standort"), icon: "house.fill", iconColor: Color.goTeal) {
-                optionPickerRow(l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), selection: $eNationality, options: countryOptions)
+                optionPickerRow(
+                    l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"),
+                    selection: nationalityPickerSelection,
+                    options: countryOptions
+                )
+                if profileExperienceStyle == .zen, eUsesCustomNationality {
+                    TextField(
+                        l.tr(zh: "输入国籍", en: "Enter nationality", de: "Nationalität eingeben"),
+                        text: $eCustomNationality
+                    )
+                    .textInputAutocapitalization(.words)
+                    .accessibilityIdentifier("human-basic-info-custom-nationality-input")
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
                 Divider().opacity(0.1)
-                optionPickerRow(l.tr(zh: "现居地", en: "Residence", de: "Wohnort"), selection: $eCity, options: residenceCityOptions)
+                optionPickerRow(
+                    l.tr(zh: "现居地", en: "Residence", de: "Wohnort"),
+                    selection: residencePickerSelection,
+                    options: residenceCityOptions
+                )
+                if profileExperienceStyle == .zen, eUsesCustomResidence {
+                    TextField(
+                        l.tr(zh: "输入现居地", en: "Enter residence", de: "Wohnort eingeben"),
+                        text: $eCustomResidence
+                    )
+                    .textInputAutocapitalization(.words)
+                    .accessibilityIdentifier("human-basic-info-custom-residence-input")
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
 
             if HumanLocalPrivacyPolicy.isEnabled {
@@ -672,6 +706,7 @@ private extension HumanBasicInfoDetailContentView {
             }
         }
         .formStyle(.grouped)
+        .tint(profileEditAccent)
         .scrollContentBackground(.hidden)
         .background(OhanaAppBackground())
         .scrollDismissesKeyboard(.interactively)
@@ -694,10 +729,13 @@ private extension HumanBasicInfoDetailContentView {
 
     private func editSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
         Section {
-            content()
+            VStack(alignment: .leading, spacing: 14) {
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         } header: {
             Label(title, systemImage: icon)
-                .foregroundStyle(iconColor)
+                .foregroundStyle(profileExperienceStyle == .zen ? profileEditAccent : iconColor)
         }
     }
 
@@ -735,7 +773,9 @@ private extension HumanBasicInfoDetailContentView {
 
     private var countryOptions: [String] {
         var options = [""] + PetBreedDatabase.countries
-        if !eNationality.isEmpty, !options.contains(eNationality) {
+        if profileExperienceStyle != .zen,
+           !eNationality.isEmpty,
+           !options.contains(eNationality) {
             options.insert(eNationality, at: 1)
         }
         return options
@@ -746,10 +786,61 @@ private extension HumanBasicInfoDetailContentView {
             ? [""]
             : [""] + PetBreedDatabase.cities(for: eNationality)
         var options = base
-        if !eCity.isEmpty, !options.contains(eCity) {
+        if profileExperienceStyle == .zen, !options.contains("其他") {
+            options.append("其他")
+        }
+        if profileExperienceStyle != .zen,
+           !eCity.isEmpty,
+           !options.contains(eCity) {
             options.insert(eCity, at: 1)
         }
         return options
+    }
+
+    private var nationalityPickerSelection: Binding<String> {
+        Binding(
+            get: { eUsesCustomNationality ? "其他" : eNationality },
+            set: { selection in
+                withAnimation(GoMotion.selection) {
+                    if profileExperienceStyle == .zen, selection == "其他" {
+                        eUsesCustomNationality = true
+                        eNationality = ""
+                    } else {
+                        eUsesCustomNationality = false
+                        eCustomNationality = ""
+                        eNationality = selection
+                    }
+                }
+            }
+        )
+    }
+
+    private var residencePickerSelection: Binding<String> {
+        Binding(
+            get: { eUsesCustomResidence ? "其他" : eCity },
+            set: { selection in
+                withAnimation(GoMotion.selection) {
+                    if profileExperienceStyle == .zen, selection == "其他" {
+                        eUsesCustomResidence = true
+                        eCity = ""
+                    } else {
+                        eUsesCustomResidence = false
+                        eCustomResidence = ""
+                        eCity = selection
+                    }
+                }
+            }
+        )
+    }
+
+    private var resolvedNationality: String {
+        (eUsesCustomNationality ? eCustomNationality : eNationality)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var resolvedResidence: String {
+        (eUsesCustomResidence ? eCustomResidence : eCity)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var heightValue: Double {
@@ -772,10 +863,14 @@ private extension HumanBasicInfoDetailContentView {
                     } label: {
                         Text(option.isEmpty ? localizedEmptyValue : "\(option)")
                             .font(OhanaFont.adaptive(size: 12, weight: heightOptionSelected(option) ? .black : .semibold, design: .rounded))
-                            .foregroundStyle(heightOptionSelected(option) ? Color.arkInk : .primary.opacity(0.78))
+                            .foregroundStyle(
+                                heightOptionSelected(option)
+                                    ? profileEditAccentForeground
+                                    : Color.ohanaPrimaryText.opacity(0.78)
+                            )
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
-                            .background(heightOptionSelected(option) ? Color.goPrimary : Color.primary.opacity(0.07), in: Capsule())
+                            .background(heightOptionSelected(option) ? profileEditAccent : Color.primary.opacity(0.07), in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -812,7 +907,7 @@ private extension HumanBasicInfoDetailContentView {
                 }
             }
             .pickerStyle(.menu)
-            .tint(Color.goPrimary)
+            .tint(profileEditAccent)
         }
     }
 
@@ -827,7 +922,11 @@ private extension HumanBasicInfoDetailContentView {
                     } label: {
                         Text(localizedOptionTitle(option))
                             .font(OhanaFont.adaptive(size: 12, weight: selected ? .black : .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(selected ? Color.arkInk : .primary.opacity(0.82))
+                            .foregroundStyle(
+                                selected
+                                    ? profileEditAccentForeground
+                                    : Color.ohanaPrimaryText.opacity(0.82)
+                            )
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
                             .background(selected ? accent : Color.primary.opacity(0.07), in: Capsule())
@@ -843,7 +942,7 @@ private extension HumanBasicInfoDetailContentView {
             editLabel(title)
             Spacer()
             Toggle("", isOn: isOn)
-                .tint(Color.goYellow)
+                .tint(profileExperienceStyle == .zen ? profileEditAccent : Color.goYellow)
                 .labelsHidden()
                 .accessibilityLabel(title)
         }
@@ -856,6 +955,21 @@ private extension HumanBasicInfoDetailContentView {
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(color.opacity(0.12), in: Capsule())
+    }
+
+    private var profileEditAccent: Color {
+        guard profileExperienceStyle == .zen else { return Color.goPrimary }
+        let value = eThemeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? Color.goPrimary : Color(hex: value)
+    }
+
+    private var profileEditAccentForeground: Color {
+        guard profileExperienceStyle == .zen else { return Color.arkInk }
+        let value = eThemeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hex = value.isEmpty ? "C8F34A" : value
+        return WalletPetCardTheme.prefersDarkForeground(for: hex)
+            ? Color.arkInk
+            : Color.goCardWhite
     }
 
     private var daysTogether: Int {
@@ -900,9 +1014,24 @@ private extension HumanBasicInfoDetailContentView {
         eHasBirthday = human.birthday != nil
         eBloodType = human.bloodType
         eHeightText = human.heightCm > 0 && human.heightCm.isFinite ? String(format: "%.0f", human.heightCm) : ""
-        eMBTI = human.mbti
-        eNationality = human.nationality
-        eCity = human.city
+        let mbti = MemberMBTISelectionPolicy.components(from: human.mbti)
+        eMBTIEnergy = mbti[0]
+        eMBTIInformation = mbti[1]
+        eMBTIDecision = mbti[2]
+        eMBTILifestyle = mbti[3]
+        eUsesCustomNationality = profileExperienceStyle == .zen &&
+            !human.nationality.isEmpty &&
+            !PetBreedDatabase.countries.contains(human.nationality)
+        eCustomNationality = eUsesCustomNationality ? human.nationality : ""
+        eNationality = eUsesCustomNationality ? "" : human.nationality
+        let recognizedResidenceOptions = eNationality.isEmpty
+            ? []
+            : PetBreedDatabase.cities(for: eNationality)
+        eUsesCustomResidence = profileExperienceStyle == .zen &&
+            !human.city.isEmpty &&
+            !recognizedResidenceOptions.contains(human.city)
+        eCustomResidence = eUsesCustomResidence ? human.city : ""
+        eCity = eUsesCustomResidence ? "" : human.city
         eThemeColorHex = human.safeThemeColorHex
         eNotes = displayNotes
         ePrivateWeight = human.privateFields.contains(HumanPrivateField.weight.rawValue)
@@ -924,9 +1053,9 @@ private extension HumanBasicInfoDetailContentView {
             birthday: eHasBirthday ? eBirthday : nil,
             bloodType: eBloodType,
             heightText: eHeightText,
-            mbti: eMBTI,
-            nationality: eNationality,
-            city: eCity,
+            mbti: editedMBTI,
+            nationality: resolvedNationality,
+            city: resolvedResidence,
             themeHex: eThemeColorHex,
             notes: eNotes,
             preservedNoteParts: preservedMetadataParts,
@@ -956,6 +1085,15 @@ private extension HumanBasicInfoDetailContentView {
             presentSavedFeedback()
             onSave?()
         }
+    }
+
+    private var editedMBTI: String {
+        MemberMBTISelectionPolicy.value(
+            energy: eMBTIEnergy,
+            information: eMBTIInformation,
+            decision: eMBTIDecision,
+            lifestyle: eMBTILifestyle
+        )
     }
 
     private var editedPrivateFieldsRaw: Set<String> {

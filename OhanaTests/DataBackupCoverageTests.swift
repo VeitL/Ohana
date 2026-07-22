@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct DataBackupCoverageTests {
     @Test func latestSwiftDataModelsHaveExternalBackupCoverageOrExplicitHealthExemption() {
-        let schemaModels = Set(ArkSchemaV94.models.map { String(describing: $0) })
+        let schemaModels = Set(ArkSchemaV96.models.map { String(describing: $0) })
         let externallyCoveredModels: Set<String> = [
             String(describing: Pet.self),
             String(describing: Human.self),
@@ -66,6 +66,8 @@ struct DataBackupCoverageTests {
             // Family-task text is free-form and legacy tasks may not link to
             // a structured source, so restricted external exports omit it.
             String(describing: FamilyCollaborationTask.self),
+            String(describing: FamilyTaskPlan.self),
+            String(describing: FamilyTaskActivity.self),
             // Derived economy sidecars retain free-form titles/metadata but
             // their legacy schema cannot prove whether a record repeats a
             // Human health fact. Restricted external packages omit them.
@@ -79,7 +81,13 @@ struct DataBackupCoverageTests {
             String(describing: ShopPurchaseAttempt.self),
             // Safety contacts and phone numbers are explicitly device-local
             // and excluded from every backup/export destination.
-            String(describing: SafetyContact.self)
+            String(describing: SafetyContact.self),
+            // Guardian projections, account/device state, and its reliable
+            // network outbox are reconstructed from the authenticated service.
+            String(describing: GuardianSafetyPolicyProjection.self),
+            String(describing: GuardianRelationshipProjection.self),
+            String(describing: GuardianIncidentProjection.self),
+            String(describing: GuardianSafetySyncOutbox.self)
         ]
         let classifiedModels = externallyCoveredModels.union(intentionallyExcludedFromExternalBackup)
         let missingModels = schemaModels.subtracting(classifiedModels)
@@ -90,7 +98,7 @@ struct DataBackupCoverageTests {
             Issue.record("SwiftData models missing external backup coverage or explicit classification: \(missingModels.sorted())")
         }
         if !staleCoverageModels.isEmpty {
-            Issue.record("External backup coverage lists models no longer in ArkSchemaV94: \(staleCoverageModels.sorted())")
+            Issue.record("External backup coverage lists models no longer in ArkSchemaV96: \(staleCoverageModels.sorted())")
         }
         if !staleExemptModels.isEmpty {
             Issue.record("External backup exclusion list contains stale models: \(staleExemptModels.sorted())")
@@ -727,7 +735,7 @@ struct DataBackupCoverageTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV94.models)
+        let schema = Schema(ArkSchemaV96.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: ArkMigrationPlan.self, configurations: [config])
     }

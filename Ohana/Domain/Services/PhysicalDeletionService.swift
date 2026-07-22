@@ -16,6 +16,8 @@ nonisolated enum PhysicalDeletionService {
         String(describing: Reminder.self),
         String(describing: PetRelationship.self),
         String(describing: FamilyCollaborationTask.self),
+        String(describing: FamilyTaskPlan.self),
+        String(describing: FamilyTaskActivity.self),
         String(describing: SharedCareSession.self),
         String(describing: PetCareLog.self),
         String(describing: PetPottyLog.self),
@@ -57,7 +59,9 @@ nonisolated enum PhysicalDeletionService {
         String(describing: EconomyBudgetUsageEvent.self),
         String(describing: SharedCareSession.self),
         String(describing: CoconutExchangeRequest.self),
-        String(describing: FamilyCollaborationTask.self)
+        String(describing: FamilyCollaborationTask.self),
+        String(describing: FamilyTaskPlan.self),
+        String(describing: FamilyTaskActivity.self)
     ]
 
     static func localPhysicalDeletionCascadeCoverage(parent: CloudSyncPhysicalDeletionParent) -> Set<String> {
@@ -80,27 +84,48 @@ nonisolated enum PhysicalDeletionService {
         cancelNotifications: Bool = true,
         notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> Int {
-        for reminder in event.reminders {
-            if cancelNotifications {
-                notifications.cancel(notificationId: reminder.notificationId)
-            }
-            CloudSyncMutationRecorder.markDeleted(
-                reminder,
-                context: context,
-                deletedAt: deletedAt,
-                deletedByHumanId: deletedByHumanId
-            )
-            context.delete(reminder)
-        }
-
-        CloudSyncMutationRecorder.markDeleted(
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: event,
+            writeKind: .lifecycle(.cleanupActiveSchedules),
+            source: .domainService,
+            context: context
+        ) else { return 0 }
+        let result = DomainScheduleWriter.deleteEvent(
             event,
+            mutation: mutation,
             context: context,
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId
         )
-        context.delete(event)
-        return 1
+        if cancelNotifications {
+            DomainScheduleEffectsDispatcher.dispatch(delete: result, notifications: notifications)
+        }
+        return result.didDelete ? 1 : 0
+    }
+
+    @discardableResult
+    static func deleteReminder(
+        _ reminder: Reminder,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+    ) -> Int {
+        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
+            reminder: reminder,
+            writeKind: .lifecycle(.cleanupActiveSchedules),
+            source: .domainService,
+            context: context
+        ) else { return 0 }
+        let result = DomainScheduleWriter.deleteReminder(
+            reminder,
+            mutation: mutation,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+        DomainScheduleEffectsDispatcher.dispatch(delete: result, notifications: notifications)
+        return result.didDelete ? 1 : 0
     }
 
     static func deletePet(
@@ -130,7 +155,8 @@ nonisolated enum PhysicalDeletionService {
             petId: petId,
             context: context,
             deletedAt: deletedAt,
-            deletedByHumanId: deletedByHumanId
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
         )
         deletePetDerivedRows(
             petId: petId,
@@ -183,6 +209,14 @@ nonisolated enum PhysicalDeletionService {
             )
             return pendingShopPurchaseDeletionBlockCode
         }
+        // Direct deletion callers (including deferred sync cleanup) still make
+        // a best effort to stop remote guarding. User-facing deletion uses the
+        // strict preflight in the user-facing member deletion boundary.
+        try? stageGuardianOwnerUnavailableIfNeeded(
+            ownerHumanID: human.id,
+            occurredAt: deletedAt,
+            context: context
+        )
         let humanMedications = fetchAll(HumanMedication.self, context: context).filter { $0.humanId == humanId }
         let relatedEventCount = deleteHumanRelatedEvents(
             humanId: humanId,
@@ -196,7 +230,8 @@ nonisolated enum PhysicalDeletionService {
             for: human,
             context: context,
             deletedAt: deletedAt,
-            deletedByHumanId: deletedByHumanId
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
         )
         CloudSyncMutationRecorder.markDeleted(
             human,
@@ -486,7 +521,8 @@ nonisolated enum PhysicalDeletionService {
         for human: Human,
         context: ModelContext,
         deletedAt: Date,
-        deletedByHumanId: String?
+        deletedByHumanId: String?,
+        notifications: ReminderNotificationScheduling
     ) -> Int {
         let humanId = human.id.uuidString
         var deletedCount = 0
@@ -575,11 +611,17 @@ nonisolated enum PhysicalDeletionService {
         }, context: context) {
             markGenericDeleted(entityName: String(describing: CoconutExchangeRequest.self), localRecordId: $0.id, parentId: humanId, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
         }
-        deletedCount += deleteRows(fetchAll(FamilyCollaborationTask.self, context: context).filter { task in
-            referencesHuman(task, humanId: humanId)
-        }, context: context) {
-            markGenericDeleted(entityName: String(describing: FamilyCollaborationTask.self), localRecordId: $0.id, parentId: humanId, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
+        deletedCount += deleteFamilyTaskPlansAndActivitiesReferencingHuman(
+            humanId: humanId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications
+        )
+        deletedCount += deleteGuardianSafetyProjections(
+            ownerHumanID: human.id,
+            context: context
+        )
 
         return deletedCount
     }
@@ -955,10 +997,19 @@ extension PhysicalDeletionService {
         let pets = fetchAll(Pet.self, context: context)
         let petMedications = pets.flatMap(\.medications)
         let insurances = pets.flatMap(\.insurances)
+        let familyTaskEventIDs = Set(
+            fetchAll(FamilyCollaborationTask.self, context: context)
+                .filter { referencesHuman($0, humanId: humanId) }
+                .compactMap(\.relatedEventId)
+        )
         var eventsToDelete: [Event] = []
         var retainedAssignedEvents: [Event] = []
 
         for event in fetchAll(Event.self, context: context) {
+            if familyTaskEventIDs.contains(event.id.uuidString) {
+                eventsToDelete.append(event)
+                continue
+            }
             if MemberLifecycleActiveScheduleResolver.eventOwnedByHuman(
                 event,
                 humanId: humanId,
