@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct PetWeightLedgerEntry: Identifiable, Hashable {
     let id: UUID
@@ -74,10 +75,15 @@ struct PetWeightDashboardContent: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedRange: WeightRange = .days30
+    @State private var showingPersonalPlan = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     enum WeightRange: Hashable, CaseIterable {
         case days7, days30, days90, all
+
+        var requiresPersonal: Bool {
+            self == .days90 || self == .all
+        }
 
         func title(_ l: L10n) -> String {
             switch self {
@@ -166,6 +172,15 @@ struct PetWeightDashboardContent: View {
                 addButton
             }
         )
+        .sheet(isPresented: $showingPersonalPlan) {
+            PersonalPlanView()
+                .ohanaSheetPagePresentation()
+        }
+        .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+            if selectedRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                selectedRange = .days30
+            }
+        }
     }
 
     private var metrics: some View {
@@ -195,7 +210,11 @@ struct PetWeightDashboardContent: View {
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                DashboardRangePicker(ranges: WeightRange.allCases, selection: $selectedRange) {
+                DashboardRangePicker(
+                    ranges: WeightRange.allCases,
+                    selection: personalRangeSelection,
+                    isLocked: { $0.requiresPersonal && !appServices.commerce.allows(.extendedTrends) }
+                ) {
                     $0.title(l)
                 }
             }
@@ -214,6 +233,20 @@ struct PetWeightDashboardContent: View {
         }
     }
 
+    private var personalRangeSelection: Binding<WeightRange> {
+        Binding(
+            get: { selectedRange },
+            set: { range in
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                selectedRange = range
+            }
+        )
+    }
+
     private var historyBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
@@ -227,7 +260,7 @@ struct PetWeightDashboardContent: View {
                 )
             } else {
                 LazyVStack(spacing: 10) {
-                    ForEach(entries.prefix(20)) { entry in
+                    ForEach(entries) { entry in
                         weightRow(entry)
                     }
                 }

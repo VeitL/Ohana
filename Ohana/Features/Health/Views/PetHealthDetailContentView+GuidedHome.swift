@@ -51,20 +51,24 @@ extension PetHealthDetailContentView {
         VStack(alignment: .trailing, spacing: 14) {
             if isHealthFabExpanded {
                 ForEach(Array(healthFabActionKinds.enumerated()), id: \.element.id) { index, action in
-                    HomeFabActionRow(
-                        item: HomeFabFunctionShortcut(
-                            label: action.label(l, isRenderingPDF: isRenderingPDF),
-                            icon: action.icon,
-                            isAvailable: action != .pdf || !isRenderingPDF
-                        ),
-                        rowHeight: 48
+                    let shortcut = HomeFabFunctionShortcut(
+                        label: action == .pdf && !appServices.commerce.allows(.vetSummaryPDF)
+                            ? l.tr(zh: "导出 PDF · Personal", en: "Export PDF · Personal", de: "PDF exportieren · Personal")
+                            : action.label(l, isRenderingPDF: isRenderingPDF),
+                        icon: action == .pdf && !appServices.commerce.allows(.vetSummaryPDF) ? "lock.fill" : action.icon,
+                        isAvailable: action != .pdf || !isRenderingPDF
                     )
-                    .ohanaStaggeredMenuItem(isVisible: healthFabItemsVisible, index: index, total: healthFabActionKinds.count)
-                    .onTapGesture {
+                    Button {
                         performHealthFabAction(action)
+                    } label: {
+                        HomeFabActionRow(item: shortcut, rowHeight: 48)
                     }
-                    .allowsHitTesting(healthFabItemsVisible && (action != .pdf || !isRenderingPDF))
+                    .buttonStyle(ScaleButtonStyle())
+                    .ohanaStaggeredMenuItem(isVisible: healthFabItemsVisible, index: index, total: healthFabActionKinds.count)
+                    .disabled(!shortcut.isAvailable)
+                    .allowsHitTesting(healthFabItemsVisible)
                     .accessibilityHidden(!healthFabItemsVisible)
+                    .accessibilityLabel(shortcut.label)
                     .accessibilityIdentifier("pet-health-fab-action-\(action.id)")
                 }
             }
@@ -220,6 +224,11 @@ extension PetHealthDetailContentView {
 
     func renderHealthPDF() {
         guard !isRenderingPDF else { return }
+        guard appServices.commerce.allows(.vetSummaryPDF) else {
+            showingPersonalPlan = true
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return
+        }
         isRenderingPDF = true
         Task {
             pdfURL = await PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)
@@ -304,6 +313,7 @@ extension PetHealthDetailContentView {
                 tint: preventionTint,
                 primaryTitle: l.tr(zh: "记录", en: "Log", de: "Eintragen"),
                 secondaryTitle: l.tr(zh: "疫苗本", en: "Passport", de: "Impfpass"),
+                primaryIdentifier: "pet-health-tool-preventive-action",
                 primaryAction: { openHealthRecord(.guided(.preventive)) },
                 secondaryAction: {
                     OhanaFeedback.light()
@@ -334,6 +344,7 @@ extension PetHealthDetailContentView {
                 tint: symptomVisitTint,
                 primaryTitle: l.tr(zh: "症状", en: "Symptom", de: "Symptom"),
                 secondaryTitle: l.tr(zh: "就诊", en: "Visit", de: "Besuch"),
+                secondaryIdentifier: "pet-health-tool-visit-action",
                 primaryAction: { openHealthRecord(.symptom) },
                 secondaryAction: { openHealthRecord(.guided(.visit)) },
                 cardAction: { openHealthOverview(.symptomVisitOverview) }
@@ -349,6 +360,8 @@ extension PetHealthDetailContentView {
         tint: Color,
         primaryTitle: String,
         secondaryTitle: String,
+        primaryIdentifier: String? = nil,
+        secondaryIdentifier: String? = nil,
         primaryAction: @escaping () -> Void,
         secondaryAction: @escaping () -> Void,
         cardAction: @escaping () -> Void
@@ -391,6 +404,7 @@ extension PetHealthDetailContentView {
                         .background(tint, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier(primaryIdentifier ?? "")
 
                 Button {
                     secondaryAction()
@@ -402,6 +416,7 @@ extension PetHealthDetailContentView {
                         .background(Color.primary.opacity(isDark ? 0.10 : 0.07), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier(secondaryIdentifier ?? "")
             }
         }
         .padding(14)

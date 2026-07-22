@@ -37,6 +37,8 @@ extension PetHealthDetailContentView {
                             .font(OhanaFont.adaptive(size: 14, weight: .black))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
+                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                    .accessibilityIdentifier("pet-health-overview-close-action")
                 }
             }
         }
@@ -50,6 +52,7 @@ extension PetHealthDetailContentView {
                 subtitle: preventiveDashboardDetail,
                 tint: preventionTint
             )
+            .accessibilityIdentifier("pet-health-overview-preventive")
 
             VStack(spacing: 10) {
                 ForEach(preventionItems) { item in
@@ -62,6 +65,7 @@ extension PetHealthDetailContentView {
                     activeHealthSheet = nil
                     openHealthRecord(.guided(.preventive), feedback: false)
                 }
+                .accessibilityIdentifier("pet-health-overview-add-preventive-action")
                 overviewActionButton(l.tr(zh: "疫苗本", en: "Passport", de: "Impfpass"), icon: "syringe.fill") {
                     activeHealthSheet = nil
                     showingPassport = true

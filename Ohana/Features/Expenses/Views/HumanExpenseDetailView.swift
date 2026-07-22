@@ -71,7 +71,6 @@ struct HumanExpenseDetailContentView: View {
                 .zIndex(20)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
     }
 
     private var header: some View {

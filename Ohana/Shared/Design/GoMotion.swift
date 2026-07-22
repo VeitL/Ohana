@@ -16,6 +16,8 @@ enum GoMotion {
     static let tap: Animation = .interactiveSpring(response: 0.18, dampingFraction: 0.84, blendDuration: 0.08)
     static let selection: Animation = .interactiveSpring(response: 0.32, dampingFraction: 0.88, blendDuration: 0.16)
     static let stateChange: Animation = .interactiveSpring(response: 0.38, dampingFraction: 0.90, blendDuration: 0.18)
+    static let zenCardGlassDissolve: Animation = .timingCurve(0.20, 0.76, 0.24, 1.00, duration: 0.76)
+    static let zenCardColorReveal: Animation = zenCardGlassDissolve
     static let sheet: Animation = .interactiveSpring(response: 0.40, dampingFraction: 0.88, blendDuration: 0.22)
     static let heroExpand: Animation = .interactiveSpring(response: 0.62, dampingFraction: 0.91, blendDuration: 0.18)
     static let heroCollapse: Animation = .interactiveSpring(response: 0.54, dampingFraction: 0.94, blendDuration: 0.14)

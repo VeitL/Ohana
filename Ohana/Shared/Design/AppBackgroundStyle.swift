@@ -37,6 +37,16 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
     }
 
     static var officialPairOptions: [AppBackgroundStyle] {
+        supporterPackOptions + freeOfficialPairOptions
+    }
+
+    static let supporterPackOptions: [AppBackgroundStyle] = [
+        .goDefault,
+        .midnight,
+        .neonGrid
+    ]
+
+    static var freeOfficialPairOptions: [AppBackgroundStyle] {
         [
             .ohanaWarmth,
             .botanicalMoon,
@@ -56,6 +66,10 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
             .peachCloud,
             .graphitePulse
         ]
+    }
+
+    var isSupporterPackStyle: Bool {
+        Self.supporterPackOptions.contains(self)
     }
 
     var displayName: String {
@@ -86,6 +100,8 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
 
     func localizedName(_ lang: String) -> String {
         switch self {
+        case .goDefault:
+            L10n(lang).tr(zh: "流光绿洲", en: "Oasis Glow", de: "Oasenleuchten")
         case .goIsland:
             L10n(lang).tr(zh: "岛屿雾灰", en: "Island Mist", de: "Inselnebel")
         case .cleanBlueGray:
@@ -98,10 +114,14 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
             L10n(lang).tr(zh: "星云光感", en: "Nebula Glow", de: "Nebelglanz")
         case .aurora:
             L10n(lang).tr(zh: "极光柔幕", en: "Soft Aurora", de: "Sanfte Aurora")
+        case .midnight:
+            L10n(lang).tr(zh: "午夜群岛", en: "Midnight Isles", de: "Mitternachtsinseln")
         case .sakuraMist:
             L10n(lang).tr(zh: "樱雾紫", en: "Sakura Mist", de: "Sakura-Nebel")
         case .sunsetGlow:
             L10n(lang).tr(zh: "落日暖光", en: "Sunset Glow", de: "Abendrot")
+        case .neonGrid:
+            L10n(lang).tr(zh: "霓虹网格", en: "Neon Grid", de: "Neonraster")
         case .coastalFresh:
             L10n(lang).tr(zh: "海岸清风", en: "Coastal Fresh", de: "Küstenfrische")
         case .lavenderDawn:
@@ -129,6 +149,8 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
 
     func localizedSubtitle(_ lang: String) -> String {
         switch self {
+        case .goDefault:
+            L10n(lang).tr(zh: "青柠光球缓慢漂浮", en: "Slow-drifting lime light", de: "Sanft schwebendes Limettenlicht")
         case .goIsland:
             L10n(lang).tr(zh: "温和雾灰，保留一点岛屿层次", en: "Gentle mist gray with a little island depth", de: "Sanftes Nebelgrau mit etwas Inseltiefe")
         case .cleanBlueGray:
@@ -141,10 +163,14 @@ enum AppBackgroundStyle: String, CaseIterable, Identifiable {
             L10n(lang).tr(zh: "更酷的光感背景", en: "Cooler ambient light style", de: "Kühler Lichtstil")
         case .aurora:
             L10n(lang).tr(zh: "清透青绿，适合轻松页面", en: "Clear teal tones for calm screens", de: "Klare Türkistöne für ruhige Seiten")
+        case .midnight:
+            L10n(lang).tr(zh: "安静深蓝，衬托夜间记录", en: "Quiet deep blue for nighttime records", de: "Ruhiges Tiefblau für Einträge bei Nacht")
         case .sakuraMist:
             L10n(lang).tr(zh: "柔粉与紫雾，温柔但不甜腻", en: "Soft pink and violet without feeling sugary", de: "Sanftes Rosa und Violett ohne Kitsch")
         case .sunsetGlow:
             L10n(lang).tr(zh: "暖橙层次，适合奖励感", en: "Warm orange layers for reward moments", de: "Warme Orangetöne für Belohnungen")
+        case .neonGrid:
+            L10n(lang).tr(zh: "青蓝与紫色交织的数字夜景", en: "A digital night in cyan and violet", de: "Digitale Nacht in Cyan und Violett")
         case .coastalFresh:
             L10n(lang).tr(zh: "海风蓝绿，浅色更清爽", en: "Blue-green sea air, crisp in light mode", de: "Blaugrüne Meeresluft, frisch im Hellmodus")
         case .lavenderDawn:

@@ -37,7 +37,29 @@ nonisolated enum HouseholdStarterJourneyTask: String, CaseIterable, Identifiable
     }
 
     var checkpoints: [HouseholdStarterJourneyCheckpoint] {
-        HouseholdStarterJourneyCheckpoint.allCases.filter { $0.task == self }
+        switch self {
+        case .humanProfile:
+            [.humanAppearance, .humanLifeStage, .humanBodyProfile, .humanPersonalityContext]
+        case .petProfile:
+            [.petLifeStage, .petBodyProfile, .petPersonalityAppearance, .petDailyCare]
+        case .identityProtection:
+            [.petIdentityDocuments, .petEmergencyContact]
+        case .healthProtection:
+            [.petHealthProtection]
+        case .carePlan:
+            [.acceptedRecommendedCarePlan]
+        case .firstCare:
+            []
+        }
+    }
+
+    /// Retired checkpoints stay readable for old explicit answers, but never
+    /// appear as new questions or receive new writes.
+    var compatibilityCheckpoints: [HouseholdStarterJourneyCheckpoint] {
+        switch self {
+        case .humanProfile: [.humanOptionalDetails]
+        case .petProfile, .identityProtection, .healthProtection, .carePlan, .firstCare: []
+        }
     }
 }
 
@@ -50,6 +72,10 @@ nonisolated enum HouseholdStarterJourneyResolution: String, Codable, CaseIterabl
 
 nonisolated enum HouseholdStarterJourneyCheckpoint: String, Codable, CaseIterable, Identifiable, Sendable {
     case humanAppearance
+    case humanLifeStage
+    case humanBodyProfile
+    case humanPersonalityContext
+    /// Read-only legacy checkpoint retained for existing stores.
     case humanOptionalDetails
     case petLifeStage
     case petBodyProfile
@@ -64,7 +90,8 @@ nonisolated enum HouseholdStarterJourneyCheckpoint: String, Codable, CaseIterabl
 
     var task: HouseholdStarterJourneyTask {
         switch self {
-        case .humanAppearance, .humanOptionalDetails:
+        case .humanAppearance, .humanLifeStage, .humanBodyProfile,
+             .humanPersonalityContext, .humanOptionalDetails:
             .humanProfile
         case .petLifeStage, .petBodyProfile, .petPersonalityAppearance, .petDailyCare:
             .petProfile
@@ -79,7 +106,8 @@ nonisolated enum HouseholdStarterJourneyCheckpoint: String, Codable, CaseIterabl
 
     var targetKind: HouseholdStarterJourneyTargetKind {
         switch self {
-        case .humanAppearance, .humanOptionalDetails:
+        case .humanAppearance, .humanLifeStage, .humanBodyProfile,
+             .humanPersonalityContext, .humanOptionalDetails:
             .human
         case .petLifeStage, .petBodyProfile, .petPersonalityAppearance,
              .petDailyCare, .petIdentityDocuments, .petEmergencyContact,
@@ -92,8 +120,9 @@ nonisolated enum HouseholdStarterJourneyCheckpoint: String, Codable, CaseIterabl
         switch self {
         case .humanAppearance:
             [.reviewed, .preferNotToSay]
-        case .humanOptionalDetails:
-            [.reviewed, .unknown, .preferNotToSay]
+        case .humanLifeStage, .humanBodyProfile, .humanPersonalityContext,
+             .humanOptionalDetails:
+            [.reviewed, .unknown, .notApplicable, .preferNotToSay]
         case .petLifeStage, .petBodyProfile, .petPersonalityAppearance, .petDailyCare,
              .petIdentityDocuments, .petEmergencyContact, .petHealthProtection:
             [.reviewed, .unknown, .notApplicable, .preferNotToSay]
@@ -144,10 +173,38 @@ nonisolated struct HouseholdStarterJourneyTaskState: Identifiable, Equatable, Se
     let rewardCoconuts: Int
     let completedCheckpointCount: Int
     let requiredCheckpointCount: Int
+    let completionPercent: Int?
+    let requiredCompletionPercent: Int?
     let targetID: UUID?
     let completedCheckpoints: Set<HouseholdStarterJourneyCheckpoint>
     let checkpointResolutions: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution]
     var availableResolutionCheckpoints: Set<HouseholdStarterJourneyCheckpoint> = []
+
+    init(
+        task: HouseholdStarterJourneyTask,
+        status: Status,
+        rewardCoconuts: Int,
+        completedCheckpointCount: Int,
+        requiredCheckpointCount: Int,
+        completionPercent: Int? = nil,
+        requiredCompletionPercent: Int? = nil,
+        targetID: UUID?,
+        completedCheckpoints: Set<HouseholdStarterJourneyCheckpoint>,
+        checkpointResolutions: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution],
+        availableResolutionCheckpoints: Set<HouseholdStarterJourneyCheckpoint> = []
+    ) {
+        self.task = task
+        self.status = status
+        self.rewardCoconuts = rewardCoconuts
+        self.completedCheckpointCount = completedCheckpointCount
+        self.requiredCheckpointCount = requiredCheckpointCount
+        self.completionPercent = completionPercent
+        self.requiredCompletionPercent = requiredCompletionPercent
+        self.targetID = targetID
+        self.completedCheckpoints = completedCheckpoints
+        self.checkpointResolutions = checkpointResolutions
+        self.availableResolutionCheckpoints = availableResolutionCheckpoints
+    }
 
     var id: String { task.id }
     var isClaimable: Bool { status == .claimable }
@@ -257,7 +314,7 @@ nonisolated enum HouseholdStarterJourneyPolicy {
     static func requiredCheckpointCount(for task: HouseholdStarterJourneyTask) -> Int {
         switch task {
         case .humanProfile:
-            2
+            3
         case .petProfile:
             3
         case .identityProtection:

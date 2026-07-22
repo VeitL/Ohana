@@ -971,6 +971,9 @@ nonisolated extension DataBackupManager {
             instantCoconutDelta: dto.instantCoconutDelta ?? 0,
             costCoconuts: dto.costCoconuts,
             dailySequence: dto.dailySequence,
+            oddsVersion: dto.oddsVersion,
+            guaranteeKindRaw: dto.guaranteeKindRaw,
+            stardustDelta: dto.stardustDelta,
             drawDate: parseDate(dto.drawDate) ?? Date(),
             createdAt: parseDate(dto.createdAt) ?? parseDate(dto.drawDate) ?? Date()
         )

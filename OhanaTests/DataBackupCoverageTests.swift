@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct DataBackupCoverageTests {
     @Test func latestSwiftDataModelsHaveExternalBackupCoverageOrExplicitHealthExemption() {
-        let schemaModels = Set(ArkSchemaV91.models.map { String(describing: $0) })
+        let schemaModels = Set(ArkSchemaV96.models.map { String(describing: $0) })
         let externallyCoveredModels: Set<String> = [
             String(describing: Pet.self),
             String(describing: Human.self),
@@ -46,7 +46,12 @@ struct DataBackupCoverageTests {
             String(describing: GachaOwnedItem.self),
             String(describing: GachaDrawLog.self),
             String(describing: CoconutAccount.self),
-            String(describing: ShopPurchaseRecord.self)
+            String(describing: ShopPurchaseRecord.self),
+            String(describing: PresenceCheckIn.self),
+            String(describing: PresenceParticipationPeriod.self),
+            String(describing: PresenceRewardReceipt.self),
+            String(describing: AchievementUnlock.self),
+            String(describing: AchievementRewardReceipt.self)
         ]
         let intentionallyExcludedFromExternalBackup: Set<String> = [
             // P0: no human health / HealthKit data may enter an externally
@@ -61,6 +66,8 @@ struct DataBackupCoverageTests {
             // Family-task text is free-form and legacy tasks may not link to
             // a structured source, so restricted external exports omit it.
             String(describing: FamilyCollaborationTask.self),
+            String(describing: FamilyTaskPlan.self),
+            String(describing: FamilyTaskActivity.self),
             // Derived economy sidecars retain free-form titles/metadata but
             // their legacy schema cannot prove whether a record repeats a
             // Human health fact. Restricted external packages omit them.
@@ -70,7 +77,17 @@ struct DataBackupCoverageTests {
             String(describing: RecycleBinBatch.self),
             // Local crash-recovery coordination state is neither a user fact
             // nor safe to resurrect from a stale external backup.
-            String(describing: SharedCareUndoReceipt.self)
+            String(describing: SharedCareUndoReceipt.self),
+            String(describing: ShopPurchaseAttempt.self),
+            // Safety contacts and phone numbers are explicitly device-local
+            // and excluded from every backup/export destination.
+            String(describing: SafetyContact.self),
+            // Guardian projections, account/device state, and its reliable
+            // network outbox are reconstructed from the authenticated service.
+            String(describing: GuardianSafetyPolicyProjection.self),
+            String(describing: GuardianRelationshipProjection.self),
+            String(describing: GuardianIncidentProjection.self),
+            String(describing: GuardianSafetySyncOutbox.self)
         ]
         let classifiedModels = externallyCoveredModels.union(intentionallyExcludedFromExternalBackup)
         let missingModels = schemaModels.subtracting(classifiedModels)
@@ -81,7 +98,7 @@ struct DataBackupCoverageTests {
             Issue.record("SwiftData models missing external backup coverage or explicit classification: \(missingModels.sorted())")
         }
         if !staleCoverageModels.isEmpty {
-            Issue.record("External backup coverage lists models no longer in ArkSchemaV91: \(staleCoverageModels.sorted())")
+            Issue.record("External backup coverage lists models no longer in ArkSchemaV96: \(staleCoverageModels.sorted())")
         }
         if !staleExemptModels.isEmpty {
             Issue.record("External backup exclusion list contains stale models: \(staleExemptModels.sorted())")
@@ -533,8 +550,192 @@ struct DataBackupCoverageTests {
         #expect(manager.decodeReminderSnapshot(legacyDTO).occurrenceAt == nil)
     }
 
+    @Test func v32PresenceFactsRoundTripIdempotentlyWhileContactsStayLocal() throws {
+        let sourceDefaultsName = "DataBackupPresenceSource.\(UUID().uuidString)"
+        let targetDefaultsName = "DataBackupPresenceTarget.\(UUID().uuidString)"
+        let sourceDefaults = try #require(UserDefaults(suiteName: sourceDefaultsName))
+        let targetDefaults = try #require(UserDefaults(suiteName: targetDefaultsName))
+        defer {
+            sourceDefaults.removePersistentDomain(forName: sourceDefaultsName)
+            targetDefaults.removePersistentDomain(forName: targetDefaultsName)
+        }
+        let sourceReminderConfiguration = PresenceReminderConfiguration(
+            isEnabled: true,
+            schedules: [.init(hour: 19, minute: 45)],
+            gracePeriodMinutes: 30,
+            sendsSecondLocalReminder: true,
+            messageTemplate: "SOURCE-LOCAL-ONLY-MESSAGE"
+        )
+        PresenceReminderConfigurationStore(defaults: sourceDefaults).save(sourceReminderConfiguration)
+        sourceDefaults.set(AppExperienceMode.zen.rawValue, forKey: AppExperienceMode.storageKey)
+        sourceDefaults.set(
+            "10000000-0000-4000-8000-000000000099",
+            forKey: AppExperienceMode.zenOwnerHumanIDKey
+        )
+
+        let source = try makeInMemoryContainer()
+        let context = source.mainContext
+        let ownerID = try #require(UUID(uuidString: "10000000-0000-4000-8000-000000000001"))
+        let checkInID = try #require(UUID(uuidString: "10000000-0000-4000-8000-000000000002"))
+        let periodID = try #require(UUID(uuidString: "10000000-0000-4000-8000-000000000003"))
+        let receiptID = try #require(UUID(uuidString: "10000000-0000-4000-8000-000000000004"))
+        let now = try #require(ISO8601DateFormatter().date(from: "2026-07-18T18:00:00Z"))
+        let human = Human(name: "Owner")
+        human.id = ownerID
+        let ownerSubject = PresenceSubjectRef(kind: .human, id: ownerID)
+        let checkIn = PresenceCheckIn(
+            id: checkInID,
+            uniqueKey: PresenceCheckInCommandService.checkInKey(
+                subject: ownerSubject,
+                dayKey: "2026-07-18"
+            ),
+            subject: ownerSubject,
+            ownerHumanId: ownerID,
+            isOwner: true,
+            dayKey: "2026-07-18",
+            timeZoneIdentifier: "Europe/Berlin",
+            checkedInAt: now,
+            source: .card,
+            status: .great,
+            operatorHumanId: ownerID
+        )
+        let period = PresenceParticipationPeriod(
+            id: periodID,
+            periodKey: "presence-period:test",
+            ownerHumanId: ownerID,
+            startedAt: now,
+            startedDayKey: "2026-07-18",
+            startedTimeZoneIdentifier: "Europe/Berlin",
+            source: .settings
+        )
+        let receipt = PresenceRewardReceipt(
+            id: receiptID,
+            receiptKey: PresenceCheckInCommandService.ownerDailyReceiptKey(dayKey: "2026-07-18"),
+            ownerHumanId: ownerID,
+            rewardKind: .ownerDaily,
+            dayKey: "2026-07-18",
+            requestedAmount: 1,
+            awardedAmount: 1,
+            walletTransactionKey: "presence-wallet-test",
+            relatedCheckInId: checkInID,
+            awardedAt: now
+        )
+        let contact = SafetyContact(name: "Secret Contact", phoneNumber: "+49 123 456")
+        context.insert(human)
+        context.insert(checkIn)
+        context.insert(period)
+        context.insert(receipt)
+        context.insert(contact)
+        try context.save()
+
+        let manager = DataBackupManager(defaults: sourceDefaults)
+        let backup = try manager.buildBackup(context: context)
+        #expect(backup.schemaVersion == 33)
+        #expect(backup.presenceCheckIns?.count == 1)
+        #expect(backup.presenceParticipationPeriods?.count == 1)
+        #expect(backup.presenceRewardReceipts?.count == 1)
+        let manifest = try manager.encode(backup)
+        let manifestText = try #require(String(data: manifest, encoding: .utf8))
+        #expect(!manifestText.contains("Secret Contact"))
+        #expect(!manifestText.contains("+49 123 456"))
+        #expect(!manifestText.contains("SOURCE-LOCAL-ONLY-MESSAGE"))
+        #expect(!manifestText.contains(PresenceReminderConfigurationStore.storageKey))
+
+        let decoded = try JSONDecoder().decode(OhanaBackup.self, from: manifest)
+        #expect(decoded.schemaVersion == 33)
+        #expect(decoded.presenceCheckIns == backup.presenceCheckIns)
+        #expect(decoded.presenceParticipationPeriods == backup.presenceParticipationPeriods)
+        #expect(decoded.presenceRewardReceipts == backup.presenceRewardReceipts)
+
+        var malformed = decoded
+        malformed.presenceCheckIns?[0].uniqueKey = "forged-presence-natural-key"
+        let malformedTarget = try makeInMemoryContainer()
+        do {
+            try DataBackupManager(defaults: targetDefaults).applyBackup(
+                malformed,
+                context: malformedTarget.mainContext,
+                projectionManager: nil,
+                schedulePlantNotifications: false
+            )
+            Issue.record("Restore accepted a PresenceCheckIn whose natural key did not match its subject and day.")
+        } catch let BackupError.invalidRestoreData(category) {
+            #expect(category == .identity)
+        } catch {
+            Issue.record("Restore rejected malformed Presence data with an unexpected error: \(error)")
+        }
+        #expect(try malformedTarget.mainContext.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 0)
+
+        let targetReminderConfiguration = PresenceReminderConfiguration(
+            isEnabled: false,
+            schedules: [.init(hour: 8, minute: 15)],
+            gracePeriodMinutes: nil,
+            sendsSecondLocalReminder: false,
+            messageTemplate: "TARGET-DEVICE-SETTING"
+        )
+        let targetReminderStore = PresenceReminderConfigurationStore(defaults: targetDefaults)
+        targetReminderStore.save(targetReminderConfiguration)
+        targetDefaults.set(AppExperienceMode.standard.rawValue, forKey: AppExperienceMode.storageKey)
+        let restoreManager = DataBackupManager(defaults: targetDefaults)
+
+        let target = try makeInMemoryContainer()
+        for _ in 0 ..< 2 {
+            try restoreManager.applyBackup(
+                decoded,
+                context: target.mainContext,
+                projectionManager: nil,
+                schedulePlantNotifications: false
+            )
+        }
+
+        #expect(try target.mainContext.fetch(FetchDescriptor<PresenceCheckIn>()).count == 1)
+        let restoredPeriods = try target.mainContext.fetch(FetchDescriptor<PresenceParticipationPeriod>())
+        #expect(restoredPeriods.count == 1)
+        #expect(restoredPeriods.first?.endedAt != nil)
+        #expect(try target.mainContext.fetch(FetchDescriptor<PresenceRewardReceipt>()).count == 1)
+        #expect(try target.mainContext.fetch(FetchDescriptor<SafetyContact>()).isEmpty)
+        let restoredLedger = try target.mainContext.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(!restoredLedger.contains {
+            $0.sourceModelName == "PresenceRewardReceipt" || $0.transactionKey == "presence-wallet-test"
+        })
+        #expect(targetReminderStore.load() == targetReminderConfiguration)
+        #expect(targetDefaults.string(forKey: AppExperienceMode.storageKey) == AppExperienceMode.standard.rawValue)
+    }
+
+    @Test func v31ManifestWithoutPresenceFieldsStillDecodes() throws {
+        let defaultsName = "DataBackupV31Presence.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: defaultsName))
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        let manager = DataBackupManager(defaults: defaults)
+        let source = try makeInMemoryContainer()
+        let backup = try manager.buildBackup(context: source.mainContext)
+        let data = try manager.encode(backup)
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object["schemaVersion"] = 31
+        object.removeValue(forKey: "presenceCheckIns")
+        object.removeValue(forKey: "presenceParticipationPeriods")
+        object.removeValue(forKey: "presenceRewardReceipts")
+
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(OhanaBackup.self, from: legacyData)
+        #expect(decoded.schemaVersion == 31)
+        #expect(decoded.presenceCheckIns == nil)
+        #expect(decoded.presenceParticipationPeriods == nil)
+        #expect(decoded.presenceRewardReceipts == nil)
+
+        let target = try makeInMemoryContainer()
+        try manager.applyBackup(
+            decoded,
+            context: target.mainContext,
+            projectionManager: nil,
+            schedulePlantNotifications: false
+        )
+        #expect(try target.mainContext.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 0)
+        #expect(try target.mainContext.fetchCount(FetchDescriptor<PresenceParticipationPeriod>()) == 0)
+        #expect(try target.mainContext.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 0)
+    }
+
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV96.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: ArkMigrationPlan.self, configurations: [config])
     }

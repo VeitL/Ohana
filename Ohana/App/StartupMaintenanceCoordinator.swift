@@ -22,6 +22,8 @@ final class StartupMaintenanceCoordinator: ObservableObject {
 
     private static let maintenanceStepNames: Set<String> = [
         "input_warmup",
+        "shop_purchase_recovery",
+        "companion_lifecycle_compatibility",
         "auto_feeder_materialization",
         "reminder_refill",
         "media_attachment_presence_backfill",
@@ -37,7 +39,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         self.defaults = defaults
     }
 
-    func startAfterFirstRender(context: ModelContext) {
+    func startAfterFirstRender(context: ModelContext, services: AppServices) {
         guard !didStart else { return }
         didStart = true
         let persistedCursor = defaults.string(forKey: Keys.maintenanceCursor)
@@ -65,17 +67,57 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 note: "startup maintenance deferred"
             )
 
-            guard await runStep("input_warmup", delayMilliseconds: 700, operation: {
+            await runMaintenanceSequence(context: context, services: services)
+            maintenanceTask = nil
+        }
+    }
+
+    private func runMaintenanceSequence(context: ModelContext, services: AppServices) async {
+        guard await runStep("input_warmup", delayMilliseconds: 700, operation: {
                 InputLatencyWarmupService.warmUpOnce()
             }) else {
-                maintenanceTask = nil
+                return
+            }
+
+            guard await runStep("shop_purchase_recovery", delayMilliseconds: 120, operation: {
+                let results = ShopPurchaseRecoveryService.settleRecoverable(
+                    context: context,
+                    services: services
+                )
+                guard !results.isEmpty else { return }
+                AppPerformanceMonitor.shared.record(
+                    "startup_shop_purchase_recovery",
+                    valueMS: 0,
+                    note: "settled=\(results.count)"
+                )
+            }) else {
+                return
+            }
+
+            guard await runStep("companion_lifecycle_compatibility", delayMilliseconds: 120, operation: {
+                do {
+                    let result = try OasisCompanionLifecycleCompatibilityService.reconcile(
+                        context: context
+                    )
+                    guard result.repairedCount > 0 || result.hasMoreWork else { return }
+                    AppPerformanceMonitor.shared.record(
+                        "startup_companion_lifecycle_compatibility",
+                        valueMS: 0,
+                        note: "inspected=\(result.inspectedCount), repaired=\(result.repairedCount), more=\(result.hasMoreWork)"
+                    )
+                } catch {
+                    OhanaLog.error(
+                        "Companion lifecycle compatibility failed: \(error.localizedDescription)",
+                        category: "StartupMaintenance"
+                    )
+                }
+            }) else {
                 return
             }
 
             guard await runStep("auto_feeder_materialization", delayMilliseconds: 2500, operation: {
                 await self.materializeAutoFeederLogsIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
@@ -87,21 +129,18 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                     self.defaults.set(Date().timeIntervalSince1970, forKey: Keys.reminderMaintenanceLastRunAt)
                 }
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("media_attachment_presence_backfill", delayMilliseconds: 2500, requiresExpensiveBudget: true, operation: {
                 await self.backfillMediaAttachmentPresenceIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("member_theme_normalization", delayMilliseconds: 5000, requiresExpensiveBudget: true, operation: {
                 await self.normalizeMemberThemeColorsIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
@@ -118,40 +157,32 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                     note: "\(result.removedEventCount) events, \(result.removedReminderCount) reminders, \(result.cleanedPreferencePlantCount) pref scopes"
                 )
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("care_ledger_backfill", delayMilliseconds: 45000, requiresExpensiveBudget: true, operation: {
                 await self.runCareLedgerBackfillIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("shared_care_note_cleanup", delayMilliseconds: 5000, requiresExpensiveBudget: true, operation: {
                 await self.cleanLegacySharedCareNotesIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("shop_purchase_defaults_migration", delayMilliseconds: 5000, requiresExpensiveBudget: true, operation: {
                 await self.migrateLegacyShopPurchasesIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
 
             guard await runStep("avatar_asset_compaction", delayMilliseconds: 90000, requiresExpensiveBudget: true, operation: {
                 await self.compactAvatarAssetsIfNeeded(context: context)
             }) else {
-                maintenanceTask = nil
                 return
             }
-
-            maintenanceTask = nil
-        }
     }
 
     func cancel() {

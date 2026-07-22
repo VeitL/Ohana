@@ -5,6 +5,7 @@ struct GrowthUnlockRulesSheet: View {
     let appLanguage: String
     let onClose: () -> Void
 
+    private var l: L10n { L10n(appLanguage) }
     private var accent: Color {
         Color(hex: status.step.tintHex)
     }
@@ -19,32 +20,60 @@ struct GrowthUnlockRulesSheet: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 12) {
-                        requirementCard
-                        methodCard
-                        roadmapCard
+                        GrowthUnlockLoopCard(
+                            currentLevel: status.currentLevel,
+                            appLanguage: appLanguage
+                        )
+                        GrowthUnlockStageExplorer(
+                            currentLevel: status.currentLevel,
+                            appLanguage: appLanguage,
+                            initialStageID: status.step.id
+                        )
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 28)
                 }
             }
         }
+        .accessibilityIdentifier("growth-unlock-rules-sheet")
     }
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "info.circle.fill").accessibilityHidden(true)
+            Image(systemName: "tree.fill").accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 17, weight: .black))
                 .foregroundStyle(accent)
-                .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                .frame(width: 44, height: 44)
+                .background(accent.opacity(0.12), in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(localized(zh: "解锁规则", en: "Unlock rules", de: "Freischaltregeln"))
+                Text(l.tr(
+                    zh: "椰子树成长图鉴",
+                    en: "Coconut Tree Atlas",
+                    de: "Kokosbaum-Atlas",
+                    es: "Atlas del cocotero",
+                    pt: "Atlas do coqueiro",
+                    fr: "Atlas du cocotier",
+                    ja: "ココナッツツリー図鑑",
+                    ko: "코코넛 나무 도감",
+                    it: "Atlante dell’albero di cocco"
+                ))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(status.step.title(language: appLanguage))
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(accent)
-                    .lineLimit(1)
+                Text(l.tr(
+                    zh: "点一级，看看会长出什么",
+                    en: "Tap a level to see what grows",
+                    de: "Tippe eine Stufe an und entdecke mehr",
+                    es: "Toca un nivel para ver qué crece",
+                    pt: "Toque em um nível para ver o que cresce",
+                    fr: "Touchez un niveau pour voir ce qui pousse",
+                    ja: "レベルをタップして成長を確認",
+                    ko: "레벨을 탭해 무엇이 자라는지 확인하세요",
+                    it: "Tocca un livello e scopri cosa cresce"
+                ))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .lineLimit(2)
             }
 
             Spacer(minLength: 8)
@@ -57,134 +86,22 @@ struct GrowthUnlockRulesSheet: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(localized(zh: "关闭", en: "Close", de: "Schließen"))
+            .accessibilityLabel(l.tr(
+                zh: "关闭",
+                en: "Close",
+                de: "Schließen",
+                es: "Cerrar",
+                pt: "Fechar",
+                fr: "Fermer",
+                ja: "閉じる",
+                ko: "닫기",
+                it: "Chiudi"
+            ))
         }
         .padding(.leading, 16)
         .padding(.trailing, 6)
         .padding(.top, 14)
         .padding(.bottom, 10)
-    }
-
-    private var requirementCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: status.isUnlocked ? "checkmark.seal.fill" : "lock.fill")
-                    .font(OhanaFont.adaptive(size: 17, weight: .black))
-                    .foregroundStyle(accent)
-                    .frame(width: 38, height: 38) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    .background(Color.ohanaControlFill, in: Circle())
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(localized(zh: "开放条件", en: "Requirement", de: "Bedingung"))
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(requirementText)
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            Text(status.step.detail(language: appLanguage))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-    }
-
-    private var methodCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(localized(zh: "怎样升级", en: "How to level up", de: "So steigst du auf"))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-
-            ruleLine(
-                icon: "checklist",
-                text: localized(
-                    zh: "完成待办中的每日照护和提醒，稳定获得成长能量。",
-                    en: "Complete daily care and reminders in Tasks to earn steady growth energy.",
-                    de: "Erledige Pflege und Erinnerungen in Aufgaben fuer stetige Energie."
-                )
-            )
-            ruleLine(
-                icon: "tree.fill",
-                text: localized(
-                    zh: "把获得的能量投入生命之树，生命之树达到目标等级后自动开放入口。",
-                    en: "Feed that energy into the Life Tree; the entry opens automatically at the target level.",
-                    de: "Gib Energie an den Lebensbaum; der Zugang oeffnet sich ab dem Ziellevel."
-                )
-            )
-            ruleLine(
-                icon: "lock.open.fill",
-                text: localized(
-                    zh: "解锁只控制入口节奏，不会删除已有数据，也不会改变照护记录。",
-                    en: "Unlocking only controls entry pacing; it never deletes data or changes care records.",
-                    de: "Freischalten steuert nur den Zugang und veraendert keine Pflegedaten."
-                )
-            )
-        }
-        .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-    }
-
-    private var roadmapCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(localized(zh: "完整路线", en: "Full path", de: "Ganzer Pfad"))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-
-            VStack(spacing: 8) {
-                ForEach(GrowthUnlockPolicy.stages) { step in
-                    GrowthUnlockStageRow(
-                        step: step,
-                        currentLevel: status.currentLevel,
-                        appLanguage: appLanguage
-                    )
-                }
-            }
-        }
-        .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-    }
-
-    private func ruleLine(icon: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
-                .foregroundStyle(accent)
-                .frame(width: 24, height: 24) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(Color.ohanaControlFill, in: Circle())
-
-            Text(text)
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private var requirementText: String {
-        if status.isUnlocked {
-            return localized(
-                zh: "当前生命之树 Lv.\(status.currentLevel)，已达到 Lv.\(status.step.requiredLevel)。",
-                en: "Life Tree is Lv.\(status.currentLevel), already at Lv.\(status.step.requiredLevel).",
-                de: "Lebensbaum Lv.\(status.currentLevel), bereits bei Lv.\(status.step.requiredLevel)."
-            )
-        }
-        return localized(
-            zh: "当前生命之树 Lv.\(status.currentLevel)，还差 \(status.missingLevels) 级；达到 Lv.\(status.step.requiredLevel) 后自动解锁。",
-            en: "Life Tree is Lv.\(status.currentLevel); \(status.missingLevels) more level(s) to unlock at Lv.\(status.step.requiredLevel).",
-            de: "Lebensbaum Lv.\(status.currentLevel); noch \(status.missingLevels) Level bis Lv.\(status.step.requiredLevel)."
-        )
-    }
-
-    private func localized(zh: String, en: String, de: String) -> String {
-        switch appLanguage {
-        case "en": en
-        case "de": de
-        default: zh
-        }
     }
 }
 
@@ -318,7 +235,6 @@ struct GrowthUnlockRoadmapView: View {
 
     @Environment(AppServices.self) private var appServices
     @AppStorage(PlantLockedPreviewPolicy.onboardingHasPlantsKey) private var onboardingHasPlants = false
-    @State private var ruleStatus: GrowthUnlockStatus?
     @State private var appearHandoffTask: Task<Void, Never>?
 
     private var l: L10n { L10n(appLanguage) }
@@ -341,7 +257,10 @@ struct GrowthUnlockRoadmapView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 14) {
-                        starterGiftCard
+                        GrowthUnlockLoopCard(
+                            currentLevel: currentLevel,
+                            appLanguage: appLanguage
+                        )
                         GrowthUnlockProgressCard(
                             currentLevel: currentLevel,
                             progressToNextLevel: progressToNextLevel,
@@ -354,8 +273,10 @@ struct GrowthUnlockRoadmapView: View {
                                 appLanguage: appLanguage
                             )
                         }
-                        levelRulesCard
-                        roadmapCard
+                        GrowthUnlockStageExplorer(
+                            currentLevel: currentLevel,
+                            appLanguage: appLanguage
+                        )
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 28)
@@ -374,14 +295,7 @@ struct GrowthUnlockRoadmapView: View {
             appearHandoffTask?.cancel()
             appearHandoffTask = nil
         }
-        .sheet(item: $ruleStatus) { status in
-            GrowthUnlockRulesSheet(
-                status: status,
-                appLanguage: appLanguage,
-                onClose: { ruleStatus = nil }
-            )
-            .ohanaCompactSheetPresentation(detents: [.medium, .large])
-        }
+        .accessibilityIdentifier("growth-unlock-roadmap-screen")
     }
 
     private var header: some View {
@@ -393,16 +307,22 @@ struct GrowthUnlockRoadmapView: View {
                 .background(Color.ohanaControlFill, in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(localized(zh: "椰子树成长路线", en: "Coconut Tree Roadmap", de: "Kokosbaum-Roadmap"))
+                Text(l.tr(
+                    zh: "椰子树成长路线",
+                    en: "Coconut Tree Roadmap",
+                    de: "Kokosbaum-Roadmap",
+                    es: "Ruta del cocotero",
+                    pt: "Rota do coqueiro",
+                    fr: "Parcours du cocotier",
+                    ja: "ココナッツツリーの成長ルート",
+                    ko: "코코넛 나무 성장 경로",
+                    it: "Percorso dell’albero di cocco"
+                ))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
-                Text(localized(
-                    zh: "Lv.\(currentLevel) · \(currentStep.title(language: appLanguage))",
-                    en: "Lv.\(currentLevel) · \(currentStep.title(language: appLanguage))",
-                    de: "Lv.\(currentLevel) · \(currentStep.title(language: appLanguage))"
-                ))
+                Text("Lv.\(currentLevel) · \(currentStep.title(language: appLanguage))")
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.goPrimary)
                 .lineLimit(1)
@@ -419,136 +339,22 @@ struct GrowthUnlockRoadmapView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                .accessibilityLabel(l.tr(
+                    zh: "关闭",
+                    en: "Close",
+                    de: "Schließen",
+                    es: "Cerrar",
+                    pt: "Fechar",
+                    fr: "Fermer",
+                    ja: "閉じる",
+                    ko: "닫기",
+                    it: "Chiudi"
+                ))
             }
         }
         .padding(.leading, 16)
         .padding(.trailing, 6)
         .padding(.top, 14)
         .padding(.bottom, 10)
-    }
-
-    private var starterGiftCard: some View {
-        HStack(alignment: .top, spacing: 11) {
-            Image(systemName: currentLevel >= 1 ? "gift.fill" : "sparkles")
-                .accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 16, weight: .black))
-                .foregroundStyle(Color.goPrimary)
-                .frame(width: 44, height: 44)
-                .background(Color.ohanaControlFill, in: Circle())
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(localized(zh: "新人椰子礼包", en: "Starter coconut gift", de: "Starter-Kokosgeschenk"))
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(localized(
-                    zh: "首次建立家庭后获得 \(StarterGiftPolicy.giftAmount)🥥；椰子树保持 Lv0。每次注入 \(OasisTreeEnergyInjectionPolicy.starterPackageXP) 能量，注入 5 次后升到 Lv1。",
-                    en: "After the first family setup, you receive \(StarterGiftPolicy.giftAmount)🥥; the tree stays Lv0. Each injection adds \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energy, and 5 injections reach Lv1.",
-                    de: "Nach dem ersten Zuhause gibt es \(StarterGiftPolicy.giftAmount)🥥; der Baum bleibt Lv0. Jede Einspeisung gibt \(OasisTreeEnergyInjectionPolicy.starterPackageXP) Energie, 5 Einspeisungen erreichen Lv1."
-                ))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(minHeight: 76)
-        .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
-    }
-
-    private var levelRulesCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(localized(zh: "等级说明", en: "Level guide", de: "Level-Hinweise"))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-
-            levelRuleLine(
-                icon: "bolt.fill",
-                text: localized(
-                    zh: "注入能量会消耗当前主人的椰子：\(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 -> \(OasisTreeEnergyInjectionPolicy.starterPackageXP) 能量。",
-                    en: "Injecting energy spends the active human's coconuts: \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 -> \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energy.",
-                    de: "Energieeinspeisung nutzt Kokosnüsse der aktiven Person: \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 -> \(OasisTreeEnergyInjectionPolicy.starterPackageXP) Energie."
-                )
-            )
-            levelRuleLine(
-                icon: "tree.fill",
-                text: localized(
-                    zh: "Lv1 需要 50 总能量，所以新手礼包足够完成 5 次注入。",
-                    en: "Lv1 needs 50 total energy, so the starter gift covers 5 injections.",
-                    de: "Lv1 braucht 50 Gesamtenergie; das Startergeschenk reicht fuer 5 Einspeisungen."
-                )
-            )
-            levelRuleLine(
-                icon: "circle.hexagongrid.fill",
-                text: localized(
-                    zh: "Lv5 开始解锁每日椰子收益；到达后这里会显示每天可领取的椰子数。",
-                    en: "Lv5 unlocks daily coconut yield; after reaching it, this guide shows the daily amount you can collect.",
-                    de: "Ab Lv5 gibt es taegliche Kokos-Ertraege; danach zeigt diese Hilfe die taegliche Menge."
-                )
-            )
-        }
-        .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
-    }
-
-    private func levelRuleLine(icon: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
-                .foregroundStyle(Color.goPrimary)
-                .frame(width: 24, height: 24) // a11y: allow non-interactive level guide glyph; row text carries the content.
-                .background(Color.ohanaControlFill, in: Circle())
-                .accessibilityHidden(true)
-
-            Text(text)
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private var roadmapCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(localized(zh: "升级会解锁什么", en: "What each level opens", de: "Was jede Stufe öffnet"))
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer()
-                Text(localized(zh: "本地成长节奏", en: "Local growth pace", de: "Lokales Wachstum"))
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Color.ohanaControlFill, in: Capsule())
-            }
-
-            VStack(spacing: 8) {
-                ForEach(GrowthUnlockPolicy.roadmapStages()) { step in
-                    Button {
-                        ruleStatus = GrowthUnlockStatus(step: step, currentLevel: currentLevel)
-                    } label: {
-                        GrowthUnlockStageRow(
-                            step: step,
-                            currentLevel: currentLevel,
-                            appLanguage: appLanguage
-                        )
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(step.title(language: appLanguage))
-                    .accessibilityHint(localized(zh: "查看解锁规则", en: "Show unlock rules", de: "Freischaltregeln anzeigen"))
-                }
-            }
-        }
-        .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
-    }
-
-    private func localized(zh: String, en: String, de: String) -> String {
-        switch appLanguage {
-        case "en": en
-        case "de": de
-        default: zh
-        }
     }
 }

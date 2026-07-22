@@ -13,6 +13,7 @@ import CloudKit
 #endif
 
 final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
+    private var guardianSafety: (any GuardianSafetyManaging)?
 #if OHANA_FAMILY_CAPABILITIES
     private var modelContainer: ModelContainer?
     private var cloudSync: (any CloudSyncManaging)?
@@ -23,8 +24,13 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
     @MainActor
     func configure(
         modelContainer: ModelContainer,
-        cloudSync: any CloudSyncManaging
+        cloudSync: any CloudSyncManaging,
+        guardianSafety: any GuardianSafetyManaging
     ) {
+        self.guardianSafety = guardianSafety
+        if OnlineFeatureGate.allows(.guardianSafety) {
+            UIApplication.shared.registerForRemoteNotifications()
+        }
 #if OHANA_FAMILY_CAPABILITIES
         guard AppCapabilityProfile.permitsCloudSyncRuntime else { return }
         self.modelContainer = modelContainer
@@ -37,6 +43,25 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func application(
+        _: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Task { @MainActor in
+            await guardianSafety?.registerAPNSToken(deviceToken)
+        }
+    }
+
+    func application(
+        _: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        OhanaLog.warning(
+            "APNs registration unavailable: \(error.localizedDescription)",
+            category: "GuardianSafety"
+        )
+    }
+
+    func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
@@ -46,6 +71,42 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
         }
 #endif
         return true
+    }
+
+    func application(
+        _: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        if Self.isGuardianNotification(userInfo) {
+            Task { @MainActor in
+                await guardianSafety?.refresh()
+                completionHandler(.newData)
+            }
+            return
+        }
+#if OHANA_FAMILY_CAPABILITIES
+        guard shouldHandleCloudSyncRemoteNotification(userInfo) else {
+            completionHandler(.noData)
+            return
+        }
+
+        Task { @MainActor in
+            guard let modelContainer, let cloudSync else {
+                completionHandler(.failed)
+                return
+            }
+            let result = await cloudSync.handleRemoteNotification(modelContainer: modelContainer)
+            completionHandler(backgroundFetchResult(for: result))
+        }
+#else
+        completionHandler(.noData)
+#endif
+    }
+
+    private static func isGuardianNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
+        userInfo[GuardianRemoteNotificationContract.markerUserInfoKey] as? Bool == true ||
+            userInfo[GuardianRemoteNotificationContract.incidentIDUserInfoKey] != nil
     }
 
 #if OHANA_FAMILY_CAPABILITIES
@@ -99,26 +160,6 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
             } catch {
                 OhanaLog.error("Cloud sync failed to accept household share: \(error)", category: "CloudSync")
             }
-        }
-    }
-
-    func application(
-        _: UIApplication,
-        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
-        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
-    ) {
-        guard shouldHandleCloudSyncRemoteNotification(userInfo) else {
-            completionHandler(.noData)
-            return
-        }
-
-        Task { @MainActor in
-            guard let modelContainer, let cloudSync else {
-                completionHandler(.failed)
-                return
-            }
-            let result = await cloudSync.handleRemoteNotification(modelContainer: modelContainer)
-            completionHandler(backgroundFetchResult(for: result))
         }
     }
 

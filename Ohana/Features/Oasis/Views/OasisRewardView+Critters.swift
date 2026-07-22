@@ -32,10 +32,8 @@ extension OasisRewardView {
                             .foregroundStyle(Color.goPrimary)
                             .contentTransition(.numericText())
                         HStack(spacing: 8) {
-                            critterQuickMetric(icon: "fork.knife", value: "\(critter.hunger)")
-                            critterQuickMetric(icon: "face.smiling", value: "\(critter.mood)")
-                            critterQuickMetric(icon: "cross.case.fill", value: "\(critter.health)")
                             critterQuickMetric(icon: "heart.fill", value: "B\(critterRenderSnapshot(for: critter).bondLevel)")
+                            critterQuickMetric(icon: "arrow.up.circle.fill", value: "Lv.\(critter.level)")
                             critterQuickMetric(icon: "star.fill", value: "\(critter.starLevel)")
                         }
                     }
@@ -162,7 +160,7 @@ extension OasisRewardView {
     var featuredCritter: OasisElectronicPet? {
         electronicPets
             .filter { !$0.isArchived }
-            .filter { $0.lifeState != .dead }
+            .filter { $0.lifeState != .dead && $0.lifeState != .critical && $0.lifeState != .sleeping }
             .sorted {
                 if $0.isFeaturedOnOasis != $1.isFeaturedOnOasis {
                     return $0.isFeaturedOnOasis && !$1.isFeaturedOnOasis
@@ -373,8 +371,7 @@ extension OasisRewardView {
         case .needsCare: "hand.raised.fill"
         case .atRisk: "exclamationmark.circle.fill"
         case .sick: "cross.case.fill"
-        case .critical: "hourglass"
-        case .dead: "leaf.fill"
+        case .critical, .sleeping, .dead: "moon.zzz.fill"
         }
     }
 
@@ -384,8 +381,7 @@ extension OasisRewardView {
         case .needsCare: Color.goTeal
         case .atRisk: Color.goOrange
         case .sick: Color.goPurple
-        case .critical: Color.goYellow
-        case .dead: Color.ohanaCardSurface
+        case .critical, .sleeping, .dead: Color.ohanaCardSurface
         }
     }
 
@@ -393,7 +389,7 @@ extension OasisRewardView {
         switch state {
         case .healthy:
             Color.goPrimary
-        case .dead:
+        case .dead, .sleeping:
             Color.ohanaTertiaryText
         case .needsCare, .atRisk, .sick, .critical:
             Color.goRed
@@ -520,8 +516,12 @@ extension OasisRewardView {
     }
 
     var fragmentSummary: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 8) {
             Text("◇")
+                .font(OhanaFont.footnote(.black))
+            Text("✦")
+                .font(OhanaFont.footnote(.black))
+            Text("\(actionSnapshot.stardustBalance)")
                 .font(OhanaFont.footnote(.black))
             Text("\(actionSnapshot.critterFragmentTotal)")
                 .font(OhanaFont.footnote(.black))
@@ -532,7 +532,7 @@ extension OasisRewardView {
     func critterCompanionCard(_ critter: OasisElectronicPet) -> some View {
         let snapshot = critterRenderSnapshot(for: critter)
         let lifecycle = snapshot.lifecycle
-        let isDead = lifecycle.state == .dead
+        let isDead = lifecycle.state == .dead || lifecycle.state == .critical || lifecycle.state == .sleeping
         return HStack(spacing: 12) {
             OasisCritterIllustration(catalogId: critter.catalogId, locked: false, size: 58, critter: critter)
                 .scaleEffect(critterActionPulseId == critter.id ? 1.08 : 1)
@@ -551,10 +551,9 @@ extension OasisRewardView {
                 }
 
                 HStack(spacing: 6) {
-                    critterMeter(value: critter.hunger, icon: "fork.knife")
-                    critterMeter(value: critter.mood, icon: "face.smiling")
-                    critterMeter(value: critter.health, icon: "cross.case.fill")
                     critterMeter(value: snapshot.bondProgress, icon: "heart.fill")
+                    critterQuickMetric(icon: "arrow.up.circle.fill", value: "Lv.\(critter.level)")
+                    critterQuickMetric(icon: "star.fill", value: "\(critter.starLevel)/\(OasisCompanionCurrency.maxStarLevel)")
                 }
                 Text(lifecycle.state.name(l))
                     .font(OhanaFont.caption2(.black))
@@ -586,10 +585,10 @@ extension OasisRewardView {
                     }
                     critterActionButton(
                         icon: "star.fill",
-                        cost: "\(snapshot.starFragmentsCost)◇",
+                        cost: "\(snapshot.starAvailability.fundingPlan.specificFragmentsUsed)◇ + \(snapshot.starAvailability.fundingPlan.stardustUsed)✦",
                         enabled: snapshot.canUpgradeStar
                     ) {
-                        upgradeCritterStar(critter)
+                        openSheet(.critterCodex)
                     }
                 }
             }

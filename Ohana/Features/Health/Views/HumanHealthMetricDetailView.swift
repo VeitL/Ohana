@@ -92,26 +92,19 @@ struct HumanHealthMetricDetailView: View {
                 addButton
                     .padding(.bottom, 28)
             }
-
-            if showingEntrySheet {
-                HumanHealthMetricEntrySheet(
-                    human: human,
-                    metric: metric,
-                    initialUnitCode: selectedUnit.code,
-                    onSaved: { log in
-                        selectedUnitCode = log.unitCode
-                    },
-                    onDismiss: {
-                        withAnimation(GoMotion.feedback) {
-                            showingEntrySheet = false
-                        }
-                    }
-                )
-                .zIndex(20)
-            }
         }
         .navigationTitle(metric.displayName(l))
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingEntrySheet) {
+            HumanHealthMetricEntrySheet(
+                human: human,
+                metric: metric,
+                initialUnitCode: selectedUnit.code,
+                onSaved: { log in
+                    selectedUnitCode = log.unitCode
+                }
+            )
+        }
         .toolbarBackground(.hidden, for: .navigationBar)
         .environment(\.locale, AppLanguage.effectiveLocale)
         .accessibilityIdentifier("human-health-metric-detail-\(metric.key)")

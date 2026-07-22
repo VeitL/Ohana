@@ -62,6 +62,57 @@ extension SettingsView {
             .accessibilityIdentifier("settings-debug-reminder-observability")
 
             #if DEBUG
+                NavigationLink {
+                    PrimaryAccentLabView()
+                } label: {
+                    SettingsNavigationLabel(
+                        icon: "paintpalette.fill",
+                        title: l.tr(
+                            zh: "主色实验室",
+                            en: "Primary accent lab",
+                            de: "Primärfarben-Labor",
+                            es: "Laboratorio de color",
+                            pt: "Laboratório de cor",
+                            fr: "Laboratoire de couleur",
+                            ja: "メインカラー実験室",
+                            ko: "주 색상 실험실",
+                            it: "Laboratorio colore"
+                        ),
+                        subtitle: l.tr(
+                            zh: "分别比较浅色与深色模式的主色",
+                            en: "Compare light and dark appearance accents",
+                            de: "Akzentfarben für Hell und Dunkel vergleichen",
+                            es: "Compara colores para modo claro y oscuro",
+                            pt: "Compare cores nos modos claro e escuro",
+                            fr: "Comparer les couleurs claire et sombre",
+                            ja: "ライトとダークの主色を比較",
+                            ko: "라이트와 다크 모드 주 색상 비교",
+                            it: "Confronta i colori chiaro e scuro"
+                        )
+                    )
+                }
+                .accessibilityIdentifier("settings-debug-primary-accent")
+
+                NavigationLink {
+                    PerformanceDiagnosticsView()
+                        .toolbar {
+                            ToolbarItem(placement: .primaryAction) {
+                                Button(role: .cancel) { closeSettings() } label: {
+                                    Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
+                                }
+                                .labelStyle(.iconOnly)
+                                .accessibilityIdentifier("settings-close-action")
+                            }
+                        }
+                } label: {
+                    SettingsNavigationLabel(
+                        icon: "speedometer",
+                        title: l.tr(zh: "性能诊断", en: "Performance diagnostics", de: "Leistungsdiagnose"),
+                        subtitle: l.tr(zh: "设置打开阶段与轻量视觉实验", en: "Settings-open phases and visual experiment", de: "Einstellungsphasen und Darstellungstest")
+                    )
+                }
+                .accessibilityIdentifier("settings-debug-performance-diagnostics")
+
                 settingsRow(
                     icon: "paintpalette.fill",
                     title: l.tr(zh: "UI 规范展示", en: "UI Specification Showcase"),

@@ -838,8 +838,44 @@ nonisolated extension DataBackupManager {
             instantCoconutDelta: log.instantCoconutDelta,
             costCoconuts: log.costCoconuts,
             dailySequence: log.dailySequence,
+            oddsVersion: log.oddsVersion,
+            guaranteeKindRaw: log.guaranteeKindRaw,
+            stardustDelta: log.stardustDelta,
             drawDate: d(log.drawDate),
             createdAt: d(log.createdAt)
+        )
+    }
+
+    func encodeAchievementUnlock(_ unlock: AchievementUnlock) -> AchievementUnlockBackup {
+        AchievementUnlockBackup(
+            id: unlock.id.uuidString,
+            achievementKey: unlock.achievementKey,
+            achievementID: unlock.achievementID,
+            scopeKindRaw: unlock.scopeKindRaw,
+            scopeIDRaw: unlock.scopeIDRaw,
+            unlockedAt: d(unlock.unlockedAt),
+            isLegacyImport: unlock.isLegacyImport,
+            createdAt: d(unlock.createdAt)
+        )
+    }
+
+    func encodeAchievementRewardReceipt(
+        _ receipt: AchievementRewardReceipt
+    ) -> AchievementRewardReceiptBackup {
+        AchievementRewardReceiptBackup(
+            id: receipt.id.uuidString,
+            receiptKey: receipt.receiptKey,
+            achievementKey: receipt.achievementKey,
+            achievementID: receipt.achievementID,
+            scopeKindRaw: receipt.scopeKindRaw,
+            scopeIDRaw: receipt.scopeIDRaw,
+            recipientHumanIDRaw: receipt.recipientHumanIDRaw,
+            claimedAt: d(receipt.claimedAt),
+            awardedCoconutAmount: receipt.awardedCoconutAmount,
+            awardedStardustAmount: receipt.awardedStardustAmount,
+            walletTransactionKey: receipt.walletTransactionKey,
+            isLegacyImport: receipt.isLegacyImport,
+            createdAt: d(receipt.createdAt)
         )
     }
 

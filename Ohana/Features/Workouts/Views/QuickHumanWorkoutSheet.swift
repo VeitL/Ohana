@@ -71,11 +71,13 @@ struct QuickHumanWorkoutSheet: View {
                 .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
+            .accessibilityIdentifier("quick-human-workout-sheet")
             .navigationTitle(l.tr(zh: "快速运动", en: "Quick Workout", de: "Schnelles Training"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(l.cancel, role: .cancel) { close() }
+                        .accessibilityIdentifier("ohana-sheet-close-action")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }

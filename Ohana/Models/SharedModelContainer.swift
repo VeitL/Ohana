@@ -1018,6 +1018,62 @@ enum ArkSchemaV91: VersionedSchema {
     }
 }
 
+// MARK: - Schema V92（商店购买外部发放恢复）
+enum ArkSchemaV92: VersionedSchema {
+    static var versionIdentifier = Schema.Version(92, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV91.models + [ShopPurchaseAttempt.self]
+    }
+}
+
+// MARK: - Schema V93（佛系模式打卡、参与区间、奖励回执与本机安全联系人）
+enum ArkSchemaV93: VersionedSchema {
+    static var versionIdentifier = Schema.Version(93, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV92.models + [
+            PresenceCheckIn.self,
+            PresenceParticipationPeriod.self,
+            PresenceRewardReceipt.self,
+            SafetyContact.self
+        ]
+    }
+}
+
+// MARK: - Schema V94（成就永久解锁与奖励回执）
+enum ArkSchemaV94: VersionedSchema {
+    static var versionIdentifier = Schema.Version(94, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV93.models + [
+            AchievementUnlock.self,
+            AchievementRewardReceipt.self
+        ]
+    }
+}
+
+// MARK: - Schema V95（家庭协作重复计划与收件人活动流）
+enum ArkSchemaV95: VersionedSchema {
+    static var versionIdentifier = Schema.Version(95, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV94.models + [
+            FamilyTaskPlan.self,
+            FamilyTaskActivity.self
+        ]
+    }
+}
+
+// MARK: - Schema V96（Family App 守护本机投影与可靠同步 outbox）
+enum ArkSchemaV96: VersionedSchema {
+    static var versionIdentifier = Schema.Version(96, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV95.models + [
+            GuardianSafetyPolicyProjection.self,
+            GuardianRelationshipProjection.self,
+            GuardianIncidentProjection.self,
+            GuardianSafetySyncOutbox.self
+        ]
+    }
+}
+
 // MARK: - Migration Plan
 // 只保留有真实 custom logic 的 stage；轻量新增字段/模型不需要显式 stage。
 // 相邻 schema hash 相同时，显式 stage 会触发 iOS 26 "model reference cannot be equal"。
@@ -1042,7 +1098,8 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV75.self, ArkSchemaV76.self, ArkSchemaV77.self, ArkSchemaV78.self, ArkSchemaV79.self,
          ArkSchemaV80.self, ArkSchemaV81.self, ArkSchemaV82.self, ArkSchemaV83.self, ArkSchemaV84.self,
          ArkSchemaV85.self, ArkSchemaV86.self, ArkSchemaV87.self, ArkSchemaV88.self,
-         ArkSchemaV89.self, ArkSchemaV90.self, ArkSchemaV91.self]
+         ArkSchemaV89.self, ArkSchemaV90.self, ArkSchemaV91.self, ArkSchemaV92.self,
+         ArkSchemaV93.self, ArkSchemaV94.self, ArkSchemaV95.self, ArkSchemaV96.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -1105,8 +1162,16 @@ enum SharedModelContainer {
         return created
     }
 
+    static func invalidateCachedContainer(_ container: ModelContainer) {
+        lock.lock()
+        defer { lock.unlock() }
+        if _shared === container {
+            _shared = nil
+        }
+    }
+
     static func makePreview() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV96.models)
         let configuration = ModelConfiguration(
             isStoredInMemoryOnly: true,
             cloudKitDatabase: .none
@@ -1116,7 +1181,7 @@ enum SharedModelContainer {
 
     private static func createPersistentContainer() throws -> ModelContainer {
         ensureApplicationSupportDirectory()
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV96.models)
         let primaryConfiguration = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

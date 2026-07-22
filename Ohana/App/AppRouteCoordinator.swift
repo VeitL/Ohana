@@ -94,6 +94,7 @@ enum AppSheetRoute: Hashable, Identifiable {
     case humanWishlist(UUID)
     case humanNoteQuick(UUID)
     case humanNote(UUID)
+    case guardianSafety(invitationCode: String?, incidentID: String?)
     case requiredAccountSwitch
     case settings
     case streakDetail
@@ -192,6 +193,8 @@ enum AppSheetRoute: Hashable, Identifiable {
             "human-note-quick-\(id.uuidString)"
         case let .humanNote(id):
             "human-note-\(id.uuidString)"
+        case let .guardianSafety(invitationCode, incidentID):
+            "guardian-safety-\(invitationCode ?? "none")-\(incidentID ?? "none")"
         case .requiredAccountSwitch:
             "required-account-switch"
         case .settings:
@@ -254,7 +257,10 @@ enum AppOverlayRoute: Hashable, Identifiable {
 enum AppRouteNotificationEvent: Equatable {
     case humanDeleted(requiresReplacementHuman: Bool, requiresAccountSwitch: Bool)
     case reminderRouteRequested
+    case familyWeeklyReportRouteRequested
     case plantBatchCareRouteRequested(careType: PlantCareType?)
+    case guardianSafetyRouteRequested(invitationCode: String?, incidentID: String?)
+    case guardianIncidentAcknowledgementRequested(incidentID: String)
 }
 
 enum AppRouteNotificationOutcome: Equatable {
@@ -314,10 +320,15 @@ final class AppRouteCoordinator: ObservableObject {
 
     func functionMenuPresentationDecision(
         destination: FMDest? = nil,
-        currentLevel: Int? = nil
+        currentLevel: Int? = nil,
+        plan: OhanaPlanLevel = .free
     ) -> AppRoutePresentationDecision<AppSheetRoute> {
         let requestedRoute = AppSheetRoute.functionMenu(destination: destination)
-        switch AppFeatureRouteGuard.functionDestinationDecision(destination, currentLevel: currentLevel ?? self.currentFeatureLevel) {
+        switch AppFeatureRouteGuard.functionDestinationDecision(
+            destination,
+            currentLevel: currentLevel ?? self.currentFeatureLevel,
+            plan: plan
+        ) {
         case .rootMenu:
             return .allowed(.functionMenu(destination: nil))
         case let .allow(destination):
@@ -367,8 +378,11 @@ final class AppRouteCoordinator: ObservableObject {
         return .allowed(route)
     }
 
-    func presentFunctionMenu(destination: FMDest? = nil) {
-        applySheetDecision(functionMenuPresentationDecision(destination: destination))
+    func presentFunctionMenu(
+        destination: FMDest? = nil,
+        plan: OhanaPlanLevel = .free
+    ) {
+        applySheetDecision(functionMenuPresentationDecision(destination: destination, plan: plan))
     }
 
     func presentCalendar(entityID: String? = nil, humanID: String? = nil, plantID _: String? = nil) {
@@ -470,10 +484,17 @@ final class AppRouteCoordinator: ObservableObject {
         overlay = nil
     }
 
-    func handleNotificationEvent(_ event: AppRouteNotificationEvent) -> AppRouteNotificationOutcome {
+    func handleNotificationEvent(
+        _ event: AppRouteNotificationEvent,
+        plan: OhanaPlanLevel = .free
+    ) -> AppRouteNotificationOutcome {
         switch event {
         case let .humanDeleted(requiresReplacementHuman, requiresAccountSwitch):
-            resetToHome(rebuildRoot: true)
+            // The deletion command dismisses its member route before publishing.
+            // Clearing the route state is enough to release that destination;
+            // re-identifying the whole root can trap the native TabView in a
+            // continuous tab rebuild while Home refreshes after the deletion.
+            resetToHome()
             if requiresReplacementHuman {
                 presentRequiredHumanProfile()
                 return .clearActiveHuman
@@ -486,6 +507,10 @@ final class AppRouteCoordinator: ObservableObject {
         case .reminderRouteRequested:
             resetToHome()
             return .none
+        case .familyWeeklyReportRouteRequested:
+            resetToHome()
+            presentFunctionMenu(destination: .familyWeeklyReport, plan: plan)
+            return .none
         case let .plantBatchCareRouteRequested(careType):
             resetToHome()
             if let careType {
@@ -494,6 +519,41 @@ final class AppRouteCoordinator: ObservableObject {
                 presentFunctionMenu(destination: .plantsBatchCare)
             }
             return .none
+        case let .guardianSafetyRouteRequested(invitationCode, incidentID):
+            resetToHome()
+            presentSheet(.guardianSafety(invitationCode: invitationCode, incidentID: incidentID))
+            return .none
+        case .guardianIncidentAcknowledgementRequested:
+            return .none
+        }
+    }
+
+    @discardableResult
+    func handleExternalURL(_ url: URL) -> Bool {
+        guard let route = OhanaExternalRoute.parse(url) else { return false }
+        handleExternalRoute(route)
+        return true
+    }
+
+    func handleExternalRoute(_ route: OhanaExternalRoute) {
+        resetToHome()
+        switch route {
+        case let .taskCenter(focusedItemID):
+            presentTaskCenter(
+                context: TaskCenterRouteContext(
+                    scope: .all,
+                    focusedItemID: focusedItemID,
+                    focusRequestID: focusedItemID == nil ? nil : UUID()
+                )
+            )
+        case let .activeWalk(petID):
+            presentWalk(petID: petID)
+        case .settings:
+            presentSettings()
+        case let .guardianInvite(code):
+            presentSheet(.guardianSafety(invitationCode: code, incidentID: nil))
+        case let .guardianIncident(id):
+            presentSheet(.guardianSafety(invitationCode: nil, incidentID: id))
         }
     }
 

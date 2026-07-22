@@ -8,8 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 ROOT = Path(__file__).resolve().parent
-REPO_ROOT = ROOT.parents[1]
-SOURCE = REPO_ROOT / "Icon.png"
+SOURCE = ROOT / "input" / "Icon.png"
 CANVAS = 1024
 ALPHA_THRESHOLD = 16
 
@@ -78,7 +77,7 @@ def make_preview(black_on_white: Image.Image, white_on_black: Image.Image, mask:
     draw.text((92, 72), "Ohana Exact Black / White Icon Suite", fill="#000000", font=title_font)
     draw.text(
         (96, 152),
-        f"Shape extracted directly from Icon.png alpha channel. Colors: #000000 and #FFFFFF only. Threshold: alpha >= {ALPHA_THRESHOLD}.",
+        f"Shape extracted directly from input/Icon.png alpha channel. Colors: #000000 and #FFFFFF only. Threshold: alpha >= {ALPHA_THRESHOLD}.",
         fill="#000000",
         font=body_font,
     )
@@ -187,10 +186,13 @@ def write_readme() -> None:
             [
                 "# Ohana Exact Black / White Icon Suite",
                 "",
-                "`Icon.png` is now treated as the source of truth. The mark is extracted from its alpha channel and rendered as a binary mask, so the icon uses only pure black `#000000` and pure white `#FFFFFF`.",
+                "`input/Icon.png` is the source of truth. The mark is extracted from its alpha channel and rendered as a binary mask, so the icon uses only pure black `#000000` and pure white `#FFFFFF`.",
                 "",
                 "## Contents",
                 "",
+                "- `input/Icon.png`: raster extraction source.",
+                "- `input/Icon.svg`: editable vector source.",
+                "- `input/Icon.pixel-exact.svg`: pixel-exact vector reference.",
                 "- `masters/ohana-smile-black-on-white-1024.png`: black mark on white.",
                 "- `masters/ohana-smile-white-on-black-1024.png`: white mark on black.",
                 "- `source/ohana-smile-mask-binary-1024.png`: pure black/white extracted mask.",
@@ -202,7 +204,7 @@ def write_readme() -> None:
                 "",
                 "## Extraction Rules",
                 "",
-                f"- Source: `{SOURCE}`.",
+                f"- Source: `{SOURCE.relative_to(ROOT).as_posix()}`.",
                 f"- Canvas: `{CANVAS}x{CANVAS}`.",
                 f"- Mask: alpha channel, threshold `>= {ALPHA_THRESHOLD}`.",
                 "- Final opaque app icons contain only two RGB values: black and white.",
@@ -219,11 +221,11 @@ def write_tokens(mask: Image.Image) -> None:
     bbox = mask.getbbox()
     payload = {
         "brand": "Ohana",
-        "sourceReference": str(SOURCE),
+        "sourceReference": SOURCE.relative_to(ROOT).as_posix(),
         "generatedAt": "2026-06-09",
         "colorRule": "Only #000000 and #FFFFFF are used in opaque app icon PNGs.",
         "extraction": {
-            "method": "Icon.png alpha channel to binary mask",
+            "method": "input/Icon.png alpha channel to binary mask",
             "alphaThreshold": ALPHA_THRESHOLD,
             "canvas": [CANVAS, CANVAS],
             "maskBoundingBox": list(bbox) if bbox else None,

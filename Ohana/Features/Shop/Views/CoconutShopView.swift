@@ -1,15 +1,73 @@
 import SwiftData
 import SwiftUI
 
+nonisolated enum CoconutShopDataState: Equatable {
+    case loading
+    case loaded
+    case failed
+}
+
+nonisolated enum ShopPurchaseReadiness: Equatable {
+    case loading
+    case missingBuyer
+    case walletFrozen
+    case insufficient(missing: Int)
+    case ready
+
+    static func resolve(
+        dataState: CoconutShopDataState,
+        hasBuyer: Bool,
+        buyerCanWrite: Bool,
+        spendableBalance: Int,
+        cost: Int
+    ) -> ShopPurchaseReadiness {
+        guard dataState == .loaded else { return .loading }
+        guard hasBuyer else { return .missingBuyer }
+        guard buyerCanWrite else { return .walletFrozen }
+        let missing = max(0, cost - max(0, spendableBalance))
+        return missing == 0 ? .ready : .insufficient(missing: missing)
+    }
+}
+
+nonisolated enum ShopPurchaseSettlementState: Equatable, Sendable {
+    case pending
+    case refunding
+    case needsAttention
+}
+
+nonisolated enum ShopManualRecoveryActionPolicy {
+    static func canRetry(reasonCode: String?) -> Bool {
+        switch reasonCode {
+        case "catalogItemMissing",
+             "missingFundingSnapshot",
+             "invalidFundingSnapshot",
+             "missingOrFrozenRefundRecipient",
+             "manualRecoveryPersistenceFailed":
+            true
+        default:
+            false
+        }
+    }
+}
+
 struct CoconutShopView: View {
     let humans: [Human]
     let pets: [Pet]
     let purchaseRecords: [ShopPurchaseRecord]
     let exchangeRequests: [CoconutExchangeRequest]
+    let humanBalances: [UUID: Int]
+    let purchaseSettlements: [String: ShopPurchaseSettlementState]
+    let purchaseSettlementReasons: [String: String]
+    let dataState: CoconutShopDataState
+    let retryDataLoad: () -> Void
+    let refreshData: () -> Void
+    let retryPurchaseRecovery: (String) -> ShopPurchaseManualRecoveryResult
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.hasSupporterPackEntitlement) var hasSupporterPack
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(AppServices.self) var appServices
 
     @Environment(\.ohanaAppLanguageCode) var appLanguage
@@ -29,9 +87,15 @@ struct CoconutShopView: View {
     @State var pendingPurchaseItem: ShopItem?
     @State var activePicker: ShopPicker?
     @State var equipPopoutPet: Pet?
+    @State var showInventory = false
     @State var toast: ShopToast?
     @State var toastTask: Task<Void, Never>?
-    @State var confettiItems: [ConfettiDrop] = []
+    @State var purchaseInFlightItemID: String?
+    @State var purchaseErrorMessage: String?
+    @State var purchaseRetryBlocked = false
+    @State var blockedPurchaseItemIDs: Set<String> = []
+    @State var recoveryInFlightItemID: String?
+    @State var shopBuyerID: UUID?
     @State var exchangeReceiverId = ""
     @State var exchangeOptionId = ""
     @State var exchangeNote = ""
@@ -41,12 +105,32 @@ struct CoconutShopView: View {
         humans: [Human] = [],
         pets: [Pet] = [],
         purchaseRecords: [ShopPurchaseRecord] = [],
-        exchangeRequests: [CoconutExchangeRequest] = []
+        exchangeRequests: [CoconutExchangeRequest] = [],
+        humanBalances: [UUID: Int] = [:],
+        purchaseSettlements: [String: ShopPurchaseSettlementState] = [:],
+        purchaseSettlementReasons: [String: String] = [:],
+        dataState: CoconutShopDataState = .loaded,
+        retryDataLoad: @escaping () -> Void = {},
+        refreshData: @escaping () -> Void = {},
+        retryPurchaseRecovery: @escaping (String) -> ShopPurchaseManualRecoveryResult = { itemID in
+            ShopPurchaseManualRecoveryResult(
+                itemID: itemID,
+                disposition: .stillNeedsAttention,
+                reasonCode: "manualReviewAttemptUnavailable"
+            )
+        }
     ) {
         self.humans = humans
         self.pets = pets
         self.purchaseRecords = purchaseRecords
         self.exchangeRequests = exchangeRequests
+        self.humanBalances = humanBalances
+        self.purchaseSettlements = purchaseSettlements
+        self.purchaseSettlementReasons = purchaseSettlementReasons
+        self.dataState = dataState
+        self.retryDataLoad = retryDataLoad
+        self.refreshData = refreshData
+        self.retryPurchaseRecovery = retryPurchaseRecovery
         _selectedCategory = State(initialValue: initialCategory.isVisibleInFirstRelease ? initialCategory : .appIcon)
     }
 
@@ -71,13 +155,6 @@ struct CoconutShopView: View {
         let tint: Color
     }
 
-    struct ConfettiDrop: Identifiable {
-        let id = UUID()
-        let emoji: String
-        let x: CGFloat
-        let delay: Double
-    }
-
     @StateObject var commandQueue = DeferredDomainCommandQueue()
 
     var l: L10n { L10n(appLanguage) }
@@ -86,7 +163,11 @@ struct CoconutShopView: View {
     var tertiaryText: Color { Color.ohanaTertiaryText }
 
     var purchasedSet: Set<String> {
-        ShopPurchaseRecordStore.ownedItemIDs(from: purchaseRecords)
+        var ownedIDs = ShopPurchaseRecordStore.ownedItemIDs(from: purchaseRecords)
+        if hasSupporterPack {
+            ownedIDs.insert(SupporterPackCatalog.supporterIconItemID)
+        }
+        return ownedIDs
     }
 
     var allItems: [ShopItem] {
@@ -102,14 +183,17 @@ struct CoconutShopView: View {
     }
 
     var selectedActiveHuman: Human? {
-        humans.first { $0.id.uuidString == activeHumanId }
+        if let shopBuyerID {
+            return activeHumans.first { $0.id == shopBuyerID }
+        }
+        return activeHumans.first { $0.id.uuidString == activeHumanId }
     }
 
     var currentHuman: Human? {
         if let selectedActiveHuman {
             return selectedActiveHuman
         }
-        return activeHumans.first
+        return activeHumans.count == 1 ? activeHumans.first : nil
     }
 
     var otherHumans: [Human] {
@@ -126,13 +210,14 @@ struct CoconutShopView: View {
     }
 
     var currentHumanBalance: Int {
-        currentHuman?.coconutBalance ?? 0
+        guard let currentHuman else { return 0 }
+        return max(0, humanBalances[currentHuman.id] ?? currentHuman.coconutBalance)
     }
 
     var islandSpendableHumanBalance: Int {
-        humans
-            .filter { !$0.hasPassedAway }
-            .reduce(0) { $0 + max(0, $1.coconutBalance) }
+        activeHumans.reduce(0) { partial, human in
+            partial + max(0, humanBalances[human.id] ?? human.coconutBalance)
+        }
     }
 
     var exchangeOptions: [CoconutExchangeOption] {
@@ -161,81 +246,116 @@ struct CoconutShopView: View {
     }
 
     var ownedCount: Int {
-        purchasedSet.count + Avatar2DAccess.extraPassCount
+        let consumables = appServices.shopInventory.consumableSnapshot()
+        return purchasedSet.count
+            + consumables.avatar2DExtraPassCount
+            + consumables.backdatePassCount
+            + (consumables.isDoubleRewardBoostActive ? 1 : 0)
+            + ((consumables.streakShieldExpiry ?? .distantPast) > Date() ? 1 : 0)
     }
 
-    var isPopupActive: Bool {
-        pendingPurchaseItem != nil || activePicker != nil
+    var shopGridColumns: [GridItem] {
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible(), spacing: 12)]
+            : [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
     }
 
     var body: some View {
-        ZStack {
-            OhanaAppBackground()
-                .ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                OhanaAppBackground()
+                    .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                header
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 14)
-
-                categoryRail
-                    .padding(.bottom, 12)
-
-                categoryIntro
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, effectiveSelectedCategory == .plantDecor ? 12 : 0)
-
-                ScrollView {
-                    if effectiveSelectedCategory == .cashExchange {
-                        cashExchangeSection
+                switch dataState {
+                case .loading:
+                    shopLoadingState
+                case .failed:
+                    shopFailureState
+                case .loaded:
+                    VStack(spacing: 0) {
+                        header
                             .padding(.horizontal, 20)
-                            .padding(.bottom, 36)
-                    } else {
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                            ForEach(filteredItems) { item in
-                                shopItemCard(item)
+                            .padding(.top, 8)
+                            .padding(.bottom, 14)
+
+                        categoryRail
+                            .padding(.bottom, 12)
+
+                        categoryIntro
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, effectiveSelectedCategory == .plantDecor ? 12 : 0)
+
+                        if !purchaseSettlements.isEmpty || !blockedPurchaseItemIDs.isEmpty {
+                            purchaseSettlementNotice
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 12)
+                        }
+
+                        ScrollView {
+                            if effectiveSelectedCategory == .cashExchange {
+                                cashExchangeSection
+                                    .padding(.horizontal, 20)
+                                    .padding(.bottom, 36)
+                            } else {
+                                LazyVGrid(columns: shopGridColumns, spacing: 12) {
+                                    ForEach(filteredItems) { item in
+                                        shopItemCard(item)
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 36)
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 36)
                     }
                 }
-            }
-            .disabled(isPopupActive)
-            .blur(radius: isPopupActive ? 1.2 : 0)
 
-            ForEach(confettiItems) { item in
-                Text(item.emoji)
-                    .font(OhanaFont.adaptive(size: 24)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .position(x: item.x, y: -20)
-                    .opacity(toast == nil ? 0 : 1)
-                    .animation(GoMotion.feedback.delay(item.delay), value: toast)
+                if let toast {
+                    toastView(toast)
+                        .transition(.ohanaPop)
+                        .zIndex(20)
+                }
             }
-
-            if let toast {
-                toastView(toast)
-                    .transition(.ohanaPop)
-                    .zIndex(20)
+            .navigationTitle(l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokosnuss-Shop"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.tr(zh: "关闭", en: "Close", de: "Schließen")) { dismiss() }
+                }
             }
         }
         .tint(Color.goPrimary)
+        .sheet(isPresented: $showInventory) {
+            InventoryView()
+                .ohanaSheetPagePresentation()
+        }
         .sheet(item: $equipPopoutPet) { pet in
             EquipPopoutCardSheet(pet: pet)
                 .presentationDetents([.medium, .large])
         }
         .sheet(item: $pendingPurchaseItem) { item in
             NavigationStack {
-                purchaseConfirmation(item: item)
-                    .navigationTitle(l.tr(zh: "确认购买", en: "Confirm purchase", de: "Kauf bestätigen"))
+                ScrollView {
+                    purchaseConfirmation(item: item)
+                        .padding(20)
+                }
+                    .navigationTitle(l.tr(zh: "确认兑换", en: "Confirm redemption", de: "Einlösen bestätigen"))
                     .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(l.cancel) {
+                                pendingPurchaseItem = nil
+                            }
+                            .disabled(purchaseInFlightItemID != nil)
+                        }
+                    }
             }
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
+            .interactiveDismissDisabled(purchaseInFlightItemID != nil)
         }
         .sheet(item: $activePicker) { picker in
             NavigationStack {
                 pickerContent(picker)
-                    .navigationTitle(l.tr(zh: "选择", en: "Choose", de: "Auswählen"))
+                    .navigationTitle(pickerTitle(picker))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
@@ -251,5 +371,52 @@ struct CoconutShopView: View {
             }
             selectedAppIcon = appServices.appIcons.currentDescriptor.itemId
         }
+        .onChange(of: pendingPurchaseItem?.id) { _, itemID in
+            purchaseErrorMessage = nil
+            purchaseRetryBlocked = false
+            if itemID == nil { purchaseInFlightItemID = nil }
+        }
+        .onDisappear {
+            toastTask?.cancel()
+            toastTask = nil
+        }
+    }
+
+    var shopLoadingState: some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .controlSize(.large)
+            Text(l.tr(zh: "正在读取可用椰子与已购内容…", en: "Loading spendable coconuts and purchases…", de: "Verfügbare Kokosnüsse und Käufe werden geladen…"))
+                .font(OhanaFont.callout(.semibold))
+                .foregroundStyle(secondaryText)
+                .multilineTextAlignment(.center)
+            LazyVGrid(columns: shopGridColumns, spacing: 12) {
+                ForEach(0 ..< 4, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
+                        .fill(Color.ohanaCardSurface)
+                        .frame(height: 190)
+                }
+            }
+            .redacted(reason: .placeholder)
+            .accessibilityHidden(true)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityIdentifier("coconut-shop-loading")
+    }
+
+    var shopFailureState: some View {
+        ContentUnavailableView {
+            Label(
+                l.tr(zh: "商店暂时无法读取", en: "Shop data is unavailable", de: "Shop-Daten sind nicht verfügbar"),
+                systemImage: "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90"
+            )
+        } description: {
+            Text(l.tr(zh: "你的余额和已购内容没有被当作空数据处理。请重试。", en: "Your balance and purchases were not treated as empty. Please try again.", de: "Guthaben und Käufe wurden nicht als leer behandelt. Bitte versuche es erneut."))
+        } actions: {
+            Button(l.tr(zh: "重新加载", en: "Reload", de: "Neu laden"), action: retryDataLoad)
+                .buttonStyle(.borderedProminent)
+        }
+        .accessibilityIdentifier("coconut-shop-load-failed")
     }
 }

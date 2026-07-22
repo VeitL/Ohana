@@ -9,6 +9,27 @@ struct OnlineFeatureGateTests {
         #expect(!AppCapabilityProfile.permitsCloudSyncRuntime)
         #expect(!AppCapabilityProfile.shippingPermitsCloudSyncDirtyWrites)
         #expect(!OnlineFeatureGate.allows(.onlineCollaboration))
+        #expect(!OnlineFeatureGate.allows(.guardianSafety))
+        #expect(GuardianSafetyConfiguration.current == nil)
+    }
+
+    @Test func guardianConfigurationRequiresTheFlagSecureEndpointsAndRegisteredCallback() {
+        var values: [String: Any] = [
+            "OHANAGuardianSafetyEnabled": true,
+            "OHANAGuardianAPIBaseURL": "https://guardian.example/v1/",
+            "OHANAGuardianCognitoAuthorizationURL": "https://auth.example/oauth2/authorize",
+            "OHANAGuardianCognitoTokenURL": "https://auth.example/oauth2/token",
+            "OHANAGuardianCognitoClientID": "client-id",
+            "OHANAGuardianRedirectURL": "ohana://auth/family",
+            "OHANAGuardianInviteBaseURL": "https://guardian.example"
+        ]
+
+        #expect(GuardianSafetyConfiguration.configuration(from: values) != nil)
+        values["OHANAGuardianAPIBaseURL"] = "http://guardian.example/v1/"
+        #expect(GuardianSafetyConfiguration.configuration(from: values) == nil)
+        values["OHANAGuardianAPIBaseURL"] = "https://guardian.example/v1/"
+        values["OHANAGuardianRedirectURL"] = "other://auth/family"
+        #expect(GuardianSafetyConfiguration.configuration(from: values) == nil)
     }
 
     @Test func initialMergeCannotBypassTheSoloDirtyWriteBoundary() throws {

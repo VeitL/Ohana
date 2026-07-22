@@ -5,6 +5,7 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
+import StoreKitTest
 import XCTest
 
 final class OhanaUITests: XCTestCase {
@@ -48,11 +49,4434 @@ final class OhanaUITests: XCTestCase {
             name: petName,
             flowTitle: "Create Pet Card",
             missingFieldMessage: "The first-Pet system journey did not open Pet creation.",
+            completionMessage: "Creating the deferred first Pet did not reach the starter reward.",
             petSpeciesLabel: "Dog",
-            postSaveMarkerIdentifiers: ["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
+            postSaveMarkerIdentifiers: ["home-card-pet-\(petName)"]
         )
         finishRequiredStarterGift(in: app)
         XCTAssertTrue(app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 12))
+    }
+
+    @MainActor
+    func testPetCreationBackDefersThenTasksCancelPreservesJourney() throws {
+        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        let humanName = "Codex Back Then Defer Human"
+        let draftPetName = "Codex Abandoned Pet Draft"
+        let petName = "Codex Resumed Pet"
+        createOnboardingHuman(named: humanName, in: app)
+
+        let createNow = app.buttons["onboarding-create-pet-now"]
+        XCTAssertTrue(waitUntil(timeout: 8) { createNow.exists && createNow.isEnabled && createNow.isHittable })
+        createNow.tap()
+
+        let nameField = app.textFields["member-name-input"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 12), "Create now did not open Pet creation.")
+        nameField.tap()
+        nameField.typeText(draftPetName)
+        nameField.typeText("\n")
+
+        let onboardingBack = app.buttons["member-creation-back-action"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                onboardingBack.exists && onboardingBack.isEnabled && onboardingBack.isHittable
+            },
+            "The onboarding Pet form did not expose its semantic Back action."
+        )
+        onboardingBack.tap()
+
+        XCTAssertTrue(
+            app.buttons["home-card-human-\(humanName)"].waitForExistence(timeout: 15),
+            "Returning from Pet creation did not preserve the Human card."
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !nameField.exists })
+        XCTAssertFalse(
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-pet-"))
+                .firstMatch.exists,
+            "Returning from the Pet draft created a Pet."
+        )
+        XCTAssertFalse(app.buttons["home-tab-oasis"].exists, "Oasis unlocked before the first Pet existed.")
+
+        let tasksTab = app.buttons["home-tab-calendar"]
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+
+        let createTask = app.buttons["task-center-system-action-createFirstPet-system-journey-create-first-pet"]
+        let claimTask = app.buttons["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
+        XCTAssertTrue(createTask.waitForExistence(timeout: 15), "The deferred first-Pet task did not appear.")
+        XCTAssertFalse(claimTask.exists)
+        XCTAssertTrue(waitUntil(timeout: 8) { createTask.isEnabled && createTask.isHittable })
+        createTask.tap()
+
+        XCTAssertTrue(nameField.waitForExistence(timeout: 12), "The deferred task did not reopen Pet creation.")
+        let resumedNameValue = (nameField.value as? String) ?? ""
+        XCTAssertNotEqual(
+            resumedNameValue,
+            draftPetName,
+            "The abandoned onboarding Pet draft leaked into the resumed form."
+        )
+        XCTAssertTrue(
+            isEmptyTextFieldValue(resumedNameValue),
+            "The resumed Pet form was not empty. Actual: \(resumedNameValue)"
+        )
+        let cancelCreation = app.buttons["member-creation-cancel-action"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                cancelCreation.exists && cancelCreation.isEnabled && cancelCreation.isHittable
+            },
+            "The standard Pet form did not expose its semantic Cancel action."
+        )
+        cancelCreation.tap()
+
+        XCTAssertTrue(waitUntil(timeout: 12) { !nameField.exists && !cancelCreation.exists })
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(createTask.waitForExistence(timeout: 12), "Cancelling removed the deferred first-Pet task.")
+        XCTAssertFalse(claimTask.exists, "Cancelling incorrectly exposed the starter reward.")
+        XCTAssertFalse(app.buttons["home-tab-oasis"].exists, "Cancelling Pet creation unlocked Oasis.")
+
+        XCTAssertTrue(waitUntil(timeout: 8) { createTask.isEnabled && createTask.isHittable })
+        createTask.tap()
+        createMember(
+            in: app,
+            name: petName,
+            flowTitle: "Create Pet Card",
+            missingFieldMessage: "Reopening the deferred task did not restore Pet creation.",
+            completionMessage: "Completing the resumed Pet form did not return to Home with the new card.",
+            petSpeciesLabel: "Dog",
+            postSaveMarkerIdentifiers: ["home-card-pet-\(petName)"]
+        )
+
+        XCTAssertTrue(app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 12))
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(claimTask.waitForExistence(timeout: 12), "Saving the resumed Pet did not expose Claim.")
+        XCTAssertFalse(createTask.exists, "The create task remained after the first Pet was saved.")
+        XCTAssertFalse(app.buttons["starter-gift-finish-action"].exists)
+        XCTAssertFalse(app.buttons["home-tab-oasis"].exists)
+        finishRequiredStarterGift(in: app)
+        XCTAssertFalse(claimTask.exists, "The claimed starter reward task remained visible.")
+        XCTAssertTrue(app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 12))
+    }
+
+    @MainActor
+    func testDeferredFirstPetTaskPersistsAcrossRelaunchWithoutUnsavedDraft() throws {
+        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        let humanName = "Codex Relaunch Deferred Human"
+        let abandonedDraftName = "Codex Relaunch Abandoned Pet"
+        createOnboardingHuman(named: humanName, in: app)
+
+        let deferPet = app.buttons["onboarding-defer-pet"]
+        XCTAssertTrue(waitUntil(timeout: 8) { deferPet.exists && deferPet.isEnabled && deferPet.isHittable })
+        deferPet.tap()
+        XCTAssertTrue(app.buttons["home-card-human-\(humanName)"].waitForExistence(timeout: 15))
+
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let homeTab = app.buttons["home-tab-home"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let createTask = app.buttons[
+            "task-center-system-action-createFirstPet-system-journey-create-first-pet"
+        ]
+        let claimTask = app.buttons[
+            "task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"
+        ]
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(createTask.waitForExistence(timeout: 15))
+        XCTAssertFalse(claimTask.exists)
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20), "Home was not reachable after the deferred relaunch.")
+        XCTAssertTrue(waitUntil(timeout: 8) { homeTab.isEnabled && homeTab.isHittable })
+        homeTab.tap()
+        XCTAssertTrue(
+            app.buttons["home-card-human-\(humanName)"].waitForExistence(timeout: 15),
+            "The Human card did not survive the deferred relaunch."
+        )
+        XCTAssertFalse(
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-pet-"))
+                .firstMatch.exists,
+            "Relaunching a deferred first-Pet task fabricated a Pet."
+        )
+        XCTAssertFalse(app.buttons["home-tab-oasis"].exists, "Relaunch unlocked Oasis before a Pet existed.")
+
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(createTask.waitForExistence(timeout: 15), "The deferred first-Pet task did not survive relaunch.")
+        XCTAssertFalse(claimTask.exists)
+        XCTAssertTrue(waitUntil(timeout: 8) { createTask.isEnabled && createTask.isHittable })
+        createTask.tap()
+
+        let nameField = app.textFields["member-name-input"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 12))
+        let firstResumeValue = (nameField.value as? String) ?? ""
+        XCTAssertTrue(
+            isEmptyTextFieldValue(firstResumeValue),
+            "The first post-relaunch Pet form was not empty. Actual: \(firstResumeValue)"
+        )
+        nameField.tap()
+        nameField.typeText(abandonedDraftName)
+        nameField.typeText("\n")
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(createTask.waitForExistence(timeout: 15))
+        XCTAssertFalse(claimTask.exists, "Terminating an unsaved Pet draft exposed the starter reward.")
+        XCTAssertTrue(waitUntil(timeout: 8) { createTask.isEnabled && createTask.isHittable })
+        createTask.tap()
+        XCTAssertTrue(nameField.waitForExistence(timeout: 12))
+        let secondResumeValue = (nameField.value as? String) ?? ""
+        XCTAssertNotEqual(
+            secondResumeValue,
+            abandonedDraftName,
+            "The unsaved Pet draft survived process termination."
+        )
+        XCTAssertTrue(
+            isEmptyTextFieldValue(secondResumeValue),
+            "The second post-relaunch Pet form was not empty. Actual: \(secondResumeValue)"
+        )
+
+        let cancelCreation = app.buttons["member-creation-cancel-action"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                cancelCreation.exists && cancelCreation.isEnabled && cancelCreation.isHittable
+            }
+        )
+        cancelCreation.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(createTask.waitForExistence(timeout: 12), "Cancelling after relaunch removed the deferred task.")
+        XCTAssertFalse(claimTask.exists)
+    }
+
+    @MainActor
+    func testStarterGiftCeremonyResumesAfterRelaunchWithoutDuplicateReward() throws {
+        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        let humanName = "Codex Gift Relaunch Human"
+        let petName = "Codex Gift Relaunch Pet"
+        createOnboardingHuman(named: humanName, in: app)
+
+        let createNow = app.buttons["onboarding-create-pet-now"]
+        XCTAssertTrue(waitUntil(timeout: 8) { createNow.exists && createNow.isEnabled && createNow.isHittable })
+        createNow.tap()
+        createMember(
+            in: app,
+            name: petName,
+            flowTitle: "Create Pet Card",
+            missingFieldMessage: "Immediate Pet creation did not open before the gift relaunch path.",
+            completionMessage: "Saving the Pet did not return to Home before the gift relaunch path.",
+            petSpeciesLabel: "Dog",
+            postSaveMarkerIdentifiers: ["home-card-pet-\(petName)"]
+        )
+
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let oasisTab = app.buttons["home-tab-oasis"]
+        let coconutBalance = app.buttons["home-coconut-action"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let createTask = app.buttons[
+            "task-center-system-action-createFirstPet-system-journey-create-first-pet"
+        ]
+        let claimTask = app.buttons[
+            "task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"
+        ]
+        let finishGift = app.buttons["starter-gift-finish-action"]
+
+        XCTAssertFalse(oasisTab.exists, "Oasis unlocked before the starter gift was claimed.")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { coconutBalance.label == "Coconut balance 0" },
+            "The starter gift was credited before explicit confirmation."
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(claimTask.waitForExistence(timeout: 20))
+        XCTAssertFalse(createTask.exists, "The first-Pet creation task remained after the Pet was saved.")
+        XCTAssertTrue(waitUntil(timeout: 8) { claimTask.isEnabled && claimTask.isHittable })
+        claimTask.tap()
+        XCTAssertTrue(finishGift.waitForExistence(timeout: 20))
+        XCTAssertFalse(oasisTab.exists)
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(
+            finishGift.waitForExistence(timeout: 30),
+            "The unconfirmed starter gift ceremony did not resume after relaunch."
+        )
+        XCTAssertFalse(oasisTab.exists, "Relaunch committed the starter gift without confirmation.")
+        XCTAssertTrue(waitUntil(timeout: 8) { finishGift.isEnabled && finishGift.isHittable })
+        finishGift.tap()
+        XCTAssertTrue(oasisTab.waitForExistence(timeout: 12), "Confirming the resumed gift did not unlock Oasis.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 50" },
+            "Confirming the resumed gift did not credit exactly 50 coconuts."
+        )
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 8))
+        XCTAssertTrue(waitUntil(timeout: 8) { homeTab.isEnabled && homeTab.isHittable })
+        homeTab.tap()
+        XCTAssertTrue(app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 12))
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(oasisTab.waitForExistence(timeout: 20), "Oasis unlock did not survive relaunch.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 50" },
+            "Relaunch duplicated or lost the starter gift reward."
+        )
+        XCTAssertFalse(finishGift.exists, "The completed starter gift ceremony reopened after relaunch.")
+
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            app.buttons[
+                "task-center-system-action-completeHumanProfile-household-starter-v1-humanProfile"
+            ].waitForExistence(timeout: 15),
+            "Tasks did not finish loading after the completed gift relaunch."
+        )
+        XCTAssertFalse(createTask.exists, "The completed first-Pet journey regressed to Create after relaunch.")
+        XCTAssertFalse(claimTask.exists, "The completed starter gift remained claimable after relaunch.")
+    }
+
+    @MainActor
+    func testMemberCardNavigationCancelResumeReviewedAndPrivate() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true
+        )
+        openMemberCardJourney(in: app)
+
+        let appearanceQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanAppearance"
+        ]
+        let optionalQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanOptionalDetails"
+        ]
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 12))
+        assertMemberCardProgress("0/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/2", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        reopenMemberCardJourney(in: app)
+        XCTAssertTrue(
+            appearanceQuestion.waitForExistence(timeout: 8),
+            "Closing without answering did not resume at the first incomplete member-card question."
+        )
+        assertMemberCardProgress("0/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-open-humanAppearance"], in: app)
+        let nameField = app.textFields["human-basic-info-name-input"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 12), "The member-card editor did not start in edit mode.")
+        XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].exists)
+        XCTAssertTrue(app.buttons["profile-avatar-photos-action"].exists)
+        XCTAssertFalse(app.textFields["human-basic-info-avatar-emoji-input"].exists)
+        let originalName = String(describing: nameField.value ?? "")
+        nameField.tap()
+        nameField.typeText(" Unsaved")
+        discardHumanBasicInfoChanges(in: app)
+
+        tapWhenHittable(app.buttons["human-basic-info-edit-action"], timeout: 8)
+        XCTAssertTrue(nameField.waitForExistence(timeout: 8))
+        XCTAssertEqual(
+            String(describing: nameField.value ?? ""),
+            originalName,
+            "Cancel persisted an unrelated profile edit."
+        )
+        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
+        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanAppearance-reviewed"],
+            in: app
+        )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/2", in: app)
+
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        reopenMemberCardJourney(in: app)
+        XCTAssertTrue(
+            optionalQuestion.waitForExistence(timeout: 8),
+            "Reopening did not resume at the remaining optional-details question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanOptionalDetails-preferNotToSay"],
+            in: app
+        )
+        assertMemberCardJourneyComplete(in: app)
+    }
+
+    @MainActor
+    func testMemberCardAvatarEditorUsesPhotoControlsWithoutExposingFallbackEmoji() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true
+        )
+        openMemberCardJourney(in: app)
+
+        let appearanceQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanAppearance"
+        ]
+        let optionalQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanOptionalDetails"
+        ]
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 12))
+        assertMemberCardProgress("0/2", in: app)
+
+        tapWhenHittable(
+            app.buttons["task-center-starter-journey-open-humanAppearance"],
+            timeout: 8
+        )
+        let editor = app.descendants(matching: .any)["human-basic-info-screen"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["profile-avatar-paste-action"].exists)
+        XCTAssertTrue(app.buttons["profile-avatar-photos-action"].exists)
+        XCTAssertTrue(app.buttons["profile-avatar-camera-action"].exists)
+        XCTAssertFalse(
+            app.textFields["human-basic-info-avatar-emoji-input"].exists,
+            "The internal fallback emoji must not be exposed as editable profile data."
+        )
+
+        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
+        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanAppearance-reviewed"],
+            in: app
+        )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/2", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanOptionalDetails-preferNotToSay"],
+            in: app
+        )
+        assertMemberCardJourneyComplete(in: app)
+    }
+    @MainActor
+    func testMemberCardPrivateAppearanceSurvivesPhotoEditorCancelAcrossRelaunch() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true
+        )
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let taskAction = app.buttons[
+            "task-center-system-action-completeHumanProfile-household-starter-v1-humanProfile"
+        ]
+        let journeySheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeHumanProfile"
+        ]
+        let appearanceQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanAppearance"
+        ]
+        let optionalQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanOptionalDetails"
+        ]
+        let completedAppearance = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-humanAppearance"
+        ]
+
+        openMemberCardJourney(in: app)
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanAppearance-preferNotToSay"],
+            in: app
+        )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/2", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedAppearance.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedAppearance).localizedCaseInsensitiveContains("Prefer not to say")
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-humanAppearance"],
+            in: app
+        )
+        let editor = app.descendants(matching: .any)["human-basic-info-screen"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.textFields["human-basic-info-avatar-emoji-input"].exists)
+        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
+        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 12))
+        XCTAssertTrue(completedAppearance.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedAppearance).localizedCaseInsensitiveContains("Prefer not to say"),
+            "Cancelling the photo editor replaced the explicit private Appearance answer."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(taskAction.waitForExistence(timeout: 15))
+        tapWhenHittable(taskAction, timeout: 8)
+        XCTAssertTrue(journeySheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/2", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedAppearance.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedAppearance).localizedCaseInsensitiveContains("Prefer not to say"),
+            "Relaunch lost the explicit private Appearance answer."
+        )
+    }
+    @MainActor
+    func testMemberCardReviewedOptionalThenRealBirthdaySupersedesResolutionAcrossRelaunchAndRewardsOnce() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true,
+            coconutBalanceSeedAmount: 7
+        )
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let taskAction = app.buttons[
+            "task-center-system-action-completeHumanProfile-household-starter-v1-humanProfile"
+        ]
+        let journeySheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeHumanProfile"
+        ]
+        let appearanceQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanAppearance"
+        ]
+        let optionalQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanOptionalDetails"
+        ]
+        let completedOptional = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-humanOptionalDetails"
+        ]
+        let coconutBalance = app.buttons["home-coconut-action"]
+
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 7" },
+            "The optional-details supersession path did not start from 7 coconuts."
+        )
+        openMemberCardJourney(in: app)
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 12))
+        assertMemberCardProgress("0/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanOptionalDetails-reviewed"],
+            in: app
+        )
+        XCTAssertTrue(
+            appearanceQuestion.waitForExistence(timeout: 8),
+            "Reviewing the current Optional details did not return to the remaining Appearance question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedOptional.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedOptional).localizedCaseInsensitiveContains("Current status reviewed"),
+            "The initial reviewed Optional details answer was not shown before replacement."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-humanOptionalDetails"],
+            in: app
+        )
+        let editor = app.descendants(matching: .any)["human-basic-info-screen"]
+        let birthdayToggle = app.switches["human-basic-info-birthday-toggle"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
+        XCTAssertFalse(isToggleOn(birthdayToggle), "The sparse Human unexpectedly started with a birthday.")
+        tapGuidedJourneyControlAfterSemanticScroll(birthdayToggle, in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { self.isToggleOn(birthdayToggle) })
+        tapWhenHittable(app.buttons["human-basic-info-save-action"], timeout: 8)
+
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !editor.exists },
+            "Saving the real birthday did not return to the guided journey."
+        )
+        XCTAssertTrue(
+            optionalQuestion.waitForExistence(timeout: 12),
+            "Replacing an already-completed Optional details answer did not return for review."
+        )
+        assertMemberCardProgress("1/2", in: app)
+        XCTAssertTrue(completedOptional.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedOptional).localizedCaseInsensitiveContains("existing information"),
+            "The real birthday did not replace the reviewed Optional details answer."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: completedOptional).localizedCaseInsensitiveContains("Current status reviewed"),
+            "The superseded reviewed Optional details answer remained visible after saving a birthday."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 7" },
+            "Relaunch changed the balance before the member-card Claim."
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(taskAction.waitForExistence(timeout: 15))
+        tapWhenHittable(taskAction, timeout: 8)
+        XCTAssertTrue(journeySheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            appearanceQuestion.waitForExistence(timeout: 8),
+            "Relaunch did not resume at the remaining Appearance question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedOptional.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedOptional).localizedCaseInsensitiveContains("existing information"),
+            "Relaunch did not preserve the real Optional details answer."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: completedOptional).localizedCaseInsensitiveContains("Current status reviewed"),
+            "Relaunch restored the superseded reviewed Optional details answer."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-humanOptionalDetails"],
+            in: app
+        )
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
+        XCTAssertTrue(isToggleOn(birthdayToggle), "Relaunch did not read back the saved birthday.")
+        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
+        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanAppearance-preferNotToSay"],
+            in: app
+        )
+        assertMemberCardJourneyComplete(in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !journeySheet.exists })
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                taskAction.exists && taskAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The completed supersession path did not expose a separate Claim state."
+        )
+        XCTAssertEqual(coconutBalance.label, "Coconut balance 7")
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 7" },
+            "The unclaimed member-card reward changed across relaunch."
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 15) {
+                taskAction.exists && taskAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Relaunch did not preserve the member-card Claim state."
+        )
+        tapWhenHittable(taskAction, timeout: 8)
+        XCTAssertTrue(journeySheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-completeHumanProfile"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !journeySheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !taskAction.exists })
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 107" },
+            "The member-card Claim did not add exactly 100 coconuts."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 107" },
+            "The second relaunch duplicated or lost the member-card reward."
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertFalse(taskAction.exists, "The claimed member-card task returned after relaunch.")
+    }
+
+    @MainActor
+    func testMemberCardOptionalBirthdayCancelCloseReopenSaveAndClaim() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true,
+            coconutBalanceSeedAmount: 7
+        )
+        let coconutBalance = app.buttons["home-coconut-action"]
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 7" },
+            "The birthday journey did not start from its explicit 7-coconut baseline."
+        )
+        openMemberCardJourney(in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanAppearance-reviewed"],
+            in: app
+        )
+        let optionalQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanOptionalDetails"
+        ]
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-humanOptionalDetails"],
+            in: app
+        )
+        let editor = app.descendants(matching: .any)["human-basic-info-screen"]
+        let birthdayToggle = app.switches["human-basic-info-birthday-toggle"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The Human optional-details editor did not open.")
+        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8), "The birthday toggle was unavailable.")
+        XCTAssertFalse(isToggleOn(birthdayToggle), "The sparse Human unexpectedly started with a birthday.")
+        tapGuidedJourneyControlAfterSemanticScroll(birthdayToggle, in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { self.isToggleOn(birthdayToggle) })
+
+        discardHumanBasicInfoChanges(in: app)
+        let closeEditor = app.buttons["human-basic-info-close-action"]
+        XCTAssertTrue(closeEditor.waitForExistence(timeout: 8), "Cancel did not expose the Human editor close action.")
+        tapWhenHittable(closeEditor, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists }, "Close did not return to the guided journey.")
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/2", in: app)
+
+        let journeySheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeHumanProfile"
+        ]
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !journeySheet.exists })
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 7" },
+            "Relaunch after cancelling the birthday draft changed the coconut balance."
+        )
+        openMemberCardJourney(in: app)
+        XCTAssertTrue(
+            optionalQuestion.waitForExistence(timeout: 8),
+            "Relaunch after cancelling did not resume the remaining optional-details question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-humanOptionalDetails"],
+            in: app
+        )
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
+        XCTAssertFalse(isToggleOn(birthdayToggle), "Cancelling the birthday edit persisted it.")
+        tapGuidedJourneyControlAfterSemanticScroll(birthdayToggle, in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { self.isToggleOn(birthdayToggle) })
+        tapWhenHittable(app.buttons["human-basic-info-save-action"], timeout: 8)
+
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !editor.exists },
+            "Saving the birthday did not return to the guided journey."
+        )
+        assertMemberCardJourneyComplete(in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !journeySheet.exists }, "Finish did not return to Tasks.")
+
+        let taskAction = app.buttons[
+            "task-center-system-action-completeHumanProfile-household-starter-v1-humanProfile"
+        ]
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                taskAction.exists && taskAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Saving a real birthday did not expose a separate Claim state."
+        )
+        XCTAssertEqual(coconutBalance.label, "Coconut balance 7")
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(app.buttons["home-tab-home"].waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 7" },
+            "Relaunch changed the balance before the birthday member-card Claim."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12),
+            "Relaunch did not return to Tasks for the birthday member-card Claim."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 15) {
+                taskAction.exists && taskAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Relaunch did not preserve the birthday member-card Claim state."
+        )
+        tapWhenHittable(taskAction, timeout: 8)
+        XCTAssertTrue(journeySheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-completeHumanProfile"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !journeySheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !taskAction.exists })
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 107" },
+            "The birthday member-card reward was not applied exactly once."
+        )
+    }
+
+    @MainActor
+    func testMemberCardPrivateAppearanceAndUnknownOptionalPath() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true,
+            coconutBalanceSeedAmount: 7
+        )
+        let coconutBalance = app.buttons["home-coconut-action"]
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 7" },
+            "The member-card reward test did not start from its explicit 7-coconut baseline."
+        )
+        openMemberCardJourney(in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanAppearance-preferNotToSay"],
+            in: app
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)[
+                "task-center-starter-question-checkpoint-humanOptionalDetails"
+            ].waitForExistence(timeout: 8)
+        )
+        assertMemberCardProgress("1/2", in: app)
+        XCTAssertFalse(
+            app.buttons["task-center-starter-resolution-humanOptionalDetails-notApplicable"].exists,
+            "The Human optional-details question exposed an unsupported not-applicable answer."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanOptionalDetails-unknown"],
+            in: app
+        )
+        assertMemberCardJourneyComplete(in: app)
+
+        let journeySheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeHumanProfile"
+        ]
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !journeySheet.exists },
+            "Returning to Tasks did not close the completed member-card journey."
+        )
+
+        let taskAction = app.buttons[
+            "task-center-system-action-completeHumanProfile-household-starter-v1-humanProfile"
+        ]
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                taskAction.exists && taskAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The completed member-card task did not change to Claim."
+        )
+        tapWhenHittable(taskAction, timeout: 8)
+        XCTAssertTrue(journeySheet.waitForExistence(timeout: 12))
+
+        let claim = app.buttons["task-center-starter-journey-claim-completeHumanProfile"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { claim.exists && claim.isEnabled && claim.isHittable },
+            "The member-card reward claim action did not become available."
+        )
+        claim.doubleTap()
+
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !journeySheet.exists },
+            "Claiming the member-card reward did not close its sheet."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !taskAction.exists },
+            "The claimed member-card task remained visible or was claimed twice."
+        )
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 107" },
+            "The member-card reward was not applied exactly once after a double tap."
+        )
+    }
+
+    @MainActor
+    func testMemberCardMixedPrivateAndSavedAnswersSurviveRelaunchAndRewardOnce() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true
+        )
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let taskAction = app.buttons[
+            "task-center-system-action-completeHumanProfile-household-starter-v1-humanProfile"
+        ]
+        let journeySheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeHumanProfile"
+        ]
+        let appearanceQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanAppearance"
+        ]
+        let optionalQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanOptionalDetails"
+        ]
+        let coconutBalance = app.buttons["home-coconut-action"]
+
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 20))
+        let balanceBeforeClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+        XCTAssertGreaterThanOrEqual(balanceBeforeClaim, 0, "The member-card baseline balance was unreadable.")
+        openMemberCardJourney(in: app)
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 12))
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-humanAppearance-preferNotToSay"],
+            in: app
+        )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/2", in: app)
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20), "Home was unavailable after the partial member-card relaunch.")
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(taskAction.waitForExistence(timeout: 15), "The partial member-card task did not survive relaunch.")
+        tapWhenHittable(taskAction, timeout: 8)
+        XCTAssertTrue(journeySheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            optionalQuestion.waitForExistence(timeout: 8),
+            "Relaunch did not resume at the remaining optional-details question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
+        let persistedPrivateAnswer = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-humanAppearance"
+        ]
+        XCTAssertTrue(persistedPrivateAnswer.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: persistedPrivateAnswer).localizedCaseInsensitiveContains("Prefer not to say"),
+            "Relaunch did not preserve the private Appearance answer."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(optionalQuestion.waitForExistence(timeout: 8))
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-humanOptionalDetails"],
+            in: app
+        )
+        let editor = app.descendants(matching: .any)["human-basic-info-screen"]
+        let birthdayToggle = app.switches["human-basic-info-birthday-toggle"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
+        XCTAssertFalse(isToggleOn(birthdayToggle), "The sparse Human unexpectedly started with a birthday.")
+        tapGuidedJourneyControlAfterSemanticScroll(birthdayToggle, in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { self.isToggleOn(birthdayToggle) })
+        tapWhenHittable(app.buttons["human-basic-info-save-action"], timeout: 8)
+
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists })
+        assertMemberCardJourneyComplete(in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !journeySheet.exists })
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                taskAction.exists && taskAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The mixed-answer member-card task did not expose Claim."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 15) {
+                taskAction.exists && taskAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The unclaimed member-card reward did not survive relaunch."
+        )
+        tapWhenHittable(taskAction, timeout: 8)
+        XCTAssertTrue(journeySheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-completeHumanProfile"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !journeySheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !taskAction.exists })
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 100
+            },
+            "The mixed-answer member-card claim did not add exactly 100 coconuts."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 100
+            },
+            "Relaunch duplicated or lost the member-card reward."
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertFalse(taskAction.exists, "The claimed member-card task returned after relaunch.")
+    }
+
+    @MainActor
+    func testPetDailyCareUnknownCancelThenRealSetupSurvivesRelaunchWithoutFabricationAndRewardsOnce() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE"]
+        )
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let coconutBalance = app.buttons["home-coconut-action"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let action = app.buttons[
+            "task-center-system-action-completeFirstPetProfile-household-starter-v1-petProfile"
+        ]
+        let identityAction = app.buttons[
+            "task-center-system-action-confirmPetIdentityProtection-household-starter-v1-identityProtection"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeFirstPetProfile"
+        ]
+        let lifeStageQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petLifeStage"
+        ]
+        let bodyQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petBodyProfile"
+        ]
+        let personalityQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petPersonalityAppearance"
+        ]
+        let dailyCareQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petDailyCare"
+        ]
+        let completedDailyCare = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petDailyCare"
+        ]
+        let openDailyCare = app.buttons["task-center-starter-journey-open-petDailyCare"]
+        let feedDetail = app.descendants(matching: .any)["quick-feed-detail-screen"]
+        let saveManualSettings = app.buttons["quick-feed-manual-settings-save"]
+        let primaryFeedAction = app.buttons["quick-feed-primary-action"]
+        let closeFeed = app.buttons["quick-feed-detail-close-action"]
+
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 8))
+        let balanceBeforeClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+        XCTAssertGreaterThanOrEqual(balanceBeforeClaim, 0, "The sparse Pet baseline balance was unreadable.")
+
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The sparse Pet profile task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 8))
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petDailyCare-unknown"],
+            in: app
+        )
+        XCTAssertTrue(
+            lifeStageQuestion.waitForExistence(timeout: 8),
+            "Resolving Daily Care did not return to the first unanswered Pet question."
+        )
+        assertMemberCardProgress("1/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedDailyCare.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not sure yet"),
+            "The explicit Daily Care unknown answer was not displayed."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12), "Daily Care did not open Quick Feed.")
+        if !saveManualSettings.waitForExistence(timeout: 4) {
+            tapWhenHittable(primaryFeedAction, timeout: 8)
+        }
+        XCTAssertTrue(
+            saveManualSettings.waitForExistence(timeout: 12),
+            "Choosing Not sure yet fabricated a feed setup for the sparse Pet."
+        )
+        tapWhenHittable(app.buttons["quick-feed-sheet-cancel-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !saveManualSettings.exists && feedDetail.exists },
+            "Cancelling feed setup did not keep the unchanged Daily Care screen open."
+        )
+        tapWhenHittable(closeFeed, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not sure yet"),
+            "Cancelling feed setup changed the completed Daily Care answer."
+        )
+        assertMemberCardProgress("1/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12))
+        if !saveManualSettings.waitForExistence(timeout: 4) {
+            tapWhenHittable(primaryFeedAction, timeout: 8)
+        }
+        XCTAssertTrue(saveManualSettings.waitForExistence(timeout: 12))
+        tapWhenHittable(saveManualSettings, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !saveManualSettings.exists && primaryFeedAction.exists
+            },
+            "Saving a real feed default did not return to the configured Feed screen."
+        )
+        assertManualFeedPrimaryReady(in: app)
+        tapWhenHittable(closeFeed, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                self.accessibilityText(for: completedDailyCare)
+                    .localizedCaseInsensitiveContains("existing information")
+            },
+            "The real feed setup did not replace the same-session unknown answer."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not sure yet"),
+            "The stale Daily Care unknown answer still overrode the real setup."
+        )
+        assertMemberCardProgress("1/3", in: app)
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim
+            },
+            "The partial Pet profile changed the coconut balance before an explicit claim."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 15), "The partial Pet profile task did not survive relaunch.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedDailyCare.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("existing information"),
+            "The real Daily Care setup resumed as an unknown answer after relaunch."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not sure yet"),
+            "The obsolete Daily Care unknown answer returned after relaunch."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12))
+        assertManualFeedPrimaryReady(in: app)
+        XCTAssertFalse(saveManualSettings.exists, "The saved feed default was lost after relaunch.")
+        tapWhenHittable(closeFeed, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 12))
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petBodyProfile-notApplicable"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("2/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petPersonalityAppearance-preferNotToSay"],
+            in: app
+        )
+        assertMemberCardProgress("3/3", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "Three completed Pet profile questions did not finish the journey."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Pet profile completion did not stay separate from its reward claim."
+        )
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim
+            },
+            "Finishing the Pet profile granted its reward before Claim."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            }
+        )
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-completeFirstPetProfile"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists })
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 100
+            },
+            "Claiming the Pet profile reward did not add exactly 100 coconuts."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 100
+            },
+            "Relaunch duplicated or lost the Pet profile reward."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            identityAction.waitForExistence(timeout: 15),
+            "Tasks did not finish loading after the claimed Pet profile relaunch."
+        )
+        XCTAssertFalse(action.exists, "The claimed Pet profile task returned after relaunch.")
+    }
+
+    @MainActor
+    func testPetProfileEditorCancelCloseAndDateSaveCompletesLifeStage() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        let action = app.buttons[
+            "task-center-system-action-completeFirstPetProfile-household-starter-v1-petProfile"
+        ]
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The first-pet profile task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeFirstPetProfile"
+        ]
+        let lifeStageQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petLifeStage"
+        ]
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("2/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-open-petLifeStage"], in: app)
+        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The pet date editor did not open.")
+        let birthdayToggle = app.switches["pet-basic-info-birthday-toggle"]
+        scrollToElement(birthdayToggle, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(birthdayToggle, timeout: 8),
+            "The birthday toggle did not become semantically tappable."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-basic-info-birthday-date-picker"]
+                .waitForExistence(timeout: 8),
+            "Enabling the birthday did not reveal its date picker."
+        )
+
+        discardPetBasicInfoChanges(in: app)
+        let close = app.buttons["pet-basic-info-close-action"]
+        XCTAssertTrue(close.waitForExistence(timeout: 8), "Cancel did not expose a clear return action.")
+        tapWhenHittable(close, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { !editor.exists }, "Close did not return to the guided question.")
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("2/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-open-petLifeStage"], in: app)
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        let homeDateToggle = app.switches["pet-basic-info-home-date-toggle"]
+        scrollToElement(homeDateToggle, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(homeDateToggle, timeout: 8),
+            "The home-date toggle did not become semantically tappable."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-basic-info-home-date-picker"]
+                .waitForExistence(timeout: 8),
+            "Enabling the home date did not reveal its date picker."
+        )
+        tapWhenHittable(app.buttons["pet-basic-info-save-action"], timeout: 8)
+
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists }, "Saving did not return to the guided question.")
+        assertMemberCardProgress("3/3", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "Saving a real pet date did not complete the life-stage checkpoint."
+        )
+    }
+
+    @MainActor
+    func testPetProfileBodyNotApplicablePersonalityPrivateAndDailyReviewedCompletesAnyThree() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE"]
+        )
+        let coconutBalance = app.buttons["home-coconut-action"]
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 20), "The sparse Pet baseline did not reach Home.")
+        let balanceBeforeClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+        XCTAssertGreaterThanOrEqual(balanceBeforeClaim, 0, "The sparse Pet baseline balance was unreadable.")
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12),
+            "The sparse Pet profile journey did not reach Tasks."
+        )
+
+        let action = app.buttons[
+            "task-center-system-action-completeFirstPetProfile-household-starter-v1-petProfile"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeFirstPetProfile"
+        ]
+        let lifeStageQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petLifeStage"
+        ]
+        let bodyQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petBodyProfile"
+        ]
+        let personalityQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petPersonalityAppearance"
+        ]
+        let dailyCareQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petDailyCare"
+        ]
+
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The sparse Pet profile task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The sparse Pet profile sheet did not open.")
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8), "Next did not reach the Pet body question.")
+        assertMemberCardProgress("0/3", in: app)
+        XCTAssertFalse(
+            app.descendants(matching: .any)[
+                "task-center-starter-answer-complete-checkpoint-petLifeStage"
+            ].exists,
+            "Moving to the next question must not answer the Pet life-stage question."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petBodyProfile-notApplicable"],
+            in: app
+        )
+        XCTAssertTrue(
+            personalityQuestion.waitForExistence(timeout: 8),
+            "Not applicable did not advance from body to personality."
+        )
+        assertMemberCardProgress("1/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petPersonalityAppearance-preferNotToSay"],
+            in: app
+        )
+        XCTAssertTrue(
+            dailyCareQuestion.waitForExistence(timeout: 8),
+            "Prefer not to say did not advance from personality to daily care."
+        )
+        assertMemberCardProgress("2/3", in: app)
+
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Closing the sparse Pet journey did not dismiss it.")
+
+        // Re-enter Tasks through normal tab semantics so the reopened sheet is
+        // built from persisted checkpoint records rather than local sheet state.
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 8))
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The incomplete sparse Pet task did not remain available.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            lifeStageQuestion.waitForExistence(timeout: 8),
+            "Reopening did not start from the first still-incomplete Life Stage question."
+        )
+        assertMemberCardProgress("2/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        let bodyAnswer = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petBodyProfile"
+        ]
+        XCTAssertTrue(bodyAnswer.waitForExistence(timeout: 8), "The persisted body answer marker was missing.")
+        XCTAssertTrue(
+            accessibilityText(for: bodyAnswer).localizedCaseInsensitiveContains("Not applicable"),
+            "The persisted body answer did not retain Not applicable."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        let personalityAnswer = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petPersonalityAppearance"
+        ]
+        XCTAssertTrue(
+            personalityAnswer.waitForExistence(timeout: 8),
+            "The persisted personality answer marker was missing."
+        )
+        XCTAssertTrue(
+            accessibilityText(for: personalityAnswer).localizedCaseInsensitiveContains("Prefer not to say"),
+            "The persisted personality answer did not retain Prefer not to say."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petDailyCare-reviewed"],
+            in: app
+        )
+        assertMemberCardProgress("3/3", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "The three privacy-safe Pet profile answers did not complete the journey."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Pet profile Finish did not return to Tasks.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The completed sparse Pet profile did not expose its separate Claim state."
+        )
+
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The sparse Pet profile Claim sheet did not open.")
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-completeFirstPetProfile"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Claiming the Pet profile reward did not close its sheet.")
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists }, "The claimed sparse Pet profile task remained visible.")
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 100
+            },
+            "Claiming the sparse Pet profile reward did not add exactly 100 coconuts."
+        )
+    }
+
+    @MainActor
+    func testPetProfileReviewedThenRealAnswersPersistAcrossRelaunch() throws {
+        let petName = "Codex Sparse Pet Profile"
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE"]
+        )
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let action = app.buttons[
+            "task-center-system-action-completeFirstPetProfile-household-starter-v1-petProfile"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeFirstPetProfile"
+        ]
+        let lifeStageQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petLifeStage"
+        ]
+        let bodyQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petBodyProfile"
+        ]
+        let personalityQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petPersonalityAppearance"
+        ]
+        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
+        let boyLabels = ["♂ Boy", "♂ 男孩", "♂ Junge"]
+        let coconutBalance = app.buttons["home-coconut-action"]
+
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 20))
+        let balanceBeforeClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+        XCTAssertGreaterThanOrEqual(balanceBeforeClaim, 0, "The sparse Pet balance was unreadable.")
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 12))
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petLifeStage-reviewed"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/3", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petBodyProfile-unknown"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("2/3", in: app)
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 15), "The partial sparse Pet task did not survive relaunch.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            personalityQuestion.waitForExistence(timeout: 8),
+            "Relaunch did not resume at the first incomplete Pet profile question."
+        )
+        assertMemberCardProgress("2/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        let persistedUnknown = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petBodyProfile"
+        ]
+        XCTAssertTrue(persistedUnknown.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: persistedUnknown).localizedCaseInsensitiveContains("Not sure yet"),
+            "Relaunch did not preserve the unknown Body answer."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petBodyProfile"],
+            in: app
+        )
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The completed Body editor did not reopen.")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { self.firstHittableButton(labels: boyLabels, in: app) != nil },
+            "The Body editor did not expose a semantic Boy segment."
+        )
+        guard let boy = firstHittableButton(labels: boyLabels, in: app) else {
+            return XCTFail("The Boy segment was not semantically tappable.")
+        }
+        XCTAssertFalse(boy.isSelected, "The sparse Body fixture unexpectedly started with Boy selected.")
+        boy.tap()
+        XCTAssertTrue(waitUntil(timeout: 8) { boy.isSelected })
+        tapWhenHittable(app.buttons["pet-basic-info-save-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !editor.exists },
+            "Saving a fact for an already completed Body checkpoint did not return to its guide."
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                self.accessibilityText(for: persistedUnknown)
+                    .localizedCaseInsensitiveContains("existing information")
+            },
+            "The real Body fact did not replace the same-checkpoint unknown answer."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: persistedUnknown).localizedCaseInsensitiveContains("Not sure yet"),
+            "The old unknown Body answer still overrode the saved fact."
+        )
+        assertMemberCardProgress("2/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        let lifeStageAnswer = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petLifeStage"
+        ]
+        XCTAssertTrue(lifeStageAnswer.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: lifeStageAnswer).localizedCaseInsensitiveContains("Current status reviewed"),
+            "The initial reviewed Life Stage answer was not preserved before replacement."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petLifeStage"],
+            in: app
+        )
+        let birthdayToggle = app.switches["pet-basic-info-birthday-toggle"]
+        let homeDateToggle = app.switches["pet-basic-info-home-date-toggle"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
+        XCTAssertTrue(homeDateToggle.waitForExistence(timeout: 8))
+        XCTAssertFalse(isToggleOn(birthdayToggle), "Reviewing Life Stage fabricated a birthday before editing.")
+        XCTAssertFalse(isToggleOn(homeDateToggle), "Reviewing Life Stage fabricated a home date before editing.")
+        tapGuidedJourneyControlAfterSemanticScroll(homeDateToggle, in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-basic-info-home-date-picker"]
+                .waitForExistence(timeout: 8),
+            "Enabling the home date did not reveal its date picker."
+        )
+        tapWhenHittable(app.buttons["pet-basic-info-save-action"], timeout: 8)
+
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists })
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                self.accessibilityText(for: lifeStageAnswer)
+                    .localizedCaseInsensitiveContains("existing information")
+            },
+            "The real home date did not replace the reviewed Life Stage answer."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: lifeStageAnswer).localizedCaseInsensitiveContains("Current status reviewed"),
+            "The reviewed Life Stage answer still overrode the saved home date."
+        )
+        assertMemberCardProgress("2/3", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petPersonalityAppearance-notApplicable"],
+            in: app
+        )
+        assertMemberCardProgress("3/3", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "The final Personality answer did not complete the mixed sparse Pet profile."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The mixed sparse Pet profile did not expose Claim."
+        )
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-completeFirstPetProfile"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists })
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 100
+            },
+            "The mixed sparse Pet profile claim did not add exactly 100 coconuts."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 100
+            },
+            "Relaunch duplicated or lost the sparse Pet profile reward."
+        )
+        openPetBasicInfoFromHome(in: app, petName: petName)
+        openPetBasicInfoEditMode(in: app)
+        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
+        XCTAssertTrue(homeDateToggle.waitForExistence(timeout: 8))
+        XCTAssertFalse(isToggleOn(birthdayToggle), "The reviewed birthday was fabricated after relaunch.")
+        XCTAssertTrue(isToggleOn(homeDateToggle), "The real saved home date was lost after relaunch.")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                app.buttons.matching(NSPredicate(format: "label IN %@", boyLabels)).firstMatch.isSelected
+            },
+            "The real Body value that replaced unknown was lost after relaunch."
+        )
+        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+    }
+
+    @MainActor
+    func testPetProfileBodyAndPersonalityRealSavesSurviveRelaunch() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE"]
+        )
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let action = app.buttons[
+            "task-center-system-action-completeFirstPetProfile-household-starter-v1-petProfile"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeFirstPetProfile"
+        ]
+        let lifeStageQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petLifeStage"
+        ]
+        let bodyQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petBodyProfile"
+        ]
+        let personalityQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petPersonalityAppearance"
+        ]
+        let dailyCareQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petDailyCare"
+        ]
+        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
+        let saveAction = app.buttons["pet-basic-info-save-action"]
+        let boyLabels = ["♂ Boy", "♂ 男孩", "♂ Junge"]
+        let curiousLabels = ["Curious soul", "好奇宝宝", "Neugierig"]
+        let curiousOption = app.buttons["pet-basic-info-primary-personality-option-curious"]
+
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20), "The sparse Pet baseline did not reach Home.")
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The sparse Pet profile task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8), "Next did not reach the Pet body question.")
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petBodyProfile"],
+            in: app
+        )
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The Pet body editor did not open.")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { self.firstHittableButton(labels: boyLabels, in: app) != nil },
+            "The Pet body editor did not expose the Boy segment."
+        )
+        guard let boy = firstHittableButton(labels: boyLabels, in: app) else {
+            return XCTFail("The Boy segment was not semantically tappable.")
+        }
+        XCTAssertFalse(boy.isSelected, "The sparse Pet fixture unexpectedly started with Boy selected.")
+        boy.tap()
+        XCTAssertTrue(waitUntil(timeout: 8) { boy.isSelected }, "Selecting Boy did not update the segment state.")
+        XCTAssertTrue(waitUntil(timeout: 8) { saveAction.exists && saveAction.isEnabled && saveAction.isHittable })
+        saveAction.tap()
+
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists }, "Saving Body did not return to the guided card.")
+        XCTAssertTrue(
+            personalityQuestion.waitForExistence(timeout: 12),
+            "Saving a real Body answer did not advance to Personality."
+        )
+        assertMemberCardProgress("1/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petPersonalityAppearance"],
+            in: app
+        )
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The Pet personality editor did not open.")
+        XCTAssertTrue(
+            curiousOption.waitForExistence(timeout: 8),
+            "The primary personality choices did not appear."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(curiousOption, in: app)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                curiousOption.isSelected
+                    || String(describing: curiousOption.value ?? "")
+                    .localizedCaseInsensitiveCompare("Selected") == .orderedSame
+            },
+            "Selecting Curious soul did not update the personality choices."
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { saveAction.exists && saveAction.isEnabled && saveAction.isHittable })
+        saveAction.tap()
+
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists }, "Saving Personality did not return to the guided card.")
+        XCTAssertTrue(
+            dailyCareQuestion.waitForExistence(timeout: 12),
+            "Saving a real Personality answer did not advance to Daily Care."
+        )
+        assertMemberCardProgress("2/3", in: app)
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20), "Home was not reachable after relaunch.")
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 15), "The partial Pet profile task did not survive relaunch.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("2/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        let bodyAnswer = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petBodyProfile"
+        ]
+        XCTAssertTrue(bodyAnswer.waitForExistence(timeout: 8), "The real Body answer was lost after relaunch.")
+        XCTAssertTrue(
+            accessibilityText(for: bodyAnswer).localizedCaseInsensitiveContains("existing information"),
+            "Body resumed as a skip resolution instead of persisted profile data."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        let personalityAnswer = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petPersonalityAppearance"
+        ]
+        XCTAssertTrue(
+            personalityAnswer.waitForExistence(timeout: 8),
+            "The real Personality answer was lost after relaunch."
+        )
+        XCTAssertTrue(
+            accessibilityText(for: personalityAnswer).localizedCaseInsensitiveContains("existing information"),
+            "Personality resumed as a skip resolution instead of persisted profile data."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petPersonalityAppearance"],
+            in: app
+        )
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                app.buttons.matching(NSPredicate(format: "label IN %@", boyLabels)).firstMatch.isSelected
+            },
+            "The saved Boy segment was not projected after relaunch."
+        )
+        XCTAssertTrue(
+            curiousOption.waitForExistence(timeout: 8)
+                && curiousLabels.contains { curiousOption.label.localizedCaseInsensitiveContains($0) }
+                && (curiousOption.isSelected
+                    || String(describing: curiousOption.value ?? "")
+                    .localizedCaseInsensitiveCompare("Selected") == .orderedSame),
+            "The saved Curious soul value was not projected after relaunch."
+        )
+        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        let closeAction = app.buttons["pet-basic-info-close-action"]
+        XCTAssertTrue(closeAction.waitForExistence(timeout: 8))
+        tapWhenHittable(closeAction, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { !editor.exists })
+    }
+
+    @MainActor
+    func testPetDailyCareNotApplicableThenRealSetupSupersedesResolutionAcrossRelaunch() throws {
+        let app = launchEnglishApp(
+            seedMemberCardBaseline: true,
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE"]
+        )
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let action = app.buttons[
+            "task-center-system-action-completeFirstPetProfile-household-starter-v1-petProfile"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-completeFirstPetProfile"
+        ]
+        let lifeStageQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petLifeStage"
+        ]
+        let bodyQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petBodyProfile"
+        ]
+        let personalityQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petPersonalityAppearance"
+        ]
+        let dailyCareQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petDailyCare"
+        ]
+        let completedDailyCare = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petDailyCare"
+        ]
+        let openDailyCare = app.buttons["task-center-starter-journey-open-petDailyCare"]
+        let feedDetail = app.descendants(matching: .any)["quick-feed-detail-screen"]
+        let saveManualSettings = app.buttons["quick-feed-manual-settings-save"]
+        let primaryFeedAction = app.buttons["quick-feed-primary-action"]
+        let closeFeed = app.buttons["quick-feed-detail-close-action"]
+
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 8) {
+            tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable
+        })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The sparse Pet profile task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 8))
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petDailyCare-notApplicable"],
+            in: app
+        )
+        XCTAssertTrue(
+            lifeStageQuestion.waitForExistence(timeout: 8),
+            "Resolving Daily Care did not return to the first unanswered Pet question."
+        )
+        assertMemberCardProgress("1/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedDailyCare.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not applicable"),
+            "The explicit Daily Care answer was not displayed."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12), "Daily Care did not open Quick Feed.")
+        if !saveManualSettings.waitForExistence(timeout: 4) {
+            tapWhenHittable(primaryFeedAction, timeout: 8)
+        }
+        XCTAssertTrue(saveManualSettings.waitForExistence(timeout: 12), "The sparse Pet did not request feed setup.")
+        tapWhenHittable(app.buttons["quick-feed-sheet-cancel-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !saveManualSettings.exists && feedDetail.exists },
+            "Cancelling feed setup did not keep the unchanged Daily Care screen open."
+        )
+        tapWhenHittable(closeFeed, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not applicable"),
+            "Cancelling feed setup changed the completed Daily Care answer."
+        )
+        assertMemberCardProgress("1/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12))
+        if !saveManualSettings.waitForExistence(timeout: 4) {
+            tapWhenHittable(primaryFeedAction, timeout: 8)
+        }
+        XCTAssertTrue(saveManualSettings.waitForExistence(timeout: 12))
+        tapWhenHittable(saveManualSettings, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !saveManualSettings.exists && primaryFeedAction.exists
+            },
+            "Saving a real feed default did not return to the configured Feed screen."
+        )
+        assertManualFeedPrimaryReady(in: app)
+        XCTAssertTrue(
+            feedDetail.exists,
+            "Saving an already completed Daily Care checkpoint unexpectedly closed its review screen."
+        )
+        tapWhenHittable(closeFeed, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                self.accessibilityText(for: completedDailyCare)
+                    .localizedCaseInsensitiveContains("existing information")
+            },
+            "The real feed setup did not replace the same-session Not applicable answer."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not applicable"),
+            "The stale Daily Care resolution still overrode the real setup."
+        )
+        assertMemberCardProgress("1/3", in: app)
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 8) {
+            tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable
+        })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 15), "The partial Pet profile task did not survive relaunch.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedDailyCare.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("existing information"),
+            "The real Daily Care setup resumed as a skip resolution after relaunch."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not applicable"),
+            "The obsolete Daily Care resolution returned after relaunch."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12))
+        assertManualFeedPrimaryReady(in: app)
+        XCTAssertFalse(saveManualSettings.exists, "The saved feed default was lost after relaunch.")
+        tapWhenHittable(closeFeed, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
+    }
+
+    @MainActor
+    func testPetIdentityNotApplicableResumesThenEmergencyContactSaveCompletes() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12),
+            "The first-pet identity journey did not reach Tasks."
+        )
+
+        let action = app.buttons[
+            "task-center-system-action-confirmPetIdentityProtection-household-starter-v1-identityProtection"
+        ]
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The first-pet identity task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-confirmPetIdentityProtection"
+        ]
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The first-pet identity guided sheet did not open.")
+
+        let documentsQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petIdentityDocuments"
+        ]
+        let emergencyQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petEmergencyContact"
+        ]
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petIdentityDocuments-notApplicable"],
+            in: app
+        )
+        XCTAssertTrue(
+            emergencyQuestion.waitForExistence(timeout: 8),
+            "Choosing Not applicable did not advance to the remaining identity question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { !sheet.exists }, "Closing the identity journey did not dismiss it.")
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The incomplete identity task did not remain available.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            emergencyQuestion.waitForExistence(timeout: 8),
+            "Reopening did not resume at the remaining identity question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(
+            documentsQuestion.waitForExistence(timeout: 8),
+            "Previous did not open the completed identity question for review."
+        )
+        let completedDocumentsAnswer = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petIdentityDocuments"
+        ]
+        XCTAssertTrue(
+            completedDocumentsAnswer.waitForExistence(timeout: 8),
+            "The completed identity question did not show its persisted answer."
+        )
+        XCTAssertTrue(
+            completedDocumentsAnswer.label.localizedCaseInsensitiveContains("Not applicable"),
+            "The completed identity question did not preserve the Not applicable answer."
+        )
+        assertMemberCardProgress("1/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(
+            emergencyQuestion.waitForExistence(timeout: 8),
+            "Next did not return from answer review to the remaining identity question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petEmergencyContact"],
+            in: app
+        )
+        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
+        let vetContact = app.textFields["pet-basic-info-vet-contact-input"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The emergency-contact editor did not open.")
+        scrollTowardElement(vetContact, in: app, maxSwipes: 8)
+        XCTAssertTrue(vetContact.waitForExistence(timeout: 8), "The emergency phone field was not available.")
+        tapWhenHittable(vetContact, timeout: 8)
+        vetContact.typeText("5550107")
+        dismissKeyboardIfPresent(in: app)
+        tapWhenHittable(app.buttons["pet-basic-info-save-action"], timeout: 8)
+
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists }, "Saving did not return to the identity journey.")
+        assertMemberCardProgress("2/2", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "The identity journey did not complete after the mixed skip-and-save path."
+        )
+    }
+
+    @MainActor
+    func testPetIdentityDocumentCancelReviewedThenRealSaveSupersedesResolutionAcrossRelaunch() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let action = app.buttons[
+            "task-center-system-action-confirmPetIdentityProtection-household-starter-v1-identityProtection"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-confirmPetIdentityProtection"
+        ]
+        let documentsQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petIdentityDocuments"
+        ]
+        let emergencyQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petEmergencyContact"
+        ]
+        let documentsScreen = app.descendants(matching: .any)["pet-documents-screen"]
+        let addDocument = app.buttons["pet-documents-add-document-action"]
+        let documentEditor = app.descendants(matching: .any)["protection-document-editor"]
+        let cancelDocument = app.buttons["protection-document-cancel-action"]
+        let saveDocument = app.buttons["protection-document-save-action"]
+
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The identity task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petIdentityDocuments"],
+            in: app
+        )
+        XCTAssertTrue(documentsScreen.waitForExistence(timeout: 12), "The Documents screen did not open.")
+        XCTAssertTrue(addDocument.waitForExistence(timeout: 8), "The empty Documents screen had no Add action.")
+        tapWhenHittable(addDocument, timeout: 8)
+        XCTAssertTrue(documentEditor.waitForExistence(timeout: 12), "The document editor did not open.")
+        XCTAssertTrue(cancelDocument.waitForExistence(timeout: 8))
+        tapWhenHittable(cancelDocument, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { !documentEditor.exists }, "Cancel did not dismiss the document editor.")
+        XCTAssertTrue(documentsScreen.exists, "Cancel unexpectedly dismissed the Documents screen.")
+        XCTAssertFalse(
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "pet-documents-document-row-"))
+                .firstMatch.exists,
+            "Cancelling document creation fabricated a document row."
+        )
+        tapWhenHittable(app.buttons["pet-documents-close-action"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !documentsScreen.exists })
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/2", in: app)
+        XCTAssertFalse(
+            app.descendants(matching: .any)[
+                "task-center-starter-answer-complete-checkpoint-petIdentityDocuments"
+            ].exists,
+            "Cancelling document creation completed the identity question."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petIdentityDocuments-reviewed"],
+            in: app
+        )
+        XCTAssertTrue(
+            emergencyQuestion.waitForExistence(timeout: 8),
+            "Reviewing the current Documents status did not advance to Emergency Contact."
+        )
+        assertMemberCardProgress("1/2", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        let completedDocuments = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petIdentityDocuments"
+        ]
+        XCTAssertTrue(completedDocuments.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedDocuments).localizedCaseInsensitiveContains("Current status reviewed"),
+            "The reviewed Documents answer was not shown before real data replaced it."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petIdentityDocuments"],
+            in: app
+        )
+        XCTAssertTrue(documentsScreen.waitForExistence(timeout: 12))
+        XCTAssertFalse(
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "pet-documents-document-row-"))
+                .firstMatch.exists,
+            "Reviewing the current Documents status fabricated a document row."
+        )
+        tapWhenHittable(addDocument, timeout: 8)
+        XCTAssertTrue(documentEditor.waitForExistence(timeout: 12))
+        let authority = app.textFields["protection-document-authority-input"]
+        XCTAssertTrue(authority.waitForExistence(timeout: 8), "The passport authority field was unavailable.")
+        XCTAssertTrue(
+            app.textFields["protection-document-title-input"].exists,
+            "The default passport title field was unavailable."
+        )
+        tapWhenHittable(authority, timeout: 8)
+        authority.typeText("Codex Passport Office")
+        XCTAssertTrue(waitUntil(timeout: 8) { saveDocument.exists && saveDocument.isEnabled && saveDocument.isHittable })
+        saveDocument.tap()
+
+        XCTAssertTrue(waitUntil(timeout: 12) { !documentEditor.exists }, "Saving did not dismiss the document editor.")
+        XCTAssertTrue(
+            documentsScreen.exists,
+            "Saving from an already completed checkpoint unexpectedly closed Documents."
+        )
+        let savedDocument = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "pet-documents-document-row-")
+        ).firstMatch
+        XCTAssertTrue(
+            savedDocument.waitForExistence(timeout: 12),
+            "Saving the real passport did not create a document row."
+        )
+        tapWhenHittable(app.buttons["pet-documents-close-action"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !documentsScreen.exists })
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                self.accessibilityText(for: completedDocuments)
+                    .localizedCaseInsensitiveContains("existing information")
+            },
+            "The real passport did not replace the same-session reviewed answer."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: completedDocuments).localizedCaseInsensitiveContains("Current status reviewed"),
+            "The old reviewed answer still overrode the saved passport."
+        )
+        assertMemberCardProgress("1/2", in: app)
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 15), "The partial identity task did not survive relaunch.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedDocuments.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedDocuments).localizedCaseInsensitiveContains("existing information"),
+            "The saved passport resumed as a reviewed resolution instead of persisted data."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petIdentityDocuments"],
+            in: app
+        )
+        XCTAssertTrue(documentsScreen.waitForExistence(timeout: 12))
+        let persistedDocument = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "pet-documents-document-row-")
+        ).firstMatch
+        XCTAssertTrue(persistedDocument.waitForExistence(timeout: 12), "The saved passport row was lost after relaunch.")
+        XCTAssertTrue(
+            app.staticTexts["Codex Passport Office"].exists,
+            "The saved passport authority was not projected after relaunch."
+        )
+        tapWhenHittable(app.buttons["pet-documents-close-action"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !documentsScreen.exists })
+    }
+
+    @MainActor
+    func testPetEmergencyContactNotApplicableThenRealSaveSupersedesResolutionAcrossRelaunch() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let action = app.buttons[
+            "task-center-system-action-confirmPetIdentityProtection-household-starter-v1-identityProtection"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-confirmPetIdentityProtection"
+        ]
+        let documentsQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petIdentityDocuments"
+        ]
+        let emergencyQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petEmergencyContact"
+        ]
+        let completedDocuments = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petIdentityDocuments"
+        ]
+        let completedEmergency = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petEmergencyContact"
+        ]
+        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
+        let vetContact = app.textFields["pet-basic-info-vet-contact-input"]
+        let saveAction = app.buttons["pet-basic-info-save-action"]
+        let phone = "5550199"
+
+        XCTAssertTrue(waitUntil(timeout: 8) {
+            tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable
+        })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The identity task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(
+            emergencyQuestion.waitForExistence(timeout: 8),
+            "Next did not reach the unanswered Emergency Contact question."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petEmergencyContact-notApplicable"],
+            in: app
+        )
+        XCTAssertTrue(
+            documentsQuestion.waitForExistence(timeout: 8),
+            "Completing Emergency Contact did not return to the remaining Documents question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+        XCTAssertFalse(
+            completedDocuments.exists,
+            "Resolving Emergency Contact unexpectedly completed Documents."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            completedEmergency.waitForExistence(timeout: 8),
+            "The completed Emergency Contact question did not expose its answer."
+        )
+        XCTAssertTrue(
+            accessibilityText(for: completedEmergency).localizedCaseInsensitiveContains("Not applicable"),
+            "The explicit Emergency Contact resolution was not displayed."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petEmergencyContact"],
+            in: app
+        )
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The emergency-contact editor did not open.")
+        scrollTowardElement(vetContact, in: app, maxSwipes: 8)
+        XCTAssertTrue(vetContact.waitForExistence(timeout: 8), "The emergency phone field was unavailable.")
+        tapWhenHittable(vetContact, timeout: 8)
+        vetContact.typeText(phone)
+        XCTAssertTrue(waitUntil(timeout: 8) {
+            saveAction.exists && saveAction.isEnabled && saveAction.isHittable
+        })
+        saveAction.tap()
+
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !editor.exists },
+            "Saving the real emergency phone did not return to the guided card."
+        )
+        XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                self.accessibilityText(for: completedEmergency)
+                    .localizedCaseInsensitiveContains("existing information")
+            },
+            "The real emergency phone did not replace the same-session Not applicable answer."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: completedEmergency).localizedCaseInsensitiveContains("Not applicable"),
+            "The stale Emergency Contact resolution still overrode the real phone."
+        )
+        assertMemberCardProgress("1/2", in: app)
+        XCTAssertFalse(
+            completedDocuments.exists,
+            "Saving Emergency Contact unexpectedly completed Documents."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 8) {
+            tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable
+        })
+        tasksTab.tap()
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 15), "The partial identity task did not survive relaunch.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            documentsQuestion.waitForExistence(timeout: 8),
+            "The partial identity task did not resume at unanswered Documents."
+        )
+        assertMemberCardProgress("1/2", in: app)
+        XCTAssertFalse(completedDocuments.exists, "Documents became completed after relaunch.")
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedEmergency.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedEmergency).localizedCaseInsensitiveContains("existing information"),
+            "The real emergency phone resumed as a skip resolution after relaunch."
+        )
+        XCTAssertFalse(
+            accessibilityText(for: completedEmergency).localizedCaseInsensitiveContains("Not applicable"),
+            "The obsolete Emergency Contact resolution returned after relaunch."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petEmergencyContact"],
+            in: app
+        )
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        scrollTowardElement(vetContact, in: app, maxSwipes: 8)
+        XCTAssertTrue(vetContact.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { self.accessibilityText(for: vetContact).contains(phone) },
+            "The saved emergency phone was not projected after relaunch."
+        )
+
+        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        let closeAction = app.buttons["pet-basic-info-close-action"]
+        XCTAssertTrue(closeAction.waitForExistence(timeout: 8))
+        tapWhenHittable(closeAction, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { !editor.exists })
+    }
+
+    @MainActor
+    func testPetIdentityPrivateDocumentsAndUnknownEmergencyPersistAcrossRelaunchWithoutFabricationAndRewardsOnce() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        let petName = completeFirstDayStarterFunnel(in: app)
+
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let coconutBalance = app.buttons["home-coconut-action"]
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(
+            taskCenter.waitForExistence(timeout: 12),
+            "The identity reward-resume journey did not reach Tasks."
+        )
+
+        let action = app.buttons[
+            "task-center-system-action-confirmPetIdentityProtection-household-starter-v1-identityProtection"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-confirmPetIdentityProtection"
+        ]
+        let documentsQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petIdentityDocuments"
+        ]
+        let completedDocuments = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petIdentityDocuments"
+        ]
+        let emergencyQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petEmergencyContact"
+        ]
+        let completedEmergency = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petEmergencyContact"
+        ]
+        let documentsScreen = app.descendants(matching: .any)["pet-documents-screen"]
+        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
+        let cancelledDraftPhone = "5550198"
+        let emergencyFieldExpectations = [
+            (identifier: "pet-basic-info-vet-clinic-input", placeholder: "Clinic"),
+            (identifier: "pet-basic-info-vet-doctor-input", placeholder: "Doctor"),
+            (identifier: "pet-basic-info-vet-contact-input", placeholder: "Phone"),
+            (identifier: "pet-basic-info-vet-address-input", placeholder: "Clinic address"),
+            (identifier: "pet-basic-info-allergies-input", placeholder: "Allergies")
+        ]
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The identity starter task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The identity guided sheet did not open.")
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petIdentityDocuments-preferNotToSay"],
+            in: app
+        )
+        XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedDocuments.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedDocuments).localizedCaseInsensitiveContains("Prefer not to say"),
+            "The Documents question did not preserve its private answer."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petIdentityDocuments"],
+            in: app
+        )
+        XCTAssertTrue(documentsScreen.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            app.buttons["pet-documents-add-document-action"].waitForExistence(timeout: 8),
+            "The Documents screen did not finish loading."
+        )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-documents-document-row-", in: app),
+            0,
+            "Choosing Prefer not to say fabricated an identity document."
+        )
+        tapWhenHittable(app.buttons["pet-documents-close-action"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !documentsScreen.exists })
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 8))
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petEmergencyContact"],
+            in: app
+        )
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The emergency-contact editor did not open.")
+        let draftPhoneField = app.textFields["pet-basic-info-vet-contact-input"]
+        scrollTowardElement(draftPhoneField, in: app, maxSwipes: 8)
+        XCTAssertTrue(draftPhoneField.waitForExistence(timeout: 8), "The emergency phone field was unavailable.")
+        tapWhenHittable(draftPhoneField, timeout: 8)
+        draftPhoneField.typeText(cancelledDraftPhone)
+        dismissKeyboardIfPresent(in: app)
+        discardPetBasicInfoChanges(in: app)
+        let closeEditor = app.buttons["pet-basic-info-close-action"]
+        XCTAssertTrue(closeEditor.waitForExistence(timeout: 8))
+        tapWhenHittable(closeEditor, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists })
+        XCTAssertTrue(
+            emergencyQuestion.waitForExistence(timeout: 12),
+            "Cancelling the emergency draft did not return to its unanswered question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+        XCTAssertFalse(completedEmergency.exists, "Cancelling the emergency draft completed the question.")
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petEmergencyContact-unknown"],
+            in: app
+        )
+        assertMemberCardProgress("2/2", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "The private Documents and unknown Emergency answers did not complete the guided journey."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Identity Finish did not return to Tasks.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The completed identity journey did not expose its separate Claim state."
+        )
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 12))
+        let balanceBeforeClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+        XCTAssertGreaterThanOrEqual(balanceBeforeClaim, 0, "The pre-claim coconut balance was unreadable.")
+
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The identity task did not retain Claim before opening its reward sheet."
+        )
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The identity Claim sheet did not open.")
+        XCTAssertTrue(
+            app.buttons["task-center-starter-journey-claim-confirmPetIdentityProtection"]
+                .waitForExistence(timeout: 8),
+            "The identity reward action was unavailable before closing the Claim sheet."
+        )
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Closing the identity Claim sheet did not dismiss it.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Closing the identity Claim sheet lost its claimable task state."
+        )
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim
+            },
+            "Closing the identity Claim sheet changed the balance before an explicit claim."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim
+            },
+            "Relaunch changed the balance before the explicit identity Claim."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The identity task did not remain claimable after relaunch."
+        )
+
+        tapWhenHittable(homeTab, timeout: 8)
+        openPetBasicInfoFromHome(in: app, petName: petName)
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        tapWhenHittable(app.buttons["pet-basic-info-edit-action"], timeout: 8)
+        for expectation in emergencyFieldExpectations {
+            let field = app.textFields[expectation.identifier]
+            scrollTowardElement(field, in: app, maxSwipes: 8)
+            XCTAssertTrue(field.waitForExistence(timeout: 8), "\(expectation.identifier) was unavailable after relaunch.")
+            let value = String(describing: field.value ?? "")
+            XCTAssertTrue(
+                value.isEmpty || value == expectation.placeholder,
+                "The private or unknown answer fabricated \(expectation.identifier): \(value)"
+            )
+            if expectation.identifier == "pet-basic-info-vet-contact-input" {
+                XCTAssertFalse(
+                    value.contains(cancelledDraftPhone),
+                    "The cancelled emergency phone draft survived relaunch."
+                )
+            }
+        }
+        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        tapWhenHittable(app.buttons["BackButton"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists })
+        collapseExpandedPetCardIfNeeded(in: app)
+
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Inspecting the cancelled emergency draft lost the claimable identity task."
+        )
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The identity Claim sheet did not reopen.")
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-confirmPetIdentityProtection"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Claiming the identity reward did not close its sheet.")
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists }, "The claimed identity task remained visible.")
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 60
+            },
+            "Reopening and claiming the identity reward did not add exactly 60 coconuts once."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 60
+            },
+            "The second relaunch duplicated or lost the identity reward."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            app.buttons[
+                "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
+            ].waitForExistence(timeout: 15),
+            "Tasks did not finish loading after the claimed identity relaunch."
+        )
+        XCTAssertFalse(action.exists, "The claimed identity task returned after relaunch.")
+    }
+
+    @MainActor
+    func testPetIdentityUnknownDocumentsReviewedEmergencyPersistWithoutFabricationAndRewardsOnce() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        let petName = "Codex Unknown Identity Pet \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not reach the unknown identity journey in time."
+        )
+
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let coconutBalance = app.buttons["home-coconut-action"]
+        let action = app.buttons[
+            "task-center-system-action-confirmPetIdentityProtection-household-starter-v1-identityProtection"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-confirmPetIdentityProtection"
+        ]
+        let documentsQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petIdentityDocuments"
+        ]
+        let emergencyQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petEmergencyContact"
+        ]
+        let completedDocuments = app.descendants(matching: .any)[
+            "task-center-starter-answer-complete-checkpoint-petIdentityDocuments"
+        ]
+        let documentsScreen = app.descendants(matching: .any)["pet-documents-screen"]
+        let addDocument = app.buttons["pet-documents-add-document-action"]
+
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 12))
+        let balanceBeforeClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+        XCTAssertEqual(balanceBeforeClaim, 50, "The identity branch did not start from the starter gift balance.")
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The identity task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/2", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petIdentityDocuments-unknown"],
+            in: app
+        )
+        XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("1/2", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedDocuments.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedDocuments).localizedCaseInsensitiveContains("Not sure yet"),
+            "The Documents question did not show its explicit unknown answer."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 8))
+
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(action.waitForExistence(timeout: 12))
+        XCTAssertFalse(
+            action.label.localizedCaseInsensitiveContains("Claim"),
+            "Closing the partial unknown identity path made it claimable."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim
+            },
+            "Relaunch changed the balance for a partial identity answer."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 15))
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            emergencyQuestion.waitForExistence(timeout: 8),
+            "Relaunch did not resume at the remaining Emergency Contact question."
+        )
+        assertMemberCardProgress("1/2", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        XCTAssertTrue(completedDocuments.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            accessibilityText(for: completedDocuments).localizedCaseInsensitiveContains("Not sure yet"),
+            "Relaunch lost the explicit unknown Documents answer."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petIdentityDocuments"],
+            in: app
+        )
+        XCTAssertTrue(documentsScreen.waitForExistence(timeout: 12))
+        XCTAssertTrue(addDocument.waitForExistence(timeout: 8), "The Documents screen did not finish loading.")
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-documents-document-row-", in: app),
+            0,
+            "Choosing Not sure yet fabricated an identity document."
+        )
+        tapWhenHittable(app.buttons["pet-documents-close-action"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !documentsScreen.exists })
+        XCTAssertTrue(documentsQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 8))
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petEmergencyContact-reviewed"],
+            in: app
+        )
+        assertMemberCardProgress("2/2", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "The reviewed Emergency Contact answer did not complete the identity journey."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Finish did not expose the identity Claim state."
+        )
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim
+            },
+            "Finishing unknown and reviewed answers changed the balance before Claim."
+        )
+        openPetBasicInfoFromHome(in: app, petName: petName)
+        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
+        let vetContact = app.textFields["pet-basic-info-vet-contact-input"]
+        tapWhenHittable(app.buttons["pet-basic-info-edit-action"], timeout: 8)
+        scrollTowardElement(vetContact, in: app, maxSwipes: 8)
+        XCTAssertTrue(vetContact.waitForExistence(timeout: 8))
+        let emergencyPhoneValue = String(describing: vetContact.value ?? "")
+        XCTAssertTrue(
+            emergencyPhoneValue.isEmpty || emergencyPhoneValue == "Phone",
+            "Choosing Current status reviewed fabricated an emergency phone: \(emergencyPhoneValue)"
+        )
+        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        tapWhenHittable(app.buttons["BackButton"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists })
+        collapseExpandedPetCardIfNeeded(in: app)
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim
+            },
+            "Relaunch changed the balance before the explicit identity Claim."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 15) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Relaunch did not preserve the identity Claim state."
+        )
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-confirmPetIdentityProtection"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists })
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 60
+            },
+            "The explicit identity Claim did not add exactly 60 coconuts."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim + 60
+            },
+            "The second relaunch duplicated or lost the identity reward."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            app.buttons[
+                "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
+            ].waitForExistence(timeout: 15),
+            "Tasks did not finish loading after the claimed identity relaunch."
+        )
+        XCTAssertFalse(action.exists, "The claimed identity task returned after relaunch.")
+    }
+
+    @MainActor
+    func testStarterPreventiveHealthCancelResumeSaveAndClaimSeparation() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12),
+            "The starter health journey did not reach Tasks."
+        )
+        completeAndClaimStarterProfilePrerequisites(in: app)
+
+        let coconutBalance = app.buttons["home-coconut-action"]
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 310" },
+            "The three prerequisite starter rewards did not reach the expected 310-coconut balance."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+
+        let action = app.buttons[
+            "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-confirmPetPreventiveCare"
+        ]
+        let question = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petHealthProtection"
+        ]
+        let openEditor = app.buttons["task-center-starter-journey-open-petHealthProtection"]
+        let healthDetail = app.descendants(matching: .any)["pet-health-detail-screen"]
+        let overview = app.descendants(matching: .any)["pet-health-overview-preventive"]
+        let recordSheet = app.descendants(matching: .any)["pet-health-record-sheet"]
+
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The preventive-health starter task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The preventive-health guided sheet did not open.")
+        XCTAssertTrue(question.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/1", in: app)
+
+        tapWhenHittable(openEditor, timeout: 8)
+        XCTAssertTrue(overview.waitForExistence(timeout: 12), "The preventive overview did not open from the journey.")
+        tapWhenHittable(app.buttons["pet-health-overview-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !overview.exists } && healthDetail.exists,
+            "Closing the preventive overview did not return to the health detail editor."
+        )
+        tapWhenHittable(app.buttons["pet-health-detail-close-action"], timeout: 8)
+        XCTAssertTrue(question.waitForExistence(timeout: 12), "Closing health detail did not return to the journey.")
+        assertMemberCardProgress("0/1", in: app)
+
+        tapWhenHittable(openEditor, timeout: 8)
+        XCTAssertTrue(overview.waitForExistence(timeout: 12))
+        tapWhenHittable(app.buttons["pet-health-overview-add-preventive-action"], timeout: 8)
+        XCTAssertTrue(recordSheet.waitForExistence(timeout: 12), "Add preventive did not open the record sheet.")
+        tapWhenHittable(app.buttons["pet-health-record-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !recordSheet.exists },
+            "Cancelling the preventive record did not dismiss its sheet."
+        )
+        XCTAssertTrue(healthDetail.waitForExistence(timeout: 8))
+        tapWhenHittable(app.buttons["pet-health-detail-close-action"], timeout: 8)
+        XCTAssertTrue(question.waitForExistence(timeout: 12))
+        assertMemberCardProgress("0/1", in: app)
+
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { !sheet.exists }, "Closing the incomplete health journey did not dismiss it.")
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The cancelled health task did not remain available.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(question.waitForExistence(timeout: 8), "Reopening did not resume the incomplete health question.")
+        assertMemberCardProgress("0/1", in: app)
+
+        tapWhenHittable(openEditor, timeout: 8)
+        XCTAssertTrue(overview.waitForExistence(timeout: 12))
+        tapWhenHittable(app.buttons["pet-health-overview-add-preventive-action"], timeout: 8)
+        XCTAssertTrue(recordSheet.waitForExistence(timeout: 12))
+        tapWhenHittable(app.buttons["pet-health-record-save-action"], timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 18),
+            "Saving the default vaccine did not return to the completed health journey."
+        )
+        assertMemberCardProgress("1/1", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Finish did not return to Tasks.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Saving preventive care claimed its reward automatically instead of exposing Claim."
+        )
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 12))
+        let balanceBeforeHealthClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+        XCTAssertGreaterThanOrEqual(
+            balanceBeforeHealthClaim,
+            310,
+            "Saving the preventive record left the household below its pre-record balance."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The preventive-health task did not preserve its explicit Claim state."
+        )
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-confirmPetPreventiveCare"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Claiming the health reward did not close its sheet.")
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists }, "The claimed health task remained visible.")
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeHealthClaim + 80
+            },
+            "The explicit preventive-health claim did not add exactly 80 coconuts."
+        )
+    }
+
+    @MainActor
+    func testStarterPreventiveHealthClaimedNotApplicableThenRealRecordDoesNotResurrectAcrossRelaunch() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex No Preventive Record Pet \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not reach the starter health journey in time."
+        )
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12),
+            "The Not applicable health journey did not reach Tasks."
+        )
+        completeAndClaimStarterProfilePrerequisites(in: app)
+
+        let coconutBalance = app.buttons["home-coconut-action"]
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 310" },
+            "The three prerequisite starter rewards did not reach the expected 310-coconut balance."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+
+        let action = app.buttons[
+            "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-confirmPetPreventiveCare"
+        ]
+        let question = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petHealthProtection"
+        ]
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let nextTask = app.buttons[
+            "task-center-system-action-configureFirstCarePlan-household-starter-v1-carePlan"
+        ]
+        let healthDetail = app.descendants(matching: .any)["pet-health-detail-screen"]
+        let recentHealthRows = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "pet-health-recent-row-")
+        )
+
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The preventive-health starter task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The preventive-health guided sheet did not open.")
+        XCTAssertTrue(question.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/1", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-petHealthProtection-notApplicable"],
+            in: app
+        )
+        assertMemberCardProgress("1/1", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "Choosing Not applicable did not complete the preventive-health journey."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Finish did not return to Tasks.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Finishing the Not applicable path claimed its reward instead of exposing Claim."
+        )
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 310" },
+            "Finishing the Not applicable path changed the balance before explicit Claim."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The preventive-health task did not preserve its explicit Claim state."
+        )
+
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-confirmPetPreventiveCare"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Claiming the health reward did not close its sheet.")
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists }, "The claimed health task remained visible.")
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 390" },
+            "The explicit Not applicable preventive-health claim did not add exactly 80 coconuts."
+        )
+
+        openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            0,
+            "Choosing Not applicable fabricated a health record in the normal pet health UI."
+        )
+        XCTAssertTrue(
+            app.staticTexts["No health records yet"].waitForExistence(timeout: 8),
+            "The normal pet health UI did not retain its empty-record state after Not applicable."
+        )
+
+        tapWhenHittable(app.buttons["pet-health-fab-toggle"], timeout: 8)
+        let preventiveAction = app.descendants(matching: .any)["pet-health-fab-action-preventive"]
+        XCTAssertTrue(
+            preventiveAction.waitForExistence(timeout: 8),
+            "The normal Health menu did not expose Preventive care after the claimed answer."
+        )
+        tapWhenHittable(preventiveAction, timeout: 8)
+        let recordSheet = app.descendants(matching: .any)["pet-health-record-sheet"]
+        XCTAssertTrue(recordSheet.waitForExistence(timeout: 10))
+        tapWhenHittable(app.buttons["pet-health-record-save-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !recordSheet.exists },
+            "Saving the real preventive record did not dismiss its form."
+        )
+        XCTAssertTrue(healthDetail.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            recentHealthRows.firstMatch.waitForExistence(timeout: 18),
+            "The real preventive record did not appear after the claimed privacy-preserving path."
+        )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            1,
+            "Saving one real preventive fact did not produce exactly one visible record."
+        )
+        let savedRowIdentifier = recentHealthRows.firstMatch.identifier
+        XCTAssertFalse(savedRowIdentifier.isEmpty, "The saved health row did not expose a stable identity.")
+
+        tapWhenHittable(app.buttons["pet-health-detail-close-action"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !healthDetail.exists })
+        collapseExpandedPetCardIfNeeded(in: app)
+        let allowedBalancesAfterRealHealthRecord = Set([400, 402, 408])
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                allowedBalancesAfterRealHealthRecord.contains(
+                    Int(self.numericLabel(coconutBalance.label)) ?? -1
+                )
+            },
+            "The real health record did not add its 10-coconut base reward plus an allowed luck bonus."
+        )
+        let balanceAfterRealHealthRecord = Int(numericLabel(coconutBalance.label)) ?? -1
+
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            nextTask.waitForExistence(timeout: 15),
+            "Tasks did not finish loading after the claimed health task."
+        )
+        XCTAssertFalse(action.exists, "Saving a real record resurrected the already-claimed health task.")
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceAfterRealHealthRecord
+            },
+            "Relaunch duplicated or lost a claimed health reward or real-record reward."
+        )
+        openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
+        XCTAssertTrue(
+            app.descendants(matching: .any)[savedRowIdentifier].waitForExistence(timeout: 18),
+            "Relaunch did not read back the same real health record."
+        )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            1,
+            "Relaunch lost or duplicated the real health record."
+        )
+        tapWhenHittable(app.buttons["pet-health-detail-close-action"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !healthDetail.exists })
+        collapseExpandedPetCardIfNeeded(in: app)
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(nextTask.waitForExistence(timeout: 15))
+        XCTAssertFalse(action.exists, "Relaunch resurrected the already-claimed preventive-health task.")
+    }
+
+    @MainActor
+    func testStarterPreventiveHealthUnknownCloseReopenCompletesWithoutFabricatedRecord() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Unknown Preventive Pet \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not reach the unknown health journey in time."
+        )
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12),
+            "The unknown health journey did not reach Tasks."
+        )
+        completeAndClaimStarterProfilePrerequisites(in: app)
+
+        let coconutBalance = app.buttons["home-coconut-action"]
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 310" },
+            "The three prerequisite starter rewards did not reach the expected 310-coconut balance."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+
+        let action = app.buttons[
+            "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-confirmPetPreventiveCare"
+        ]
+        let question = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-petHealthProtection"
+        ]
+        let unknown = app.buttons[
+            "task-center-starter-resolution-petHealthProtection-unknown"
+        ]
+
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The preventive-health starter task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The preventive-health guided sheet did not open.")
+        XCTAssertTrue(question.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/1", in: app)
+        XCTAssertTrue(unknown.waitForExistence(timeout: 8), "The Not sure yet health answer was unavailable.")
+        XCTAssertTrue(
+            app.buttons["task-center-starter-resolution-petHealthProtection-preferNotToSay"].exists,
+            "The privacy-preserving health answer was unavailable."
+        )
+        XCTAssertTrue(
+            app.buttons["task-center-starter-resolution-petHealthProtection-notApplicable"].exists,
+            "The Not applicable health answer was unavailable."
+        )
+        XCTAssertFalse(app.buttons["task-center-starter-question-previous"].exists)
+        XCTAssertFalse(app.buttons["task-center-starter-question-next"].exists)
+
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Closing the unanswered health sheet failed.")
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The unanswered health task did not remain available.")
+        XCTAssertFalse(
+            action.label.localizedCaseInsensitiveContains("Claim"),
+            "Closing an unanswered health task incorrectly made it claimable."
+        )
+
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(question.waitForExistence(timeout: 8), "Reopening did not restore the health question.")
+        assertMemberCardProgress("0/1", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(unknown, in: app)
+
+        assertMemberCardProgress("1/1", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "Choosing Not sure yet did not complete the preventive-health journey."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Finish did not return to Tasks.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Finishing the unknown path claimed its reward instead of exposing Claim."
+        )
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 310" },
+            "Finishing the unknown path changed the balance before explicit Claim."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The unknown preventive-health task did not preserve its explicit Claim state."
+        )
+
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-confirmPetPreventiveCare"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Claiming the health reward did not close its sheet.")
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists }, "The claimed health task remained visible.")
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 390" },
+            "The explicit unknown preventive-health claim did not add exactly 80 coconuts."
+        )
+
+        openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            0,
+            "Choosing Not sure yet fabricated a health record in the normal pet health UI."
+        )
+        XCTAssertTrue(
+            app.staticTexts["No health records yet"].waitForExistence(timeout: 8),
+            "The normal pet health UI did not remain empty after the unknown answer."
+        )
+    }
+
+    @MainActor
+    func testStarterPreventiveHealthPrivateAnswerSurvivesRelaunchWithoutFabricatedRecordAndRewardsOnce() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Private Preventive Pet \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not reach the private health journey in time."
+        )
+
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        completeAndClaimStarterProfilePrerequisites(in: app)
+
+        let coconutBalance = app.buttons["home-coconut-action"]
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 12))
+        let balanceBeforeHealthClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+        XCTAssertGreaterThanOrEqual(
+            balanceBeforeHealthClaim,
+            310,
+            "The prerequisite rewards left an unreadable or incomplete balance."
+        )
+
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        let action = app.buttons[
+            "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-confirmPetPreventiveCare"
+        ]
+        let privateAnswer = app.buttons[
+            "task-center-starter-resolution-petHealthProtection-preferNotToSay"
+        ]
+
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The private health task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(privateAnswer.waitForExistence(timeout: 8), "Prefer not to say was unavailable.")
+        assertMemberCardProgress("0/1", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(privateAnswer, in: app)
+
+        assertMemberCardProgress("1/1", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "Prefer not to say did not complete the health journey."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The private health answer did not expose a separate Claim state."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20), "Home was unavailable after the private-answer relaunch.")
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeHealthClaim
+            },
+            "Relaunch changed the balance before an explicit private-answer Claim."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 15) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The private health answer did not survive relaunch as Claim."
+        )
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        assertMemberCardProgress("1/1", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-confirmPetPreventiveCare"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists })
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeHealthClaim + 80
+            },
+            "The private health Claim did not add exactly 80 coconuts."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeHealthClaim + 80
+            },
+            "The second relaunch duplicated or lost the private health reward."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            app.buttons[
+                "task-center-system-action-configureFirstCarePlan-household-starter-v1-carePlan"
+            ].waitForExistence(timeout: 15),
+            "Tasks did not finish loading after the claimed private health relaunch."
+        )
+        XCTAssertFalse(action.exists, "The claimed private health task returned after relaunch.")
+
+        openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            0,
+            "Prefer not to say fabricated a health record in the normal pet health UI."
+        )
+        XCTAssertTrue(
+            app.staticTexts["No health records yet"].waitForExistence(timeout: 8),
+            "The normal pet health UI did not remain empty after the private answer."
+        )
+    }
+
+    @MainActor
+    func testStarterPreventiveHealthReviewedThenRealRecordKeepsSingleClaimAcrossRelaunch() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Reviewed Then Real Health Pet \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not reach the health supersession journey in time."
+        )
+
+        let homeTab = app.buttons["home-tab-home"]
+        let tasksTab = app.buttons["home-tab-calendar"]
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        let coconutBalance = app.buttons["home-coconut-action"]
+        let action = app.buttons[
+            "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-confirmPetPreventiveCare"
+        ]
+        let reviewedAnswer = app.buttons[
+            "task-center-starter-resolution-petHealthProtection-reviewed"
+        ]
+        let recentHealthRows = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "pet-health-recent-row-")
+        )
+
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        completeAndClaimStarterProfilePrerequisites(in: app)
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 12))
+        let balanceBeforeHealthClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+        XCTAssertGreaterThanOrEqual(
+            balanceBeforeHealthClaim,
+            310,
+            "The prerequisite rewards left an unreadable or incomplete balance."
+        )
+
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The preventive-health task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(reviewedAnswer.waitForExistence(timeout: 8), "Current status reviewed was unavailable.")
+        assertMemberCardProgress("0/1", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(reviewedAnswer, in: app)
+        assertMemberCardProgress("1/1", in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "The reviewed health answer did not complete the guided card."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The reviewed answer did not leave one explicit health Claim."
+        )
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeHealthClaim
+            },
+            "Finishing the reviewed answer changed the balance before Claim."
+        )
+        openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            0,
+            "The reviewed answer fabricated a health record before the real save."
+        )
+
+        let healthFab = app.buttons["pet-health-fab-toggle"]
+        XCTAssertTrue(healthFab.waitForExistence(timeout: 8), "The health menu was unavailable.")
+        tapWhenHittable(healthFab, timeout: 8)
+        let preventiveAction = app.descendants(matching: .any)["pet-health-fab-action-preventive"]
+        XCTAssertTrue(
+            preventiveAction.waitForExistence(timeout: 8),
+            "The normal Health menu did not expose Preventive care."
+        )
+        tapWhenHittable(preventiveAction, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-health-record-sheet"].waitForExistence(timeout: 10),
+            "Preventive care did not open the vaccine record form."
+        )
+        let saveRecord = app.buttons["pet-health-record-save-action"]
+        XCTAssertTrue(saveRecord.waitForExistence(timeout: 10), "The real preventive record Save action was unavailable.")
+        tapWhenHittable(saveRecord, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !app.descendants(matching: .any)["pet-health-record-sheet"].exists
+            },
+            "Saving the real preventive record did not dismiss its form."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-health-detail-screen"].waitForExistence(timeout: 8),
+            "Saving the real preventive record did not return to normal Health."
+        )
+        XCTAssertTrue(
+            recentHealthRows.firstMatch.waitForExistence(timeout: 18),
+            "The real health record did not appear after saving."
+        )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            1,
+            "Saving one real health fact did not produce exactly one visible record."
+        )
+        tapWhenHittable(app.buttons["pet-health-detail-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !app.descendants(matching: .any)["pet-health-detail-screen"].exists
+            },
+            "Closing Health after the real preventive save did not return Home."
+        )
+        collapseExpandedPetCardIfNeeded(in: app)
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 12))
+        let allowedBalancesAfterRealHealthRecord = Set([
+            balanceBeforeHealthClaim + 10,
+            balanceBeforeHealthClaim + 12,
+            balanceBeforeHealthClaim + 18
+        ])
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                allowedBalancesAfterRealHealthRecord.contains(
+                    Int(self.numericLabel(coconutBalance.label)) ?? -1
+                )
+            },
+            "Saving one real preventive fact did not add its 10-coconut base reward plus an allowed luck bonus."
+        )
+        let balanceAfterRealHealthRecord = Int(numericLabel(coconutBalance.label)) ?? -1
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 15) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The real preventive fact did not preserve one Claim before relaunch."
+        )
+        XCTAssertEqual(
+            app.buttons.matching(NSPredicate(
+                format: "identifier == %@",
+                "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
+            )).count,
+            1,
+            "The reviewed-to-real transition exposed more than one Claim before relaunch."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceAfterRealHealthRecord
+            },
+            "Relaunch duplicated or lost the real preventive-care reward before starter Claim."
+        )
+        openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
+        XCTAssertTrue(recentHealthRows.firstMatch.waitForExistence(timeout: 18))
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            1,
+            "The real health record was lost or duplicated after relaunch."
+        )
+        tapWhenHittable(app.buttons["pet-health-detail-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !app.descendants(matching: .any)["pet-health-detail-screen"].exists
+            },
+            "Closing Health after relaunch did not return Home."
+        )
+        collapseExpandedPetCardIfNeeded(in: app)
+
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 15) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Replacing the reviewed answer with a real health fact lost or duplicated the Claim state."
+        )
+        XCTAssertEqual(
+            app.buttons.matching(NSPredicate(
+                format: "identifier == %@",
+                "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
+            )).count,
+            1,
+            "The reviewed-to-real transition exposed more than one health Claim."
+        )
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        assertMemberCardProgress("1/1", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-confirmPetPreventiveCare"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists })
+
+        tapWhenHittable(homeTab, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceAfterRealHealthRecord + 80
+            },
+            "The reviewed-to-real health Claim did not add exactly 80 coconuts once."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceAfterRealHealthRecord + 80
+            },
+            "Relaunch duplicated or lost the reviewed-to-real health reward."
+        )
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            app.buttons[
+                "task-center-system-action-configureFirstCarePlan-household-starter-v1-carePlan"
+            ].waitForExistence(timeout: 15),
+            "Tasks did not finish loading after the claimed reviewed-to-real health relaunch."
+        )
+        XCTAssertFalse(action.exists, "The claimed reviewed-to-real health task returned after relaunch.")
+
+        openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
+        XCTAssertTrue(recentHealthRows.firstMatch.waitForExistence(timeout: 18))
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            1,
+            "Claiming or relaunching duplicated the real health record."
+        )
+    }
+
+    @MainActor
+    func testStarterCustomCarePlanCancelAndSaveRemainSeparatedAcrossRelaunch() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12),
+            "The custom care-plan journey did not reach Tasks."
+        )
+        completeAndClaimStarterProfilePrerequisites(in: app)
+
+        let coconutBalance = app.buttons["home-coconut-action"]
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 310" },
+            "The three prerequisite starter rewards did not reach the expected 310-coconut balance."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+
+        let action = app.buttons[
+            "task-center-system-action-configureFirstCarePlan-household-starter-v1-carePlan"
+        ]
+        let sheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-configureFirstCarePlan"
+        ]
+        let question = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-acceptedRecommendedCarePlan"
+        ]
+        let openEditor = app.buttons[
+            "task-center-starter-journey-open-acceptedRecommendedCarePlan"
+        ]
+        let recommendedResponse = app.buttons[
+            "task-center-starter-resolution-acceptedRecommendedCarePlan-reviewed"
+        ]
+        let feedDetail = app.descendants(matching: .any)["quick-feed-detail-screen"]
+        let manualReminderMode = app.buttons["quick-feed-mode-manualReminder"]
+        let planSave = app.buttons["quick-feed-plan-save"]
+
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The starter care-plan task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The care-plan guided sheet did not open.")
+        XCTAssertTrue(question.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            recommendedResponse.waitForExistence(timeout: 8),
+            "The recommended response was unavailable before choosing the custom-plan branch."
+        )
+        assertMemberCardProgress("0/1", in: app)
+
+        tapWhenHittable(openEditor, timeout: 8)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12), "The care-plan journey did not open Quick Feed.")
+        XCTAssertTrue(
+            manualReminderMode.waitForExistence(timeout: 12),
+            "Quick Feed did not expose the manual-reminder plan option."
+        )
+        tapWhenHittable(manualReminderMode, timeout: 8)
+        XCTAssertTrue(planSave.waitForExistence(timeout: 12), "The manual-reminder plan editor did not open.")
+        tapWhenHittable(app.buttons["quick-feed-sheet-cancel-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !planSave.exists && feedDetail.exists },
+            "Cancelling the custom plan did not return to unchanged Quick Feed detail."
+        )
+        tapWhenHittable(app.buttons["quick-feed-detail-close-action"], timeout: 8)
+        XCTAssertTrue(
+            question.waitForExistence(timeout: 12),
+            "Closing Quick Feed did not return to the incomplete care-plan question."
+        )
+        assertMemberCardProgress("0/1", in: app)
+
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { !sheet.exists }, "Closing the incomplete care-plan journey did not dismiss it.")
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(app.buttons["home-tab-home"].waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 310" },
+            "Relaunch after cancelling the care-plan draft changed the prerequisite reward balance."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            action.waitForExistence(timeout: 12),
+            "The cancelled care-plan task did not remain available after relaunch."
+        )
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            question.waitForExistence(timeout: 8),
+            "Relaunch did not resume the incomplete care-plan question."
+        )
+        XCTAssertTrue(
+            recommendedResponse.waitForExistence(timeout: 8),
+            "Relaunch lost the unselected recommended-plan alternative."
+        )
+        assertMemberCardProgress("0/1", in: app)
+
+        tapWhenHittable(openEditor, timeout: 8)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12))
+        XCTAssertTrue(manualReminderMode.waitForExistence(timeout: 12))
+        tapWhenHittable(manualReminderMode, timeout: 8)
+        XCTAssertTrue(planSave.waitForExistence(timeout: 12))
+        tapWhenHittable(planSave, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 18),
+            "Saving a real manual-reminder plan did not return to the completed care-plan journey."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !feedDetail.exists },
+            "The completed custom plan left its nested Quick Feed editor visible."
+        )
+        assertMemberCardProgress("1/1", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Care-plan Finish did not return to Tasks.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Saving the custom plan claimed its reward automatically instead of exposing Claim."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(app.buttons["home-tab-home"].waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 310" },
+            "Relaunch after saving the custom plan changed the balance before explicit Claim."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Relaunch did not preserve the custom care-plan task's explicit Claim state."
+        )
+
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-configureFirstCarePlan"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists }, "Claiming the care-plan reward did not close its sheet.")
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists }, "The claimed care-plan task remained visible.")
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 350" },
+            "The explicit custom care-plan claim did not add exactly 40 coconuts."
+        )
+    }
+
+    @MainActor
+    func testFirstCareCompletedByHomeWaterBeforeOpeningJourneyBecomesClaimable() throws {
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            resetEconomyBudget: true
+        )
+        let humanName = createFirstHuman(from: app)
+        let petName = "Codex Water First Care \(Int(Date().timeIntervalSince1970))"
+        completeFirstDayStarterFunnel(
+            in: app,
+            petName: petName,
+            completionMessage: "Creating the first pet did not reach the external First Care journey in time."
+        )
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12),
+            "The external First Care journey did not reach Tasks."
+        )
+        completeAndClaimStarterProfilePrerequisites(in: app)
+
+        let coconutBalance = app.buttons["home-coconut-action"]
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 310" },
+            "The three prerequisite starter rewards did not reach the expected 310-coconut balance."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+
+        let carePlanAction = app.buttons[
+            "task-center-system-action-configureFirstCarePlan-household-starter-v1-carePlan"
+        ]
+        let carePlanSheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-configureFirstCarePlan"
+        ]
+
+        XCTAssertTrue(carePlanAction.waitForExistence(timeout: 12), "The starter care-plan task did not appear.")
+        tapWhenHittable(carePlanAction, timeout: 8)
+        XCTAssertTrue(carePlanSheet.waitForExistence(timeout: 12), "The care-plan guided sheet did not open.")
+        XCTAssertTrue(
+            app.descendants(matching: .any)[
+                "task-center-starter-question-checkpoint-acceptedRecommendedCarePlan"
+            ].waitForExistence(timeout: 8)
+        )
+        assertMemberCardProgress("0/1", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-acceptedRecommendedCarePlan-reviewed"],
+            in: app
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "Accepting the recommended care plan did not complete its guided card."
+        )
+        assertMemberCardProgress("1/1", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !carePlanSheet.exists }, "Care-plan Finish did not return to Tasks.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                carePlanAction.exists && carePlanAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Accepting the care plan claimed its reward automatically instead of exposing Claim."
+        )
+        tapWhenHittable(carePlanAction, timeout: 8)
+        XCTAssertTrue(carePlanSheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-configureFirstCarePlan"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !carePlanSheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !carePlanAction.exists })
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 350" },
+            "The explicit care-plan claim did not add exactly 40 coconuts."
+        )
+
+        let firstCareAction = app.buttons[
+            "task-center-system-action-recordFirstCare-household-starter-v1-firstCare"
+        ]
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(firstCareAction.waitForExistence(timeout: 12), "The First Care task did not appear before water.")
+        XCTAssertFalse(
+            firstCareAction.label.localizedCaseInsensitiveContains("Claim"),
+            "The First Care task was already claimable before a real care action."
+        )
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        openPetWaterDetailFromHome(in: app, petName: petName, humanName: humanName)
+
+        let recentWaterRow = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "quick-water-log-row-watering-"))
+            .firstMatch
+        let waterLogAction = app.buttons["quick-water-log-action"]
+        scrollToElement(waterLogAction, in: app, maxSwipes: 5)
+        XCTAssertTrue(waterLogAction.waitForExistence(timeout: 12), "Water detail did not expose its real log action.")
+        tapWhenHittable(waterLogAction, timeout: 8)
+        XCTAssertTrue(
+            recentWaterRow.waitForExistence(timeout: 18),
+            "The normal Home water flow did not persist a recent water row."
+        )
+        tapWhenHittable(app.buttons["quick-water-detail-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !app.descendants(matching: .any)["quick-water-detail-sheet"].exists
+            },
+            "Closing Water detail did not return to Home."
+        )
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 18) {
+                firstCareAction.exists && firstCareAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "A real Home water record did not refresh First Care directly to Claim."
+        )
+
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                (Int(self.numericLabel(coconutBalance.label)) ?? -1) >= 353
+            },
+            "The water action did not preserve the 350-coconut baseline and add its normal care reward."
+        )
+        let balanceBeforeFirstCareClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+
+        let firstCareDirectClaim = app.buttons[
+            "task-center-system-claim-recordFirstCare-household-starter-v1-firstCare"
+        ]
+        XCTAssertTrue(
+            firstCareDirectClaim.waitForExistence(timeout: 8),
+            "Externally completed First Care did not expose its direct Claim action."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["task-center-starter-journey-sheet-recordFirstCare"].exists,
+            "The direct First Care Claim unexpectedly opened a details sheet."
+        )
+
+        tapWhenHittable(firstCareDirectClaim, timeout: 8)
+        XCTAssertFalse(
+            app.descendants(matching: .any)["task-center-starter-journey-sheet-recordFirstCare"].exists,
+            "Claiming First Care should stay in the Task Center."
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !firstCareAction.exists })
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeFirstCareClaim + 20
+            },
+            "The explicit First Care claim did not add exactly 20 coconuts after Home water."
+        )
+    }
+
+    @MainActor
+    func testStarterRecommendedCarePlanAndFirstCareCancelResumeClaimSeparation() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        _ = createFirstHuman(from: app)
+        completeFirstDayStarterFunnel(in: app)
+
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12),
+            "The starter care journey did not reach Tasks."
+        )
+        completeAndClaimStarterProfilePrerequisites(in: app)
+
+        let coconutBalance = app.buttons["home-coconut-action"]
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 310" },
+            "The three prerequisite starter rewards did not reach the expected 310-coconut balance."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+
+        let carePlanAction = app.buttons[
+            "task-center-system-action-configureFirstCarePlan-household-starter-v1-carePlan"
+        ]
+        let carePlanSheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-configureFirstCarePlan"
+        ]
+        let carePlanQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-acceptedRecommendedCarePlan"
+        ]
+
+        XCTAssertTrue(carePlanAction.waitForExistence(timeout: 12), "The starter care-plan task did not appear.")
+        tapWhenHittable(carePlanAction, timeout: 8)
+        XCTAssertTrue(carePlanSheet.waitForExistence(timeout: 12), "The care-plan guided sheet did not open.")
+        XCTAssertTrue(carePlanQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/1", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-resolution-acceptedRecommendedCarePlan-reviewed"],
+            in: app
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "Accepting the recommended care plan did not complete its guided card."
+        )
+        assertMemberCardProgress("1/1", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { !carePlanSheet.exists }, "Care-plan Finish did not return to Tasks.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                carePlanAction.exists && carePlanAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Accepting the care plan claimed its reward automatically instead of exposing Claim."
+        )
+        tapWhenHittable(carePlanAction, timeout: 8)
+        XCTAssertTrue(carePlanSheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-configureFirstCarePlan"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !carePlanSheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !carePlanAction.exists })
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 350" },
+            "The explicit care-plan claim did not add exactly 40 coconuts."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+
+        let firstCareAction = app.buttons[
+            "task-center-system-action-recordFirstCare-household-starter-v1-firstCare"
+        ]
+        let firstCareSheet = app.descendants(matching: .any)[
+            "task-center-starter-journey-sheet-recordFirstCare"
+        ]
+        let firstCareQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-action-firstCare"
+        ]
+        let openFirstCare = app.buttons["task-center-starter-journey-open-recordFirstCare"]
+        let feedDetail = app.descendants(matching: .any)["quick-feed-detail-screen"]
+        let saveManualSettings = app.buttons["quick-feed-manual-settings-save"]
+
+        XCTAssertTrue(firstCareAction.waitForExistence(timeout: 12), "The first-care starter task did not appear.")
+        tapWhenHittable(firstCareAction, timeout: 8)
+        XCTAssertTrue(firstCareSheet.waitForExistence(timeout: 12), "The first-care guided sheet did not open.")
+        XCTAssertTrue(firstCareQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("0/1", in: app)
+
+        tapWhenHittable(openFirstCare, timeout: 8)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12), "First Care did not open Quick Feed.")
+        XCTAssertTrue(saveManualSettings.waitForExistence(timeout: 12), "Quick Feed did not request its initial setup.")
+        tapWhenHittable(app.buttons["quick-feed-sheet-cancel-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !saveManualSettings.exists && feedDetail.exists },
+            "Cancelling initial feed setup did not leave the unchanged Quick Feed detail visible."
+        )
+        tapWhenHittable(app.buttons["quick-feed-detail-close-action"], timeout: 8)
+        XCTAssertTrue(firstCareQuestion.waitForExistence(timeout: 12), "Closing Quick Feed did not return to First Care.")
+        assertMemberCardProgress("0/1", in: app)
+
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { !firstCareSheet.exists }, "Closing incomplete First Care did not dismiss it.")
+        XCTAssertTrue(firstCareAction.waitForExistence(timeout: 12), "Cancelled First Care did not remain available.")
+        tapWhenHittable(firstCareAction, timeout: 8)
+        XCTAssertTrue(firstCareSheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(firstCareQuestion.waitForExistence(timeout: 8), "Reopening did not resume incomplete First Care.")
+        assertMemberCardProgress("0/1", in: app)
+
+        tapWhenHittable(openFirstCare, timeout: 8)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12))
+        XCTAssertTrue(saveManualSettings.waitForExistence(timeout: 12))
+        tapWhenHittable(saveManualSettings, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !saveManualSettings.exists && app.buttons["quick-feed-primary-action"].exists
+            },
+            "Saving valid manual feed setup did not expose the real care action."
+        )
+        tapWhenHittable(app.buttons["quick-feed-primary-action"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 18),
+            "Recording a real feed did not return to completed First Care."
+        )
+        assertMemberCardProgress("1/1", in: app)
+        tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !firstCareSheet.exists },
+            "Closing completed First Care did not return to Tasks."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                firstCareAction.exists && firstCareAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Closing completed First Care claimed its reward automatically instead of preserving Claim."
+        )
+
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(coconutBalance.waitForExistence(timeout: 12))
+        let balanceBeforeFirstCareClaim = Int(numericLabel(coconutBalance.label)) ?? -1
+        XCTAssertGreaterThanOrEqual(
+            balanceBeforeFirstCareClaim,
+            350,
+            "The real care action left the Human wallet below its pre-care balance."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(
+            app.buttons["home-tab-home"].waitForExistence(timeout: 20),
+            "Home was unavailable after closing completed First Care."
+        )
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeFirstCareClaim
+            },
+            "Relaunch changed the wallet before the explicit First Care Claim."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 15) {
+                firstCareAction.exists && firstCareAction.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "Completed First Care did not survive relaunch as Claim."
+        )
+        tapWhenHittable(firstCareAction, timeout: 8)
+        XCTAssertTrue(firstCareSheet.waitForExistence(timeout: 12))
+        assertMemberCardProgress("1/1", in: app)
+        let firstCareClaim = app.buttons["task-center-starter-journey-claim-recordFirstCare"]
+        XCTAssertTrue(
+            firstCareClaim.waitForExistence(timeout: 8),
+            "Relaunched First Care did not expose its explicit Claim action."
+        )
+        XCTAssertFalse(
+            app.buttons["task-center-starter-journey-finish"].exists,
+            "Relaunched completed First Care regressed to a Finish step."
+        )
+        tapWhenHittable(firstCareClaim, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { !firstCareSheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !firstCareAction.exists })
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeFirstCareClaim + 20
+            },
+            "The explicit First Care claim did not add exactly 20 coconuts."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(app.buttons["home-tab-home"].waitForExistence(timeout: 20))
+        tapWhenHittable(app.buttons["home-tab-home"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == balanceBeforeFirstCareClaim + 20
+            },
+            "The second relaunch duplicated or lost the First Care reward."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            app.buttons[
+                "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
+            ].waitForExistence(timeout: 15),
+            "Tasks did not finish loading after the claimed First Care relaunch."
+        )
+        XCTAssertFalse(firstCareAction.exists, "Claimed First Care returned after relaunch.")
     }
 
     @MainActor
@@ -63,8 +4487,422 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testZenFreshInstallCreatesOnlyAHumanAndOpensTheThreeTabShell() throws {
+        let app = launchEnglishApp(
+            seedHumanBaseline: false,
+            initialExperienceMode: "zen",
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
+        )
+        let nameField = app.textFields["onboarding-human-name-input"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 25), "Zen onboarding did not ask for the Human name.")
+        nameField.tap()
+        nameField.typeText("Codex Zen Human")
+        tapWhenHittable(app.buttons["onboarding-human-continue"], timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 20),
+            "Zen onboarding did not enter the lightweight Home shell."
+        )
+        XCTAssertFalse(app.buttons["onboarding-create-pet-now"].exists, "Zen onboarding incorrectly required a Pet.")
+
+        let ownerCard = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
+        ).firstMatch
+        XCTAssertTrue(ownerCard.waitForExistence(timeout: 12), "Zen Home did not show the bound owner card.")
+        let allCompleteStatus = app.descendants(matching: .any)["zen-home-all-complete-status"]
+        XCTAssertTrue(
+            allCompleteStatus.waitForExistence(timeout: 12),
+            "Opening the active Zen shell did not automatically check in its only owner."
+        )
+        XCTAssertFalse(app.buttons["zen-home-check-in-all-action"].exists)
+        let autoCheckInToast = app.descendants(matching: .any)["zen-home-auto-check-in-toast"]
+        XCTAssertTrue(autoCheckInToast.waitForExistence(timeout: 8))
+
+        let coconutBalance = app.buttons["zen-toolbar-coconut-log"]
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                Int(self.numericLabel(coconutBalance.label)) == 1
+            },
+            "The fresh Zen owner's automatic check-in did not grant exactly one coconut before status selection."
+        )
+        let balanceBeforeStatus = try XCTUnwrap(Int(numericLabel(coconutBalance.label)))
+        XCTAssertFalse(
+            app.descendants(matching: .any)["zen-status-picker"].exists,
+            "Automatic check-in must not open the removed status popup."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                (ownerCard.value as? String)?.contains("Neutral status background") == true
+            },
+            "The automatically checked-in owner card did not reveal its neutral checked state."
+        )
+        tapWhenHittable(ownerCard, timeout: 8)
+        let alreadyCheckedToast = app.descendants(matching: .any)["zen-home-already-checked-toast"]
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertFalse(
+            alreadyCheckedToast.exists,
+            "Tapping an already checked-in card must only raise it in the deck, without showing a notice."
+        )
+        let scoreGestureStart = ownerCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: 0.74)
+        )
+        let scoreGestureEnd = ownerCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: -0.12)
+        )
+        scoreGestureStart.press(forDuration: 0.65, thenDragTo: scoreGestureEnd)
+        var observedCardLabel = ownerCard.label
+        var observedBalanceLabel = coconutBalance.label
+        let didReflectStatusReward = waitUntil(timeout: 12) {
+            observedCardLabel = app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
+            ).firstMatch.label
+            observedBalanceLabel = app.buttons["zen-toolbar-coconut-log"].label
+            let observedCardValue = app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
+            ).firstMatch.value as? String ?? ""
+            return observedCardLabel.contains("10/10 · Great") &&
+                observedCardValue.contains("Status background: 10/10 · Great") &&
+                Int(self.numericLabel(observedBalanceLabel)) == balanceBeforeStatus + 1
+        }
+        XCTAssertTrue(
+            didReflectStatusReward,
+            "Holding and sliding to the first explicit daily status did not update the card and grant exactly one coconut. " +
+                "Before: \(balanceBeforeStatus); card: \(observedCardLabel); balance: \(observedBalanceLabel)."
+        )
+
+        XCTAssertFalse(
+            app.descendants(matching: .any)["zen-status-picker"].exists,
+            "Tapping an already checked-in wallet card must not reopen the removed status popup."
+        )
+        XCTAssertTrue(waitUntil(timeout: 6) { !autoCheckInToast.exists }, "The automatic check-in toast did not dismiss.")
+
+        let expandButton = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-expand-human-")
+        ).firstMatch
+        XCTAssertTrue(expandButton.waitForExistence(timeout: 8), "The collapsed Zen card did not expose its expand action.")
+        tapWhenHittable(expandButton, timeout: 8)
+
+        let expandedCard = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-collapse-human-")
+        ).firstMatch
+        XCTAssertTrue(expandedCard.waitForExistence(timeout: 8), "The Zen card did not expand with the shared wallet-card presentation.")
+        XCTAssertTrue(
+            app.descendants(matching: .any).matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-expanded-card-details-")
+            ).firstMatch.waitForExistence(timeout: 8),
+            "The expanded Zen card did not expose its type-specific profile and recent-status details."
+        )
+        let expandedAttachment = XCTAttachment(screenshot: app.screenshot())
+        expandedAttachment.name = "Zen expanded card — premium profile details"
+        expandedAttachment.lifetime = .keepAlways
+        add(expandedAttachment)
+        let profileButton = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-profile-human-")
+        ).firstMatch
+        XCTAssertTrue(profileButton.waitForExistence(timeout: 8), "The expanded card did not expose its profile action.")
+        tapWhenHittable(profileButton, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["human-basic-info-screen"].waitForExistence(timeout: 12),
+            "The expanded Zen card did not open the editable Human profile."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["profile-completion-card"].waitForExistence(timeout: 8),
+            "The Human profile did not show its four-category completion card."
+        )
+        tapWhenHittable(app.buttons["human-basic-info-edit-action"], timeout: 8)
+        let editedOwnerName = "Codex Zen Human Edited"
+        let nameInput = app.textFields["human-basic-info-name-input"]
+        XCTAssertTrue(nameInput.waitForExistence(timeout: 8), "Human profile edit mode did not expose its name field.")
+        XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].exists)
+        XCTAssertFalse(app.textFields["human-basic-info-avatar-emoji-input"].exists)
+        clearTextField(nameInput, in: app)
+        nameInput.typeText(editedOwnerName)
+        dismissKeyboardIfPresent(in: app)
+
+        let firstMBTIChoice = app.buttons["member-mbti-energy-i"]
+        scrollToElement(firstMBTIChoice, in: app, maxSwipes: 6)
+        XCTAssertTrue(firstMBTIChoice.waitForExistence(timeout: 8), "The Human editor did not expose four MBTI dimensions.")
+        for identifier in [
+            "member-mbti-energy-i", "member-mbti-energy-e",
+            "member-mbti-information-s", "member-mbti-information-n",
+            "member-mbti-decision-t", "member-mbti-decision-f",
+            "member-mbti-lifestyle-j", "member-mbti-lifestyle-p"
+        ] {
+            XCTAssertTrue(app.buttons[identifier].exists, "Missing MBTI binary choice: \(identifier)")
+        }
+        tapWhenHittable(app.buttons["human-basic-info-save-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                app.descendants(matching: .any)["human-basic-info-name-readback"].label.contains(editedOwnerName)
+            },
+            "The Human profile edit did not read back the saved name."
+        )
+        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any).matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-collapse-human-")
+            ).firstMatch.waitForExistence(timeout: 10),
+            "Closing the profile did not return to the expanded Zen card."
+        )
+        tapWhenHittable(
+            app.descendants(matching: .any).matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-collapse-human-")
+            ).firstMatch,
+            timeout: 8
+        )
+        XCTAssertTrue(
+            app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-expand-human-")
+            ).firstMatch.waitForExistence(timeout: 8),
+            "Tapping the expanded card did not collapse it."
+        )
+
+        tapWhenHittable(app.buttons["zen-toolbar-coconut-log"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["coconut-log-screen"].waitForExistence(timeout: 12),
+            "The Zen coconut balance did not open coconut history."
+        )
+        tapWhenHittable(app.buttons["coconut-log-close-action"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 10))
+
+        tapWhenHittable(app.buttons["zen-toolbar-members"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["zen-members-screen"].waitForExistence(timeout: 12),
+            "The shared Zen toolbar did not open the lightweight members page."
+        )
+        XCTAssertTrue(app.buttons["zen-members-add-menu"].waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-members-row-human-")
+            ).firstMatch.waitForExistence(timeout: 8),
+            "The Zen members page did not list its active Human."
+        )
+
+        let addedMemberName = "Codex Zen Member"
+        tapWhenHittable(app.buttons["zen-members-add-menu"], timeout: 8)
+        tapWhenHittable(app.buttons["zen-members-add-human-action"], timeout: 8)
+        let addedMemberNameField = app.textFields["member-name-input"]
+        XCTAssertTrue(
+            addedMemberNameField.waitForExistence(timeout: 12),
+            "The Zen members page did not open the shared Human creation flow."
+        )
+        addedMemberNameField.tap()
+        addedMemberNameField.typeText(addedMemberName)
+        addedMemberNameField.typeText("\n")
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        tapThroughMemberCreationSteps(in: app)
+
+        let addedMemberRow = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                "zen-members-row-human-",
+                addedMemberName
+            )
+        ).firstMatch
+        XCTAssertTrue(
+            addedMemberRow.waitForExistence(timeout: 20),
+            "Saving a Human from Zen members did not return to the member list with refreshed data."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["zen-members-screen"].exists,
+            "Saving from Zen members unexpectedly left the members page."
+        )
+        tapWhenHittable(app.buttons["zen-members-close-action"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 10))
+
+        for tab in ["home", "streak", "oasis"] {
+            XCTAssertTrue(
+                app.descendants(matching: .any)["zen-tab-\(tab)"].exists,
+                "Zen shell is missing the \(tab) tab."
+            )
+        }
+        XCTAssertFalse(app.buttons["home-tab-calendar"].exists, "Zen shell mounted the Standard task tab.")
+
+        tapWhenHittable(app.descendants(matching: .any)["zen-tab-streak"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["zen-streak-screen"].waitForExistence(timeout: 12))
+        for action in ["zen-toolbar-coconut-log", "zen-toolbar-members", "zen-toolbar-settings"] {
+            XCTAssertTrue(app.buttons[action].exists, "Streak is missing the shared toolbar action: \(action)")
+        }
+        let nextMonth = app.buttons["zen-streak-next-month"]
+        XCTAssertFalse(nextMonth.isEnabled)
+        let monthPager = app.descendants(matching: .any)["zen-streak-month-pager"]
+        XCTAssertTrue(monthPager.waitForExistence(timeout: 8))
+        monthPager.swipeRight()
+        XCTAssertTrue(waitUntil(timeout: 8) { nextMonth.isEnabled }, "Swiping did not move the Zen calendar to the previous month.")
+        let streakAttachment = XCTAttachment(screenshot: app.screenshot())
+        streakAttachment.name = "Zen Streak — semantic calendar card"
+        streakAttachment.lifetime = .keepAlways
+        add(streakAttachment)
+        tapWhenHittable(app.descendants(matching: .any)["zen-tab-oasis"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["zen-oasis-screen"].waitForExistence(timeout: 12))
+        for action in ["zen-toolbar-coconut-log", "zen-toolbar-members", "zen-toolbar-settings"] {
+            XCTAssertTrue(app.buttons[action].exists, "Oasis is missing the shared toolbar action: \(action)")
+        }
+        XCTAssertTrue(
+            app.descendants(matching: .any)["oasis-tree-level-control"].waitForExistence(timeout: 8),
+            "Zen Oasis did not render the shared standard tree card."
+        )
+        let oasisAttachment = XCTAttachment(screenshot: app.screenshot())
+        oasisAttachment.name = "Zen Oasis — shared standard composition"
+        oasisAttachment.lifetime = .keepAlways
+        add(oasisAttachment)
+
+        tapWhenHittable(app.descendants(matching: .any)["zen-tab-home"], timeout: 8)
+        let balanceBeforeUndo = try XCTUnwrap(
+            Int(numericLabel(app.buttons["zen-toolbar-coconut-log"].label))
+        )
+        let checkedHumanCard = try XCTUnwrap(app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
+        ).allElementsBoundByIndex.first {
+            ($0.value as? String)?.contains("Status background") == true
+        })
+        let checkedHumanIdentifier = checkedHumanCard.identifier
+        let checkedHumanExpandIdentifier = checkedHumanIdentifier.replacingOccurrences(
+            of: "zen-home-subject-",
+            with: "zen-home-expand-"
+        )
+        let expandBeforeUndo = app.buttons.matching(
+            NSPredicate(format: "identifier == %@", checkedHumanExpandIdentifier)
+        ).firstMatch
+        tapWhenHittable(expandBeforeUndo, timeout: 8)
+        let undoCheckIn = app.buttons["zen-expanded-undo-check-in"]
+        XCTAssertTrue(undoCheckIn.waitForExistence(timeout: 8), "The expanded checked card did not expose Undo.")
+        tapWhenHittable(undoCheckIn, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { !undoCheckIn.exists }, "Undo did not remove today's check-in state.")
+        tapWhenHittable(
+            app.descendants(matching: .any).matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-collapse-human-")
+            ).firstMatch,
+            timeout: 8
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 20))
+        let withdrawnOwnerCard = app.buttons[checkedHumanIdentifier]
+        XCTAssertTrue(withdrawnOwnerCard.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                (withdrawnOwnerCard.value as? String)?.contains("Frosted glass cover") == true
+            },
+            "Foreground auto check-in ignored the user's same-day withdrawal."
+        )
+        tapWhenHittable(withdrawnOwnerCard, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                let value = withdrawnOwnerCard.value as? String ?? ""
+                let balance = Int(self.numericLabel(app.buttons["zen-toolbar-coconut-log"].label))
+                return value.contains("Neutral status background") && balance == balanceBeforeUndo
+            },
+            "Manual re-check-in after Undo did not restore the fact without duplicating coconut rewards."
+        )
+    }
+
+    @MainActor
+    func testZenCardTapChecksInAndPressDragSelectsStatusWithoutPopup() throws {
+        let app = launchEnglishApp(
+            matureHouseholdPetName: "Codex Zen Pet",
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
+        )
+        let introduction = app.buttons["zen-introduction-banner"]
+        if introduction.waitForExistence(timeout: 5) {
+            tapWhenHittable(introduction, timeout: 8)
+        }
+        openSettingsFromHomeChrome(in: app)
+        tapWhenHittable(app.buttons["settings-experience-mode-zen"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 20),
+            "The mature Zen household did not reach its lightweight Home shell."
+        )
+
+        XCTAssertFalse(app.descendants(matching: .any)["zen-status-picker"].exists)
+
+        let petCard = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-pet-")
+        ).firstMatch
+        XCTAssertTrue(petCard.waitForExistence(timeout: 12), "Zen Home did not show its active Pet card.")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                (petCard.value as? String)?.contains("Frosted glass cover") == true
+            },
+            "The unchecked Pet card did not expose its frosted-glass pending state."
+        )
+
+        let pendingAttachment = XCTAttachment(screenshot: app.screenshot())
+        pendingAttachment.name = "Zen pending card — frosted glass"
+        pendingAttachment.lifetime = .keepAlways
+        add(pendingAttachment)
+
+        let humanCard = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
+        ).firstMatch
+        XCTAssertTrue(humanCard.waitForExistence(timeout: 8), "Zen Home did not show its active Human card.")
+        humanCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: 0.64)
+        ).press(forDuration: 1.2)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                let currentHumanCard = app.buttons.matching(
+                    NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-human-")
+                ).firstMatch
+                let label = currentHumanCard.label
+                let value = currentHumanCard.value as? String ?? ""
+                return label.contains("5/10 · Steady") && value.contains("Status background: 5/10 · Steady")
+            },
+            "Holding the differently rotated Human card did not save its centered default score."
+        )
+
+        let quickTapCoordinate = petCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: 0.62)
+        )
+        quickTapCoordinate.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["zen-home-all-complete-status"]
+                .waitForExistence(timeout: 12),
+            "A quick tap did not check in the Pet without a status."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["zen-status-picker"].exists,
+            "Quick check-in unexpectedly opened the removed status popup."
+        )
+
+        let neutralAttachment = XCTAttachment(screenshot: app.screenshot())
+        neutralAttachment.name = "Zen checked card — quick check-in without status"
+        neutralAttachment.lifetime = .keepAlways
+        add(neutralAttachment)
+
+        let scoreGestureStart = petCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: 0.74)
+        )
+        let scoreGestureEnd = petCard.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.50, dy: -0.12)
+        )
+        scoreGestureStart.press(forDuration: 0.65, thenDragTo: scoreGestureEnd)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                let currentPetCard = app.buttons.matching(
+                    NSPredicate(format: "identifier BEGINSWITH %@", "zen-home-subject-pet-")
+                ).firstMatch
+                let label = currentPetCard.label
+                let value = currentPetCard.value as? String ?? ""
+                return label.contains("10/10 · Great") && value.contains("Status background: 10/10 · Great")
+            },
+            "Holding and sliding upward did not save 10/10 and reveal the Pet card's green checked state."
+        )
+
+        let checkedAttachment = XCTAttachment(screenshot: app.screenshot())
+        checkedAttachment.name = "Zen checked card — 10 out of 10"
+        checkedAttachment.lifetime = .keepAlways
+        add(checkedAttachment)
+    }
+
+    @MainActor
     func testHumanFirstOnboardingWithProductionOverlaysCompletes() throws {
-        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        let app = launchEnglishApp(
+            seedHumanBaseline: false,
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
+        )
         completePetFirstD17Flow(
             in: app,
             completionMessage: "Human-first onboarding with production overlays did not reach the starter reward in time."
@@ -97,9 +4935,11 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(nameField.waitForExistence(timeout: 12), "Pet name field did not appear.")
         XCTAssertEqual(nameField.elementType, .textField, "Pet name entry lost its text-field role.")
         XCTAssertFalse(
-            app.buttons["member-pet-species-picker"].exists,
+            app.buttons["member-pet-species-option-dog"].exists,
             "The name page should contain only the name task."
         )
+        let petAvatarPreview = app.descendants(matching: .any)["member-pet-avatar-preview"]
+        XCTAssertFalse(petAvatarPreview.exists, "The Pet avatar appeared before step 5.")
 
         let creationPrimary = app.buttons["member-creation-primary-action"]
         XCTAssertFalse(creationPrimary.isEnabled, "An empty Pet name should not advance.")
@@ -113,16 +4953,54 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(creationPrimary, timeout: 8)
 
         XCTAssertTrue(
-            app.buttons["member-pet-species-picker"].waitForExistence(timeout: 8),
+            app.buttons["member-pet-species-option-dog"].waitForExistence(timeout: 8),
             "The identity page did not expose Species."
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["member-pet-species-grid"].exists)
+        XCTAssertFalse(app.buttons["member-pet-species-picker"].exists)
+        XCTAssertFalse(app.staticTexts["Add now, edit details later"].exists)
+        XCTAssertFalse(
+            app.staticTexts["Species and breed are required; sex and appearance can be added later."].exists
         )
         XCTAssertFalse(
             app.buttons["member-gender-boy"].exists || app.buttons["member-gender-girl"].exists,
             "Sex controls should remain on their own appearance page."
         )
+        XCTAssertFalse(petAvatarPreview.exists, "The Pet avatar appeared on the identity step.")
         selectMemberCreationPetSpecies("Dog", in: app)
         selectMemberCreationPetBreed(for: "Dog", in: app)
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Pomeranian")).firstMatch.waitForExistence(timeout: 8),
+            "The English Pet card preview exposed the Chinese breed storage value."
+        )
+        keepScreenshot(of: app, named: "Pet creation - minimal species buttons")
         XCTAssertTrue(waitUntil(timeout: 8) { creationPrimary.isEnabled })
+        tapWhenHittable(creationPrimary, timeout: 8)
+
+        let boy = app.buttons["member-gender-boy"]
+        XCTAssertTrue(boy.waitForExistence(timeout: 8), "The required Pet appearance page did not appear.")
+        XCTAssertTrue(
+            app.buttons["member-pet-coat-picker"].exists,
+            "The optional coat picker was missing from the Pet appearance page."
+        )
+        XCTAssertFalse(petAvatarPreview.exists, "The Pet avatar appeared on the appearance step.")
+        XCTAssertFalse(creationPrimary.isEnabled, "Pet creation advanced before the required sex was selected.")
+        tapWhenHittable(boy, timeout: 8)
+        let coatPicker = app.buttons["member-pet-coat-picker"]
+        tapWhenHittable(coatPicker, timeout: 8)
+        let coatSkipLabels = ["Skip for now", "暂不设置", "Vorerst überspringen"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { self.firstHittableButton(labels: coatSkipLabels, in: app) != nil },
+            "The explicit Coat skip action did not appear."
+        )
+        guard let coatSkip = firstHittableButton(labels: coatSkipLabels, in: app) else {
+            return XCTFail("The explicit Coat skip action was not semantically tappable.")
+        }
+        coatSkip.tap()
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { creationPrimary.isEnabled },
+            "Explicitly skipping Coat did not preserve the valid required Sex answer."
+        )
         tapWhenHittable(creationPrimary, timeout: 8)
 
         XCTAssertTrue(
@@ -130,6 +5008,7 @@ final class OhanaUITests: XCTestCase {
             "The optional personality page did not appear."
         )
         XCTAssertTrue(creationPrimary.isEnabled, "Personality must be skippable without a selection.")
+        XCTAssertFalse(petAvatarPreview.exists, "The Pet avatar appeared on the personality step.")
 
         let personalityIds = [
             "curious", "lazy", "energetic", "clingy", "smart", "toy", "foodie", "drama", "clean", "shy",
@@ -159,18 +5038,259 @@ final class OhanaUITests: XCTestCase {
         )
         keepScreenshot(of: app, named: "Pet creation - personality")
 
-        for id in personalityIds.dropFirst(4) {
-            let choice = app.buttons["member-pet-personality-\(id)"]
-            scrollToElement(choice, in: app, maxSwipes: 6)
-            XCTAssertTrue(
-                choice.exists && hasVisibleFrame(choice, in: app),
-                "Personality \(id) was not available as a direct-tap choice."
-            )
-        }
+        XCTAssertEqual(
+            app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH %@", "member-pet-personality-")
+            ).count,
+            personalityIds.count,
+            "The optional personality grid did not expose every direct-tap choice."
+        )
 
         tapWhenHittable(creationPrimary, timeout: 8)
-        XCTAssertTrue(creationPrimary.waitForExistence(timeout: 8), "Avatar was not the final Pet creation step.")
+        XCTAssertTrue(
+            petAvatarPreview.waitForExistence(timeout: 8),
+            "The Pet avatar did not appear on the final step."
+        )
         XCTAssertTrue(creationPrimary.isEnabled, "The preselected default avatar should allow immediate save.")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        keepScreenshot(of: app, named: "Pet creation - enlarged 2.5D avatar")
+
+        let backAction = app.buttons["member-creation-back-action"]
+        XCTAssertTrue(backAction.waitForExistence(timeout: 4))
+        tapWhenHittable(backAction, timeout: 4)
+        XCTAssertTrue(
+            app.buttons["member-pet-personality-curious"].waitForExistence(timeout: 8),
+            "Back from the avatar step did not return to personality."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 4) { !petAvatarPreview.exists },
+            "The Pet avatar remained visible after leaving step 5."
+        )
+        tapWhenHittable(creationPrimary, timeout: 8)
+        XCTAssertTrue(
+            petAvatarPreview.waitForExistence(timeout: 8),
+            "The Pet avatar did not reappear after returning to step 5."
+        )
+    }
+
+    @MainActor
+    func testHumanFirstOnboardingPetCoatSelectionSurvivesBackNavigation() throws {
+        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        createOnboardingHuman(named: "Codex Coat Human", in: app)
+        advanceOnboardingIntroToMemberCreation(in: app)
+
+        let nameField = app.textFields["member-name-input"]
+        let creationPrimary = app.buttons["member-creation-primary-action"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 12))
+        tapWhenHittable(nameField, timeout: 8)
+        nameField.typeText("Codex Coat Pet")
+        nameField.typeText("\n")
+        XCTAssertTrue(waitUntil(timeout: 8) { creationPrimary.isEnabled })
+        tapWhenHittable(creationPrimary, timeout: 8)
+
+        XCTAssertTrue(app.buttons["member-pet-species-option-dog"].waitForExistence(timeout: 8))
+        selectMemberCreationPetSpecies("Dog", in: app)
+        selectMemberCreationPetBreed(for: "Dog", in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { creationPrimary.isEnabled })
+        tapWhenHittable(creationPrimary, timeout: 8)
+
+        let boy = app.buttons["member-gender-boy"]
+        XCTAssertTrue(boy.waitForExistence(timeout: 8))
+        tapWhenHittable(boy, timeout: 8)
+        let coatPicker = app.buttons["member-pet-coat-picker"]
+        XCTAssertTrue(coatPicker.waitForExistence(timeout: 8))
+        tapWhenHittable(coatPicker, timeout: 8)
+        let firstCoatLabels = ["orange color", "橙色"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { self.firstHittableButton(labels: firstCoatLabels, in: app) != nil },
+            "The first real Coat option did not appear."
+        )
+        guard let firstCoat = firstHittableButton(labels: firstCoatLabels, in: app) else {
+            return XCTFail("The first real Coat option was not semantically tappable.")
+        }
+        let selectedCoatLabel = firstCoat.label
+        firstCoat.tap()
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                self.accessibilityText(for: coatPicker).contains(selectedCoatLabel)
+            },
+            "Selecting a real Coat did not update the appearance answer."
+        )
+
+        tapWhenHittable(creationPrimary, timeout: 8)
+        XCTAssertTrue(
+            app.buttons["member-pet-personality-curious"].waitForExistence(timeout: 8),
+            "The selected Coat path did not advance to Personality."
+        )
+        tapWhenHittable(app.buttons["member-creation-back-action"], timeout: 8)
+        XCTAssertTrue(coatPicker.waitForExistence(timeout: 8), "Back did not return to the Coat answer.")
+        XCTAssertTrue(
+            accessibilityText(for: coatPicker).contains(selectedCoatLabel),
+            "Back navigation lost the selected Coat."
+        )
+        tapWhenHittable(coatPicker, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { self.firstHittableButton(labels: firstCoatLabels, in: app) != nil },
+            "The restored Coat option did not remain available after Back navigation."
+        )
+    }
+
+    @MainActor
+    func testSecondFreePetShowsPersonalBeforeCreationForm() throws {
+        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        let petName = "Codex First Free Pet"
+        advanceOnboardingIntroToMemberCreation(in: app)
+        createMember(
+            in: app,
+            name: petName,
+            flowTitle: "Create Pet Card",
+            missingFieldMessage: "The first Pet creation form did not appear.",
+            completionMessage: "The first Pet did not return directly to Home.",
+            petSpeciesLabel: "Dog",
+            postSaveMarkerIdentifiers: ["home-card-pet-\(petName)"]
+        )
+
+        XCTAssertTrue(
+            app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 12),
+            "Saving the first Pet did not leave its card visible on Home."
+        )
+        tapWhenHittable(app.buttons["home-crew-roster-action"], timeout: 8)
+        let addMember = app.buttons["crew-roster-primary-action"]
+        XCTAssertTrue(addMember.waitForExistence(timeout: 12))
+        tapWhenHittable(addMember, timeout: 8)
+        let addPet = app.descendants(matching: .any)["crew-roster-add-pet-action"]
+        XCTAssertTrue(addPet.waitForExistence(timeout: 8))
+        tapWhenHittable(addPet, timeout: 8)
+
+        let nameField = app.textFields["member-name-input"]
+        let personalScreen = app.descendants(matching: .any)["personal-plan-screen"]
+        var didExposeNameField = false
+        let reachedPersonal = waitUntil(timeout: 12) {
+            didExposeNameField = didExposeNameField || nameField.exists
+            return personalScreen.exists
+        }
+        XCTAssertTrue(
+            reachedPersonal,
+            "A second Free Pet did not show Personal before the creation form."
+        )
+        let reason = app.descendants(matching: .any)["personal-plan-upgrade-reason"]
+        XCTAssertTrue(
+            reason.waitForExistence(timeout: 8),
+            "The compact Personal prompt did not explain the current Pet limit."
+        )
+        XCTAssertTrue(accessibilityText(for: reason).contains("Add another pet"))
+        XCTAssertFalse(
+            didExposeNameField || nameField.exists,
+            "The second Pet form appeared before the Free quota check."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["personal-plan-free-card"].exists ||
+                app.descendants(matching: .any)["personal-plan-appearance-extras"].exists,
+            "The quota prompt still mounted the verbose generic Personal comparison."
+        )
+        keepScreenshot(of: app, named: "Second Free Pet - compact Personal prompt")
+
+        tapWhenHittable(app.buttons["personal-plan-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !personalScreen.exists },
+            "Closing the Personal prompt did not dismiss it."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["crew-roster-members"].waitForExistence(timeout: 8),
+            "Declining the Personal prompt did not return to the member roster."
+        )
+        XCTAssertTrue(
+            app.buttons["crew-roster-card-pet-\(petName)"].waitForExistence(timeout: 8),
+            "Declining the Personal prompt removed the existing Free Pet."
+        )
+        XCTAssertFalse(
+            nameField.exists,
+            "Declining the Personal prompt leaked the second-Pet creation form."
+        )
+    }
+
+    @MainActor
+    func testLocalStoreKitPersonalPlansShowPricesTrialAndEmptyRestoreWithoutPurchase() throws {
+        let storeSession = try SKTestSession(configurationFileNamed: "Ohana")
+        storeSession.disableDialogs = true
+        storeSession.clearTransactions()
+        defer {
+            storeSession.clearTransactions()
+            storeSession.resetToDefaultState()
+        }
+
+        let app = launchEnglishApp(seedHumanBaseline: true, enableProductionOverlays: true)
+        let deferPet = app.buttons["onboarding-defer-pet"]
+        XCTAssertTrue(
+            deferPet.waitForExistence(timeout: 12),
+            "The seeded Human baseline did not expose the optional first-pet decision."
+        )
+        tapWhenHittable(deferPet, timeout: 8)
+        guard let humanName = seededHumanBaselineName else {
+            return XCTFail("The local StoreKit fixture did not retain its seeded Human name.")
+        }
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openSettingsFromHomeChrome(in: app)
+
+        let personalAction = app.buttons["settings-personal-plan-action"]
+        scrollToElement(personalAction, in: app, maxSwipes: 12)
+        XCTAssertTrue(personalAction.waitForExistence(timeout: 12), "Settings did not expose Ohana Personal.")
+        tapWhenHittable(personalAction, timeout: 8)
+
+        let personalScreen = app.descendants(matching: .any)["personal-plan-screen"]
+        XCTAssertTrue(personalScreen.waitForExistence(timeout: 12), "The Personal comparison did not open.")
+
+        let monthly = app.buttons["personal-plan-choice-monthly"]
+        let yearly = app.buttons["personal-plan-choice-yearly"]
+        let lifetime = app.buttons["personal-plan-choice-lifetime"]
+        XCTAssertTrue(monthly.waitForExistence(timeout: 12), "The monthly Personal choice did not appear.")
+        XCTAssertTrue(yearly.waitForExistence(timeout: 12), "The yearly Personal choice did not appear.")
+        XCTAssertTrue(lifetime.waitForExistence(timeout: 12), "The Lifetime Personal choice did not appear.")
+
+        XCTAssertTrue(
+            waitUntil(timeout: 20) {
+                [monthly, yearly, lifetime].allSatisfy {
+                    let text = self.accessibilityText(for: $0)
+                    return !text.contains("—") && !text.contains("Loading")
+                }
+            },
+            "The local StoreKit session did not load all three localized Personal prices."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                self.accessibilityText(for: yearly).contains("14-day free trial")
+            },
+            "The eligible yearly choice did not disclose its configured 14-day trial."
+        )
+
+        tapWhenHittable(monthly, timeout: 8)
+        XCTAssertEqual(monthly.value as? String, "Selected")
+        tapWhenHittable(yearly, timeout: 8)
+        XCTAssertEqual(yearly.value as? String, "Selected")
+        tapWhenHittable(lifetime, timeout: 8)
+        XCTAssertEqual(lifetime.value as? String, "Selected")
+
+        let purchaseAction = app.buttons["personal-plan-purchase-action"]
+        XCTAssertTrue(purchaseAction.exists && purchaseAction.isEnabled, "A loaded Lifetime choice was not purchasable.")
+
+        let restoreAction = app.buttons["personal-plan-restore-action"]
+        XCTAssertTrue(restoreAction.exists && restoreAction.isEnabled, "The Personal screen did not expose Restore Purchases.")
+        tapWhenHittable(restoreAction, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any).matching(
+                NSPredicate(
+                    format: "label CONTAINS %@",
+                    "no Personal or Supporter Pack purchase to restore"
+                )
+            ).firstMatch.waitForExistence(timeout: 12),
+            "An empty local StoreKit restore did not produce the explicit no-purchase result."
+        )
+
+        tapWhenHittable(app.buttons["personal-plan-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !personalScreen.exists && app.buttons["settings-close-action"].exists },
+            "Closing the Personal screen did not return to Settings."
+        )
     }
 
     @MainActor
@@ -225,6 +5345,7 @@ final class OhanaUITests: XCTestCase {
         completeFirstDayStarterFunnel(in: app)
 
         openSettingsFromHomeChrome(in: app)
+        openSettingsCategory("settings-destination-notifications", in: app)
         let advancedNotifications = app.buttons["settings-advanced-notifications-disclosure"]
         scrollToElement(advancedNotifications, in: app, maxSwipes: 8)
         XCTAssertTrue(
@@ -232,23 +5353,124 @@ final class OhanaUITests: XCTestCase {
             "Settings did not expose the advanced notification row."
         )
 
-        let calendarToggle = app.descendants(matching: .any)["settings-notification-calendar-toggle"]
+        let medicationToggle = app.switches["settings-notification-medication-toggle"]
         XCTAssertFalse(
-            calendarToggle.exists,
-            "Calendar notification toggle was mounted before advanced notification settings were expanded."
+            medicationToggle.exists,
+            "Medication notification toggle was mounted before advanced notification settings were expanded."
         )
 
         tapWhenHittable(advancedNotifications, timeout: 8)
+        scrollToElement(medicationToggle, in: app, maxSwipes: 6)
         XCTAssertTrue(
-            calendarToggle.waitForExistence(timeout: 8),
-            "Expanding advanced notification settings did not mount the calendar notification toggle."
+            medicationToggle.waitForExistence(timeout: 8),
+            "Expanding advanced notification settings did not mount the medication notification toggle."
         )
 
+        scrollToElement(advancedNotifications, in: app, maxSwipes: 4)
+        XCTAssertTrue(
+            medicationToggle.exists,
+            "Advanced notification controls disappeared before the collapse action."
+        )
         tapWhenHittable(advancedNotifications, timeout: 8)
         XCTAssertTrue(
-            waitUntil(timeout: 5) { !calendarToggle.exists },
+            waitUntil(timeout: 5) { !medicationToggle.exists },
             "Collapsing advanced notification settings did not unmount category controls."
         )
+    }
+
+    @MainActor
+    func testSettingsLanguageSelectionSurvivesImmediateCloseAndRelaunch() throws {
+        let app = launchEnglishApp(seedHumanBaseline: true, enableProductionOverlays: true)
+        let deferPet = app.buttons["onboarding-defer-pet"]
+        XCTAssertTrue(
+            deferPet.waitForExistence(timeout: 12),
+            "The seeded Human baseline did not expose the optional first-pet decision."
+        )
+        tapWhenHittable(deferPet, timeout: 8)
+        guard let humanName = seededHumanBaselineName else {
+            return XCTFail("The language-switch fixture did not retain its seeded Human name.")
+        }
+
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openSettingsFromHomeChrome(in: app)
+        openSettingsCategory("settings-destination-regionAndLanguage", in: app)
+
+        let languagePicker = app.descendants(matching: .any)["settings-language-picker"]
+        scrollToElement(languagePicker, in: app, maxSwipes: 8)
+        XCTAssertTrue(languagePicker.waitForExistence(timeout: 12), "Settings did not expose the language Picker.")
+        tapWhenHittable(languagePicker, timeout: 8)
+
+        let germanChoice = app.buttons["Deutsch"]
+        XCTAssertTrue(germanChoice.waitForExistence(timeout: 8), "The language Picker did not expose Deutsch.")
+        germanChoice.tap()
+
+        let closeSettings = app.buttons["settings-close-action"]
+        XCTAssertTrue(closeSettings.exists, "The language selection unexpectedly removed the Settings close action.")
+        closeSettings.tap()
+        XCTAssertTrue(
+            app.buttons["home-card-human-\(humanName)"].waitForExistence(timeout: 15),
+            "Closing immediately after language selection did not return to Home."
+        )
+
+        relaunchPreservingPersistentState(in: app, preservingAppLanguage: true)
+        XCTAssertTrue(app.buttons["home-tab-home"].waitForExistence(timeout: 20))
+        openSettingsFromHomeChrome(in: app)
+        openSettingsCategory("settings-destination-regionAndLanguage", in: app)
+
+        let persistedLanguagePicker = app.descendants(matching: .any)["settings-language-picker"]
+        scrollToElement(persistedLanguagePicker, in: app, maxSwipes: 8)
+        XCTAssertTrue(
+            persistedLanguagePicker.waitForExistence(timeout: 12) &&
+                accessibilityText(for: persistedLanguagePicker).contains("Deutsch"),
+            "The immediately selected language did not survive a cold relaunch."
+        )
+    }
+
+    @MainActor
+    func testSettingsSixCategoriesSupportNativeRoundTrips() throws {
+        let app = launchEnglishApp(seedHumanBaseline: true, enableProductionOverlays: true)
+        if app.buttons["onboarding-defer-pet"].waitForExistence(timeout: 5) {
+            tapWhenHittable(app.buttons["onboarding-defer-pet"], timeout: 5)
+        }
+        guard let humanName = seededHumanBaselineName else {
+            return XCTFail("The settings category fixture did not retain its seeded Human name.")
+        }
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openSettingsFromHomeChrome(in: app)
+
+        let identifiers = [
+            "settings-destination-regionAndLanguage",
+            "settings-destination-appearanceAndPerformance",
+            "settings-destination-notifications",
+            "settings-destination-privacyAndSecurity",
+            "settings-destination-dataAndBackup",
+            "settings-destination-about"
+        ]
+
+        for identifier in identifiers {
+            openSettingsCategory(identifier, in: app)
+            let back = app.navigationBars.buttons["BackButton"]
+            XCTAssertTrue(back.waitForExistence(timeout: 8), "\(identifier) did not expose the system back button.")
+            tapWhenHittable(back, timeout: 8)
+            XCTAssertTrue(
+                app.descendants(matching: .any)["settings-main-scroll"].waitForExistence(timeout: 8),
+                "\(identifier) did not return to the Settings root."
+            )
+        }
+
+        let personalAction = app.buttons["settings-personal-plan-action"]
+        scrollTowardElement(personalAction, in: app)
+        XCTAssertTrue(personalAction.exists)
+        tapWhenHittable(personalAction, timeout: 8)
+        let personalScreen = app.descendants(matching: .any)["personal-plan-screen"]
+        XCTAssertTrue(personalScreen.waitForExistence(timeout: 12))
+        tapWhenHittable(app.buttons["personal-plan-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !personalScreen.exists && app.buttons["settings-close-action"].exists },
+            "Closing Personal did not return to Settings."
+        )
+        tapWhenHittable(app.buttons["settings-close-action"], timeout: 8)
+        XCTAssertTrue(app.buttons["home-settings-action"].waitForExistence(timeout: 12))
     }
 
     @MainActor
@@ -285,7 +5507,7 @@ final class OhanaUITests: XCTestCase {
         )
         tapWhenHittable(app.buttons["coconut-balance-close-action"], timeout: 8)
         XCTAssertTrue(
-            waitUntil(timeout: 12) { !coconutScreen.exists && app.otherElements["settings-screen"].exists },
+            waitUntil(timeout: 12) { !coconutScreen.exists && app.buttons["settings-close-action"].exists },
             "Coconut balance developer tool did not remain responsive after applying the test balance."
         )
     }
@@ -303,17 +5525,17 @@ final class OhanaUITests: XCTestCase {
         assertSingleMemberShapeHasNoDeficitCopy(in: app, context: "single-member Home after first pet")
 
         openOasisAndInjectStarterEnergy(in: app)
-        openPetFeatureCollectionFromHomeToolbar(in: app, humanName: humanName)
+        openPetFeatureHubFromHome(in: app, petName: petName, humanName: humanName)
 
         XCTAssertTrue(
-            app.descendants(matching: .any)["pet-feature-collection"].waitForExistence(timeout: 12),
-            "Pet All Features did not open for a one-human one-pet household."
+            app.descendants(matching: .any)["pet-all-features-summary-panel"].waitForExistence(timeout: 12),
+            "The Pet feature hub did not remain open for a one-human one-pet household."
         )
         XCTAssertTrue(
-            app.buttons["pet-feature-card-food"].waitForExistence(timeout: 8),
-            "Pet All Features did not expose the food aggregate card for a one-human one-pet household."
+            app.buttons["feature-hub-daily-food"].waitForExistence(timeout: 8),
+            "The Pet feature hub did not expose food for a one-human one-pet household."
         )
-        assertSingleMemberShapeHasNoDeficitCopy(in: app, context: "single-member Pet All Features")
+        assertSingleMemberShapeHasNoDeficitCopy(in: app, context: "single-member Pet feature hub")
     }
 
     @MainActor
@@ -356,34 +5578,102 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testHumanFeatureHubRoutesOpenFromHome() throws {
+    func testHumanModuleRoutesOpenFromCurrentUI() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
 
-        let routes: [HumanFeatureHubRouteExpectation] = [
-            .init(tileIdentifier: "feature-hub-body-weight", markers: ["Weight trend", "Add weight", "Weight is private", "体重趋势", "添加体重", "体重记录仅本人可见"]),
-            .init(tileIdentifier: "feature-hub-body-metrics", markers: ["Charts appear after you log a metric", "No checkup metrics yet", "Body data is private", "录入任意指标后会生成追踪图", "还没有体检指标记录", "身体数据仅本人可见"]),
-            .init(tileIdentifier: "feature-hub-body-workout", markers: ["Workout Summary", "Add Workout", "Recent Workouts", "运动摘要", "添加运动", "最近运动"]),
-            .init(tileIdentifier: "feature-hub-body-report", markers: ["Health Reports", "Add Report", "No health reports yet", "身体检测报告", "添加报告", "还没有检测报告"]),
-            .init(tileIdentifier: "feature-hub-care-medication", markers: ["No medication plan yet", "Add medication to see", "No medication yet", "还没有服药计划", "添加药物后", "还没有添加药物"]),
-            .init(tileIdentifier: "feature-hub-care-basic", markers: ["\(humanName)'s Info", "\(humanName) 的信息"]),
-            .init(tileIdentifier: "feature-hub-money-expense", markers: ["Timeline", "No expenses yet", "Period", "时间分布", "还没有花费记录", "本期"]),
-            .init(tileIdentifier: "feature-hub-money-wishlist", markers: ["No wishes yet", "Make a wish", "还没有心愿", "许一个愿"]),
-            .init(tileIdentifier: "feature-hub-money-notes", markers: ["Timeline", "Total", "Latest", "时间线", "总记录", "最近"]),
-            .init(tileIdentifier: "feature-hub-account-profile", markers: ["\(humanName)'s Info", "\(humanName) 的信息"])
-        ]
+        openHumanDetailFromHome(in: app, humanName: humanName)
+        let humanDetail = app.descendants(matching: .any)["human-detail-screen"]
+        XCTAssertTrue(
+            humanDetail.waitForExistence(timeout: 12),
+            "The current Human profile entry did not open the member detail screen."
+        )
+        assertAnyMarkerExists([humanName], in: app, timeout: 8, context: "human detail profile")
 
-        for route in routes {
-            openHumanFeatureHubFromHome(in: app, humanName: humanName)
-            openHumanFeatureTile(route.tileIdentifier, in: app)
-            assertAnyMarkerExists(route.markers, in: app, timeout: 18, context: route.tileIdentifier)
-            closeCurrentSheetToHome(in: app, humanName: humanName)
+        let detailRoutes: [(action: String, marker: String, close: String)] = [
+            ("human-detail-health-metrics-action", "human-health-metric-starter-record-action", "BackButton"),
+            ("human-detail-health-report-action", "human-health-report-add-action", "BackButton"),
+            ("human-detail-wishlist-action", "human-wishlist-add-action", "human-module-close-action")
+        ]
+        for route in detailRoutes {
+            let action = app.buttons[route.action]
+            scrollToElement(action, in: app, maxSwipes: 8)
+            XCTAssertTrue(
+                waitForFrameReady(action, timeout: 10),
+                "Human detail did not expose the current module action: \(route.action)"
+            )
+            XCTAssertTrue(
+                tapWhenSemanticallyHittable(action, timeout: 8),
+                "Human detail module action did not become semantically tappable: \(route.action)"
+            )
+
+            let marker = app.descendants(matching: .any)[route.marker]
+            XCTAssertTrue(
+                marker.waitForExistence(timeout: 12),
+                "Human detail module did not expose its stable destination marker: \(route.marker)"
+            )
+
+            let close = app.buttons[route.close]
+            XCTAssertTrue(
+                tapWhenSemanticallyHittable(close, timeout: 8),
+                "Human detail module did not expose its stable return action: \(route.close)"
+            )
+            XCTAssertTrue(
+                waitUntil(timeout: 10) {
+                    !marker.exists &&
+                        app.buttons["human-detail-edit-action"].exists &&
+                        app.buttons["human-detail-edit-action"].isHittable
+                },
+                "Human detail module did not return to the member detail screen: \(route.action)"
+            )
+        }
+
+        let profileBack = app.buttons["BackButton"]
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(profileBack, timeout: 8),
+            "Human detail did not expose a stable Back action."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 10) {
+                !humanDetail.exists && app.buttons["home-tab-home"].exists
+            },
+            "Human detail did not return to Home."
+        )
+
+        let quickRoutes: [(legacy: String, marker: String, close: String)] = [
+            ("feature-hub-body-weight", "human-weight-add-action", "ohana-sheet-close-action"),
+            ("feature-hub-body-workout", "human-workout-summary-view", "human-module-close-action"),
+            ("feature-hub-care-medication", "human-medication-add-action", "human-module-close-action"),
+            ("feature-hub-money-expense", "human-expense-add-action", "ohana-sheet-close-action"),
+            ("feature-hub-money-notes", "human-note-add-action", "human-module-close-action")
+        ]
+        for route in quickRoutes {
+            openHumanModuleFromHome(route.legacy, in: app, humanName: humanName)
+            let marker = app.descendants(matching: .any)[route.marker]
+            XCTAssertTrue(
+                marker.waitForExistence(timeout: 12),
+                "Human quick-action detail did not expose its stable destination marker: \(route.marker)"
+            )
+
+            let close = app.buttons[route.close]
+            XCTAssertTrue(
+                tapWhenSemanticallyHittable(close, timeout: 8),
+                "Human quick-action detail did not expose its stable Close action: \(route.close)"
+            )
+            XCTAssertTrue(
+                waitUntil(timeout: 10) {
+                    !marker.exists &&
+                        !isHumanFeatureRouteOverlayVisible(in: app) &&
+                        app.buttons["home-tab-home"].exists
+                },
+                "Human quick-action detail did not return to Home: \(route.legacy)"
+            )
         }
     }
 
     @MainActor
-    func testHumanRecordOperationsPersistFromFeatureHub() throws {
+    func testHumanRecordOperationsPersistFromCurrentUI() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
@@ -393,31 +5683,31 @@ final class OhanaUITests: XCTestCase {
         let medicationName = "Vitamin D"
         let noteText = "Codex human note \(timestamp)"
 
-        saveHumanWeightFromFeatureHub(in: app, humanName: humanName)
-        assertHumanFeatureRouteContains(
+        saveHumanWeightFromCurrentUI(in: app, humanName: humanName)
+        assertHumanModuleRouteContains(
             "feature-hub-body-weight",
             markers: ["70.0", "70 kg", "70kg"],
             in: app,
             humanName: humanName
         )
 
-        saveHumanExpenseFromFeatureHub(in: app, humanName: humanName, note: expenseNote)
-        assertHumanFeatureRouteContains(
+        saveHumanExpenseFromCurrentUI(in: app, humanName: humanName, note: expenseNote)
+        assertHumanModuleRouteContains(
             "feature-hub-money-expense",
             markers: [expenseNote],
             in: app,
             humanName: humanName
         )
 
-        saveHumanMedicationFromFeatureHub(in: app, humanName: humanName, medicationName: medicationName)
-        assertHumanFeatureRouteContains(
+        saveHumanMedicationFromCurrentUI(in: app, humanName: humanName, medicationName: medicationName)
+        assertHumanModuleRouteContains(
             "feature-hub-care-medication",
             markers: [medicationName],
             in: app,
             humanName: humanName
         )
 
-        saveHumanNoteFromFeatureHub(in: app, humanName: humanName, note: noteText)
+        saveHumanNoteFromCurrentUI(in: app, humanName: humanName, note: noteText)
     }
 
     @MainActor
@@ -444,10 +5734,22 @@ final class OhanaUITests: XCTestCase {
             in: app,
             humanName: humanName
         )
+        assertHumanHomeQuickActionOpensSheet(
+            actionIdentifier: "home-quick-action-humanWorkout",
+            sheetIdentifier: "quick-human-workout-sheet",
+            in: app,
+            humanName: humanName
+        )
+        assertHumanHomeQuickActionOpensSheet(
+            actionIdentifier: "home-quick-action-humanNote",
+            sheetIdentifier: "quick-human-note-sheet",
+            in: app,
+            humanName: humanName
+        )
     }
 
     @MainActor
-    func testHumanExtendedModuleOperationsPersistFromFeatureHub() throws {
+    func testHumanExtendedModuleOperationsPersistFromCurrentUI() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
@@ -458,19 +5760,26 @@ final class OhanaUITests: XCTestCase {
         let reportSummary = "Codex health report \(timestamp)"
         let wishTitle = "Codex wish \(timestamp)"
 
-        saveHumanHealthMetricFromFeatureHub(in: app, humanName: humanName)
-        saveHumanWorkoutFromFeatureHub(in: app, humanName: humanName, note: workoutNote)
-        saveHumanHealthReportFromFeatureHub(
+        saveHumanHealthMetricFromCurrentUI(in: app, humanName: humanName)
+        saveHumanWorkoutFromCurrentUI(in: app, humanName: humanName, note: workoutNote)
+        saveHumanHealthReportFromCurrentUI(
             in: app,
             humanName: humanName,
             hospital: reportHospital,
             summary: reportSummary
         )
-        saveHumanWishlistFromFeatureHub(in: app, humanName: humanName, title: wishTitle)
+        saveHumanWishlistFromCurrentUI(in: app, humanName: humanName, title: wishTitle)
+        assertHumanExtendedModuleOperationsPersistAfterRelaunch(
+            in: app,
+            humanName: humanName,
+            reportHospital: reportHospital,
+            reportSummary: reportSummary,
+            wishTitle: wishTitle
+        )
     }
 
     @MainActor
-    func testHumanExtendedModuleDeletesDisappearFromFeatureHub() throws {
+    func testHumanExtendedModuleDeletesDisappearFromCurrentUI() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
@@ -481,66 +5790,79 @@ final class OhanaUITests: XCTestCase {
         let reportSummary = "Codex delete report \(timestamp)"
         let noteText = "Codex delete note \(timestamp)"
 
-        saveHumanHealthMetricFromFeatureHub(in: app, humanName: humanName)
-        deleteHumanHealthMetricFromFeatureHub(in: app, humanName: humanName)
+        saveHumanHealthMetricFromCurrentUI(in: app, humanName: humanName)
+        deleteHumanHealthMetricFromCurrentUI(in: app, humanName: humanName)
 
-        saveHumanWorkoutFromFeatureHub(in: app, humanName: humanName, note: workoutNote)
+        saveHumanWorkoutFromCurrentUI(in: app, humanName: humanName, note: workoutNote)
         deleteHumanWorkoutFromProfile(in: app, humanName: humanName)
 
-        saveHumanHealthReportFromFeatureHub(
+        saveHumanHealthReportFromCurrentUI(
             in: app,
             humanName: humanName,
             hospital: reportHospital,
             summary: reportSummary
         )
-        deleteHumanHealthReportFromFeatureHub(
+        deleteHumanHealthReportFromCurrentUI(
             in: app,
             humanName: humanName,
             hospital: reportHospital,
             summary: reportSummary
         )
 
-        saveHumanNoteFromFeatureHub(in: app, humanName: humanName, note: noteText)
-        deleteHumanNoteFromFeatureHub(in: app, humanName: humanName, note: noteText)
+        saveHumanNoteFromCurrentUI(in: app, humanName: humanName, note: noteText)
+        deleteHumanNoteFromCurrentUI(in: app, humanName: humanName, note: noteText)
+        assertHumanExtendedModuleDeletesStayDeletedAfterRelaunch(
+            in: app,
+            humanName: humanName,
+            reportHospital: reportHospital,
+            reportSummary: reportSummary,
+            noteText: noteText
+        )
     }
 
     @MainActor
-    func testHumanWishlistRedeemSpendsCoconutsFromFeatureHub() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+    func testHumanWishlistRedeemSpendsCoconutsFromCurrentUI() throws {
+        let startingBalance = 20
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            coconutBalanceSeedAmount: startingBalance
+        )
         let humanName = createFirstHuman(from: app)
-        completeFirstDayStarterFunnel(in: app)
+        completeFirstDayStarterFunnel(
+            in: app,
+            expectedStarterGiftBalance: startingBalance * 2 + 50
+        )
 
         let wishTitle = "Codex redeem wish \(Int(Date().timeIntervalSince1970))"
 
-        saveHumanWishlistFromFeatureHub(in: app, humanName: humanName, title: wishTitle)
-        redeemHumanWishlistFromFeatureHub(in: app, humanName: humanName, title: wishTitle)
+        saveHumanWishlistFromCurrentUI(in: app, humanName: humanName, title: wishTitle)
+        redeemHumanWishlistFromCurrentUI(
+            in: app,
+            humanName: humanName,
+            title: wishTitle,
+            startingBalance: startingBalance,
+            expectedBalance: startingBalance - 10
+        )
     }
 
     @MainActor
-    func testHumanSettingsAccountSwitcherHidesLocalPrivacyControls() throws {
+    func testHumanSettingsInlineSwitcherHidesLocalPrivacyControls() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
-        let humanName = createFirstHuman(from: app)
+        let ownerName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
-
+        let viewerName = createAdditionalHumanFromCrewRoster(in: app, homeHumanName: ownerName)
         openSettingsFromHomeChrome(in: app)
 
-        let accountSwitcher = app.buttons["settings-human-account-switcher-action"]
-        scrollToElement(accountSwitcher, in: app, maxSwipes: 3)
         XCTAssertTrue(
-            accountSwitcher.waitForExistence(timeout: 12),
-            "Settings did not expose the Human account switcher entry."
-        )
-        tapWhenHittable(accountSwitcher, timeout: 8)
-
-        XCTAssertTrue(
-            app.descendants(matching: .any)["human-account-switcher-sheet"].waitForExistence(timeout: 12),
-            "Human account switcher did not open from Settings."
+            app.buttons["settings-human-identity-switch-\(ownerName)"].waitForExistence(timeout: 8),
+            "Settings did not list the original local member in the inline switcher."
         )
         XCTAssertTrue(
-            app.buttons["human-account-switch-row-\(humanName)"].waitForExistence(timeout: 8),
-            "Human account switcher did not list the current local member."
+            app.buttons["settings-human-identity-switch-\(viewerName)"].waitForExistence(timeout: 8),
+            "Settings did not list the additional local member in the inline switcher."
         )
 
+        XCTAssertFalse(app.descendants(matching: .any)["human-account-switcher-sheet"].exists)
         let securitySheet = app.descendants(matching: .any)["human-account-security-sheet"]
         XCTAssertFalse(
             securitySheet.waitForExistence(timeout: 2),
@@ -549,19 +5871,196 @@ final class OhanaUITests: XCTestCase {
         XCTAssertFalse(app.buttons["human-account-security-active-action"].exists)
         XCTAssertFalse(app.buttons["human-account-privacy-all-private-action"].exists)
         XCTAssertFalse(app.buttons["human-account-privacy-all-open-action"].exists)
-
-        tapWhenHittable(app.buttons["human-account-switcher-close-action"], timeout: 8)
     }
 
     @MainActor
     func testHumanProfileStaysVisibleWhenViewedByOtherLocalMember() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let ownerName = createFirstHuman(from: app)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(app.buttons["onboarding-defer-pet"], timeout: 8),
+            "The optional first-pet step did not expose its semantic defer action."
+        )
+        ensureHomeSurfaceVisible(in: app, humanName: ownerName)
         let viewerName = createAdditionalHumanFromCrewRoster(in: app, homeHumanName: ownerName)
 
         switchActiveHumanFromSettings(in: app, to: viewerName)
         openHumanProfileViaUITestLaunchRoute(in: app, humanName: ownerName)
         assertHumanProfileVisibleInLocalFirstMode(in: app, ownerName: ownerName, viewerName: viewerName)
+    }
+
+    @MainActor
+    func testHumanMemberButtonTapAndLongPressOpenDistinctRoutes() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let humanName = createFirstHuman(from: app)
+        tapWhenHittable(app.buttons["onboarding-defer-pet"], timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        let memberAction = app.buttons["home-crew-roster-action"]
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(memberAction, timeout: 8),
+            "The Home member button did not accept its ordinary tap."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["crew-roster-members"].waitForExistence(timeout: 12),
+            "An ordinary member-button tap did not open the crew roster."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["human-account-switcher-sheet"].exists,
+            "An ordinary member-button tap incorrectly opened the account switcher."
+        )
+        closeCrewRosterIfNeeded(in: app)
+
+        XCTAssertTrue(memberAction.waitForExistence(timeout: 8))
+        memberAction.press(forDuration: 0.6)
+
+        let identifiedSwitchAction = app.buttons["home-account-switcher-menu-action"]
+        let labeledSwitchAction = app.buttons["Switch human account"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                identifiedSwitchAction.exists || labeledSwitchAction.exists
+            },
+            "Long-pressing the member button did not expose the account-switch action."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["crew-roster-members"].exists,
+            "Long-pressing the member button incorrectly opened the crew roster."
+        )
+        let switchAction = identifiedSwitchAction.exists ? identifiedSwitchAction : labeledSwitchAction
+        tapWhenHittable(switchAction, timeout: 8)
+
+        let switcher = app.descendants(matching: .any)["human-account-switcher-sheet"]
+        XCTAssertTrue(
+            switcher.waitForExistence(timeout: 12),
+            "Selecting the long-press action did not open the Human account switcher."
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["human-account-active-card"].waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            app.buttons["human-account-switch-row-\(humanName)"].waitForExistence(timeout: 8),
+            "The account switcher did not preserve the current Human row."
+        )
+        tapWhenHittable(app.buttons["human-account-switcher-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !switcher.exists && memberAction.exists },
+            "Closing the account switcher did not return to Home."
+        )
+    }
+
+    @MainActor
+    func testHumanOnlyHouseholdOpensUnifiedAchievementsFromAllFeatures() throws {
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            unlockRewardTier: true
+        )
+        let humanName = createFirstHuman(from: app)
+        tapWhenHittable(app.buttons["onboarding-defer-pet"], timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        let primaryAction = app.buttons["home-primary-action"]
+        XCTAssertTrue(
+            primaryAction.waitForExistence(timeout: 12),
+            "Human-only Home did not expose the feature-center menu."
+        )
+        primaryAction.press(forDuration: 0.6)
+
+        let allFeatures = app.buttons["home-all-features-action"]
+        XCTAssertTrue(
+            allFeatures.waitForExistence(timeout: 8),
+            "Long-pressing the Home action did not expose All Features."
+        )
+        tapWhenHittable(allFeatures, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["function-menu-root"].waitForExistence(timeout: 12),
+            "All Features did not open the function-center root."
+        )
+        let achievements = app.buttons["function-menu-tool-achievements"]
+        XCTAssertTrue(
+            achievements.waitForExistence(timeout: 12),
+            "The Human-only function center did not expose Achievements."
+        )
+        tapWhenHittable(achievements, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["achievement-unified-wall"].waitForExistence(timeout: 16),
+            "The Human-only achievement entry did not open the unified wall."
+        )
+    }
+
+    @MainActor
+    func testHouseholdInsightsKeepAllSixTabsVisibleAtLevelSix() throws {
+        let petName = "Codex Insight Pet \(Int(Date().timeIntervalSince1970))"
+        let app = launchEnglishApp(
+            matureHouseholdPetName: petName,
+            enableProductionOverlays: true,
+            unlockRewardTier: true
+        )
+        XCTAssertTrue(app.buttons["home-tab-home"].waitForExistence(timeout: 20))
+
+        let primaryAction = app.buttons["home-primary-action"]
+        XCTAssertTrue(primaryAction.waitForExistence(timeout: 12))
+        primaryAction.press(forDuration: 0.6)
+        let allFeatures = app.buttons["home-all-features-action"]
+        XCTAssertTrue(
+            tapWhenFrameReady(allFeatures, timeout: 8),
+            "Long-pressing Home did not produce a frame-ready All Features action."
+        )
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["function-menu-root"].waitForExistence(timeout: 12)
+        )
+        let household = app.buttons["function-menu-group-householdHub"]
+        XCTAssertTrue(
+            household.waitForExistence(timeout: 16),
+            "Level 6 did not expose Household Insights in More."
+        )
+        tapWhenHittable(household, timeout: 8)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["function-menu-group-screen-householdHub"]
+                .waitForExistence(timeout: 12)
+        )
+        let segmentIDs = [
+            "feature-weight",
+            "feature-expense",
+            "weekly-report",
+            "care-ledger",
+            "reminder-observability",
+            "long-term-review"
+        ]
+        for id in segmentIDs {
+            XCTAssertTrue(
+                app.buttons["function-menu-group-segment-\(id)"].waitForExistence(timeout: 8),
+                "Household Insights hid the \(id) tab instead of keeping it visible."
+            )
+        }
+
+        let weight = app.buttons["function-menu-group-segment-feature-weight"]
+        let weekly = app.buttons["function-menu-group-segment-weekly-report"]
+        XCTAssertTrue(
+            String(describing: weight.value).contains("Selected"),
+            "Weight was not the available first Household Insight at Level 6."
+        )
+        XCTAssertFalse(
+            String(describing: weekly.value).contains("Lv."),
+            "Weekly Report should be available at Level 6."
+        )
+        let care = app.buttons["function-menu-group-segment-care-ledger"]
+        let reminder = app.buttons["function-menu-group-segment-reminder-observability"]
+        let review = app.buttons["function-menu-group-segment-long-term-review"]
+        XCTAssertTrue(String(describing: care.value).contains("Lv.8"))
+        XCTAssertTrue(String(describing: reminder.value).contains("Lv.8"))
+        XCTAssertTrue(String(describing: review.value).contains("Lv.9"))
+
+        let expense = app.buttons["function-menu-group-segment-feature-expense"]
+        tapWhenHittable(expense, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8, condition: {
+                String(describing: expense.value).contains("Selected")
+                    && String(describing: weight.value).contains("Not selected")
+            }),
+            "The independent Expense tab did not become the selected dashboard."
+        )
     }
 
     @MainActor
@@ -748,10 +6247,15 @@ final class OhanaUITests: XCTestCase {
         ensureHomePetQuickActionVisible(actionType: "walk", in: app, petName: petName)
         let resumeWalkAction = app.buttons["home-quick-action-walk"]
         tapWhenHittable(resumeWalkAction, timeout: 8)
-        let quickStart = app.buttons["home-quick-action-menu-walk"]
-        if quickStart.waitForExistence(timeout: 3) {
-            tapWhenHittable(quickStart, timeout: 8)
-        }
+        let quickStart = homeQuickActionMenuButton(in: app, actionType: "walk", suffix: "quick")
+        XCTAssertTrue(
+            quickStart.waitForExistence(timeout: 8),
+            "Tapping Walk during an active walk did not expose the current quick action."
+        )
+        XCTAssertTrue(
+            tapWhenFrameReady(quickStart, timeout: 8),
+            "The active-walk quick action did not become tappable."
+        )
 
         XCTAssertTrue(
             app.buttons["walk-tracking-card-minimize-action"].waitForExistence(timeout: 10) ||
@@ -803,7 +6307,7 @@ final class OhanaUITests: XCTestCase {
         openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
         openLitterSettings(in: app)
         tapWhenHittable(app.descendants(matching: .any)["quick-potty-litter-settings-reminder-toggle"], timeout: 8)
-        dismissInlinePottySheetByBackdrop(in: app)
+        cancelLitterSettings(in: app)
         openLitterSettings(in: app)
         assertLitterSettingsStatus(
             in: app,
@@ -824,7 +6328,7 @@ final class OhanaUITests: XCTestCase {
             containsAny: ["Reminder on", "提醒已开启", "Erinnerung an"],
             message: "Saving litter settings did not persist the long-session reminder state."
         )
-        dismissInlinePottySheetByBackdrop(in: app)
+        cancelLitterSettings(in: app)
 
         let scoopAction = app.buttons["quick-potty-scoop-primary-action"]
         scrollToElement(scoopAction, in: app, maxSwipes: 6)
@@ -876,13 +6380,13 @@ final class OhanaUITests: XCTestCase {
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "pet-health-recent-row-"))
             .firstMatch
         openPetHealthVisitPopup(in: app)
-        tapWhenHittable(petHealthPopupButton(in: app, labels: ["关闭", "Close"]), timeout: 8)
+        tapWhenHittable(app.buttons["pet-health-record-close-action"], timeout: 8)
         XCTAssertFalse(
             healthRecentRow.waitForExistence(timeout: 2),
             "Cancelling the long-session health popup created a recent health record."
         )
         openPetHealthVisitPopup(in: app)
-        tapWhenHittable(petHealthPopupButton(in: app, labels: ["保存记录", "Save record"]), timeout: 8)
+        tapWhenHittable(app.buttons["pet-health-record-save-action"], timeout: 8)
         XCTAssertTrue(
             healthRecentRow.waitForExistence(timeout: 18),
             "Long-session health log did not appear after saving."
@@ -999,15 +6503,13 @@ final class OhanaUITests: XCTestCase {
         )
         closeCurrentSheetToHome(in: app, humanName: humanName)
 
-        app.terminate()
-        app.launchArguments.removeAll { $0 == "-OHANA_RESET_PERSISTENT_STATE" }
-        app.launch()
+        relaunchPreservingPersistentState(in: app)
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
         openPetBasicInfoFromHome(in: app, petName: petName)
         openPetBasicInfoEditMode(in: app)
         enterPetBasicInfoNote(cancelledNote, in: app)
-        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        discardPetBasicInfoChanges(in: app)
         XCTAssertFalse(
             app.staticTexts["pet-basic-info-notes-readback"].waitForExistence(timeout: 2),
             "Cancelling dog long-session Basic Info edit persisted an unsaved note."
@@ -1031,14 +6533,14 @@ final class OhanaUITests: XCTestCase {
         let markAction = app.buttons["pet-memorial-mark-action"]
         scrollToElement(markAction, in: app)
         tapWhenHittable(markAction, timeout: 8)
-        tapWhenHittable(app.buttons["取消"], timeout: 8)
+        tapFirstAvailableButton(["Cancel", "取消", "Abbrechen"], in: app, timeout: 8, context: "dog long-session memorial mark cancel")
         XCTAssertFalse(
             app.staticTexts["pet-memorial-passed-date"].waitForExistence(timeout: 2),
             "Cancelling the dog long-session memorial mark still wrote a passed-away date."
         )
 
         tapWhenHittable(markAction, timeout: 8)
-        tapWhenHittable(app.buttons["确认"], timeout: 8)
+        tapFirstAvailableButton(["Confirm", "确认", "Bestätigen"], in: app, timeout: 8, context: "dog long-session memorial mark confirm")
         let passedDate = app.staticTexts["pet-memorial-passed-date"]
         XCTAssertTrue(
             passedDate.waitForExistence(timeout: 12),
@@ -1048,14 +6550,14 @@ final class OhanaUITests: XCTestCase {
         let undoAction = app.buttons["pet-memorial-undo-action"]
         scrollToElement(undoAction, in: app)
         tapWhenHittable(undoAction, timeout: 8)
-        tapWhenHittable(app.buttons["取消"], timeout: 8)
+        tapFirstAvailableButton(["Cancel", "取消", "Abbrechen"], in: app, timeout: 8, context: "dog long-session memorial undo cancel")
         XCTAssertTrue(
             passedDate.waitForExistence(timeout: 4),
             "Cancelling dog long-session memorial undo unexpectedly cleared the passed-away date."
         )
 
         tapWhenHittable(undoAction, timeout: 8)
-        tapWhenHittable(app.buttons["撤销"], timeout: 8)
+        tapFirstAvailableButton(["Undo", "撤销", "Zurücknehmen"], in: app, timeout: 8, context: "dog long-session memorial undo confirm")
         XCTAssertTrue(
             markAction.waitForExistence(timeout: 12),
             "Confirming dog long-session memorial undo did not restore the live-pet mark action."
@@ -1099,13 +6601,23 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testExistingPetRealUserJourneyWithoutReset() throws {
-        let app = launchEnglishApp(resetPersistentState: false, enableProductionOverlays: true)
-        let humanName: String = if let existingHumanName = firstExistingHomeHumanName(in: app) {
-            existingHumanName
-        } else if isOnboardingEntryAvailable(in: app, timeout: 2) {
-            createFirstHuman(from: app)
+        let app = launchEnglishApp(
+            resetPersistentState: false,
+            seedHumanBaseline: false,
+            enableProductionOverlays: true
+        )
+        prepareExistingUserHomeDiscovery(in: app)
+        let humanName: String
+        if let existingHumanName = firstExistingHomeHumanName(in: app) {
+            humanName = existingHumanName
+        } else if app.textFields["onboarding-human-name-input"].waitForExistence(timeout: 3) {
+            let onboardingHumanName = "Codex No Reset Human \(Int(Date().timeIntervalSince1970))"
+            createOnboardingHuman(named: onboardingHumanName, in: app)
+            humanName = onboardingHumanName
         } else {
-            seedReusablePetBaselineByResettingEmptyState(in: app)
+            throw XCTSkip(
+                "Existing-user journey requires an existing Home user or a fresh Human-first onboarding state; it will not reset or inject a hidden baseline."
+            )
         }
 
         let petName: String = if let existingPetName = firstExistingHomePetName(in: app) {
@@ -1159,8 +6671,7 @@ final class OhanaUITests: XCTestCase {
         )
         closeCurrentSheetToHome(in: app, humanName: humanName)
 
-        app.terminate()
-        app.launch()
+        relaunchPreservingPersistentState(in: app)
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
         XCTAssertTrue(
             app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 14) ||
@@ -1261,9 +6772,9 @@ final class OhanaUITests: XCTestCase {
         let humanName = createFirstHuman(from: app)
         let petName = "Codex Water Calendar Pet \(Int(Date().timeIntervalSince1970))"
         let waterEventTitles = [
-            "Water \(petName)",
+            "\(petName) water",
             "\(petName) 喂水",
-            "\(petName) Wasser geben"
+            "\(petName) Wasser"
         ]
         completeFirstDayStarterFunnel(
             in: app,
@@ -1445,8 +6956,32 @@ final class OhanaUITests: XCTestCase {
             recentLitterRow.waitForExistence(timeout: 18),
             "Scoop log did not appear in the recent strip after recording."
         )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "quick-potty-recent-row-litter-", in: app),
+            1,
+            "One scoop produced an unexpected number of logical litter records."
+        )
 
-        tapWhenHittable(scoopAction, timeout: 8)
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+        openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
+
+        let recentStrip = app.descendants(matching: .any)["quick-potty-recent-strip"]
+        let persistedLitterRows = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "quick-potty-recent-row-litter-"))
+        scrollToElement(persistedLitterRows.firstMatch, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            persistedLitterRows.firstMatch.waitForExistence(timeout: 18),
+            "Scoop log did not survive closing and reopening the potty detail."
+        )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "quick-potty-recent-row-litter-", in: app),
+            1,
+            "Reopening the potty detail showed an unexpected number of litter records after one scoop."
+        )
+
+        let reopenedScoopAction = app.buttons["quick-potty-scoop-primary-action"]
+        scrollTowardElement(reopenedScoopAction, in: app, maxSwipes: 6)
+        tapWhenHittable(reopenedScoopAction, timeout: 8)
         let repeatConfirm = app.buttons["quick-potty-scoop-confirm-action"]
         XCTAssertTrue(
             repeatConfirm.waitForExistence(timeout: 10),
@@ -1463,6 +6998,29 @@ final class OhanaUITests: XCTestCase {
             },
             "Scoop repeat confirmation did not explain the same-day guard."
         )
+        tapWhenHittable(app.buttons["quick-potty-sheet-cancel-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                !app.buttons["quick-potty-scoop-confirm-action"].exists
+            },
+            "Cancelling the guarded scoop confirmation did not return to the potty detail."
+        )
+        XCTAssertTrue(recentStrip.exists, "Cancelling the guarded scoop confirmation lost the potty detail.")
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+        openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
+        let finalLitterRows = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "quick-potty-recent-row-litter-"))
+        scrollToElement(finalLitterRows.firstMatch, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            finalLitterRows.firstMatch.waitForExistence(timeout: 18),
+            "The original scoop record disappeared after the guarded repeat path."
+        )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "quick-potty-recent-row-litter-", in: app),
+            1,
+            "The guarded repeat scoop changed the persisted litter record count."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
     }
 
     @MainActor
@@ -1505,15 +7063,14 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testPetLitterPlanReminderCancelAndSaveFromQuickCareDetail() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
-        let humanName = createFirstHuman(from: app)
         let petName = "Codex Litter Plan Cat \(Int(Date().timeIntervalSince1970))"
-        completeFirstDayStarterFunnel(
-            in: app,
+        let fixture = launchMatureHouseholdEnglishApp(
             petName: petName,
-            petSpeciesLabel: "Cat",
-            completionMessage: "Creating the first cat did not leave the pet creation handoff in time."
+            petSpecies: "cat",
+            enableProductionOverlays: true
         )
+        let app = fixture.app
+        let humanName = fixture.humanName
 
         openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
         openLitterSettings(in: app)
@@ -1529,7 +7086,7 @@ final class OhanaUITests: XCTestCase {
             "Litter settings did not expose the reminder toggle."
         )
         tapWhenHittable(reminderToggle, timeout: 8)
-        dismissInlinePottySheetByBackdrop(in: app)
+        cancelLitterSettings(in: app)
 
         openLitterSettings(in: app)
         assertLitterSettingsStatus(
@@ -1553,11 +7110,13 @@ final class OhanaUITests: XCTestCase {
             "Litter settings sheet stayed open after saving."
         )
 
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+        openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
         openLitterSettings(in: app)
         assertLitterSettingsStatus(
             in: app,
             containsAny: ["Reminder on", "提醒已开启", "Erinnerung an"],
-            message: "Saving litter settings did not persist the reminder state."
+            message: "Saving litter settings did not survive reopening the potty detail."
         )
     }
 
@@ -1786,23 +7345,57 @@ final class OhanaUITests: XCTestCase {
             "Hygiene log did not appear in recent records after recording."
         )
 
-        tapWhenHittable(recordAction, timeout: 8)
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+        openPetHygieneDetailFromHome(in: app, petName: petName, humanName: humanName)
+
+        let reopenedRecordAction = app.buttons["pet-hygiene-teeth-record-action"]
+        let persistedRows = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "pet-hygiene-teeth-recent-row-"))
+        scrollToElement(persistedRows.firstMatch, in: app, maxSwipes: 6)
         XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                app.staticTexts["Already done today"].exists ||
-                    app.staticTexts["今天已经完成了"].exists ||
-                    app.buttons["OK"].exists ||
-                    app.buttons["知道了"].exists
-            },
+            persistedRows.firstMatch.waitForExistence(timeout: 18),
+            "Hygiene log did not survive closing and reopening the hygiene detail."
+        )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-hygiene-teeth-recent-row-", in: app),
+            1,
+            "Reopening the hygiene detail showed an unexpected number of teeth records after one check-in."
+        )
+
+        scrollTowardElement(reopenedRecordAction, in: app, maxSwipes: 6)
+        tapWhenHittable(reopenedRecordAction, timeout: 8)
+        let repeatAlert = app.alerts["Already done today"]
+        XCTAssertTrue(
+            repeatAlert.waitForExistence(timeout: 8),
             "Repeating the same hygiene record did not show the single-use guard."
         )
-        tapWhenHittable(
-            app.buttons.matching(NSPredicate(format: "label IN %@", ["OK", "知道了", "Verstanden"])).firstMatch,
-            timeout: 8
+        let acknowledgeRepeat = repeatAlert.buttons["OK"]
+        XCTAssertTrue(
+            acknowledgeRepeat.waitForExistence(timeout: 4),
+            "The hygiene repeat alert did not expose its scoped acknowledgement action."
+        )
+        tapWhenHittable(acknowledgeRepeat, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !repeatAlert.exists },
+            "Acknowledging the hygiene repeat guard did not dismiss its alert."
         )
         XCTAssertTrue(
             app.descendants(matching: .any)["pet-hygiene-detail-screen"].waitForExistence(timeout: 8),
             "Dismissing the repeat hygiene guard did not return to the hygiene detail screen."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+        openPetHygieneDetailFromHome(in: app, petName: petName, humanName: humanName)
+        let finalPersistedRows = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "pet-hygiene-teeth-recent-row-"))
+        scrollToElement(finalPersistedRows.firstMatch, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            finalPersistedRows.firstMatch.waitForExistence(timeout: 18),
+            "The original hygiene record disappeared after the guarded repeat path."
+        )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-hygiene-teeth-recent-row-", in: app),
+            1,
+            "The guarded repeat hygiene tap changed the persisted teeth record count."
         )
         closeCurrentSheetToHome(in: app, humanName: humanName)
     }
@@ -1829,17 +7422,17 @@ final class OhanaUITests: XCTestCase {
 
         openPetHealthVisitPopup(in: app)
         XCTAssertTrue(
-            app.descendants(matching: .any)["pet-health-record-inline-popup"].waitForExistence(timeout: 10),
-            "Health visit action did not open the inline record popup."
+            app.descendants(matching: .any)["pet-health-record-sheet"].waitForExistence(timeout: 10),
+            "Health visit action did not open the record sheet."
         )
-        tapWhenHittable(petHealthPopupButton(in: app, labels: ["关闭", "Close"]), timeout: 8)
+        tapWhenHittable(app.buttons["pet-health-record-close-action"], timeout: 8)
         XCTAssertFalse(
             recentRow.waitForExistence(timeout: 2),
             "Cancelling the health record popup created a recent health record."
         )
 
         openPetHealthVisitPopup(in: app)
-        let saveAction = petHealthPopupButton(in: app, labels: ["保存记录", "Save record"])
+        let saveAction = app.buttons["pet-health-record-save-action"]
         XCTAssertTrue(
             saveAction.waitForExistence(timeout: 10),
             "Health record popup did not expose the save action."
@@ -1850,6 +7443,35 @@ final class OhanaUITests: XCTestCase {
             recentRow.waitForExistence(timeout: 18),
             "Health log did not appear in the recent health records after saving."
         )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            1,
+            "Saving one health visit did not produce exactly one visible recent row."
+        )
+
+        let savedRowIdentifier = recentRow.identifier
+        XCTAssertTrue(
+            savedRowIdentifier.hasPrefix("pet-health-recent-row-health-"),
+            "The saved health row did not expose its persistent PetHealthLog identity."
+        )
+
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
+
+        let persistedRow = app.descendants(matching: .any)[savedRowIdentifier]
+        XCTAssertTrue(
+            persistedRow.waitForExistence(timeout: 18),
+            "Relaunch did not read back the same saved health record."
+        )
+        XCTAssertEqual(
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            1,
+            "Relaunch lost or duplicated the saved health record."
+        )
+
         closeCurrentSheetToHome(in: app, humanName: humanName)
     }
 
@@ -1901,8 +7523,28 @@ final class OhanaUITests: XCTestCase {
         )
 
         openPetBasicInfoFromHome(in: app, petName: petName)
-        scrollToElement(app.buttons["pet-danger-delete-action"], in: app)
-        tapWhenHittable(app.buttons["pet-danger-delete-action"], timeout: 8)
+        let deleteAction = app.buttons["pet-danger-delete-action"]
+        scrollToElement(deleteAction, in: app)
+        tapWhenHittable(deleteAction, timeout: 8)
+
+        let closeAction = app.buttons["pet-delete-confirm-close"]
+        XCTAssertTrue(closeAction.waitForExistence(timeout: 8), "Pet delete confirmation did not expose its top close action.")
+        tapWhenHittable(closeAction, timeout: 8)
+        XCTAssertFalse(
+            app.textFields["pet-delete-confirm-name-input"].waitForExistence(timeout: 2),
+            "Pet delete confirmation sheet stayed visible after its top close action."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-basic-info-screen"].waitForExistence(timeout: 8),
+            "Closing pet delete from the top action did not return to Basic Info."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { containsAnyMarker([petName], in: app) },
+            "Pet name disappeared after closing permanent delete from the top action."
+        )
+
+        scrollToElement(deleteAction, in: app)
+        tapWhenHittable(deleteAction, timeout: 8)
 
         let finalDelete = app.buttons["pet-delete-confirm-delete"]
         XCTAssertTrue(finalDelete.waitForExistence(timeout: 8), "Pet delete confirmation action did not appear.")
@@ -1929,11 +7571,15 @@ final class OhanaUITests: XCTestCase {
         let humanName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
 
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-account-profile", in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        expandHumanCardFromHome(in: app, humanName: humanName)
         XCTAssertTrue(
-            app.descendants(matching: .any)["human-basic-info-screen"].waitForExistence(timeout: 12),
-            "Human Basic Info did not open before the permanent delete safety check."
+            tapWhenFrameReady(app.buttons["home-expanded-detail-human"], timeout: 8),
+            "Expanded Human card did not expose a stable detail entry before the permanent delete safety check."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["human-detail-screen"].waitForExistence(timeout: 12),
+            "Human details did not open before the permanent delete safety check."
         )
 
         let markAction = app.buttons["human-memorial-mark-action"]
@@ -1965,8 +7611,8 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(app.buttons["human-delete-confirm-cancel"], timeout: 8)
         XCTAssertFalse(nameInput.waitForExistence(timeout: 2), "Human delete confirmation sheet stayed visible after cancel.")
         XCTAssertTrue(
-            app.descendants(matching: .any)["human-basic-info-screen"].waitForExistence(timeout: 8),
-            "Canceling human delete did not return to Basic Info."
+            app.descendants(matching: .any)["human-detail-screen"].waitForExistence(timeout: 8),
+            "Canceling human delete did not return to Human details."
         )
         XCTAssertTrue(
             waitUntil(timeout: 8) {
@@ -1974,6 +7620,217 @@ final class OhanaUITests: XCTestCase {
                     app.buttons["human-danger-delete-action"].exists
             },
             "Human memorial and permanent delete actions were not both still available after canceling delete."
+        )
+    }
+
+    @MainActor
+    func testHumanPermanentDeleteWithExactNamePersistsAcrossRelaunch() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let ownerName = createFirstHuman(from: app)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(app.buttons["onboarding-defer-pet"], timeout: 8),
+            "The optional first-pet step did not expose its semantic defer action."
+        )
+        ensureHomeSurfaceVisible(in: app, humanName: ownerName)
+
+        let deletedHumanName = createAdditionalHumanFromCrewRoster(
+            in: app,
+            homeHumanName: ownerName,
+            name: "Codex Deleted Human \(Int(Date().timeIntervalSince1970))"
+        )
+
+        openHumanDetailFromHome(in: app, humanName: deletedHumanName)
+
+        let deleteAction = app.buttons["human-danger-delete-action"]
+        scrollToElement(deleteAction, in: app)
+        XCTAssertTrue(
+            deleteAction.waitForExistence(timeout: 8),
+            "Additional Human did not expose the permanent delete action."
+        )
+        tapWhenHittable(deleteAction, timeout: 8)
+
+        let nameInput = app.textFields["human-delete-confirm-name-input"]
+        XCTAssertTrue(
+            nameInput.waitForExistence(timeout: 8),
+            "Human delete confirmation input did not appear."
+        )
+        tapWhenHittable(nameInput, timeout: 8)
+        nameInput.typeText(deletedHumanName)
+
+        let finalDelete = app.buttons["human-delete-confirm-delete"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                finalDelete.exists && finalDelete.isEnabled
+            },
+            "Human delete action did not enable after entering the exact name."
+        )
+        tapWhenHittable(finalDelete, timeout: 8)
+
+        let ownerHomeCard = app.buttons["home-card-human-\(ownerName)"]
+        let deletedHomeCard = app.buttons["home-card-human-\(deletedHumanName)"]
+        XCTAssertTrue(
+            waitUntil(timeout: 20) {
+                app.state == .runningForeground &&
+                    ownerHomeCard.exists &&
+                    !deletedHomeCard.exists &&
+                    isHomeSurfaceResponsive(in: app)
+            },
+            "Deleting the additional Human did not return to responsive Home with the owner preserved."
+        )
+        XCTAssertFalse(
+            deletedHomeCard.exists,
+            "Deleted Human remained visible on Home."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: ownerName)
+
+        let relaunchedOwnerCard = app.buttons["home-card-human-\(ownerName)"]
+        let relaunchedDeletedCard = app.buttons["home-card-human-\(deletedHumanName)"]
+        XCTAssertTrue(
+            relaunchedOwnerCard.waitForExistence(timeout: 15),
+            "Owner Human did not survive relaunch after deleting another Human."
+        )
+        XCTAssertFalse(
+            relaunchedDeletedCard.waitForExistence(timeout: 3),
+            "Deleted Human returned on Home after relaunch."
+        )
+
+        let rosterAction = app.buttons["home-crew-roster-action"]
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(rosterAction, timeout: 8),
+            "Home crew roster action did not become semantically tappable after relaunch."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["crew-roster-members"]
+                .waitForExistence(timeout: 12),
+            "Crew roster did not open after relaunch."
+        )
+
+        let ownerRosterCard = app.buttons["crew-roster-card-human-\(ownerName)"]
+        let deletedRosterCard = app.buttons["crew-roster-card-human-\(deletedHumanName)"]
+        XCTAssertTrue(
+            ownerRosterCard.waitForExistence(timeout: 12),
+            "Owner Human was missing from the roster after relaunch."
+        )
+        XCTAssertFalse(
+            deletedRosterCard.waitForExistence(timeout: 3),
+            "Deleted Human returned in the roster after relaunch."
+        )
+    }
+
+    @MainActor
+    func testDeletingActiveHumanRequiresAccountSwitchAndPersistsAcrossRelaunch() throws {
+        let app = launchEnglishApp(enableProductionOverlays: true)
+        let ownerName = createFirstHuman(from: app)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(app.buttons["onboarding-defer-pet"], timeout: 8),
+            "The optional first-pet step did not expose its semantic defer action."
+        )
+        ensureHomeSurfaceVisible(in: app, humanName: ownerName)
+
+        let deletedHumanName = createAdditionalHumanFromCrewRoster(
+            in: app,
+            homeHumanName: ownerName,
+            name: "Codex Active Deleted Human \(Int(Date().timeIntervalSince1970))"
+        )
+        switchActiveHumanFromSettings(in: app, to: deletedHumanName)
+        openHumanDetailFromHome(in: app, humanName: deletedHumanName)
+
+        let deleteAction = app.buttons["human-danger-delete-action"]
+        scrollToElement(deleteAction, in: app)
+        XCTAssertTrue(
+            deleteAction.waitForExistence(timeout: 8),
+            "Active additional Human did not expose the permanent delete action."
+        )
+        tapWhenHittable(deleteAction, timeout: 8)
+
+        let nameInput = app.textFields["human-delete-confirm-name-input"]
+        XCTAssertTrue(
+            nameInput.waitForExistence(timeout: 8),
+            "Active Human delete confirmation input did not appear."
+        )
+        tapWhenHittable(nameInput, timeout: 8)
+        nameInput.typeText(deletedHumanName)
+
+        let finalDelete = app.buttons["human-delete-confirm-delete"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                finalDelete.exists && finalDelete.isEnabled
+            },
+            "Active Human delete action did not enable after entering the exact name."
+        )
+        tapWhenHittable(finalDelete, timeout: 8)
+
+        let switcher = app.descendants(matching: .any)["human-account-switcher-sheet"]
+        XCTAssertTrue(
+            switcher.waitForExistence(timeout: 18),
+            "Deleting the active Human did not require choosing a remaining account."
+        )
+        XCTAssertFalse(
+            app.buttons["human-account-switcher-close-action"].waitForExistence(timeout: 2),
+            "Required account switch exposed a close action that could skip choosing an active Human."
+        )
+
+        let ownerSwitchRow = app.buttons["human-account-switch-row-\(ownerName)"]
+        let deletedSwitchRow = app.buttons["human-account-switch-row-\(deletedHumanName)"]
+        XCTAssertTrue(
+            ownerSwitchRow.waitForExistence(timeout: 12),
+            "Required account switch did not offer the surviving owner."
+        )
+        XCTAssertFalse(
+            deletedSwitchRow.waitForExistence(timeout: 2),
+            "Required account switch still offered the deleted Human."
+        )
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(ownerSwitchRow, timeout: 8),
+            "The surviving owner did not become semantically tappable in required account switch."
+        )
+
+        let ownerHomeCard = app.buttons["home-card-human-\(ownerName)"]
+        let deletedHomeCard = app.buttons["home-card-human-\(deletedHumanName)"]
+        let settings = app.buttons["home-settings-action"]
+        XCTAssertTrue(
+            waitUntil(timeout: 20) {
+                !switcher.exists &&
+                    ownerHomeCard.exists &&
+                    !deletedHomeCard.exists &&
+                    settings.exists &&
+                    settings.label.contains(ownerName) &&
+                    isHomeSurfaceResponsive(in: app)
+            },
+            "Choosing the surviving owner did not restore a responsive Home and active identity."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: ownerName)
+        XCTAssertTrue(
+            waitUntil(timeout: 15) {
+                app.buttons["home-settings-action"].exists &&
+                    app.buttons["home-settings-action"].label.contains(ownerName)
+            },
+            "Relaunch did not preserve the surviving owner as the active Human."
+        )
+        XCTAssertFalse(
+            app.buttons["home-card-human-\(deletedHumanName)"].waitForExistence(timeout: 3),
+            "Deleted active Human returned on Home after relaunch."
+        )
+
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(app.buttons["home-crew-roster-action"], timeout: 8),
+            "Home crew roster action did not become semantically tappable after account recovery."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["crew-roster-members"].waitForExistence(timeout: 12),
+            "Crew roster did not open after relaunching the recovered account."
+        )
+        XCTAssertTrue(
+            app.buttons["crew-roster-card-human-\(ownerName)"].waitForExistence(timeout: 12),
+            "Surviving owner was missing from the roster after relaunch."
+        )
+        XCTAssertFalse(
+            app.buttons["crew-roster-card-human-\(deletedHumanName)"].waitForExistence(timeout: 3),
+            "Deleted active Human returned in the roster after relaunch."
         )
     }
 
@@ -2052,7 +7909,7 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     func testPetMemorialMarkCancelConfirmAndUndoFlow() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
-        _ = createFirstHuman(from: app)
+        let humanName = createFirstHuman(from: app)
         let petName = "Codex Memorial Pet \(Int(Date().timeIntervalSince1970))"
         completeFirstDayStarterFunnel(
             in: app,
@@ -2064,34 +7921,122 @@ final class OhanaUITests: XCTestCase {
         let markAction = app.buttons["pet-memorial-mark-action"]
         scrollToElement(markAction, in: app)
         tapWhenHittable(markAction, timeout: 8)
-        tapWhenHittable(app.buttons["取消"], timeout: 8)
+        let cancelledMarkAlert = app.alerts["Confirm passing mark"]
+        XCTAssertTrue(
+            cancelledMarkAlert.waitForExistence(timeout: 8),
+            "The memorial mark action did not expose its confirmation alert."
+        )
+        tapWhenHittable(cancelledMarkAlert.buttons["Cancel"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-basic-info-screen"].waitForExistence(timeout: 8),
+            "Cancelling the memorial mark alert lost the pet profile."
+        )
+        XCTAssertTrue(
+            markAction.waitForExistence(timeout: 4),
+            "Cancelling the memorial mark alert removed the live-pet mark action."
+        )
         XCTAssertFalse(
             app.staticTexts["pet-memorial-passed-date"].waitForExistence(timeout: 2),
             "Cancelling the memorial mark alert still wrote a passed-away date."
         )
 
-        tapWhenHittable(markAction, timeout: 8)
-        tapWhenHittable(app.buttons["确认"], timeout: 8)
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openPetBasicInfoFromHome(in: app, petName: petName)
+        let persistedMarkAction = app.buttons["pet-memorial-mark-action"]
+        scrollToElement(persistedMarkAction, in: app)
+        XCTAssertTrue(
+            persistedMarkAction.waitForExistence(timeout: 8),
+            "Relaunch after cancelling memorial mark did not preserve the live-pet state."
+        )
+        XCTAssertFalse(
+            app.staticTexts["pet-memorial-passed-date"].exists,
+            "Relaunch after cancelling memorial mark unexpectedly read a passed-away date."
+        )
+
+        tapWhenHittable(persistedMarkAction, timeout: 8)
+        let confirmedMarkAlert = app.alerts["Confirm passing mark"]
+        XCTAssertTrue(
+            confirmedMarkAlert.waitForExistence(timeout: 8),
+            "The persisted live-pet profile did not expose the memorial confirmation alert."
+        )
+        tapWhenHittable(confirmedMarkAlert.buttons["Confirm"], timeout: 8)
         let passedDate = app.staticTexts["pet-memorial-passed-date"]
         XCTAssertTrue(
             passedDate.waitForExistence(timeout: 12),
             "Confirming the memorial mark did not show the passed-away summary."
         )
 
-        let undoAction = app.buttons["pet-memorial-undo-action"]
-        scrollToElement(undoAction, in: app)
-        tapWhenHittable(undoAction, timeout: 8)
-        tapWhenHittable(app.buttons["取消"], timeout: 8)
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
         XCTAssertTrue(
-            passedDate.waitForExistence(timeout: 4),
+            waitUntil(timeout: 12) { !app.buttons["home-card-pet-\(petName)"].exists },
+            "Confirmed memorial pet still appeared as a live Home card after relaunch."
+        )
+        openPetBasicInfoFromCrewRoster(in: app, petName: petName)
+        let persistedPassedDate = app.staticTexts["pet-memorial-passed-date"]
+        XCTAssertTrue(
+            persistedPassedDate.waitForExistence(timeout: 12),
+            "Confirmed memorial mark did not survive relaunch and roster readback."
+        )
+
+        let persistedUndoAction = app.buttons["pet-memorial-undo-action"]
+        scrollToElement(persistedUndoAction, in: app)
+        tapWhenHittable(persistedUndoAction, timeout: 8)
+        let cancelledUndoAlert = app.alerts["Undo passing mark"]
+        XCTAssertTrue(
+            cancelledUndoAlert.waitForExistence(timeout: 8),
+            "The memorial undo action did not expose its confirmation alert."
+        )
+        tapWhenHittable(cancelledUndoAlert.buttons["Cancel"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-basic-info-screen"].waitForExistence(timeout: 8),
+            "Cancelling memorial undo lost the archived pet profile."
+        )
+        XCTAssertTrue(
+            persistedPassedDate.waitForExistence(timeout: 4),
             "Cancelling the memorial undo alert unexpectedly cleared the passed-away date."
         )
 
-        tapWhenHittable(undoAction, timeout: 8)
-        tapWhenHittable(app.buttons["撤销"], timeout: 8)
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openPetBasicInfoFromCrewRoster(in: app, petName: petName)
         XCTAssertTrue(
-            markAction.waitForExistence(timeout: 12),
+            app.staticTexts["pet-memorial-passed-date"].waitForExistence(timeout: 12),
+            "Cancelling memorial undo did not preserve the archived state across relaunch."
+        )
+
+        let confirmedUndoAction = app.buttons["pet-memorial-undo-action"]
+        scrollToElement(confirmedUndoAction, in: app)
+        tapWhenHittable(confirmedUndoAction, timeout: 8)
+        let confirmedUndoAlert = app.alerts["Undo passing mark"]
+        XCTAssertTrue(
+            confirmedUndoAlert.waitForExistence(timeout: 8),
+            "The persisted memorial profile did not expose the undo confirmation alert."
+        )
+        tapWhenHittable(confirmedUndoAlert.buttons["Undo"], timeout: 8)
+        let restoredMarkAction = app.buttons["pet-memorial-mark-action"]
+        XCTAssertTrue(
+            restoredMarkAction.waitForExistence(timeout: 12),
             "Confirming memorial undo did not restore the live-pet mark action."
+        )
+
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        XCTAssertTrue(
+            app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 12),
+            "Confirmed memorial undo did not restore the pet Home card after relaunch."
+        )
+        openPetBasicInfoFromHome(in: app, petName: petName)
+        let finalMarkAction = app.buttons["pet-memorial-mark-action"]
+        scrollToElement(finalMarkAction, in: app)
+        XCTAssertTrue(
+            finalMarkAction.waitForExistence(timeout: 8),
+            "Final relaunch did not preserve the restored live-pet memorial action."
+        )
+        XCTAssertFalse(
+            app.staticTexts["pet-memorial-passed-date"].exists || app.buttons["pet-memorial-undo-action"].exists,
+            "Final relaunch retained memorial state after confirmed undo."
         )
     }
 
@@ -2101,11 +8046,16 @@ final class OhanaUITests: XCTestCase {
         let humanName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
 
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-account-profile", in: app)
+        closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        expandHumanCardFromHome(in: app, humanName: humanName)
         XCTAssertTrue(
-            app.descendants(matching: .any)["human-basic-info-screen"].waitForExistence(timeout: 12),
-            "Human Basic Info did not open before the memorial lifecycle flow."
+            tapWhenFrameReady(app.buttons["home-expanded-detail-human"], timeout: 8),
+            "Expanded Human card did not expose a stable detail entry before the memorial lifecycle flow."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["human-detail-screen"].waitForExistence(timeout: 12),
+            "Human details did not open before the memorial lifecycle flow."
         )
 
         let markAction = app.buttons["human-memorial-mark-action"]
@@ -2124,11 +8074,6 @@ final class OhanaUITests: XCTestCase {
             passedDate.waitForExistence(timeout: 12),
             "Confirming the human memorial mark did not show the passed-away summary."
         )
-        XCTAssertFalse(
-            app.buttons["human-basic-info-edit-action"].waitForExistence(timeout: 2),
-            "Human Basic Info still exposed live edit after entering memorial mode."
-        )
-
         let undoAction = app.buttons["human-memorial-undo-action"]
         scrollToElement(undoAction, in: app)
         tapWhenHittable(undoAction, timeout: 8)
@@ -2144,10 +8089,6 @@ final class OhanaUITests: XCTestCase {
             markAction.waitForExistence(timeout: 12),
             "Confirming human memorial undo did not restore the live mark action."
         )
-        XCTAssertTrue(
-            app.buttons["human-basic-info-edit-action"].waitForExistence(timeout: 8),
-            "Confirming human memorial undo did not restore the live edit entry."
-        )
     }
 
     @MainActor
@@ -2160,12 +8101,13 @@ final class OhanaUITests: XCTestCase {
             petName: petName,
             completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
         )
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
         openPetBasicInfoFromHome(in: app, petName: petName)
         let markAction = app.buttons["pet-memorial-mark-action"]
         scrollToElement(markAction, in: app)
         tapWhenHittable(markAction, timeout: 8)
-        tapWhenHittable(app.buttons["确认"], timeout: 8)
+        tapFirstAvailableButton(["Confirm", "确认", "Bestätigen"], in: app, timeout: 8, context: "hidden pet memorial mark confirm")
         XCTAssertTrue(
             app.staticTexts["pet-memorial-passed-date"].waitForExistence(timeout: 12),
             "Confirming memorial mark did not show the passed-away summary."
@@ -2193,29 +8135,28 @@ final class OhanaUITests: XCTestCase {
             "Memorial pet still exposed live-care quick actions on Home."
         )
 
-        openOasisAndInjectStarterEnergy(in: app)
-        openPetFeatureCollectionFromHomeToolbar(in: app, humanName: humanName)
-
+        let rosterAction = app.buttons["home-crew-roster-action"]
         XCTAssertTrue(
-            app.descendants(matching: .any)["pet-feature-collection"].waitForExistence(timeout: 12),
-            "Pet All Features did not open after memorial pet return."
+            tapWhenFrameReady(rosterAction, timeout: 8),
+            "Home member roster action did not become tappable after memorial pet return."
         )
-        let foodCard = app.buttons["pet-feature-card-food"]
-        XCTAssertTrue(foodCard.waitForExistence(timeout: 12), "Pet All Features did not expose the food aggregate card.")
-        tapWhenHittable(foodCard, timeout: 8)
-
         XCTAssertTrue(
-            app.descendants(matching: .any)["function-menu-aggregate-food"].waitForExistence(timeout: 12),
-            "Pet All Features food card did not open the food aggregate surface."
+            app.descendants(matching: .any)["crew-roster-members"].waitForExistence(timeout: 12),
+            "Home member roster did not open after memorial pet return."
         )
-        XCTAssertFalse(
-            app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch.exists ||
-                app.staticTexts.matching(NSPredicate(format: "label == %@", petName)).firstMatch.exists,
-            "Memorial pet still appeared as an active Function Menu daily-care target."
+        let memorialRosterCard = app.buttons["crew-roster-card-pet-\(petName)"]
+        XCTAssertTrue(
+            memorialRosterCard.waitForExistence(timeout: 12),
+            "Memorial pet disappeared from the member archive roster."
         )
-        XCTAssertFalse(
-            isAnyLivePetRouteVisible(in: app),
-            "Opening Function Menu daily care for a memorial-only household opened a live pet route."
+        tapWhenHittable(memorialRosterCard, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-basic-info-screen"].waitForExistence(timeout: 12),
+            "Opening the memorial pet from the member roster did not restore its archived profile."
+        )
+        XCTAssertTrue(
+            app.staticTexts["pet-memorial-passed-date"].waitForExistence(timeout: 12),
+            "The archived memorial pet profile did not preserve its passed-away summary."
         )
     }
 
@@ -2241,7 +8182,7 @@ final class OhanaUITests: XCTestCase {
         let markAction = app.buttons["pet-memorial-mark-action"]
         scrollToElement(markAction, in: app)
         tapWhenHittable(markAction, timeout: 8)
-        tapWhenHittable(app.buttons["确认"], timeout: 8)
+        tapFirstAvailableButton(["Confirm", "确认", "Bestätigen"], in: app, timeout: 8, context: "calendar pet memorial mark confirm")
         XCTAssertTrue(
             app.staticTexts["pet-memorial-passed-date"].waitForExistence(timeout: 12),
             "Confirming memorial mark did not show the passed-away summary before stale Calendar route check."
@@ -2253,18 +8194,17 @@ final class OhanaUITests: XCTestCase {
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
         openCalendarTabFromHome(in: app, humanName: humanName)
-        assertCalendarEvent(petEventTitle, exists: true, in: app, context: "memorial stale calendar row still visible")
-        tapCalendarEvent(petEventTitle, in: app)
+        assertCalendarEvent(petEventTitle, exists: false, in: app, context: "memorial event excluded from the active calendar")
 
         XCTAssertTrue(
             waitUntil(timeout: 8) {
                 app.state == .runningForeground
             },
-            "Tapping a stale Calendar event for a memorial pet left the app unresponsive."
+            "Filtering a memorial pet's Calendar event left the app unresponsive."
         )
         XCTAssertFalse(
             isAnyLivePetRouteVisible(in: app),
-            "Tapping a stale Calendar event for a memorial pet opened a live care, health, walk, or economy route."
+            "Filtering a memorial pet's Calendar event opened a live care, health, walk, or economy route."
         )
     }
 
@@ -2314,13 +8254,15 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testPetBondVaultUnlockSpendsPetBalanceFromFeatureHub() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true, coconutBalanceSeedAmount: 1000)
+        let seedBalance = 1000
+        let app = launchEnglishApp(enableProductionOverlays: true, coconutBalanceSeedAmount: seedBalance)
         let humanName = createFirstHuman(from: app)
         let petName = "Codex Bond Vault Spend Pet \(Int(Date().timeIntervalSince1970))"
         completeFirstDayStarterFunnel(
             in: app,
             petName: petName,
-            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time.",
+            expectedStarterGiftBalance: seedBalance * 2 + 50
         )
 
         openPetFeatureHubFromHome(in: app, petName: petName, humanName: humanName)
@@ -2365,9 +8307,10 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu() throws {
+        let seedBalance = 1000
         let app = launchEnglishApp(
             enableProductionOverlays: true,
-            coconutBalanceSeedAmount: 1000,
+            coconutBalanceSeedAmount: seedBalance,
             unlockRewardTier: true
         )
         let humanName = createFirstHuman(from: app)
@@ -2375,7 +8318,8 @@ final class OhanaUITests: XCTestCase {
         completeFirstDayStarterFunnel(
             in: app,
             petName: petName,
-            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+            completionMessage: "Creating the first pet did not leave the pet creation handoff in time.",
+            expectedStarterGiftBalance: seedBalance * 2 + 50
         )
 
         openCoconutShopFromOasis(in: app, humanName: humanName)
@@ -2415,6 +8359,65 @@ final class OhanaUITests: XCTestCase {
             Int(numericLabel(accessibilityText(for: balance))) == startingBalance - 300
         }
         XCTAssertTrue(didSpend, "Purchasing Lime Glow did not spend 300 human coconuts through the shop GUI.")
+
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                accessibilityText(for: limeGlow).contains("Owned")
+            },
+            "Purchased Lime Glow did not become an owned shop item."
+        )
+
+        let treasureBoxMetric = app.descendants(matching: .any)["coconut-shop-owned-count"]
+        tapWhenHittable(treasureBoxMetric, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["inventory-screen"].waitForExistence(timeout: 12),
+            "The shop's treasure-box entry did not open owned-item management."
+        )
+        let limeGlowSwitch = app.switches["coconut-inventory-effect-fx_lime_glow"]
+        XCTAssertTrue(
+            limeGlowSwitch.waitForExistence(timeout: 8),
+            "The purchased Lime Glow effect was missing from the treasure box."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { (limeGlowSwitch.value as? String) == "1" },
+            "Purchasing Lime Glow did not equip it in the treasure box."
+        )
+        tapWhenHittable(limeGlowSwitch, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { (limeGlowSwitch.value as? String) == "0" },
+            "The Lime Glow switch did not turn the effect off."
+        )
+        tapWhenHittable(limeGlowSwitch, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { (limeGlowSwitch.value as? String) == "1" },
+            "The Lime Glow switch did not turn the effect back on."
+        )
+
+        tapWhenHittable(app.navigationBars["My treasure box"].buttons["Close"], timeout: 8)
+        tapWhenHittable(app.navigationBars["Coconut Shop"].buttons["Close"], timeout: 8)
+        openCoconutShopFromOasis(in: app, humanName: humanName)
+        tapWhenHittable(app.buttons["coconut-shop-category-effect"], timeout: 8)
+        let reopenedLimeGlow = app.descendants(matching: .any)["coconut-shop-item-fx_lime_glow"]
+        scrollToElement(reopenedLimeGlow, in: app, maxSwipes: 4)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                accessibilityText(for: reopenedLimeGlow).contains("Owned")
+            },
+            "Lime Glow ownership did not survive closing and reopening the shop."
+        )
+
+        tapWhenHittable(app.descendants(matching: .any)["coconut-shop-owned-count"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["inventory-screen"].waitForExistence(timeout: 12),
+            "The treasure box did not reopen after returning to the shop."
+        )
+        let persistedLimeGlowSwitch = app.switches["coconut-inventory-effect-fx_lime_glow"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                persistedLimeGlowSwitch.exists && (persistedLimeGlowSwitch.value as? String) == "1"
+            },
+            "The equipped Lime Glow state did not survive closing and reopening the shop."
+        )
     }
 
     @MainActor
@@ -2433,7 +8436,7 @@ final class OhanaUITests: XCTestCase {
         openPetBasicInfoFromHome(in: app, petName: petName)
         openPetBasicInfoEditMode(in: app)
         enterPetBasicInfoNote(cancelledNote, in: app)
-        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        discardPetBasicInfoChanges(in: app)
         XCTAssertFalse(
             app.textFields["pet-basic-info-notes-input"].waitForExistence(timeout: 3),
             "Cancelling pet basic info edit left the edit note field visible."
@@ -2544,9 +8547,16 @@ final class OhanaUITests: XCTestCase {
 
         let titleField = app.textFields["add-event-title-input"]
         XCTAssertTrue(titleField.waitForExistence(timeout: 10), "Calendar add-event sheet did not expose title input.")
+        let reminderLeadPicker = app.buttons["add-event-reminder-lead-picker"]
         XCTAssertTrue(
-            app.buttons["add-event-reminder-lead-atTime"].waitForExistence(timeout: 8),
-            "Calendar add-event sheet did not default to an at-time reminder option."
+            reminderLeadPicker.waitForExistence(timeout: 8),
+            "Calendar add-event sheet did not expose the reminder lead picker."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 5) {
+                accessibilityText(for: reminderLeadPicker).localizedCaseInsensitiveContains("At time")
+            },
+            "Calendar add-event sheet did not default to an at-time reminder option. Actual: \(accessibilityText(for: reminderLeadPicker))"
         )
         XCTAssertTrue(tapWhenFrameReady(titleField, timeout: 8), "Calendar event title input was not frame-ready.")
 
@@ -2882,10 +8892,14 @@ final class OhanaUITests: XCTestCase {
     private func launchEnglishApp(
         resetPersistentState: Bool = true,
         seedHumanBaseline: Bool = true,
+        seedMemberCardBaseline: Bool = false,
+        matureHouseholdPetName: String? = nil,
+        matureHouseholdPetSpecies: String = "dog",
         enableProductionOverlays: Bool = false,
         coconutBalanceSeedAmount: Int? = nil,
         unlockRewardTier: Bool = false,
         resetEconomyBudget: Bool = false,
+        initialExperienceMode: String = "standard",
         extraLaunchArguments: [String] = []
     ) -> XCUIApplication {
         let app = XCUIApplication()
@@ -2901,7 +8915,7 @@ final class OhanaUITests: XCTestCase {
         if resetPersistentState {
             app.launchArguments += ["-OHANA_RESET_PERSISTENT_STATE"]
         }
-        if seedHumanBaseline {
+        if seedHumanBaseline || seedMemberCardBaseline {
             let baselineName = "Codex Human Baseline \(Int(Date().timeIntervalSince1970))"
             seededHumanBaselineName = baselineName
             app.launchArguments += [
@@ -2909,8 +8923,24 @@ final class OhanaUITests: XCTestCase {
                 "-OHANA_UI_TEST_HUMAN_BASELINE_NAME",
                 baselineName
             ]
+            if seedMemberCardBaseline {
+                app.launchArguments += ["-OHANA_UI_TEST_SEED_MEMBER_CARD_BASELINE"]
+            }
         } else {
             seededHumanBaselineName = nil
+        }
+        if let matureHouseholdPetName {
+            XCTAssertTrue(
+                resetPersistentState && seedHumanBaseline && !seedMemberCardBaseline,
+                "The mature household fixture requires reset plus the standard Human baseline."
+            )
+            app.launchArguments += [
+                "-OHANA_UI_TEST_SEED_MATURE_HOUSEHOLD_BASELINE",
+                "-OHANA_UI_TEST_PET_BASELINE_NAME",
+                matureHouseholdPetName,
+                "-OHANA_UI_TEST_PET_BASELINE_SPECIES",
+                matureHouseholdPetSpecies
+            ]
         }
         if enableProductionOverlays {
             app.launchArguments += ["-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS"]
@@ -2930,7 +8960,223 @@ final class OhanaUITests: XCTestCase {
         }
         app.launchArguments += extraLaunchArguments
         app.launch()
+        chooseInitialExperienceIfNeeded(initialExperienceMode, in: app)
         return app
+    }
+
+    @MainActor
+    private func chooseInitialExperienceIfNeeded(_ mode: String, in app: XCUIApplication) {
+        let selection = app.descendants(matching: .any)["app-experience-selection"]
+        _ = waitUntil(timeout: 8) {
+            selection.exists ||
+                app.textFields["onboarding-human-name-input"].exists ||
+                app.buttons["home-tab-home"].exists ||
+                app.descendants(matching: .any)["zen-home-screen"].exists
+        }
+        guard selection.exists else { return }
+        let action = app.buttons["app-experience-\(mode)"]
+        XCTAssertTrue(
+            action.waitForExistence(timeout: 8),
+            "The requested initial Ohana experience was not available: \(mode)"
+        )
+        tapWhenHittable(action, timeout: 8)
+
+        // A freshly erased Simulator can occasionally drop the first
+        // synthesized tap while its rendering pipelines are still warming.
+        // The selection action is idempotent while this picker remains on
+        // screen, so verify the handoff and retry its center once if needed.
+        if !waitUntil(timeout: 2, condition: { !selection.exists }),
+           action.exists,
+           action.isEnabled {
+            action.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !selection.exists },
+            "The requested initial Ohana experience did not open: \(mode)"
+        )
+    }
+
+    @MainActor
+    private func launchMatureHouseholdEnglishApp(
+        petName: String,
+        petSpecies: String,
+        enableProductionOverlays: Bool = false
+    ) -> (app: XCUIApplication, humanName: String) {
+        let app = launchEnglishApp(
+            matureHouseholdPetName: petName,
+            matureHouseholdPetSpecies: petSpecies,
+            enableProductionOverlays: enableProductionOverlays
+        )
+        guard let humanName = seededHumanBaselineName else {
+            XCTFail("The mature household fixture did not request its Human baseline.")
+            return (app, "Codex Human Baseline")
+        }
+        XCTAssertTrue(
+            app.buttons["home-tab-home"].waitForExistence(timeout: 20),
+            "The mature household fixture did not reach Home."
+        )
+        XCTAssertTrue(
+            app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 12),
+            "The mature household fixture did not expose its seeded Pet on Home."
+        )
+        return (app, humanName)
+    }
+
+    @MainActor
+    private func openMemberCardJourney(in app: XCUIApplication) {
+        XCTAssertTrue(
+            app.buttons["home-tab-home"].waitForExistence(timeout: 20),
+            "The member-card baseline did not reach Home."
+        )
+        tapWhenHittable(app.buttons["home-tab-calendar"], timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-route"].waitForExistence(timeout: 12),
+            "The member-card baseline did not reach Tasks."
+        )
+        reopenMemberCardJourney(in: app)
+    }
+
+    @MainActor
+    private func reopenMemberCardJourney(in app: XCUIApplication) {
+        let action = app.buttons[
+            "task-center-system-action-completeHumanProfile-household-starter-v1-humanProfile"
+        ]
+        XCTAssertTrue(action.waitForExistence(timeout: 12), "The member-card starter task did not appear.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)[
+                "task-center-starter-journey-sheet-completeHumanProfile"
+            ].waitForExistence(timeout: 12),
+            "The member-card guided sheet did not open."
+        )
+    }
+
+    @MainActor
+    private func assertMemberCardProgress(
+        _ expected: String,
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let progress = app.descendants(matching: .any)["task-center-starter-journey-progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 8), file: file, line: line)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { self.accessibilityText(for: progress).contains(expected) },
+            "Expected member-card progress \(expected), got \(accessibilityText(for: progress)).",
+            file: file,
+            line: line
+        )
+    }
+
+    @MainActor
+    private func assertMemberCardJourneyComplete(
+        in app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        assertMemberCardProgress("2/2", in: app, file: file, line: line)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "The member-card journey did not expose its completed state.",
+            file: file,
+            line: line
+        )
+    }
+
+    @MainActor
+    private func completeAndClaimStarterProfilePrerequisites(in app: XCUIApplication) {
+        completeAndClaimStarterJourney(
+            in: app,
+            actionIdentifier: "task-center-system-action-completeHumanProfile-household-starter-v1-humanProfile",
+            sheetIdentifier: "task-center-starter-journey-sheet-completeHumanProfile",
+            destination: "completeHumanProfile"
+        ) {
+            tapGuidedJourneyControlAfterSemanticScroll(
+                app.buttons["task-center-starter-resolution-humanAppearance-preferNotToSay"],
+                in: app
+            )
+            tapGuidedJourneyControlAfterSemanticScroll(
+                app.buttons["task-center-starter-resolution-humanOptionalDetails-unknown"],
+                in: app
+            )
+        }
+
+        completeAndClaimStarterJourney(
+            in: app,
+            actionIdentifier: "task-center-system-action-completeFirstPetProfile-household-starter-v1-petProfile",
+            sheetIdentifier: "task-center-starter-journey-sheet-completeFirstPetProfile",
+            destination: "completeFirstPetProfile"
+        ) {
+            tapGuidedJourneyControlAfterSemanticScroll(
+                app.buttons["task-center-starter-resolution-petLifeStage-unknown"],
+                in: app
+            )
+        }
+
+        completeAndClaimStarterJourney(
+            in: app,
+            actionIdentifier: "task-center-system-action-confirmPetIdentityProtection-household-starter-v1-identityProtection",
+            sheetIdentifier: "task-center-starter-journey-sheet-confirmPetIdentityProtection",
+            destination: "confirmPetIdentityProtection"
+        ) {
+            tapGuidedJourneyControlAfterSemanticScroll(
+                app.buttons["task-center-starter-resolution-petIdentityDocuments-notApplicable"],
+                in: app
+            )
+            tapGuidedJourneyControlAfterSemanticScroll(
+                app.buttons["task-center-starter-resolution-petEmergencyContact-preferNotToSay"],
+                in: app
+            )
+        }
+    }
+
+    @MainActor
+    private func completeAndClaimStarterJourney(
+        in app: XCUIApplication,
+        actionIdentifier: String,
+        sheetIdentifier: String,
+        destination: String,
+        completeQuestions: () -> Void
+    ) {
+        let action = app.buttons[actionIdentifier]
+        let sheet = app.descendants(matching: .any)[sheetIdentifier]
+        XCTAssertTrue(
+            action.waitForExistence(timeout: 12),
+            "The prerequisite \(destination) task did not appear."
+        )
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(
+            sheet.waitForExistence(timeout: 12),
+            "The prerequisite \(destination) journey did not open."
+        )
+
+        completeQuestions()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-starter-journey-complete"]
+                .waitForExistence(timeout: 12),
+            "The prerequisite \(destination) journey did not reach its completed card."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !sheet.exists },
+            "The prerequisite \(destination) Finish action did not return to Tasks."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                action.exists && action.label.localizedCaseInsensitiveContains("Claim")
+            },
+            "The prerequisite \(destination) journey did not expose a separate Claim state."
+        )
+
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-claim-\(destination)"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
+        XCTAssertTrue(waitUntil(timeout: 12) { !action.exists })
     }
 
     @MainActor
@@ -2983,16 +9229,26 @@ final class OhanaUITests: XCTestCase {
             missingFieldMessage: "Pet-first onboarding name field did not appear.",
             completionMessage: completionMessage,
             petSpeciesLabel: "Dog",
-            postSaveMarkerIdentifiers: ["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
+            postSaveMarkerIdentifiers: ["home-card-pet-\(petName)"]
         )
-        XCTAssertGreaterThanOrEqual(
-            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-")).count,
-            1,
-            "The first Human card was missing before the starter gift appeared."
+        let homeTab = app.buttons["home-tab-home"]
+        XCTAssertTrue(
+            tapWhenFrameReady(homeTab, timeout: 8),
+            "The Home tab was not reachable before the starter gift."
         )
         XCTAssertTrue(
-            app.buttons["home-card-pet-\(petName)"].exists,
-            "The first Pet card was missing before the starter gift appeared."
+            waitUntil(timeout: 8) {
+                app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-")).count >= 1
+            },
+            "The first Human card was missing from Home before the starter gift appeared."
+        )
+        XCTAssertTrue(
+            app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 8),
+            "The first Pet card was missing from Home before the starter gift appeared."
+        )
+        XCTAssertTrue(
+            tapWhenFrameReady(app.buttons["home-tab-calendar"], timeout: 8),
+            "Tasks was not reachable again to claim the starter gift."
         )
         finishRequiredStarterGift(in: app)
 
@@ -3003,10 +9259,23 @@ final class OhanaUITests: XCTestCase {
         let level = app.descendants(matching: .any)["oasis-tree-level-control"]
         XCTAssertTrue(level.waitForExistence(timeout: 12), "The Oasis seed level was not visible.")
         XCTAssertTrue(level.label.contains("level 0"), "The first Oasis surface was not the Lv0 seed state: \(level.label)")
-        XCTAssertGreaterThanOrEqual(
-            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-")).count,
-            1,
-            "Human-first onboarding did not retain its Human profile."
+        XCTAssertTrue(
+            tapWhenFrameReady(homeTab, timeout: 8),
+            "Home was not reachable after checking the Oasis seed state."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-")).count >= 1
+            },
+            "Human-first onboarding did not retain its Human profile on Home."
+        )
+        XCTAssertTrue(
+            tapWhenFrameReady(oasisTab, timeout: 8),
+            "Oasis was not reachable again after verifying the retained Home cards."
+        )
+        XCTAssertTrue(
+            app.otherElements["oasis-screen"].waitForExistence(timeout: 12),
+            "The starter flow did not return to Oasis for the next value-loop action."
         )
         XCTAssertLessThanOrEqual(
             Date().timeIntervalSince(startedAt),
@@ -3048,7 +9317,8 @@ final class OhanaUITests: XCTestCase {
         in app: XCUIApplication,
         petName: String = "Codex Pet \(Int(Date().timeIntervalSince1970))",
         petSpeciesLabel: String? = "Dog",
-        completionMessage: String = "Creating the first pet did not leave the pet creation handoff in time."
+        completionMessage: String = "Creating the first pet did not leave the pet creation handoff in time.",
+        expectedStarterGiftBalance: Int = 50
     ) -> String {
         openFirstPetCreationFromJourney(in: app)
         createMember(
@@ -3058,15 +9328,21 @@ final class OhanaUITests: XCTestCase {
             missingFieldMessage: "Pet creation name field did not appear.",
             completionMessage: completionMessage,
             petSpeciesLabel: petSpeciesLabel,
-            postSaveMarkerIdentifiers: ["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
+            postSaveMarkerIdentifiers: ["home-card-pet-\(petName)"]
         )
-        finishRequiredStarterGift(in: app)
+        finishRequiredStarterGift(in: app, expectedHomeBalance: expectedStarterGiftBalance)
         return petName
     }
 
     @MainActor
-    private func finishRequiredStarterGift(in app: XCUIApplication) {
+    private func finishRequiredStarterGift(in app: XCUIApplication, expectedHomeBalance: Int = 50) {
         let taskClaim = app.buttons["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
+        if !taskClaim.exists {
+            XCTAssertTrue(
+                tapWhenFrameReady(app.buttons["home-tab-calendar"], timeout: 8),
+                "Tasks was not reachable to claim the first-pet reward."
+            )
+        }
         XCTAssertTrue(taskClaim.waitForExistence(timeout: 20), "First-pet reward task did not appear after the Pet was saved.")
         XCTAssertFalse(app.buttons["starter-gift-finish-action"].exists, "Starter gift appeared before the reward task was opened.")
         tapWhenHittable(taskClaim, timeout: 8)
@@ -3078,9 +9354,19 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home-tab-oasis"].waitForExistence(timeout: 8), "Oasis tab did not appear after unlocking the Coconut Tree.")
         XCTAssertTrue(
             waitUntil(timeout: 8) {
-                app.buttons["home-coconut-action"].label.localizedCaseInsensitiveContains("50")
+                app.buttons["home-coconut-action"].label == "Coconut balance \(expectedHomeBalance)"
             },
-            "The Home coconut balance did not refresh to include the starter gift before the ceremony closed."
+            "The Home coconut balance did not refresh to the expected post-gift balance \(expectedHomeBalance) before the ceremony closed."
+        )
+        let homeTab = app.tabBars.buttons["home-tab-home"]
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 8), "Home tab did not remain available after starter gift.")
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(homeTab, timeout: 8),
+            "Home tab did not become semantically tappable after starter gift."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 5) { homeTab.isSelected },
+            "Home tab did not become selected after starter gift."
         )
         XCTAssertTrue(
             app.descendants(matching: .any)["starter-oasis-tab-prompt"].waitForExistence(timeout: 8),
@@ -3211,12 +9497,24 @@ final class OhanaUITests: XCTestCase {
         let settings = app.buttons["home-settings-action"]
         XCTAssertTrue(settings.waitForExistence(timeout: 12), "Home settings action did not appear.")
         XCTAssertTrue(
-            tapWhenFrameReady(settings, timeout: 8),
-            "Home settings action existed but did not become frame-ready."
+            tapWhenSemanticallyHittable(settings, timeout: 8),
+            "Home settings action existed but did not become semantically tappable."
         )
 
-        let settingsScreen = app.otherElements["settings-screen"]
-        XCTAssertTrue(settingsScreen.waitForExistence(timeout: 12), "Settings screen did not open from home chrome.")
+        let settingsCloseAction = app.buttons["settings-close-action"]
+        XCTAssertTrue(settingsCloseAction.waitForExistence(timeout: 12), "Settings screen did not open from home chrome.")
+    }
+
+    @MainActor
+    private func openSettingsCategory(_ identifier: String, in app: XCUIApplication) {
+        let category = app.buttons[identifier]
+        scrollToElement(category, in: app, maxSwipes: 8)
+        XCTAssertTrue(category.waitForExistence(timeout: 12), "Settings category \(identifier) did not appear.")
+        tapWhenHittable(category, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !category.exists || !category.isHittable },
+            "Settings category \(identifier) did not navigate."
+        )
     }
 
     @MainActor
@@ -3230,15 +9528,24 @@ final class OhanaUITests: XCTestCase {
 
         let crewButton = app.buttons["home-crew-roster-action"]
         XCTAssertTrue(crewButton.waitForExistence(timeout: 12), "Home crew roster action did not appear.")
-        tapWhenHittable(crewButton, timeout: 8)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(crewButton, timeout: 8),
+            "Home crew roster action did not become semantically tappable."
+        )
 
         let addMember = app.buttons["crew-roster-primary-action"]
         XCTAssertTrue(addMember.waitForExistence(timeout: 12), "Crew roster did not expose the add-member action.")
-        tapWhenHittable(addMember, timeout: 8)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(addMember, timeout: 8),
+            "Crew roster add-member action did not become semantically tappable."
+        )
 
         let humanCrew = app.buttons["crew-roster-add-human-action"]
         XCTAssertTrue(humanCrew.waitForExistence(timeout: 8), "Crew roster add menu did not expose Human crew.")
-        tapWhenHittable(humanCrew, timeout: 8)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(humanCrew, timeout: 8),
+            "Crew roster Human action did not become semantically tappable."
+        )
 
         createMember(
             in: app,
@@ -3300,11 +9607,23 @@ final class OhanaUITests: XCTestCase {
             quickSwitch.waitForExistence(timeout: 12),
             "Settings did not expose the Human identity quick switch for \(humanName)."
         )
-        tapWhenHittable(quickSwitch, timeout: 8)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(quickSwitch, timeout: 8),
+            "Human identity switch did not become semantically tappable for \(humanName)."
+        )
+        let selectedSummary = app.staticTexts["settings-human-identity-selected-summary"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                selectedSummary.exists && selectedSummary.label.contains(humanName)
+            },
+            "Settings did not confirm the active Human switch to \(humanName) before relaunch."
+        )
 
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
         app.terminate()
         app.launchArguments.removeAll { $0 == "-OHANA_RESET_PERSISTENT_STATE" }
+        app.launchArguments.removeAll { $0 == "-OHANA_UI_TEST_SEED_HUMAN_BASELINE" }
+        removeLaunchArgumentPair("-OHANA_UI_TEST_HUMAN_BASELINE_NAME", from: &app.launchArguments)
         app.launch()
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
@@ -3358,25 +9677,6 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func openHumanAccountSwitcherFromSettings(in app: XCUIApplication, homeHumanName: String) {
-        closeCurrentSheetToHomeIfNeeded(in: app, humanName: homeHumanName)
-        ensureHomeSurfaceVisible(in: app, humanName: homeHumanName)
-        openSettingsFromHomeChrome(in: app)
-
-        let accountSwitcher = app.buttons["settings-human-account-switcher-action"]
-        scrollToElement(accountSwitcher, in: app, maxSwipes: 3)
-        XCTAssertTrue(
-            accountSwitcher.waitForExistence(timeout: 12),
-            "Settings did not expose the Human account switcher entry."
-        )
-        tapWhenHittable(accountSwitcher, timeout: 8)
-        XCTAssertTrue(
-            app.descendants(matching: .any)["human-account-switcher-sheet"].waitForExistence(timeout: 12),
-            "Human account switcher did not open from Settings."
-        )
-    }
-
-    @MainActor
     private func closeSettingsToHome(in app: XCUIApplication, humanName: String) {
         let close = app.buttons["ohana-sheet-close-action"]
         if close.exists {
@@ -3419,24 +9719,6 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)["coconut-shop-screen"].waitForExistence(timeout: 18),
             "Coconut Shop did not open from the Oasis shop entry."
-        )
-    }
-
-    @MainActor
-    private func openPetFeatureCollectionFromHomeToolbar(in app: XCUIApplication, humanName: String) {
-        closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
-        ensureHomeSurfaceVisible(in: app, humanName: humanName)
-        collapseExpandedHumanCardIfNeeded(in: app, humanName: humanName)
-
-        let familyDataAction = app.buttons["home-primary-action"]
-        XCTAssertTrue(
-            tapWhenFrameReady(familyDataAction, timeout: 8),
-            "Home family-data toolbar action did not become tappable."
-        )
-
-        XCTAssertTrue(
-            app.descendants(matching: .any)["pet-feature-collection"].waitForExistence(timeout: 14),
-            "Family data did not open from the Home toolbar."
         )
     }
 
@@ -3538,30 +9820,95 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func openHumanFeatureHubFromHome(in app: XCUIApplication, humanName: String) {
+    private func openHumanDetailFromHome(in app: XCUIApplication, humanName: String) {
         closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        expandHumanCardFromHome(in: app, humanName: humanName)
 
-        let allFeaturesShortcut = app.buttons["home-expanded-shortcut-humanAllFeatures"]
-        if !waitForFrameReady(allFeaturesShortcut, timeout: 1) {
-            expandHumanCardFromHome(in: app, humanName: humanName)
-        }
-
-        if !waitForFrameReady(allFeaturesShortcut, timeout: 2) {
-            expandHumanCardFromHome(in: app, humanName: humanName)
-        }
+        let detailAction = app.buttons["home-expanded-detail-human"]
         XCTAssertTrue(
-            waitForFrameReady(allFeaturesShortcut, timeout: 10),
-            "Expanded human card did not expose a stable Human All Features shortcut."
+            tapWhenSemanticallyHittable(detailAction, timeout: 8),
+            "Expanded Human card did not expose a stable detail entry."
         )
         XCTAssertTrue(
-            tapWhenFrameReady(allFeaturesShortcut, timeout: 4),
-            "Human All Features shortcut lost its stable touch frame before opening."
+            app.descendants(matching: .any)["human-detail-screen"].waitForExistence(timeout: 14),
+            "Human detail did not open from the expanded Home card."
+        )
+    }
+
+    @MainActor
+    private func openHumanModuleFromHome(
+        _ legacyModuleIdentifier: String,
+        in app: XCUIApplication,
+        humanName: String
+    ) {
+        switch legacyModuleIdentifier {
+        case "feature-hub-body-weight":
+            openHumanQuickActionDetailFromHome("humanWeight", in: app, humanName: humanName)
+        case "feature-hub-body-workout":
+            openHumanQuickActionDetailFromHome("humanWorkout", in: app, humanName: humanName)
+        case "feature-hub-care-medication":
+            openHumanQuickActionDetailFromHome("humanMedication", in: app, humanName: humanName)
+        case "feature-hub-money-expense":
+            openHumanQuickActionDetailFromHome("humanExpense", in: app, humanName: humanName)
+        case "feature-hub-money-notes":
+            openHumanQuickActionDetailFromHome("humanNote", in: app, humanName: humanName)
+        case "feature-hub-body-metrics":
+            openHumanDetailModule("human-detail-health-metrics-action", in: app, humanName: humanName)
+        case "feature-hub-body-report":
+            openHumanDetailModule("human-detail-health-report-action", in: app, humanName: humanName)
+        case "feature-hub-money-wishlist":
+            openHumanDetailModule("human-detail-wishlist-action", in: app, humanName: humanName)
+        case "feature-hub-care-basic", "feature-hub-account-profile":
+            openHumanDetailFromHome(in: app, humanName: humanName)
+        default:
+            XCTFail("No current Human UI route is mapped for \(legacyModuleIdentifier).")
+        }
+    }
+
+    @MainActor
+    private func openHumanDetailModule(
+        _ actionIdentifier: String,
+        in app: XCUIApplication,
+        humanName: String
+    ) {
+        openHumanDetailFromHome(in: app, humanName: humanName)
+        let action = app.buttons[actionIdentifier]
+        scrollToElement(action, in: app, maxSwipes: 8)
+        XCTAssertTrue(
+            waitForFrameReady(action, timeout: 10),
+            "Human detail did not expose the current module action: \(actionIdentifier)"
+        )
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(action, timeout: 8),
+            "Human detail module action did not become semantically tappable: \(actionIdentifier)"
+        )
+    }
+
+    @MainActor
+    private func openHumanQuickActionDetailFromHome(
+        _ actionType: String,
+        in app: XCUIApplication,
+        humanName: String
+    ) {
+        closeCurrentSheetToHomeIfNeeded(in: app, humanName: humanName)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        expandHumanCardFromHome(in: app, humanName: humanName)
+
+        let action = app.buttons["home-quick-action-\(actionType)"]
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(action, timeout: 8),
+            "Expanded Human card did not expose the current \(actionType) quick action."
         )
 
+        let detailAction = homeQuickActionMenuButton(in: app, actionType: actionType, suffix: "detail")
         XCTAssertTrue(
-            app.buttons["feature-hub-body-weight"].waitForExistence(timeout: 14),
-            "Human feature hub did not expose the body section."
+            waitForFrameReady(detailAction, timeout: 8),
+            "Human quick action did not expose its detail branch: \(actionType)"
+        )
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(detailAction, timeout: 8),
+            "Human quick action detail branch did not become semantically tappable: \(actionType)"
         )
     }
 
@@ -3579,16 +9926,16 @@ final class OhanaUITests: XCTestCase {
         let humanCard = app.buttons["home-card-human-\(humanName)"]
         let humanCardByLabel = app.buttons.matching(NSPredicate(format: "label == %@", humanName)).firstMatch
         let targetCard = humanCard.exists ? humanCard : humanCardByLabel
-        XCTAssertTrue(targetCard.waitForExistence(timeout: 20), "Human home card did not appear before opening the feature hub.")
+        XCTAssertTrue(targetCard.waitForExistence(timeout: 20), "Human home card did not appear before opening its routes.")
         XCTAssertTrue(
-            tapWhenFrameReady(targetCard, timeout: 8),
-            "Human home card existed but did not expose a finite tappable frame."
+            tapWhenSemanticallyHittable(targetCard, timeout: 8),
+            "Human home card existed but did not become semantically tappable."
         )
 
         let didExpand = waitUntil(timeout: 12) {
             expandedMarkers.contains(where: \.exists)
         }
-        XCTAssertTrue(didExpand, "Human home card did not finish expanding before opening the feature hub.")
+        XCTAssertTrue(didExpand, "Human home card did not finish expanding before opening its routes.")
     }
 
     @MainActor
@@ -3604,16 +9951,12 @@ final class OhanaUITests: XCTestCase {
         ]
         guard petExpandedMarkers.contains(where: \.exists) else { return }
 
-        let petCard = app.buttons
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-pet-"))
-            .firstMatch
-        guard petCard.waitForExistence(timeout: 8) else { return }
-
-        for _ in 0 ..< 3 where petExpandedMarkers.contains(where: \.exists) {
-            guard waitUntil(timeout: 2, condition: { !petCard.frame.isEmpty }) else { break }
-            petCard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.18)).tap()
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-        }
+        let collapseAction = app.buttons["home-expanded-collapse-pet"]
+        XCTAssertTrue(
+            collapseAction.waitForExistence(timeout: 8),
+            "Expanded pet card did not expose its semantic collapse action."
+        )
+        tapWhenHittable(collapseAction, timeout: 8)
 
         XCTAssertTrue(
             waitUntil(timeout: 8) {
@@ -3655,46 +9998,15 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func openHumanFeatureTile(_ identifier: String, in app: XCUIApplication) {
-        let tile = app.buttons[identifier]
-        scrollToElement(tile, in: app, maxSwipes: 6)
-        XCTAssertTrue(tile.waitForExistence(timeout: 8), "Human feature hub tile did not appear: \(identifier)")
-        tapWhenHittable(tile, timeout: 8)
-    }
-
-    @MainActor
-    private func assertHumanFeatureRouteContains(
+    private func assertHumanModuleRouteContains(
         _ tileIdentifier: String,
         markers: [String],
         in app: XCUIApplication,
         humanName: String
     ) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile(tileIdentifier, in: app)
+        openHumanModuleFromHome(tileIdentifier, in: app, humanName: humanName)
         assertAnyMarkerExists(markers, in: app, timeout: 14, context: tileIdentifier)
         closeCurrentSheetToHome(in: app, humanName: humanName)
-    }
-
-    @MainActor
-    private func assertHumanPrivateRouteLock(
-        _ tileIdentifier: String,
-        markers: [String],
-        hiddenActionIdentifiers: [String],
-        in app: XCUIApplication,
-        ownerName: String,
-        viewerName: String
-    ) {
-        openHumanFeatureHubFromHome(in: app, humanName: ownerName)
-        openHumanFeatureTile(tileIdentifier, in: app)
-        assertAnyMarkerExists(markers, in: app, timeout: 14, context: "\(tileIdentifier) privacy lock")
-
-        for identifier in hiddenActionIdentifiers {
-            XCTAssertFalse(
-                app.buttons[identifier].exists,
-                "\(tileIdentifier) exposed private owner action \(identifier) while viewed by \(viewerName)."
-            )
-        }
-        closeCurrentSheetToHome(in: app, humanName: ownerName)
     }
 
     @MainActor
@@ -3716,7 +10028,10 @@ final class OhanaUITests: XCTestCase {
             waitForFrameReady(action, timeout: 10),
             "Expanded human card did not expose a stable quick action: \(actionIdentifier)"
         )
-        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(action, timeout: 8),
+            "Human home quick action did not become semantically tappable: \(actionIdentifier)"
+        )
 
         let sheetMarker = app.descendants(matching: .any)[sheetIdentifier]
         if !sheetMarker.waitForExistence(timeout: 1.5) {
@@ -3733,7 +10048,10 @@ final class OhanaUITests: XCTestCase {
                 quickMenuAction.waitForExistence(timeout: 8),
                 "Human home quick action \(actionIdentifier) opened neither the expected sheet nor its inline quick menu."
             )
-            tapWhenHittable(quickMenuAction, timeout: 8)
+            XCTAssertTrue(
+                tapWhenSemanticallyHittable(quickMenuAction, timeout: 8),
+                "Human quick menu branch did not become semantically tappable: \(actionIdentifier)"
+            )
         }
 
         XCTAssertTrue(
@@ -3744,13 +10062,13 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func saveHumanWeightFromFeatureHub(in app: XCUIApplication, humanName: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-body-weight", in: app)
+    private func saveHumanWeightFromCurrentUI(in app: XCUIApplication, humanName: String) {
+        openHumanModuleFromHome("feature-hub-body-weight", in: app, humanName: humanName)
         tapWhenHittable(app.buttons["human-weight-add-action"], timeout: 8)
 
+        let weightEntrySheet = app.descendants(matching: .any)["generic-weight-entry-sheet-human"]
         XCTAssertTrue(
-            app.staticTexts["generic-weight-entry-sheet-human"].waitForExistence(timeout: 10),
+            weightEntrySheet.waitForExistence(timeout: 10),
             "Human quick weight sheet did not open."
         )
         tapWhenHittable(app.buttons["embedded-decimal-keypad-key-7"], timeout: 8)
@@ -3765,7 +10083,7 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(app.buttons["generic-weight-entry-save-action"], timeout: 8)
         XCTAssertTrue(
             waitUntil(timeout: 14) {
-                !app.staticTexts["generic-weight-entry-sheet-human"].exists
+                !weightEntrySheet.exists
             },
             "Human weight entry sheet did not dismiss after saving."
         )
@@ -3773,13 +10091,13 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func saveHumanExpenseFromFeatureHub(in app: XCUIApplication, humanName: String, note: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-money-expense", in: app)
+    private func saveHumanExpenseFromCurrentUI(in app: XCUIApplication, humanName: String, note: String) {
+        openHumanModuleFromHome("feature-hub-money-expense", in: app, humanName: humanName)
         tapWhenHittable(app.buttons["human-expense-add-action"], timeout: 8)
 
+        let expenseSheet = app.descendants(matching: .any)["quick-human-expense-sheet"]
         XCTAssertTrue(
-            app.staticTexts["quick-human-expense-sheet"].waitForExistence(timeout: 10),
+            expenseSheet.waitForExistence(timeout: 10),
             "Human quick expense sheet did not open."
         )
         tapWhenHittable(app.buttons["quick-human-expense-amount-0"], timeout: 8)
@@ -3788,7 +10106,7 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(app.buttons["quick-human-expense-save-action"], timeout: 8)
         XCTAssertTrue(
             waitUntil(timeout: 14) {
-                !app.staticTexts["quick-human-expense-sheet"].exists
+                !expenseSheet.exists
             },
             "Human expense sheet did not dismiss after saving."
         )
@@ -3796,9 +10114,8 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func saveHumanMedicationFromFeatureHub(in app: XCUIApplication, humanName: String, medicationName: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-care-medication", in: app)
+    private func saveHumanMedicationFromCurrentUI(in app: XCUIApplication, humanName: String, medicationName: String) {
+        openHumanModuleFromHome("feature-hub-care-medication", in: app, humanName: humanName)
         tapWhenHittable(app.buttons["human-medication-add-action"], timeout: 8)
 
         XCTAssertTrue(
@@ -3818,13 +10135,13 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func saveHumanNoteFromFeatureHub(in app: XCUIApplication, humanName: String, note: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-money-notes", in: app)
+    private func saveHumanNoteFromCurrentUI(in app: XCUIApplication, humanName: String, note: String) {
+        openHumanModuleFromHome("feature-hub-money-notes", in: app, humanName: humanName)
         tapWhenHittable(app.buttons["human-note-add-action"], timeout: 8)
 
+        let noteSheet = app.descendants(matching: .any)["quick-human-note-sheet"]
         XCTAssertTrue(
-            app.staticTexts["quick-human-note-sheet"].waitForExistence(timeout: 10),
+            noteSheet.waitForExistence(timeout: 10),
             "Human quick note sheet did not open."
         )
         typeText(note, intoTextView: "quick-human-note-input", in: app)
@@ -3834,9 +10151,8 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func saveHumanHealthMetricFromFeatureHub(in app: XCUIApplication, humanName: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-body-metrics", in: app)
+    private func saveHumanHealthMetricFromCurrentUI(in app: XCUIApplication, humanName: String) {
+        openHumanModuleFromHome("feature-hub-body-metrics", in: app, humanName: humanName)
 
         tapWhenHittable(app.buttons["human-health-metric-starter-record-action"], timeout: 8)
 
@@ -3851,7 +10167,7 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func saveHumanWorkoutFromFeatureHub(in app: XCUIApplication, humanName: String, note: String) {
+    private func saveHumanWorkoutFromCurrentUI(in app: XCUIApplication, humanName: String, note: String) {
         openHumanWorkoutCardFromHomeProfile(in: app, humanName: humanName)
         tapWhenHittable(app.buttons["human-workout-add-action"], timeout: 8)
 
@@ -3872,24 +10188,22 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func openHumanWorkoutCardFromHomeProfile(in app: XCUIApplication, humanName: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-body-workout", in: app)
+        openHumanModuleFromHome("feature-hub-body-workout", in: app, humanName: humanName)
         XCTAssertTrue(
             app.descendants(matching: .any)["human-workout-summary-view"].waitForExistence(timeout: 14) &&
                 app.buttons["human-workout-add-action"].waitForExistence(timeout: 8),
-            "Human feature hub did not open the current Workout Summary with its add action."
+            "The current Human workout detail route did not open with its add action."
         )
     }
 
     @MainActor
-    private func saveHumanHealthReportFromFeatureHub(
+    private func saveHumanHealthReportFromCurrentUI(
         in app: XCUIApplication,
         humanName: String,
         hospital: String,
-        summary _: String
+        summary: String
     ) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-body-report", in: app)
+        openHumanModuleFromHome("feature-hub-body-report", in: app, humanName: humanName)
         tapWhenHittable(app.buttons["human-health-report-add-action"], timeout: 8)
 
         XCTAssertTrue(
@@ -3902,6 +10216,11 @@ final class OhanaUITests: XCTestCase {
             waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists },
             "Human health report hospital keyboard did not dismiss."
         )
+        typeText(summary, intoTextView: "add-human-health-report-summary-input", in: app)
+        // TextEditor Return inserts a newline instead of resigning focus. A
+        // visible keyboard is not a save precondition; scroll the real save
+        // action into view and submit through the product UI below.
+        dismissKeyboardIfPresent(in: app)
         let saveAction = app.buttons["add-human-health-report-save-action"]
         scrollToElement(saveAction, in: app, maxSwipes: 8)
         XCTAssertTrue(
@@ -3920,9 +10239,62 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func deleteHumanHealthMetricFromFeatureHub(in app: XCUIApplication, humanName: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-body-metrics", in: app)
+    private func assertHumanExtendedModuleOperationsPersistAfterRelaunch(
+        in app: XCUIApplication,
+        humanName: String,
+        reportHospital: String,
+        reportSummary: String,
+        wishTitle: String
+    ) {
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openHumanModuleFromHome("feature-hub-body-metrics", in: app, humanName: humanName)
+        assertAnyMarkerExists(
+            ["2.00 mIU/L", "2.00"],
+            in: app,
+            timeout: 14,
+            context: "human health metric relaunch readback"
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openHumanWorkoutCardFromHomeProfile(in: app, humanName: humanName)
+        assertAnyMarkerExists(
+            ["45 min", "45 分钟"],
+            in: app,
+            timeout: 14,
+            context: "human workout relaunch readback"
+        )
+        closeHumanProfileToHome(in: app, humanName: humanName)
+
+        openHumanModuleFromHome("feature-hub-body-report", in: app, humanName: humanName)
+        assertAnyMarkerExists(
+            [reportHospital],
+            in: app,
+            timeout: 14,
+            context: "human health report hospital relaunch readback"
+        )
+        assertAnyMarkerExists(
+            [reportSummary],
+            in: app,
+            timeout: 14,
+            context: "human health report summary relaunch readback"
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openHumanModuleFromHome("feature-hub-money-wishlist", in: app, humanName: humanName)
+        assertAnyMarkerExists(
+            [wishTitle],
+            in: app,
+            timeout: 14,
+            context: "human wishlist relaunch readback"
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+    }
+
+    @MainActor
+    private func deleteHumanHealthMetricFromCurrentUI(in app: XCUIApplication, humanName: String) {
+        openHumanModuleFromHome("feature-hub-body-metrics", in: app, humanName: humanName)
         let metricCard = app.buttons["human-health-metric-chart-tsh"]
         scrollTowardElement(metricCard, in: app, maxSwipes: 5)
         XCTAssertTrue(metricCard.waitForExistence(timeout: 10), "Human health metric card did not appear before delete.")
@@ -3951,13 +10323,19 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func deleteHumanWorkoutFromProfile(in app: XCUIApplication, humanName: String) {
         openHumanWorkoutCardFromHomeProfile(in: app, humanName: humanName)
-        let deleteAction = app.buttons["human-workout-delete-action"]
+        let deleteActions = app.buttons.matching(identifier: "human-workout-delete-action")
+        let deleteAction = deleteActions.firstMatch
         scrollToElement(deleteAction, in: app, maxSwipes: 5)
         XCTAssertTrue(deleteAction.waitForExistence(timeout: 12), "Human workout row did not expose a delete action.")
+        XCTAssertEqual(
+            deleteActions.count,
+            1,
+            "A single workout row should expose exactly one semantic delete control."
+        )
         tapWhenHittable(deleteAction, timeout: 8)
         XCTAssertTrue(
             waitUntil(timeout: 12) {
-                !deleteAction.exists &&
+                deleteActions.count == 0 &&
                     containsAnyMarker(["0", "Manual", "手动记录"], in: app)
             },
             "Deleting the human workout did not remove the visible workout row."
@@ -3966,14 +10344,13 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func deleteHumanHealthReportFromFeatureHub(
+    private func deleteHumanHealthReportFromCurrentUI(
         in app: XCUIApplication,
         humanName: String,
         hospital: String,
         summary: String
     ) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-body-report", in: app)
+        openHumanModuleFromHome("feature-hub-body-report", in: app, humanName: humanName)
         assertAnyMarkerExists([hospital, summary], in: app, timeout: 14, context: "human health report before delete")
 
         let reportRow = app.buttons["human-health-report-row"].firstMatch
@@ -3996,9 +10373,8 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func deleteHumanNoteFromFeatureHub(in app: XCUIApplication, humanName: String, note: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-money-notes", in: app)
+    private func deleteHumanNoteFromCurrentUI(in app: XCUIApplication, humanName: String, note: String) {
+        openHumanModuleFromHome("feature-hub-money-notes", in: app, humanName: humanName)
         assertAnyMarkerExists([note], in: app, timeout: 14, context: "human note before delete")
 
         let deleteAction = app.buttons["human-note-delete-action"].firstMatch
@@ -4014,10 +10390,79 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func saveHumanWishlistFromFeatureHub(in app: XCUIApplication, humanName: String, title: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-money-wishlist", in: app)
-        tapWhenHittable(app.buttons["human-wishlist-add-action"], timeout: 8)
+    private func assertHumanExtendedModuleDeletesStayDeletedAfterRelaunch(
+        in app: XCUIApplication,
+        humanName: String,
+        reportHospital: String,
+        reportSummary: String,
+        noteText: String
+    ) {
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        openHumanModuleFromHome("feature-hub-body-metrics", in: app, humanName: humanName)
+        XCTAssertFalse(
+            app.buttons["human-health-metric-chart-tsh"].waitForExistence(timeout: 2),
+            "Deleted human health metric returned after relaunch."
+        )
+        XCTAssertTrue(
+            app.buttons["human-health-metric-starter-record-action"].waitForExistence(timeout: 8),
+            "Human health metrics did not return to the empty starter state after relaunch."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openHumanWorkoutCardFromHomeProfile(in: app, humanName: humanName)
+        let workoutDeleteActions = app.buttons.matching(identifier: "human-workout-delete-action")
+        XCTAssertTrue(
+            waitUntil(timeout: 14) {
+                workoutDeleteActions.count == 0 &&
+                    containsAnyMarker(
+                        [
+                            "0 activities", "0 项活动", "0 Aktivitäten",
+                            "No workouts yet", "还没有运动记录", "Noch keine Trainings",
+                            "No readable recent workouts", "最近没有可读取的运动记录",
+                            "Keine lesbaren letzten Trainings",
+                            "No manual Ohana workouts yet", "还没有 Ohana 手动运动记录",
+                            "Noch keine manuellen Ohana-Trainings"
+                        ],
+                        in: app
+                    )
+            },
+            "Deleted human workout returned after relaunch or the workout route did not reach a valid empty state."
+        )
+        closeHumanProfileToHome(in: app, humanName: humanName)
+
+        openHumanModuleFromHome("feature-hub-body-report", in: app, humanName: humanName)
+        XCTAssertTrue(
+            waitUntil(timeout: 14) {
+                !containsAnyMarker([reportHospital, reportSummary], in: app) &&
+                    containsAnyMarker(["No health reports yet", "还没有检测报告"], in: app)
+            },
+            "Deleted human health report returned after relaunch."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        openHumanModuleFromHome("feature-hub-money-notes", in: app, humanName: humanName)
+        assertAnyMarkerExists(
+            ["No notes yet", "还没有备注"],
+            in: app,
+            timeout: 14,
+            context: "human note empty state after relaunch"
+        )
+        XCTAssertFalse(
+            waitUntil(timeout: 2) { containsAnyMarker([noteText], in: app) },
+            "Deleted human note returned after relaunch."
+        )
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+    }
+
+    @MainActor
+    private func saveHumanWishlistFromCurrentUI(in app: XCUIApplication, humanName: String, title: String) {
+        openHumanModuleFromHome("feature-hub-money-wishlist", in: app, humanName: humanName)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(app.buttons["human-wishlist-add-action"], timeout: 8),
+            "Human wishlist add action did not become semantically tappable."
+        )
 
         XCTAssertTrue(
             app.descendants(matching: .any)["add-human-wishlist-sheet"].waitForExistence(timeout: 8),
@@ -4025,46 +10470,50 @@ final class OhanaUITests: XCTestCase {
         )
         typeText(title, intoTextField: "add-human-wishlist-title-input", in: app)
         dismissKeyboardIfPresent(in: app)
-        tapWhenHittable(app.buttons["add-human-wishlist-save-action"], timeout: 8)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(app.buttons["add-human-wishlist-save-action"], timeout: 8),
+            "Human wishlist save action did not become semantically tappable."
+        )
         assertAnyMarkerExists([title], in: app, timeout: 14, context: "human wishlist save")
         closeCurrentSheetToHome(in: app, humanName: humanName)
     }
 
     @MainActor
-    private func redeemHumanWishlistFromFeatureHub(in app: XCUIApplication, humanName: String, title: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-money-wishlist", in: app)
+    private func redeemHumanWishlistFromCurrentUI(
+        in app: XCUIApplication,
+        humanName: String,
+        title: String,
+        startingBalance: Int,
+        expectedBalance: Int
+    ) {
+        openHumanModuleFromHome("feature-hub-money-wishlist", in: app, humanName: humanName)
         assertAnyMarkerExists([title], in: app, timeout: 14, context: "human wishlist pending wish")
+        XCTAssertTrue(
+            app.staticTexts["\(startingBalance)🥥"].waitForExistence(timeout: 10),
+            "Human wishlist did not show its explicit seeded wallet balance before redeeming."
+        )
 
         let redeem = app.buttons["human-wishlist-redeem-action"]
         XCTAssertTrue(
             waitUntil(timeout: 10) {
                 redeem.exists && redeem.isEnabled && redeem.isHittable
             },
-            "Human wishlist redeem action did not become available. The starter coconut gift may not have reached the human wallet."
+            "Human wishlist redeem action did not become available after explicitly seeding the human wallet."
         )
-        tapWhenHittable(redeem, timeout: 8)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(redeem, timeout: 8),
+            "Human wishlist redeem action did not remain semantically tappable."
+        )
 
         XCTAssertTrue(
             app.descendants(matching: .any)["human-wishlist-redeemed-state"].waitForExistence(timeout: 14),
             "Human wishlist did not move the item into the redeemed state after spending coconuts."
         )
+        XCTAssertTrue(
+            app.staticTexts["\(expectedBalance)🥥"].waitForExistence(timeout: 12),
+            "Redeeming the wishlist item did not spend exactly 10 coconuts from the human wallet."
+        )
         assertAnyMarkerExists(["Redeemed", "已兑换", title], in: app, timeout: 8, context: "human wishlist redeem")
-        closeCurrentSheetToHome(in: app, humanName: humanName)
-    }
-
-    @MainActor
-    private func saveHumanProfileNoteFromFeatureHub(in app: XCUIApplication, humanName: String, note: String) {
-        openHumanFeatureHubFromHome(in: app, humanName: humanName)
-        openHumanFeatureTile("feature-hub-account-profile", in: app)
-
-        tapWhenHittable(app.buttons["human-basic-info-edit-action"], timeout: 8)
-        let noteInput = app.textViews["human-basic-info-notes-input"]
-        scrollToElement(noteInput, in: app, maxSwipes: 8)
-        typeText(note, intoTextView: "human-basic-info-notes-input", in: app)
-        dismissKeyboardIfPresent(in: app)
-        tapWhenHittable(app.buttons["human-basic-info-save-action"], timeout: 8)
-        assertAnyMarkerExists([note], in: app, timeout: 14, context: "human profile note save")
         closeCurrentSheetToHome(in: app, humanName: humanName)
     }
 
@@ -4096,11 +10545,60 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func prepareExistingUserHomeDiscovery(in app: XCUIApplication) {
+        _ = waitUntil(timeout: 18) {
+            isPetFeatureRouteOverlayVisible(in: app) ||
+                isHumanFeatureRouteOverlayVisible(in: app) ||
+                app.textFields["onboarding-human-name-input"].exists ||
+                app.buttons["home-tab-home"].exists
+        }
+
+        for _ in 0 ..< 6 {
+            if isPetFeatureRouteOverlayVisible(in: app) || isHumanFeatureRouteOverlayVisible(in: app) {
+                dismissOneHumanRouteLayer(in: app)
+                _ = waitUntil(timeout: 4) {
+                    !isPetFeatureRouteOverlayVisible(in: app) &&
+                        !isHumanFeatureRouteOverlayVisible(in: app)
+                }
+                continue
+            }
+
+            if app.textFields["onboarding-human-name-input"].exists {
+                return
+            }
+
+            let homeTab = app.buttons["home-tab-home"]
+            if homeTab.exists && homeTab.isEnabled && homeTab.isHittable {
+                homeTab.tap()
+                _ = waitUntil(timeout: 4) {
+                    app.buttons
+                        .matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-"))
+                        .firstMatch.exists ||
+                        app.buttons
+                            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-pet-"))
+                            .firstMatch.exists ||
+                        app.buttons["home-add-first-pet-card"].exists
+                }
+            }
+
+            let hasHomeCard = app.buttons
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-"))
+                .firstMatch.exists ||
+                app.buttons
+                    .matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-pet-"))
+                    .firstMatch.exists
+            if hasHomeCard || app.textFields["onboarding-human-name-input"].exists {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.45))
+        }
+    }
+
+    @MainActor
     private func firstExistingHomeHumanName(in app: XCUIApplication) -> String? {
         _ = waitUntil(timeout: 18) {
             app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-human-")).firstMatch.exists ||
                 app.buttons["home-add-first-pet-card"].exists ||
-                app.buttons["home-primary-action"].exists ||
                 app.textFields["member-name-input"].exists
         }
 
@@ -4139,6 +10637,7 @@ final class OhanaUITests: XCTestCase {
         app.terminate()
         app.launchArguments.append("-OHANA_RESET_PERSISTENT_STATE")
         app.launch()
+        chooseInitialExperienceIfNeeded("standard", in: app)
         let humanName = createFirstHuman(from: app)
         app.launchArguments.removeAll { $0 == "-OHANA_RESET_PERSISTENT_STATE" }
         return humanName
@@ -4514,28 +11013,13 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func openPetHealthVisitPopup(in app: XCUIApplication) {
-        let visitLabels = ["Visit", "就诊", "Besuch"]
-        var visitAction = firstFrameReadyButton(labels: visitLabels, in: app)
-        if visitAction == nil {
-            swipeUpInPrimaryScrollArea(in: app)
-            visitAction = firstFrameReadyButton(labels: visitLabels, in: app)
-        }
+        let visitAction = app.buttons["pet-health-tool-visit-action"]
+        scrollToElement(visitAction, in: app, maxSwipes: 2)
         XCTAssertTrue(
-            visitAction != nil,
+            visitAction.waitForExistence(timeout: 8),
             "Pet health detail did not expose the current visit action."
         )
-        guard let visitAction else { return }
-        XCTAssertTrue(
-            tapWhenFrameReady(visitAction, timeout: 8),
-            "Pet health visit action did not expose a stable touch frame."
-        )
-    }
-
-    @MainActor
-    private func petHealthPopupButton(in app: XCUIApplication, labels: [String]) -> XCUIElement {
-        app.buttons.matching(
-            NSPredicate(format: "identifier == %@ AND label IN %@", "pet-health-record-inline-popup", labels)
-        ).firstMatch
+        tapWhenHittable(visitAction, timeout: 8)
     }
 
     @MainActor
@@ -4830,6 +11314,61 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func openPetBasicInfoFromCrewRoster(in app: XCUIApplication, petName: String) {
+        let rosterAction = app.buttons["home-crew-roster-action"]
+        XCTAssertTrue(
+            tapWhenFrameReady(rosterAction, timeout: 8),
+            "Home member roster action did not become tappable for memorial profile readback."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["crew-roster-members"].waitForExistence(timeout: 12),
+            "Member roster did not open for memorial profile readback."
+        )
+
+        let petCard = app.buttons["crew-roster-card-pet-\(petName)"]
+        scrollToElement(petCard, in: app, maxSwipes: 6)
+        XCTAssertTrue(
+            petCard.waitForExistence(timeout: 12),
+            "Memorial pet was missing from the member roster."
+        )
+        tapWhenHittable(petCard, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pet-basic-info-screen"].waitForExistence(timeout: 12),
+            "Opening the memorial pet from the member roster did not show Basic Info."
+        )
+    }
+
+    @MainActor
+    private func relaunchPreservingPersistentState(
+        in app: XCUIApplication,
+        preservingAppLanguage: Bool = false
+    ) {
+        app.terminate()
+        // Launch seeders and state mutators are one-shot fixtures. Replaying
+        // them can overwrite the persisted state that this relaunch is meant
+        // to verify, or create an impossible pending-and-claimed journey.
+        let oneShotFlags: Set<String> = [
+            "-OHANA_RESET_PERSISTENT_STATE",
+            "-OHANA_UI_TEST_SEED_HUMAN_BASELINE",
+            "-OHANA_UI_TEST_SEED_MEMBER_CARD_BASELINE",
+            "-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE",
+            "-OHANA_UI_TEST_SEED_MATURE_HOUSEHOLD_BASELINE",
+            "-OHANA_UI_TEST_SEED_COCONUT_BALANCE",
+            "-OHANA_UI_TEST_UNLOCK_REWARD_TIER",
+            "-OHANA_UI_TEST_RESET_ECONOMY_BUDGET"
+        ]
+        app.launchArguments.removeAll { oneShotFlags.contains($0) }
+        removeLaunchArgumentPair("-OHANA_UI_TEST_HUMAN_BASELINE_NAME", from: &app.launchArguments)
+        removeLaunchArgumentPair("-OHANA_UI_TEST_PET_BASELINE_NAME", from: &app.launchArguments)
+        removeLaunchArgumentPair("-OHANA_UI_TEST_PET_BASELINE_SPECIES", from: &app.launchArguments)
+        removeLaunchArgumentPair("-OHANA_UI_TEST_COCONUT_BALANCE_AMOUNT", from: &app.launchArguments)
+        if preservingAppLanguage {
+            removeLaunchArgumentPair("-appLanguage", from: &app.launchArguments)
+        }
+        app.launch()
+    }
+
+    @MainActor
     private func petAllFeaturesShortcut(in app: XCUIApplication) -> XCUIElement {
         if let currentQuickAction = firstFrameReadyButton(
             identifier: "home-quick-action-allFeatures",
@@ -4864,6 +11403,25 @@ final class OhanaUITests: XCTestCase {
             app.textFields["pet-basic-info-name-input"].waitForExistence(timeout: 8),
             "Pet Basic Info did not enter edit mode."
         )
+        let saveAction = app.buttons["pet-basic-info-save-action"]
+        XCTAssertTrue(saveAction.waitForExistence(timeout: 8), "Pet Basic Info did not expose Save.")
+        XCTAssertFalse(saveAction.isEnabled, "Save must stay disabled until the draft changes.")
+    }
+
+    @MainActor
+    private func discardPetBasicInfoChanges(in app: XCUIApplication) {
+        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        let discard = app.buttons["pet-basic-info-discard-changes-action"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), "Dirty Pet profile cancel did not ask for confirmation.")
+        tapWhenHittable(discard, timeout: 8)
+    }
+
+    @MainActor
+    private func discardHumanBasicInfoChanges(in app: XCUIApplication) {
+        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
+        let discard = app.buttons["human-basic-info-discard-changes-action"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 8), "Dirty Human profile cancel did not ask for confirmation.")
+        tapWhenHittable(discard, timeout: 8)
     }
 
     @MainActor
@@ -4900,7 +11458,11 @@ final class OhanaUITests: XCTestCase {
 
     private func isEmptyTextFieldValue(_ value: String) -> Bool {
         value.isEmpty ||
+            value == "Name" ||
             value == "名字" ||
+            value == "Pet name" ||
+            value == "宠物名字" ||
+            value == "Tiername" ||
             value == "给这件事起个名字" ||
             value == "Name this event" ||
             value == "Termin benennen"
@@ -4925,12 +11487,19 @@ final class OhanaUITests: XCTestCase {
         let calendarTab = app.buttons["home-tab-calendar"]
         XCTAssertTrue(calendarTab.waitForExistence(timeout: 20), "Calendar tab did not appear after starter setup.")
         tapWhenHittable(calendarTab, timeout: 8)
+        let calendarSurface = app.buttons["task-center-surface-calendar"]
+        XCTAssertTrue(
+            calendarSurface.waitForExistence(timeout: 14),
+            "Task Center did not expose the Calendar surface from the Home tab."
+        )
+        tapWhenHittable(calendarSurface, timeout: 8)
         let allFilter = app.buttons["calendar-filter-all"]
         let listViewButton = app.buttons["calendar-view-mode-list"]
         XCTAssertTrue(
             waitUntil(timeout: 14) { allFilter.exists || listViewButton.exists },
-            "Calendar screen did not open from the Home tab."
+            "Calendar surface did not open from Task Center."
         )
+        tapWhenHittable(listViewButton, timeout: 8)
         closeCurrentPetRouteIfNeeded(in: app)
     }
 
@@ -4940,10 +11509,19 @@ final class OhanaUITests: XCTestCase {
         let calendarTab = app.buttons["home-tab-calendar"]
         XCTAssertTrue(calendarTab.waitForExistence(timeout: 20), "Calendar tab did not appear from Home.")
         tapWhenHittable(calendarTab, timeout: 8)
+        let calendarSurface = app.buttons["task-center-surface-calendar"]
         XCTAssertTrue(
-            app.buttons["calendar-filter-all"].waitForExistence(timeout: 14),
-            "Calendar screen did not open from Home."
+            calendarSurface.waitForExistence(timeout: 14),
+            "Task Center did not expose the Calendar surface from Home."
         )
+        tapWhenHittable(calendarSurface, timeout: 8)
+        let allFilter = app.buttons["calendar-filter-all"]
+        let listViewButton = app.buttons["calendar-view-mode-list"]
+        XCTAssertTrue(
+            waitUntil(timeout: 14) { allFilter.exists || listViewButton.exists },
+            "Calendar surface did not open from Task Center."
+        )
+        tapWhenHittable(listViewButton, timeout: 8)
     }
 
     @MainActor
@@ -4972,9 +11550,36 @@ final class OhanaUITests: XCTestCase {
             "Calendar event title keyboard did not dismiss."
         )
         if let linkedPetName {
+            let relatedEntityPicker = app.buttons["add-event-related-entity-picker"]
+            scrollTowardElement(relatedEntityPicker, in: app, maxSwipes: 6)
+            XCTAssertTrue(
+                relatedEntityPicker.waitForExistence(timeout: 8),
+                "Calendar add-event sheet did not expose the related-entity picker."
+            )
+            tapWhenHittable(relatedEntityPicker, timeout: 8)
             let petChip = app.buttons["add-event-related-pet-\(linkedPetName)"]
-            scrollToElement(petChip, in: app, maxSwipes: 8)
-            tapWhenHittable(petChip, timeout: 8)
+            let fallbackPetOption = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", linkedPetName)).firstMatch
+            XCTAssertTrue(
+                waitUntil(timeout: 8) { petChip.exists || fallbackPetOption.exists },
+                "Calendar related-entity picker did not expose \(linkedPetName)."
+            )
+            tapWhenHittable(petChip.exists ? petChip : fallbackPetOption, timeout: 8)
+        }
+        let reminderToggle = app.switches["add-event-reminder-toggle"]
+        XCTAssertTrue(
+            reminderToggle.waitForExistence(timeout: 8),
+            "Calendar add-event sheet did not expose the reminder toggle."
+        )
+        for _ in 0 ..< 6 where !reminderToggle.isHittable {
+            app.swipeUp()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        if isToggleOn(reminderToggle) {
+            reminderToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            XCTAssertTrue(
+                waitUntil(timeout: 4) { !isToggleOn(reminderToggle) },
+                "Calendar reminder stayed enabled for a Simulator-only persistence test. Actual: \(String(describing: reminderToggle.value))"
+            )
         }
         tapFirstHittableButton(identifier: "add-event-save-action", in: app, timeout: 8, context: "calendar event save")
         XCTAssertTrue(
@@ -5189,7 +11794,7 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func swipeUpInPrimaryScrollArea(in app: XCUIApplication) {
-        let calendarList = app.scrollViews["calendar-list-scroll-view"]
+        let calendarList = app.descendants(matching: .any)["calendar-list-scroll-view"]
         if visibleFrame(of: calendarList, in: app) != nil {
             dragUp(in: calendarList)
         } else if let scrollView = largestVisibleScrollView(in: app) {
@@ -5247,11 +11852,7 @@ final class OhanaUITests: XCTestCase {
             tapWhenHittable(homeTab, timeout: 5)
         }
         let didReturnHome = waitUntil(timeout: 16) {
-            app.state == .runningForeground &&
-                !isHumanFeatureRouteOverlayVisible(in: app) &&
-                (app.buttons[humanName].exists ||
-                    app.buttons["home-primary-action"].exists ||
-                    app.buttons["home-tab-home"].exists)
+            isHumanRouteAtHome(in: app, humanName: humanName)
         }
         XCTAssertTrue(didReturnHome, "Closing the human feature route did not return to Home.")
     }
@@ -5278,13 +11879,13 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func dismissInlinePottySheetByBackdrop(in app: XCUIApplication) {
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap()
+    private func cancelLitterSettings(in app: XCUIApplication) {
+        tapWhenHittable(app.buttons["quick-potty-sheet-cancel-action"], timeout: 8)
         XCTAssertTrue(
             waitUntil(timeout: 8) {
                 !app.descendants(matching: .any)["quick-potty-litter-settings-sheet"].exists
             },
-            "Inline potty sheet did not dismiss after tapping the backdrop."
+            "Litter settings sheet did not dismiss after tapping Cancel."
         )
     }
 
@@ -5329,10 +11930,14 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func dismissOneHumanRouteLayer(in app: XCUIApplication) {
         let closeIdentifiers = [
+            "pet-bond-vault-close-action",
+            "quick-potty-sheet-cancel-action",
+            "human-module-close-action",
             "crew-roster-close-action",
             "human-workout-close-action",
             "human-basic-info-close-action",
-            "ohana-sheet-close-action"
+            "ohana-sheet-close-action",
+            "BackButton"
         ]
         for identifier in closeIdentifiers {
             if let close = firstHittableButton(identifier: identifier, in: app) {
@@ -5366,15 +11971,24 @@ final class OhanaUITests: XCTestCase {
         [
             "add-human-workout-sheet",
             "generic-weight-entry-sheet-human",
+            "human-detail-screen",
+            "human-expense-add-action",
             "human-basic-info-screen",
+            "human-health-metric-starter-record-action",
             "human-health-metric-detail-tsh",
             "human-health-metric-entry-sheet-tsh",
             "human-health-report-add-action",
-            "human-note-history-screen",
+            "human-medication-add-action",
+            "human-module-close-action",
+            "human-note-add-action",
+            "human-weight-add-action",
             "human-workout-add-action",
+            "human-workout-summary-view",
             "human-workout-delete-action",
+            "human-wishlist-add-action",
             "quick-human-expense-sheet",
             "quick-human-medication-sheet",
+            "quick-human-workout-sheet",
             "quick-human-note-sheet"
         ].contains { identifier in
             app.descendants(matching: .any)[identifier].exists
@@ -5477,79 +12091,25 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func selectMemberCreationPetSpecies(_ speciesLabel: String, in app: XCUIApplication) {
-        let speciesMenu = app.buttons
-            .matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS %@ OR label CONTAINS %@", "Species", "物种", "Art"))
-            .firstMatch
+        let speciesKey: String = switch speciesLabel.lowercased() {
+        case "cat", "猫", "katze": "cat"
+        case "dog", "狗", "hund": "dog"
+        default: speciesLabel.lowercased()
+        }
+        let speciesButton = app.buttons["member-pet-species-option-\(speciesKey)"]
         XCTAssertTrue(
-            speciesMenu.waitForExistence(timeout: 8),
-            "Pet creation species menu did not appear before selecting \(speciesLabel)."
+            speciesButton.waitForExistence(timeout: 8),
+            "Pet creation species button did not appear before selecting \(speciesLabel)."
         )
 
-        let optionLabels: [String] = switch speciesLabel.lowercased() {
-        case "cat", "猫", "katze":
-            ["Cat", "猫", "Katze"]
-        case "dog", "狗", "hund":
-            ["Dog", "狗", "Hund"]
-        default:
-            [speciesLabel]
-        }
-        let hasSelectedSpecies = {
-            speciesMenu.exists && optionLabels.contains { speciesMenu.label.localizedCaseInsensitiveContains($0) }
-        }
-        if hasSelectedSpecies() {
+        if app.buttons["member-pet-breed-picker"].exists {
             return
         }
-
-        for _ in 0 ..< 3 {
-            guard tapWhenFrameReady(speciesMenu, timeout: 8) else { continue }
-            let didExposeOption = waitUntil(timeout: 8) {
-                optionLabels.contains { app.buttons[$0].exists }
-            }
-            guard didExposeOption else { continue }
-
-            // XCTest exposes the correct SwiftUI Menu label but reports the
-            // wrong activation point. Keep this coordinate path constrained to
-            // the repository's pinned iPhone 17 simulator.
-            if tapMemberCreationSpeciesMenuCoordinate(
-                speciesLabel,
-                speciesMenu: speciesMenu,
-                in: app
-            ), waitUntil(timeout: 4, condition: hasSelectedSpecies) {
-                return
-            }
-        }
-
-        XCTFail("Pet creation species selection did not apply. Current menu label: \(speciesMenu.label)")
-    }
-
-    @MainActor
-    private func tapMemberCreationSpeciesMenuCoordinate(
-        _ speciesLabel: String,
-        speciesMenu: XCUIElement,
-        in app: XCUIApplication
-    ) -> Bool {
-        let targetLabels: [String] = switch speciesLabel.lowercased() {
-        case "dog", "狗", "hund": ["Dog", "狗", "Hund"]
-        case "cat", "猫", "katze": ["Cat", "猫", "Katze"]
-        default: [speciesLabel]
-        }
-        guard hasVisibleFrame(speciesMenu, in: app) else {
-            return false
-        }
-
-        guard let targetOption = firstFrameReadyButton(labels: targetLabels, in: app) else {
-            return false
-        }
-
-        let appFrame = app.frame
-        let targetPoint = CGPoint(x: targetOption.frame.midX, y: targetOption.frame.midY)
-        guard appFrame.contains(targetPoint) else { return false }
-
-        app.coordinate(withNormalizedOffset: CGVector(
-            dx: (targetPoint.x - appFrame.minX) / appFrame.width,
-            dy: (targetPoint.y - appFrame.minY) / appFrame.height
-        )).tap()
-        return true
+        tapGuidedJourneyControlAfterSemanticScroll(speciesButton, in: app)
+        XCTAssertTrue(
+            app.buttons["member-pet-breed-picker"].waitForExistence(timeout: 8),
+            "Selecting \(speciesLabel) did not reveal the breed picker."
+        )
     }
 
     @MainActor
@@ -5573,22 +12133,19 @@ final class OhanaUITests: XCTestCase {
         let selectionWasRequired = creationPrimary.exists && !creationPrimary.isEnabled
         let breedOptionLabels = switch speciesLabel.lowercased() {
         case "cat", "猫", "katze":
-            ["中华田园猫", "英国短毛猫", "美国短毛猫"]
+            ["ragdoll cat", "布偶猫", "Ragdoll"]
         default:
-            ["中华田园犬", "拉布拉多犬", "金毛寻回犬"]
+            ["Pomeranian", "博美犬"]
         }
 
         for _ in 0 ..< 3 {
-            XCTAssertTrue(
-                tapWhenFrameReady(breedMenu, timeout: 8),
-                "Pet creation breed menu did not expose a stable touch frame."
-            )
+            tapGuidedJourneyControlAfterSemanticScroll(breedMenu, in: app)
 
             let didExposeOption = waitUntil(timeout: 8) {
                 breedOptionLabels.contains { app.buttons[$0].exists }
             }
             guard didExposeOption else { continue }
-            guard tapMemberCreationBreedMenuCoordinate(
+            guard tapNativeMenuOption(
                 optionLabels: breedOptionLabels,
                 in: app
             ) else {
@@ -5613,22 +12170,19 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func tapMemberCreationBreedMenuCoordinate(
+    private func tapNativeMenuOption(
         optionLabels: [String],
         in app: XCUIApplication
     ) -> Bool {
-        guard let targetOption = firstFrameReadyButton(labels: optionLabels, in: app) else {
-            return false
+        let didTap = waitUntil(timeout: 8) {
+            guard let targetOption = firstHittableButton(labels: optionLabels, in: app)
+                ?? firstFrameReadyButton(labels: optionLabels, in: app) else {
+                return false
+            }
+            targetOption.tap()
+            return true
         }
-        let appFrame = app.frame
-        let targetPoint = CGPoint(x: targetOption.frame.midX, y: targetOption.frame.midY)
-        guard appFrame.contains(targetPoint) else { return false }
-
-        app.coordinate(withNormalizedOffset: CGVector(
-            dx: (targetPoint.x - appFrame.minX) / appFrame.width,
-            dy: (targetPoint.y - appFrame.minY) / appFrame.height
-        )).tap()
-        return true
+        return didTap
     }
 
     private func containsAnyElement(in app: XCUIApplication, identifiers: [String]) -> Bool {
@@ -5751,7 +12305,7 @@ final class OhanaUITests: XCTestCase {
                 )
             }
             if let petSpeciesLabel,
-               app.buttons["member-pet-species-picker"].exists {
+               app.buttons["member-pet-species-option-dog"].exists {
                 selectMemberCreationPetSpecies(petSpeciesLabel, in: app)
                 selectMemberCreationPetBreed(for: petSpeciesLabel, in: app)
             }
@@ -5773,14 +12327,7 @@ final class OhanaUITests: XCTestCase {
                 didTapFinalSave = true
                 break
             }
-            if creationPrimary.isHittable {
-                creationPrimary.tap()
-            } else {
-                XCTAssertTrue(
-                    tapWhenFrameReady(creationPrimary, timeout: 2),
-                    "Member creation primary action lost its stable touch frame before the tap."
-                )
-            }
+            tapGuidedJourneyControlAfterSemanticScroll(creationPrimary, in: app)
             if isMemberCreationFinalActionLabel(actionLabel) {
                 didTapFinalSave = true
                 break
@@ -5798,7 +12345,7 @@ final class OhanaUITests: XCTestCase {
     private func selectMemberCreationPetAppearance(in app: XCUIApplication) {
         let boy = app.buttons["member-gender-boy"]
         if boy.waitForExistence(timeout: 4), boy.isEnabled {
-            tapWhenHittable(boy, timeout: 4)
+            tapGuidedJourneyControlAfterSemanticScroll(boy, in: app)
         }
 
         let coatMenu = app.buttons["member-pet-coat-picker"]
@@ -5808,11 +12355,11 @@ final class OhanaUITests: XCTestCase {
 
         let coatOptions = ["黄色", "橘猫", "赤色", "黑色", "白色", "Black", "White", "Red"]
         for _ in 0 ..< 3 {
-            guard tapWhenFrameReady(coatMenu, timeout: 8) else { continue }
+            tapGuidedJourneyControlAfterSemanticScroll(coatMenu, in: app)
             guard waitUntil(timeout: 6, condition: {
                 coatOptions.contains { app.buttons[$0].exists }
             }) else { continue }
-            guard tapMemberCreationBreedMenuCoordinate(optionLabels: coatOptions, in: app) else { continue }
+            guard tapNativeMenuOption(optionLabels: coatOptions, in: app) else { continue }
             if waitUntil(timeout: 4, condition: { creationPrimary.isEnabled }) {
                 return
             }
@@ -5833,6 +12380,19 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func tapWhenSemanticallyHittable(
+        _ element: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let didBecomeHittable = waitUntil(timeout: timeout) {
+            element.exists && element.isEnabled && element.isHittable
+        }
+        guard didBecomeHittable else { return false }
+        element.tap()
+        return true
+    }
+
+    @MainActor
     private func tapWhenHittable(_ element: XCUIElement, timeout: TimeInterval) {
         let didBecomeHittable = waitUntil(timeout: timeout) {
             element.exists && element.isEnabled && element.isHittable
@@ -5844,11 +12404,38 @@ final class OhanaUITests: XCTestCase {
 
         let didBecomeFrameReady = waitForFrameReady(element, timeout: 1)
         let elementValue = element.value.map { String(describing: $0) } ?? "nil"
-        XCTAssertTrue(
-            didBecomeFrameReady,
-            "Element did not become hittable or frame-ready: \(element) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
-        )
+        guard didBecomeFrameReady else {
+            XCTFail(
+                "Element did not become hittable or frame-ready: \(element) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
+            )
+            return
+        }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
+    @MainActor
+    private func tapGuidedJourneyControlAfterSemanticScroll(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maxSwipes: Int = 8,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for _ in 0 ... maxSwipes {
+            if element.exists, element.isEnabled, element.isHittable {
+                element.tap()
+                return
+            }
+            swipeUpInPrimaryScrollArea(in: app)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+
+        XCTAssertTrue(
+            element.exists && element.isEnabled && element.isHittable,
+            "Guided journey control did not become semantically tappable after scrolling: \(element)",
+            file: file,
+            line: line
+        )
     }
 
     @MainActor
@@ -5864,6 +12451,14 @@ final class OhanaUITests: XCTestCase {
             }
         }
         return nil
+    }
+
+    @MainActor
+    private func uniqueAccessibilityIdentifierCount(prefix: String, in app: XCUIApplication) -> Int {
+        let matches = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
+        let count = matches.count
+        return Set((0 ..< count).map { matches.element(boundBy: $0).identifier }).count
     }
 
     @MainActor
@@ -5947,14 +12542,9 @@ final class OhanaUITests: XCTestCase {
         context: String
     ) {
         let didTap = waitUntil(timeout: timeout) {
-            for label in labels {
-                let button = app.buttons[label]
-                if button.exists && button.isEnabled && button.isHittable {
-                    button.tap()
-                    return true
-                }
-            }
-            return false
+            guard let button = firstHittableButton(labels: labels, in: app) else { return false }
+            button.tap()
+            return true
         }
         XCTAssertTrue(didTap, "No alert button became available for \(context): \(labels.joined(separator: ", "))")
     }
@@ -5975,7 +12565,7 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func tapWhenFrameReady(_ element: XCUIElement, offset: CGVector, timeout: TimeInterval) -> Bool {
         let didBecomeFrameReady = waitUntil(timeout: timeout) {
-            guard element.exists else { return false }
+            guard element.exists, element.isEnabled else { return false }
             let frame = element.frame
             return frame.width > 1 && frame.height > 1 && isFiniteFrame(frame)
         }
@@ -5993,6 +12583,13 @@ final class OhanaUITests: XCTestCase {
             frame.midY.isFinite
     }
 
+    private func isToggleOn(_ element: XCUIElement) -> Bool {
+        let value = String(describing: element.value ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return ["1", "true", "on", "yes", "enabled", "selected"].contains(value)
+    }
+
     private func accessibilityText(for element: XCUIElement) -> String {
         let value = element.value.map { String(describing: $0) } ?? ""
         return "\(element.label) \(value)"
@@ -6005,11 +12602,6 @@ final class OhanaUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
         return condition()
-    }
-
-    private struct HumanFeatureHubRouteExpectation {
-        let tileIdentifier: String
-        let markers: [String]
     }
 
     private struct PetFeatureHubRouteExpectation {

@@ -97,19 +97,20 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     var body: some View {
         TabView(selection: selection) {
             ForEach(visibleTabs) { tab in
-                page(for: tab)
-                    .background {
-                        viewportAlignedPageBackground(for: tab)
-                    }
-                    .tabItem {
-                        Label(tab.title(localization), systemImage: tab.icon)
-                            .accessibilityIdentifier("home-tab-\(tab.rawValue)")
-                            .accessibilityLabel(tabAccessibilityLabel(for: tab))
-                    }
-                    .tag(tab)
-                    .badge(tab == .calendar ? taskCenterBadge.attentionCount : 0)
+                Tab(value: tab) {
+                    page(for: tab)
+                        .background {
+                            viewportAlignedPageBackground(for: tab)
+                        }
+                } label: {
+                    Label(tab.title(localization), systemImage: tab.icon)
+                }
+                .accessibilityIdentifier("home-tab-\(tab.rawValue)")
+                .accessibilityLabel(tabAccessibilityLabel(for: tab))
+                .badge(tab == .calendar ? taskCenterBadge.attentionCount : 0)
             }
         }
+        .id(visibleTabs)
         .tint(Color.goPrimary)
         .tabBarMinimizeBehavior(.onScrollDown)
         .accessibilityIdentifier("home-native-tab-view")

@@ -290,6 +290,103 @@ nonisolated enum CalendarSnapshotBuilder {
         .reference
     }
 
+    @MainActor
+    static func mergingFamilyTaskProjectionEvents(
+        _ projectionEvents: [Event],
+        into snapshot: CalendarPreparedSnapshot,
+        allEvents: [Event],
+        pets: [Pet],
+        selectedDate: Date,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> CalendarPreparedSnapshot {
+        let persistedOccurrenceKeys = Set(snapshot.filteredEvents.compactMap(\.familyTaskOccurrenceKey))
+        let uniqueProjectionEvents = projectionEvents.filter { event in
+            guard let occurrenceKey = event.familyTaskOccurrenceKey else { return false }
+            return !persistedOccurrenceKeys.contains(occurrenceKey)
+        }
+        guard !uniqueProjectionEvents.isEmpty else { return snapshot }
+
+        let projectionSnapshot = preparedSnapshot(
+            filteredEvents: uniqueProjectionEvents,
+            allEvents: allEvents + uniqueProjectionEvents,
+            pets: pets,
+            weekDays: weekDays(around: now, calendar: calendar),
+            monthDays: monthDays(containing: selectedDate, calendar: calendar),
+            now: now,
+            calendar: calendar
+        )
+        let occurrences = (snapshot.timeline.expandedOccurrences + projectionSnapshot.timeline.expandedOccurrences)
+            .sorted(by: occurrenceSort)
+        let occurrencesByDay = Dictionary(grouping: occurrences) { occurrence in
+            calendar.startOfDay(for: occurrence.occurrenceDate)
+        }
+        .mapValues { $0.sorted(by: occurrenceSort) }
+        let sectionDates = Set(snapshot.timeline.sections.map(\.date))
+            .union(projectionSnapshot.timeline.sections.map(\.date))
+        let sections = sectionDates.sorted().map { date in
+            CalendarTimelineDateSection(
+                date: date,
+                occurrences: occurrencesByDay[calendar.startOfDay(for: date)] ?? []
+            )
+        }
+
+        return CalendarPreparedSnapshot(
+            filteredEvents: snapshot.filteredEvents + uniqueProjectionEvents,
+            timeline: CalendarTimelineSnapshot(
+                expandedOccurrences: occurrences,
+                sections: sections
+            ),
+            eventsByDay: mergingEventBuckets(snapshot.eventsByDay, projectionSnapshot.eventsByDay),
+            weekEventsByDay: mergingEventBuckets(
+                snapshot.weekEventsByDay,
+                projectionSnapshot.weekEventsByDay
+            ),
+            monthEventDayIDs: snapshot.monthEventDayIDs.union(projectionSnapshot.monthEventDayIDs)
+        )
+    }
+
+    private static func mergingEventBuckets(
+        _ first: [String: [Event]],
+        _ second: [String: [Event]]
+    ) -> [String: [Event]] {
+        first.merging(second) { existing, projected in
+            (existing + projected).sorted {
+                if $0.startDate == $1.startDate { return $0.title < $1.title }
+                return $0.startDate < $1.startDate
+            }
+        }
+    }
+
+    private static func occurrenceSort(
+        _ first: CalendarEventOccurrence,
+        _ second: CalendarEventOccurrence
+    ) -> Bool {
+        if first.occurrenceDate == second.occurrenceDate {
+            if first.event.startDate == second.event.startDate {
+                return first.event.title < second.event.title
+            }
+            return first.event.startDate < second.event.startDate
+        }
+        return first.occurrenceDate < second.occurrenceDate
+    }
+
+    private static func weekDays(around now: Date, calendar: Calendar) -> [Date] {
+        let today = calendar.startOfDay(for: now)
+        let daysFromSunday = calendar.component(.weekday, from: today) - 1
+        guard let sunday = calendar.date(byAdding: .day, value: -daysFromSunday, to: today) else { return [] }
+        return (0 ..< 7).compactMap { calendar.date(byAdding: .day, value: $0, to: sunday) }
+    }
+
+    private static func monthDays(containing date: Date, calendar: Calendar) -> [Date] {
+        let components = calendar.dateComponents([.year, .month], from: date)
+        guard let firstOfMonth = calendar.date(from: components),
+              let range = calendar.range(of: .day, in: .month, for: firstOfMonth) else { return [] }
+        return range.compactMap { day in
+            calendar.date(byAdding: .day, value: day - 1, to: firstOfMonth)
+        }
+    }
+
     private static func buildTimeline(
         occurrenceIndex: CalendarOccurrenceDayIndex,
         visibilityContext: VisibilityContext

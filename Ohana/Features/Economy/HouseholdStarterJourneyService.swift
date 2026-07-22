@@ -9,12 +9,12 @@ import Foundation
 import SwiftData
 
 enum HouseholdStarterJourneyService {
-    static let checkpointActionType = "householdStarterJourneyCheckpoint"
-    static let checkpointSourceModelName = "HouseholdStarterJourneyCheckpoint"
-    static let rewardActionType = "householdStarterJourneyReward"
-    static let rewardSourceModelName = "HouseholdStarterJourneyReward"
+    nonisolated static let checkpointActionType = "householdStarterJourneyCheckpoint"
+    nonisolated static let checkpointSourceModelName = "HouseholdStarterJourneyCheckpoint"
+    nonisolated static let rewardActionType = "householdStarterJourneyReward"
+    nonisolated static let rewardSourceModelName = "HouseholdStarterJourneyReward"
 
-    private struct CheckpointMetadata: Codable, Equatable, Sendable {
+    private nonisolated struct CheckpointMetadata: Codable, Equatable, Sendable {
         let journeyKey: String
         let taskRaw: String
         let checkpointRaw: String
@@ -58,6 +58,12 @@ enum HouseholdStarterJourneyService {
         subjectID: UUID
     ) -> String {
         "\(HouseholdStarterJourneyTask.journeyKey):\(task.rawValue):\(checkpoint.rawValue):\(checkpoint.targetKind.rawValue):\(subjectID.uuidString.lowercased())"
+    }
+
+    nonisolated static func checkpointResolutions(
+        from events: [CareLedgerEvent]
+    ) -> [String: HouseholdStarterJourneyResolution] {
+        latestCheckpointResolutions(from: events)
     }
 
     @MainActor
@@ -164,6 +170,7 @@ enum HouseholdStarterJourneyService {
         careLedger: CareLedgerRecording = CareLedgerService()
     ) -> HouseholdStarterJourneyResolutionResult {
         guard checkpoint.task == task,
+              task.checkpoints.contains(checkpoint),
               checkpoint.allowedResolutions.contains(resolution) else {
             return .invalidCheckpoint
         }
@@ -448,14 +455,30 @@ private extension HouseholdStarterJourneyService {
     ) -> SnapshotProgress {
         let human = selectCandidate(
             livingHumans.map { value in
-                candidateProgress(
+                let actual = MemberProfileCompletenessPolicy.humanActualCategories(value)
+                let legacyKey = checkpointRecordKey(
+                    task: .humanProfile,
+                    checkpoint: .humanOptionalDetails,
+                    subjectID: value.id
+                )
+                let legacyResolution = resolutions[legacyKey]
+                return candidateProgress(
                     id: value.id,
-                    checkpoints: [.humanAppearance, .humanOptionalDetails],
+                    checkpoints: HouseholdStarterJourneyTask.humanProfile.checkpoints,
                     actual: [
-                        .humanAppearance: hasMeaningfulAppearance(value),
-                        .humanOptionalDetails: hasMeaningfulOptionalDetails(value)
+                        .humanAppearance: actual.contains(.humanAppearance),
+                        .humanLifeStage: actual.contains(.humanLifeStage),
+                        .humanBodyProfile: actual.contains(.humanBodyProfile),
+                        .humanPersonalityContext: actual.contains(.humanPersonalityContext)
                     ],
-                    resolutions: resolutions
+                    resolutions: resolutions,
+                    fallbackResolutions: legacyResolution.map { resolution in
+                        [
+                            .humanLifeStage: resolution,
+                            .humanBodyProfile: resolution,
+                            .humanPersonalityContext: resolution
+                        ]
+                    } ?? [:]
                 )
             },
             preferredID: activeHumanID,
@@ -559,6 +582,18 @@ private extension HouseholdStarterJourneyService {
             hasRequiredSubject = progress.hasLivingHuman && progress.hasLivingPet
         }
         let requiredCount = HouseholdStarterJourneyPolicy.requiredCheckpointCount(for: task)
+        let completionPercent: Int? = switch task {
+        case .humanProfile, .petProfile:
+            min(100, completedCount * 25)
+        case .identityProtection, .healthProtection, .carePlan, .firstCare:
+            nil
+        }
+        let requiredCompletionPercent: Int? = switch task {
+        case .humanProfile, .petProfile:
+            MemberProfileCompletenessPolicy.starterRewardThresholdPercent
+        case .identityProtection, .healthProtection, .carePlan, .firstCare:
+            nil
+        }
         let status: HouseholdStarterJourneyTaskState.Status = if isClaimed {
             .claimed
         } else if !hasRequiredSubject {
@@ -582,6 +617,8 @@ private extension HouseholdStarterJourneyService {
             rewardCoconuts: task.rewardCoconuts,
             completedCheckpointCount: completedCount,
             requiredCheckpointCount: requiredCount,
+            completionPercent: completionPercent,
+            requiredCompletionPercent: requiredCompletionPercent,
             targetID: candidate?.id,
             completedCheckpoints: candidate?.completed ?? [],
             checkpointResolutions: candidate?.resolutions ?? [:],
@@ -593,7 +630,8 @@ private extension HouseholdStarterJourneyService {
         id: UUID,
         checkpoints: [HouseholdStarterJourneyCheckpoint],
         actual: [HouseholdStarterJourneyCheckpoint: Bool],
-        resolutions: [String: HouseholdStarterJourneyResolution]
+        resolutions: [String: HouseholdStarterJourneyResolution],
+        fallbackResolutions: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution] = [:]
     ) -> CandidateProgress {
         var completed: Set<HouseholdStarterJourneyCheckpoint> = []
         var resolved: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution] = [:]
@@ -605,8 +643,7 @@ private extension HouseholdStarterJourneyService {
             )
             if actual[checkpoint] == true {
                 completed.insert(checkpoint)
-            }
-            if let resolution = resolutions[key] {
+            } else if let resolution = resolutions[key] ?? fallbackResolutions[checkpoint] {
                 completed.insert(checkpoint)
                 resolved[checkpoint] = resolution
             }
@@ -686,10 +723,7 @@ private extension HouseholdStarterJourneyService {
     }
 
     nonisolated static func hasMeaningfulAppearance(_ human: Human) -> Bool {
-        // member-lifecycle-gate: allow read-only starter qualification
-        if human.avatarAttachmentState == .present || !human.avatarImageSignature.isEmpty { return true }
-        let emoji = normalized(human.avatarEmoji)
-        return !emoji.isEmpty && emoji != "👤"
+        MemberProfileCompletenessPolicy.humanActualCategories(human).contains(.humanAppearance)
     }
 
     nonisolated static func hasMeaningfulOptionalDetails(_ human: Human) -> Bool {
@@ -703,35 +737,19 @@ private extension HouseholdStarterJourneyService {
     }
 
     nonisolated static func hasLifeStageProfile(_ pet: Pet) -> Bool {
-        pet.birthday != nil || pet.homeDate != nil
+        MemberProfileCompletenessPolicy.petActualCategories(pet).contains(.petLifeStage)
     }
 
     nonisolated static func hasBodyProfile(_ pet: Pet) -> Bool {
-        let gender = normalized(pet.gender).lowercased()
-        return (!gender.isEmpty && gender != "unknown" && gender != "未知")
-            || !normalized(pet.coatColor).isEmpty
-            || !normalized(pet.birthCountry).isEmpty
-            || !normalized(pet.birthCity).isEmpty
+        MemberProfileCompletenessPolicy.petActualCategories(pet).contains(.petBodyProfile)
     }
 
     nonisolated static func hasPersonalityOrAppearance(_ pet: Pet) -> Bool {
-        // member-lifecycle-gate: allow read-only starter qualification
-        !normalized(pet.personalityTagsRaw).isEmpty
-            || pet.avatarAttachmentState == .present
-            || !pet.avatarImageSignature.isEmpty
-            || pet.cardPopoutAttachmentState == .present
-            || !pet.cardPopoutImageSignature.isEmpty
+        MemberProfileCompletenessPolicy.petActualCategories(pet).contains(.petPersonalityAppearance)
     }
 
     nonisolated static func hasDailyCareProfile(_ pet: Pet) -> Bool {
-        !normalized(pet.foodBrand).isEmpty
-            || pet.dailyPortionGrams > 0
-            || pet.restockDate != nil
-            || pet.restockWeight > 0
-            || pet.foodPrice > 0
-            || pet.casualOpenDate != nil
-            || pet.casualDurationDays > 0
-            || pet.foodReminderEnabled
+        MemberProfileCompletenessPolicy.petActualCategories(pet).contains(.petDailyCare)
     }
 
     nonisolated static func hasIdentityProtection(
@@ -854,27 +872,58 @@ private extension HouseholdStarterJourneyService {
     ) throws -> Bool {
         guard let pet = livingPets.first(where: { $0.id == petID }) else { return false }
         let petIDRaw = petID.uuidString
-        var eventDescriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityId == petIDRaw
-                    && event.recurrenceDays > 0
-                    && !event.isCompleted
+        for eventID in CarePlanCalendarSync.storedDefaultCalendarPlanEventIDs(for: petID) {
+            var descriptor = FetchDescriptor<Event>(
+                predicate: #Predicate<Event> { event in
+                    event.id == eventID
+                        && event.relatedEntityId == petIDRaw
+                        && event.recurrenceDays > 0
+                        && !event.isCompleted
+                }
+            )
+            descriptor.fetchLimit = 1
+            if let event = try context.fetch(descriptor).first,
+               carePlanEvidence(
+                   targetPet: pet,
+                   events: [event],
+                   reminderEventIDs: []
+               ).hasDefaultRecommendedCarePlan {
+                return true
             }
-        )
-        eventDescriptor.fetchLimit = 64
-        var reminderDescriptor = FetchDescriptor<Reminder>(
-            predicate: #Predicate<Reminder> { reminder in
-                reminder.event?.relatedEntityId == petIDRaw
+        }
+
+        for title in CarePlanCalendarSync.defaultGeneratedCalendarPlanTitles(for: pet).sorted() {
+            var eventDescriptor = FetchDescriptor<Event>(
+                predicate: #Predicate<Event> { event in
+                    event.relatedEntityId == petIDRaw
+                        && event.title == title
+                        && event.recurrenceDays > 0
+                        && !event.isCompleted
+                },
+                sortBy: [
+                    SortDescriptor(\.createdAt),
+                    SortDescriptor(\.id)
+                ]
+            )
+            eventDescriptor.fetchLimit = 1
+            guard let event = try context.fetch(eventDescriptor).first else { continue }
+            let eventID = event.id
+            var reminderDescriptor = FetchDescriptor<Reminder>(
+                predicate: #Predicate<Reminder> { reminder in
+                    reminder.event?.id == eventID
+                }
+            )
+            reminderDescriptor.fetchLimit = 1
+            let reminderEventIDs: Set<UUID> = try context.fetch(reminderDescriptor).isEmpty ? [] : [eventID]
+            if carePlanEvidence(
+                targetPet: pet,
+                events: [event],
+                reminderEventIDs: reminderEventIDs
+            ).hasDefaultRecommendedCarePlan {
+                return true
             }
-        )
-        reminderDescriptor.fetchLimit = 128
-        let events = try context.fetch(eventDescriptor)
-        let reminderIDs = Set(try context.fetch(reminderDescriptor).compactMap { $0.event?.id })
-        return carePlanEvidence(
-            targetPet: pet,
-            events: events,
-            reminderEventIDs: reminderIDs
-        ).hasDefaultRecommendedCarePlan
+        }
+        return false
     }
 
     private nonisolated static func carePlanProgress(
@@ -894,8 +943,7 @@ private extension HouseholdStarterJourneyService {
         var recordedResolutions: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution] = [:]
         if hasExplicitPlan {
             completed.insert(checkpoint)
-        }
-        if hasAnyPlan, let resolution = resolutions[key] {
+        } else if hasAnyPlan, let resolution = resolutions[key] {
             completed.insert(checkpoint)
             recordedResolutions[checkpoint] = resolution
         }
@@ -962,9 +1010,14 @@ private extension HouseholdStarterJourneyService {
                 event.actionType == actionType
                     && event.legacyModelName == modelName
                     && event.legacyModelId == recordKey
-            }
+            },
+            sortBy: [
+                SortDescriptor(\.occurredAt, order: .reverse),
+                SortDescriptor(\.createdAt, order: .reverse),
+                SortDescriptor(\.id, order: .reverse)
+            ]
         )
-        descriptor.fetchLimit = 8
+        descriptor.fetchLimit = 1
         return try context.fetch(descriptor)
     }
 

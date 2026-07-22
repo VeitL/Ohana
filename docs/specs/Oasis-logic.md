@@ -1,6 +1,6 @@
 # Oasis 规则书
 
-确认日期：2026-07-11
+确认日期：2026-07-18
 
 本规则书覆盖 Oasis 生命树、升级椰子、电子宠物、打卡与椰子收支的首发语义。最高裁判标准仍是 `docs/specs/product-foundation.md`。
 
@@ -10,7 +10,10 @@
 - 首发生命树注入是岛屿级消费，可使用 `system:island` 岛屿储备与所有活跃正式成员钱包；没有 Human 也必须可用。电子宠物互动、升星、碎片唤醒等成员型消费仍绑定当前主人钱包。
 - Oasis 的重复性产出必须计入操作日预算 / 冷却；一次性升级椰子、唯一里程碑等奖励可作为幂等的非预算 grant，但必须可由钱包账本重放。
 - 电子宠物首发不做永久死亡；长期无人照顾或高龄只进入低压的休眠 / 纪念状态，可被唤回，不因用户没打开 App 造成不可逆损失。
-- DailyStreak 是唯一打卡事实源；Oasis 只复用同一份打卡数据和命令，不建立第二套 streak。
+- V93 `PresenceCheckIn` 是佛系打卡事实源；Oasis 只展示其快照并发出统一命令意图，不建立第二套 streak。旧 `CheckInStreakStore` 只保留一次兼容迁移读取。
+- 佛系使用轻量 `ZenOasisPage`：余额、生命树、能量注入、商店、扭蛋、电子宠物三个紧凑入口。它不挂载普通 Oasis 的重型首帧工作。
+- 基础 Oasis、商店、扭蛋与电子宠物继续对 Free 开放；Personal/Family 不改变奖励倍率、价格或抽取概率。
+- 佛系首次新增 Pet 或 Plant 后显示家庭级 50 椰子起航礼卡。它与普通首 Pet 赠礼共用同一稳定 grant key，任一入口领取后另一入口不可再领。
 - 生命树是历史记忆。历史照护产生的树 XP 不因成员离世而回退；删除成员是不可恢复物理删除，未来活跃生成由对应模块的离世 / 删除规则控制。隐私删除一切数据除外。
 - 树注入是正式消费出口，首发允许无限次使用，只受正式岛屿总资产限制；扣款顺序固定为岛屿储备、当前 active Human、其余活跃成员钱包，`system:legacy` 永远不可用。
 
@@ -26,8 +29,9 @@
 - OAS-008：隐藏或离开 Oasis 后必须取消 route-scoped 任务并释放 live snapshot；环境动画必须受 `AppWorkloadPolicy` / Reduce Motion / 可见性控制。
 - OAS-009：电子宠物生命周期不得因未打开 App 进入不可逆死亡；低状态可进入需要救援 / 休眠 / 纪念展示，但用户可通过救援或互动唤回。
 - OAS-010：真实照护行为只能给当前展示的非归档、非休眠最终态电子宠物一次轻量 `careEcho` 反馈；不得复活不可交互对象，也不得重复写多条回声。
-- OAS-011：DailyStreak 与 Oasis 打卡读写同一份 `CheckInStreakStore` 数据；从 Oasis 或 DailyStreak 进入当天，只能产生一次当天打卡奖励。
+- OAS-011：Zen Home、Zen Streak 与 Zen Oasis 读写同一份 `PresenceCheckIn` 数据并只通过 `PresenceCheckInCommandService` 写入；从任意入口重复进入当天只能存在一条本人事实和对应幂等 receipt。
 - OAS-012：生命树历史 XP 不因成员离世而回退；只有成员不可恢复删除、隐私真删或全量重置会清除对应数据。
+- OAS-013：普通首 Pet 赠礼与佛系首 Pet/Plant 起航礼共享同一家庭稳定键、同一 50 椰子非预算 grant 和同一 `system:island` 入账语义。
 
 ## 状态机
 
@@ -93,11 +97,11 @@
 - 生命树聚合扣款与其他 Oasis 椰子收支集中在 `OasisCritterEconomyService` 与 `OasisRewardCommandExecutor`：`Ohana/Features/Oasis/OasisCritterEconomyService.swift`、`Ohana/Features/Oasis/OasisRewardCommandExecutor.swift`。
 - 升级椰子生成与打开在 `OasisUpgradeRewardService+Opening.swift`。
 - 电子宠物互动、升星、碎片唤醒、真实照护回声在 `OasisUpgradeRewardService+Interaction.swift` 与 `OasisUpgradeRewardService+Upgrades.swift`。
-- Oasis 与 DailyStreak 共享 `CheckInStreakStore`，命令边界在 `OasisRewardCommandExecutor`。
+- 佛系打卡命令边界为 `PresenceCheckInCommandService`；`CheckInStreakStore` 不再接受新写入，只供一次 legacy 迁移。
 
 ## 边界
 
-- 本轮不改 SwiftData schema。
+- V93 新增 Presence 事实、参与区间、奖励 receipt 与本机安全联系人模型；Oasis 经济模型本身不变。
 - 本轮不启用 CloudKit，不修改联机同步语义。
 - 本轮不改变 Oasis / Shop / Gacha / Achievements 的成长解锁等级；只保证锁住时不可达、解锁后命令合规。
 - `system:island` 是正式岛屿储备，可参与生命树注入；`system:legacy` 可继续存在于数据库中用于迁移兼容，但 Oasis 首发正式行为不得依赖它。
@@ -108,4 +112,4 @@
 - OAS-006、OAS-012：用生命树 XP 重建与缓存测试覆盖。
 - OAS-007~008：用现有 mount policy / runtime audit 覆盖，并保留人工 Reduce Motion 目检。
 - OAS-009~010：用电子宠物生命周期与 care echo 测试覆盖。
-- OAS-011：用 Oasis / DailyStreak 共享命令测试覆盖。
+- OAS-011~013：用 Zen 三页共享 Presence 命令和两入口赠礼幂等测试覆盖。

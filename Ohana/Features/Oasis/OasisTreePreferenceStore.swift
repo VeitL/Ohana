@@ -8,12 +8,18 @@ struct OasisLedgerEnergyCache: Equatable {
     var injectedXP: Int
 }
 
+struct OasisShopEnergyPurchaseWrite: Equatable {
+    let injectedEnergy: Int
+    let didApplyEnergy: Bool
+}
+
 enum OasisTreePreferenceStore {
     static let passiveIncomeKey = "lastTreeHarvestDate"
     static let dailyInjectionDayKey = "oasis_v2DailyTreeInjectionDay"
     static let weeklyInjectionWeekKey = "oasis_v2WeeklyTreeInjectionWeek"
 
     private nonisolated static let injectedEnergyKey = "oasis_injectedEnergy"
+    nonisolated static let shopEnergyPurchaseStateKey = "oasis_shopEnergyPurchaseStateV1"
     private nonisolated static let careGrowthEnergyKey = "oasis_careGrowthEnergy"
     private static let careGrowthBaselineKey = "oasis_careGrowthBaselineXP"
     private static let lastRewardedLevelKey = "oasis_lastRewardedLevel"
@@ -33,8 +39,84 @@ enum OasisTreePreferenceStore {
     private static let defaults = UserDefaults.standard
 
     nonisolated static var injectedEnergy: Int {
-        get { UserDefaults.standard.integer(forKey: injectedEnergyKey) }
-        set { UserDefaults.standard.set(newValue, forKey: injectedEnergyKey) }
+        get {
+            let defaults = UserDefaults.standard
+            return shopEnergyPurchaseState(defaults: defaults)?.injectedEnergy
+                ?? defaults.integer(forKey: injectedEnergyKey)
+        }
+        set {
+            let defaults = UserDefaults.standard
+            let safeEnergy = max(0, newValue)
+            if var state = shopEnergyPurchaseState(defaults: defaults) {
+                state.injectedEnergy = state.appliedPurchaseIDs.isEmpty
+                    ? safeEnergy
+                    : max(state.injectedEnergy, safeEnergy)
+                storeShopEnergyPurchaseState(state, defaults: defaults)
+                defaults.set(state.injectedEnergy, forKey: injectedEnergyKey)
+                return
+            }
+            defaults.set(safeEnergy, forKey: injectedEnergyKey)
+        }
+    }
+
+    nonisolated static func hasAppliedShopEnergyPurchase(
+        _ purchaseID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        shopEnergyPurchaseState(defaults: defaults)?
+            .appliedPurchaseIDs
+            .contains(purchaseID.uuidString) == true
+    }
+
+    nonisolated static func pendingShopEnergyPurchaseIDs(
+        defaults: UserDefaults = .standard
+    ) -> [UUID] {
+        guard let state = shopEnergyPurchaseState(defaults: defaults) else { return [] }
+        return state.appliedPurchaseIDs.compactMap(UUID.init(uuidString:))
+    }
+
+    /// Commits a shop-funded tree-energy effect and its idempotency marker in
+    /// one durable defaults record. The legacy scalar remains a compatibility
+    /// projection and is synchronized in the same write boundary.
+    @discardableResult
+    nonisolated static func applyShopEnergyPurchase(
+        _ purchaseID: UUID,
+        xp: Int,
+        currentInjectedEnergy: Int,
+        defaults: UserDefaults = .standard
+    ) -> OasisShopEnergyPurchaseWrite {
+        commitShopEnergyPurchase(
+            purchaseID,
+            xp: max(0, xp),
+            currentInjectedEnergy: currentInjectedEnergy,
+            defaults: defaults
+        )
+    }
+
+    /// Backfills the marker when the SwiftData ledger checkpoint already
+    /// proves that an older build applied this purchase.
+    @discardableResult
+    nonisolated static func checkpointShopEnergyPurchase(
+        _ purchaseID: UUID,
+        currentInjectedEnergy: Int,
+        defaults: UserDefaults = .standard
+    ) -> OasisShopEnergyPurchaseWrite {
+        commitShopEnergyPurchase(
+            purchaseID,
+            xp: 0,
+            currentInjectedEnergy: currentInjectedEnergy,
+            defaults: defaults
+        )
+    }
+
+    nonisolated static func clearShopEnergyPurchaseMarker(
+        _ purchaseID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        guard var state = shopEnergyPurchaseState(defaults: defaults) else { return }
+        state.appliedPurchaseIDs.remove(purchaseID.uuidString)
+        storeShopEnergyPurchaseState(state, defaults: defaults)
+        defaults.synchronize()
     }
 
     /// 照护养分累计能量(计入树等级)。派生自账本,持久化仅为冷启动即时显示。
@@ -165,5 +247,70 @@ enum OasisTreePreferenceStore {
         } else {
             defaults.removeObject(forKey: limitKey)
         }
+    }
+
+    private nonisolated struct ShopEnergyPurchaseState: Codable {
+        static let currentVersion = 1
+
+        let version: Int
+        var injectedEnergy: Int
+        var appliedPurchaseIDs: Set<String>
+
+        init(injectedEnergy: Int, appliedPurchaseIDs: Set<String>) {
+            version = Self.currentVersion
+            self.injectedEnergy = max(0, injectedEnergy)
+            self.appliedPurchaseIDs = appliedPurchaseIDs
+        }
+    }
+
+    private nonisolated static func commitShopEnergyPurchase(
+        _ purchaseID: UUID,
+        xp: Int,
+        currentInjectedEnergy: Int,
+        defaults: UserDefaults
+    ) -> OasisShopEnergyPurchaseWrite {
+        var state = shopEnergyPurchaseState(defaults: defaults)
+            ?? ShopEnergyPurchaseState(
+                injectedEnergy: max(
+                    0,
+                    max(currentInjectedEnergy, defaults.integer(forKey: injectedEnergyKey))
+                ),
+                appliedPurchaseIDs: []
+            )
+        let purchaseKey = purchaseID.uuidString
+        let alreadyApplied = state.appliedPurchaseIDs.contains(purchaseKey)
+        let baseline = max(0, max(currentInjectedEnergy, state.injectedEnergy))
+        state.injectedEnergy = alreadyApplied ? baseline : baseline + xp
+        state.appliedPurchaseIDs.insert(purchaseKey)
+
+        // The combined record is the authority: a crash can observe either
+        // the whole energy-plus-marker update or none of it. The scalar is
+        // maintained for older readers in the same synchronized batch.
+        storeShopEnergyPurchaseState(state, defaults: defaults)
+        defaults.set(state.injectedEnergy, forKey: injectedEnergyKey)
+        defaults.synchronize()
+        return OasisShopEnergyPurchaseWrite(
+            injectedEnergy: state.injectedEnergy,
+            didApplyEnergy: !alreadyApplied && xp > 0
+        )
+    }
+
+    private nonisolated static func shopEnergyPurchaseState(
+        defaults: UserDefaults
+    ) -> ShopEnergyPurchaseState? {
+        guard let data = defaults.data(forKey: shopEnergyPurchaseStateKey),
+              let state = try? JSONDecoder().decode(ShopEnergyPurchaseState.self, from: data),
+              state.version == ShopEnergyPurchaseState.currentVersion else {
+            return nil
+        }
+        return state
+    }
+
+    private nonisolated static func storeShopEnergyPurchaseState(
+        _ state: ShopEnergyPurchaseState,
+        defaults: UserDefaults
+    ) {
+        guard let data = try? JSONEncoder().encode(state) else { return }
+        defaults.set(data, forKey: shopEnergyPurchaseStateKey)
     }
 }

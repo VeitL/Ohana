@@ -195,6 +195,7 @@ struct ProtectionEmptyState: View {
     let icon: String
     let title: String
     let actionTitle: String
+    let actionIdentifier: String
     let tint: Color
     let action: () -> Void
 
@@ -215,6 +216,7 @@ struct ProtectionEmptyState: View {
                     .background(Color.goPrimary, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier(actionIdentifier)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)
@@ -318,6 +320,7 @@ struct DocumentDetailRow: View {
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("pet-documents-document-row-\(doc.id.uuidString)")
         .contextMenu {
             Button { onDetail() } label: {
                 Label(l.tr(zh: "查看详情", en: "View details", de: "Details ansehen"), systemImage: "doc.text.magnifyingglass")

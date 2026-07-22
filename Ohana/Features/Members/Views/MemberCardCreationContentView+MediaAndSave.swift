@@ -20,7 +20,7 @@ extension MemberCardCreationContentView {
     }
 
     func configureAvatarStepIfNeeded() {
-        guard !didConfigureAvatarStep else { return }
+        guard currentStep == .avatar, !didConfigureAvatarStep else { return }
         didConfigureAvatarStep = true
         guard canUseFree2D, draft.avatarSource == .placeholder else { return }
         applyDefault2DCandidate(usesInventoryPass: false)
@@ -491,6 +491,11 @@ extension MemberCardCreationContentView {
             handleSaveFailure(l.tr(zh: "这个名字已经被使用。", en: "This name is already in use.", de: "Dieser Name wird bereits verwendet."))
         } catch MemberCreationError.emptyName {
             handleSaveFailure(l.tr(zh: "请先输入名字。", en: "Enter a name first.", de: "Gib zuerst einen Namen ein."))
+        } catch let MemberCreationError.personalUpgradeRequired(denial) {
+            isSaving = false
+            onHomeJoinHandoffEnded?()
+            restoreHomeJoinHandoffAfterFailure()
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
         } catch {
             handleSaveFailure(error.localizedDescription)
         }

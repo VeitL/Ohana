@@ -30,6 +30,7 @@ struct OnboardingView: View {
     @Environment(AppServices.self) private var appServices
 
     var isReplay = false
+    var experienceMode: AppExperienceMode = .standard
     var onReplayFinished: (() -> Void)?
     var onFirstHumanSaved: ((UUID) -> Void)?
     var onPetDeferred: (() -> Void)?
@@ -59,14 +60,32 @@ struct OnboardingView: View {
     @State private var isHomeJoinHandoffPresentationActive = false
     @FocusState private var isHumanNameFocused: Bool
 
-    private var languageCode: String { AppLanguage.normalize(appLanguage) }
-
     private var trimmedHumanName: String {
         humanName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func localized(zh: String, en: String, de: String) -> String {
-        AppLocalizedText(zh: zh, en: en, de: de).resolve(languageCode)
+    private func localized(
+        zh: String,
+        en: String,
+        de: String,
+        es: String,
+        pt: String,
+        fr: String,
+        ja: String,
+        ko: String,
+        it: String
+    ) -> String {
+        L10n(appLanguage).tr(
+            zh: zh,
+            en: en,
+            de: de,
+            es: es,
+            pt: pt,
+            fr: fr,
+            ja: ja,
+            ko: ko,
+            it: it
+        )
     }
 
     var body: some View {
@@ -92,6 +111,9 @@ struct OnboardingView: View {
         .environment(\.colorScheme, .dark)
         .onAppear {
             guard !isReplay else { return }
+            // Both shells share the same household starter journey key. Zen
+            // defers eligibility until the first Pet or Plant, while Standard
+            // continues to wait for the first Pet.
             appServices.onboardingJourney.beginFreshJourney(context: modelContext)
             recoverInterruptedFlow()
         }
@@ -99,11 +121,27 @@ struct OnboardingView: View {
             localized(
                 zh: "无法建立家庭成员",
                 en: "Couldn't create the family member",
-                de: "Familienmitglied konnte nicht erstellt werden"
+                de: "Familienmitglied konnte nicht erstellt werden",
+                es: "No se pudo crear el miembro de la familia",
+                pt: "Não foi possível criar o membro da família",
+                fr: "Impossible de créer le membre de la famille",
+                ja: "家族メンバーを作成できませんでした",
+                ko: "가족 구성원을 만들 수 없어요",
+                it: "Impossibile creare il membro della famiglia"
             ),
             isPresented: $showsError
         ) {
-            Button(localized(zh: "好", en: "OK", de: "OK"), role: .cancel) {}
+            Button(localized(
+                zh: "好",
+                en: "OK",
+                de: "OK",
+                es: "Aceptar",
+                pt: "OK",
+                fr: "OK",
+                ja: "OK",
+                ko: "확인",
+                it: "OK"
+            ), role: .cancel) {}
         } message: {
             Text(errorMessage)
         }
@@ -137,7 +175,13 @@ struct OnboardingView: View {
                         Text(localized(
                             zh: "宠物已经保存，但首页暂时没有准备好。",
                             en: "Your pet is saved, but Home isn’t ready yet.",
-                            de: "Dein Tier ist gespeichert, aber Home ist noch nicht bereit."
+                            de: "Dein Tier ist gespeichert, aber Home ist noch nicht bereit.",
+                            es: "Tu mascota se ha guardado, pero Inicio aún no está listo.",
+                            pt: "Seu pet foi salvo, mas a tela Início ainda não está pronta.",
+                            fr: "Votre animal a été enregistré, mais l’accueil n’est pas encore prêt.",
+                            ja: "ペットは保存されましたが、ホームの準備がまだできていません。",
+                            ko: "반려동물은 저장했지만 홈이 아직 준비되지 않았어요.",
+                            it: "Il tuo animale è stato salvato, ma la Home non è ancora pronta."
                         ))
                         .font(.headline)
                         .foregroundStyle(OnboardingPalette.primaryText)
@@ -146,7 +190,17 @@ struct OnboardingView: View {
                         Button {
                             onRetryHomePreparation?()
                         } label: {
-                            Text(localized(zh: "重新准备首页", en: "Try Home again", de: "Home erneut laden"))
+                            Text(localized(
+                                zh: "重新准备首页",
+                                en: "Try Home again",
+                                de: "Home erneut laden",
+                                es: "Reintentar Inicio",
+                                pt: "Tentar o Início novamente",
+                                fr: "Réessayer l’accueil",
+                                ja: "ホームを再準備",
+                                ko: "홈 다시 준비",
+                                it: "Riprova la Home"
+                            ))
                                 .font(.headline)
                                 .frame(maxWidth: .infinity, minHeight: 44)
                         }
@@ -175,7 +229,13 @@ struct OnboardingView: View {
                 .accessibilityLabel(localized(
                     zh: "正在准备首页",
                     en: "Preparing Home",
-                    de: "Startseite wird vorbereitet"
+                    de: "Startseite wird vorbereitet",
+                    es: "Preparando Inicio",
+                    pt: "Preparando o Início",
+                    fr: "Préparation de l’accueil",
+                    ja: "ホームを準備中",
+                    ko: "홈 준비 중",
+                    it: "Preparazione della Home"
                 ))
         }
     }
@@ -189,7 +249,13 @@ struct OnboardingView: View {
                     Text(localized(
                         zh: "你希望我们怎么称呼你？",
                         en: "What should we call you?",
-                        de: "Wie dürfen wir dich nennen?"
+                        de: "Wie dürfen wir dich nennen?",
+                        es: "¿Cómo quieres que te llamemos?",
+                        pt: "Como você gostaria que chamássemos você?",
+                        fr: "Comment souhaitez-vous que nous vous appelions ?",
+                        ja: "何とお呼びすればよいですか？",
+                        ko: "어떻게 불러 드릴까요?",
+                        it: "Come vuoi che ti chiamiamo?"
                     ))
                     .font(OhanaFont.title(.black))
                     .foregroundStyle(OnboardingPalette.primaryText)
@@ -198,7 +264,13 @@ struct OnboardingView: View {
                     Text(localized(
                         zh: "先建立这台设备上的第一位家庭成员。",
                         en: "Start with the first family member on this device.",
-                        de: "Beginne mit dem ersten Familienmitglied auf diesem Gerät."
+                        de: "Beginne mit dem ersten Familienmitglied auf diesem Gerät.",
+                        es: "Empieza con el primer miembro de la familia en este dispositivo.",
+                        pt: "Comece com o primeiro membro da família neste dispositivo.",
+                        fr: "Commencez par le premier membre de la famille sur cet appareil.",
+                        ja: "まず、この端末に最初の家族メンバーを作成します。",
+                        ko: "먼저 이 기기에 첫 가족 구성원을 만들어 주세요.",
+                        it: "Inizia con il primo membro della famiglia su questo dispositivo."
                     ))
                     .font(OhanaFont.body(.semibold))
                     .foregroundStyle(OnboardingPalette.secondaryText)
@@ -207,7 +279,17 @@ struct OnboardingView: View {
                 }
 
                 TextField(
-                    localized(zh: "你的名字", en: "Your name", de: "Dein Name"),
+                    localized(
+                        zh: "你的名字",
+                        en: "Your name",
+                        de: "Dein Name",
+                        es: "Tu nombre",
+                        pt: "Seu nome",
+                        fr: "Votre nom",
+                        ja: "あなたの名前",
+                        ko: "이름",
+                        it: "Il tuo nome"
+                    ),
                     text: $humanName
                 )
                 .textFieldStyle(.plain)
@@ -231,7 +313,17 @@ struct OnboardingView: View {
                 .accessibilityIdentifier("onboarding-human-name-input")
 
                 primaryButton(
-                    title: localized(zh: "继续", en: "Continue", de: "Weiter"),
+                    title: localized(
+                        zh: "继续",
+                        en: "Continue",
+                        de: "Weiter",
+                        es: "Continuar",
+                        pt: "Continuar",
+                        fr: "Continuer",
+                        ja: "続ける",
+                        ko: "계속",
+                        it: "Continua"
+                    ),
                     systemImage: "arrow.right",
                     isLoading: isSavingHuman,
                     isEnabled: !trimmedHumanName.isEmpty && !isSavingHuman,
@@ -256,7 +348,13 @@ struct OnboardingView: View {
                     Text(localized(
                         zh: "现在建立宠物吗？",
                         en: "Add a pet now?",
-                        de: "Jetzt ein Tier hinzufügen?"
+                        de: "Jetzt ein Tier hinzufügen?",
+                        es: "¿Añadir una mascota ahora?",
+                        pt: "Adicionar um pet agora?",
+                        fr: "Ajouter un animal maintenant ?",
+                        ja: "今ペットを追加しますか？",
+                        ko: "지금 반려동물을 추가할까요?",
+                        it: "Aggiungere un animale ora?"
                     ))
                     .font(OhanaFont.title(.black))
                     .foregroundStyle(OnboardingPalette.primaryText)
@@ -265,7 +363,13 @@ struct OnboardingView: View {
                     Text(localized(
                         zh: "只需名字和物种，其他资料可以以后再补充。",
                         en: "You only need a name and species. Everything else can wait.",
-                        de: "Name und Art genügen. Alles Weitere kann warten."
+                        de: "Name und Art genügen. Alles Weitere kann warten.",
+                        es: "Solo necesitas un nombre y la especie. El resto puede esperar.",
+                        pt: "Você só precisa do nome e da espécie. O restante pode esperar.",
+                        fr: "Il suffit d’un nom et de l’espèce. Le reste peut attendre.",
+                        ja: "必要なのは名前と種類だけです。ほかの情報は後から追加できます。",
+                        ko: "이름과 종만 입력하면 돼요. 나머지는 나중에 추가할 수 있어요.",
+                        it: "Bastano nome e specie. Il resto può aspettare."
                     ))
                     .font(OhanaFont.body(.semibold))
                     .foregroundStyle(OnboardingPalette.secondaryText)
@@ -275,7 +379,17 @@ struct OnboardingView: View {
 
                 VStack(spacing: 10) {
                     primaryButton(
-                        title: localized(zh: "现在建立", en: "Add pet now", de: "Tier jetzt hinzufügen"),
+                        title: localized(
+                            zh: "现在建立",
+                            en: "Add pet now",
+                            de: "Tier jetzt hinzufügen",
+                            es: "Añadir ahora",
+                            pt: "Adicionar agora",
+                            fr: "Ajouter maintenant",
+                            ja: "今すぐ追加",
+                            ko: "지금 추가",
+                            it: "Aggiungi ora"
+                        ),
                         systemImage: "pawprint.fill",
                         isLoading: false,
                         isEnabled: true,
@@ -284,7 +398,17 @@ struct OnboardingView: View {
                     )
 
                     Button(action: deferPetCreation) {
-                        Text(localized(zh: "稍后再说", en: "Maybe later", de: "Vielleicht später"))
+                        Text(localized(
+                            zh: "稍后再说",
+                            en: "Maybe later",
+                            de: "Vielleicht später",
+                            es: "Más tarde",
+                            pt: "Mais tarde",
+                            fr: "Plus tard",
+                            ja: "後で",
+                            ko: "나중에",
+                            it: "Più tardi"
+                        ))
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(OnboardingPalette.primaryText)
                             .frame(maxWidth: .infinity)
@@ -300,7 +424,13 @@ struct OnboardingView: View {
                     Text(localized(
                         zh: "跳过后会放入「待办」，随时可以继续。",
                         en: "We'll place it in To-dos so you can continue anytime.",
-                        de: "Wir legen es in Aufgaben ab, damit du jederzeit fortfahren kannst."
+                        de: "Wir legen es in Aufgaben ab, damit du jederzeit fortfahren kannst.",
+                        es: "Si omites este paso, lo añadiremos a Tareas para que puedas continuar cuando quieras.",
+                        pt: "Se você pular, vamos adicionar a Tarefas para continuar quando quiser.",
+                        fr: "Si vous passez cette étape, nous l’ajouterons aux tâches afin de reprendre à tout moment.",
+                        ja: "スキップすると「やること」に追加され、いつでも続けられます。",
+                        ko: "건너뛰면 ‘할 일’에 추가되어 언제든 이어서 할 수 있어요.",
+                        it: "Se salti, lo aggiungeremo alle attività così potrai continuare quando vuoi."
                     ))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(OnboardingPalette.tertiaryText)
@@ -335,14 +465,30 @@ struct OnboardingView: View {
                 Text(localized(
                     zh: "初始设置已完成",
                     en: "Setup is already complete",
-                    de: "Die Einrichtung ist abgeschlossen"
+                    de: "Die Einrichtung ist abgeschlossen",
+                    es: "La configuración ya está completa",
+                    pt: "A configuração já foi concluída",
+                    fr: "La configuration est déjà terminée",
+                    ja: "初期設定は完了しています",
+                    ko: "초기 설정이 완료되었어요",
+                    it: "La configurazione è già completata"
                 ))
                 .font(OhanaFont.title(.black))
                 .foregroundStyle(OnboardingPalette.primaryText)
                 .multilineTextAlignment(.center)
 
                 primaryButton(
-                    title: localized(zh: "关闭", en: "Close", de: "Schließen"),
+                    title: localized(
+                        zh: "关闭",
+                        en: "Close",
+                        de: "Schließen",
+                        es: "Cerrar",
+                        pt: "Fechar",
+                        fr: "Fermer",
+                        ja: "閉じる",
+                        ko: "닫기",
+                        it: "Chiudi"
+                    ),
                     systemImage: "xmark",
                     isLoading: false,
                     isEnabled: true,
@@ -454,6 +600,10 @@ struct OnboardingView: View {
             onFirstHumanSaved?(human.id)
             isSavingHuman = false
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            if experienceMode == .zen {
+                finishOnboarding(playsFeedback: false)
+                return
+            }
             withAnimation(GoMotion.page) {
                 step = .petChoice
             }
@@ -461,19 +611,37 @@ struct OnboardingView: View {
             handleHumanSaveFailure(localized(
                 zh: "这个名字已经被使用。",
                 en: "This name is already in use.",
-                de: "Dieser Name wird bereits verwendet."
+                de: "Dieser Name wird bereits verwendet.",
+                es: "Este nombre ya está en uso.",
+                pt: "Este nome já está em uso.",
+                fr: "Ce nom est déjà utilisé.",
+                ja: "この名前はすでに使われています。",
+                ko: "이미 사용 중인 이름이에요.",
+                it: "Questo nome è già in uso."
             ))
         } catch MemberCreationError.emptyName {
             handleHumanSaveFailure(localized(
                 zh: "请先输入名字。",
                 en: "Enter a name first.",
-                de: "Gib zuerst einen Namen ein."
+                de: "Gib zuerst einen Namen ein.",
+                es: "Introduce primero un nombre.",
+                pt: "Digite um nome primeiro.",
+                fr: "Saisissez d’abord un nom.",
+                ja: "先に名前を入力してください。",
+                ko: "먼저 이름을 입력해 주세요.",
+                it: "Inserisci prima un nome."
             ))
         } catch {
             handleHumanSaveFailure(localized(
                 zh: "保存失败，请再试一次。",
                 en: "Saving failed. Please try again.",
-                de: "Speichern fehlgeschlagen. Bitte versuche es erneut."
+                de: "Speichern fehlgeschlagen. Bitte versuche es erneut.",
+                es: "No se pudo guardar. Inténtalo de nuevo.",
+                pt: "Não foi possível salvar. Tente novamente.",
+                fr: "Échec de l’enregistrement. Réessayez.",
+                ja: "保存できませんでした。もう一度お試しください。",
+                ko: "저장하지 못했어요. 다시 시도해 주세요.",
+                it: "Salvataggio non riuscito. Riprova."
             ))
         }
     }
@@ -510,6 +678,13 @@ struct OnboardingView: View {
 
     private func recoverInterruptedFlow() {
         guard !hasOnboarded else { return }
+        if experienceMode == .zen,
+           let humanID = appServices.humanRequirements.firstLivingHumanID(context: modelContext) {
+            currentActiveHumanId = humanID.uuidString
+            onFirstHumanSaved?(humanID)
+            finishOnboarding(playsFeedback: false)
+            return
+        }
         if let firstPetID = appServices.onboardingJourney.interruptedOnboardingFirstPetID(
             context: modelContext
         ), let petID = UUID(uuidString: firstPetID) {

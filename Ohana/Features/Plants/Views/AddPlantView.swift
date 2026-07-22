@@ -66,6 +66,7 @@ struct AddPlantView: View {
     @State var showingCustomLocationField = false
     @State var didShowSuccess = false
     @State var saveFailureMessage: String?
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var isPreparingCamera = false
     @State var cropPresentationTask: Task<Void, Never>?
     @State var duplicateAcknowledgementKey = ""
@@ -149,6 +150,10 @@ struct AddPlantView: View {
                 finishPlantAvatarMediaPresentation()
             }
             .presentationDetents([.large]) // ui-v4: allow portrait crop editor needs full-height working area
+        }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
         }
         .onChange(of: roomName) { _, newValue in
             if commonRoomOptions.contains(newValue.trimmingCharacters(in: .whitespacesAndNewlines)) {
@@ -1102,6 +1107,11 @@ struct AddPlantView: View {
             )
             guard result.didPersist else {
                 isSaving = false
+                if let denial = result.personalDenial {
+                    personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
                 saveFailureMessage = plantCreationSaveFailureMessage(result.persistenceErrorDescription)
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return

@@ -8,6 +8,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct PetHealthDetailContentView: View {
     let pet: Pet
@@ -34,6 +35,7 @@ struct PetHealthDetailContentView: View {
     @State var showingPDFPreview = false
     @State var pdfURL: URL? = nil
     @State var isRenderingPDF = false
+    @State var showingPersonalPlan = false
     @State var healthAlerts: [HealthAlert] = []
     @State var scatterRevealProgress: CGFloat = 0.0
     @State var showingHistory = false
@@ -669,6 +671,7 @@ struct PetHealthDetailContentView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
             }
+            .accessibilityIdentifier("pet-health-detail-screen")
             .onAppear {
                 refreshHealthAlerts()
                 openInitialSectionIfNeeded()
@@ -694,7 +697,6 @@ struct PetHealthDetailContentView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .navigationBar)
-        .accessibilityIdentifier("pet-health-detail-screen")
         .sheet(item: sheetHealthPlusDestination) { dest in
             switch dest {
             case .guided, .direct:
@@ -740,6 +742,10 @@ struct PetHealthDetailContentView: View {
             if let url = pdfURL {
                 PetVetPDFShareSheet(pdfURL: url, pet: pet)
             }
+        }
+        .sheet(isPresented: $showingPersonalPlan) {
+            PersonalPlanView()
+                .ohanaSheetPagePresentation()
         }
         .sheet(item: $activeHealthSheet) { sheet in
             healthOverviewSheet(sheet)

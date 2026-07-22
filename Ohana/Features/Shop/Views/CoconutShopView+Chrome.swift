@@ -8,59 +8,206 @@ import SwiftUI
 
 extension CoconutShopView {
     var header: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokosnuss-Shop"))
-                        .font(OhanaFont.title(.black))
-                        .foregroundStyle(primaryText)
-                        .accessibilityIdentifier("coconut-shop-screen")
-                    Text(l.tr(zh: "买断外观、植物装饰、称号和 App Icon。", en: "Unlock looks, plant decor, titles, and App Icons.", de: "Schalte Looks, Pflanzendeko, Titel und App Icons frei."))
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(secondaryText)
+        VStack(alignment: .leading, spacing: 12) {
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 12) {
+                        spendableMetric
+                        inventoryMetric
+                        if CoconutExchangeFeatureGate.isEnabled {
+                            pendingExchangeMetric
+                        }
+                    }
+                } else {
+                    HStack(spacing: 18) {
+                        spendableMetric
+                        inventoryMetric
+                        if CoconutExchangeFeatureGate.isEnabled {
+                            pendingExchangeMetric
+                        }
+                    }
                 }
-
-                Spacer()
-
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(primaryText)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
             }
 
-            HStack(spacing: 18) {
-                metric(
-                    label: l.tr(zh: "本人余额", en: "My balance", de: "Mein Guthaben"),
-                    value: "\(currentHumanBalance)",
-                    suffix: "🥥",
-                    tint: Color.goYellow,
-                    accessibilityIdentifier: "coconut-shop-current-human-balance"
-                )
-                metric(
-                    label: l.tr(zh: "已拥有", en: "Owned", de: "Besitzt"),
-                    value: "\(ownedCount)",
-                    suffix: "",
-                    tint: Color.goPrimary,
-                    accessibilityIdentifier: "coconut-shop-owned-count"
-                )
-                if CoconutExchangeFeatureGate.isEnabled {
-                    metric(
-                        label: l.tr(zh: "待确认", en: "Pending", de: "Offen"),
-                        value: "\(incomingPendingExchanges.count)",
-                        suffix: "",
-                        tint: Color.goTeal,
-                        accessibilityIdentifier: nil
-                    )
+            buyerSummaryControl
+                .accessibilityIdentifier("coconut-shop-screen")
+        }
+    }
+
+    @ViewBuilder
+    var buyerSummaryControl: some View {
+        if activeHumans.count > 1 {
+            Menu {
+                ForEach(activeHumans) { human in
+                    Button {
+                        shopBuyerID = human.id
+                        OhanaFeedback.selection()
+                    } label: {
+                        if currentHuman?.id == human.id {
+                            Label(human.name, systemImage: "checkmark")
+                        } else {
+                            Text(human.name)
+                        }
+                    }
                 }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    buyerSummaryLabel
+                    Image(systemName: "chevron.up.chevron.down") // a11y: allow decorative menu affordance; the menu label names the selected buyer.
+                        .font(OhanaFont.caption2(.bold))
+                        .accessibilityHidden(true)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(l.tr(zh: "为本次商店会话选择付款成员", en: "Chooses the paying member for this shop session", de: "Wählt das zahlende Mitglied für diese Shop-Sitzung"))
+        } else {
+            buyerSummaryLabel
+        }
+    }
+
+    var buyerSummaryLabel: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Image(systemName: currentHuman == nil ? "person.crop.circle.badge.questionmark" : "person.crop.circle")
+                .foregroundStyle(currentHuman == nil ? Color.goOrange : Color.goTeal)
+                .accessibilityHidden(true)
+            Text(currentHumanSummary)
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    var spendableMetric: some View {
+        metric(
+            label: l.tr(zh: "全岛可兑换", en: "Island spendable", de: "Inselweit verfügbar"),
+            value: "\(islandSpendableHumanBalance)",
+            suffix: "🥥",
+            tint: Color.goYellow,
+            accessibilityIdentifier: "coconut-shop-current-human-balance"
+        )
+    }
+
+    var inventoryMetric: some View {
+        Button {
+            showInventory = true
+        } label: {
+            metric(
+                label: l.tr(zh: "百宝箱", en: "Treasure box", de: "Schatzkiste"),
+                value: "\(ownedCount)",
+                suffix: "",
+                tint: Color.goPrimary,
+                accessibilityIdentifier: nil
+            )
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("coconut-shop-owned-count")
+        .accessibilityHint(l.tr(zh: "打开百宝箱管理已拥有内容", en: "Opens your owned items for management", de: "Öffnet deine gekauften Inhalte zur Verwaltung"))
+    }
+
+    var pendingExchangeMetric: some View {
+        metric(
+            label: l.tr(zh: "待确认", en: "Pending", de: "Offen"),
+            value: "\(incomingPendingExchanges.count)",
+            suffix: "",
+            tint: Color.goTeal,
+            accessibilityIdentifier: nil
+        )
+    }
+
+    @ViewBuilder
+    var purchaseSettlementNotice: some View {
+        let needsAttention = purchaseSettlements.values.contains(.needsAttention)
+            || !blockedPurchaseItemIDs.isEmpty
+        let recoveryItemID = allItems.first {
+            purchaseSettlements[$0.id] == .needsAttention
+        }?.id ?? purchaseSettlements.first { $0.value == .needsAttention }?.key
+        VStack(alignment: .leading, spacing: 10) {
+            Label {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        needsAttention
+                            ? l.tr(
+                                zh: "有一笔兑换尚未安全完成或退款。它不会再次扣款，保留本机数据即可继续恢复。",
+                                en: "A redemption has not safely completed or refunded. It cannot be charged again; keep the local data to continue recovery.",
+                                de: "Eine Einlösung wurde noch nicht sicher abgeschlossen oder erstattet. Sie wird nicht erneut belastet; behalte die lokalen Daten für die Wiederherstellung."
+                            )
+                            : l.tr(
+                                zh: "上一笔兑换或退款仍在安全结算；对应商品暂时不会再次扣款。",
+                                en: "A previous redemption or refund is still settling safely. That item cannot be charged again.",
+                                de: "Eine frühere Einlösung oder Erstattung wird noch sicher verarbeitet. Dieser Artikel wird nicht erneut belastet."
+                            )
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                    if let recoveryItemID,
+                       let reason = purchaseSettlementReasons[recoveryItemID] {
+                        Text(purchaseRecoveryReasonMessage(reason))
+                            .font(OhanaFont.caption2(.semibold))
+                            .foregroundStyle(secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } icon: {
+                Image(systemName: needsAttention ? "exclamationmark.triangle.fill" : "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                    .accessibilityHidden(true)
+            }
+
+            if let recoveryItemID,
+               ShopManualRecoveryActionPolicy.canRetry(
+                   reasonCode: purchaseSettlementReasons[recoveryItemID]
+               ) {
+                Button {
+                    retryRecovery(for: recoveryItemID)
+                } label: {
+                    if recoveryInFlightItemID == recoveryItemID {
+                        Label(
+                            l.tr(zh: "正在检查…", en: "Checking…", de: "Wird geprüft…"),
+                            systemImage: "clock"
+                        )
+                    } else {
+                        Label(
+                            l.tr(zh: "重新尝试恢复", en: "Retry recovery", de: "Wiederherstellung erneut versuchen"),
+                            systemImage: "arrow.clockwise"
+                        )
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(recoveryInFlightItemID != nil)
+                .accessibilityIdentifier("coconut-shop-retry-recovery")
+                .accessibilityHint(purchaseRecoverySafetyHint)
             }
         }
+        .font(OhanaFont.caption(.bold))
+        .foregroundStyle(needsAttention ? Color.goOrange : Color.goTeal)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            (needsAttention ? Color.goOrange : Color.goTeal).opacity(0.12),
+            in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
+        )
+        .accessibilityIdentifier("coconut-shop-settlement-notice")
+    }
+
+    var currentHumanSummary: String {
+        guard let currentHuman else {
+            return l.tr(
+                zh: "先选择一位在世家庭成员，才能发起兑换。",
+                en: "Choose an active family member before redeeming.",
+                de: "Wähle vor dem Einlösen ein aktives Familienmitglied."
+            )
+        }
+        guard EconomyWalletWritePolicy.canWrite(currentHuman) else {
+            return l.tr(
+                zh: "当前成员：\(currentHuman.name) · 纪念钱包已冻结",
+                en: "Current member: \(currentHuman.name) · memorial wallet frozen",
+                de: "Aktuelles Mitglied: \(currentHuman.name) · Gedenk-Wallet eingefroren"
+            )
+        }
+        return l.tr(
+            zh: "当前成员：\(currentHuman.name) · 不足时由其他在世成员共同补足",
+            en: "Current member: \(currentHuman.name) · active members can cofund a shortfall",
+            de: "Aktuelles Mitglied: \(currentHuman.name) · aktive Mitglieder können gemeinsam ergänzen"
+        )
     }
 
     func metric(label: String, value: String, suffix: String, tint: Color, accessibilityIdentifier: String?) -> some View {
@@ -90,38 +237,45 @@ extension CoconutShopView {
         .accessibilityIdentifier(accessibilityIdentifier ?? "coconut-shop-metric-\(label)")
     }
 
-    var selectedAppIconShortName: String {
-        guard let item = ShopCatalog.item(id: selectedAppIcon, purchasedSet: purchasedSet) else {
-            return "Ohana"
-        }
-        return item.name(l)
-    }
-
     var categoryRail: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(ShopItem.ShopCategory.visibleCases) { category in
-                    Button {
-                        withAnimation(GoMotion.feedback) {
-                            selectedCategory = category
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(ShopItem.ShopCategory.visibleCases) { category in
+                        Button {
+                            OhanaFeedback.selection()
+                            withAnimation(GoMotion.feedback) {
+                                selectedCategory = category
+                                proxy.scrollTo(category.id, anchor: .center)
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: category.icon)
+                                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                Text(category.title(l))
+                                    .font(OhanaFont.caption(.black))
+                            }
+                            .foregroundStyle(selectedCategory == category ? Color.ohanaPrimaryActionText : primaryText)
+                            .padding(.horizontal, 13)
+                            .frame(minHeight: 44)
+                            .background(selectedCategory == category ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                         }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: category.icon)
-                                .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            Text(category.title(l))
-                                .font(OhanaFont.caption(.black))
-                        }
-                        .foregroundStyle(selectedCategory == category ? Color.ohanaPrimaryActionText : primaryText)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 9)
-                        .background(selectedCategory == category ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                        .buttonStyle(ScaleButtonStyle())
+                        .accessibilityIdentifier("coconut-shop-category-\(category.rawValue)")
+                        .accessibilityAddTraits(selectedCategory == category ? .isSelected : [])
+                        .id(category.id)
                     }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityIdentifier("coconut-shop-category-\(category.rawValue)")
+                }
+                .padding(.horizontal, 20)
+            }
+            .onAppear {
+                proxy.scrollTo(effectiveSelectedCategory.id, anchor: .center)
+            }
+            .onChange(of: effectiveSelectedCategory) { _, category in
+                withAnimation(GoMotion.feedback) {
+                    proxy.scrollTo(category.id, anchor: .center)
                 }
             }
-            .padding(.horizontal, 20)
         }
     }
 

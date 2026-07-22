@@ -135,6 +135,7 @@ struct CoconutGachaRevealView: View {
     var isNewCollectible: Bool = false
     var onCollectibleCardTap: (() -> Void)?
     var onCollectibleKeepTap: (() -> Void)?
+    var onCollectibleRepeatTap: (() -> Void)?
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -174,6 +175,10 @@ struct CoconutGachaRevealView: View {
                 case .idle, .cardPopped, .flipping, .secretBurst, .toyAppearing, .cardGone, .flying, .settled:
                     break
                 }
+            }
+            .accessibilityAction(named: Text(l.tr(zh: "再来一次", en: "Open another", de: "Noch einmal"))) {
+                guard revealCardPhase == .toyReady else { return }
+                onCollectibleRepeatTap?()
             }
         }
         .animation(shouldAnimate ? GoMotion.stateChange : GoMotion.reduced, value: phase)
@@ -251,7 +256,8 @@ struct CoconutGachaRevealView: View {
                     shouldAnimate: shouldAnimate,
                     isNewCollectible: isNewCollectible,
                     onTap: onCollectibleCardTap,
-                    onKeep: onCollectibleKeepTap
+                    onKeep: onCollectibleKeepTap,
+                    onRepeat: onCollectibleRepeatTap
                 )
 
                 if revealCardPhase.showsFloatingToy {
@@ -392,9 +398,9 @@ struct CoconutGachaRevealView: View {
             )
         case .toyReady:
             return l.tr(
-                zh: "轻点收下按钮，玩偶会进入收藏夹。",
-                en: "Tap collect to move the plush into the collection.",
-                de: "Tippe auf Sammeln, um die Figur in die Sammlung zu legen."
+                zh: "轻点收下，或使用“再来一次”操作继续抽取。",
+                en: "Collect it, or use the Open another action to continue.",
+                de: "Sammle die Figur oder nutze die Aktion Noch einmal."
             )
         case .idle, .cardPopped, .flipping, .secretBurst, .toyAppearing, .cardGone, .flying, .settled:
             return ""

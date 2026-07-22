@@ -7,10 +7,10 @@
 
 import Foundation
 
-/// The shipped app is deliberately a single-device product. A future Family
-/// configuration must opt in with `OHANA_FAMILY_CAPABILITIES` *and* restore the
-/// matching signed entitlements and Info.plist declarations before it can use
-/// CloudKit, APNs, or collaboration runtime work.
+/// Compile-time boundary for the deferred CloudKit household-collaboration
+/// runtime. The separate, minimum-data Family guardian uses ordinary APNs and
+/// its own fail-closed `GuardianSafetyConfiguration`; it never enables this
+/// CloudKit profile or uploads local household/care records.
 nonisolated enum AppCapabilityProfile: Equatable, Sendable {
     case solo
     case family

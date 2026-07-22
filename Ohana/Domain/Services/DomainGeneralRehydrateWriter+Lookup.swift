@@ -106,6 +106,18 @@ extension DomainGeneralRehydrateWriter {
         return try context.fetch(descriptor).first
     }
 
+    nonisolated static func fetchOasisCritterFragment(
+        catalogID: String,
+        context: ModelContext
+    ) throws -> OasisCritterFragmentBalance? {
+        var descriptor = FetchDescriptor<OasisCritterFragmentBalance>(
+            predicate: #Predicate<OasisCritterFragmentBalance> { $0.catalogId == catalogID },
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     nonisolated static func fetchOasisUnlock(id: UUID, context: ModelContext) throws -> OasisUnlock? {
         var descriptor = FetchDescriptor<OasisUnlock>(predicate: #Predicate<OasisUnlock> { $0.id == id })
         descriptor.fetchLimit = 1

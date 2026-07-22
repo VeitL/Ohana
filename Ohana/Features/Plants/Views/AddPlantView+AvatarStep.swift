@@ -14,39 +14,16 @@ extension AddPlantView {
                 title: l.tr(zh: "植物头像", en: "Plant avatar", de: "Pflanzenavatar"),
                 icon: "camera.aperture"
             ) {
-                plantAvatarHero
+                Text(plantAvatarStatusText)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
                 plantAvatarSourceActions
             }
         }
         .overlay(alignment: .topLeading) {
             PlantCreationAccessibilityMarker(identifier: "add-plant-step-avatar")
         }
-    }
-
-    var plantAvatarHero: some View {
-        VStack(alignment: .center, spacing: 12) {
-            PlantCreationAvatarPreview(
-                image: selectedAvatarSource == .customImage ? decodedAvatarImage : nil,
-                catalog: selectedCatalog,
-                size: 154
-            )
-            .accessibilityIdentifier("add-plant-avatar-preview")
-
-            VStack(spacing: 4) {
-                Text(resolvedPlantName)
-                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.68)
-                Text(plantAvatarStatusText)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
     }
 
     var plantAvatarStatusText: String {

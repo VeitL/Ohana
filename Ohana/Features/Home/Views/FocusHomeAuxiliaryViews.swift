@@ -108,6 +108,7 @@ nonisolated struct TodayFocusFamilyTaskSnapshot: Identifiable, Equatable, Sendab
         switch status {
         case .scheduled, .active: .active
         case .claimed: .claimed
+        case .declined: .declined
         case .pendingReview: .pendingReview
         case .completed: .completed
         case .cancelled: .cancelled

@@ -259,7 +259,7 @@ struct HumanNoteAttachmentLifecycleTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let suiteName = "HumanNoteAttachmentLifecycleTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV94.models)
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: [configuration])
         return Fixture(

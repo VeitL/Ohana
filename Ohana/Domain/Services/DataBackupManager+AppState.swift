@@ -21,14 +21,13 @@ nonisolated extension DataBackupManager {
             target.set(state.celebratedMilestoneDays, forKey: "celebratedMilestoneDays")
         }
         if let inventory = state.shopConsumableInventory {
-            target.set(max(0, inventory.backdatePassCount), forKey: CheckInStreakStore.makeupPackKey)
-            target.set(max(0, inventory.avatar2DExtraPassCount), forKey: ShopInventoryDefaultsKeys.avatar2DExtraPassInventory)
-            target.set(inventory.doubleRewardBoostActive, forKey: ShopInventoryDefaultsKeys.doubleRewardBoost)
-            if let expiry = parseDate(inventory.streakShieldExpiry) {
-                target.set(expiry, forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
-            } else {
-                target.removeObject(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
-            }
+            ShopInventoryStateStore.replaceFromBackup(
+                backdatePassCount: inventory.backdatePassCount,
+                avatar2DExtraPassCount: inventory.avatar2DExtraPassCount,
+                doubleRewardBoostActive: inventory.doubleRewardBoostActive,
+                streakShieldExpiry: parseDate(inventory.streakShieldExpiry),
+                defaults: target
+            )
         }
         if let plantReminderPreferences = state.plantReminderPreferences {
             applyPlantReminderPreferences(plantReminderPreferences, defaults: target)

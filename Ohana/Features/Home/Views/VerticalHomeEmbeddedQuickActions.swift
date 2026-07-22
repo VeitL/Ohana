@@ -220,7 +220,12 @@ struct VerticalHomeEmbeddedQuickActions: View {
             }
         }
         .onChange(of: visibleItemsRevision) { _, _ in
-            openActionId = nil
+            if let openActionId,
+               !visibleItems.contains(where: { item in
+                   item.id == openActionId && shouldOpenMenu(for: item)
+               }) {
+                self.openActionId = nil
+            }
             if visibleItems.count >= maxItems || availableAddItems.isEmpty {
                 showingAddPanel = false
             }

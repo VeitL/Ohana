@@ -29,6 +29,12 @@ struct OhanaApp: App {
     @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem: String = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency: String = AppCurrency.fallbackCode
+    #if DEBUG
+        @AppStorage(OhanaPrimaryAccentPreferences.lightStorageKey)
+        private var debugLightPrimaryAccent = OhanaPrimaryAccentPreferences.defaultLight.rawValue
+        @AppStorage(OhanaPrimaryAccentPreferences.darkStorageKey)
+        private var debugDarkPrimaryAccent = OhanaPrimaryAccentPreferences.defaultDark.rawValue
+    #endif
 
     init() {
         #if DEBUG
@@ -48,12 +54,24 @@ struct OhanaApp: App {
         }
     }
 
+    private var primaryAccent: Color {
+        #if DEBUG
+            OhanaPrimaryAccentPreferences.adaptivePrimaryColor(
+                lightRawValue: debugLightPrimaryAccent,
+                darkRawValue: debugDarkPrimaryAccent
+            )
+        #else
+            Color.goPrimary
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             OhanaBootstrapRootView(
                 cloudSharingAppDelegate: cloudSharingAppDelegate,
                 preferredScheme: preferredScheme,
-                appLanguage: appLanguage
+                appLanguage: appLanguage,
+                primaryAccent: primaryAccent
             )
             .onChange(of: appCountry) { _, _ in }
             .onChange(of: appCurrency) { _, _ in }
@@ -71,6 +89,7 @@ private struct OhanaBootstrapRootView: View {
     let cloudSharingAppDelegate: OhanaCloudSharingAppDelegate
     let preferredScheme: ColorScheme?
     let appLanguage: String
+    let primaryAccent: Color
 
     @State private var payload: OhanaBootstrapPayload?
     @State private var bootstrapStatus: OhanaBootstrapStatus = .preparing
@@ -79,6 +98,8 @@ private struct OhanaBootstrapRootView: View {
     @State private var launchRevealTask: Task<Void, Never>?
     @State private var launchRevealProgress: CGFloat = 0
     @State private var isLaunchOverlayVisible = true
+    @State private var commerce = CommerceEntitlementService()
+    @State private var pendingExternalURL: URL?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -114,9 +135,12 @@ private struct OhanaBootstrapRootView: View {
             }
         }
         .background(ohanaLaunchCanvasColor.ignoresSafeArea())
-        .tint(Color.goPrimary)
+        .tint(primaryAccent)
         .preferredColorScheme(preferredScheme)
         .onAppear {
+            Task { @MainActor in
+                await commerce.start()
+            }
             startBootstrapIfNeeded()
             beginLaunchRevealIfReady()
         }
@@ -124,6 +148,7 @@ private struct OhanaBootstrapRootView: View {
             guard isReady else { return }
             beginLaunchRevealIfReady()
         }
+        .onOpenURL(perform: handleExternalURL)
         .onDisappear {
             bootstrapTask?.cancel()
             bootstrapTask = nil
@@ -146,6 +171,18 @@ private struct OhanaBootstrapRootView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
                 payload.appServices.lifecycle.handle(.didBecomeActive)
+                Task { @MainActor in
+                    await payload.appServices.commerce.refreshEntitlements()
+                    await payload.appServices.guardianSafety.start()
+                    if payload.appServices.commerce.hasFamilyEntitlement {
+                        await payload.appServices.guardianSafety.flushOutbox()
+                        await payload.appServices.guardianSafety.syncFamilyEntitlement()
+                        await payload.appServices.guardianSafety.notificationReachabilityChanged()
+                    } else {
+                        await payload.appServices.guardianSafety.stopMonitoringForEntitlementLoss()
+                    }
+                    payload.appServices.systemSurfaces.scheduleRefresh(reason: "entitlementsRefreshed")
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
                 payload.appServices.lifecycle.handle(.willTerminate)
@@ -187,7 +224,7 @@ private struct OhanaBootstrapRootView: View {
             bootstrapStatus = .openingStore
             let openResult = await Self.openModelContainerOffMain()
             guard !Task.isCancelled else { return }
-            let modelContainer: ModelContainer
+            var modelContainer: ModelContainer
             switch openResult {
             case let .success(openedContainer):
                 modelContainer = openedContainer
@@ -200,26 +237,61 @@ private struct OhanaBootstrapRootView: View {
                 return
             }
             OhanaStartupProbe.mark("bootstrap.container-ready")
-            resetPersistentStateForUITestsIfNeeded(modelContainer: modelContainer)
+            if resetPersistentStateForUITestsIfNeeded(modelContainer: modelContainer) {
+                let reopenResult = await Self.openModelContainerOffMain()
+                guard !Task.isCancelled else { return }
+                switch reopenResult {
+                case let .success(reopenedContainer):
+                    modelContainer = reopenedContainer
+                    OhanaStartupProbe.mark("ui-test-reset.container-reopened")
+                case .failure:
+                    OhanaStartupProbe.mark("ui-test-reset.container-reopen-failed")
+                    bootstrapStatus = .storeUnavailable
+                    bootstrapWatchdogTask?.cancel()
+                    bootstrapWatchdogTask = nil
+                    bootstrapTask = nil
+                    return
+                }
+            }
             bootstrapStatus = .buildingServices
-            let services = AppServices(modelContainer: modelContainer)
+            let services = AppServices(modelContainer: modelContainer, commerce: commerce)
 #if DEBUG
             seedHumanBaselineForUITestsIfNeeded(modelContainer: modelContainer, services: services)
             seedPlantBaselineForUITestsIfNeeded(modelContainer: modelContainer, services: services)
 #endif
             OhanaStartupProbe.mark("bootstrap.services-ready")
-            cloudSharingAppDelegate.configure(modelContainer: modelContainer, cloudSync: services.cloudSync)
+            cloudSharingAppDelegate.configure(
+                modelContainer: modelContainer,
+                cloudSync: services.cloudSync,
+                guardianSafety: services.guardianSafety
+            )
+            Task { @MainActor in
+                await services.guardianSafety.start()
+            }
             let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1000
             let containerDurationMS = (CFAbsoluteTimeGetCurrent() - containerStartedAt) * 1000
             AppPerformanceMonitor.shared.record("SwiftData container ready", valueMS: containerDurationMS, note: "Deferred after first shell")
             AppPerformanceMonitor.shared.record("App init", valueMS: initDurationMS, note: "BGTask + deferred container")
             AppPerformanceMonitor.shared.record("进程到 App init 完成", startedAt: ohanaProcessStartTime)
             services.metricKit.start()
+            if let pendingExternalURL {
+                _ = services.systemSurfaceRoutes.submit(pendingExternalURL)
+                self.pendingExternalURL = nil
+            }
             payload = OhanaBootstrapPayload(modelContainer: modelContainer, appServices: services)
             OhanaStartupProbe.mark("bootstrap.payload-set")
             bootstrapWatchdogTask?.cancel()
             bootstrapWatchdogTask = nil
             bootstrapTask = nil
+        }
+    }
+
+    private func handleExternalURL(_ url: URL) {
+        guard OhanaExternalRoute.parse(url) != nil else { return }
+        if let payload {
+            _ = payload.appServices.systemSurfaceRoutes.submit(url)
+        } else {
+            pendingExternalURL = url
         }
     }
 
@@ -283,19 +355,24 @@ private struct OhanaBootstrapRootView: View {
         }
     #endif
 
-    private func resetPersistentStateForUITestsIfNeeded(modelContainer: ModelContainer) {
+    private func resetPersistentStateForUITestsIfNeeded(modelContainer: ModelContainer) -> Bool {
         #if DEBUG
-            guard OhanaUITestLaunchOptions.resetsPersistentState else { return }
+            guard OhanaUITestLaunchOptions.resetsPersistentState else { return false }
             do {
                 try StaticAppResetter(
                     questManager: QuestManager(),
                     automaticBackups: AutomaticBackupService()
                 ).resetForUITests(context: modelContainer.mainContext)
+                SharedModelContainer.invalidateCachedContainer(modelContainer)
                 OhanaStartupProbe.mark("ui-test-reset.complete")
+                return true
             } catch {
                 OhanaStartupProbe.mark("ui-test-reset.failed")
                 OhanaLog.error("UI test persistent reset failed: \(error.localizedDescription)", category: "Startup")
+                return false
             }
+        #else
+            return false
         #endif
     }
 

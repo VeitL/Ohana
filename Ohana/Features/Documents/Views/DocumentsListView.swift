@@ -69,6 +69,7 @@ struct DocumentsListContentView: View {
                 .padding(.top, 18)
             }
         }
+        .accessibilityIdentifier("pet-documents-screen")
         .toolbar(.hidden, for: .navigationBar)
         .sheet(item: $activePopup) { popup in
             switch popup {
@@ -162,6 +163,7 @@ struct DocumentsListContentView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                .accessibilityIdentifier("pet-documents-close-action")
             }
         }
     }
@@ -236,6 +238,7 @@ struct DocumentsListContentView: View {
                         icon: "doc.badge.plus",
                         title: l.tr(zh: "还没有证件", en: "No documents yet", de: "Noch keine Dokumente"),
                         actionTitle: l.tr(zh: "添加证件", en: "Add document", de: "Dokument hinzufügen"),
+                        actionIdentifier: "pet-documents-add-document-action",
                         tint: selectedSection.tint
                     ) { openAdd(for: .documents) }
                 } else {
@@ -254,6 +257,7 @@ struct DocumentsListContentView: View {
                         icon: "shield",
                         title: l.tr(zh: "还没有保单", en: "No policies yet", de: "Noch keine Policen"),
                         actionTitle: l.tr(zh: "添加保单", en: "Add policy", de: "Police hinzufügen"),
+                        actionIdentifier: "pet-documents-add-insurance-action",
                         tint: selectedSection.tint
                     ) { openAdd(for: .insurance) }
                 } else {

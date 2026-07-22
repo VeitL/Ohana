@@ -12,12 +12,9 @@ import SwiftData
 struct RainbowBridgeService {
     init() {}
 
-    init(reminderScheduling: ReminderSchedulingManaging) {}
-
-    /// 标记宠物离世：关闭未来活跃安排；历史与纪念内容只读保留。
+    /// 标记宠物离世：只写生命周期事实；活跃退场由读取与命令边界负责。
     func markPassedAway(pet: Pet, date: Date = Date(), context: ModelContext) {
         pet.passedAwayDate = date
-        MemberLifecycleActiveScheduleCleanup.removeFutureSchedules(for: pet, passedAwayAt: date, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: date)
     }
 
@@ -28,10 +25,10 @@ struct RainbowBridgeService {
     }
 }
 
-enum MemberLifecycleActiveScheduleCleanup {
+enum MemberLifecycleActiveScheduleNotifications {
     @MainActor
-    static func removeFutureSchedules(for pet: Pet, passedAwayAt date: Date, context: ModelContext) {
-        removeFutureEvents(context: context, passedAwayAt: date) { event in
+    static func futureNotificationIDs(for pet: Pet, passedAwayAt date: Date, context: ModelContext) -> [String] {
+        futureNotificationIDs(context: context, passedAwayAt: date) { event in
             MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
                 event,
                 petId: pet.id.uuidString,
@@ -42,9 +39,9 @@ enum MemberLifecycleActiveScheduleCleanup {
     }
 
     @MainActor
-    static func removeFutureSchedules(for human: Human, passedAwayAt date: Date, context: ModelContext) {
+    static func futureNotificationIDs(for human: Human, passedAwayAt date: Date, context: ModelContext) -> [String] {
         let medications = fetchHumanMedications(humanKey: human.id.uuidString, context: context)
-        removeFutureEvents(context: context, passedAwayAt: date) { event in
+        return futureNotificationIDs(context: context, passedAwayAt: date) { event in
             MemberLifecycleActiveScheduleResolver.eventBelongsToHuman(
                 event,
                 humanId: human.id.uuidString,
@@ -54,56 +51,31 @@ enum MemberLifecycleActiveScheduleCleanup {
     }
 
     @MainActor
-    private static func removeFutureEvents(
-        context: ModelContext,
-        passedAwayAt date: Date,
-        belongsToMember: (Event) -> Bool
-    ) {
-        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? []
-        var didDelete = false
-        for event in events where belongsToMember(event) && MemberLifecycleActiveScheduleResolver.isActiveSchedule(event, now: date) {
-            if MemberLifecycleActiveScheduleResolver.retainedHistoryExists(in: event, cutoff: date) {
-                if pruneFutureSchedule(from: event, context: context, deletedAt: date) {
-                    didDelete = true
-                }
-            } else {
-                if tombstoneAndDelete(event, context: context, deletedAt: date).didDelete {
-                    didDelete = true
-                }
-            }
+    static func cancel(_ notificationIDs: [String]) {
+        for notificationID in notificationIDs {
+            OhanaNotifications.current.cancel(notificationId: notificationID)
         }
-        _ = didDelete
     }
 
     @MainActor
-    private static func pruneFutureSchedule(from event: Event, context: ModelContext, deletedAt: Date) -> Bool {
-        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
-            event: event,
-            writeKind: .lifecycle(.cleanupActiveSchedules),
-            source: .domainService,
-            context: context
-        ) else { return false }
-        var didChange = false
-        for reminder in MemberLifecycleActiveScheduleResolver.futureActionableReminders(in: event, cutoff: deletedAt) {
-            let result = DomainScheduleWriter.deleteReminder(
-                reminder,
-                mutation: mutation,
-                context: context,
-                deletedAt: deletedAt
-            )
-            DomainScheduleEffectsDispatcher.dispatch(delete: result)
-            didChange = result.didDelete || didChange
-        }
-        if event.recurrenceDays > 0 {
-            didChange = DomainScheduleWriter.truncateRecurringEvent(
-                event,
-                recurrenceEndDate: deletedAt,
-                mutation: mutation,
-                context: context,
-                modifiedAt: deletedAt
-            ) || didChange
-        }
-        return didChange
+    private static func futureNotificationIDs(
+        context: ModelContext,
+        passedAwayAt date: Date,
+        belongsToMember: (Event) -> Bool
+    ) -> [String] {
+        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+        let notificationIDs = events
+            .filter {
+                belongsToMember($0) &&
+                    MemberLifecycleActiveScheduleResolver.isActiveSchedule($0, now: date)
+            }
+            .flatMap {
+                MemberLifecycleActiveScheduleResolver.futureActionableReminders(in: $0, cutoff: date)
+            }
+            .map(\.notificationId)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return Array(Set(notificationIDs)).sorted()
     }
 
     @MainActor
@@ -114,22 +86,5 @@ enum MemberLifecycleActiveScheduleCleanup {
             }
         )
         return (try? context.fetch(descriptor)) ?? []
-    }
-
-    @MainActor
-    private static func tombstoneAndDelete(
-        _ event: Event,
-        context: ModelContext,
-        deletedAt: Date
-    ) -> DomainScheduleDeleteResult {
-        guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
-            event: event,
-            writeKind: .lifecycle(.cleanupActiveSchedules),
-            source: .domainService,
-            context: context
-        ) else { return .notDeleted }
-        let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context, deletedAt: deletedAt)
-        DomainScheduleEffectsDispatcher.dispatch(delete: result)
-        return result
     }
 }

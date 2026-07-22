@@ -648,6 +648,9 @@ extension CloudSyncRecordApplier {
                 instantCoconutDelta: record.int(for: "instantCoconutDelta") ?? existing?.instantCoconutDelta ?? 0,
                 costCoconuts: record.int(for: "costCoconuts") ?? existing?.costCoconuts ?? DomainGachaDrawDefaults.costPerDraw,
                 dailySequence: record.int(for: "dailySequence") ?? existing?.dailySequence ?? 1,
+                oddsVersion: record.int(for: "oddsVersion") ?? existing?.oddsVersion,
+                guaranteeKindRaw: record.string(for: "guaranteeKindRaw") ?? existing?.guaranteeKindRaw,
+                stardustDelta: record.int(for: "stardustDelta") ?? existing?.stardustDelta,
                 drawDate: record.date(for: "drawDate") ?? existing?.drawDate ?? metadata.lastModifiedAt,
                 createdAt: record.date(for: "createdAt") ?? existing?.createdAt ?? metadata.lastModifiedAt
             ),

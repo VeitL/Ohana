@@ -9,7 +9,7 @@ extension OasisRewardView {
     // MARK: - Life Tree Stage
 
     var treeSceneCard: some View {
-        treeSceneCard(stageHeight: 540, treeVisualHeight: 300, isCompact: false)
+        treeSceneCard(stageHeight: 500, treeVisualHeight: 250, isCompact: false)
     }
 
     func treeSceneCard(metrics: OasisEmbeddedLayoutMetrics) -> some View {
@@ -27,21 +27,15 @@ extension OasisRewardView {
 
             stageStars
 
-            Circle()
-                .fill(Color.goYellow)
-                .frame(width: 26, height: 26) // a11y: allow decorative celestial dot
+            Image(systemName: "moon.fill") // a11y: allow decorative Oasis moon
+                .font(OhanaFont.adaptive(size: 25, weight: .black))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(Color.goYellow)
                 .shadow(color: Color.goYellow.opacity(0.68), radius: 14, x: 0, y: 0) // ui-v4: allow Oasis stage celestial glow
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .padding(.top, 24)
                 .padding(.trailing, 28)
-
-            stageIslandBase
-
-            stagePlantAmbience(snapshot: plantAmbienceSnapshot)
-
-            stageTreeGlow
-
-            treeEnergyBeam
+                .accessibilityHidden(true)
 
             VStack(spacing: 0) {
                 stageTopHUD
@@ -50,38 +44,19 @@ extension OasisRewardView {
 
                 Spacer(minLength: 0)
 
-                ZStack(alignment: .bottom) {
-                    BeautifulCoconutTree(
-                        level: treeVisualLevel.rawValue,
-                        isInjecting: isInjecting,
-                        growthProgress: treeVisualProgressToNextLevel,
-                        injectionPulseToken: injectionPulseToken,
-                        pendingUpgradeCoconutCount: pendingUpgradeCoconuts.count,
-                        dailyCoconutCount: dailyTreeCoconutCount,
-                        allowsAmbientMotion: shouldRunAmbientMotion,
-                        harvestedCoconuts: harvestedCoconutIndices,
-                        onHarvest: { harvestTreeCoconut($0) }
-                    )
-                    .shadow(color: Color.goPrimary.opacity(glowBreathing ? 0.42 : 0.16), radius: glowBreathing ? 22 : 10, x: 0, y: 0) // ui-v4: allow Oasis tree focus glow
-                    .scaleEffect(treeScale * treeInjectionVisualScale)
-                    .animation(GoMotion.hero, value: treeScale)
-                    .animation(interactionMotionBudget.allowsMotion ? GoMotion.feedback : GoMotion.reduced, value: treeInjectionProgress)
-                    .frame(height: treeVisualHeight)
-                    .padding(.bottom, isCompact ? 2 : 16)
-
-                    treeCritterEntryButton
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                        .offset(x: isCompact ? 66 : 78, y: isCompact ? -18 : -28)
-                        .zIndex(5)
-                }
+                stageTreeScene(height: treeVisualHeight, isCompact: isCompact)
 
                 stageUpgradeCoconutDock
                     .padding(.horizontal, 18)
-                    .padding(.bottom, isCompact ? 6 : 10)
+                    .padding(.bottom, isCompact ? 5 : 8)
+
+                stageInjectEnergyButton(isCompact: isCompact)
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 8)
 
                 stageEnergyRail
                     .padding(.horizontal, 18)
-                    .padding(.bottom, isCompact ? 14 : 20)
+                    .padding(.bottom, isCompact ? 12 : 18)
             }
 
             if let reward = openedUpgradeReward {
@@ -123,6 +98,51 @@ extension OasisRewardView {
         }
     }
 
+    func stageTreeScene(height: CGFloat, isCompact: Bool) -> some View {
+        ZStack(alignment: .bottom) {
+            stageTreeGlow
+                .zIndex(0)
+
+            treeEnergyBeam
+                .zIndex(1)
+
+            OasisTreeIslandBase(
+                level: treeVisualLevel.rawValue,
+                progress: treeVisualProgressToNextLevel
+            )
+            .zIndex(2)
+
+            stagePlantAmbience(snapshot: plantAmbienceSnapshot)
+                .zIndex(3)
+
+            BeautifulCoconutTree(
+                level: treeVisualLevel.rawValue,
+                isInjecting: isInjecting,
+                growthProgress: treeVisualProgressToNextLevel,
+                injectionPulseToken: injectionPulseToken,
+                pendingUpgradeCoconutCount: pendingUpgradeCoconuts.count,
+                dailyCoconutCount: dailyTreeCoconutCount,
+                allowsAmbientMotion: shouldRunAmbientMotion,
+                allowsInteractionMotion: interactionMotionBudget.allowsMotion,
+                usesLiquidGlassLeaves: usesFullTreeVisualEffects,
+                harvestedCoconuts: harvestedCoconutIndices,
+                onHarvest: { harvestTreeCoconut($0) }
+            )
+            .shadow(color: Color.goPrimary.opacity(glowBreathing ? 0.30 : 0.10), radius: glowBreathing ? 18 : 8, x: 0, y: 0) // ui-v4: allow Oasis tree focus glow
+            .scaleEffect(treeScale, anchor: .bottom)
+            .animation(GoMotion.hero, value: treeScale)
+            .frame(height: max(0, height - 18))
+            .offset(y: -18)
+            .zIndex(4)
+
+            treeCritterEntryButton
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .offset(x: isCompact ? 70 : 82, y: isCompact ? -8 : -14)
+                .zIndex(5)
+        }
+        .frame(height: height)
+    }
+
     func stageBackground(shape: RoundedRectangle) -> some View {
         shape
             .fill(
@@ -149,40 +169,18 @@ extension OasisRewardView {
 
     var stageStars: some View {
         ZStack {
-            ForEach(0 ..< 24, id: \.self) { i in
-                let size = CGFloat([1.5, 2.0, 2.5, 1.8][i % 4])
+            ForEach(0 ..< 8, id: \.self) { i in
+                let size = CGFloat([2.0, 2.8, 2.2, 3.0][i % 4])
                 Circle()
-                    .fill(Color.ohanaPrimaryText.opacity(Double([0.28, 0.44, 0.24, 0.5][i % 4])))
+                    .fill(Color.ohanaPrimaryText.opacity(Double([0.22, 0.38, 0.20, 0.32][i % 4])))
                     .frame(width: size, height: size)
+                    .shadow(color: Color.ohanaPrimaryText.opacity(0.18), radius: 3) // ui-v4: allow subtle decorative star glow inside the Oasis illustration
                     .offset(x: starPositions[i].0, y: starPositions[i].1)
             }
         }
         .opacity(colorScheme == .light ? 0.45 : 1)
-    }
-
-    var stageIslandBase: some View {
-        ZStack(alignment: .bottom) {
-            Ellipse()
-                .fill(
-                    LinearGradient(
-                        colors: colorScheme == .light
-                            ? [Color(hex: "D4B989"), Color(hex: "B58B55")]
-                            : [Color(hex: "E2A545"), Color(hex: "9A5B22")],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 304, height: 56)
-                .blur(radius: 0.2)
-
-            Ellipse()
-                .fill(Color.black.opacity(colorScheme == .light ? 0.12 : 0.26)) // ui-v4: allow grounded island stage shadow
-                .frame(width: 250, height: 18)
-                .offset(y: 11)
-        }
-        .frame(maxHeight: .infinity, alignment: .bottom)
-        .padding(.bottom, 110)
         .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     func stagePlantAmbience(snapshot: OasisPlantAmbienceSnapshot) -> some View {
@@ -195,7 +193,7 @@ extension OasisRewardView {
             stagePlantPotDecor(id: snapshot.equippedPotSkinID)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .padding(.bottom, 98)
+        .padding(.bottom, 28)
         .opacity(snapshot.hasAnyVisual ? 1 : 0)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -425,14 +423,14 @@ extension OasisRewardView {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [treeVisualLevel.glowColor.opacity(glowBreathing ? 0.30 : 0.10), .clear],
+                        colors: [treeVisualLevel.glowColor.opacity(glowBreathing ? 0.18 : 0.06), .clear],
                         center: .center,
                         startRadius: 20,
-                        endRadius: 190
+                        endRadius: 145
                     )
                 )
-                .frame(width: 340, height: 340)
-                .scaleEffect(glowBreathing ? 1.08 : 0.94)
+                .frame(width: 280, height: 280)
+                .scaleEffect(glowBreathing ? 1.04 : 0.96)
                 .animation(
                     shouldRunAmbientMotion
                         ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated stage glow; smoothness: allow visible-only ambient tree glow
@@ -441,9 +439,9 @@ extension OasisRewardView {
                 )
 
             Circle()
-                .stroke(Color.goPrimary.opacity(glowBreathing ? 0.18 : 0.05), lineWidth: 2)
-                .frame(width: 250, height: 250)
-                .blur(radius: glowBreathing ? 7 : 2)
+                .stroke(Color.goPrimary.opacity(glowBreathing ? 0.10 : 0.035), lineWidth: 1.5)
+                .frame(width: 210, height: 210)
+                .blur(radius: glowBreathing ? 5 : 2)
                 .animation(
                     shouldRunAmbientMotion
                         ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated stage ring; smoothness: allow visible-only ambient tree ring
@@ -451,32 +449,16 @@ extension OasisRewardView {
                     value: glowBreathing
                 )
         }
-        .offset(y: -32)
+        .offset(y: -12)
         .allowsHitTesting(false)
     }
 
     var treeEnergyBeam: some View {
-        let progress = max(0, min(1, treeInjectionProgress))
-        return VStack(spacing: 0) {
-            Spacer()
-            Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.goPrimary.opacity(0), Color.goPrimary.opacity(0.85), Color.goTeal.opacity(0)],
-                        startPoint: .bottom,
-                        endPoint: .top
-                    )
-                )
-                .frame(width: 2 + 7 * progress, height: 52 + 168 * progress)
-                .blur(radius: 10 - 5 * progress)
-                .opacity(0.9 * Double(progress))
-                .offset(y: -18 - 120 * progress)
-                .animation(
-                    interactionMotionBudget.allowsMotion ? GoMotion.feedback : GoMotion.reduced,
-                    value: treeInjectionProgress
-                )
-        }
-        .allowsHitTesting(false)
+        OasisTreeEnergySurgeView(
+            pulseToken: injectionPulseToken,
+            color: treeVisualLevel.glowColor,
+            allowsMotion: interactionMotionBudget.allowsMotion
+        )
     }
 
     var stageTopHUD: some View {
@@ -485,17 +467,23 @@ extension OasisRewardView {
                 OhanaFeedback.light()
                 openSheet(.growthRoadmap)
             } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Lv.\(treeVisualLevel.rawValue)")
-                        .font(OhanaFont.title3(.black))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                    Text(treeVisualLevel.displayName)
+                HStack(spacing: 9) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Lv.\(treeVisualLevel.rawValue)")
+                            .font(OhanaFont.title3(.black))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                        Text(treeVisualLevel.displayName)
+                            .font(OhanaFont.caption(.black))
+                            .opacity(0.72)
+                            .lineLimit(1)
+                    }
+
+                    Image(systemName: "chevron.right") // a11y: allow decorative disclosure glyph; the button owns the localized label
                         .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
-                        .lineLimit(1)
+                        .accessibilityHidden(true)
                 }
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
@@ -700,7 +688,7 @@ extension OasisRewardView {
 
             Spacer(minLength: 0)
         }
-        .frame(minHeight: 44)
+        .frame(minHeight: pendingUpgradeCoconuts.isEmpty ? 28 : 44)
     }
 
     func stageUpgradeCoconutButton(_ coconut: OasisUpgradeCoconut) -> some View {
@@ -729,14 +717,68 @@ extension OasisRewardView {
         .accessibilityLabel("\(coconut.title(l)) \(l.tr(zh: "敲开", en: "Open", de: "Öffnen"))")
     }
 
+    func stageInjectEnergyButton(isCompact: Bool) -> some View {
+        let cost = OasisTreeEnergyInjectionPolicy.starterPackageCost
+        let energy = OasisTreeEnergyInjectionPolicy.starterPackageXP
+        let buttonWidth: CGFloat = isCompact ? 236 : 258
+        return HStack(spacing: 0) {
+            Spacer(minLength: 0)
+
+            Button {
+                injectTreeEnergy()
+            } label: {
+                Label(stageInjectionButtonTitle(cost: cost, energy: energy), systemImage: "bolt.fill")
+                    .font(OhanaFont.body(.black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .padding(.horizontal, 14)
+                    .frame(width: buttonWidth, height: 44)
+                    .background(Color.goPrimary, in: Capsule())
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .opacity(canInjectTreeEnergy ? 1 : 0.52)
+            .disabled(!canInjectTreeEnergy)
+            .accessibilityIdentifier("oasis-inject-energy-action")
+            .accessibilityHint(l.tr(
+                zh: "照护会自然增加能量，椰子可以用于加速成长",
+                en: "Care grows the tree naturally; coconuts can accelerate it",
+                de: "Pflege lässt den Baum natürlich wachsen; Kokosnüsse beschleunigen das Wachstum"
+            ))
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    func stageInjectionButtonTitle(cost: Int, energy: Int) -> String {
+        if treeInjectionLocked {
+            return l.tr(zh: "正在注入…", en: "Injecting…", de: "Energie wird eingespeist…")
+        }
+        if !hasEnoughCoconutsForTreeInjection {
+            return l.tr(
+                zh: "椰子不足 · 需要 \(cost)🥥",
+                en: "Need \(cost)🥥",
+                de: "\(cost)🥥 benötigt"
+            )
+        }
+        return l.tr(
+            zh: "注入 \(cost)🥥 · +\(energy) 能量",
+            en: "Use \(cost)🥥 · +\(energy) energy",
+            de: "\(cost)🥥 nutzen · +\(energy) Energie"
+        )
+    }
+
     var stageEnergyRail: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 8) {
-                Text(treeVisualLevel == .lv10 ? l.tr(zh: "满级", en: "Max", de: "Max") : "\(treeVisualTotalEnergy)/\(treeVisualNextLevelThreshold)")
+                Text(stageEnergyProgressTitle)
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .monospacedDigit()
                     .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 Spacer()
                 if treePassiveIncomeAmount > 0 {
                     Text("+\(treePassiveIncomeAmount)🥥/d")
@@ -758,21 +800,34 @@ extension OasisRewardView {
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.goTeal)
                 }
+
+                if treeVisualLevel != .lv10 {
+                    Text("\(treeVisualTotalEnergy)/\(treeVisualNextLevelThreshold)")
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .monospacedDigit()
+                }
             }
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.ohanaControlFill)
-                    Capsule()
-                        .fill(LinearGradient(colors: [Color.goPrimary, Color.goTeal], startPoint: .leading, endPoint: .trailing))
-                        .frame(width: max(8, geo.size.width * treeVisualProgressToNextLevel))
-                        .contentTransition(.numericText())
-                }
-                .frame(height: 8)
-                .animation(GoMotion.page, value: treeVisualProgressToNextLevel)
-            }
-            .frame(height: 8)
+            OasisEnergyProgressBar(
+                progress: treeVisualProgressToNextLevel,
+                pulseToken: injectionPulseToken,
+                allowsMotion: interactionMotionBudget.allowsMotion
+            )
         }
+    }
+
+    var stageEnergyProgressTitle: String {
+        guard treeVisualLevel != .lv10 else {
+            return l.tr(zh: "生命树已达到满级", en: "Life Tree at max level", de: "Lebensbaum auf höchster Stufe")
+        }
+        let nextLevel = min(TreeLevel.lv10.rawValue, treeVisualLevel.rawValue + 1)
+        let remaining = max(0, treeVisualNextLevelThreshold - treeVisualTotalEnergy)
+        return l.tr(
+            zh: "距 Lv.\(nextLevel) 还差 \(remaining) 能量",
+            en: "\(remaining) energy to Lv.\(nextLevel)",
+            de: "Noch \(remaining) Energie bis Lv.\(nextLevel)"
+        )
     }
 
     var stageLevelUpBadge: some View {
@@ -806,7 +861,11 @@ extension OasisRewardView {
                 de: "Pflanzenpflege macht die Insel grüner"
             )
         }
-        return l.tr(zh: "下一颗升级椰子在树上成长", en: "Next upgrade coconut is growing", de: "Nächste Upgrade-Kokosnuss wächst")
+        return l.tr(
+            zh: "完成照护，生命树会自然成长",
+            en: "Care grows the Life Tree naturally",
+            de: "Pflege lässt den Lebensbaum natürlich wachsen"
+        )
     }
 
     var nextCritterTargetCatalogId: String {
@@ -923,7 +982,6 @@ extension OasisRewardView {
         let motionBudget = interactionMotionBudget
         let visualAnimation = motionBudget.allowsMotion ? GoMotion.feedback : GoMotion.reduced
         let commandDelay: UInt64 = motionBudget.usesFullMotion ? 280 : 120
-        let resetDelay: UInt64 = motionBudget.usesFullMotion ? 230 : 120
         let thawDelay: UInt64 = motionBudget.usesFullMotion ? 120 : 48
         let beforeLevel = treeVisualLevel
         let beforeBalance = availableOasisCoconutBalance
@@ -931,9 +989,7 @@ extension OasisRewardView {
         let targetEnergy = treeMgr.totalEnergy + OasisTreeEnergyInjectionPolicy.starterPackageXP
         let targetLevel = treeMgr.treeLevel(forTotalEnergy: targetEnergy)
         let isLevelUp = targetLevel.rawValue > beforeLevel.rawValue
-        let pulseBoost: CGFloat = motionBudget.usesFullMotion ? (isLevelUp ? 0.045 : 0.026) : 0.01
         injectionPulseToken += 1
-        let pulseToken = injectionPulseToken
         OhanaFeedback.light()
         treeInjectionLocked = true
         withAnimation(visualAnimation) {
@@ -943,8 +999,6 @@ extension OasisRewardView {
             bentoSnapshot.shopMetric = "\(targetBalance)"
             treeVisualEnergyOverride = targetEnergy
             isInjecting = true
-            treeInjectionBoost = pulseBoost
-            treeInjectionProgress = 1
         }
         if isLevelUp {
             triggerLevelUpFeedback()
@@ -967,38 +1021,15 @@ extension OasisRewardView {
                     treeCommandTask = nil
                 }
             } else {
-                injectionResetTask?.cancel()
-                injectionResetTask = nil
                 withAnimation(visualAnimation) {
                     isInjecting = false
                     treeInjectionLocked = false
-                    treeInjectionProgress = 0
-                    treeInjectionBoost = 0.026
                     treeVisualEnergyOverride = nil
                     coconutBalanceVisualOverride = nil
                 }
                 rebuildOasisRenderSnapshots()
                 OhanaFeedback.error()
                 treeCommandTask = nil
-            }
-        }
-
-        injectionResetTask?.cancel()
-        injectionResetTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: resetDelay) {
-            guard injectionPulseToken == pulseToken else {
-                injectionResetTask = nil
-                return
-            }
-            withAnimation(visualAnimation) {
-                treeInjectionProgress = 0
-            }
-            injectionResetTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
-                guard injectionPulseToken == pulseToken else {
-                    injectionResetTask = nil
-                    return
-                }
-                treeInjectionBoost = 0.026
-                injectionResetTask = nil
             }
         }
     }

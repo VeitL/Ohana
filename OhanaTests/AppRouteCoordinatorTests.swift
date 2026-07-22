@@ -114,6 +114,28 @@ struct AppRouteCoordinatorTests {
         #expect(reason.hasPrefix("locked:"))
     }
 
+    @Test func personalCanOpenHouseholdInsightsWithoutBypassingOtherGrowthRoutes() {
+        let coordinator = AppRouteCoordinator()
+
+        let insightDecision = coordinator.functionMenuPresentationDecision(
+            destination: .familyLongTermReview,
+            currentLevel: 0,
+            plan: .personal
+        )
+        #expect(insightDecision == .allowed(.functionMenu(destination: .familyLongTermReview)))
+
+        let shopDecision = coordinator.functionMenuPresentationDecision(
+            destination: .coconutShop,
+            currentLevel: 0,
+            plan: .personal
+        )
+        guard case let .redirected(_, to, _) = shopDecision else {
+            Issue.record("Expected Personal to keep the coconut shop behind its tree level")
+            return
+        }
+        #expect(to == .functionMenu(destination: .growthRoadmap))
+    }
+
     @Test func calendarUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
         let petID = UUID().uuidString
@@ -145,6 +167,82 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.sheet == .taskCenter(.all))
         #expect(coordinator.sheet?.id == "task-center-all-all")
+    }
+
+    @Test func widgetDeepLinkOpensAndFocusesTaskCenterItem() throws {
+        let coordinator = AppRouteCoordinator()
+        coordinator.presentSettings()
+
+        let handled = coordinator.handleExternalURL(
+            OhanaExternalRoute.taskCenter(focusedItemID: "event:water").url
+        )
+
+        #expect(handled)
+        guard case let .taskCenter(context) = try #require(coordinator.sheet) else {
+            Issue.record("Expected the task center sheet")
+            return
+        }
+        #expect(context.scope == .all)
+        #expect(context.focusedItemID == "event:water")
+        #expect(context.focusRequestID != nil)
+        #expect(coordinator.fullScreen == nil)
+    }
+
+    @Test func liveActivityDeepLinkReplacesExistingPresentationWithWalk() {
+        let coordinator = AppRouteCoordinator()
+        let petID = UUID()
+        coordinator.presentSettings()
+
+        let handled = coordinator.handleExternalURL(
+            OhanaExternalRoute.activeWalk(petID: petID).url
+        )
+
+        #expect(handled)
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.fullScreen == .walk(petID: petID))
+    }
+
+    @Test func foreignExternalURLLeavesRouteStateUntouched() {
+        let coordinator = AppRouteCoordinator()
+        coordinator.presentSettings()
+
+        let handled = coordinator.handleExternalURL(URL(string: "https://example.com")!)
+
+        #expect(!handled)
+        #expect(coordinator.sheet == .settings)
+    }
+
+    @Test func guardianInviteDeepLinkNormalizesCodeAndOpensGuardianSheet() throws {
+        let coordinator = AppRouteCoordinator()
+        let url = try #require(URL(string: "\(OhanaExternalRoute.scheme)://guardian?invite=abc123"))
+
+        #expect(coordinator.handleExternalURL(url))
+        #expect(coordinator.sheet == .guardianSafety(invitationCode: "ABC123", incidentID: nil))
+    }
+
+    @Test func guardianNotificationOpensOnlyTheRequestedIncident() {
+        let coordinator = AppRouteCoordinator()
+        coordinator.presentSettings()
+
+        let outcome = coordinator.handleNotificationEvent(
+            .guardianSafetyRouteRequested(invitationCode: nil, incidentID: "incident-7")
+        )
+
+        #expect(outcome == .none)
+        #expect(coordinator.sheet == .guardianSafety(invitationCode: nil, incidentID: "incident-7"))
+        #expect(coordinator.path.isEmpty)
+    }
+
+    @Test func guardianAcknowledgementActionDoesNotNavigateOrCreateAUiFact() {
+        let coordinator = AppRouteCoordinator()
+        coordinator.presentSettings()
+
+        let outcome = coordinator.handleNotificationEvent(
+            .guardianIncidentAcknowledgementRequested(incidentID: "incident-7")
+        )
+
+        #expect(outcome == .none)
+        #expect(coordinator.sheet == .settings)
     }
 
     @Test func profileAndFocusedTaskRoutesCarryTypedTaskCenterContext() {
@@ -576,25 +674,28 @@ struct AppRouteCoordinatorTests {
 
         #expect(outcome == .clearActiveHuman)
         #expect(coordinator.path.isEmpty)
-        #expect(coordinator.rootIdentity != initialRoot)
+        #expect(coordinator.rootIdentity == initialRoot)
         #expect(coordinator.fullScreen == .requiredHumanProfile)
         #expect(coordinator.sheet == nil)
     }
 
     @Test func accountSwitchNotificationRoutesThroughCoordinator() {
         let coordinator = AppRouteCoordinator()
+        let initialRoot = coordinator.rootIdentity
 
         let outcome = coordinator.handleNotificationEvent(
             .humanDeleted(requiresReplacementHuman: false, requiresAccountSwitch: true)
         )
 
         #expect(outcome == .clearActiveHuman)
+        #expect(coordinator.rootIdentity == initialRoot)
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.sheet == .requiredAccountSwitch)
     }
 
     @Test func plainHumanDeletionRequestsRequirementReconciliation() {
         let coordinator = AppRouteCoordinator()
+        let initialRoot = coordinator.rootIdentity
 
         let outcome = coordinator.handleNotificationEvent(
             .humanDeleted(requiresReplacementHuman: false, requiresAccountSwitch: false)
@@ -602,6 +703,7 @@ struct AppRouteCoordinatorTests {
 
         #expect(outcome == .reconcileHumanRequirement)
         #expect(coordinator.path.isEmpty)
+        #expect(coordinator.rootIdentity == initialRoot)
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.sheet == nil)
     }
@@ -618,6 +720,30 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.path.isEmpty)
         #expect(coordinator.sheet == nil)
         #expect(coordinator.rootIdentity == initialRoot)
+    }
+
+    @Test func weeklyReportNotificationOpensWeeklyReportSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+        let treeManager = TestOasisTreeManagerProjection.manager
+        let oldTreeManager = OasisTreeManagerRegistry.current
+        let oldIslandEnergy = treeManager.islandEnergy
+        let oldInjectedEnergy = treeManager.injectedEnergy
+        OasisTreeManagerRegistry.current = treeManager
+        defer {
+            treeManager.setEnergyForTesting(
+                islandEnergy: oldIslandEnergy,
+                injectedEnergy: oldInjectedEnergy
+            )
+            OasisTreeManagerRegistry.current = oldTreeManager
+        }
+        treeManager.setEnergyForTesting(islandEnergy: 0, injectedEnergy: 1200)
+
+        coordinator.openHuman(UUID())
+        let outcome = coordinator.handleNotificationEvent(.familyWeeklyReportRouteRequested)
+
+        #expect(outcome == .none)
+        #expect(coordinator.path.isEmpty)
+        #expect(coordinator.sheet == .functionMenu(destination: .familyWeeklyReport))
     }
 
     @Test func plantBatchCareNotificationOpensFilteredBatchSheetRoute() {

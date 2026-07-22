@@ -47,7 +47,7 @@ nonisolated extension TaskCenterSystemJourneyProjection {
                 source: .systemJourney,
                 systemDestination: destination(for: state.task),
                 systemJourneyPresentationState: presentationState,
-                title: title(for: state.task),
+                title: title(for: state),
                 subject: subject(for: state, pets: pets, humans: humans),
                 eventType: nil,
                 symbol: symbol(for: state.task),
@@ -88,8 +88,11 @@ nonisolated extension TaskCenterSystemJourneyProjection {
         }
     }
 
-    private static func title(for task: HouseholdStarterJourneyTask) -> String {
-        switch task {
+    private static func title(for state: HouseholdStarterJourneyTaskState) -> String {
+        if state.status == .claimable {
+            return completedTitle(for: state.task)
+        }
+        return switch state.task {
         case .humanProfile:
             L10n.current.tr(
                 zh: "完善我的成员卡",
@@ -125,6 +128,47 @@ nonisolated extension TaskCenterSystemJourneyProjection {
                 zh: "完成首次真实照护",
                 en: "Complete the first real care action",
                 de: "Erste echte Pflege abschließen"
+            )
+        }
+    }
+
+    private static func completedTitle(for task: HouseholdStarterJourneyTask) -> String {
+        switch task {
+        case .humanProfile:
+            L10n.current.tr(
+                zh: "成员卡已完善",
+                en: "Member card complete",
+                de: "Mitgliedskarte vollständig"
+            )
+        case .petProfile:
+            L10n.current.tr(
+                zh: "首只宠物档案已完善",
+                en: "First pet profile complete",
+                de: "Erstes Haustierprofil vollständig"
+            )
+        case .identityProtection:
+            L10n.current.tr(
+                zh: "证件与保障状态已确认",
+                en: "Identity and protection reviewed",
+                de: "Dokumente und Schutz geprüft"
+            )
+        case .healthProtection:
+            L10n.current.tr(
+                zh: "疫苗与保健状态已确认",
+                en: "Vaccines and preventive care reviewed",
+                de: "Impfungen und Vorsorge geprüft"
+            )
+        case .carePlan:
+            L10n.current.tr(
+                zh: "首个照护计划已建立",
+                en: "First care plan ready",
+                de: "Erster Pflegeplan erstellt"
+            )
+        case .firstCare:
+            L10n.current.tr(
+                zh: "首次真实照护已完成",
+                en: "First real care action complete",
+                de: "Erste echte Pflege abgeschlossen"
             )
         }
     }

@@ -103,6 +103,494 @@ struct HouseholdStarterJourneyServiceTests {
         #expect(!markers[0].metadataJSON.contains(human.name))
     }
 
+    @Test func legacyHumanOptionalAnswerIsReadOnlyAndMapsToThreeFocusedCategories() throws {
+        let human = Human(name: "Legacy")
+        let legacyCheckpoint = HouseholdStarterJourneyCheckpoint.humanOptionalDetails
+        let key = HouseholdStarterJourneyService.checkpointRecordKey(
+            task: .humanProfile,
+            checkpoint: legacyCheckpoint,
+            subjectID: human.id
+        )
+        let targetID = human.id.uuidString.lowercased()
+        let legacyEvent = CareLedgerEvent(
+            actorKind: .human,
+            actorId: targetID,
+            subjectKind: .household,
+            eventKind: .milestone,
+            actionType: HouseholdStarterJourneyService.checkpointActionType,
+            legacyModelName: HouseholdStarterJourneyService.checkpointSourceModelName,
+            legacyModelId: key,
+            metadataJSON: "{\"journeyKey\":\"household-starter-v1\",\"taskRaw\":\"humanProfile\",\"checkpointRaw\":\"humanOptionalDetails\",\"resolutionRaw\":\"preferNotToSay\",\"targetKindRaw\":\"human\",\"targetID\":\"\(targetID)\"}"
+        )
+
+        let snapshot = HouseholdStarterJourneyService.buildSnapshot(
+            enabled: true,
+            activeHumanID: human.id.uuidString,
+            humans: [human],
+            pets: [],
+            qualificationFacts: .empty,
+            careLedgerEvents: [legacyEvent],
+            coconutLedgerEntries: []
+        )
+        let state = try #require(snapshot.state(for: .humanProfile))
+        #expect(state.completedCheckpoints == [
+            .humanLifeStage,
+            .humanBodyProfile,
+            .humanPersonalityContext
+        ])
+        #expect(state.completionPercent == 75)
+        #expect(state.status == .claimable)
+
+        let container = try makeContainer()
+        let context = container.mainContext
+        context.insert(human)
+        try context.save()
+        #expect(HouseholdStarterJourneyService.recordResolution(
+            task: .humanProfile,
+            checkpoint: .humanOptionalDetails,
+            resolution: .preferNotToSay,
+            subjectID: human.id,
+            context: context,
+            activeHumanSelection: FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
+        ) == .invalidCheckpoint)
+    }
+
+    @Test func alternateResolutionPathsReloadLatestChoiceWithoutLeakingOrCreatingDuplicateMarkers() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Private human")
+        let pet = Pet(name: "Private pet", species: "cat")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+        let selection = FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
+        let checkpoint = HouseholdStarterJourneyCheckpoint.petIdentityDocuments
+        let resolutions: [HouseholdStarterJourneyResolution] = [
+            .reviewed,
+            .unknown,
+            .notApplicable,
+            .preferNotToSay
+        ]
+
+        for resolution in resolutions {
+            let result = HouseholdStarterJourneyService.recordResolution(
+                task: .identityProtection,
+                checkpoint: checkpoint,
+                resolution: resolution,
+                subjectID: pet.id,
+                context: context,
+                activeHumanSelection: selection
+            )
+            #expect(result == .recorded(
+                task: .identityProtection,
+                checkpoint: checkpoint,
+                resolution: resolution
+            ))
+        }
+
+        let recordKey = HouseholdStarterJourneyService.checkpointRecordKey(
+            task: .identityProtection,
+            checkpoint: checkpoint,
+            subjectID: pet.id
+        )
+        var markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            $0.actionType == HouseholdStarterJourneyService.checkpointActionType
+                && $0.legacyModelId == recordKey
+        }
+        #expect(markers.count == resolutions.count)
+        for marker in markers {
+            let resolutionIndex = resolutions.firstIndex {
+                marker.metadataJSON.contains("\"resolutionRaw\":\"\($0.rawValue)\"")
+            }
+            #expect(resolutionIndex != nil)
+            if let resolutionIndex {
+                let timestamp = Date(timeIntervalSince1970: Double(resolutionIndex + 1))
+                marker.occurredAt = timestamp
+                marker.createdAt = timestamp
+            }
+            #expect(marker.note.isEmpty)
+            #expect(marker.privacyFieldRaw == nil)
+            #expect(!marker.metadataJSON.contains(human.name))
+            #expect(!marker.metadataJSON.contains(pet.name))
+        }
+        try context.save()
+
+        let duplicate = HouseholdStarterJourneyService.recordResolution(
+            task: .identityProtection,
+            checkpoint: checkpoint,
+            resolution: .preferNotToSay,
+            subjectID: pet.id,
+            context: context,
+            activeHumanSelection: selection
+        )
+        #expect(duplicate == .unchanged(
+            task: .identityProtection,
+            checkpoint: checkpoint,
+            resolution: .preferNotToSay
+        ))
+
+        markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            $0.actionType == HouseholdStarterJourneyService.checkpointActionType
+                && $0.legacyModelId == recordKey
+        }
+        let snapshot = HouseholdStarterJourneyService.buildSnapshot(
+            enabled: true,
+            activeHumanID: human.id.uuidString,
+            humans: [human],
+            pets: [pet],
+            qualificationFacts: .empty,
+            careLedgerEvents: markers,
+            coconutLedgerEntries: []
+        )
+        let state = try #require(snapshot.state(for: .identityProtection))
+        #expect(markers.count == resolutions.count)
+        #expect(state.completedCheckpointCount == 1)
+        #expect(state.completedCheckpoints == [checkpoint])
+        #expect(state.checkpointResolutions[checkpoint] == .preferNotToSay)
+        #expect(state.status == .actionRequired)
+    }
+
+    @Test func laterRealIdentityFactSupersedesEarlierResolutionWithoutDoubleCounting() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Resolution owner")
+        let pet = Pet(name: "Resolution pet", species: "cat")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let checkpoint = HouseholdStarterJourneyCheckpoint.petIdentityDocuments
+        let selection = FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
+        let result = HouseholdStarterJourneyService.recordResolution(
+            task: .identityProtection,
+            checkpoint: checkpoint,
+            resolution: .notApplicable,
+            subjectID: pet.id,
+            context: context,
+            activeHumanSelection: selection
+        )
+        #expect(result == .recorded(
+            task: .identityProtection,
+            checkpoint: checkpoint,
+            resolution: .notApplicable
+        ))
+
+        let markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            $0.actionType == HouseholdStarterJourneyService.checkpointActionType
+        }
+        let resolutionBacked = HouseholdStarterJourneyService.buildSnapshot(
+            enabled: true,
+            activeHumanID: human.id.uuidString,
+            humans: [human],
+            pets: [pet],
+            qualificationFacts: .empty,
+            careLedgerEvents: markers,
+            coconutLedgerEntries: []
+        )
+        let resolutionState = try #require(resolutionBacked.state(for: .identityProtection))
+        #expect(resolutionState.completedCheckpointCount == 1)
+        #expect(resolutionState.completedCheckpoints == [checkpoint])
+        #expect(resolutionState.checkpointResolutions[checkpoint] == .notApplicable)
+
+        pet.microchipID = "real-chip-after-skip"
+        try context.save()
+        let factBacked = HouseholdStarterJourneyService.buildSnapshot(
+            enabled: true,
+            activeHumanID: human.id.uuidString,
+            humans: [human],
+            pets: [pet],
+            qualificationFacts: .empty,
+            careLedgerEvents: markers,
+            coconutLedgerEntries: []
+        )
+        let factState = try #require(factBacked.state(for: .identityProtection))
+        #expect(factState.completedCheckpointCount == 1)
+        #expect(factState.completedCheckpoints == [checkpoint])
+        #expect(factState.checkpointResolutions[checkpoint] == nil)
+        #expect(factState.status == .actionRequired)
+    }
+
+    @Test func laterRealPreventiveHealthFactSupersedesEarlierResolutionWithoutDoubleCounting() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Health owner")
+        let pet = Pet(name: "Health pet", species: "cat")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let checkpoint = HouseholdStarterJourneyCheckpoint.petHealthProtection
+        let selection = FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
+        #expect(HouseholdStarterJourneyService.recordResolution(
+            task: .healthProtection,
+            checkpoint: checkpoint,
+            resolution: .notApplicable,
+            subjectID: pet.id,
+            context: context,
+            activeHumanSelection: selection
+        ) == .recorded(
+            task: .healthProtection,
+            checkpoint: checkpoint,
+            resolution: .notApplicable
+        ))
+
+        let recordKey = HouseholdStarterJourneyService.checkpointRecordKey(
+            task: .healthProtection,
+            checkpoint: checkpoint,
+            subjectID: pet.id
+        )
+        var markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            $0.actionType == HouseholdStarterJourneyService.checkpointActionType
+                && $0.legacyModelId == recordKey
+        }
+        #expect(markers.count == 1)
+
+        let resolutionReference = try await TaskCenterRouteDataActor(
+            modelContainer: container
+        ).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            starterJourneyEnabled: true
+        )
+        let resolutionState = try #require(
+            resolutionReference.snapshot.starterJourney?.state(for: .healthProtection)
+        )
+        #expect(resolutionState.completedCheckpointCount == 1)
+        #expect(resolutionState.completedCheckpoints == [checkpoint])
+        #expect(resolutionState.checkpointResolutions == [checkpoint: .notApplicable])
+        #expect(resolutionState.status == .claimable)
+
+        context.insert(PetHealthLog(
+            type: .vaccine,
+            note: "Rabies",
+            pet: pet,
+            executorId: human.id.uuidString
+        ))
+        try context.save()
+
+        let factReference = try await TaskCenterRouteDataActor(
+            modelContainer: container
+        ).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            starterJourneyEnabled: true
+        )
+        let factState = try #require(
+            factReference.snapshot.starterJourney?.state(for: .healthProtection)
+        )
+        #expect(factState.completedCheckpointCount == 1)
+        #expect(factState.completedCheckpoints == [checkpoint])
+        #expect(factState.checkpointResolutions.isEmpty)
+        #expect(factState.status == .claimable)
+
+        markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            $0.actionType == HouseholdStarterJourneyService.checkpointActionType
+                && $0.legacyModelId == recordKey
+        }
+        #expect(markers.count == 1)
+    }
+
+    @Test func duplicateLatestResolutionAfterMoreThanEightRevisionsIsUnchanged() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let selection = FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
+        let checkpoint = HouseholdStarterJourneyCheckpoint.petIdentityDocuments
+        let resolutions: [HouseholdStarterJourneyResolution] = [
+            .reviewed,
+            .unknown,
+            .notApplicable,
+            .preferNotToSay,
+            .reviewed,
+            .unknown,
+            .notApplicable,
+            .preferNotToSay,
+            .unknown
+        ]
+        let recordKey = HouseholdStarterJourneyService.checkpointRecordKey(
+            task: .identityProtection,
+            checkpoint: checkpoint,
+            subjectID: pet.id
+        )
+        var knownMarkerIDs: Set<UUID> = []
+
+        for (index, resolution) in resolutions.enumerated() {
+            let result = HouseholdStarterJourneyService.recordResolution(
+                task: .identityProtection,
+                checkpoint: checkpoint,
+                resolution: resolution,
+                subjectID: pet.id,
+                context: context,
+                activeHumanSelection: selection
+            )
+            #expect(result == .recorded(
+                task: .identityProtection,
+                checkpoint: checkpoint,
+                resolution: resolution
+            ))
+
+            let markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+                $0.actionType == HouseholdStarterJourneyService.checkpointActionType
+                    && $0.legacyModelId == recordKey
+            }
+            let newMarkers = markers.filter { !knownMarkerIDs.contains($0.id) }
+            #expect(newMarkers.count == 1)
+            if let marker = newMarkers.first {
+                let timestamp = Date(timeIntervalSince1970: Double(index + 1))
+                marker.occurredAt = timestamp
+                marker.createdAt = timestamp
+                knownMarkerIDs.insert(marker.id)
+            }
+            try context.save()
+        }
+
+        let duplicate = HouseholdStarterJourneyService.recordResolution(
+            task: .identityProtection,
+            checkpoint: checkpoint,
+            resolution: .unknown,
+            subjectID: pet.id,
+            context: context,
+            activeHumanSelection: selection
+        )
+        #expect(duplicate == .unchanged(
+            task: .identityProtection,
+            checkpoint: checkpoint,
+            resolution: .unknown
+        ))
+        let markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            $0.actionType == HouseholdStarterJourneyService.checkpointActionType
+                && $0.legacyModelId == recordKey
+        }
+        #expect(markers.count == resolutions.count)
+    }
+
+    @Test func everyThreeOfFourPersistedPetProfilePathsBecomeClaimable() throws {
+        let checkpoints = HouseholdStarterJourneyTask.petProfile.checkpoints
+
+        for omitted in checkpoints {
+            let container = try makeContainer()
+            let context = container.mainContext
+            let human = Human(name: "Ava")
+            let pet = Pet(name: "Momo", species: "cat")
+            context.insert(human)
+            context.insert(pet)
+            try context.save()
+            let selection = FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
+
+            for checkpoint in checkpoints where checkpoint != omitted {
+                let result = HouseholdStarterJourneyService.recordResolution(
+                    task: .petProfile,
+                    checkpoint: checkpoint,
+                    resolution: .reviewed,
+                    subjectID: pet.id,
+                    context: context,
+                    activeHumanSelection: selection
+                )
+                #expect(result.didSucceed)
+            }
+
+            let markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+                $0.actionType == HouseholdStarterJourneyService.checkpointActionType
+            }
+            let snapshot = HouseholdStarterJourneyService.buildSnapshot(
+                enabled: true,
+                activeHumanID: human.id.uuidString,
+                humans: [human],
+                pets: [pet],
+                qualificationFacts: .empty,
+                careLedgerEvents: markers,
+                coconutLedgerEntries: []
+            )
+            let state = try #require(snapshot.state(for: .petProfile))
+            #expect(state.completedCheckpointCount == 3)
+            #expect(state.status == .claimable)
+            #expect(!state.completedCheckpoints.contains(omitted))
+        }
+    }
+
+    @Test func sparsePetProfileAnswersCompleteWithoutFabricatingProfileFacts() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Sparse", species: "dog")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let selection = FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
+        let answers: [(HouseholdStarterJourneyCheckpoint, HouseholdStarterJourneyResolution)] = [
+            (.petBodyProfile, .notApplicable),
+            (.petPersonalityAppearance, .preferNotToSay),
+            (.petDailyCare, .reviewed)
+        ]
+        for (checkpoint, resolution) in answers {
+            let result = HouseholdStarterJourneyService.recordResolution(
+                task: .petProfile,
+                checkpoint: checkpoint,
+                resolution: resolution,
+                subjectID: pet.id,
+                context: context,
+                activeHumanSelection: selection
+            )
+            #expect(result == .recorded(
+                task: .petProfile,
+                checkpoint: checkpoint,
+                resolution: resolution
+            ))
+        }
+
+        let markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            $0.actionType == HouseholdStarterJourneyService.checkpointActionType
+        }
+        let snapshot = HouseholdStarterJourneyService.buildSnapshot(
+            enabled: true,
+            activeHumanID: human.id.uuidString,
+            humans: [human],
+            pets: [pet],
+            qualificationFacts: .empty,
+            careLedgerEvents: markers,
+            coconutLedgerEntries: []
+        )
+        let state = try #require(snapshot.state(for: .petProfile))
+
+        #expect(markers.count == 3)
+        #expect(state.completedCheckpointCount == 3)
+        #expect(state.status == .claimable)
+        #expect(state.completedCheckpoints == [
+            .petBodyProfile,
+            .petPersonalityAppearance,
+            .petDailyCare
+        ])
+        #expect(state.checkpointResolutions == [
+            .petBodyProfile: .notApplicable,
+            .petPersonalityAppearance: .preferNotToSay,
+            .petDailyCare: .reviewed
+        ])
+        #expect(!state.completedCheckpoints.contains(.petLifeStage))
+
+        let factsOnlySnapshot = HouseholdStarterJourneyService.buildSnapshot(
+            enabled: true,
+            activeHumanID: human.id.uuidString,
+            humans: [human],
+            pets: [pet],
+            qualificationFacts: .empty,
+            careLedgerEvents: [],
+            coconutLedgerEntries: []
+        )
+        let factsOnlyState = try #require(factsOnlySnapshot.state(for: .petProfile))
+        #expect(factsOnlyState.completedCheckpointCount == 0)
+        #expect(factsOnlyState.completedCheckpoints.isEmpty)
+        #expect(pet.gender == "unknown")
+        #expect(pet.personalityTagsRaw.isEmpty)
+        #expect(pet.avatarAttachmentState == .absent)
+        #expect(pet.cardPopoutAttachmentState == .absent)
+    }
+
     @Test func carePlanResolutionNeedsARealRecommendedPlanAndFirstCareNeedsARealCareFact() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -229,6 +717,362 @@ struct HouseholdStarterJourneyServiceTests {
         #expect(rewardEvents.count == 1)
     }
 
+    @Test func routeReloadKeepsActiveHumanCheckpointsBeyondGlobalMarkerLimit() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active early Human")
+        activeHuman.createdAt = Date(timeIntervalSince1970: 1)
+        let pet = Pet(name: "Starter Pet", species: "dog")
+        pet.createdAt = Date(timeIntervalSince1970: 1)
+        context.insert(activeHuman)
+        context.insert(pet)
+
+        var noiseHumans: [Human] = []
+        for index in 0 ..< 33 {
+            let human = Human(name: "Later Human \(index)")
+            human.createdAt = Date(timeIntervalSince1970: Double(index + 2))
+            context.insert(human)
+            noiseHumans.append(human)
+        }
+        try context.save()
+
+        let selection = FixedActiveHumanSelection(currentHumanId: activeHuman.id.uuidString)
+        for (checkpoint, resolution) in [
+            (HouseholdStarterJourneyCheckpoint.humanAppearance, HouseholdStarterJourneyResolution.reviewed),
+            (.humanLifeStage, .unknown),
+            (.humanBodyProfile, .preferNotToSay)
+        ] {
+            #expect(HouseholdStarterJourneyService.recordResolution(
+                task: .humanProfile,
+                checkpoint: checkpoint,
+                resolution: resolution,
+                subjectID: activeHuman.id,
+                context: context,
+                activeHumanSelection: selection
+            ).didSucceed)
+        }
+        for human in noiseHumans {
+            for (checkpoint, resolution) in [
+                (HouseholdStarterJourneyCheckpoint.humanAppearance, HouseholdStarterJourneyResolution.reviewed),
+                (.humanLifeStage, .unknown),
+                (.humanBodyProfile, .preferNotToSay)
+            ] {
+                #expect(HouseholdStarterJourneyService.recordResolution(
+                    task: .humanProfile,
+                    checkpoint: checkpoint,
+                    resolution: resolution,
+                    subjectID: human.id,
+                    context: context,
+                    activeHumanSelection: selection
+                ).didSucceed)
+            }
+        }
+
+        let activeAppearanceKey = HouseholdStarterJourneyService.checkpointRecordKey(
+            task: .humanProfile,
+            checkpoint: .humanAppearance,
+            subjectID: activeHuman.id
+        )
+        let activeLifeStageKey = HouseholdStarterJourneyService.checkpointRecordKey(
+            task: .humanProfile,
+            checkpoint: .humanLifeStage,
+            subjectID: activeHuman.id
+        )
+        let activeBodyKey = HouseholdStarterJourneyService.checkpointRecordKey(
+            task: .humanProfile,
+            checkpoint: .humanBodyProfile,
+            subjectID: activeHuman.id
+        )
+        let markers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            $0.actionType == HouseholdStarterJourneyService.checkpointActionType
+        }
+        #expect(markers.count == 102)
+        var laterIndex = 0
+        for marker in markers {
+            let timestamp: Date
+            switch marker.legacyModelId {
+            case activeAppearanceKey:
+                timestamp = Date(timeIntervalSince1970: 1)
+            case activeLifeStageKey:
+                timestamp = Date(timeIntervalSince1970: 2)
+            case activeBodyKey:
+                timestamp = Date(timeIntervalSince1970: 3)
+            default:
+                timestamp = Date(timeIntervalSince1970: Double(100 + laterIndex))
+                laterIndex += 1
+            }
+            marker.occurredAt = timestamp
+            marker.createdAt = timestamp
+        }
+        try context.save()
+        #expect(markers.count(where: {
+            $0.legacyModelId == activeAppearanceKey
+                || $0.legacyModelId == activeLifeStageKey
+                || $0.legacyModelId == activeBodyKey
+        }) == 3)
+
+        let reference = try await TaskCenterRouteDataActor(modelContainer: container).load(
+            loadPlants: false,
+            activeHumanID: activeHuman.id.uuidString,
+            starterJourneyEnabled: true
+        )
+        let journey = try #require(reference.snapshot.starterJourney)
+        let state = try #require(journey.state(for: .humanProfile))
+        #expect(state.targetID == activeHuman.id)
+        #expect(state.completedCheckpointCount == 3)
+        #expect(state.completionPercent == 75)
+        #expect(state.requiredCompletionPercent == 75)
+        #expect(state.completedCheckpoints == [.humanAppearance, .humanLifeStage, .humanBodyProfile])
+        #expect(state.checkpointResolutions == [
+            .humanAppearance: .reviewed,
+            .humanLifeStage: .unknown,
+            .humanBodyProfile: .preferNotToSay
+        ])
+        #expect(state.status == .claimable)
+    }
+
+    @Test func routeReloadKeepsOldExplicitCarePlanBeyondEventFetchLimit() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Care plan owner")
+        let pet = Pet(name: "Long-term care pet", species: "dog")
+        human.createdAt = Date(timeIntervalSince1970: 1)
+        pet.createdAt = Date(timeIntervalSince1970: 1)
+        context.insert(human)
+        context.insert(pet)
+
+        let explicitPlan = Event(
+            title: "Original feeding plan",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString,
+            taskCareKindRaw: TaskCareKind.petFeeding.rawValue
+        )
+        explicitPlan.recurrenceDays = 1
+        explicitPlan.createdAt = Date(timeIntervalSince1970: 2)
+        context.insert(explicitPlan)
+
+        var laterGenericEvents: [Event] = []
+        for index in 0 ..< 64 {
+            let event = Event(
+                title: "Generic recurring event \(index)",
+                eventType: EventType.daily.rawValue,
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: pet.id.uuidString
+            )
+            event.recurrenceDays = 1
+            event.createdAt = Date(timeIntervalSince1970: Double(index + 100))
+            context.insert(event)
+            laterGenericEvents.append(event)
+        }
+        try context.save()
+
+        let genericEvidence = HouseholdStarterJourneyService.carePlanEvidence(
+            targetPet: pet,
+            events: laterGenericEvents,
+            reminderEventIDs: []
+        )
+        #expect(!genericEvidence.hasExplicitCarePlan)
+        #expect(!genericEvidence.hasDefaultRecommendedCarePlan)
+        #expect(HouseholdStarterJourneyService.carePlanEvidence(
+            targetPet: pet,
+            events: [explicitPlan] + laterGenericEvents,
+            reminderEventIDs: []
+        ).hasExplicitCarePlan)
+
+        let reference = try await TaskCenterRouteDataActor(modelContainer: container).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            starterJourneyEnabled: true
+        )
+        let journey = try #require(reference.snapshot.starterJourney)
+        let state = try #require(journey.state(for: .carePlan))
+        #expect(state.targetID == pet.id)
+        #expect(state.completedCheckpoints == [.acceptedRecommendedCarePlan])
+        #expect(state.completedCheckpointCount == 1)
+        #expect(state.checkpointResolutions.isEmpty)
+        #expect(state.availableResolutionCheckpoints.isEmpty)
+        #expect(state.status == .claimable)
+    }
+
+    @Test func routeReloadKeepsOldStoredGeneratedCarePlanBeyondEventFetchLimit() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Stored plan owner")
+        let pet = Pet(name: "Stored plan pet", species: "cat")
+        human.createdAt = Date(timeIntervalSince1970: 1)
+        pet.createdAt = Date(timeIntervalSince1970: 1)
+        context.insert(human)
+        context.insert(pet)
+
+        let storedPlan = Event(
+            title: "Original play plan",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        storedPlan.recurrenceDays = 1
+        storedPlan.createdAt = Date(timeIntervalSince1970: 2)
+        context.insert(storedPlan)
+        insertLaterGenericCarePlanEvents(targetPet: pet, context: context)
+        try context.save()
+
+        let storageKey = "careCalendarEventId_play_\(pet.id.uuidString)"
+        UserDefaults.standard.set(storedPlan.id.uuidString, forKey: storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: storageKey) }
+        #expect(HouseholdStarterJourneyService.carePlanEvidence(
+            targetPet: pet,
+            events: [storedPlan],
+            reminderEventIDs: []
+        ).hasExplicitCarePlan)
+
+        let reference = try await TaskCenterRouteDataActor(modelContainer: container).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            starterJourneyEnabled: true
+        )
+        let journey = try #require(reference.snapshot.starterJourney)
+        let state = try #require(journey.state(for: .carePlan))
+        #expect(state.completedCheckpoints == [.acceptedRecommendedCarePlan])
+        #expect(state.status == .claimable)
+    }
+
+    @Test func oldStoredDefaultCarePlanStaysAcceptableAndResolutionGateAgrees() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Default plan owner")
+        let pet = Pet(name: "Default plan pet", species: "dog")
+        human.createdAt = Date(timeIntervalSince1970: 1)
+        pet.createdAt = Date(timeIntervalSince1970: 1)
+        context.insert(human)
+        context.insert(pet)
+        insertLaterGenericCarePlanEvents(targetPet: pet, context: context)
+
+        let defaultPlan = Event(
+            title: "Original default feeding plan",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        defaultPlan.recurrenceDays = 1
+        defaultPlan.createdAt = Date(timeIntervalSince1970: 2)
+        context.insert(defaultPlan)
+        try context.save()
+
+        let storageKey = "careCalendarEventId_default_feed_\(pet.id.uuidString)"
+        UserDefaults.standard.set(defaultPlan.id.uuidString, forKey: storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: storageKey) }
+        #expect(HouseholdStarterJourneyService.carePlanEvidence(
+            targetPet: pet,
+            events: [defaultPlan],
+            reminderEventIDs: []
+        ).hasDefaultRecommendedCarePlan)
+
+        let reference = try await TaskCenterRouteDataActor(modelContainer: container).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            starterJourneyEnabled: true
+        )
+        let journey = try #require(reference.snapshot.starterJourney)
+        let state = try #require(journey.state(for: .carePlan))
+        #expect(state.completedCheckpoints.isEmpty)
+        #expect(state.availableResolutionCheckpoints == [.acceptedRecommendedCarePlan])
+        #expect(state.status == .actionRequired)
+
+        let resolution = HouseholdStarterJourneyService.recordResolution(
+            task: .carePlan,
+            checkpoint: .acceptedRecommendedCarePlan,
+            resolution: .reviewed,
+            subjectID: pet.id,
+            context: context,
+            activeHumanSelection: FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
+        )
+        #expect(resolution == .recorded(
+            task: .carePlan,
+            checkpoint: .acceptedRecommendedCarePlan,
+            resolution: .reviewed
+        ))
+    }
+
+    @Test func laterExplicitCarePlanSupersedesEarlierResolutionWithoutDoubleCounting() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Care plan owner")
+        let pet = Pet(name: "Care plan pet", species: "dog")
+        context.insert(human)
+        context.insert(pet)
+
+        let defaultPlan = Event(
+            title: "Default feeding plan",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        defaultPlan.recurrenceDays = 1
+        context.insert(defaultPlan)
+        try context.save()
+
+        let storageKey = "careCalendarEventId_default_feed_\(pet.id.uuidString)"
+        UserDefaults.standard.set(defaultPlan.id.uuidString, forKey: storageKey)
+        defer { UserDefaults.standard.removeObject(forKey: storageKey) }
+
+        let checkpoint = HouseholdStarterJourneyCheckpoint.acceptedRecommendedCarePlan
+        let selection = FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
+        #expect(HouseholdStarterJourneyService.recordResolution(
+            task: .carePlan,
+            checkpoint: checkpoint,
+            resolution: .reviewed,
+            subjectID: pet.id,
+            context: context,
+            activeHumanSelection: selection
+        ) == .recorded(
+            task: .carePlan,
+            checkpoint: checkpoint,
+            resolution: .reviewed
+        ))
+
+        let resolutionReference = try await TaskCenterRouteDataActor(
+            modelContainer: container
+        ).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            starterJourneyEnabled: true
+        )
+        let resolutionState = try #require(
+            resolutionReference.snapshot.starterJourney?.state(for: .carePlan)
+        )
+        #expect(resolutionState.completedCheckpointCount == 1)
+        #expect(resolutionState.completedCheckpoints == [checkpoint])
+        #expect(resolutionState.checkpointResolutions == [checkpoint: .reviewed])
+        #expect(resolutionState.status == .claimable)
+
+        let explicitPlan = Event(
+            title: "Explicit feeding plan",
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString,
+            taskCareKindRaw: TaskCareKind.petFeeding.rawValue
+        )
+        explicitPlan.recurrenceDays = 1
+        context.insert(explicitPlan)
+        try context.save()
+
+        let factReference = try await TaskCenterRouteDataActor(
+            modelContainer: container
+        ).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            starterJourneyEnabled: true
+        )
+        let factState = try #require(
+            factReference.snapshot.starterJourney?.state(for: .carePlan)
+        )
+        #expect(factState.completedCheckpointCount == 1)
+        #expect(factState.completedCheckpoints == [checkpoint])
+        #expect(factState.checkpointResolutions.isEmpty)
+        #expect(factState.status == .claimable)
+    }
+
     private func qualifyHumanProfile(
         human: Human,
         context: ModelContext,
@@ -244,7 +1088,15 @@ struct HouseholdStarterJourneyServiceTests {
         )
         _ = HouseholdStarterJourneyService.recordResolution(
             task: .humanProfile,
-            checkpoint: .humanOptionalDetails,
+            checkpoint: .humanLifeStage,
+            resolution: .unknown,
+            subjectID: human.id,
+            context: context,
+            activeHumanSelection: selection
+        )
+        _ = HouseholdStarterJourneyService.recordResolution(
+            task: .humanProfile,
+            checkpoint: .humanBodyProfile,
             resolution: .preferNotToSay,
             subjectID: human.id,
             context: context,
@@ -252,9 +1104,23 @@ struct HouseholdStarterJourneyServiceTests {
         )
     }
 
+    private func insertLaterGenericCarePlanEvents(targetPet: Pet, context: ModelContext) {
+        for index in 0 ..< 64 {
+            let event = Event(
+                title: "Later generic recurring event \(index)",
+                eventType: EventType.daily.rawValue,
+                relatedEntityType: EntityKind.pet.rawValue,
+                relatedEntityId: targetPet.id.uuidString
+            )
+            event.recurrenceDays = 1
+            event.createdAt = Date(timeIntervalSince1970: Double(index + 100))
+            context.insert(event)
+        }
+    }
+
     private func makeContainer() throws -> ModelContainer {
         try ModelContainer(
-            for: Schema(ArkSchemaV91.models),
+            for: Schema(ArkSchemaV94.models),
             configurations: [ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)]
         )
     }

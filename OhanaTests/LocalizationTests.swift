@@ -43,6 +43,77 @@ struct LocalizationTests {
         #expect(text.missingSupportedLanguageCodes == ["de", "es", "pt", "fr", "ja", "ko", "it"])
     }
 
+    @Test func personalCommerceStaticCopyResolvesRegisteredLanguages() {
+        let englishFallback = "__personal_commerce_english_fallback__"
+        let keys = [
+            "Free 没有广告，也不会锁住你的记录。Personal 为更多活跃成员与进阶本地工具而生。",
+            "无限数量与全部 Personal 功能已可使用。",
+            "永久免费 · 无广告",
+            "全部历史、现有数据、核心照护记录与导出始终可用",
+            "Lifetime 是可选的一次性购买。购买后 Apple 不会自动取消你现有的月度或年度订阅，请在订阅管理中确认续订状态。",
+            "月度与年度方案会自动续订，除非在当前周期结束前至少 24 小时于 Apple 账号中取消。Lifetime 为一次性购买。付款由 Apple 处理。",
+            "Lifetime 仅包含当前平台的本地 Personal 功能，不包含未来的 Family 在线服务或 Care+。",
+            "当前 Apple 账号没有可恢复的 Personal 或 Supporter Pack 购买。",
+            "添加另一只宠物",
+            "Free 提供最近 30 天的基础趋势；Ohana Personal 解锁 90 天与全部时间分析。现有记录始终可用。",
+            "Ohana Personal 可从本地记录生成兽医 PDF 摘要；原始记录与手动导出始终可用。",
+            "Personal Lifetime · 已启用",
+            "Personal 背景",
+            "Ohana Personal 暂时无法使用。"
+        ]
+
+        for languageCode in ["es", "pt", "fr", "ja", "ko", "it"] {
+            let localization = L10n(languageCode)
+            for key in keys {
+                #expect(localization.tr(zh: key, en: englishFallback) != englishFallback)
+            }
+        }
+    }
+
+    @Test func personalUpgradePromptsResolveRegisteredLanguages() {
+        let english = L10n("en")
+
+        for languageCode in ["es", "pt", "fr", "ja", "ko", "it"] {
+            let localization = L10n(languageCode)
+            for resource in PersonalLimitedResource.allCases {
+                let prompt = PersonalUpgradePrompt(resource: resource)
+                #expect(prompt.title(localization) != prompt.title(english))
+                #expect(prompt.detail(localization) != prompt.detail(english))
+            }
+            for feature in PersonalFeature.allCases {
+                let prompt = PersonalUpgradePrompt(feature: feature)
+                #expect(prompt.title(localization) != prompt.title(english))
+                #expect(prompt.detail(localization) != prompt.detail(english))
+            }
+        }
+    }
+
+    @Test func petCreationMinimalCopyResolvesRegisteredLanguages() {
+        let englishFallback = "__pet_creation_english_fallback__"
+        let keys = [
+            "性别（必填）",
+            "毛色（可选）",
+            "暂不设置",
+            "性格（可选）",
+            "主题色（可选）",
+            "已手动选择",
+            "已自动分配",
+            "已按毛色自动搭配",
+            "恢复自动",
+            "选择宠物主题色",
+            "保存时消耗 1 张头像券",
+            "正在检查 Personal 额度",
+            "暂时无法检查宠物额度"
+        ]
+
+        for languageCode in ["es", "pt", "fr", "ja", "ko", "it"] {
+            let localization = L10n(languageCode)
+            for key in keys {
+                #expect(localization.tr(zh: key, en: englishFallback) != englishFallback)
+            }
+        }
+    }
+
     @Test func languageRegistryProvidesFutureReadyFallbackChains() {
         #expect(AppLanguage.supported.map(\.code) == ["zh", "en", "de", "es", "pt", "fr", "ja", "ko", "it"])
         #expect(AppLanguage.supportedLprojNames == Set(["zh-Hans", "en", "de", "es", "pt", "fr", "ja", "ko", "it"]))
@@ -165,6 +236,30 @@ struct LocalizationTests {
         #expect(containsCJK(zh.joined(separator: " ")))
         #expect(!containsCJK(en.joined(separator: " ")))
         #expect(!containsCJK(de.joined(separator: " ")))
+    }
+
+    @Test func petCreationCatalogNamesUseTheSelectedAppLanguage() {
+        let zh = L10n("zh")
+        let en = L10n("en")
+        let de = L10n("de")
+
+        #expect(zh.resourceName("柴犬") == "柴犬")
+        #expect(en.resourceName("柴犬") == "Shiba Inu")
+        #expect(en.resourceName("黑褐色") == "Black & tan")
+        #expect(de.resourceName("巴哥犬") == "Mops")
+        #expect(en.resourceName("Custom user breed") == "Custom user breed")
+
+        let species = ["dog", "cat", "rabbit", "hamster", "bird", "other"]
+        let breeds = species.flatMap { PetBreedDatabase.breeds(for: $0) }
+        let breedNames = Set(breeds.map(\.name))
+        let databaseCoats = breeds.flatMap(\.coatColors).map(\.name)
+        let avatarCoats = breeds.flatMap { breed in
+            PetAvatarAssetCatalog.coatColors(species: speciesForBreed(breed.name), breed: breed.name) ?? []
+        }.map(\.name)
+
+        for name in breedNames.union(databaseCoats).union(avatarCoats) {
+            #expect(!containsCJK(en.resourceName(name)), "English catalog name leaked Chinese: \(name)")
+        }
     }
 
     @Test func day0PromiseCopyResolvesChineseAndEnglish() {
@@ -407,5 +502,13 @@ struct LocalizationTests {
         text.unicodeScalars.contains { scalar in
             (0x4E00 ... 0x9FFF).contains(Int(scalar.value))
         }
+    }
+
+    private func speciesForBreed(_ breed: String) -> String {
+        for species in ["dog", "cat", "rabbit", "hamster", "bird", "other"]
+            where PetBreedDatabase.breeds(for: species).contains(where: { $0.name == breed }) {
+            return species
+        }
+        return "other"
     }
 }

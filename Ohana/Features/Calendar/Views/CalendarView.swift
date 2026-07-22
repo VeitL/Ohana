@@ -23,6 +23,7 @@ struct CalendarView: View {
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
     var onCompleteEvent: ((Event, Date, String?) -> Bool)?
     var events: [Event] = []
+    var familyTaskProjectionEvents: [Event] = []
     var pets: [Pet] = []
     var humans: [Human] = []
     var plants: [Plant] = []
@@ -52,6 +53,7 @@ struct CalendarView: View {
     @State var deletingEvent: Event? = nil
     @State var eventDetailPresentation: CalendarEventDetailPresentation?
     @State var pendingActionHumanConfirmation: ActionHumanConfirmationDraft?
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var showDeleteSeriesAlert = false
     @Environment(\.colorScheme) var colorScheme
     @StateObject var visibleDateCoordinator = CalendarVisibleDateCoordinator()
@@ -305,6 +307,9 @@ struct CalendarView: View {
                     )
                 }
             )
+        }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
         }
         .actionHumanConfirmationDialog(draft: $pendingActionHumanConfirmation)
     }

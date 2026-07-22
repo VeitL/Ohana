@@ -203,6 +203,7 @@ struct InsurancePolicyDetailSheet: View {
                     icon: "arrow.down.doc.fill",
                     title: l.tr(zh: "还没有报销", en: "No claims yet", de: "Noch keine Erstattung"),
                     actionTitle: l.tr(zh: "新增报销", en: "Add claim", de: "Hinzufügen"),
+                    actionIdentifier: "pet-insurance-add-claim-action",
                     tint: Color.goPurple
                 ) { withAnimation(GoMotion.page) { showAddClaim = true } }
             } else {

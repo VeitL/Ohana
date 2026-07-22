@@ -38,6 +38,8 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
     let isAllDay: Bool
     let eventType: String
     let taskCareKindRaw: String
+    let familyTaskPlanId: String?
+    let familyTaskOccurrenceKey: String?
     let relatedLink: DomainEntityLink
     let recurrenceDays: Int
     let recurrenceEndDate: Date?
@@ -61,6 +63,8 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
         reminderDates: [Date] = [],
         assigneeId: String? = nil,
         taskCareKindRaw: String = "",
+        familyTaskPlanId: String? = nil,
+        familyTaskOccurrenceKey: String? = nil,
         writeKind: MemberWriteKind,
         source: DomainScheduleSourceKind = .userCommand
     ) {
@@ -70,6 +74,8 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
         self.isAllDay = isAllDay
         self.eventType = eventType
         self.taskCareKindRaw = taskCareKindRaw
+        self.familyTaskPlanId = familyTaskPlanId
+        self.familyTaskOccurrenceKey = familyTaskOccurrenceKey
         self.relatedLink = DomainEntityLink(rawType: relatedEntityType, rawId: relatedEntityId)
         self.recurrenceDays = recurrenceDays
         self.recurrenceEndDate = recurrenceDays > 0 ? recurrenceEndDate : nil
@@ -100,6 +106,8 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
             recurrenceEndDate: recurrenceEndDate ?? event.recurrenceEndDate,
             assigneeId: assigneeOverride.resolved(existing: event.assigneeId),
             taskCareKindRaw: event.taskCareKindRaw,
+            familyTaskPlanId: event.familyTaskPlanId,
+            familyTaskOccurrenceKey: event.familyTaskOccurrenceKey,
             writeKind: writeKind,
             source: source
         )
@@ -120,6 +128,8 @@ nonisolated struct DomainScheduleCreateIntent: Equatable {
             reminderDates: explicitReminderDates,
             assigneeId: assigneeId,
             taskCareKindRaw: taskCareKindRaw,
+            familyTaskPlanId: familyTaskPlanId,
+            familyTaskOccurrenceKey: familyTaskOccurrenceKey,
             writeKind: writeKind,
             source: source
         )
@@ -383,6 +393,17 @@ nonisolated enum DomainScheduleWriter {
         constructEvent(intent: intent)
     }
 
+    static func makeUnpersistedEvent(
+        intent: DomainScheduleCreateIntent,
+        id: UUID,
+        createdAt: Date
+    ) -> Event {
+        let event = constructEvent(intent: intent)
+        event.id = id
+        event.createdAt = createdAt
+        return event
+    }
+
     static func makeUnpersistedReminder(event: Event? = nil, scheduledAt: Date) -> Reminder {
         Reminder(event: event, scheduledAt: scheduledAt)
     }
@@ -426,6 +447,8 @@ nonisolated enum DomainScheduleWriter {
         event.recurrenceDays = intent.recurrenceDays
         event.recurrenceEndDate = intent.recurrenceEndDate
         event.assigneeId = intent.assigneeId
+        event.familyTaskPlanId = intent.familyTaskPlanId
+        event.familyTaskOccurrenceKey = intent.familyTaskOccurrenceKey
         return event
     }
 
@@ -450,6 +473,8 @@ nonisolated enum DomainScheduleWriter {
         event.taskCareKindRaw = authorizedIntent.taskCareKindRaw
         event.isAllDay = authorizedIntent.isAllDay
         event.assigneeId = authorizedIntent.assigneeId
+        event.familyTaskPlanId = authorizedIntent.familyTaskPlanId
+        event.familyTaskOccurrenceKey = authorizedIntent.familyTaskOccurrenceKey
         return true
     }
 
@@ -617,16 +642,34 @@ nonisolated enum DomainScheduleWriter {
         mutation: AuthorizedDomainScheduleMutation,
         skippedBy humanId: String?,
         skippedAt: Date,
+        terminalAt: Date? = nil,
         context: ModelContext
     ) -> Bool {
         _ = mutation.token
         mutation.mutationPlan.consumeAuthorization()
         guard mutation.writesContent else { return false }
         reminder.statusEnum = .skipped
-        reminder.completedAt = nil
+        reminder.completedAt = terminalAt
         reminder.completedBy = humanId ?? ""
         CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: skippedAt)
         return true
+    }
+
+    /// Restores the in-memory value object after a command fails before its
+    /// transaction commits. This deliberately emits no persistence metadata.
+    static func restoreUncommittedReminder(
+        _ reminder: Reminder,
+        occurrenceAt: Date?,
+        scheduledAt: Date,
+        status: String,
+        completedAt: Date?,
+        completedBy: String
+    ) {
+        reminder.occurrenceAt = occurrenceAt
+        reminder.scheduledAt = scheduledAt
+        reminder.status = status
+        reminder.completedAt = completedAt
+        reminder.completedBy = completedBy
     }
 
     @discardableResult
@@ -714,6 +757,28 @@ nonisolated enum DomainScheduleWriter {
         reminder.scheduledAt = calendar.date(byAdding: .day, value: 1, to: reminder.scheduledAt)
             ?? snoozedAt.addingTimeInterval(86400)
         CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: snoozedAt)
+        return true
+    }
+
+    /// Moves only the delivery time for one concrete task occurrence. The
+    /// immutable `occurrenceAt` remains the nominal series identity; callers
+    /// update the occurrence's effective due date in the same transaction.
+    @discardableResult
+    static func rescheduleReminderDelivery(
+        _ reminder: Reminder,
+        scheduledAt: Date,
+        mutation: AuthorizedDomainScheduleMutation,
+        modifiedAt: Date,
+        context: ModelContext
+    ) -> Bool {
+        _ = mutation.token
+        mutation.mutationPlan.consumeAuthorization()
+        guard mutation.writesContent else { return false }
+        reminder.statusEnum = .pending
+        reminder.completedAt = nil
+        reminder.completedBy = ""
+        reminder.scheduledAt = scheduledAt
+        CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: modifiedAt)
         return true
     }
 

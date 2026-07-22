@@ -22,6 +22,10 @@ extension VerticalSolidHomeView {
             for: FMDest.gacha,
             currentLevel: 0
         ).step.requiredLevel
+        let achievementsUnlockLevel = GrowthUnlockPolicy.status(
+            for: PetFeature.achievements,
+            currentLevel: 0
+        ).step.requiredLevel
         let critterUnlockLevel = OasisUpgradeRewardCatalog.critter(
             id: OasisUpgradeRewardCatalog.firstCritterId
         )?.sourceLevel ?? 10
@@ -34,16 +38,39 @@ extension VerticalSolidHomeView {
                 progressToNextLevel: treeManager.progressToNextLevel,
                 totalEnergy: treeManager.totalEnergy,
                 nextLevelThreshold: treeManager.nextLevelThreshold,
+                coconutBalance: islandCoconutBalance,
                 shopLockedLevel: treeLevel >= shopUnlockLevel ? nil : shopUnlockLevel,
                 shopInitialCategory: shopInitialCategory,
+                achievementsLockedLevel: treeLevel >= achievementsUnlockLevel ? nil : achievementsUnlockLevel,
                 crittersLockedLevel: treeLevel >= critterUnlockLevel ? nil : critterUnlockLevel,
                 gachaLockedLevel: treeLevel >= gachaUnlockLevel ? nil : gachaUnlockLevel
             ),
             injectEnergyTrigger: oasisInjectEnergyTrigger,
+            allowsAmbientMotion: workloadPolicy
+                .ambientMotionBudget(isVisible: lifecycle.isVisible)
+                .allowsMotion,
+            allowsInteractionMotion: workloadPolicy
+                .interactionMotionBudget(isVisible: lifecycle.isVisible)
+                .allowsMotion,
+            usesFullVisualEffects: workloadPolicy
+                .visualEffectsBudget(isVisible: lifecycle.isVisible)
+                .usesFullEffects,
             onPresentCoconutLog: onPresentCoconutLog,
             onInjectEnergy: injectEmbeddedOasisEnergy,
             onOpenShop: { category in
                 routeCoordinator.openCoconutShop(category, currentLevel: treeLevel)
+            },
+            onOpenAchievements: {
+                openFunctionMenu(destination: .featureAggregate(.achievements))
+            },
+            onOpenCritters: {
+                routeCoordinator.openCritterCodex(currentLevel: treeLevel)
+            },
+            onOpenGacha: {
+                openFunctionMenu(destination: .gacha)
+            },
+            onOpenGrowthRoadmap: {
+                openFunctionMenu(destination: .growthRoadmap)
             }
         )
     }

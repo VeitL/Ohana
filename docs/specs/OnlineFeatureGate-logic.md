@@ -1,7 +1,7 @@
 # OnlineFeatureGate Logic
 
-> 状态：当前首发边界。
-> 最近核对：2026-07-15，依据 `OnlineFeatureGate`、`AppCapabilityProfile`、`AppFeatureRouteGuard`、`TaskCenterRouteContainer` 与 `FamilyTaskService`。
+> 状态：CloudKit 协作关闭；Family 守护使用独立 fail-closed 子门。
+> 最近核对：2026-07-22，依据 `OnlineFeatureGate`、`GuardianSafetyConfiguration`、`AppCapabilityProfile`、`AppFeatureRouteGuard`、`TaskCenterRouteContainer` 与 `FamilyTaskService`。
 > 所有者：`OnlineFeatureGate` 与 `AppCapabilityProfile`；具体远端入口由 `AppFeatureRouteGuard` 和 CKShare / Settings 写入边界共同执行。
 
 ## Purpose
@@ -11,13 +11,20 @@
 collaboration 命名，但当前“家庭分工”是同一设备上的本地 SwiftData 记录，
 不是账号、远程邀请或跨设备协作。
 
-未来付费多设备同步和多主人协作应继续从这一门控演进，而不是在本机 Task
+付费多设备同步和多主人协作应继续从这一门控演进，而不是在本机 Task
 Center、Human 数量或 FamilyTask 写入路径散落新的在线判定。
+
+Family App 内亲友守护不是 CloudKit 家庭共享。它使用
+`OnlineFeatureGate.allows(.guardianSafety)`，只有完整 `GuardianSafetyConfiguration`
+同时满足运行开关、HTTPS API / Cognito / invite URL、回调 scheme 与客户端 ID 时才
+开放。拥有 Family entitlement 本身不能打开网络运行时。
 
 ## Launch Semantics
 
 - 首发 `AppCapabilityProfile.shipsCloudFamilyCapabilities` 为 false，
   `OnlineFeatureGate.allows(.onlineCollaboration)` 也为 false。
+- `OHANAGuardianSafetyEnabled` 默认 false，服务 URL 默认为空，因此
+  `OnlineFeatureGate.allows(.guardianSafety)` 默认 false。该门与 CloudKit 门彼此独立。
 - 关闭门控必须阻止 CloudKit share 接受、云同步设置、远端家庭邀请、共享
   database scope 切换，以及明确标为未来联机面的入口。
 - 关闭门控不得隐藏本机 Task Center、`FamilyCollaborationTask`、家庭分工创建与
@@ -70,8 +77,12 @@ Center、Human 数量或 FamilyTask 写入路径散落新的在线判定。
 - `OhanaCloudSharingAppDelegate` 必须在调用 `CloudSyncHouseholdShareService`、
   写 accepted-share state、启用 cloud sync 或启动远端收发前拒绝 CKShare。
 - `CloudSyncShareRuntime` 可以保留为未来实现细节，但当前没有可达的接受路径。
-- Solo target 不注册 APNs，也不声明 `remote-notification` background mode 或
-  CloudKit service entitlement；存在 dormant CloudKit 代码不构成现有能力。
+- App target 已声明 Sign in with Apple、APNs development 与 `remote-notification`
+  background mode，供通过上线门禁后的 Family 守护使用；当前开关关闭时不启动登录、
+  不注册可用服务端点、不加载 Family 商品。Associated Domains 尚未加入真实 host，
+  因而仍是 Family 发布阻断项。
+- CloudKit service entitlement 仍未声明，`shipsCloudFamilyCapabilities` 恒 false；存在
+  dormant CloudKit 代码或 APNs 能力不构成 CloudKit 协作已启用。
 
 ## Blocked UX
 
@@ -93,7 +104,7 @@ Center、Human 数量或 FamilyTask 写入路径散落新的在线判定。
 
 ## Entitlement Evolution
 
-未来 entitlement 服务可以替换 `OnlineFeatureGate` 内部实现，但调用者仍只询问
-是否允许 online collaboration。任何调用点都不得仅根据 CloudKit account state、
-UserDefaults sync flag、Human 数量、build configuration、订阅字符串或产品 ID
-自行推断联机可用性。
+调用者必须分别询问 online collaboration 或 guardian safety。任何调用点都不得仅根据
+CloudKit account state、UserDefaults、Human 数量、build configuration、订阅字符串、
+产品 ID 或 entitlement 单独推断联机可用性。Family 守护同时要求 `hasFamily`、有效
+服务端权益、已接受可达守护人和 `guardianSafety` 运行门。

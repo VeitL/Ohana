@@ -331,7 +331,7 @@ extension AchievementWallContentView {
         case "year_companion":
             return .init(current: Double(max(0, activePet.daysTogether)), target: 365, unit: progressUnit(.days), actionTitle: progressAction(.daysTogether))
         case "global_island_crew":
-            return .init(current: Double(pets.count), target: 2, unit: progressUnit(.members), actionTitle: progressAction(.memberProfiles))
+            return .init(current: Double(pets.count + humans.count), target: 2, unit: progressUnit(.members), actionTitle: progressAction(.memberProfiles))
         case "global_first_critter":
             return .init(current: Double(electronicPets.count), target: 1, unit: progressUnit(.pets), actionTitle: progressAction(.firstCritter))
         case "global_legendary_critter":
@@ -583,8 +583,10 @@ extension AchievementWallContentView {
     func feedingSpanDays() -> Int {
         let dates = activePetActivitySummary.foodRecordDates
             + activeCareLedgerSummary.mainFeedEvents.map(\.occurredAt)
-        guard let first = dates.min(), let last = dates.max() else { return 0 }
-        return Calendar.current.dateComponents([.day], from: first, to: last).day ?? 0
+        return AchievementCareLedgerSummary.longestConsecutiveCalendarDays(
+            dates,
+            calendar: Calendar.current
+        )
     }
 
     func hasAnyRecord() -> Bool {
@@ -626,13 +628,7 @@ extension AchievementWallContentView {
     }
 
     func humanProfileScore(_ human: Human) -> Int {
-        [
-            human.birthday != nil,
-            human.heightCm > 0,
-            !human.bloodType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            !human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            !human.nationality.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !human.city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        ].count(where: { $0 })
+        HumanBasicProfileAchievementPolicy.score(human)
     }
 
     func medications(for human: Human) -> [HumanMedication] {

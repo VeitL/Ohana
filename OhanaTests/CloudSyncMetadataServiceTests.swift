@@ -335,7 +335,7 @@ struct CloudSyncMetadataServiceTests {
 
     @MainActor
     @Test func entityRegistryCoversCurrentSwiftDataSchema() {
-        let schemaNames = Set(ArkSchemaV91.models.map { String(describing: $0) })
+        let schemaNames = Set(ArkSchemaV96.models.map { String(describing: $0) })
             .subtracting(CloudSyncEntityRegistry.localOnlySchemaEntityNames)
         let descriptorNames = Set(CloudSyncEntityRegistry.descriptors.map(\.entityName))
 
@@ -345,7 +345,7 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
-    @Test func soloProjectConfigurationKeepsOnlyICloudDocumentsCapability() throws {
+    @Test func soloProjectKeepsCloudKitDisabledWhileDeclaringOptionalGuardianCapabilities() throws {
         let rootURL = repositoryRootURL()
         let entitlements = try propertyListDictionary(
             rootURL.appendingPathComponent("Ohana/Ohana.entitlements")
@@ -364,8 +364,10 @@ struct CloudSyncMetadataServiceTests {
 
         #expect(containers.contains(CloudSyncEngineRuntime.containerIdentifier))
         #expect(services == ["CloudDocuments"])
-        #expect(entitlements["aps-environment"] == nil)
-        #expect(!backgroundModes.contains("remote-notification"))
+        #expect(entitlements["aps-environment"] as? String == "development")
+        #expect(entitlements["com.apple.developer.applesignin"] as? [String] == ["Default"])
+        #expect(entitlements["com.apple.developer.associated-domains"] == nil)
+        #expect(backgroundModes.contains("remote-notification"))
         #expect(infoPlist["CKSharingSupported"] == nil)
         #expect(!project.contains("INFOPLIST_KEY_CKSharingSupported = YES;"))
         #expect(project.contains("SWIFT_ACTIVE_COMPILATION_CONDITIONS = \"OHANA_SOLO_CAPABILITIES $(inherited)\";"))

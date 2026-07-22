@@ -312,7 +312,13 @@ extension QuickPottyDetailSheet {
     func poopOverviewRangePicker(tint: Color) -> some View {
         HStack(spacing: 8) {
             ForEach(PoopOverviewRange.allCases) { range in
+                let isLocked = range == .days90 && !appServices.commerce.allows(.extendedTrends)
                 Button {
+                    guard !isLocked else {
+                        personalUpgradePrompt = PersonalUpgradePrompt(feature: .extendedTrends)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        return
+                    }
                     withAnimation(GoMotion.page) {
                         overviewRange = range
                         overviewChartProgress = 0
@@ -324,14 +330,22 @@ extension QuickPottyDetailSheet {
                         }
                     }
                 } label: {
-                    Text(range.title(l))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    HStack(spacing: 4) {
+                        Text(range.title(l))
+                        if isLocked {
+                            Image(systemName: "lock.fill").accessibilityHidden(true)
+                        }
+                    }
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(overviewRange == range ? Color.arkInk : tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(overviewRange == range ? tint : Color.ohanaControlFill.opacity(0.5), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityHint(isLocked
+                    ? l.tr(zh: "需要 Ohana Personal", en: "Requires Ohana Personal", de: "Ohana Personal erforderlich")
+                    : "")
             }
         }
     }

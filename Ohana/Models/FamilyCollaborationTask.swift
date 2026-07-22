@@ -19,6 +19,7 @@ enum FamilyCollaborationTaskKind: String, Codable, CaseIterable, Identifiable {
 enum FamilyCollaborationTaskStatus: String, Codable, CaseIterable, Identifiable {
     case active
     case claimed
+    case declined
     case pendingReview
     case completed
     case cancelled
@@ -37,7 +38,13 @@ nonisolated enum FamilyCollaborationTaskSubjectKind: String, Codable, CaseIterab
 
 @Model
 final class FamilyCollaborationTask {
-    #Index<FamilyCollaborationTask>([\.statusRaw], [\.assignedToId], [\.relatedReminderId], [\.dueAt])
+    #Index<FamilyCollaborationTask>(
+        [\.statusRaw],
+        [\.assignedToId],
+        [\.relatedReminderId],
+        [\.dueAt],
+        [\.planId, \.nominalAt]
+    )
 
     var id: UUID
     var title: String
@@ -51,6 +58,11 @@ final class FamilyCollaborationTask {
     var relatedPetId: String?
     var relatedEventId: String?
     var relatedReminderId: String?
+    /// V95 recurrence-plan provenance. Legacy one-off rows remain `nil` / version zero.
+    var planId: String?
+    @Attribute(.unique) var occurrenceKey: String?
+    var nominalAt: Date?
+    var scheduleVersion: Int = 0
 
     var createdById: String
     var createdByName: String
@@ -79,6 +91,10 @@ final class FamilyCollaborationTask {
         relatedPetId: String? = nil,
         relatedEventId: String? = nil,
         relatedReminderId: String? = nil,
+        planId: String? = nil,
+        occurrenceKey: String? = nil,
+        nominalAt: Date? = nil,
+        scheduleVersion: Int = 0,
         createdById: String,
         createdByName: String,
         assignedToId: String? = nil,
@@ -105,6 +121,10 @@ final class FamilyCollaborationTask {
             : nil
         self.relatedEventId = relatedEventId
         self.relatedReminderId = relatedReminderId
+        self.planId = planId
+        self.occurrenceKey = occurrenceKey
+        self.nominalAt = nominalAt
+        self.scheduleVersion = max(0, scheduleVersion)
         self.createdById = createdById
         self.createdByName = createdByName
         self.assignedToId = assignedToId
@@ -171,7 +191,7 @@ final class FamilyCollaborationTask {
     }
 
     var isFinished: Bool {
-        status == .completed || status == .cancelled
+        status == .declined || status == .completed || status == .cancelled
     }
 
     var isPendingReview: Bool {
@@ -179,7 +199,7 @@ final class FamilyCollaborationTask {
     }
 
     var hasReward: Bool {
-        rewardCoconuts > 0 || kind == .bounty
+        rewardCoconuts > 0
     }
 
     func touch() {

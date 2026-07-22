@@ -1,0 +1,66 @@
+{
+  "schema": "ohana.dogfood-user-profile.v1",
+  "updated": "2026-07-16",
+  "policyDocuments": [
+    "docs/dogfood-testing.md"
+  ],
+  "profile": {
+    "id": "synthetic-solo-free-v1",
+    "operatorModel": "one-local-operator",
+    "primaryHumanName": "Lin Cheng",
+    "firstPet": {
+      "name": "Mochi",
+      "species": "dog",
+      "breed": "Labrador Retriever"
+    },
+    "appLanguage": "en",
+    "region": "DE",
+    "currency": "EUR",
+    "measurementSystem": "metric",
+    "timeZone": "Europe/Berlin",
+    "initialEntitlement": "free"
+  },
+  "environment": {
+    "simulatorName": "iPhone 17 Dogfood",
+    "bundleIdentifier": "com.guanchen.li.Ohana",
+    "configuration": "Release",
+    "derivedDataPath": ".build/DerivedData/dogfood"
+  },
+  "readiness": {
+    "requireOnboardingComplete": true,
+    "requireActiveHumanSelection": true,
+    "requireStarterGiftClaimed": true,
+    "requireStarterGiftPendingCleared": true,
+    "requireOasisAccessUnlocked": true,
+    "requireOasisVisitConfirmed": true,
+    "requireNoTestArtifacts": true,
+    "requirePersonaLocale": true,
+    "minActiveHumans": 1,
+    "minActivePets": 1,
+    "minCareRecords": 1,
+    "minCarePlans": 2,
+    "minLedgerEntries": 1,
+    "minStarterGiftLedgerEntries": 1,
+    "minCareRewardLedgerEntries": 1,
+    "minRewardedCareEvents": 1,
+    "minLinkedRewardedCareEvents": 1
+  },
+  "milestones": {
+    "day7": {
+      "minHistoryDays": 7,
+      "minCareRecords": 15,
+      "minDistinctCareDays": 5,
+      "minWeightRecords": 1,
+      "minExpenseRecords": 1,
+      "minMoments": 1
+    },
+    "day30": {
+      "minHistoryDays": 30,
+      "minCareRecords": 30,
+      "minDistinctCareDays": 14,
+      "minWeightRecords": 4,
+      "minExpenseRecords": 2,
+      "minMoments": 3
+    }
+  }
+}

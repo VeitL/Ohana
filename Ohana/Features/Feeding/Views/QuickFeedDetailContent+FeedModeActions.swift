@@ -59,6 +59,9 @@ extension QuickFeedDetailContent {
                 }
                 scheduleDeferredFeedRefresh(refreshRequest, milliseconds: feedPlanPostSaveRefreshDelayMilliseconds)
                 triggerToast(feedPlanSavedMessage(kind: kind, targetCount: result.targetCount), tint: savingTint)
+            } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode, .forceDisplayedMode])
             } catch {
                 handleFeedCommandFailure(error, command: .feedPlan(petID: pet.id, action: "save_\(kind.rawValue)"))
                 scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode, .forceDisplayedMode])

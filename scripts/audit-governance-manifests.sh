@@ -44,6 +44,7 @@ REQUIRED_FILES = [
     "recurring-findings-audit-baseline.json",
     "localization-hardcoded-ui-baseline.json",
     "swiftdata-save-failure-baseline.json",
+    "dogfood-user-profile.json",
 ]
 
 failures: list[str] = []
@@ -116,6 +117,112 @@ for name, data in manifests.items():
     require_text(data, "schema", name)
     require_text(data, "updated", name)
     require_policy_docs(data, name)
+
+dogfood = manifests.get("dogfood-user-profile.json", {})
+if dogfood:
+    profile = dogfood.get("profile", {})
+    first_pet = profile.get("firstPet", {})
+    environment = dogfood.get("environment", {})
+    readiness = dogfood.get("readiness", {})
+    milestones = dogfood.get("milestones", {})
+    for key in (
+        "id",
+        "operatorModel",
+        "primaryHumanName",
+        "appLanguage",
+        "region",
+        "currency",
+        "measurementSystem",
+        "timeZone",
+        "initialEntitlement",
+    ):
+        require_text(profile, key, f"dogfood profile")
+    for key in ("name", "species", "breed"):
+        require_text(first_pet, key, "dogfood first Pet")
+    if profile.get("operatorModel") != "one-local-operator":
+        fail("dogfood profile must remain one-local-operator.")
+    if profile.get("initialEntitlement") != "free":
+        fail("dogfood profile must begin on the Free entitlement.")
+    expected_locale = {
+        "appLanguage": "en",
+        "region": "DE",
+        "currency": "EUR",
+        "measurementSystem": "metric",
+        "timeZone": "Europe/Berlin",
+    }
+    for key, expected in expected_locale.items():
+        if profile.get(key) != expected:
+            fail(f"dogfood profile {key} must remain {expected}.")
+    for key in ("simulatorName", "bundleIdentifier", "configuration", "derivedDataPath"):
+        require_text(environment, key, f"dogfood environment")
+    if environment.get("simulatorName") != "iPhone 17 Dogfood":
+        fail("dogfood environment must use the fixed iPhone 17 Dogfood name.")
+    if environment.get("configuration") != "Release":
+        fail("dogfood environment must use Release configuration.")
+    if environment.get("bundleIdentifier") != "com.guanchen.li.Ohana":
+        fail("dogfood environment must use the production app bundle identifier.")
+    if environment.get("derivedDataPath") != ".build/DerivedData/dogfood":
+        fail("dogfood environment must use the fixed Dogfood DerivedData lane.")
+    for key in (
+        "minActiveHumans",
+        "minActivePets",
+        "minCareRecords",
+        "minCarePlans",
+        "minLedgerEntries",
+        "minStarterGiftLedgerEntries",
+        "minCareRewardLedgerEntries",
+        "minRewardedCareEvents",
+        "minLinkedRewardedCareEvents",
+    ):
+        value = readiness.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            fail(f"dogfood readiness must define positive integer {key}.")
+    if readiness.get("requireNoTestArtifacts") is not True:
+        fail("dogfood readiness must reject test artifact files.")
+    if readiness.get("requireOasisAccessUnlocked") is not True:
+        fail("dogfood readiness must require product-level Oasis access.")
+    if readiness.get("requireOasisVisitConfirmed") is not True:
+        fail("dogfood readiness must require the first Oasis visit confirmation.")
+    if readiness.get("requirePersonaLocale") is not True:
+        fail("dogfood readiness must require the declared locale persona.")
+    for key in (
+        "requireOnboardingComplete",
+        "requireActiveHumanSelection",
+        "requireStarterGiftClaimed",
+        "requireStarterGiftPendingCleared",
+    ):
+        if readiness.get(key) is not True:
+            fail(f"dogfood readiness must set {key} to true.")
+    for milestone_name in ("day7", "day30"):
+        milestone = milestones.get(milestone_name)
+        if not isinstance(milestone, dict):
+            fail(f"dogfood milestones must define {milestone_name}.")
+            continue
+        for key in (
+            "minHistoryDays",
+            "minCareRecords",
+            "minDistinctCareDays",
+            "minWeightRecords",
+            "minExpenseRecords",
+            "minMoments",
+        ):
+            value = milestone.get(key)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                fail(f"dogfood {milestone_name} must define positive integer {key}.")
+    day7 = milestones.get("day7", {})
+    day30 = milestones.get("day30", {})
+    if isinstance(day7, dict) and isinstance(day30, dict):
+        for key in (
+            "minHistoryDays",
+            "minCareRecords",
+            "minDistinctCareDays",
+            "minWeightRecords",
+            "minExpenseRecords",
+            "minMoments",
+        ):
+            if isinstance(day7.get(key), int) and isinstance(day30.get(key), int):
+                if day30[key] < day7[key]:
+                    fail(f"dogfood day30 {key} must not be lower than day7.")
 
 feature = manifests.get("feature-ownership.json", {})
 for entry in feature.get("features", []):

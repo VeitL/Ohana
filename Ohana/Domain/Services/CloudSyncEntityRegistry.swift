@@ -59,7 +59,35 @@ nonisolated enum CloudSyncEntityRegistry {
         // Human notes are private local-first content. The legacy Human.notes
         // string remains authoritative for compatibility; this sidecar only
         // preserves per-entry local attribution.
-        String(describing: HumanNoteRecord.self)
+        String(describing: HumanNoteRecord.self),
+        // Local shop outbox coordinates UserDefaults and system App Icon
+        // effects. It must never replay fulfillment on another device.
+        String(describing: ShopPurchaseAttempt.self),
+        // Zen presence is part of restricted backup v32 but is deliberately
+        // excluded from the current Solo CloudSync runtime. Family sync ships
+        // only with the later account/member-permission phase.
+        String(describing: PresenceCheckIn.self),
+        String(describing: PresenceParticipationPeriod.self),
+        String(describing: PresenceRewardReceipt.self),
+        // Solo achievement progression and reward receipts are local-first.
+        // They enter restricted backup v33 but not the deferred sync surface.
+        String(describing: AchievementUnlock.self),
+        String(describing: AchievementRewardReceipt.self),
+        // Family collaboration plans and their activity/message stream may
+        // contain free-form text. V95 keeps both device-local alongside the
+        // existing FamilyCollaborationTask backup exclusion.
+        String(describing: FamilyTaskPlan.self),
+        String(describing: FamilyTaskActivity.self),
+        // Phone numbers and local safety-message configuration never enter the
+        // current backup or CloudSync payload.
+        String(describing: SafetyContact.self),
+        // Family guardian service state is synchronized only with its minimal
+        // purpose-built API. These device projections, endpoint state, and
+        // reliable outbox must never leak into the legacy CloudKit pipeline.
+        String(describing: GuardianSafetyPolicyProjection.self),
+        String(describing: GuardianRelationshipProjection.self),
+        String(describing: GuardianIncidentProjection.self),
+        String(describing: GuardianSafetySyncOutbox.self)
     ]
 
     static let descriptors: [CloudSyncEntityDescriptor] = [
@@ -152,6 +180,8 @@ nonisolated enum CloudSyncEntityRegistry {
         deletionOwnership(Reminder.self, parent: .pet, reason: "event.reminders"),
         deletionOwnership(PetRelationship.self, parent: .pet, reason: "fromPetId/toPetId"),
         deletionOwnership(FamilyCollaborationTask.self, parent: .pet, reason: "pet subject/relatedPetId"),
+        deletionOwnership(FamilyTaskPlan.self, parent: .pet, reason: "plan or occurrence pet subject"),
+        deletionOwnership(FamilyTaskActivity.self, parent: .pet, reason: "family-task plan/occurrence"),
         deletionOwnership(SharedCareSession.self, parent: .pet, reason: "source/target/stock owner pet ids"),
         deletionOwnership(PetCareLog.self, parent: .pet, reason: "pet relationship"),
         deletionOwnership(PetPottyLog.self, parent: .pet, reason: "pet relationship"),
@@ -192,10 +222,14 @@ nonisolated enum CloudSyncEntityRegistry {
         deletionOwnership(SharedCareSession.self, parent: .human, reason: "executorIds"),
         deletionOwnership(CoconutExchangeRequest.self, parent: .human, reason: "sender/receiver"),
         deletionOwnership(FamilyCollaborationTask.self, parent: .human, reason: "human subject/actor fields"),
+        deletionOwnership(FamilyTaskPlan.self, parent: .human, reason: "creator/assignee/subject"),
+        deletionOwnership(FamilyTaskActivity.self, parent: .human, reason: "actor/recipient/plan/occurrence"),
 
         deletionOwnership(Event.self, parent: .plant, reason: "plant relatedEntityId"),
         deletionOwnership(Reminder.self, parent: .plant, reason: "event.reminders"),
         deletionOwnership(FamilyCollaborationTask.self, parent: .plant, reason: "plant subject"),
+        deletionOwnership(FamilyTaskPlan.self, parent: .plant, reason: "plan or occurrence plant subject"),
+        deletionOwnership(FamilyTaskActivity.self, parent: .plant, reason: "family-task plan/occurrence"),
         deletionOwnership(PlantCareLog.self, parent: .plant, reason: "plant relationship"),
         deletionOwnership(CareLedgerEvent.self, parent: .plant, reason: "subject/legacy source")
     ]

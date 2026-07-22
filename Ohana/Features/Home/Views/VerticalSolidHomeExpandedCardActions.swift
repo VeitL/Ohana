@@ -142,28 +142,11 @@ struct VerticalSolidHomeExpandedCardActions: View {
     }
 
     private func buildCurrentItems() -> [QuickActionItem] {
-        actionSnapshot.currentItems.isEmpty ? fallbackItems : actionSnapshot.currentItems
+        actionSnapshot.currentItems
     }
 
     private func buildCandidateItems() -> [QuickActionItem] {
         actionSnapshot.candidateItems
-    }
-
-    private var fallbackItems: [QuickActionItem] {
-        let entityID = card.id
-        if card.isHuman {
-            return [
-                QuickActionItem(id: "human-\(entityID)-weight", label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA", actionType: "humanWeight", entityId: entityID, entityKind: .human),
-                QuickActionItem(id: "human-\(entityID)-expense", label: l.expense, icon: "creditcard.fill", colorHex: "F59E0B", actionType: "humanExpense", entityId: entityID, entityKind: .human),
-                QuickActionItem(id: "human-\(entityID)-medication", label: l.homeQAMeds, icon: "pill.fill", colorHex: "FF6B8A", actionType: "humanMedication", entityId: entityID, entityKind: .human)
-            ]
-        }
-        return [
-            QuickActionItem(id: "pet-\(entityID)-feed", label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44", petId: entityID, actionType: "feed", entityId: entityID, entityKind: .pet),
-            QuickActionItem(id: "pet-\(entityID)-water", label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA", petId: entityID, actionType: "water", entityId: entityID, entityKind: .pet),
-            QuickActionItem(id: "pet-\(entityID)-play", label: l.homeQAPlay, icon: "tennisball.fill", colorHex: "FF6B6B", petId: entityID, actionType: "play", entityId: entityID, entityKind: .pet),
-            QuickActionItem(id: "pet-\(entityID)-allFeatures", label: l.tr(zh: "全部", en: "All", de: "Alle"), icon: "square.grid.2x2.fill", colorHex: "5B6AFF", petId: entityID, actionType: "allFeatures", entityId: entityID, entityKind: .pet)
-        ]
     }
 
     private func makeEmbeddedAction(_ item: QuickActionItem) -> VerticalHomeEmbeddedAction {

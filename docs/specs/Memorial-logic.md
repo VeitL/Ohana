@@ -37,7 +37,7 @@
 | `Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift` | CrewRoster 标记宠物离世文案同上。 |
 | `Ohana/Features/Home/FocusHomeCardDataSource.swift` | 首页主卡排除离世宠物与离世人类。 |
 | `Ohana/Features/FunctionMenu/Views/FunctionMenuRootView.swift`、`FeatureGroupDashboardView.swift`、`FeatureAggregateView.swift` | 功能菜单活跃宠物 / 可见人类目标排除离世成员。 |
-| `Ohana/Features/Tasks/TaskCenterModels.swift` 与任务读取边界 | 待办排除离世成员的活跃目标；旧 `IslandQuestEngine` 继续保留相同排除语义用于兼容测试。 |
+| `Ohana/Features/Tasks/TaskCenterSnapshotBuilder.swift` 与任务读取边界 | 待办排除离世成员的活跃目标；旧 `IslandQuestEngine` 继续保留相同排除语义用于兼容测试。 |
 | `Ohana/Features/FamilyReports/Views/FamilyWeeklyReportDashboardView.swift` | 周报活跃宠物和活跃人类贡献统计排除离世成员。 |
 | `Ohana/Features/Economy/QuestManager+Awards.swift`、`QuestManager.swift` | 奖励入口遇到离世宠物 / 人类时跳过对应钱包写入。 |
 | `Ohana/Domain/Services/PhysicalDeletionService.swift` | 删除是不可恢复物理删除边界；不承载纪念退场，也不恢复离世成员。 |

@@ -8,64 +8,11 @@
 import SwiftData
 import SwiftUI
 
-private enum PlantEditFocusSection: String, CaseIterable, Identifiable {
-    case all
-    case identity
-    case care
-    case environment
-    case potting
-    case growth
-    case safety
-    case notes
-
-    var id: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .all:
-            "square.grid.2x2.fill"
-        case .identity:
-            "person.text.rectangle.fill"
-        case .care:
-            "calendar.badge.clock"
-        case .environment:
-            "sun.max.fill"
-        case .potting:
-            "shippingbox.fill"
-        case .growth:
-            "ruler.fill"
-        case .safety:
-            "shield.checkered"
-        case .notes:
-            "note.text"
-        }
-    }
-
-    func title(_ l: L10n) -> String {
-        switch self {
-        case .all:
-            l.tr(zh: "全部", en: "All", de: "Alles")
-        case .identity:
-            l.tr(zh: "身份", en: "Identity", de: "Identität")
-        case .care:
-            l.tr(zh: "护理", en: "Care", de: "Pflege")
-        case .environment:
-            l.tr(zh: "环境", en: "Environment", de: "Umgebung")
-        case .potting:
-            l.tr(zh: "盆土", en: "Potting", de: "Topf")
-        case .growth:
-            l.tr(zh: "成长", en: "Growth", de: "Wachstum")
-        case .safety:
-            l.tr(zh: "安全", en: "Safety", de: "Sicherheit")
-        case .notes:
-            l.tr(zh: "备注", en: "Notes", de: "Notizen")
-        }
-    }
-}
-
 // MARK: - Edit Plant Sheet
 struct EditPlantSheet: View {
     let plant: Plant
+    var scope: PlantProfileEditorScope = .fullCare
+    var onSave: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -77,6 +24,7 @@ struct EditPlantSheet: View {
     @State private var roomNameRaw = ""
     @State private var location = ""
     @State private var avatarEmoji = ""
+    @State private var avatarImageData: Data? = nil
     @State private var wateringInterval = 7
     @State private var fertilizingInterval = 30
     @State private var notes = ""
@@ -108,7 +56,12 @@ struct EditPlantSheet: View {
     @State private var isIndoorSuitable = true
     @State private var remindersEnabled = true
     @State private var isSaving = false
+    @State private var showingDiscardConfirmation = false
+    @State private var saveErrorMessage: String?
     @State private var selectedEditFocus: PlantEditFocusSection = .all
+}
+
+extension EditPlantSheet {
     private var l: L10n { L10n(appLanguage) }
 
     private var commonCatalogEntries: [PlantCatalogEntry] {
@@ -368,6 +321,46 @@ struct EditPlantSheet: View {
     }
 
     var body: some View {
+        Group {
+            if scope == .profile {
+                profileEditor
+            } else {
+                fullCareEditor
+            }
+        }
+        .interactiveDismissDisabled(scope == .profile && (profileHasChanges || isSaving))
+        .confirmationDialog(
+            l.tr(zh: "放弃未保存的修改？", en: "Discard unsaved changes?", de: "Ungespeicherte Änderungen verwerfen?"),
+            isPresented: $showingDiscardConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(l.tr(zh: "放弃修改", en: "Discard changes", de: "Änderungen verwerfen"), role: .destructive) {
+                dismiss()
+            }
+            .accessibilityIdentifier("plant-profile-discard-changes-action")
+            Button(l.tr(zh: "继续编辑", en: "Keep editing", de: "Weiter bearbeiten"), role: .cancel) {}
+        }
+        .alert(
+            l.tr(zh: "无法保存资料", en: "Could not save profile", de: "Profil konnte nicht gespeichert werden"),
+            isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { if !$0 { saveErrorMessage = nil } }
+            )
+        ) {
+            Button(l.tr(zh: "好的", en: "OK", de: "OK"), role: .cancel) {}
+        } message: {
+            Text(saveErrorMessage ?? "")
+        }
+        .accessibilityIdentifier(scope == .profile ? "plant-profile-editor" : "plant-edit-sheet")
+        .onAppear {
+            prepareState()
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
+        }
+    }
+
+    private var fullCareEditor: some View {
         OhanaSheetWrapper(title: l.tr(zh: "编辑植物", en: "Edit plant", de: "Pflanze bearbeiten"), onDismiss: { dismiss() }) {
             VStack(spacing: 16) {
                 editProfileOverview
@@ -379,21 +372,220 @@ struct EditPlantSheet: View {
                     Text(isSaving ? l.tr(zh: "保存中…", en: "Saving...", de: "Speichern...") : l.tr(zh: "保存", en: "Save", de: "Speichern")).capsuleButton()
                 }
                 .padding(.top, 8)
-                .disabled(isSaving)
+                .disabled(!canSave)
                 .accessibilityIdentifier("plant-edit-save-action")
             }
             .padding(.vertical, 16)
         }
-        .accessibilityIdentifier("plant-edit-sheet")
-        .onAppear {
-            prepareState()
+    }
+
+    private var profileEditor: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    EditableProfileAvatarPicker(
+                        avatarImageData: $avatarImageData,
+                        fallbackEmoji: avatarEmoji.isEmpty ? plant.avatarEmoji : avatarEmoji,
+                        accentColor: Color(hex: plant.themeColorHex),
+                        cropSpecies: species,
+                        silhouetteSystemName: "leaf.fill"
+                    )
+                    TextField(l.tr(zh: "名称", en: "Name", de: "Name"), text: $name)
+                        .accessibilityIdentifier("plant-edit-name-input")
+                    TextField(l.tr(zh: "物种或品种（可选）", en: "Species or variety (optional)", de: "Art oder Sorte (optional)"), text: $species)
+                        .accessibilityIdentifier("plant-edit-species-input")
+                    Picker(l.tr(zh: "植物资料库（可选）", en: "Plant catalog (optional)", de: "Pflanzenkatalog (optional)"), selection: catalogSelection) {
+                        Text(l.tr(zh: "未链接", en: "Not linked", de: "Nicht verknüpft")).tag("")
+                        if !catalogSpeciesId.isEmpty, PlantCatalog.entry(id: catalogSpeciesId) == nil {
+                            Text(catalogSpeciesId).tag(catalogSpeciesId)
+                        }
+                        ForEach(PlantCatalog.entries) { entry in
+                            Text("\(entry.localizedCommonName) · \(entry.latinName)").tag(entry.id)
+                        }
+                    }
+                } header: {
+                    Label(l.tr(zh: "基本资料", en: "Basic info", de: "Basisdaten"), systemImage: "leaf.fill")
+                }
+
+                Section {
+                    TextField(l.tr(zh: "房间（可选）", en: "Room (optional)", de: "Raum (optional)"), text: $roomNameRaw)
+                        .accessibilityIdentifier("plant-edit-room-input")
+                    TextField(l.tr(zh: "具体位置（可选）", en: "Exact spot (optional)", de: "Genauer Standort (optional)"), text: $location)
+                        .accessibilityIdentifier("plant-edit-location-input")
+                    Toggle(l.tr(zh: "室内植物", en: "Indoor plant", de: "Zimmerpflanze"), isOn: $isIndoor)
+                    Picker(l.tr(zh: "窗户朝向", en: "Window direction", de: "Fensterausrichtung"), selection: $windowDirection) {
+                        ForEach(PlantWindowDirection.allCases) { direction in
+                            Text(direction.displayName).tag(direction)
+                        }
+                    }
+                    Picker(l.tr(zh: "光照强度", en: "Light level", de: "Lichtstärke"), selection: $lightLevel) {
+                        ForEach(PlantLightLevel.allCases) { level in
+                            Text(level.displayName).tag(level)
+                        }
+                    }
+                    Toggle(l.tr(zh: "记录光照实测", en: "Record light reading", de: "Lichtmessung erfassen"), isOn: $recordsLightMeasurement)
+                    if recordsLightMeasurement {
+                        Stepper(
+                            l.tr(zh: "光照实测 \(lastLightMeasurementLux) lux", en: "Light reading \(lastLightMeasurementLux) lux", de: "Lichtmessung \(lastLightMeasurementLux) lux"),
+                            value: $lastLightMeasurementLux,
+                            in: 0 ... 20000,
+                            step: 250
+                        )
+                    }
+                    Picker(l.tr(zh: "湿度偏好", en: "Humidity preference", de: "Luftfeuchte"), selection: $humidityPreference) {
+                        ForEach(PlantHumidityPreference.allCases) { preference in
+                            Text(preference.displayName).tag(preference)
+                        }
+                    }
+                    Picker(l.tr(zh: "温度偏好", en: "Temperature preference", de: "Temperatur"), selection: $temperaturePreference) {
+                        ForEach(PlantTemperaturePreference.allCases) { preference in
+                            Text(preference.displayName).tag(preference)
+                        }
+                    }
+                    Toggle(l.tr(zh: "靠近空调或暖气", en: "Near AC or heater", de: "Nahe Klimaanlage oder Heizung"), isOn: $isNearClimateSource)
+                } header: {
+                    Label(l.tr(zh: "位置与环境", en: "Place & environment", de: "Standort & Umgebung"), systemImage: "sun.max.fill")
+                }
+
+                Section {
+                    Stepper(
+                        l.tr(zh: "盆径 \(Int(potDiameterCm)) cm", en: "Pot diameter \(Int(potDiameterCm)) cm", de: "Topfdurchmesser \(Int(potDiameterCm)) cm"),
+                        value: $potDiameterCm,
+                        in: 0 ... 80,
+                        step: 1
+                    )
+                    TextField(l.tr(zh: "盆材质（可选）", en: "Pot material (optional)", de: "Topfmaterial (optional)"), text: $potMaterialRaw)
+                    TextField(l.tr(zh: "土壤类型（可选）", en: "Soil type (optional)", de: "Erdtyp (optional)"), text: $soilTypeRaw)
+                    Toggle(l.tr(zh: "花盆有排水孔", en: "Pot has drainage hole", de: "Topf hat Abzugsloch"), isOn: $potHasDrainage)
+                    Toggle(l.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur"), isOn: $isHydroponic)
+                    Toggle(l.tr(zh: "多肉或仙人掌类", en: "Succulent or cactus", de: "Sukkulente oder Kaktus"), isOn: $isSucculent)
+                } header: {
+                    Label(l.tr(zh: "盆土与生长", en: "Potting & growth", de: "Topf & Wachstum"), systemImage: "shippingbox.fill")
+                }
+
+                Section {
+                    Toggle(l.tr(zh: "记录获得日期", en: "Record acquired date", de: "Kaufdatum erfassen"), isOn: $hasAcquiredDate)
+                    if hasAcquiredDate {
+                        DatePicker(l.tr(zh: "获得日期", en: "Acquired date", de: "Kaufdatum"), selection: $acquiredDate, displayedComponents: .date)
+                    }
+                    TextField(l.tr(zh: "来源（可选）", en: "Source (optional)", de: "Quelle (optional)"), text: $acquisitionSourceRaw)
+                    Stepper(
+                        l.tr(zh: "当前高度 \(Int(currentHeightCm)) cm", en: "Current height \(Int(currentHeightCm)) cm", de: "Aktuelle Höhe \(Int(currentHeightCm)) cm"),
+                        value: $currentHeightCm,
+                        in: 0 ... 300,
+                        step: 1
+                    )
+                    Stepper(
+                        l.tr(zh: "冠幅 \(Int(currentSpreadCm)) cm", en: "Spread \(Int(currentSpreadCm)) cm", de: "Breite \(Int(currentSpreadCm)) cm"),
+                        value: $currentSpreadCm,
+                        in: 0 ... 300,
+                        step: 1
+                    )
+                } header: {
+                    Label(l.tr(zh: "来源与尺寸", en: "Source & size", de: "Quelle & Größe"), systemImage: "ruler.fill")
+                }
+
+                Section {
+                    Picker(l.tr(zh: "当前状态", en: "Current status", de: "Aktueller Zustand"), selection: $healthStatus) {
+                        ForEach(PlantHealthStatus.allCases) { status in
+                            Text(status.displayName).tag(status)
+                        }
+                    }
+                    Toggle(l.tr(zh: "适合室内", en: "Suitable indoors", de: "Für drinnen geeignet"), isOn: $isIndoorSuitable)
+                    Toggle(l.tr(zh: "对猫有风险", en: "Risk for cats", de: "Risiko für Katzen"), isOn: $isToxicToCats)
+                    Toggle(l.tr(zh: "对狗有风险", en: "Risk for dogs", de: "Risiko für Hunde"), isOn: $isToxicToDogs)
+                    Toggle(l.tr(zh: "对儿童有风险", en: "Risk for children", de: "Risiko für Kinder"), isOn: $isToxicToChildren)
+                } header: {
+                    Label(l.tr(zh: "状态与安全", en: "Status & safety", de: "Status & Sicherheit"), systemImage: "shield.checkered")
+                }
+
+                Section {
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 110)
+                        .accessibilityLabel(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)"))
+                } header: {
+                    Label(l.tr(zh: "备注", en: "Notes", de: "Notizen"), systemImage: "note.text")
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(Color.goPrimary)
+            .navigationTitle(l.tr(zh: "编辑资料", en: "Edit profile", de: "Profil bearbeiten"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), action: cancelProfileEditor)
+                        .disabled(isSaving)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(action: save) {
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
+                        }
+                    }
+                    .disabled(!canSave)
+                    .accessibilityIdentifier("plant-edit-save-action")
+                }
+            }
         }
-        .onChange(of: catalogSpeciesId) { _, newValue in
-            applyCatalogSelection(newValue)
+    }
+
+    private var canSave: Bool {
+        !isSaving && !trimmedName.isEmpty && hasDraftChanges
+    }
+
+    private var hasDraftChanges: Bool {
+        profileHasChanges || (scope == .fullCare && carePlanHasChanges)
+    }
+
+    private var carePlanHasChanges: Bool {
+        wateringInterval != plant.wateringIntervalDays ||
+            fertilizingInterval != plant.fertilizingIntervalDays ||
+            remindersEnabled != plant.remindersEnabled
+    }
+
+    private var profileHasChanges: Bool {
+        name != plant.name ||
+            species != plant.species ||
+            roomNameRaw != plant.roomNameRaw ||
+            location != plant.location ||
+            avatarEmoji != plant.avatarEmoji ||
+            avatarImageData != plant.avatarImageData ||
+            notes != plant.notes ||
+            potDiameterCm != plant.potDiameterCm ||
+            potMaterialRaw != plant.potMaterialRaw ||
+            soilTypeRaw != plant.soilTypeRaw ||
+            isIndoor != plant.isIndoor ||
+            windowDirection != plant.windowDirection ||
+            lightLevel != plant.lightLevel ||
+            recordsLightMeasurement != (plant.lastLightMeasurementLux > 0) ||
+            (recordsLightMeasurement && lastLightMeasurementLux != plant.lastLightMeasurementLux) ||
+            humidityPreference != plant.humidityPreference ||
+            temperaturePreference != plant.temperaturePreference ||
+            isNearClimateSource != plant.isNearClimateSource ||
+            potHasDrainage != plant.potHasDrainage ||
+            hasAcquiredDate != (plant.acquiredDate != nil) ||
+            (hasAcquiredDate && plant.acquiredDate.map { acquiredDate != $0 } == true) ||
+            acquisitionSourceRaw != plant.acquisitionSourceRaw ||
+            currentHeightCm != plant.currentHeightCm ||
+            currentSpreadCm != plant.currentSpreadCm ||
+            isHydroponic != plant.isHydroponic ||
+            isSucculent != plant.isSucculent ||
+            healthStatus != plant.healthStatus ||
+            catalogSpeciesId != plant.catalogSpeciesId ||
+            isToxicToCats != plant.isToxicToCats ||
+            isToxicToDogs != plant.isToxicToDogs ||
+            isToxicToChildren != plant.isToxicToChildren ||
+            isIndoorSuitable != plant.isIndoorSuitable
+    }
+
+    private func cancelProfileEditor() {
+        guard profileHasChanges else {
+            dismiss()
+            return
         }
-        .onDisappear {
-            commandQueue.cancelAll()
-        }
+        showingDiscardConfirmation = true
     }
 
     private var editFocusSwitcher: some View {
@@ -640,7 +832,6 @@ struct EditPlantSheet: View {
                 identifierPrefix: "plant-edit-location-choice"
             )
             formField(l.tr(zh: "具体位置", en: "Exact spot", de: "Genauer Standort"), text: $location, identifier: "plant-edit-location-input")
-            formField(l.tr(zh: "头像 Emoji", en: "Avatar emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
         }
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
@@ -667,7 +858,7 @@ struct EditPlantSheet: View {
         let isSelected = catalogSpeciesId == entry.id
         return Button {
             withAnimation(GoMotion.selection) {
-                catalogSpeciesId = entry.id
+                selectCatalogEntry(entry.id)
             }
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
@@ -706,7 +897,7 @@ struct EditPlantSheet: View {
     private var catalogSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle(l.tr(zh: "资料库", en: "Catalog", de: "Katalog"))
-            Picker(l.tr(zh: "资料库物种", en: "Catalog species", de: "Katalogart"), selection: $catalogSpeciesId) {
+            Picker(l.tr(zh: "资料库物种", en: "Catalog species", de: "Katalogart"), selection: catalogSelection) {
                 Text(l.tr(zh: "未链接", en: "Not linked", de: "Nicht verknüpft")).tag("")
                 if !catalogSpeciesId.isEmpty, PlantCatalog.entry(id: catalogSpeciesId) == nil {
                     Text(catalogSpeciesId).tag(catalogSpeciesId)
@@ -957,6 +1148,7 @@ struct EditPlantSheet: View {
         roomNameRaw = plant.roomNameRaw
         location = plant.location
         avatarEmoji = plant.avatarEmoji
+        avatarImageData = plant.avatarImageData
         wateringInterval = plant.wateringIntervalDays
         fertilizingInterval = plant.fertilizingIntervalDays
         notes = plant.notes
@@ -989,14 +1181,29 @@ struct EditPlantSheet: View {
         remindersEnabled = plant.remindersEnabled
     }
 
+    private var catalogSelection: Binding<String> {
+        Binding(
+            get: { catalogSpeciesId },
+            set: { selectCatalogEntry($0) }
+        )
+    }
+
+    private func selectCatalogEntry(_ id: String) {
+        guard id != catalogSpeciesId else { return }
+        catalogSpeciesId = id
+        applyCatalogSelection(id)
+    }
+
     private func applyCatalogSelection(_ id: String) {
         guard let entry = PlantCatalog.entry(id: id) else { return }
         let defaults = PlantProfileUXPolicy.catalogDefaults(for: entry)
         species = defaults.species
         lightLevel = defaults.lightLevel
         soilTypeRaw = defaults.soilTypeRaw
-        wateringInterval = defaults.wateringIntervalDays
-        fertilizingInterval = defaults.fertilizingIntervalDays
+        if scope == .fullCare {
+            wateringInterval = defaults.wateringIntervalDays
+            fertilizingInterval = defaults.fertilizingIntervalDays
+        }
         isIndoor = defaults.isIndoor
         humidityPreference = defaults.humidityPreference
         temperaturePreference = defaults.temperaturePreference
@@ -1010,12 +1217,13 @@ struct EditPlantSheet: View {
     }
 
     private func save() {
-        guard !isSaving else { return }
+        guard canSave else { return }
         let input = makeProfileInput()
         let command = DomainCommand.memberProfile(entityID: plant.id, kind: EntityKind.plant.rawValue)
 
         isSaving = true
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        saveErrorMessage = nil
+        OhanaFeedback.light()
         commandQueue.enqueue(command) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).updatePlantProfile(
                 plant,
@@ -1024,10 +1232,17 @@ struct EditPlantSheet: View {
             )
             guard result.didPersist else {
                 isSaving = false
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                saveErrorMessage = l.tr(
+                    zh: "修改没有保存，请稍后重试。",
+                    en: "Changes were not saved. Please try again.",
+                    de: "Änderungen wurden nicht gespeichert. Bitte erneut versuchen."
+                )
+                OhanaFeedback.error()
                 return
             }
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            isSaving = false
+            OhanaFeedback.success()
+            onSave?()
             dismiss()
         }
     }
@@ -1096,12 +1311,12 @@ struct EditPlantSheet: View {
     private func makeProfileInput() -> PlantProfileCommandInput {
         PlantProfileCommandInput(
             name: name,
-            avatarImageData: plant.avatarImageData,
+            avatarImageData: avatarImageData,
             avatarEmoji: avatarEmoji,
             species: species,
             location: location,
-            wateringIntervalDays: wateringInterval,
-            fertilizingIntervalDays: fertilizingInterval,
+            wateringIntervalDays: scope == .profile ? plant.wateringIntervalDays : wateringInterval,
+            fertilizingIntervalDays: scope == .profile ? plant.fertilizingIntervalDays : fertilizingInterval,
             roomNameRaw: roomNameRaw,
             potDiameterCm: potDiameterCm,
             potMaterialRaw: potMaterialRaw,
@@ -1129,7 +1344,7 @@ struct EditPlantSheet: View {
             isToxicToDogs: isToxicToDogs,
             isToxicToChildren: isToxicToChildren,
             isIndoorSuitable: isIndoorSuitable,
-            remindersEnabled: remindersEnabled,
+            remindersEnabled: scope == .profile ? plant.remindersEnabled : remindersEnabled,
             themeHex: plant.themeColorHex,
             notes: notes
         )

@@ -12,6 +12,7 @@ struct DocumentsListView: View {
 
     let pet: Pet
     var showsCloseButton: Bool = true
+    @State private var routeRevision = HomeRevision()
 
     init(pet: Pet, showsCloseButton: Bool = true) {
         self.pet = pet
@@ -21,7 +22,7 @@ struct DocumentsListView: View {
     var body: some View {
         RouteFirstFrameDeferredLoad(
             initialData: DocumentsListRouteData(),
-            refreshToken: appServices.domainRevisions.homeRevision,
+            refreshToken: routeRevision,
             loadDelayMilliseconds: 48,
             reloadDelayMilliseconds: 96,
             shouldLoad: { !$0.hasLoaded },
@@ -33,6 +34,9 @@ struct DocumentsListView: View {
                 routeDocuments: data.documents,
                 routeInsurances: data.insurances
             )
+        }
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
+            routeRevision = revision
         }
     }
 }

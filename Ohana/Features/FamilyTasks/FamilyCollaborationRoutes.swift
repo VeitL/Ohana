@@ -35,8 +35,15 @@ enum FamilyCollaborationEditorRoute: Identifiable, Equatable {
     }
 }
 
+struct FamilyCollaborationTaskDetailRoute: Identifiable, Equatable {
+    let taskID: UUID
+
+    var id: UUID { taskID }
+}
+
 enum FamilyCollaborationPostSheetAction: Equatable {
     case presentEditor(FamilyCollaborationEditorRoute)
+    case presentTaskDetail(UUID)
     case openWeeklyReport
 }
 

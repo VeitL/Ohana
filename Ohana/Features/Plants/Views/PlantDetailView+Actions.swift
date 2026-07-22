@@ -76,7 +76,7 @@ extension PlantDetailContentView {
         case .leafCleaning:
             openPlantCareFeatureDetail(for: .leafCleaning)
         case .profile:
-            showingEditSheet = true
+            showingBasicInfo = true
         case .photos:
             if galleryPhotoItems.isEmpty {
                 openCareLogSheet(.photo)
@@ -506,6 +506,11 @@ extension PlantDetailContentView {
                 plant,
                 note: "plant.detail.restore"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }

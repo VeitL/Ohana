@@ -104,6 +104,7 @@ private extension PetHealthInitialSection {
 
 enum HomeModalRoute: Identifiable {
     case functionMenu(destination: FMDest?)
+    case critterCodex
     case streakDetail
     case addEntity(EntityType)
     case coconutLog(CoconutLogSubject?)
@@ -116,6 +117,8 @@ enum HomeModalRoute: Identifiable {
         switch self {
         case let .functionMenu(destination):
             "function-menu-\(String(describing: destination))"
+        case .critterCodex:
+            "critter-codex"
         case .streakDetail:
             "streak-detail"
         case let .addEntity(type):
@@ -280,11 +283,16 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = nil
     }
 
-    func openFunctionMenu(destination: FMDest?, currentLevel: Int) {
+    func openFunctionMenu(
+        destination: FMDest?,
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
+    ) {
         let routedDestination: FMDest?
         switch AppFeatureRouteGuard.functionDestinationDecision(
             destination,
-            currentLevel: currentLevel
+            currentLevel: currentLevel,
+            plan: plan
         ) {
         case .rootMenu:
             routedDestination = nil
@@ -303,6 +311,17 @@ final class HomeRouteCoordinator: ObservableObject {
             return
         }
         modal = .functionMenu(destination: routedDestination)
+    }
+
+    func openCritterCodex(currentLevel: Int) {
+        guard AppFeatureRouteGuard.allowsOasisSheetRoute(.critterCodex, currentLevel: currentLevel) else {
+            AppFeatureRouteGuard.recordIntercept(
+                AppFeatureRouteGuard.lockedRouteNote(for: .critterCodex, currentLevel: currentLevel)
+            )
+            openFunctionMenu(destination: .growthRoadmap, currentLevel: currentLevel)
+            return
+        }
+        modal = .critterCodex
     }
 
     func openStreakDetail() {
@@ -385,6 +404,7 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openSettings() {
+        SettingsOpenPerformance.start(source: "home")
         if let appSheetRouteSink {
             appSheetRouteSink(.appSheet(.settings))
             modal = nil

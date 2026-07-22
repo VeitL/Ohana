@@ -232,7 +232,10 @@ struct TaskActionCommandExecutor {
                 context: modelContext
             )
         } == true
+        let usesPlanOccurrenceCommand = familyTask?.planId != nil ||
+            event.map { !CalendarEventInteractionPolicy.allowsDirectMutation(for: $0) } == true
         if let event,
+           !usesPlanOccurrenceCommand,
            !event.isOccurrenceMarkedComplete(on: command.occurrenceDate) {
             do {
                 let completion = try CalendarCommandExecutor(
@@ -396,6 +399,7 @@ struct TaskActionCommandExecutor {
         switch task.status {
         case .active: .active
         case .claimed: .claimed
+        case .declined: .declined
         case .pendingReview: .pendingReview
         case .completed: .completed
         case .cancelled: .cancelled

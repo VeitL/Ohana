@@ -23,6 +23,8 @@ xcuserdata/
 *.xcresult
 .claude/
 .venv-l10n/
+__pycache__/
+*.py[cod]
 scripts/.l10n_en_cache.json
 tmp/
 *.tmp

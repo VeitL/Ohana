@@ -84,7 +84,8 @@ struct QuickFeedDetailSheet: View {
                 context: modelContext,
                 careEvents: appServices.careEvents,
                 revisions: appServices.domainRevisions,
-                reminderScheduling: appServices.reminderScheduling
+                reminderScheduling: appServices.reminderScheduling,
+                personalAccessLevel: appServices.commerce.hasPersonalEntitlement ? .personal : .free
             ),
             appLanguage: appLanguage,
             defaultFeedGrams: $defaultFeedGrams
@@ -125,6 +126,7 @@ struct QuickFeedDetailContent: View {
     @StateObject var runtimeState = QuickFeedRuntimeState()
     @StateObject var feedHomeController: FeedHomeController
     @State var selectedActionHumanID: UUID?
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @FocusState var focusedField: FeedInputField?
 
     let stockReminderAdvanceOptions = [1, 3, 7, 14]
@@ -480,6 +482,14 @@ struct QuickFeedDetailContent: View {
             .modifier(rootEventHost)
             .modifier(systemSheetHost)
             .modifier(feedAlertHost)
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
+            }
+            .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, isEntitled in
+                if !isEntitled, draftStore.overviewRange == .days90 {
+                    draftStore.overviewRange = .days30
+                }
+            }
             .interactiveDismissDisabled(inlineOverlayBlocksBackground)
             .animation(GoMotion.page, value: activeSheet?.id)
             .animation(GoMotion.page, value: activeEmbeddedPanel)
@@ -798,6 +808,7 @@ struct QuickFeedDetailContent: View {
                 Text(l.tr(zh: "粮食记录", en: "Food log", de: "Futter"))
                     .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
+                    .accessibilityIdentifier("quick-feed-detail-screen")
             }
             Spacer()
             if showsCloseButton {

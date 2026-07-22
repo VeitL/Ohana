@@ -32,6 +32,7 @@ struct MemberCardCreationContentView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.memberCreationCardFlipProgress) var memberCreationCardFlipProgress
+    @Environment(\.memberProfileExperienceStyle) var profileExperienceStyle
     @Environment(AppServices.self) var appServices
     @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
@@ -53,6 +54,7 @@ struct MemberCardCreationContentView: View {
     @State var isSaving = false
     @State var errorMessage = ""
     @State var showError = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var showPurchaseConfirm = false
     @State var didConfigureInitialAvatar = false
     @State var didConfigureAvatarStep = false
@@ -69,6 +71,8 @@ struct MemberCardCreationContentView: View {
     @State var mbtiDecision = ""
     @State var mbtiLifestyle = ""
     @State var usesCustomResidenceCity = false
+    @State var usesCustomNationality = false
+    @State var usesCustomResidenceCountry = false
     @State var isJoinHandoffRunning = false
     @State var joinHandoffProgress: CGFloat = 0
     @State var joinHandoffSnapshot: MemberCardRenderSnapshot?
@@ -131,7 +135,9 @@ struct MemberCardCreationContentView: View {
     }
 
     var hasRequiredPetProfile: Bool {
-        !draft.resolvedSpecies.isEmpty && !draft.resolvedBreed.isEmpty
+        !draft.resolvedSpecies.isEmpty
+            && !draft.resolvedBreed.isEmpty
+            && ["boy", "girl"].contains(draft.petGender)
     }
 
     var creationSteps: [MemberCreationStep] { MemberCreationStep.steps(for: kind) }
@@ -145,7 +151,7 @@ struct MemberCardCreationContentView: View {
         case .petIdentity:
             return !draft.resolvedSpecies.isEmpty && !draft.resolvedBreed.isEmpty
         case .petAppearance:
-            return ["boy", "girl"].contains(draft.petGender) && !draft.coatColor.isEmpty
+            return ["boy", "girl"].contains(draft.petGender)
         case .avatar, .petPersonality, .theme:
             return true
         }
@@ -389,6 +395,10 @@ struct MemberCardCreationContentView: View {
                 finishAvatarMediaPresentation()
             }
             .presentationDetents([.large]) // ui-v4: allow portrait crop editor needs full-height working area
+        }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
         }
         .alert(l.tr(zh: "无法打开相机", en: "Camera unavailable", de: "Kamera nicht verfügbar"), isPresented: permissionAlertBinding) {
             Button(l.done, role: .cancel) {

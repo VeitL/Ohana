@@ -12,12 +12,16 @@ struct ArkBackgroundView: View {
     @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage("appCustomBackgroundVersion") private var customBackgroundVersion = 0
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
+    @Environment(\.hasSupporterPackEntitlement) private var hasSupporterPack
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private var style: AppBackgroundStyle {
-        AppBackgroundStyle(rawValue: styleRaw) ?? .goDefault
+        SupporterPackAccessPolicy.resolvedBackgroundStyle(
+            requested: AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland,
+            hasSupporterPack: hasSupporterPack
+        )
     }
 
     private var shouldReduceWork: Bool {
@@ -92,10 +96,14 @@ struct OhanaAppBackground: View {
 /// starting ambient animation loops on the user's tap frame.
 struct OhanaStaticAppBackground: View {
     @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
+    @Environment(\.hasSupporterPackEntitlement) private var hasSupporterPack
     @Environment(\.colorScheme) private var colorScheme
 
     private var style: AppBackgroundStyle {
-        AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland
+        SupporterPackAccessPolicy.resolvedBackgroundStyle(
+            requested: AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland,
+            hasSupporterPack: hasSupporterPack
+        )
     }
 
     @ViewBuilder
@@ -113,10 +121,14 @@ struct OhanaStaticAppBackground: View {
 /// layout. Tab pages use this canvas to sample the same crop as the root shell.
 struct OhanaStaticBackgroundCanvas: View {
     @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
+    @Environment(\.hasSupporterPackEntitlement) private var hasSupporterPack
     @Environment(\.colorScheme) private var colorScheme
 
     private var style: AppBackgroundStyle {
-        AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland
+        SupporterPackAccessPolicy.resolvedBackgroundStyle(
+            requested: AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland,
+            hasSupporterPack: hasSupporterPack
+        )
     }
 
     var body: some View {

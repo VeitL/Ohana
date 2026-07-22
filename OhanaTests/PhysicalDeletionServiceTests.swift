@@ -95,6 +95,72 @@ struct PhysicalDeletionServiceTests {
         #expect(deletionTombstone(PetWalkLog.self, id: walkLog.id, context: context) != nil)
     }
 
+    @Test func physicalMemberDeletionPreservesHistoricalPresenceFactsAndRewardReceipts() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        let pet = Pet(name: "Momo", species: "cat")
+        let plant = Plant(name: "Fern")
+        let ownerID = owner.id
+        let petID = pet.id
+        let plantID = plant.id
+        let occurredAt = Date(timeIntervalSinceReferenceDate: 100)
+        let subjects = [
+            PresenceSubjectRef(kind: .human, id: ownerID),
+            PresenceSubjectRef(kind: .pet, id: petID),
+            PresenceSubjectRef(kind: .plant, id: plantID)
+        ]
+        context.insert(owner)
+        context.insert(pet)
+        context.insert(plant)
+        for subject in subjects {
+            context.insert(PresenceCheckIn(
+                uniqueKey: PresenceCheckInCommandService.checkInKey(
+                    subject: subject,
+                    dayKey: "2026-07-18"
+                ),
+                subject: subject,
+                ownerHumanId: ownerID,
+                isOwner: subject.kind == .human,
+                dayKey: "2026-07-18",
+                timeZoneIdentifier: "Europe/Berlin",
+                checkedInAt: occurredAt,
+                source: .card
+            ))
+        }
+        context.insert(PresenceParticipationPeriod(
+            periodKey: "presence-period:physical-deletion-test",
+            ownerHumanId: ownerID,
+            startedAt: occurredAt,
+            startedDayKey: "2026-07-18",
+            startedTimeZoneIdentifier: "Europe/Berlin",
+            source: .settings
+        ))
+        context.insert(PresenceRewardReceipt(
+            receiptKey: "presence:owner-daily:physical-deletion-test",
+            ownerHumanId: ownerID,
+            rewardKind: .ownerDaily,
+            dayKey: "2026-07-18",
+            requestedAmount: 1,
+            awardedAmount: 1,
+            awardedAt: occurredAt
+        ))
+        try context.save()
+
+        PhysicalDeletionService.deletePet(pet, context: context)
+        PhysicalDeletionService.deletePlant(plant, context: context)
+        #expect(PhysicalDeletionService.deleteHuman(owner, context: context) >= 0)
+        try context.save()
+
+        #expect(try context.fetch(FetchDescriptor<Human>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Plant>()).isEmpty)
+        let facts = try context.fetch(FetchDescriptor<PresenceCheckIn>())
+        #expect(Set(facts.compactMap(\.subject)) == Set(subjects))
+        #expect(try context.fetchCount(FetchDescriptor<PresenceParticipationPeriod>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 1)
+    }
+
     @Test func deletePlantPhysicallyDeletesCareFactsEventsAndNotifications() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -1294,7 +1360,7 @@ struct PhysicalDeletionServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV94.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

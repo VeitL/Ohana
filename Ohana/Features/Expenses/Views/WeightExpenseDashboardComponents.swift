@@ -113,21 +113,28 @@ struct UnifiedWeightTrendChart: View {
     }
 }
 
-struct ExpenseDashboardRange: CaseIterable, Hashable {
-    enum Kind: Hashable { case week, month, quarter, all }
+nonisolated struct ExpenseDashboardRange: CaseIterable, Hashable, Sendable {
+    nonisolated enum Kind: Hashable, Sendable { case week, month, quarter, year, all }
     let kind: Kind
 
     static let week = ExpenseDashboardRange(kind: .week)
     static let month = ExpenseDashboardRange(kind: .month)
     static let quarter = ExpenseDashboardRange(kind: .quarter)
+    static let year = ExpenseDashboardRange(kind: .year)
     static let all = ExpenseDashboardRange(kind: .all)
-    static let allCases: [ExpenseDashboardRange] = [.week, .month, .quarter, .all]
+    static let allCases: [ExpenseDashboardRange] = [.week, .month, .quarter, .year, .all]
 
+    var requiresPersonal: Bool {
+        kind == .quarter || kind == .year || kind == .all
+    }
+
+    @MainActor
     func title(_ l: L10n) -> String {
         switch kind {
         case .week: l.tr(zh: "7天", en: "7D", de: "7T")
         case .month: l.tr(zh: "30天", en: "30D", de: "30T")
         case .quarter: l.tr(zh: "90天", en: "90D", de: "90T")
+        case .year: l.tr(zh: "1年", en: "1Y", de: "1J")
         case .all: l.tr(zh: "全部", en: "All", de: "Alle")
         }
     }
@@ -140,6 +147,8 @@ struct ExpenseDashboardRange: CaseIterable, Hashable {
             calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
         case .quarter:
             calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
+        case .year:
+            calendar.date(byAdding: .day, value: -364, to: calendar.startOfDay(for: now))
         case .all:
             nil
         }
@@ -184,32 +193,51 @@ struct ExpenseBarDashboardChart: View {
 struct DashboardRangePicker<Range: Hashable>: View {
     let ranges: [Range]
     @Binding var selection: Range
+    var isLocked: (Range) -> Bool = { _ in false }
     let title: (Range) -> String
 
     var body: some View {
-        HStack(spacing: 7) {
-            ForEach(ranges, id: \.self) { range in
-                let selected = range == selection
-                Button {
-                    withAnimation(GoMotion.feedback) {
-                        selection = range
-                    }
-                    UISelectionFeedbackGenerator().selectionChanged()
-                } label: {
-                    Text(title(range))
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                ForEach(ranges, id: \.self) { range in
+                    let selected = range == selection
+                    Button {
+                        if isLocked(range) {
+                            selection = range
+                            return
+                        }
+                        withAnimation(GoMotion.feedback) {
+                            selection = range
+                        }
+                        UISelectionFeedbackGenerator().selectionChanged()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(title(range))
+                            if isLocked(range) {
+                                Image(systemName: "lock.fill").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 8, weight: .black))
+                            }
+                        }
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(selected ? Color.arkInk : Color.ohanaSecondaryText)
                         .padding(.horizontal, 12)
                         .frame(height: 32)
                         .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(
+                        isLocked(range) ? "\(title(range)), Ohana Personal" : title(range)
+                    )
                 }
-                .buttonStyle(ScaleButtonStyle())
             }
         }
     }
 }
 
-func makeExpenseBuckets(from logs: [PetExpenseLog], range: ExpenseDashboardRange) -> [ExpenseTimeBucket] {
+func makeExpenseBuckets(
+    from logs: [some ExpenseSummaryRecord],
+    range: ExpenseDashboardRange
+) -> [ExpenseTimeBucket] {
     let calendar = Calendar.current
     let now = Date()
     let dateFormatter = DateFormatter()
@@ -245,12 +273,34 @@ func makeExpenseBuckets(from logs: [PetExpenseLog], range: ExpenseDashboardRange
                 .reduce(0) { $0 + max(0, $1.amount) }
             return ExpenseTimeBucket(date: start, label: dateFormatter.string(from: start), amount: amount)
         }
-    case .all:
+    case .year:
         dateFormatter.setLocalizedDateFormatFromTemplate("MMM")
         return (0 ..< 12).compactMap { offset in
             guard let date = calendar.date(byAdding: .month, value: offset - 11, to: now) else { return nil }
             let amount = logs
                 .filter { calendar.isDate($0.date, equalTo: date, toGranularity: .month) }
+                .reduce(0) { $0 + max(0, $1.amount) }
+            return ExpenseTimeBucket(date: date, label: dateFormatter.string(from: date), amount: amount)
+        }
+    case .all:
+        guard let firstDate = logs.map(\.date).min() else { return [] }
+        let monthSpan = max(0, calendar.dateComponents([.month], from: firstDate, to: now).month ?? 0)
+        if monthSpan <= 24 {
+            dateFormatter.setLocalizedDateFormatFromTemplate("MMM")
+            return (0 ... monthSpan).compactMap { offset in
+                guard let date = calendar.date(byAdding: .month, value: offset, to: firstDate) else { return nil }
+                let amount = logs
+                    .filter { calendar.isDate($0.date, equalTo: date, toGranularity: .month) }
+                    .reduce(0) { $0 + max(0, $1.amount) }
+                return ExpenseTimeBucket(date: date, label: dateFormatter.string(from: date), amount: amount)
+            }
+        }
+        dateFormatter.setLocalizedDateFormatFromTemplate("yyyy")
+        let yearSpan = max(0, calendar.dateComponents([.year], from: firstDate, to: now).year ?? 0)
+        return (0 ... yearSpan).compactMap { offset in
+            guard let date = calendar.date(byAdding: .year, value: offset, to: firstDate) else { return nil }
+            let amount = logs
+                .filter { calendar.isDate($0.date, equalTo: date, toGranularity: .year) }
                 .reduce(0) { $0 + max(0, $1.amount) }
             return ExpenseTimeBucket(date: date, label: dateFormatter.string(from: date), amount: amount)
         }

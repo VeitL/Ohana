@@ -106,8 +106,12 @@ final class OasisTreeManager {
     }
     // 额外注入经验（消耗椰子所得）
     private(set) var injectedEnergy: Int = 0 {
-        didSet { OasisTreePreferenceStore.injectedEnergy = injectedEnergy }
+        didSet {
+            guard persistsInjectedEnergyChanges else { return }
+            OasisTreePreferenceStore.injectedEnergy = injectedEnergy
+        }
     }
+    private var persistsInjectedEnergyChanges = true
 
     var totalEnergy: Int { careGrowthEnergy + injectedEnergy }
     private let questManager: QuestManager
@@ -393,7 +397,9 @@ final class OasisTreeManager {
     }
 
     // MARK: - Load Energy from ModelContext
+}
 
+extension OasisTreeManager {
     func refreshPreviewEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant] = []) {
         _ = plants
         let snapshot = Self.ledgerEnergySnapshot(
@@ -589,6 +595,27 @@ final class OasisTreeManager {
         }
     }
 
+    private static func shopInjectionLedgerEvent(
+        purchaseID: String,
+        modelContext: ModelContext
+    ) -> CareLedgerEvent? {
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.sourceEventId == purchaseID
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try modelContext.fetch(descriptor).first
+        } catch {
+            OhanaLog.warning(
+                "[OasisTreeManager] failed to resolve shop injection purchase=\(purchaseID): \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return nil
+        }
+    }
+
     private static func cacheMatchesLatestCursor(
         _ cache: OasisLedgerEnergyCache,
         latestCursor: LedgerEventCursor?
@@ -674,6 +701,137 @@ final class OasisTreeManager {
         guard package.isAvailable else { return false }
         guard Self.canUseInjectionPackage(package) else { return false }
         return applyEnergyPackage(package, recordsCost: false, modelContext: modelContext)
+    }
+
+    /// Replays a shop-funded injection using its durable purchase marker. Tree
+    /// energy is not evidence that this specific purchase was applied: another
+    /// purchase may have advanced the same aggregate in the meantime.
+    @discardableResult
+    @MainActor
+    func applyPurchasedEnergyBoost(
+        cost: Int,
+        injectedXP: Int,
+        purchaseID: UUID,
+        modelContext: ModelContext
+    ) -> Bool {
+        let purchaseKey = purchaseID.uuidString
+        let package = Self.injectionPackage(forRequestedCost: cost, currentLevel: treeLevel)
+        guard injectedXP == package.xp else { return false }
+        let existingEvent = Self.shopInjectionLedgerEvent(
+            purchaseID: purchaseKey,
+            modelContext: modelContext
+        )
+        let hasDurableMarker = OasisTreePreferenceStore.hasAppliedShopEnergyPurchase(purchaseID)
+        if existingEvent == nil, !hasDurableMarker {
+            guard package.isAvailable else { return false }
+            guard Self.canUseInjectionPackage(package) else { return false }
+        }
+
+        let previousInjectedEnergy = injectedEnergy
+        let durableWrite = if hasDurableMarker || existingEvent != nil {
+            OasisTreePreferenceStore.checkpointShopEnergyPurchase(
+                purchaseID,
+                currentInjectedEnergy: previousInjectedEnergy
+            )
+        } else {
+            OasisTreePreferenceStore.applyShopEnergyPurchase(
+                purchaseID,
+                xp: package.xp,
+                currentInjectedEnergy: previousInjectedEnergy
+            )
+        }
+        if injectedEnergy != durableWrite.injectedEnergy {
+            persistsInjectedEnergyChanges = false
+            injectedEnergy = durableWrite.injectedEnergy
+            persistsInjectedEnergyChanges = true
+        }
+        Self.markInjectionPackageUsed(package)
+
+        if existingEvent == nil {
+            recordShopInjectionLedgerEvent(
+                package: package,
+                purchaseKey: purchaseKey,
+                modelContext: modelContext
+            )
+            do {
+                try modelContext.save()
+            } catch {
+                modelContext.rollback()
+                // The durable energy-plus-marker record is already committed.
+                // Reinsert the checkpoint so the caller's final attempt save
+                // can persist both facts together; a later recovery remains
+                // safe if that save also fails.
+                recordShopInjectionLedgerEvent(
+                    package: package,
+                    purchaseKey: purchaseKey,
+                    modelContext: modelContext
+                )
+                return true
+            }
+        }
+        OasisTreePreferenceStore.clearShopEnergyPurchaseMarker(purchaseID)
+
+        guard durableWrite.didApplyEnergy else { return true }
+        if checkAndRewardLevelUp(modelContext: modelContext) != nil {
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        } else {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+        return true
+    }
+
+    @MainActor
+    func finalizePurchasedEnergyBoost(
+        purchaseID: UUID,
+        modelContext: ModelContext
+    ) {
+        guard Self.shopInjectionLedgerEvent(
+            purchaseID: purchaseID.uuidString,
+            modelContext: modelContext
+        ) != nil else { return }
+        OasisTreePreferenceStore.clearShopEnergyPurchaseMarker(purchaseID)
+    }
+
+    @MainActor
+    func reconcilePurchasedEnergyBoostMarkers(modelContext: ModelContext) {
+        for purchaseID in OasisTreePreferenceStore.pendingShopEnergyPurchaseIDs() {
+            finalizePurchasedEnergyBoost(
+                purchaseID: purchaseID,
+                modelContext: modelContext
+            )
+        }
+    }
+
+    @MainActor
+    private func recordShopInjectionLedgerEvent(
+        package: InjectionPackage,
+        purchaseKey: String,
+        modelContext: ModelContext
+    ) {
+        let activeHumanID = UserDefaultsActiveHumanSelection().currentHumanId
+        careLedger.record(
+            occurredAt: Date(),
+            actorKind: activeHumanID == nil ? .system : .human,
+            actorId: activeHumanID,
+            subjectKind: .system,
+            subjectId: nil,
+            eventKind: .coconut,
+            actionType: package.actionType,
+            amountValue: 0,
+            amountUnit: "",
+            note: package.title,
+            source: .economy,
+            sourceEventId: purchaseKey,
+            sourceReminderId: nil,
+            legacyModelName: nil,
+            legacyModelId: nil,
+            coconutDelta: 0,
+            rewardLogId: nil,
+            privacyFieldRaw: nil,
+            metadataJSON: "{\"economyVersion\":3,\"walletScope\":\"islandTotal\",\"injectedXP\":\(package.xp),\"coconutCost\":\(package.cost),\"budgetMultiplier\":1.0,\"reason\":\"treeInjection\",\"shopPurchaseId\":\"\(purchaseKey)\"}",
+            context: modelContext,
+            save: false
+        )
     }
 
     #if DEBUG

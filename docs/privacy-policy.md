@@ -1,22 +1,27 @@
 # Ohana Privacy Policy / Ohana 隐私政策
 
-Last updated / 更新日期：2026-07-16
+Last updated / 更新日期：2026-07-22
 Support / 支持：[guanchen.li.119@gmail.com](mailto:guanchen.li.119@gmail.com?subject=Ohana%20Support)
 
 ## Summary / 摘要
 
-Ohana is a local-first care app. The Free / Personal release does not operate developer-
-hosted accounts, advertising, analytics SDKs, tracking, support uploads,
-CloudKit sharing, APNs remote notifications, or remote data synchronization.
+Ohana is a local-first care app. Free / Personal does not require a developer-
+hosted account and does not use advertising, analytics SDKs, tracking, support
+uploads, CloudKit sharing, or remote care-data synchronization.
 It offers optional Personal monthly/yearly subscriptions and a Personal Lifetime
 purchase through Apple's In-App Purchase. A verified historical Supporter Pack
 purchase is recognized as Personal Lifetime.
-Your care records are used on your device to provide the app's features.
+Your care records are used on your device to provide the app's features. If
+Ohana Family guardian is offered and you choose to enable it, Ohana uses a
+minimum-data account and APNs only to notify accepted Ohana guardians about a
+missed-check-in event; it does not upload your profile or care records.
 
-Ohana 是一款本地优先的照护应用。当前 Free / Personal 版本不运营开发者托管账号、广告、
-分析 SDK、追踪、支持材料上传、CloudKit 共享、APNs 远程通知或远程数据同步。
+Ohana 是一款本地优先的照护应用。Free / Personal 不要求开发者托管账号，也不使用广告、
+分析 SDK、追踪、支持材料上传、CloudKit 共享或远程照护数据同步。
 应用通过 Apple 的 App 内购买提供可选的 Personal 月付 / 年付订阅和 Personal Lifetime 一次购买；已验证有效的历史 Supporter Pack 购买会被识别为 Personal Lifetime。你的照护记录仅在
-设备上用于提供应用功能。
+设备上用于提供应用功能。如果 Ohana Family 守护已经开放，且你主动启用，Ohana 只会
+使用最小数据账号和 APNs，向已接受邀请的 Ohana 守护人通知漏签事件；不会上传你的资料
+或照护记录。
 
 ## Data Ohana Stores / Ohana 存储的数据
 
@@ -40,6 +45,30 @@ Human, a name is required; gender and birthday are optional.
 
 Human 档案是本地照护记录，不是 Ohana 账号。Ohana 不会读取你的 Apple 账号资料来
 创建 Human。只有当你主动创建 Human 时需要填写姓名；性别和生日均为可选。
+
+## Optional Family Guardian / 可选 Family 亲友守护
+
+Family guardian requires Sign in with Apple only when you choose to enable the
+online guardian service. The service may process a pseudonymous account ID,
+per-installation device identifier and APNs endpoint, accepted guardian
+relationships, time zone and schedule version, guardian-day check-in signals,
+incident / acknowledgement states, minimum notification attempts, and the
+minimum App Store transaction state needed to verify Family entitlement.
+
+只有当你主动启用在线守护时，Family 亲友守护才要求使用“通过 Apple 登录”。该服务可能
+处理匿名化账号 ID、每次安装的设备标识与 APNs 端点、已接受的守护关系、时区和计划版本、
+守护日签到信号、事件 / 确认状态、最小通知尝试，以及验证 Family 权益所需的最小 App
+Store 交易状态。
+
+The service does not receive names, phone numbers, email addresses, check-in
+scores, Human / pet / plant profiles, health, medication, weight, expenses,
+photos, notes, location routes, or other care records. Guardians can see only
+the events and status needed for their accepted guardian role. Ohana does not
+send guardian SMS, email, or external automated messages.
+
+该服务不会接收姓名、电话号码、邮箱、打卡分数、Human / 宠物 / 植物资料、健康、用药、
+体重、费用、照片、笔记、位置路线或其他照护记录。守护人只能看到其已接受守护角色所需
+的事件与状态。Ohana 不会发送守护短信、邮件或外部自动消息。
 
 ## Health and Apple Health / 健康与 Apple Health
 
@@ -105,13 +134,15 @@ retry. You can also remove your own backup files in the Files app.
 
 ## Data Sharing / 数据共享
 
-Ohana does not send app records to the developer. It does not sell, use for
-advertising, or use for cross-app tracking your personal, health, location, or
-care data. It has no current account backend, CloudKit collaboration, or
-server-side sync feature.
+Ohana does not send local care records to the developer. Except for the optional
+minimum Family guardian data described above, it does not send app records to
+the developer. It does not sell, use for advertising, or use for cross-app
+tracking your personal, health, location, or care data. It does not use
+CloudKit collaboration or server-side care-data sync.
 
-Ohana 不会将应用记录发送给开发者，也不会出售、用于广告或跨应用追踪你的个人、健康、
-位置或照护数据。当前版本没有账号后端、CloudKit 协作或服务端同步功能。
+Ohana 不会将本机照护记录发送给开发者；除上文所述的可选最小 Family 守护数据外，也不会
+向开发者发送应用记录。Ohana 不会出售、用于广告或跨应用追踪你的个人、健康、位置或
+照护数据，也不使用 CloudKit 协作或服务端照护数据同步。
 
 Choosing an iOS share destination is your action. The destination's privacy
 practices are governed by that provider's policies.
@@ -122,15 +153,25 @@ practices are governed by that provider's policies.
 
 Apple processes payment for optional Personal monthly/yearly subscriptions,
 Personal Lifetime, and the historical Supporter Pack through StoreKit and the
-App Store. Ohana reads StoreKit-provided product metadata plus Apple-signed and
+App Store. Family guardian, when offered, uses a Family Yearly subscription with
+no trial or Lifetime option. Ohana reads StoreKit-provided product metadata plus Apple-signed and
 verified transaction/current-entitlement status on-device only to display
 localized offers, complete or restore purchases, recognize expiration, refunds
 or revocations, and unlock eligible local Personal capabilities. Ohana does not
 receive or store your payment card, billing address, Apple Account password, or
 other complete payment credentials.
 
-Apple 通过 StoreKit 和 App Store 处理可选 Personal 月付 / 年付订阅、Personal Lifetime 和历史 Supporter Pack 的付款。Ohana 仅在本机读取 StoreKit 提供的商品元数据，以及 Apple 签名并验证的交易和当前权益状态，用于显示本地化商品、完成或恢复购买、识别过期 / 退款 / 撤销，以及解锁符合条件的本地 Personal 能力。Ohana 不会接收或存储你的支付卡、账单地址、Apple 账号密码
+For Family, the signed transaction and App Store Server Notifications V2 are
+verified by the guardian service to start or stop online scheduling. The service
+stores only minimum transaction identifiers, product, expiry, and status; it
+does not store the signed payload or full receipt as a user profile.
+
+Apple 通过 StoreKit 和 App Store 处理可选 Personal 月付 / 年付订阅、Personal Lifetime 和历史 Supporter Pack 的付款。Family 守护开放后使用无试用、无 Lifetime 的 Family Yearly 订阅。Ohana 读取 StoreKit 提供的商品元数据，以及 Apple 签名并验证的交易和当前权益状态，用于显示本地化商品、完成或恢复购买、识别过期 / 退款 / 撤销，以及解锁符合条件的能力。Ohana 不会接收或存储你的支付卡、账单地址、Apple 账号密码
 或其他完整支付凭据。
+
+对于 Family，守护服务会验证签名交易和 App Store Server Notifications V2，以开启或
+停止在线调度。服务只保存最小交易标识、商品、到期时间和状态，不把签名载荷或完整
+收据保存为用户资料。
 
 Ohana does not send care records to the developer or associate Human, pet,
 plant, health, location, or care data with the purchase. Free quota counts are
@@ -152,12 +193,15 @@ Ohana asks only for permissions used by an enabled feature:
 - Location while using the app, and background location only during an active
   dog walk.
 - Notifications, for local reminders and their actions.
+- Sign in with Apple and remote notifications, only when you enable Family
+  guardian.
 - HealthKit, for the read-only Human Workout integration.
 - iCloud Drive, when you enable automatic restricted backup.
 
 Ohana 仅在启用功能需要时请求权限：选取图像或附件时的相机和照片；使用应用期间的位置，
 以及仅在活跃遛狗期间的后台位置；本地提醒及其操作的通知；只读人类运动整合的 HealthKit；
-以及启用受限自动备份时的 iCloud Drive。
+以及启用受限自动备份时的 iCloud Drive。只有在你启用 Family 守护时，才会使用“通过
+Apple 登录”和远程通知。
 
 ## Retention, Deletion, and Choices / 保留、删除与选择
 
@@ -167,17 +211,27 @@ and attempts to remove the app-managed automatic iCloud Drive backup. Deleting
 or resetting app data does not automatically erase copies you deliberately
 shared or moved outside the app.
 
+If you delete your Family guardian account, new scheduling and device endpoints
+are disabled immediately. Related server data is deleted within 30 days;
+minimum notification audit records expire within 90 days. Invitation records
+expire after 48 hours and guardian-day signals after 35 days. Revoking a
+guardian relationship stops future notifications for that relationship.
+
 你可以在应用中编辑或删除支持的记录、重置本地应用数据，并在 Settings 中关闭自动备份。
 重置 App 会删除应用管理的本地数据，并尝试删除应用管理的 iCloud Drive 自动备份。删除或
 重置应用数据不会自动抹除你主动分享或移出应用的副本。
 
+如果你删除 Family 守护账号，新的调度和设备端点会立即停用；相关服务端数据会在 30 天
+内删除，最小通知审计记录会在 90 天内到期。邀请记录 48 小时后到期，守护日信号保留
+35 天。撤销守护关系会停止该关系后续通知。
+
 ## Changes and Contact / 变更与联系
 
-We will update this policy before enabling an Ohana account, Apple or Google
-login, CloudKit sharing, remote sync, analytics, advertising, support uploads,
-or any new protected-data use. For privacy questions or support, email
+We will update this policy before enabling any broader Ohana account, Google
+login, CloudKit sharing, remote care-data sync, analytics, advertising, support
+uploads, or any new protected-data use. For privacy questions or support, email
 [guanchen.li.119@gmail.com](mailto:guanchen.li.119@gmail.com?subject=Ohana%20Support).
 
-在启用 Ohana 账号、Apple 或 Google 登录、CloudKit 共享、远程同步、分析、广告、支持
-上传或任何新的受保护数据用途之前，我们会更新本政策。如有隐私问题或需要支持，请发送
+在启用更广泛的 Ohana 账号、Google 登录、CloudKit 共享、远程照护数据同步、分析、广告、
+支持上传或任何新的受保护数据用途之前，我们会更新本政策。如有隐私问题或需要支持，请发送
 邮件至 [guanchen.li.119@gmail.com](mailto:guanchen.li.119@gmail.com?subject=Ohana%20Support)。

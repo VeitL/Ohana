@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - 顶层备份结构
 nonisolated struct OhanaBackup: Codable {
-    var schemaVersion: Int = 31
+    var schemaVersion: Int = 33
     var exportedAt: String
     /// Records the destination policy for auditability. Older backups decode as
     /// `nil`; both current user-visible export paths are restricted, while
@@ -67,8 +67,96 @@ nonisolated struct OhanaBackup: Codable {
     var gachaOwnedItems: [GachaOwnedItemBackup]?
     var gachaDrawLogs: [GachaDrawLogBackup]?
     var shopPurchaseRecords: [ShopPurchaseRecordBackup]? = nil
+    /// V32 durable Zen presence history. SafetyContact and all device-local
+    /// reminder/message settings are intentionally excluded.
+    var presenceCheckIns: [PresenceCheckInBackup]? = nil
+    var presenceParticipationPeriods: [PresenceParticipationPeriodBackup]? = nil
+    var presenceRewardReceipts: [PresenceRewardReceiptBackup]? = nil
+    /// V33 permanent achievement facts. Importing these records never invokes
+    /// the live reward command.
+    var achievementUnlocks: [AchievementUnlockBackup]? = nil
+    var achievementRewardReceipts: [AchievementRewardReceiptBackup]? = nil
     // App 状态
     var appState: AppStateBackup
+}
+
+// MARK: - Achievements (V33 backup payload)
+nonisolated struct AchievementUnlockBackup: Codable, Equatable, Sendable {
+    var id: String
+    var achievementKey: String
+    var achievementID: String
+    var scopeKindRaw: String
+    var scopeIDRaw: String
+    var unlockedAt: String
+    var isLegacyImport: Bool
+    var createdAt: String
+}
+
+nonisolated struct AchievementRewardReceiptBackup: Codable, Equatable, Sendable {
+    var id: String
+    var receiptKey: String
+    var achievementKey: String
+    var achievementID: String
+    var scopeKindRaw: String
+    var scopeIDRaw: String
+    var recipientHumanIDRaw: String
+    var claimedAt: String
+    var awardedCoconutAmount: Int
+    var awardedStardustAmount: Int
+    var walletTransactionKey: String
+    var isLegacyImport: Bool
+    var createdAt: String
+}
+
+// MARK: - Presence (V32 backup payload)
+nonisolated struct PresenceCheckInBackup: Codable, Equatable, Sendable {
+    var id: String
+    var uniqueKey: String
+    var subjectKindRaw: String
+    var subjectIdRaw: String
+    var ownerHumanIdRaw: String
+    var isOwner: Bool
+    var dayKey: String
+    var timeZoneIdentifier: String
+    var checkedInAt: String
+    var sourceRaw: String
+    var statusRaw: String?
+    var batchIdRaw: String?
+    var operatorHumanIdRaw: String?
+    var isLegacy: Bool
+    var createdAt: String
+    var updatedAt: String
+}
+
+nonisolated struct PresenceParticipationPeriodBackup: Codable, Equatable, Sendable {
+    var id: String
+    var periodKey: String
+    var ownerHumanIdRaw: String
+    var startedAt: String
+    var startedDayKey: String
+    var startedTimeZoneIdentifier: String
+    var endedAt: String?
+    var lastParticipatingDayKey: String?
+    var endedTimeZoneIdentifier: String?
+    var sourceRaw: String
+    var createdAt: String
+    var updatedAt: String
+}
+
+nonisolated struct PresenceRewardReceiptBackup: Codable, Equatable, Sendable {
+    var id: String
+    var receiptKey: String
+    var ownerHumanIdRaw: String
+    var rewardKindRaw: String
+    var dayKey: String?
+    var milestoneDays: Int
+    var requestedAmount: Int
+    var awardedAmount: Int
+    var walletTransactionKey: String?
+    var relatedCheckInId: String?
+    var isLegacy: Bool
+    var awardedAt: String
+    var createdAt: String
 }
 
 nonisolated struct BackupMediaPackageInfo: Codable, Equatable, Sendable {
@@ -276,6 +364,9 @@ nonisolated struct GachaDrawLogBackup: Codable {
     var instantCoconutDelta: Int?
     var costCoconuts: Int
     var dailySequence: Int
+    var oddsVersion: Int?
+    var guaranteeKindRaw: String?
+    var stardustDelta: Int?
     var drawDate: String
     var createdAt: String
 }

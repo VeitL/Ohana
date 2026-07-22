@@ -13,6 +13,7 @@ struct SwipeableEventRow: View {
     var occurrenceDate: Date = .init()
     var petThemeColor: Color?
     var allowsUserEventDetail = true
+    var allowsMutation = true
     /// Returns `true` when the occurrence completed immediately. A `false`
     /// result means the parent presented a lightweight choice first, so the row
     /// must stay in place instead of playing a premature success animation.
@@ -53,7 +54,14 @@ struct SwipeableEventRow: View {
     private var rightProgress: CGFloat { max(0, offsetX) / triggerThreshold }
     private var l: L10n { L10n(appLanguage) }
     private var accessibilityHint: String {
-        allowsUserEventDetail
+        if allowsUserEventDetail, !allowsMutation {
+            return l.tr(
+                zh: "查看只读日历事项详情",
+                en: "View read-only calendar event details",
+                de: "Schreibgeschützte Termindetails anzeigen"
+            )
+        }
+        return allowsUserEventDetail
             ? l.tr(zh: "查看日历事项详情", en: "View calendar event details", de: "Kalendertermin-Details anzeigen")
             : l.tr(zh: "打开相关功能", en: "Open related feature", de: "Zugehorige Funktion offnen")
     }
@@ -86,7 +94,7 @@ struct SwipeableEventRow: View {
             .animation(GoMotion.feedback, value: celebrationParticles.count)
 
             // 左滑背景（完成，仅行动任务才可完成）
-            if offsetX < 0, event.isActionableTask {
+            if allowsMutation, offsetX < 0, event.isActionableTask {
                 HStack {
                     Spacer()
                     VStack(spacing: 4) {
@@ -106,7 +114,7 @@ struct SwipeableEventRow: View {
             }
 
             // 右滑背景（删除）
-            if offsetX > 0 {
+            if allowsMutation, offsetX > 0 {
                 HStack {
                     VStack(spacing: 4) {
                         Image(systemName: "trash.fill").accessibilityHidden(true)
@@ -321,7 +329,7 @@ struct SwipeableEventRow: View {
     private var rowSwipeGesture: some Gesture {
         DragGesture(minimumDistance: 12, coordinateSpace: .local)
             .onChanged { value in
-                guard !isTriggerred else { return }
+                guard allowsMutation, !isTriggerred else { return }
                 let dx = value.translation.width
                 let dy = value.translation.height
 
@@ -352,7 +360,12 @@ struct SwipeableEventRow: View {
             }
             .onEnded { value in
                 defer { activeDragAxis = nil }
-                guard !isTriggerred else { return }
+                guard allowsMutation, !isTriggerred else {
+                    if offsetX != 0 {
+                        withAnimation(GoMotion.feedback) { offsetX = 0 }
+                    }
+                    return
+                }
                 guard activeDragAxis == .horizontal else {
                     if offsetX != 0 {
                         withAnimation(GoMotion.feedback) { offsetX = 0 }
@@ -377,6 +390,7 @@ struct SwipeableEventRow: View {
     }
 
     private func triggerComplete() {
+        guard allowsMutation else { return }
         isTriggerred = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
@@ -408,12 +422,14 @@ struct SwipeableEventRow: View {
 
     // E1: 右滑只弹确认 alert，回弹到原位
     private func pendingDelete() {
+        guard allowsMutation else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withAnimation(GoMotion.feedback) { offsetX = 0 }
         showDeleteConfirmAlert = true
     }
 
     private func triggerDelete() {
+        guard allowsMutation else { return }
         isTriggerred = true
         withAnimation(GoMotion.page) { offsetX = 800 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
@@ -438,6 +454,7 @@ struct SwipeableEventRow: View {
     }
 
     private func deleteEvent(scope: CalendarEventDeletionScope) {
+        guard allowsMutation else { return }
         let command = DomainCommand.calendarEventDeletion(eventID: event.id, scope: scope.revisionActionKey)
         do {
             try CalendarCommandExecutor(context: modelContext, services: appServices).delete(

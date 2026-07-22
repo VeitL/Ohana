@@ -14,20 +14,24 @@ import UIKit
 enum MemberPortraitDraftCardLayoutMode: Equatable {
     case standard
     case compactPersonalization
+    case avatarFocus
 }
 
 struct MemberPortraitDraftCardSurface<Controls: View>: View {
     let snapshot: MemberCardRenderSnapshot
     let layoutMode: MemberPortraitDraftCardLayoutMode
+    let showsAvatar: Bool
     @ViewBuilder var controls: () -> Controls
 
     init(
         snapshot: MemberCardRenderSnapshot,
         layoutMode: MemberPortraitDraftCardLayoutMode = .standard,
+        showsAvatar: Bool,
         @ViewBuilder controls: @escaping () -> Controls
     ) {
         self.snapshot = snapshot
         self.layoutMode = layoutMode
+        self.showsAvatar = showsAvatar
         self.controls = controls
     }
 
@@ -39,7 +43,10 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
     }
 
     private var usesWidePhoto: Bool {
-        snapshot.avatarSource == .customImage && !snapshot.avatarIsTransparent && snapshot.avatarImage != nil
+        showsAvatar &&
+            snapshot.avatarSource == .customImage &&
+            !snapshot.avatarIsTransparent &&
+            snapshot.avatarImage != nil
     }
 
     private var statusPillForeground: Color {
@@ -97,6 +104,8 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
             min(max(width * 0.78, 240), min(height * 0.45, 320))
         case .compactPersonalization:
             min(max(width * 0.42, 150), min(height * 0.29, 180))
+        case .avatarFocus:
+            min(max(width * 0.90, 270), min(height * 0.53, 350))
         }
     }
 
@@ -163,7 +172,7 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
             .padding(.horizontal, 22)
             .padding(.bottom, isCompact ? 8 : 14)
 
-            if !usesWidePhoto, snapshot.avatarImage == nil {
+            if showsAvatar, !usesWidePhoto, snapshot.avatarImage == nil {
                 watermarkSymbol(width: width * (isCompact ? 0.42 : 0.64))
                     .opacity(0.22)
                     .position(x: width * 0.55, y: height * (isCompact ? 0.70 : 0.63))
@@ -176,7 +185,7 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
         if usesWidePhoto {
             Color.clear
                 .frame(width: width * 0.72, height: height)
-        } else if let image = snapshot.avatarImage {
+        } else if showsAvatar, let image = snapshot.avatarImage {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFit()
@@ -184,7 +193,18 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
                     width: width * (isCompact ? 0.34 : (snapshot.kind == .pet ? 0.62 : 0.52)),
                     height: height
                 )
+                .scaleEffect(
+                    snapshot.kind == .pet &&
+                        snapshot.avatarSource == .avatar2D &&
+                        !isCompact
+                        ? (layoutMode == .avatarFocus ? 1.22 : 1.18)
+                        : 1
+                )
+                .offset(y: layoutMode == .avatarFocus ? 4 : 0)
                 .shadow(color: Color.arkInk.opacity(snapshot.avatarIsTransparent ? 0.30 : 0.18), radius: 16, y: 10) // ui-v4: allow intentional avatar depth
+                .accessibilityIdentifier(
+                    snapshot.kind == .pet ? "member-pet-avatar-preview" : "member-human-avatar-preview"
+                )
         } else {
             Color.clear
                 .frame(width: width * (isCompact ? 0.34 : 0.62), height: height)

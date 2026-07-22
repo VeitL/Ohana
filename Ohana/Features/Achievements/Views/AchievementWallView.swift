@@ -24,6 +24,7 @@ struct AchievementWallContentView: View {
     let allExpenseLogs: [PetExpenseLog]
     let careLedgerEvents: [CareLedgerEvent]
     let petActivitySummaries: [UUID: AchievementPetActivitySummary]
+    var achievementSnapshot: AchievementWallSnapshot = .empty
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
@@ -264,6 +265,7 @@ struct AchievementWallContentView: View {
     var achievementContext: AchievementComputationContext {
         AchievementComputationContext(
             allPets: pets,
+            allHumans: humans,
             electronicPets: electronicPets,
             critterFragments: critterFragments,
             critterActionLogs: critterActionLogs,
@@ -282,10 +284,28 @@ struct AchievementWallContentView: View {
     }
 
     var achievements: [Achievement] {
-        if let human = activeHuman {
-            return humanAchievements(for: human)
+        let computed: [Achievement] = if let human = activeHuman {
+            humanAchievements(for: human)
+        } else {
+            screenModel.petAchievements(for: activePet)
         }
-        return screenModel.petAchievements(for: activePet)
+        return computed.map { badge in
+            let scope = screenModel.isGlobalAchievement(badge)
+                ? AchievementScopeReference.island
+                : activeAchievementScope
+            guard let unlockedAt = achievementSnapshot.items.first(where: {
+                $0.definitionID == badge.id && $0.scope == scope
+            })?.unlockedAt else { return badge }
+            var durable = badge
+            durable.isUnlocked = true
+            durable.unlockedAt = unlockedAt
+            return durable
+        }
+    }
+
+    private var activeAchievementScope: AchievementScopeReference {
+        if let human = activeHuman { return .human(human.id) }
+        return .pet(activePet.id)
     }
 
     var unlocked: [Achievement] {

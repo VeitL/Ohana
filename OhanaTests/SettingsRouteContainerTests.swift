@@ -1,27 +1,85 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Ohana
 
+@MainActor
 struct SettingsRouteContainerTests {
-    @Test func settingsAboutExposesPublicPrivacyAndSupportDestinations() throws {
-        let aboutSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView+MainSections.swift",
-            rootURL: repositoryRootURL()
-        )
-        let linkSource = try source(
-            "Ohana/App/OhanaPublicLinks.swift",
-            rootURL: repositoryRootURL()
-        )
+    @Test func settingsExposeSixValueRoutedCategories() throws {
+        let root = try source("Ohana/Features/Settings/Views/SettingsView.swift")
+        let sections = try source("Ohana/Features/Settings/Views/SettingsView+MainSections.swift")
+        let destinations = try source("Ohana/Features/Settings/Views/SettingsDestinationPages.swift")
 
-        #expect(aboutSource.contains("settings-privacy-policy-action"))
-        #expect(aboutSource.contains("settings-support-action"))
-        #expect(aboutSource.contains("OhanaPublicLinks.privacyPolicy"))
-        #expect(aboutSource.contains("OhanaPublicLinks.support"))
-        #expect(aboutSource.contains("OhanaReleaseIdentity.currentVersionDisplay"))
-        #expect(aboutSource.contains("OhanaPublicLinks.appStoreReview"))
-        #expect(!aboutSource.contains("id6742117937"))
-        #expect(linkSource.contains("https://github.com/VeitL/Ohana/blob/main/docs/privacy-policy.md"))
-        #expect(linkSource.contains("mailto:guanchen.li.119@gmail.com"))
+        #expect(root.contains(".navigationDestination(for: SettingsDestination.self)"))
+        #expect(sections.contains("NavigationLink(value: destination)"))
+        #expect(destinations.contains("enum SettingsDestination: String, CaseIterable, Hashable"))
+        #expect(SettingsDestination.allCases == [
+            .regionAndLanguage,
+            .appearanceAndPerformance,
+            .notifications,
+            .privacyAndSecurity,
+            .dataAndBackup,
+            .about
+        ])
+    }
+
+    @Test func lightweightRootDoesNotMountDestinationSections() throws {
+        let sections = try source("Ohana/Features/Settings/Views/SettingsView+MainSections.swift")
+
+        #expect(sections.contains("settingsDataSections"))
+        #expect(sections.contains("settingsExperienceSection"))
+        #expect(sections.contains("settingsPersonalSection"))
+        #expect(sections.contains("settingsCategorySection"))
+        #expect(!sections.contains("settingsPreferencesSection"))
+        #expect(!sections.contains("AnyView(settingsDataSections)"))
+        #expect(!sections.contains("AnyView(backupSection)"))
+    }
+
+    @Test func experienceModeIsTheFirstSettingsSectionAndUsesTwoLargeChoices() throws {
+        let sections = try source("Ohana/Features/Settings/Views/SettingsView+MainSections.swift")
+        let bodyStart = try #require(sections.range(of: "var settingsBodySections"))
+        let experience = try #require(sections.range(of: "settingsExperienceSection", range: bodyStart.upperBound ..< sections.endIndex))
+        let data = try #require(sections.range(of: "settingsDataSections", range: bodyStart.upperBound ..< sections.endIndex))
+
+        #expect(experience.lowerBound < data.lowerBound)
+        #expect(sections.contains("SettingsExperienceModeSelector("))
+        #expect(sections.contains("HStack(alignment: .top, spacing: 10) { modeButtons }"))
+        #expect(sections.contains("settings-experience-mode-\\(mode.rawValue)"))
+        #expect(sections.contains("dynamicTypeSize.isAccessibilitySize"))
+        #expect(!sections.contains("settings-experience-mode-picker"))
+        #expect(sections.contains("settings-zen-owner-picker"))
+    }
+
+    @Test func debugSettingsExposeAdaptivePrimaryAccentLab() throws {
+        let debug = try source("Ohana/Features/Settings/Views/SettingsView+Debug.swift")
+        let lab = try source("Ohana/Features/Settings/DesignLab/PrimaryAccentLabView.swift")
+        let palette = try source("Ohana/Shared/Design/OhanaPrimaryAccent.swift")
+
+        #expect(debug.contains("PrimaryAccentLabView()"))
+        #expect(debug.contains("settings-debug-primary-accent"))
+        #expect(lab.contains("primary-accent-appearance-picker"))
+        #expect(lab.contains("primary-accent-live-preview"))
+        #expect(lab.contains("primary-accent-\\(appearance.rawValue)-preview"))
+        #expect(lab.contains("ColorPicker(selection: customColor, supportsOpacity: false)"))
+        #expect(lab.contains("primary-accent-system-color-picker"))
+        #expect(lab.contains("@AppStorage(OhanaPrimaryAccentPreferences.lightStorageKey)"))
+        #expect(lab.contains("@AppStorage(OhanaPrimaryAccentPreferences.darkStorageKey)"))
+        #expect(palette.contains("#if DEBUG"))
+        #expect(palette.contains("return false"))
+    }
+
+    @Test func settingsAboutUsesStaticVersionAndPublicDestinations() throws {
+        let about = try source("Ohana/Features/Settings/Views/SettingsDestinationPages.swift")
+        let links = try source("Ohana/App/OhanaPublicLinks.swift")
+
+        #expect(about.contains("OhanaReleaseIdentity.currentVersionDisplay"))
+        #expect(about.contains("settings-version-value"))
+        #expect(!about.contains("subtitle: OhanaReleaseIdentity.currentVersionDisplay"))
+        #expect(about.contains("settings-privacy-policy-action"))
+        #expect(about.contains("settings-support-action"))
+        #expect(about.contains("OhanaPublicLinks.appStoreReview"))
+        #expect(links.contains("https://github.com/VeitL/Ohana/blob/main/docs/privacy-policy.md"))
+        #expect(links.contains("mailto:guanchen.li.119@gmail.com"))
     }
 
     @Test func releaseIdentityUsesBundleVersionAndBuildWithoutHardcodedMarketingCopy() {
@@ -35,303 +93,168 @@ struct SettingsRouteContainerTests {
         #expect(OhanaReleaseIdentity.versionDisplay(infoDictionary: [:]) == "—")
     }
 
-    @Test func settingsBiometricAvailabilityIsRefreshedOnAppear() throws {
-        let source = try source(
-            "Ohana/Features/Settings/Views/SettingsView.swift",
-            rootURL: repositoryRootURL()
-        )
+    @Test func releaseSettingsExcludeVisualExperimentFromPublicPages() throws {
+        let root = try source("Ohana/Features/Settings/Views/SettingsView.swift")
+        let sections = try source("Ohana/Features/Settings/Views/SettingsView+MainSections.swift")
+        let destinations = try source("Ohana/Features/Settings/Views/SettingsDestinationPages.swift")
+        let diagnostics = try source("Ohana/Features/Settings/Views/SettingsPerformanceDiagnosticsView.swift")
+        let debug = try source("Ohana/Features/Settings/Views/SettingsView+Debug.swift")
 
-        #expect(source.contains("@State var biometricGateAvailability = MemberGateBiometricAvailability.unavailable"))
-        #expect(!source.contains("@State var biometricGateAvailability = MemberGateBiometricAuthenticator.availability()"))
-        #expect(source.contains("refreshBiometricGateAvailability()"))
+        #expect(!root.contains("reducedVisualEffectsMode"))
+        #expect(!sections.contains("轻量视觉 A/B"))
+        #expect(!destinations.contains("轻量视觉 A/B"))
+        #expect(diagnostics.contains("轻量视觉 A/B"))
+        #expect(debug.contains("#if DEBUG"))
+        #expect(debug.contains("PerformanceDiagnosticsView()"))
     }
 
-    @Test func coconutBalanceDeveloperToolDefersApplyOffTapFrame() throws {
-        let coconutSource = try source(
-            "Ohana/Features/Economy/Views/SettingsCoconutBalanceTestView.swift",
-            rootURL: repositoryRootURL()
-        )
-        let debugSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView+Debug.swift",
-            rootURL: repositoryRootURL()
-        )
-        let frameHandoff = try #require(coconutSource.range(of: "await OhanaFrameScheduler.waitAfterNextFrame()"))
-        let command = try #require(
-            coconutSource.range(
-                of: "SettingsCommandExecutor(context: modelContext, services: appServices).applyCoconutBalanceTest"
-            )
-        )
+    @Test func notificationCategoriesUseNativeLazyDisclosure() throws {
+        let notifications = try source("Ohana/Features/Settings/Views/SettingsNotificationsPage.swift")
 
-        #expect(coconutSource.contains("@State private var isApplying = false"))
-        #expect(coconutSource.contains("guard !isApplying else { return }"))
-        #expect(coconutSource.contains(".disabled(isApplying)"))
-        #expect(frameHandoff.lowerBound < command.lowerBound)
-        #expect(!coconutSource.contains("publishesRevision: !isUITestRun"))
-        #expect(!coconutSource.contains("updatesProjection: !isUITestRun"))
-        #expect(debugSource.contains("-OHANA_UI_TEST_OPEN_COCONUT_BALANCE_SHEET"))
-        #expect(debugSource.contains("!SettingsDebugTools.opensCoconutBalanceSheetInUITests"))
+        #expect(notifications.contains("@State private var showAdvancedNotificationSettings = false"))
+        #expect(notifications.contains("DisclosureGroup(isExpanded: $showAdvancedNotificationSettings)"))
+        #expect(notifications.contains("SettingsPlantReminderDataContainer()"))
+        #expect(notifications.contains("title: l.tr(zh: \"日历事项提醒\""))
+        #expect(notifications.contains("group: .calendar"))
+        #expect(notifications.contains("settings-notification-\\(group.rawValue)-toggle"))
+        #expect(notifications.contains("preferenceGroups.forEach"))
     }
 
-    @Test func coconutBalanceRevisionDoesNotReloadSettingsRouteData() throws {
+    @Test func pageStateIsOwnedByDestinationViews() throws {
+        let root = try source("Ohana/Features/Settings/Views/SettingsView.swift")
+        let destinations = try source("Ohana/Features/Settings/Views/SettingsDestinationPages.swift")
+        let notifications = try source("Ohana/Features/Settings/Views/SettingsNotificationsPage.swift")
+        let backup = try source("Ohana/Features/Settings/Views/SettingsView+Backup.swift")
+
+        #expect(!root.contains("showAdvancedNotificationSettings"))
+        #expect(!root.contains("backupPassword"))
+        #expect(destinations.contains("struct SettingsRegionLanguagePage: View"))
+        #expect(destinations.contains("struct SettingsAppearancePerformancePage: View"))
+        #expect(destinations.contains("struct SettingsPrivacySecurityPage: View"))
+        #expect(notifications.contains("struct SettingsNotificationsPage: View"))
+        #expect(backup.contains("struct SettingsBackupPage: View"))
+    }
+
+    @Test func languageCommitDefersOffTapFrameAndSurvivesImmediateClose() throws {
+        let destinations = try source("Ohana/Features/Settings/Views/SettingsDestinationPages.swift")
+
+        #expect(destinations.contains("Picker(\"\", selection: $languageSelectionCode)"))
+        #expect(destinations.contains("languageCommitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 96)"))
+        #expect(destinations.contains(".onDisappear { commitPendingLanguageChangeBeforeDismissal() }"))
+        #expect(destinations.contains("let normalized = AppLanguage.normalize(languageSelectionCode)"))
+        #expect(destinations.contains("transaction.disablesAnimations = true"))
+    }
+
+    @Test func routeStartsWithRootAndLoadsActorAfterFirstFrame() throws {
+        let route = try source("Ohana/Features/Settings/SettingsRouteContainer.swift")
+
+        #expect(route.contains("SettingsView("))
+        #expect(route.contains("await OhanaFrameScheduler.waitAfterNextFrame()"))
+        #expect(route.contains("SettingsOpenPerformance.mark(AppPerformancePhases.firstFrame)"))
+        #expect(route.contains("SettingsRouteDataActor(modelContainer: container).load()"))
+        #expect(route.contains("SettingsOpenPerformance.mark(AppPerformancePhases.dataReady)"))
+        #expect(!route.contains("SettingsFirstFrameShell"))
+        #expect(!route.contains("loadDelayMilliseconds: 160"))
+        #expect(!route.contains("reloadDelayMilliseconds: 120"))
+    }
+
+    @Test func routeRefreshCancelsAndCoalescesWorkWhileKeepingRetry() throws {
+        let route = try source("Ohana/Features/Settings/SettingsRouteContainer.swift")
+        let data = try source("Ohana/Features/Settings/Views/SettingsView+DataIdentity.swift")
+
+        #expect(route.contains("routeDataLoadTask?.cancel()"))
+        #expect(route.contains("revisionReloadTask?.cancel()"))
+        #expect(route.contains("await Task.yield()"))
+        #expect(route.contains("routeLoadErrorMessage = error.localizedDescription"))
+        #expect(data.contains("settings-route-data-retry"))
+        #expect(data.contains("Other settings remain available"))
+    }
+
+    @Test func modelActorBuildsSendableMemberPetAndHouseholdSnapshots() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let household = Household(name: "Home")
+        let pet = Pet(name: "Mochi", species: "cat")
+        let human = Human(name: "Owner")
+        context.insert(household)
+        context.insert(pet)
+        context.insert(human)
+        try context.save()
+
+        let data = try await SettingsRouteDataActor(modelContainer: container).load()
+
+        #expect(data.hasLoaded)
+        #expect(data.households?.map(\.name) == ["Home"])
+        #expect(data.pets?.map(\.name) == ["Mochi"])
+        #expect(data.humans?.map(\.name) == ["Owner"])
+    }
+
+    @Test func modelActorHonorsCancellation() async throws {
+        let actor = SettingsRouteDataActor(modelContainer: try makeContainer())
+        let task = Task {
+            try Task.checkCancellation()
+            return try await actor.load()
+        }
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+    }
+
+    @Test func failedRefreshPreservesLastGoodSnapshots() {
+        let existing = SettingsRouteData(
+            households: [SettingsHouseholdSnapshot(id: UUID(), name: "Home", ckShareRecordName: "")],
+            pets: [SettingsPetSnapshot(id: UUID(), name: "Mochi", avatarEmoji: "🐈", canWriteWallet: true)],
+            humans: [],
+            hasLoaded: true
+        )
+
+        let retained = SettingsRouteDataFailurePolicy.preservingLastGoodData(existing)
+
+        #expect(retained == existing)
+        #expect(retained.hasLoaded)
+    }
+
+    @Test func coconutAndPrivacyRevisionsDoNotReloadSettingsSnapshots() {
         var coconutRevision = HomeRevision()
         coconutRevision.advance(for: .settingsCoconutBalance(humanID: UUID(), amount: 120))
-
         var privacyRevision = HomeRevision()
         privacyRevision.advance(for: .command("privacy", "passcode"))
-
         var activeHumanRevision = HomeRevision()
         activeHumanRevision.advance(for: .settingsActiveHumanSwitch(humanID: UUID()))
 
         #expect(!SettingsRouteReloadPolicy.shouldReloadSettingsRouteData(for: coconutRevision))
         #expect(!SettingsRouteReloadPolicy.shouldReloadSettingsRouteData(for: privacyRevision))
-        #expect(SettingsRouteReloadPolicy.shouldReloadSettingsRouteData(for: activeHumanRevision))
+        #expect(!SettingsRouteReloadPolicy.shouldReloadSettingsRouteData(for: activeHumanRevision))
     }
 
-    @Test func settingsDataSectionsReserveSlotsBeforeDeferredRouteDataLoads() throws {
-        let settingsSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView.swift",
-            rootURL: repositoryRootURL()
-        )
-        let dataIdentitySource = try source(
-            "Ohana/Features/Settings/Views/SettingsView+DataIdentity.swift",
-            rootURL: repositoryRootURL()
-        )
-        let routeSource = try source(
-            "Ohana/Features/Settings/SettingsRouteContainer.swift",
-            rootURL: repositoryRootURL()
-        )
+    @Test func coconutBalanceDeveloperToolDefersApplyOffTapFrame() throws {
+        let coconut = try source("Ohana/Features/Economy/Views/SettingsCoconutBalanceTestView.swift")
+        let debug = try source("Ohana/Features/Settings/Views/SettingsView+Debug.swift")
+        let handoff = try #require(coconut.range(of: "await OhanaFrameScheduler.waitAfterNextFrame()"))
+        let command = try #require(coconut.range(of: "SettingsCommandExecutor(context: modelContext, services: appServices).applyCoconutBalanceTest"))
 
-        #expect(settingsSource.contains("let isRouteDataLoaded: Bool"))
-        #expect(routeSource.contains("isRouteDataLoaded: data.hasLoaded"))
-        #expect(routeSource.contains("loadDelayMilliseconds: 0"))
-        #expect(!routeSource.contains("RouteFirstFrameDeferredMount("))
-        #expect(!routeSource.contains("SettingsFirstFrameShell"))
-        #expect(settingsSource.contains(".onChange(of: isRouteDataLoaded)"))
-        #expect(settingsSource.contains("areDataSectionsMounted = true"))
-        #expect(dataIdentitySource.contains("""
-        if !isRouteDataLoaded {
-            deviceIdentityPlaceholderSection
-            petManagementPlaceholderSection
-        } else {
-"""))
+        #expect(handoff.lowerBound < command.lowerBound)
+        #expect(coconut.contains("guard !isApplying else { return }"))
+        #expect(coconut.contains(".disabled(isApplying)"))
+        #expect(debug.contains("-OHANA_UI_TEST_OPEN_COCONUT_BALANCE_SHEET"))
     }
 
-    @Test func settingsMainRouteUsesValueSnapshotsForMemberData() throws {
-        let settingsSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView.swift",
-            rootURL: repositoryRootURL()
+    private func makeContainer() throws -> ModelContainer {
+        try ModelContainer(
+            for: Schema(ArkSchemaV94.models),
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)]
         )
-        let routeSource = try source(
-            "Ohana/Features/Settings/SettingsRouteContainer.swift",
-            rootURL: repositoryRootURL()
-        )
-        let snapshotSource = try source(
-            "Ohana/Features/Settings/SettingsRouteSnapshots.swift",
-            rootURL: repositoryRootURL()
-        )
-        let dataIdentitySource = try source(
-            "Ohana/Features/Settings/Views/SettingsView+DataIdentity.swift",
-            rootURL: repositoryRootURL()
-        )
-        let avatarSource = try source(
-            "Ohana/Features/Settings/Views/SettingsHumanIdentityAvatar.swift",
-            rootURL: repositoryRootURL()
-        )
-        let petManagementSource = try source(
-            "Ohana/Features/Settings/Views/SettingsPetManagementSheet.swift",
-            rootURL: repositoryRootURL()
-        )
-        let quickSwitchSource = try source(
-            "Ohana/Features/Settings/Views/HumanQuickSwitchPasscodeSheet.swift",
-            rootURL: repositoryRootURL()
-        )
-
-        #expect(snapshotSource.contains("struct SettingsHumanSnapshot: Identifiable, Equatable, Sendable"))
-        #expect(snapshotSource.contains("hasPasscode: HumanPasscodeService.hasPasscode(human)"))
-        #expect(snapshotSource.contains("struct SettingsPetSnapshot: Identifiable, Equatable, Sendable"))
-        #expect(snapshotSource.contains("struct SettingsHouseholdSnapshot: Identifiable, Equatable, Sendable"))
-        #expect(settingsSource.contains("let homeHumans: [SettingsHumanSnapshot]?"))
-        #expect(settingsSource.contains("let homePets: [SettingsPetSnapshot]?"))
-        #expect(settingsSource.contains("let homeHouseholds: [SettingsHouseholdSnapshot]?"))
-        #expect(!settingsSource.contains("let homeHumans: [Human]?"))
-        #expect(!settingsSource.contains("let homePets: [Pet]?"))
-        #expect(!settingsSource.contains("let homeHouseholds: [Household]?"))
-        #expect(!settingsSource.contains("homeElectronicPets"))
-        #expect(routeSource.contains("var humans: [SettingsHumanSnapshot]?"))
-        #expect(routeSource.contains("var pets: [SettingsPetSnapshot]?"))
-        #expect(routeSource.contains("var households: [SettingsHouseholdSnapshot]?"))
-        #expect(routeSource.contains(".map(SettingsHumanSnapshot.init)"))
-        #expect(routeSource.contains(".map(SettingsPetSnapshot.init)"))
-        #expect(routeSource.contains(".map(SettingsHouseholdSnapshot.init)"))
-        #expect(!routeSource.contains("var humans: [Human]?"))
-        #expect(!routeSource.contains("var pets: [Pet]?"))
-        #expect(!routeSource.contains("var households: [Household]?"))
-        #expect(avatarSource.contains("let human: SettingsHumanSnapshot"))
-        #expect(!avatarSource.contains("HumanAvatarPipelineView"))
-        #expect(dataIdentitySource.contains("func fetchSettingsHuman(id: UUID) -> Human?"))
-        #expect(dataIdentitySource.contains("func fetchSettingsPets() -> [Pet]"))
-        #expect(!dataIdentitySource.contains("appServices.passcodes.hasPasscode(human)"))
-        #expect(petManagementSource.contains("let pets: [SettingsPetSnapshot]"))
-        #expect(petManagementSource.contains("fetchPet(id: pet.id)"))
-        #expect(!petManagementSource.contains("let pets: [Pet]"))
-        #expect(quickSwitchSource.contains("let human: SettingsHumanSnapshot"))
-        #expect(quickSwitchSource.contains("fetchHumanForVerification()"))
     }
 
-    @Test func settingsRouteCapsPhysicalDeviceGenericMetadataDepth() throws {
-        let settingsSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView.swift",
-            rootURL: repositoryRootURL()
-        )
-        let sectionsSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView+MainSections.swift",
-            rootURL: repositoryRootURL()
-        )
-
-        #expect(settingsSource.contains("private var settingsAlertContent: AnyView"))
-        #expect(settingsSource.contains("private var settingsPrimaryPresentationContent: AnyView"))
-        #expect(settingsSource.contains("private var settingsSharingPresentationContent: AnyView"))
-        #expect(settingsSource.contains("settingsSharingPresentationContent"))
-        #expect(settingsSource.components(separatedBy: "AnyView(").count >= 6)
-        #expect(sectionsSource.contains("AnyView(settingsDataSections)"))
-        #expect(sectionsSource.contains("AnyView(settingsPreferencesSection)"))
-        #expect(sectionsSource.contains("AnyView(backupSection)"))
-        #expect(sectionsSource.components(separatedBy: "AnyView(").count >= 9)
-    }
-
-    @Test func settingsLanguageSwitchDefersGlobalLocaleCommitOffTapFrame() throws {
-        let settingsSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView.swift",
-            rootURL: repositoryRootURL()
-        )
-        let mainSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView+MainSections.swift",
-            rootURL: repositoryRootURL()
-        )
-        let regionalSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView+RegionalDefaults.swift",
-            rootURL: repositoryRootURL()
-        )
-        let appSource = try source(
-            "Ohana/App/OhanaApp.swift",
-            rootURL: repositoryRootURL()
-        )
-        let contentSource = try source(
-            "Ohana/App/ContentView.swift",
-            rootURL: repositoryRootURL()
-        )
-        let rootSource = try source(
-            "Ohana/App/RootView.swift",
-            rootURL: repositoryRootURL()
-        )
-        let routeHostSource = try source(
-            "Ohana/App/RouteContainers/AppRouteDestinationContainers.swift",
-            rootURL: repositoryRootURL()
-        )
-        let localizationSource = try source(
-            "Ohana/Shared/LocalizationSettings.swift",
-            rootURL: repositoryRootURL()
-        )
-
-        #expect(settingsSource.contains("@State var languageSelectionCode = AppLanguage.code"))
-        #expect(settingsSource.contains("@State var languageCommitTask: Task<Void, Never>?"))
-        #expect(settingsSource.contains("@State var isLanguageCommitInFlight = false"))
-        #expect(mainSource.contains("Picker(\"\", selection: $languageSelectionCode)"))
-        #expect(!mainSource.contains("Picker(\"\", selection: $appLanguage)"))
-        #expect(mainSource.contains("scheduleLanguageCommit(newValue)"))
-        #expect(mainSource.contains(".disabled(isLanguageCommitInFlight)"))
-        #expect(mainSource.contains("if isLanguageCommitInFlight"))
-        #expect(mainSource.contains("settingsLanguageCommitPlaceholderSection"))
-        #expect(mainSource.contains("\"settings-language-commit-placeholder\""))
-        #expect(mainSource.contains("var settingsDeferredHeavySections: some View"))
-        #expect(mainSource.contains("if !isLanguageCommitInFlight"))
-        #expect(mainSource.contains("settingsDebugSection"))
-        #expect(mainSource.contains("householdSyncSection"))
-        #expect(regionalSource.contains("func scheduleLanguageCommit(_ rawLanguageCode: String, emitFeedback: Bool = true)"))
-        #expect(regionalSource.contains("scheduleLanguageCommit(normalizedLanguage, emitFeedback: false)"))
-        #expect(regionalSource.contains("scheduleLanguageCommit(languageSelectionCode, emitFeedback: false)"))
-        #expect(regionalSource.contains("prepareForLanguageCommit()"))
-        #expect(regionalSource.contains("areDataSectionsMounted = false"))
-        #expect(regionalSource.contains("isLanguageCommitInFlight = true"))
-        #expect(regionalSource.contains("isLanguageCommitInFlight = false"))
-        #expect(regionalSource.contains("languageCommitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 96)"))
-        #expect(regionalSource.contains("scheduleDataSectionsMount(delayMilliseconds: 320, animated: false)"))
-        #expect(regionalSource.contains("func scheduleDataSectionsMount(delayMilliseconds: UInt64 = 260, animated: Bool = true)"))
-        #expect(regionalSource.contains("transaction.disablesAnimations = true"))
-        #expect(!regionalSource.contains("commitLanguageChange(AppLanguage.code, emitFeedback: false)"))
-        #expect(!regionalSource.contains("AppCountry.applyDefaults(for: country.code)"))
-        #expect(appSource.contains("@AppStorage(\"appLanguage\") private var appLanguage: String = AppLanguage.detectedCode"))
-        #expect(appSource.contains("appLanguage: appLanguage"))
-        #expect(!appSource.contains(".environment(\\.locale, AppLanguage.swiftUIPreferredLocale(for: appLanguage))"))
-        #expect(!appSource.contains(".environment(\\.ohanaAppLanguageCode, appLanguage)"))
-        #expect(!contentSource.contains("@AppStorage(\"appLanguage\") private var appLanguage"))
-        #expect(contentSource.contains("var routeLanguageCode: String = AppLanguage.code"))
-        #expect(contentSource.contains(".homeSurfaceLanguage(homeSurfaceLanguage)"))
-        #expect(contentSource.contains("@State private var routeSurfaceLanguage = AppLanguage.code"))
-        #expect(contentSource.contains("@State private var routeSurfaceLanguageThawTask: Task<Void, Never>?"))
-        #expect(contentSource.contains("synchronizeRouteSurfaceLanguageIfAllowed(routeLanguageCode)"))
-        #expect(contentSource.contains("thawRouteSurfaceLanguageAfterSheetDismissal()"))
-        #expect(contentSource.contains("routeLanguageCode: routeSurfaceLanguage"))
-        #expect(!rootSource.contains("@AppStorage(\"appLanguage\") private var appLanguage"))
-        #expect(rootSource.contains("var appLanguage: String = AppLanguage.code"))
-        #expect(rootSource.contains("routeLanguageCode: appLanguage"))
-        #expect(routeHostSource.contains("let routeLanguageCode: String"))
-        #expect(routeHostSource.contains(".ohanaLocalizedEnvironment(routeLanguageCode)"))
-        #expect(localizationSource.contains("func ohanaLocalizedEnvironment(_ rawLanguage: String) -> some View"))
-    }
-
-    @Test func settingsLanguageSwitchDefersHomeReadModelRefresh() throws {
-        let homeDataSource = try source(
-            "Ohana/Features/Home/VerticalSolidHomeDataContainer.swift",
-            rootURL: repositoryRootURL()
-        )
-        let rootSource = try source(
-            "Ohana/App/RootView.swift",
-            rootURL: repositoryRootURL()
-        )
-
-        #expect(homeDataSource.contains("postLanguageRefreshDelayMilliseconds"))
-        #expect(homeDataSource.contains("@State private var readModelLanguage = AppLanguage.code"))
-        #expect(homeDataSource.contains("scheduleReadModelLanguageSync(newValue)"))
-        #expect(homeDataSource.contains("language: readModelLanguage"))
-        #expect(!homeDataSource.contains("language: appLanguage"))
-        #expect(!rootSource.contains("@AppStorage(\"appLanguage\") private var appLanguage"))
-        #expect(rootSource.contains("var appLanguage: String = AppLanguage.code"))
-        #expect(rootSource.contains("routeLanguageCode: appLanguage"))
-    }
-
-    @Test func notificationSettingsKeepCategoryControlsBehindAdvancedDisclosure() throws {
-        let settingsSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView.swift",
-            rootURL: repositoryRootURL()
-        )
-        let mainSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView+MainSections.swift",
-            rootURL: repositoryRootURL()
-        )
-        let chromeSource = try source(
-            "Ohana/Features/Settings/Views/SettingsView+Chrome.swift",
-            rootURL: repositoryRootURL()
-        )
-
-        #expect(settingsSource.contains("@State var showAdvancedNotificationSettings = false"))
-        #expect(mainSource.contains("routineNotificationsToggleRow"))
-        #expect(mainSource.contains("advancedNotificationSettingsDisclosure"))
-        #expect(chromeSource.contains("DisclosureGroup(isExpanded: $showAdvancedNotificationSettings)"))
-        #expect(chromeSource.contains("advancedNotificationSettingsRows"))
-        #expect(chromeSource.contains("title: l.tr(zh: \"日历事项提醒\""))
-        #expect(chromeSource.contains("group: .calendar"))
-        #expect(chromeSource.contains("\"settings-notification-\\(group.rawValue)-toggle\""))
-        #expect(chromeSource.contains("notificationPreferenceGroups.forEach"))
+    private func source(_ path: String) throws -> String {
+        try String(contentsOf: repositoryRootURL().appendingPathComponent(path), encoding: .utf8)
     }
 
     private func repositoryRootURL() -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-    }
-
-    private func source(_ path: String, rootURL: URL) throws -> String {
-        try String(contentsOf: rootURL.appendingPathComponent(path), encoding: .utf8)
     }
 }

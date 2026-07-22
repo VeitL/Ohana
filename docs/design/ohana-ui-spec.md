@@ -82,6 +82,9 @@ Use these as the first references when generating or reviewing similar UI:
 | Settings rows and debug tools | `Ohana/Features/Settings/Views/SettingsView+Debug.swift` |
 | UI token console / developer previews | `Ohana/Features/Settings/DesignLab/UIGuidelinesView.swift` |
 | Home card spatial motion | `VerticalSolidHomeView`, `FocusHomeVerticalSolidScene`, `OhanaMotionScene` |
+| Zen check-in card stack and full-card score gesture | `ZenHomeView`, reusing `FocusHomeVerticalSolidCardSurface` geometry |
+| Human, Pet, and Plant read-first profile | `ProfileDetailScaffold`, `ProfileCompletionCard`, and the three basic-info views |
+| Oasis surface in either app mode | Shared `OasisHomeTabHost` and `VerticalSolidHomeOasisFrozenTreeStage`; Zen may only overlay its one-time starter gift |
 | Plant care detail | Follow the QuickFeed guided care structure before adding plant-specific modules |
 | Performance diagnostics | `Ohana/Features/Settings/Views/SettingsPerformanceDiagnosticsView.swift` |
 
@@ -96,6 +99,9 @@ then the one with the same presentation style.
   member theme colors, domain colors, and text/surface tokens.
 - `goPrimary` is reserved for the global primary action, selection, focus,
   confirmation, and functional icons.
+- Product defaults are Go Blue (`#2563EB`) in light appearance and Go Lime
+  (`#C8F34A`) in dark appearance. A device-local Debug lab may compare
+  candidate accents; Release builds always ignore those developer selections.
 - Pet/human theme colors must not reuse primary aliases.
 - Domain colors carry meaning: feeding, reminders, danger, success, rewards,
   charts, and plant care should not borrow each other's semantics.
@@ -143,6 +149,11 @@ then the one with the same presentation style.
   for system navigation chrome, toolbars, back/close/floating controls, sheet
   control regions, popups, native system-control interaction surfaces, or an
   explicitly documented exception.
+- Zen status selection is a documented interaction exception: one noninteractive
+  full-card Liquid Glass layer may cover the touched card while the underlying
+  gesture owns input. It must match the card bounds and corner radius, use
+  high-contrast text, and become an opaque contrast surface under Reduce
+  Transparency.
 - Pet, Human, and Plant identity hero cards are the only standing content-layer
   exception: one noninteractive regular-glass surface beneath a translucent
   member-theme atmosphere. Reduce Transparency and reduced-effects modes use
@@ -285,6 +296,21 @@ Required structure:
 - A real navigation title and native toolbar actions.
 - `List` or `Form` with quiet `Section` headers where row semantics fit.
 - No duplicate or hand-drawn close controls.
+
+### Household Insights Sheet
+
+- Keep one horizontally scrolling tab row in this fixed order: Weight,
+  Expenses, Weekly, Care Analysis, Reminder Health, Long-term Review.
+- Never remove a locked tab from the row. Show a lock plus the exact required
+  tree level, and mount only the currently selected tab's content.
+- Weight and Expenses are separate Lv.1 surfaces. Health and medication family
+  aggregates remain in their separate Lv.2 group.
+- A locked Reminder Health tab still renders the compact permission, overdue,
+  and failed-reminder safety summary. Detailed scheduling history stays locked.
+- Free range controls expose 7 and 30 days with one selected subject. Personal
+  adds 90 days, one year, all time, comparison, and analytical export.
+- Locks, status, and selection always use text or symbols in addition to color;
+  the tab row must remain usable at large Dynamic Type sizes and in RTL.
 
 ### Home Spatial Card
 

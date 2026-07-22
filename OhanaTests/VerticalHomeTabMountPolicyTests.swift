@@ -235,7 +235,7 @@ struct VerticalHomeTabMountPolicyTests {
         let host = try source("Ohana/Features/Oasis/Views/OasisHomeTabHost.swift")
         let homeUtilities = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Utilities.swift")
 
-        #expect(frozenStage.contains("interactiveFeatures: [.shop]"))
+        #expect(frozenStage.contains("interactiveFeatures: Set(OasisBentoFeature.allCases)"))
         #expect(frozenStage.contains("onOpenShop(snapshot.shopInitialCategory)"))
         #expect(host.contains("VerticalSolidHomeOasisFrozenTreeStage("))
         #expect(host.contains("onOpenShop: onOpenShop"))
@@ -257,7 +257,8 @@ struct VerticalHomeTabMountPolicyTests {
             level: 4,
             progressToNextLevel: .nan,
             totalEnergy: -20,
-            nextLevelThreshold: -100
+            nextLevelThreshold: -100,
+            coconutBalance: -3
         )
 
         #expect(low.level == 0)
@@ -268,6 +269,8 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(invalid.progressToNextLevel == 0)
         #expect(invalid.totalEnergy == 0)
         #expect(invalid.nextLevelThreshold == 0)
+        #expect(invalid.coconutBalance == 0)
+        #expect(low.coconutBalance == nil)
         #expect(invalid.shopInitialCategory == .effect)
 
         let shopDecor = OasisTreeRenderSnapshot(
@@ -592,7 +595,9 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(toolbarSource.contains("if selectedTab == .home"))
         #expect(toolbarSource.contains("} else if selectedTab != .oasis {"))
         #expect(componentsSource.contains(".accessibilityIdentifier(\"oasis-inject-energy-action\")"))
-        #expect(componentsSource.contains(".buttonStyle(.borderedProminent)"))
+        #expect(componentsSource.contains(".buttonStyle(ScaleButtonStyle())"))
+        #expect(componentsSource.contains(".background(Color.goPrimary, in: Capsule())"))
+        #expect(componentsSource.contains(".frame(maxWidth: 236)"))
         #expect(oasisHostSource.contains("onInjectEnergy: onInjectEnergy"))
     }
 
@@ -655,7 +660,10 @@ struct VerticalHomeTabMountPolicyTests {
         let homeUtilitiesSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Utilities.swift")
 
         #expect(componentsSource.contains("TabView(selection: selection)"))
-        #expect(componentsSource.contains(".tabItem"))
+        #expect(componentsSource.contains("Tab(value: tab)"))
+        #expect(componentsSource.contains(".accessibilityIdentifier(\"home-tab-\\(tab.rawValue)\")"))
+        #expect(componentsSource.contains(".id(visibleTabs)"))
+        #expect(!componentsSource.contains(".tabItem"))
         #expect(componentsSource.contains(".tabBarMinimizeBehavior(.onScrollDown)"))
         #expect(componentsSource.contains(".badge(tab == .calendar ? taskCenterBadge.attentionCount : 0)"))
         #expect(componentsSource.contains(".accessibilityIdentifier(\"home-native-tab-view\")"))
@@ -746,7 +754,10 @@ struct VerticalHomeTabMountPolicyTests {
     }
 
     @Test func plantBatchCareSheetUsesRouteSnapshotInsteadOfBodyAggregation() throws {
-        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift")
+        let dashboardSource = try [
+            "Ohana/Features/Plants/Views/PlantDashboardView.swift",
+            "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift"
+        ].map { try source($0) }.joined(separator: "\n")
         let sheetSource = try source("Ohana/Features/Plants/Views/PlantBatchCareSheet.swift")
         let snapshotSource = try source("Ohana/Features/Plants/PlantBatchCareRouteSnapshot.swift")
 
@@ -767,7 +778,10 @@ struct VerticalHomeTabMountPolicyTests {
 
     @Test func plantBatchCareSheetKeepsExceptionActionsInFlow() throws {
         let sheetSource = try source("Ohana/Features/Plants/Views/PlantBatchCareSheet.swift")
-        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift")
+        let dashboardSource = try [
+            "Ohana/Features/Plants/Views/PlantDashboardView.swift",
+            "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift"
+        ].map { try source($0) }.joined(separator: "\n")
 
         #expect(sheetSource.contains("PlantBatchCareActionRevealRow"))
         #expect(sheetSource.contains("@State private var resolvedTaskIDs"))
@@ -1199,11 +1213,14 @@ struct VerticalHomeTabMountPolicyTests {
     }
 
     @Test func plantDashboardWalletLegacyToggleUsesHeroStateMachine() throws {
-        let source = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift")
+        let dashboardSource = try [
+            "Ohana/Features/Plants/Views/PlantDashboardView.swift",
+            "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift"
+        ].map { try source($0) }.joined(separator: "\n")
 
-        #expect(source.contains("expandPlantWalletCard(snapshot)"))
-        #expect(source.contains("collapsePlantWalletCard()"))
-        #expect(!source.contains("withAnimation(GoMotion.page) {\n            expandedPlantCardID"))
+        #expect(dashboardSource.contains("expandPlantWalletCard(snapshot)"))
+        #expect(dashboardSource.contains("collapsePlantWalletCard()"))
+        #expect(!dashboardSource.contains("withAnimation(GoMotion.page) {\n            expandedPlantCardID"))
     }
 
     @Test func plantDashboardWalletUsesSceneLocalInactiveFreezeWithoutExternalState() throws {
@@ -1228,7 +1245,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!VerticalSolidHomePlantRoomRailPolicy.shouldShow(plantCount: 8, selectedCardId: nil, heroDirection: 1))
     }
 
-    @Test func homePlantPageOwnsViewSwitcherAndListMode() throws {
+    @Test func homePlantPageOwnsExpandAllGroupedGridMode() throws {
         let plantPage = try source("Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift")
         let models = try source("Ohana/Features/Home/VerticalSolidHomeModels.swift")
         let builder = try source("Ohana/Features/Home/VerticalSolidHomeSnapshotBuilder.swift")
@@ -1236,12 +1253,18 @@ struct VerticalHomeTabMountPolicyTests {
 
         #expect(plantPage.contains("VerticalSolidHomePlantViewStyle"))
         #expect(plantPage.contains("@State private var selectedViewStyle"))
-        #expect(plantPage.contains("home-plants-view-switcher-rail"))
+        #expect(plantPage.contains("selectedViewStyle == .roomStacks"))
+        #expect(plantPage.contains("home-plants-expand-all"))
+        #expect(plantPage.contains("home-plants-collapse-all"))
         #expect(plantPage.contains("home-plants-view-deck"))
-        #expect(plantPage.contains("home-plants-view-list"))
-        #expect(plantPage.contains("home-plants-room-list-view"))
-        #expect(plantPage.contains("selectedViewStyle == .deck &&"))
-        #expect(plantPage.contains("viewSwitcherCenterY(roomRailCenterY: roomRailCenterY)"))
+        #expect(plantPage.contains("home-plants-all-expanded-view"))
+        #expect(plantPage.contains("home-plants-all-expanded-room-"))
+        #expect(plantPage.contains("home-plants-all-expanded-card-"))
+        #expect(plantPage.contains("LazyVGrid("))
+        #expect(plantPage.contains("ForEach(roomGroups)"))
+        #expect(!plantPage.contains("roomGroups.prefix("))
+        #expect(!plantPage.contains("home-plants-view-list"))
+        #expect(!plantPage.contains("home-plants-view-switcher-rail"))
         #expect(plantPage.contains("collapsedLayoutMode: .scrollExtended"))
         #expect(plantPage.contains("expandedVerticalPlacement: .viewportTop("))
         #expect(plantPage.contains("deckScrollOffsetTracker.offsetY"))
@@ -1267,7 +1290,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(builder.contains("overdueCareTypes: overdueCareTypes"))
         #expect(builder.contains("dueCareCount: todayDueCareCount"))
         #expect(builder.contains("overdueCareCount: overdueCareCount"))
-        #expect(uiTestSource.contains("testHomePlantViewSwitcherRailSwitchesToListMode"))
+        #expect(uiTestSource.contains("testHomePlantExpandAllGroupsCompactCardsByRoom"))
     }
 
     @Test func homeQuickActionsExposeMinimumHitAreas() {

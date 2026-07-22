@@ -47,6 +47,7 @@ struct HumanWorkoutCard: View {
                 .padding(.horizontal, 16).padding(.vertical, 12)
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("human-detail-workout-action")
 
             GoDashedDivider().padding(.horizontal, 16)
 

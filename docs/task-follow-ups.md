@@ -9,23 +9,50 @@
 
 ## Current Read
 
-- Last compacted: 2026-07-15.
-- Open follow-ups: 11 total: P1 = 6, P2 = 4, P3 = 1.
+- Last compacted: 2026-07-22.
+- Open follow-ups: 13 total: P1 = 8, P2 = 4, P3 = 1.
 - Open P0: 0.
-- First-release repository blocker: no known defect, but one release-reachable
-  P1 proof gap is open. The current Human-first/D28 worktree supersedes the old
-  Pet-first route and has not yet received current compile, targeted-test, or
-  disposable-Simulator evidence.
-- First-release product/configuration gap: none for accounts; the current Solo
-  product deliberately has no Ohana account, login, or developer backend. D24
-  still approves iPhone-only, iOS 26.2+, with native iPad/watchOS deferred.
-- Current decision: close TFU-20260715-002 before resuming the four
-  physical-device P1 items. The remaining CloudKit P1 is explicitly deferred
-  and unreachable in Solo. The future
-  account design is recorded in
-  `docs/planning/account-backend-extension.md`; the requested family invitation
-  and explicit Human-linking flow is tracked below as P3 discovery only and does
-  not activate an account, backend, or online collaboration capability. Do not
+- First-release repository blocker: no known P0 defect, and two
+  release-reachable P1 implementation/proof gaps remain. Human-first/D28
+  repository and Simulator proof closed on 2026-07-18: the final repair batch
+  passed 57/57 focused tests and 15/15 after its last warning-only isolation
+  annotation; the complete release-static lane passed; optimized and WMO
+  Simulator Release products compiled; and the protected Dogfood user passed
+  a normal-UI Task Center branch/relaunch readback with sealed identity and no
+  balance or test-artifact pollution. Signed-device acceptance remains open
+  under the existing physical-device items. The Free / Personal worktree
+  contains quota enforcement, three Personal products, StoreKit
+  trial-eligibility handling, legacy Supporter
+  grandfathering, downgrade protection, paid capability gates, and the paywall;
+  its App + UI target compiles and its focused Unit artifact reports 67/67
+  passing. Complete nine-language in-app commerce copy and real App Store /
+  Sandbox acceptance remain open. The 2026-07-20 worktree also implements a
+  privacy-bounded Personal Today Widget and a Free/Personal walk Live Activity
+  with Dynamic Island presentation; 89 focused tests pass and clean plus final
+  incremental optimized Simulator Release builds embed and validate the
+  extension. Registering the two App
+  Groups, producing a signed current package, and physical-device Widget /
+  Dynamic Island acceptance remain open. The earlier storage and conflict-copy
+  build Swift-source build blockers are cleared.
+- First-release product/configuration gap: 1.0 is now Free plus Personal.
+  Free allows 1 active Pet, 2 active Humans, 5 active Plants, and 3 ordinary
+  active logical plans while preserving basic records, existing history,
+  manual export, critical-health plans, and memorials. Personal is monthly,
+  yearly, or Lifetime and adds unlimited active capacity plus approved advanced
+  local tools and Supporter cosmetics. The worktree now contains a fail-closed
+  optional Family guardian account/backend and annual catalog, but the runtime,
+  purchase entry and public SKU remain disabled until its dedicated external
+  gates close; ordinary Free / Personal still has no login. Care+ and ads remain
+  absent. D24 still approves
+  iPhone-only, iOS 26.2+, with native
+  iPad/watchOS deferred.
+- Current decision: close TFU-20260715-003 and TFU-20260720-001 before final
+  signed-device RC acceptance. The remaining CloudKit P1 is explicitly
+  deferred and unreachable in the local-only first release. The future
+  broader account design is recorded in
+  `docs/planning/account-backend-extension.md`; the approved minimum Family
+  guardian implementation and external launch gates are tracked separately
+  below and do not activate CloudKit or full online collaboration. Do not
   claim RC/App Store readiness until all release-reachable P1 items are
   dispositioned.
 
@@ -40,35 +67,114 @@
 
 ## Open Items
 
-### TFU-20260715-002 - Validate Human-First Onboarding And Starter Journey
+### TFU-20260722-001 - Deploy And Validate Family App Guardian
 
-- Priority / bucket: P1, current first-release repository and Simulator proof.
-- Blocker: D17 now requires a local Human name and makes first-Pet creation
-  optional; the first Pet exposes an explicit 50-coconut Task Center claim, and
-  D28 adds six independently claimed member-wallet rewards. Current source and
-  test files implement these boundaries, but this documentation task did not
-  compile the affected target, run the targeted suites, or execute either clean
-  journey. The 2026-07-11 no-Human Pet-first evidence is historical.
-- Next action: on the fixed tests lane, run the focused onboarding coordinator,
-  handoff, starter gift, household journey, Task Center projection, route,
-  reset, growth-unlock, and compatibility suites. Then use only the disposable
-  `iPhone 17 Tests` device for `Human -> Later` and
-  `Human -> Pet -> Task Center -> explicit claim`, including interruption,
-  relaunch, duplicate-tap, failed-claim retry, Oasis lock, Home card handoff,
-  system-item/list-only behavior, and the first three D28 rows.
-- Close when: the affected App/test targets compile; selected tests pass with
-  non-zero execution; both clean journeys pass; the 50-coconut credit is atomic
-  and household-idempotent; Oasis never unlocks before claim; the six D28
-  rewards total 400, enter the resolved Human wallet only after eligibility is
-  rechecked, and preserve privacy-choice equivalence; active status documents
-  record the exact commands and results.
+- Priority / bucket: P1 for any Family release; unreachable and non-blocking
+  while the local Free / Personal release keeps the guardian flag false.
+- Progress: the worktree contains V96 local projections and reliable Presence
+  outbox, Sign in with Apple / Cognito client flow, per-installation APNs endpoint
+  registration, invitations, guardian dashboard, annual Family StoreKit catalog,
+  server-side JWS / App Store Server Notifications V2 verification, and an AWS
+  SAM stack for API Gateway, Lambda, DynamoDB, EventBridge Scheduler, SQS / DLQ
+  and SNS in `eu-central-1`. Guardian rules, privacy and safety-contract tests
+  pass 17/17; the
+  affected iOS selection passes 353 tests in 9 suites; cfn-lint and production
+  dependency imports pass. Runtime configuration and Family purchase remain
+  fail-closed.
+- Blocker: no production AWS deployment, controlled HTTPS invite host /
+  Associated Domains, Cognito Apple configuration, production and sandbox SNS
+  platform apps, APNs delivery evidence, App Store Server Notifications V2,
+  App Store Connect Family SKU, privacy questionnaire, Sandbox lifecycle, or
+  two-account / two-device acceptance exists. Simulator cannot prove notification
+  permission, actual delivery, uninstall token invalidation or recovery.
+- Next action: deploy the guarded stack in `eu-central-1`, configure Apple and
+  AWS secrets without logging them, add the verified invite host to Associated
+  Domains, configure App Store Server Notifications and Family Yearly, update
+  the App Store privacy label, then run the two-device matrix in
+  `docs/specs/GuardianSafety-logic.md`.
+- Close when: day 2 initial, day 3 single follow-up, recovery, guardian
+  acknowledgement, pause, revoke, entitlement loss, offline outbox, invalid
+  token and account deletion all pass on two signed physical devices; server
+  logs contain no names, scores or care data; nine languages and accessibility
+  pass; only then may `OHANAGuardianSafetyEnabled` and the Family SKU be enabled.
+
+### TFU-20260715-003 - Ship And Validate Free / Personal 1.0
+
+- Priority / bucket: P1, current first-release implementation, Store
+  configuration, quota migration, and purchase acceptance.
+- Blocker: the current worktree implements the centralized Monthly / Yearly /
+  Lifetime catalog, verified legacy Supporter grandfathering, Free quotas,
+  logical-plan grouping, reactivation protection, downgrade grandfathering,
+  StoreKit-sourced trial eligibility, paid capability gates, and paywall. The
+  current App + UI target compiles and
+  `.build/TestResults/PersonalFocused.xcresult` reports 67/67 focused Unit tests
+  passing. Free space is about 44 GiB and no `* 2.swift` / `* 3.swift` conflict
+  copies remain, so the earlier local build blockers are cleared. App Store
+  Connect, Sandbox, second-device restore, subscription lifecycle, signed
+  Storefront, assistive-technology, and complete nine-language App commerce
+  copy remain absent.
+- Next action: reconcile any remaining focused quota,
+  plan-grouping/reactivation, capability, UI-contract, catalog, and entitlement
+  selectors against the current source, and complete the remaining App commerce
+  languages. Then validate StoreKit product
+  loading, verified/unverified purchase, pending, cancel, failure,
+  `currentEntitlements`, `Transaction.updates`, `AppStore.sync()`, offline,
+  trial conversion, subscription expiration, Lifetime, refund/revocation, and
+  restore. Keep ads absent and preserve Coconut / `ShopPurchaseRecord`
+  ownership.
+- Close when: affected App/test targets compile and targeted tests execute with
+  non-zero coverage; Free quotas and logical-plan deduplication pass; Personal
+  is unlimited; all over-quota grandfather/downgrade paths preserve data and
+  only block further increasing operations; Monthly / Yearly / Lifetime and
+  legacy Supporter all produce the correct unified Personal entitlement; yearly
+  trial eligibility comes from StoreKit; every failure leaves Free data and
+  Coconut ownership unchanged; nine-language/accessibility coverage passes; a
+  final signed 1.0 build loads the real localized Storefront products; Sandbox
+  subscription, Lifetime, second-device restore, trial/expiration, and
+  refund/revocation pass; agreements, tax/banking, metadata, review materials,
+  and submission are ready and recorded in the active release dashboard.
+
+### TFU-20260720-001 - Sign And Validate Widget And Walk Live Activity
+
+- Priority / bucket: P1, current first-release capability and physical-device
+  acceptance.
+- Progress: the current worktree adds an embedded WidgetKit extension with a
+  bounded Personal Today Widget, accessory presentation, typed deep links, and
+  a walk Live Activity covering Lock Screen plus Dynamic Island expanded,
+  compact, and minimal regions. The app owns the SwiftData projection, writes
+  at most three minimized task DTOs through a dedicated App Group JSON file,
+  preserves a recoverable active walk across relaunch, removes stale
+  activities, and routes all update frequency through `AppWorkloadPolicy`.
+  Seven focused suites execute 89/89 tests, and the unsigned Simulator and
+  LocalDevice lanes compile and embed both app and extension. A clean-cache
+  dual-architecture optimized Release build and the final incremental recheck also pass
+  `ValidateEmbeddedBinary` for the extension.
+- Blocker: `group.com.guanchen.li.Ohana` and
+  `group.com.guanchen.li.Ohana.LocalDevice` have not been registered and
+  approved in Developer Portal provisioning for both app and extension. No
+  signed current Archive or physical-device run has therefore proved shared
+  snapshot access, Home/Lock Screen Widget rendering, Dynamic Island behavior,
+  foreground/background location handoff, or locked-device privacy.
+- Next action: register each App Group on its matching app and Widget extension
+  identifiers, regenerate profiles, then install one signed current Release.
+  Exercise Personal, Free, downgrade, locked/redacted, stale, reset, and deep
+  link Widget states; then run an active dog walk through start, pause, resume,
+  distance/poop updates, relaunch, background/lock, deep link, and finish on a
+  Dynamic Island-capable iPhone.
+- Close when: the signed package embeds the extension with exact matching
+  entitlements; all Widget families render current, locked, empty, and stale
+  states without leaking deleted, deceased, health, or free-form task data;
+  links restore the intended route from cold and warm launch; one active walk
+  survives relaunch without duplication and ends cleanly; key long-language,
+  Dynamic Type, Reduce Motion, Low Power, and locked-screen states are recorded.
 
 ### TFU-20260614-014 - Validate CloudSync Live-Apply Policy When Family Enables
 
 - Priority / bucket: P1, deferred CloudKit 1.x / first-release-unreachable.
 - Blocker: local tests cover delete-wins, parent lifecycle, and natural identity,
-  but the Solo target has no CloudKit/APNs capability and uses
-  `cloudKitDatabase: .none`.
+  but the target has no CloudKit service entitlement and uses
+  `cloudKitDatabase: .none`. Family guardian APNs is a separate service and does
+  not satisfy CloudKit evidence.
 - Next action: run shared-zone conflict/deletion validation only when the Family
   product gate and capability profile are explicitly enabled.
 - Close when: two-device CloudKit evidence confirms convergence without
@@ -150,12 +256,12 @@
   increase. The preserved 59🥥 Oasis regression is therefore device-verified.
   A 2026-07-12 device-local Apple identity prototype and a later provider-neutral
   backend prototype were evaluated but never became the product. On 2026-07-12
-  both were removed: the current target has no Sign in with Apple entitlement,
+  both were removed: at that checkpoint the target had no Sign in with Apple entitlement,
   login UI, Auth SDK, Supabase project, or account data collection. Their signed
   Archive and simulator tests remain historical evidence only and cannot be used
   to describe or approve the current build. Future design is retained solely in
   `docs/planning/account-backend-extension.md`.
-  Later on 2026-07-12, the current local-only worktree produced and verified
+  Later on 2026-07-12, that local-only worktree produced and verified
   `/tmp/OhanaArchives/2026-07-12-180306/Ohana-c2aa2af859-dirty.xcarchive`.
   The signed arm64/iPhone-only/iOS 26.2+ App contains HealthKit + CloudDocuments
   only and no Sign in with Apple, CloudKit, APNs, App Group, remote notification,
@@ -183,12 +289,21 @@
 ### TFU-20260629-004 - Finish Pet Simulator GUI Depth
 
 - Priority / bucket: P2, simulator/UI coverage depth.
-- Blocker: broad Pet paths pass, but some negative/edit/shop/stale-route and
-  cross-feature long-session combinations remain unautomated.
-- Next action: add only narrow tests exposed by real regression risk; use the
-  dogfood simulator for persistent old-user scenarios.
-- Close when: the remaining release-relevant Pet negative paths have stable
-  automated or recorded manual proof.
+- Blocker: all 119/119 formal UI selectors now have cumulative trusted green
+  evidence, but some negative/edit/shop/stale-route combinations remain outside
+  the manifest. Two passing current-build Walk journeys reproducibly emit
+  CoreLocation's main-thread UI-unresponsiveness runtime warning as the live
+  route starts. The result bundles provide no stack or source location, and a
+  source search finds no direct `locationServicesEnabled()` call, so App versus
+  MapKit/CoreLocation attribution remains open; no visible stall was measured.
+- Next action: add only narrow tests exposed by real regression risk. Attribute
+  the Walk warning with a focused stack/profile or signpost before changing
+  product code, rerun the narrow Walk path afterward, and cover locked-screen
+  location on the physical-device lane. Use the Dogfood simulator only for
+  non-destructive persistent old-user scenarios.
+- Close when: remaining release-relevant Pet negative paths have stable
+  automated or recorded manual proof and the Walk warning is either removed
+  from product code or attributed to the platform with measured non-regression.
 
 ### TFU-20260612-020 - Finish Long-Language Visual Coverage
 

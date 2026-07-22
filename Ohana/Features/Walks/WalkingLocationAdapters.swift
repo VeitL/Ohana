@@ -17,12 +17,15 @@ protocol WalkLocationManaging: AnyObject {
     func returnActiveWalkToForegroundDelivery()
     func enforceNoLocationUnlessRunningWalk(_ isRunningWalk: Bool, reason: String)
     func routeLocationsForPersistence(maxCount: Int) -> [CLLocation]
+    func setWalkMetricsUpdateHandler(_ handler: ((Double) -> Void)?)
 }
 
 extension WalkLocationManaging {
     func routeLocationsForPersistence() -> [CLLocation] {
         routeLocationsForPersistence(maxCount: 600)
     }
+
+    func setWalkMetricsUpdateHandler(_: ((Double) -> Void)?) {}
 }
 
 extension LocationManager: WalkLocationManaging {}

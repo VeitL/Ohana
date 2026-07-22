@@ -39,7 +39,6 @@ struct EditHumanSheet: View {
         OhanaSheetWrapper(title: l.tr(zh: "编辑成员", en: "Edit Member", de: "Mitglied bearbeiten"), onDismiss: { dismiss() }) {
             VStack(spacing: 16) {
                 formField(l.tr(zh: "姓名", en: "Name", de: "Name"), text: $name)
-                formField(l.tr(zh: "头像 Emoji", en: "Avatar Emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
 
                 Toggle(l.tr(zh: "设置生日", en: "Set Birthday", de: "Geburtstag festlegen"), isOn: $hasBirthday)
                     .tint(Color.goPrimary)
@@ -53,9 +52,14 @@ struct EditHumanSheet: View {
                 formField(l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), text: $nationality)
                 formField(l.tr(zh: "城市", en: "City", de: "Stadt"), text: $city)
 
-                Picker(l.tr(zh: "角色", en: "Role", de: "Rolle"), selection: $role) {
-                    Text(l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")).tag("owner")
-                    Text(l.tr(zh: "成员", en: "Member", de: "Mitglied")).tag("member")
+                Picker(l.tr(
+                    zh: "家庭角色", en: "Household role", de: "Rolle im Haushalt",
+                    es: "Rol en el hogar", pt: "Papel na família", fr: "Rôle dans le foyer",
+                    ja: "家族での役割", ko: "가족 역할", it: "Ruolo familiare"
+                ), selection: $role) {
+                    ForEach(HumanProfileOptions.permissionRoles, id: \.key) { option in
+                        Text(HumanProfileOptions.localizedRoleTitle(option.key, l: l)).tag(option.key)
+                    }
                 }
                 .pickerStyle(.segmented)
 

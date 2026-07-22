@@ -145,7 +145,6 @@ struct CrewRosterOverlay: View {
             .onChange(of: searchTrigger) { _, _ in
                 focusMemberSearch()
             }
-            .accessibilityIdentifier("crew-roster-\(resolvedInitialMode.rawValue)")
         }
     }
 
@@ -330,6 +329,7 @@ struct CrewRosterOverlay: View {
                 Text(l.tr(zh: "家庭成员", en: "Family Members", de: "Familienmitglieder"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .accessibilityIdentifier("crew-roster-\(resolvedInitialMode.rawValue)")
                 Text(l.tr(
                     zh: "档案、钱包与成员管理",
                     en: "Profiles, wallets, and member management",

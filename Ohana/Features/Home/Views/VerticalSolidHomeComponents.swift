@@ -67,14 +67,7 @@ struct VerticalSolidHomeDashboardPage: View {
             }
         }
         .onDisappear {
-            collapseCleanupTask?.cancel()
-            collapseCleanupTask = nil
-            headerContextCardId = nil
-            isCardExpandedOrTransitioning = false
-            isCardHeroAnimating = false
-            activeHeroSnapshot = nil
-            heroGeneration += 1
-            cardHeroProgress = 0
+            resetCardPresentationState()
         }
         .onAppear {
             prepareHeroSnapshots()
@@ -569,18 +562,24 @@ struct OasisTreeRenderSnapshot: Equatable {
     let progressToNextLevel: Double
     let totalEnergy: Int
     let nextLevelThreshold: Int
+    let availableCoconutBalance: Int?
     let shopLockedLevel: Int?
     let shopInitialCategory: ShopItem.ShopCategory
+    let achievementsLockedLevel: Int?
     let crittersLockedLevel: Int?
     let gachaLockedLevel: Int?
+
+    var coconutBalance: Int? { availableCoconutBalance }
 
     init(
         level: Int,
         progressToNextLevel: Double,
         totalEnergy: Int = 0,
         nextLevelThreshold: Int = 0,
+        coconutBalance: Int? = nil,
         shopLockedLevel: Int? = nil,
         shopInitialCategory: ShopItem.ShopCategory = .effect,
+        achievementsLockedLevel: Int? = nil,
         crittersLockedLevel: Int? = nil,
         gachaLockedLevel: Int? = nil
     ) {
@@ -588,8 +587,10 @@ struct OasisTreeRenderSnapshot: Equatable {
         self.progressToNextLevel = Self.clampedProgress(progressToNextLevel)
         self.totalEnergy = max(0, totalEnergy)
         self.nextLevelThreshold = max(0, nextLevelThreshold)
+        availableCoconutBalance = coconutBalance.map { max(0, $0) }
         self.shopLockedLevel = shopLockedLevel
         self.shopInitialCategory = shopInitialCategory
+        self.achievementsLockedLevel = achievementsLockedLevel
         self.crittersLockedLevel = crittersLockedLevel
         self.gachaLockedLevel = gachaLockedLevel
     }
@@ -602,8 +603,17 @@ struct OasisTreeRenderSnapshot: Equatable {
 
 struct VerticalSolidHomeOasisFrozenTreeStage: View {
     let snapshot: OasisTreeRenderSnapshot
+    var injectionPulseToken = 0
+    var allowsAmbientMotion = false
+    var allowsInteractionMotion = false
+    var usesFullVisualEffects = true
+    var layoutStyle: OasisHomeTreeLayoutStyle = .standard
     var onInjectEnergy: () -> Void = {}
     var onOpenShop: (ShopItem.ShopCategory) -> Void = { _ in }
+    var onOpenAchievements: () -> Void = {}
+    var onOpenCritters: () -> Void = {}
+    var onOpenGacha: () -> Void = {}
+    var onOpenGrowthRoadmap: () -> Void = {}
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
@@ -636,8 +646,6 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             frozenStageBackground(shape: stageShape)
             frozenStageStars
             frozenStageSun
-            frozenIslandBase
-            frozenTreeGlow
 
             VStack(spacing: 0) {
                 frozenStageHUD
@@ -646,31 +654,38 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
 
                 Spacer(minLength: 0)
 
-                BeautifulCoconutTree(
-                    level: snapshot.level,
-                    isInjecting: false,
-                    growthProgress: snapshot.progressToNextLevel,
-                    pendingUpgradeCoconutCount: 0,
-                    dailyCoconutCount: 0,
-                    allowsAmbientMotion: false,
-                    harvestedCoconuts: []
-                )
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-                .frame(height: metrics.treeVisualHeight)
-                .padding(.bottom, 2)
+                if layoutStyle == .zen {
+                    VStack(spacing: 0) {
+                        frozenTreeScene(height: metrics.treeVisualHeight)
 
-                frozenUpgradeCoconutDock
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 6)
+                        frozenUpgradeCoconutDock
+                            .padding(.horizontal, 18)
+                            .padding(.bottom, 4)
 
-                frozenInjectEnergyButton
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 8)
+                        frozenProgressRail
+                            .padding(.horizontal, 18)
+                            .padding(.bottom, 8)
 
-                frozenProgressRail
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 14)
+                        frozenInjectEnergyButton
+                            .padding(.horizontal, 18)
+                            .padding(.bottom, 12)
+                    }
+                    .offset(y: -28)
+                } else {
+                    frozenTreeScene(height: metrics.treeVisualHeight)
+
+                    frozenUpgradeCoconutDock
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 5)
+
+                    frozenInjectEnergyButton
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 8)
+
+                    frozenProgressRail
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 12)
+                }
             }
         }
         .frame(height: metrics.treeCardHeight)
@@ -682,32 +697,94 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
         .accessibilityIdentifier("oasis-tree-level-control")
     }
 
+    private func frozenTreeScene(height: CGFloat) -> some View {
+        ZStack(alignment: .bottom) {
+            frozenTreeGlow
+                .zIndex(0)
+
+            OasisTreeEnergySurgeView(
+                pulseToken: injectionPulseToken,
+                color: treeGlowColor,
+                allowsMotion: allowsInteractionMotion
+            )
+            .zIndex(1)
+
+            OasisTreeIslandBase(
+                level: snapshot.level,
+                progress: snapshot.progressToNextLevel
+            )
+            .zIndex(2)
+
+            BeautifulCoconutTree(
+                level: snapshot.level,
+                isInjecting: false,
+                growthProgress: snapshot.progressToNextLevel,
+                injectionPulseToken: injectionPulseToken,
+                pendingUpgradeCoconutCount: 0,
+                dailyCoconutCount: 0,
+                allowsAmbientMotion: allowsAmbientMotion,
+                allowsInteractionMotion: allowsInteractionMotion,
+                usesLiquidGlassLeaves: usesFullVisualEffects,
+                harvestedCoconuts: []
+            )
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .frame(height: max(0, height - 18))
+            .offset(y: -18)
+            .zIndex(3)
+        }
+        .frame(height: height)
+    }
+
     private var frozenInjectEnergyButton: some View {
         let cost = OasisTreeEnergyInjectionPolicy.starterPackageCost
+        let energy = OasisTreeEnergyInjectionPolicy.starterPackageXP
         return Button {
             OhanaFeedback.medium()
             onInjectEnergy()
         } label: {
             Label(
-                l.tr(
-                    zh: "注入能量 · \(cost)🥥",
-                    en: "Inject energy · \(cost)🥥",
-                    de: "Energie einspeisen · \(cost)🥥"
-                ),
+                frozenInjectionButtonTitle(cost: cost, energy: energy),
                 systemImage: "bolt.fill"
             )
-            .font(.headline)
+            .font(OhanaFont.body(.black))
+            .foregroundStyle(Color.ohanaPrimaryActionText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
             .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, 14)
+            .background(Color.goPrimary, in: Capsule())
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .tint(Color.goPrimary)
+        .buttonStyle(ScaleButtonStyle())
+        .frame(maxWidth: 236)
+        .frame(maxWidth: .infinity)
+        .opacity(canInjectFrozenEnergy(cost: cost) ? 1 : 0.52)
+        .disabled(!canInjectFrozenEnergy(cost: cost))
         .accessibilityIdentifier("oasis-inject-energy-action")
         .accessibilityHint(l.tr(
-            zh: "消耗椰子并提升椰子树能量",
-            en: "Spend coconuts to grow the Coconut Tree",
-            de: "Kokosnüsse ausgeben und den Kokosbaum stärken"
+            zh: "照护会自然增加能量，椰子可以用于加速成长",
+            en: "Care grows the tree naturally; coconuts can accelerate it",
+            de: "Pflege lässt den Baum natürlich wachsen; Kokosnüsse beschleunigen das Wachstum"
         ))
+    }
+
+    private func canInjectFrozenEnergy(cost: Int) -> Bool {
+        snapshot.availableCoconutBalance.map { $0 >= cost } ?? true
+    }
+
+    private func frozenInjectionButtonTitle(cost: Int, energy: Int) -> String {
+        guard canInjectFrozenEnergy(cost: cost) else {
+            return l.tr(
+                zh: "椰子不足 · 需要 \(cost)🥥",
+                en: "Need \(cost)🥥",
+                de: "\(cost)🥥 benötigt"
+            )
+        }
+        return l.tr(
+            zh: "注入 \(cost)🥥 · +\(energy) 能量",
+            en: "Use \(cost)🥥 · +\(energy) energy",
+            de: "\(cost)🥥 nutzen · +\(energy) Energie"
+        )
     }
 
     private var frozenBentoGrid: some View {
@@ -720,16 +797,17 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             ),
             localization: l,
             shopLockedLevel: snapshot.shopLockedLevel,
+            achievementsLockedLevel: snapshot.achievementsLockedLevel,
             crittersLockedLevel: snapshot.crittersLockedLevel,
             gachaLockedLevel: snapshot.gachaLockedLevel,
             isCompact: true,
-            interactiveFeatures: [.shop],
+            interactiveFeatures: Set(OasisBentoFeature.allCases),
             onOpenShop: {
                 onOpenShop(snapshot.shopInitialCategory)
             },
-            onOpenAchievements: {},
-            onOpenCritters: {},
-            onOpenGacha: {}
+            onOpenAchievements: onOpenAchievements,
+            onOpenCritters: onOpenCritters,
+            onOpenGacha: onOpenGacha
         )
     }
 
@@ -743,12 +821,23 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
 
     private var energyRailTitle: String {
         if snapshot.level >= TreeLevel.lv10.rawValue {
-            return l.tr(zh: "满级", en: "Max", de: "Max")
+            return l.tr(zh: "生命树已达到满级", en: "Life Tree at max level", de: "Lebensbaum auf höchster Stufe")
         }
         if snapshot.nextLevelThreshold > 0 {
-            return "\(snapshot.totalEnergy)/\(snapshot.nextLevelThreshold)"
+            let nextLevel = min(TreeLevel.lv10.rawValue, snapshot.level + 1)
+            let remaining = max(0, snapshot.nextLevelThreshold - snapshot.totalEnergy)
+            return l.tr(
+                zh: "距 Lv.\(nextLevel) 还差 \(remaining) 能量",
+                en: "\(remaining) energy to Lv.\(nextLevel)",
+                de: "Noch \(remaining) Energie bis Lv.\(nextLevel)"
+            )
         }
         return "\(Int(snapshot.progressToNextLevel * 100))%"
+    }
+
+    private var energyRailValue: String? {
+        guard snapshot.level < TreeLevel.lv10.rawValue, snapshot.nextLevelThreshold > 0 else { return nil }
+        return "\(snapshot.totalEnergy)/\(snapshot.nextLevelThreshold)"
     }
 
     private var frozenUpgradeCoconutDock: some View {
@@ -765,7 +854,7 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
 
             Spacer(minLength: 0)
         }
-        .frame(minHeight: 44)
+        .frame(minHeight: 28)
     }
 
     private var nextStageHint: String {
@@ -773,9 +862,9 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             return l.tr(zh: "树冠已觉醒", en: "Tree awakened", de: "Baum erwacht")
         }
         return l.tr(
-            zh: "下一颗升级椰子在树上成长",
-            en: "Next upgrade coconut is growing",
-            de: "Nächste Upgrade-Kokosnuss wächst"
+            zh: "完成照护，生命树会自然成长",
+            en: "Care grows the Life Tree naturally",
+            de: "Pflege lässt den Lebensbaum natürlich wachsen"
         )
     }
 
@@ -786,24 +875,27 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 Spacer()
                 if passiveIncomeAmount > 0 {
                     Text("+\(passiveIncomeAmount)🥥/d")
                         .font(OhanaFont.caption2(.black))
                         .foregroundStyle(Color.goPrimary)
                 }
-            }
-
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.ohanaControlFill)
-                    Capsule()
-                        .fill(LinearGradient(colors: [Color.goPrimary, Color.goTeal], startPoint: .leading, endPoint: .trailing))
-                        .frame(width: max(8, proxy.size.width * CGFloat(snapshot.progressToNextLevel)))
+                if let energyRailValue {
+                    Text(energyRailValue)
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .monospacedDigit()
                 }
             }
-            .frame(height: 8)
+
+            OasisEnergyProgressBar(
+                progress: snapshot.progressToNextLevel,
+                pulseToken: injectionPulseToken,
+                allowsMotion: allowsInteractionMotion
+            )
         }
     }
 
@@ -845,11 +937,12 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
 
     private var frozenStageStars: some View {
         ZStack {
-            ForEach(0 ..< 24, id: \.self) { index in
-                let size = CGFloat([1.5, 2.0, 2.5, 1.8][index % 4])
+            ForEach(0 ..< 8, id: \.self) { index in
+                let size = CGFloat([2.0, 2.8, 2.2, 3.0][index % 4])
                 Circle()
-                    .fill(Color.ohanaPrimaryText.opacity(Double([0.28, 0.44, 0.24, 0.5][index % 4])))
+                    .fill(Color.ohanaPrimaryText.opacity(Double([0.22, 0.38, 0.20, 0.32][index % 4])))
                     .frame(width: size, height: size)
+                    .shadow(color: Color.ohanaPrimaryText.opacity(0.18), radius: 3) // ui-v4: allow subtle decorative star glow inside the frozen Oasis illustration
                     .offset(
                         x: CGFloat((index * 53) % 320) - 160,
                         y: CGFloat((index * 37) % 220) - 160
@@ -857,42 +950,20 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             }
         }
         .opacity(colorScheme == .light ? 0.45 : 1)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     private var frozenStageSun: some View {
-        Circle()
-            .fill(Color.goYellow)
-            .frame(width: 26, height: 26) // a11y: allow non-interactive frozen Oasis celestial dot
+        Image(systemName: "moon.fill") // a11y: allow non-interactive frozen Oasis moon
+            .font(OhanaFont.adaptive(size: 25, weight: .black))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(Color.goYellow)
             .shadow(color: Color.goYellow.opacity(0.68), radius: 14, x: 0, y: 0) // ui-v4: allow frozen Oasis stage celestial glow
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             .padding(.top, 24)
             .padding(.trailing, 28)
-    }
-
-    private var frozenIslandBase: some View {
-        ZStack(alignment: .bottom) {
-            Ellipse()
-                .fill(
-                    LinearGradient(
-                        colors: colorScheme == .light
-                            ? [Color(hex: "D4B989"), Color(hex: "B58B55")]
-                            : [Color(hex: "E2A545"), Color(hex: "9A5B22")],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 304, height: 56)
-                .blur(radius: 0.2)
-
-            Ellipse()
-                .fill(Color.black.opacity(colorScheme == .light ? 0.12 : 0.26)) // ui-v4: allow grounded frozen island stage shadow
-                .frame(width: 250, height: 18)
-                .offset(y: 11)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .padding(.bottom, 110)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+            .accessibilityHidden(true)
     }
 
     private var frozenTreeGlow: some View {
@@ -900,43 +971,64 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [treeGlowColor.opacity(0.10), .clear],
+                        colors: [treeGlowColor.opacity(0.06), .clear],
                         center: .center,
                         startRadius: 20,
-                        endRadius: 190
+                        endRadius: 145
                     )
                 )
-                .frame(width: 340, height: 340)
-                .scaleEffect(0.94)
+                .frame(width: 280, height: 280)
+                .scaleEffect(0.96)
 
             Circle()
-                .stroke(Color.goPrimary.opacity(0.05), lineWidth: 2)
-                .frame(width: 250, height: 250)
+                .stroke(Color.goPrimary.opacity(0.035), lineWidth: 1.5)
+                .frame(width: 210, height: 210)
                 .blur(radius: 2)
         }
-        .offset(y: -32)
+        .offset(y: -12)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
     private var frozenStageHUD: some View {
         HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Lv.\(snapshot.level)")
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .monospacedDigit()
-                Text(treeDisplayName)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
-                    .lineLimit(1)
+            Button {
+                OhanaFeedback.light()
+                onOpenGrowthRoadmap()
+            } label: {
+                HStack(spacing: 9) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Lv.\(snapshot.level)")
+                            .font(OhanaFont.title3(.black))
+                            .monospacedDigit()
+                        Text(treeDisplayName)
+                            .font(OhanaFont.caption(.black))
+                            .opacity(0.72)
+                            .lineLimit(1)
+                    }
+
+                    Image(systemName: "chevron.right") // a11y: allow decorative disclosure glyph; the button owns the localized label
+                        .font(OhanaFont.caption(.black))
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+            .buttonStyle(ScaleButtonStyle())
             .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("level \(snapshot.level)")
+            .accessibilityLabel(l.tr(
+                zh: "椰子树等级 Lv.\(snapshot.level)",
+                en: "Coconut Tree level \(snapshot.level)",
+                de: "Kokosbaum Stufe \(snapshot.level)"
+            ))
+            .accessibilityHint(l.tr(
+                zh: "打开升级路线和解锁规则",
+                en: "Open upgrade roadmap and unlock rules",
+                de: "Upgrade-Roadmap und Freischaltregeln öffnen"
+            ))
 
             Spacer(minLength: 4)
         }

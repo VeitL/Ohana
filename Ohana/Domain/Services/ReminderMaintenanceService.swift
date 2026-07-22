@@ -440,24 +440,35 @@ enum ReminderMaintenanceService {
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging?
     ) async -> ReminderMaintenanceRunResult {
         let reminderScheduling = providedReminderScheduling ?? DomainServiceDependencyRegistry.reminderScheduling(careLedger: CareLedgerService())
+        let lifecycleSnapshot = MemberLifecycleActiveScheduleSnapshot(context: context)
+        let activeReminders = reminders.filter { reminder in
+            guard lifecycleSnapshot.includes(reminder) else {
+                let notificationID = reminder.notificationId.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !notificationID.isEmpty {
+                    OhanaNotifications.current.cancel(notificationId: notificationID)
+                }
+                return false
+            }
+            return true
+        }
         guard !Task.isCancelled else {
-            return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: false, hasMoreWork: hasMoreWork)
+            return ReminderMaintenanceRunResult(pendingCount: activeReminders.count, completed: false, hasMoreWork: hasMoreWork)
         }
 
         await reminderScheduling.refillMissingPendingNotifications(
-            reminders: reminders,
+            reminders: activeReminders,
             context: context
         )
         guard !Task.isCancelled else {
-            return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: false, hasMoreWork: hasMoreWork)
+            return ReminderMaintenanceRunResult(pendingCount: activeReminders.count, completed: false, hasMoreWork: hasMoreWork)
         }
 
-        reminderScheduling.compensate(reminders: reminders, context: context)
+        reminderScheduling.compensate(reminders: activeReminders, context: context)
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             context.rollback()
             return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: false, hasMoreWork: hasMoreWork)
         }
-        return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: true, hasMoreWork: hasMoreWork)
+        return ReminderMaintenanceRunResult(pendingCount: activeReminders.count, completed: true, hasMoreWork: hasMoreWork)
     }
 }

@@ -189,7 +189,7 @@ GATE_CONSUMPTION_RE = re.compile(
     r"|CarePlanCalendarSync\.(?:suppressDefaultPlan|removeCalendarPlan|removeActiveCalendarPlans|ensureDefaultPlans|reconcileDefaultPlanOverrides|sync[A-Za-z0-9_]+)"
     r"|WaterPlanWriter\.(?:replacePlan|deletePlan|deactivateReminderOperations|ensureUpcomingReminders)"
     r"|FeedingPlanWriter\.(?:replacePlan|deletePlan|deactivateManualReminderOperations|clearFeedModePlans|ensureUpcomingManualReminders|saveFoodPurchase|correctFoodStock|rebuildFoodStockReminder|rebuildFoodStockReminders)"
-    r"|MemberLifecycleActiveScheduleCleanup"
+    r"|MemberLifecycleActiveScheduleNotifications"
     r"|PetCareTrackingCommandService\.deleteCareLog"
     r"|PetPottyCommandService\.deletePottyLog"
     r"|PetHygieneCommandService\.delete"

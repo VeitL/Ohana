@@ -1,6 +1,6 @@
 # 首发真机测试清单
 
-更新日期：2026-07-15
+更新日期：2026-07-22
 
 本文件给真机执行使用，目的是让你一眼看清：哪些已经由自动化或模拟器预检覆盖，哪些还必须由你在真实 iPhone 上签收。
 
@@ -20,14 +20,17 @@
 
 ## 本轮结论
 
-当前已知首发仓库代码层 P0 为 0，首发可达的 repo-code P1 为 1。状态总账还剩
-11 个 follow-up：1 个当前 Human-first / D28 仓库与模拟器验证项、1 个 CloudKit
-1.x 延后项、4 个真机 P1、4 个非阻塞 P2 和 1 个未来 P3。
+当前已知首发仓库代码层 P0 为 0，首发可达的实现 / 证明 P1 为 2。状态总账还剩
+13 个 follow-up：1 个 Free / Personal 与 Storefront 项、1 个 Widget / Dynamic
+Island 能力与真机项、1 个 Family 守护专项、1 个 CloudKit 1.x 延后项、4 个其他
+真机 P1、4 个非阻塞 P2 和 1 个未来 P3。Family 守护在开关关闭时不阻塞本地
+Free / Personal 发布，但任何 Family 发布必须先关闭其专项 P1。
 设备范围已经批准为 iPhone-only / iOS 26.2+；签名
-Archive、App Store Connect 和最小实体 iPhone 证明并入下方 R0。下方 15 项
-是给人执行的合并验收清单，不等于 15 个独立 open follow-up；第 15 项
+Archive、App Store Connect 和最小实体 iPhone 证明并入下方 R0。下方 17 项
+是给人执行的合并验收清单，不等于 17 个独立 open follow-up；第 15 项
 CloudKit live apply 在首发继续关闭 CloudKit 时只需确认本轮不测。开始新的真机
-首启签收前，先关闭 `TFU-20260715-002`；旧 Pet-first 真机结果不能替代当前流程。
+RC 签收前，先关闭 `TFU-20260715-003` 与 `TFU-20260720-001`；旧 Pet-first
+真机结果不能替代当前流程。
 
 建议分两轮完成：
 
@@ -38,7 +41,7 @@ CloudKit live apply 在首发继续关闭 CloudKit 时只需确认本轮不测�
 
 本清单已按 2026-07-15 当前源头校对：
 
-- 15 项把当前真机/人工债按用户路径合并，状态数量以
+- 17 项把当前真机/人工债按用户路径合并，状态数量以
   `docs/task-follow-ups.md` 为准。
 - GAP-6、GAP-7、GAP-9 的详细要求来自 `docs/planning/gap-acceptance-track-list.md`。
 - CloudKit live apply 来自 TFU-20260614-014 和 `docs/cloud-sync-todo.md`，首发关闭 CloudKit 时不进入真机测试轮。
@@ -87,6 +90,8 @@ CloudKit live apply 在首发继续关闭 CloudKit 时只需确认本轮不测�
 - 失败或需要我修：不要勾，在这一行后面写 `失败：现象`，并把详情写到对应小节的“记录”。
 - 需要复测：不要勾，在这一行后面写 `复测：原因`。
 - CloudKit 如果首发继续关闭，勾选第 15 项表示“本轮确认不测”。
+- Family 守护保持运行开关和 SKU 关闭时，第 17 项标记“Family 本轮不发布”；只有
+  准备开放 Family 时才执行完整双真机矩阵。
 
 ### 第一轮：首发硬门和系统能力
 
@@ -97,6 +102,7 @@ CloudKit live apply 在首发继续关闭 CloudKit 时只需确认本轮不测�
 - [ ] 11. Expenses / Insurance / Documents
 - [ ] 12. Privacy / Security
 - [ ] 13. Onboarding / CrewRoster / FunctionMenu
+- [ ] 16. Today Widget / Live Activity / Dynamic Island
 
 ### 第二轮：模块视觉和手感
 
@@ -111,6 +117,30 @@ CloudKit live apply 在首发继续关闭 CloudKit 时只需确认本轮不测�
 
 - [ ] 14. Phase 9 dogfooding / RC
 - [ ] 15. CloudKit live apply policy - 首发关闭 CloudKit 时勾选“本轮不测”
+- [ ] 17. Family App 内亲友守护 - 本地版关闭时标记“本轮不发布”；开放前必须双真机通过
+
+## Family 守护专项（对应打卡 17）
+
+前置条件：生产 / Sandbox APNs、AWS `eu-central-1`、Cognito + Sign in with Apple、
+真实 HTTPS Universal Link / Associated Domains、App Store Server Notifications V2、
+Family Yearly Sandbox 商品和隐私标签均已配置。使用两台实体 iPhone 和两个 Apple
+测试账号，不得用模拟器结果替代。
+
+- 邀请：链接、二维码和 16 位邀请码均只能在安装 Ohana、登录并明确接受后建立关系；
+  过期、复用、第四位守护人和撤销必须失败或正确停止。
+- 权限与设备：允许 / 拒绝通知、同账号第二设备、退出当前设备、卸载 token 失效、
+  全部守护人不可达警告均符合真实状态，不显示“已收到”。
+- 漏签：第 1 个守护日无亲友推送；第 2 日恰好一次首次推送；第 3 日最多一次跟进；
+  第 4 日以后同一事件安静。
+- 结束：守护人“已联系到本人”不生成签到；本人恢复只发一次恢复推送；暂停、切换
+  普通模式、更换 / 解绑本人、纪念、撤销、Family 到期和删除账号均停止后续调度。
+- 离线与隐私：离线签到显示等待同步，恢复联网后不误报；锁屏不出现姓名、分数或
+  照护资料；服务端日志无姓名、号码、邮箱、分数、健康、Pet、Plant 或费用。
+- 订阅：Family 同时开放 Personal；Family→Personal / Free、退款、撤销和账单状态变化
+  停止在线守护但不改变本机签到、档案或椰子。
+
+记录：设备 A / iOS：_____；设备 B / iOS：_____；build：_____；AWS stage：_____；
+APNs 环境：_____；StoreKit 测试账号：_____；问题：_____。
 
 ## 2026-07-09 Solo Release P0/P1 专项验收
 
@@ -125,6 +155,7 @@ CloudKit live apply 在首发继续关闭 CloudKit 时只需确认本轮不测�
 - [ ] R4. 500 图长滚
 - [ ] R5. 30–60 分钟锁屏遛狗
 - [ ] R6. 自动备份与删除失败恢复
+- [ ] R7. Today Widget 与 Dynamic Island
 
 ### R0. 首发设备矩阵与签名包
 
@@ -137,9 +168,13 @@ Oasis 解锁 → 第一笔真实照护的最短 smoke；再用 disposable 环境
 
 - Archive 的 `UIDeviceFamily` 仅包含 `1`，App Store Connect 不要求 iPad 截图，
   不包含 watchOS app 或 complication。
-- 签名 App 与 target entitlement 一致，只保留当前需要的 HealthKit 与
-  CloudDocuments；不包含 Sign in with Apple、CloudKit、APNs、remote notification
-  或 App Group。Developer Portal 与 distribution profile 不保留未使用能力。
+- 签名 App 内嵌且只内嵌当前 `OhanaWidgets` WidgetKit extension，不包含
+  watchOS app 或 complication；App 与 extension 的 bundle identifier、版本和
+  deployment target 一致可解释。
+- 签名 App 与 target entitlement 一致，只保留当前需要的 HealthKit、
+  CloudDocuments 与匹配环境的一个 App Group；Widget extension 只申领同一个
+  App Group。不包含 Sign in with Apple、CloudKit、APNs 或 remote notification。
+  Developer Portal 与 distribution profile 不保留未使用能力。
 - 最低系统为 iOS 26.2；最小与当前 iPhone 都能完成核心 smoke，关键操作不截断、
   不被安全区遮挡、没有启动或持久化失败。
 - 记录实际开放的 storefront。原生 iPad、原生 Watch 与更低 iOS 不得写入首发宣传。
@@ -277,6 +312,31 @@ Exercise/Stand/活动环/Recent Workouts，R0 与 HealthKit P1 均保持未勾�
 
 记录：设备 / iOS：_____；iCloud 状态：_____；结果：_____；问题：_____.
 
+### R7. Today Widget 与 Dynamic Island
+
+步骤：用同一已签名 Release 在支持 Dynamic Island 的真实 iPhone 上添加 Today
+Widget 的 small、medium 与 accessory rectangular；分别观察 Personal、Free、
+降级、锁屏、过期快照和 App reset。随后为活跃狗狗开始遛狗，依次暂停、继续、
+添加便便标记、锁屏、回前台、杀进程后重开，再从 Lock Screen / Dynamic Island
+进入 App 并结束遛狗。
+
+通过标准：
+
+- Personal Widget 最多显示三项最相关照护事项；不显示自由输入任务标题、健康
+  详情、已删除或已离世对象。Free / 降级态显示升级说明而不是旧 Personal 数据。
+- small、medium、accessory rectangular、锁屏隐私与九语言关键长文案不截断；
+  空、过期、App Group 不可用和 reset 状态安全降级，不显示陈旧私人内容。
+- Widget 从冷启动和热启动都进入正确待办或设置路径，不接受外部 scheme / host；
+  路由无效时留在安全页面而不是打开错误成员。
+- 每次遛狗只有一个 Live Activity；Lock Screen 与 Dynamic Island expanded、
+  compact、minimal 的时间、距离、暂停和便便数一致。恢复 App 不复制 session，
+  停止后 Activity 正常结束，陈旧 Activity 会被清理。
+- 前后台、Low Power、Reduce Motion 与锁屏期间不出现高频刷新或额外业务写入；
+  定位和持久化仍由既有 Walk 领域边界负责。
+
+记录：设备 / iOS：_____；build：_____；App Group / profile：_____；Widget
+families：_____；Dynamic Island：_____；问题：_____.
+
 ## 快速总表
 
 | 编号 | 模块 / Gate | 已测过 | 真机还要测 | 本轮状态 |
@@ -296,6 +356,8 @@ Exercise/Stand/活动环/Recent Workouts，R0 与 HealthKit P1 均保持未勾�
 | 13 | Onboarding / CrewRoster / FunctionMenu | 旧 Pet-first 首启和既有一人一宠 Function Menu 路径有历史证据；CrewRoster 卡片缩回动画已有策略覆盖。当前 Human-first、稍后建宠、Task Center 显式领取与 D28 路径尚待 TFU-20260715-002 本地验收，旧 smoke 不算当前通过。 | 新签名包覆盖立即 / 稍后建宠、Oasis 领取门、D28 前三项、覆盖安装、reset、第二人 / 第二宠、CrewRoster 卡片手感、全功能菜单和危险区视觉。 | 本地前置未关；待真机 |
 | 14 | Phase 9 dogfooding / RC | 当前处于 9A；自动和模拟器证据已大幅收敛。 | 真机完成本表后，再跑一次 RC 级全路径冒烟。 | 待 RC |
 | 15 | CloudKit live apply policy | 已登记为 TFU-20260614-014 和 CloudKit 1.x 延后项。 | 首发如果 CloudKit 保持关闭，本轮不用测；启用 CloudKit 前另起专项真机 / iCloud 验证。 | 本轮不测 |
+| 16 | Today Widget / Live Activity / Dynamic Island | Widget extension、bounded App Group snapshot、Personal gate、typed deep link、walk Activity lifecycle 与能耗节流已由 89 项聚焦测试和 unsigned Simulator app+extension 编译覆盖。 | 注册并签名两个环境对应的 App Group；真机检查 Widget families、锁屏隐私、Free/Personal/降级/过期/reset、冷启动链接，以及完整 walk 的 Lock Screen / Dynamic Island / relaunch / background / end。 | 待签名真机 |
+| 17 | Family App 内亲友守护 | V96/outbox、客户端 fail-closed、Family catalog、AWS SAM、17 个后端规则/隐私/安全合同测试与 353 个 iOS 定向测试已通过；这不能证明 APNs 到达。 | 部署生产栈并按本节用两台真机、两个账号验证邀请、权限、第 2/3 日推送、恢复、确认、暂停、撤销、token 失效、权益到期、隐私和删除。 | Family 本轮不发布 / 开放前必测 |
 
 ## 第一轮：首发硬门
 

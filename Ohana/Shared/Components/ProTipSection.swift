@@ -28,7 +28,7 @@ struct ProTipSection: View {
         colorScheme == .light ? .primary : .white
     }
 
-    /// goLime (#C8FF00) is near-invisible on the warm-cream light background;
+    /// goLime (#C8F34A) is near-invisible on the warm-cream light background;
     /// swap to a dark olive-green in light mode for proper contrast.
     private var highlightColor: Color {
         colorScheme == .light ? Color(hex: "4F7A00") : Color.goPrimary

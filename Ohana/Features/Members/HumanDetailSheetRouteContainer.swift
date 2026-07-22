@@ -172,7 +172,7 @@ struct AppHumanDetailSheetRouteContainer: View {
         } else {
             switch destination {
             case .basicInfo:
-                NavigationStack { HumanBasicInfoDetailView(human: human) }
+                NavigationStack { HumanBasicInfoDetailView(human: human, onClose: onDismiss) }
             case .medicationQuick:
                 QuickHumanMedicationSheet(
                     human: human,
@@ -319,14 +319,21 @@ private struct HumanAllFeaturesRouteData {
             allReports: allReports,
             allExpenses: allExpenses,
             summary: human.map {
-                HumanAllFeaturesActivitySummary.load(
+                let explicitlyResolvedProfileCategories = MemberProfileCompletenessReadService
+                    .explicitlyResolvedCategories(
+                        kind: .human,
+                        subjectID: $0.id,
+                        context: context
+                    )
+                return HumanAllFeaturesActivitySummary.load(
                     human: $0,
                     allMeds: allMeds,
                     allReports: allReports,
                     allExpenses: allExpenses,
                     weightLogs: weightLogs,
                     workoutLogs: workoutLogs,
-                    healthMetricLogs: healthMetricLogs
+                    healthMetricLogs: healthMetricLogs,
+                    explicitlyResolvedProfileCategories: explicitlyResolvedProfileCategories
                 )
             } ?? .empty,
             hasLoaded: true

@@ -58,6 +58,12 @@ enum OhanaRefreshBudget: Equatable {
     case paused
 }
 
+nonisolated struct OhanaLiveActivityUpdateBudget: Equatable, Sendable {
+    let minimumDistanceDeltaMeters: Double
+    let maximumUpdateInterval: TimeInterval
+    let allowsAutomaticUpdates: Bool
+}
+
 enum OhanaVisualEffectsBudget: Equatable {
     case full
     case efficient
@@ -406,6 +412,37 @@ final class AppWorkloadPolicy: ObservableObject {
         }
     }
 
+    func walkLiveActivityUpdateBudget() -> OhanaLiveActivityUpdateBudget {
+        switch refreshBudget(isVisible: true, allowDuringActiveWalk: true) {
+        case .live:
+            OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 50,
+                maximumUpdateInterval: 30,
+                allowsAutomaticUpdates: true
+            )
+        case .throttled:
+            OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 100,
+                maximumUpdateInterval: 90,
+                allowsAutomaticUpdates: true
+            )
+        case .paused:
+            OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: .infinity,
+                maximumUpdateInterval: .infinity,
+                allowsAutomaticUpdates: false
+            )
+        }
+    }
+
+    func systemSurfaceSnapshotDebounceMilliseconds() -> Int64 {
+        switch refreshBudget(isVisible: true) {
+        case .live: 350
+        case .throttled: 1200
+        case .paused: 2500
+        }
+    }
+
     /// Produces one explicit, finite batch for deferred work. Callers must
     /// persist a continuation cursor when `maximumItemCount` is exhausted;
     /// they must not loop until completion while the app is hidden.
@@ -584,6 +621,7 @@ enum AppPerformanceFlows {
     static let calendarModeSwitch = "flow.calendar.mode_switch"
     static let calendarFilter = "flow.calendar.filter"
     static let calendarAddEventSheet = "flow.calendar.add_event_sheet"
+    static let settingsOpen = "flow.settings.open"
     static let oasisOpen = "flow.oasis.open"
     static let backupExport = "flow.backup.export"
     static let walkSession = "flow.walk.session"
@@ -688,6 +726,8 @@ private enum AppPerformanceSignposts {
             emit("flow.calendar.filter", phase: phase, valueMS: valueMS, note: note)
         case AppPerformanceFlows.calendarAddEventSheet:
             emit("flow.calendar.add_event_sheet", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.settingsOpen:
+            emit("flow.settings.open", phase: phase, valueMS: valueMS, note: note)
         case AppPerformanceFlows.oasisOpen:
             emit("flow.oasis.open", phase: phase, valueMS: valueMS, note: note)
         case AppPerformanceFlows.backupExport:

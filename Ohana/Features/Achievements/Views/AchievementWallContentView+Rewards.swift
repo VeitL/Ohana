@@ -46,7 +46,9 @@ extension AchievementWallContentView {
     }
 
     func isRewardClaimed(_ badge: Achievement) -> Bool {
-        claimedRewardIDs.contains(rewardKey(for: badge))
+        let key = rewardKey(for: badge)
+        return claimedRewardIDs.contains(key)
+            || achievementSnapshot.items.contains { $0.achievementKey == key && $0.isClaimed }
     }
 
     func claimReward(for badge: Achievement) {

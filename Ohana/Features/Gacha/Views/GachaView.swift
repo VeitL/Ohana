@@ -7,6 +7,181 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
+
+private enum GachaFlowSheet: Identifiable {
+    case odds
+    case funding(GachaFundingPreview)
+
+    var id: String {
+        switch self {
+        case .odds: "odds"
+        case let .funding(preview): "funding:\(preview.id.uuidString)"
+        }
+    }
+}
+
+private struct GachaFundingConfirmationSheet: View {
+    let preview: GachaFundingPreview
+    let approve: @MainActor () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    LabeledContent(l.tr(zh: "个人余额", en: "Personal balance", de: "Persönliches Guthaben")) {
+                        Text("\(preview.personalBalance)🥥")
+                    }
+                    LabeledContent(l.tr(zh: "岛屿可支配", en: "Island spendable", de: "Insel verfügbar")) {
+                        Text("\(preview.islandSpendableBalance)🥥")
+                    }
+                    LabeledContent(l.tr(zh: "本次总额", en: "Draw total", de: "Gesamt")) {
+                        Text("\(preview.cost)🥥")
+                    }
+                } header: {
+                    Text(l.tr(zh: "合资确认", en: "Funding confirmation", de: "Finanzierung bestätigen"))
+                } footer: {
+                    Text(l.tr(
+                        zh: "执行前会重新核验每个人的余额；变化时不会部分扣款。",
+                        en: "Every balance is rechecked before execution. Changes never cause a partial charge.",
+                        de: "Alle Guthaben werden vor der Ausführung erneut geprüft. Änderungen führen nie zu Teilabbuchungen."
+                    ))
+                }
+
+                Section(l.tr(zh: "出资明细", en: "Contributions", de: "Beiträge")) {
+                    ForEach(preview.contributions) { contribution in
+                        LabeledContent(contribution.humanName) {
+                            Text("\(contribution.amount)🥥")
+                                .fontWeight(.semibold)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(l.tr(zh: "确认抽取", en: "Confirm draw", de: "Zug bestätigen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(l.cancel) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(l.tr(zh: "确认出资", en: "Confirm", de: "Bestätigen")) {
+                        dismiss()
+                        Task { @MainActor in approve() }
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+private struct GachaOddsRulesSheet: View {
+    let series: GachaSeriesEntry
+    let status: GachaGuaranteeStatus
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
+    private var l: L10n { L10n(appLanguage) }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    probabilityRow(
+                        l.tr(zh: "普通收藏款", en: "Regular collectible", de: "Normale Sammelfigur"),
+                        value: status.hiddenUnlocked ? "38%" : "40%"
+                    )
+                    probabilityRow(
+                        l.tr(zh: "单个普通款", en: "Each regular", de: "Je normale Figur"),
+                        value: status.hiddenUnlocked ? "4.75%" : l.tr(zh: "缺款优先", en: "Missing-first", de: "Fehlende zuerst")
+                    )
+                    probabilityRow(
+                        l.tr(zh: "隐藏款", en: "Secret collectible", de: "Geheime Figur"),
+                        value: status.hiddenUnlocked ? "2%" : l.tr(zh: "未解锁", en: "Locked", de: "Gesperrt")
+                    )
+                    ForEach(series.instantResults) { result in
+                        probabilityRow(result.localizedTitle(l), value: percent(result.probabilityBasisPoints))
+                    }
+                } header: {
+                    Text(l.tr(zh: "当前有效概率", en: "Current effective odds", de: "Aktuelle Chancen"))
+                } footer: {
+                    Text(l.tr(
+                        zh: "普通款未集齐时，隐藏款 2% 转入普通收藏。普通命中后，75% 从缺少款中均匀选择，25% 从全部普通款中选择。",
+                        en: "Until all regulars are owned, the secret 2% moves to regulars. A regular hit chooses missing items 75% of the time and all regulars 25% of the time.",
+                        de: "Bis alle normalen Figuren da sind, gehen die geheimen 2 % an normale Figuren. Ein normaler Treffer wählt zu 75 % fehlende und zu 25 % alle normalen Figuren."
+                    ))
+                }
+
+                Section(l.tr(zh: "保底进度", en: "Guarantees", de: "Garantien")) {
+                    if let remaining = status.drawsUntilNewCommonGuarantee {
+                        guaranteeRow(
+                            l.tr(zh: "缺少普通款", en: "Missing regular", de: "Fehlende normale Figur"),
+                            detail: l.tr(zh: "最多再 \(remaining) 抽", en: "Within \(remaining) draws", de: "In spätestens \(remaining) Zügen")
+                        )
+                    }
+                    if let remaining = status.drawsUntilHiddenGuarantee {
+                        guaranteeRow(
+                            l.tr(zh: "隐藏款", en: "Secret", de: "Geheime Figur"),
+                            detail: l.tr(zh: "最多再 \(remaining) 抽", en: "Within \(remaining) draws", de: "In spätestens \(remaining) Zügen")
+                        )
+                    }
+                    if let remaining = status.drawsUntilCompletedCollectionGuarantee {
+                        guaranteeRow(
+                            l.tr(zh: "完整系列后的收藏品", en: "Post-completion collectible", de: "Figur nach Abschluss"),
+                            detail: l.tr(zh: "最多再 \(remaining) 抽", en: "Within \(remaining) draws", de: "In spätestens \(remaining) Zügen")
+                        )
+                    }
+                }
+
+                Section(l.tr(zh: "重复补偿", en: "Duplicate compensation", de: "Duplikat-Ausgleich")) {
+                    LabeledContent(l.tr(zh: "普通重复款", en: "Regular duplicate", de: "Normales Duplikat")) { Text("20✦") }
+                    LabeledContent(l.tr(zh: "隐藏重复款", en: "Secret duplicate", de: "Geheimes Duplikat")) { Text("100✦") }
+                    Text(l.tr(
+                        zh: "重复款仍会累加收藏数量。伙伴星光不能支付盲盒或兑换椰子。",
+                        en: "Duplicates still increase owned count. Companion stardust cannot pay for blind boxes or be exchanged for coconuts.",
+                        de: "Duplikate erhöhen weiterhin die Anzahl. Begleiter-Sternlicht bezahlt keine Blindboxen und ist nicht in Kokosnüsse tauschbar."
+                    ))
+                    .font(.footnote)
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                }
+            }
+            .navigationTitle(l.tr(zh: "概率与规则", en: "Odds & rules", de: "Chancen & Regeln"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(l.done) { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func probabilityRow(_ title: String, value: String) -> some View {
+        LabeledContent(title) {
+            Text(value).fontWeight(.semibold)
+        }
+    }
+
+    private func guaranteeRow(_ title: String, detail: String) -> some View {
+        LabeledContent(title) {
+            Text(detail)
+                .multilineTextAlignment(.trailing)
+        }
+    }
+
+    private func percent(_ basisPoints: Int) -> String {
+        let value = Double(basisPoints) / 100
+        return value.rounded() == value
+            ? "\(Int(value))%"
+            : String(format: "%.2f%%", value).replacingOccurrences(of: "0%", with: "%")
+    }
+}
 
 struct GachaView: View {
     var drawsBackground: Bool = true
@@ -20,6 +195,7 @@ struct GachaView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(AppServices.self) private var appServices
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -41,6 +217,8 @@ struct GachaView: View {
     @State private var isCollectionCompletionCelebrating = false
     @State private var revealResetToken = 0
     @State private var selectedCollectionItemId: String?
+    @State private var presentedFlowSheet: GachaFlowSheet?
+    @State private var displayedStardustBalance = 0
     init(
         drawsBackground: Bool = true,
         onClose: (() -> Void)? = nil,
@@ -89,6 +267,15 @@ struct GachaView: View {
 
     private var currentHumanLogs: [GachaDrawLog] {
         drawLogs.filter { $0.ownerHumanId == currentHuman?.id.uuidString && $0.seriesId == series.id }
+    }
+
+    private var guaranteeStatus: GachaGuaranteeStatus {
+        appServices.gacha.guaranteeStatus(
+            humanId: currentHuman?.id.uuidString ?? "",
+            series: series,
+            ownedItems: ownedItems,
+            logs: drawLogs
+        )
     }
 
     private var collectionProgress: (owned: Int, total: Int) {
@@ -148,6 +335,10 @@ struct GachaView: View {
         guard let selectedCollectionItemId else { return nil }
         return series.items.first { $0.id == selectedCollectionItemId }
     }
+
+    private var collectionColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 128 : 72), spacing: 8)]
+    }
 }
 
 extension GachaView {
@@ -162,6 +353,7 @@ extension GachaView {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
                         seriesSelector
+                        economyOverview
                         gachaStage
                         drawButton
                         if let feedbackText {
@@ -185,13 +377,38 @@ extension GachaView {
                     Button(l.cancel) { close() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    balancePill
+                    Button {
+                        presentedFlowSheet = .odds
+                    } label: {
+                        Label(
+                            l.tr(zh: "概率与规则", en: "Odds & rules", de: "Chancen & Regeln"),
+                            systemImage: "info.circle"
+                        )
+                    }
                 }
+                ToolbarItem(placement: .topBarTrailing) { balancePill }
             }
         }
         .sheet(item: selectedCollectionItemBinding) { item in
             collectionItemDetailSheet(item)
         }
+        .sheet(item: $presentedFlowSheet) { sheet in
+            switch sheet {
+            case .odds:
+                GachaOddsRulesSheet(series: series, status: guaranteeStatus)
+            case let .funding(preview):
+                GachaFundingConfirmationSheet(preview: preview) {
+                    draw(approvedFunding: preview)
+                }
+            }
+        }
+        .task {
+            refreshStardustBalance()
+        }
+        .onChange(of: drawLogs.count) { _, _ in
+            refreshStardustBalance()
+        }
+        .accessibilityIdentifier("gacha-screen")
     }
 
     private var selectedCollectionItemBinding: Binding<GachaItemEntry?> {
@@ -261,6 +478,7 @@ extension GachaView {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     seriesSelector
+                    economyOverview
                     gachaStage
                     drawButton
                     if let feedbackText {
@@ -292,6 +510,82 @@ extension GachaView {
             .padding(.vertical, 2)
         }
         .scrollClipDisabled()
+    }
+
+    private var economyOverview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Label(
+                    currentHuman?.name ?? l.tr(zh: "未选择归属人", en: "No owner selected", de: "Keine Person gewählt"),
+                    systemImage: "person.crop.circle.fill"
+                )
+                .font(OhanaFont.subheadline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer()
+                Button {
+                    presentedFlowSheet = .odds
+                } label: {
+                    Label(
+                        l.tr(zh: "概率与规则", en: "Odds & rules", de: "Chancen & Regeln"),
+                        systemImage: "info.circle"
+                    )
+                    .font(OhanaFont.caption(.bold))
+                }
+                .buttonStyle(.plain)
+            }
+
+            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
+                GridRow {
+                    economyMetric(
+                        value: "\(currentCoconutBalance)🥥",
+                        label: l.tr(zh: "个人余额", en: "Personal", de: "Persönlich")
+                    )
+                    economyMetric(
+                        value: "\(islandSpendableHumanBalance)🥥",
+                        label: l.tr(zh: "岛屿可用", en: "Island spendable", de: "Insel verfügbar")
+                    )
+                }
+                GridRow {
+                    economyMetric(
+                        value: "\(displayedStardustBalance)✦",
+                        label: l.tr(zh: "伙伴星光", en: "Companion stardust", de: "Begleiter-Sternlicht")
+                    )
+                    economyMetric(
+                        value: guaranteeSummary,
+                        label: l.tr(zh: "下一保底", en: "Next guarantee", de: "Nächste Garantie")
+                    )
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func economyMetric(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(2)
+            Text(label)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var guaranteeSummary: String {
+        if let remaining = guaranteeStatus.drawsUntilNewCommonGuarantee {
+            return l.tr(zh: "新款 ≤\(remaining) 抽", en: "New ≤\(remaining)", de: "Neu ≤\(remaining)")
+        }
+        if let remaining = guaranteeStatus.drawsUntilHiddenGuarantee {
+            return l.tr(zh: "隐藏 ≤\(remaining) 抽", en: "Secret ≤\(remaining)", de: "Geheim ≤\(remaining)")
+        }
+        if let remaining = guaranteeStatus.drawsUntilCompletedCollectionGuarantee {
+            return l.tr(zh: "收藏 ≤\(remaining) 抽", en: "Item ≤\(remaining)", de: "Figur ≤\(remaining)")
+        }
+        return l.tr(zh: "解锁后显示", en: "Shown after unlock", de: "Nach Freigabe")
     }
 
     private func seriesChip(_ entry: GachaSeriesEntry) -> some View {
@@ -361,10 +655,11 @@ extension GachaView {
         if isUnlocked {
             return l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet")
         }
+        let missing = max(0, defaultCommonProgress.total - defaultCommonProgress.owned)
         return l.tr(
-            zh: "Nana 普通款 \(defaultCommonProgress.owned)/\(defaultCommonProgress.total) 解锁",
-            en: "Unlock at Nana regulars \(defaultCommonProgress.owned)/\(defaultCommonProgress.total)",
-            de: "Frei bei Nana normal \(defaultCommonProgress.owned)/\(defaultCommonProgress.total)"
+            zh: "还缺 \(missing) 个 Nana 普通款",
+            en: "\(missing) Nana regulars missing",
+            de: "Noch \(missing) normale Nana-Figuren"
         )
     }
 
@@ -375,10 +670,11 @@ extension GachaView {
     }
 
     private var lockedSeriesMessage: String {
-        l.tr(
-            zh: "集齐第一套 Nana 的 8 个普通款后解锁 Midnight Atelier。",
-            en: "Complete the 8 Nana regulars to unlock Midnight Atelier.",
-            de: "Sammle alle 8 normalen Nana-Figuren, um Midnight Atelier freizuschalten."
+        let missing = max(0, defaultCommonProgress.total - defaultCommonProgress.owned)
+        return l.tr(
+            zh: "还缺 \(missing) 个 Nana 普通款；集齐后解锁 Midnight Atelier。",
+            en: "\(missing) Nana regulars remain before Midnight Atelier unlocks.",
+            de: "Noch \(missing) normale Nana-Figuren bis zur Freigabe von Midnight Atelier."
         )
     }
 
@@ -415,13 +711,18 @@ extension GachaView {
                     revealCardPhase: revealCardPhase,
                     isNewCollectible: drawOutcome?.log.isNew == true,
                     onCollectibleCardTap: revealCollectibleToyOnCard,
-                    onCollectibleKeepTap: releaseCollectibleFromCard
+                    onCollectibleKeepTap: { releaseCollectibleFromCard(drawAgain: false) },
+                    onCollectibleRepeatTap: { releaseCollectibleFromCard(drawAgain: true) }
                 )
                 .frame(height: drawOutcome?.item == nil ? 230 : 376)
 
                 if showPrize, let outcome = drawOutcome {
                     prizeSummary(outcome)
                         .transition(.scale(scale: 0.86).combined(with: .opacity).combined(with: .move(edge: .bottom)))
+                    if outcome.item == nil {
+                        nonCollectibleResultActions
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
                 }
             }
             .padding(.vertical, 14)
@@ -466,9 +767,16 @@ extension GachaView {
             Spacer()
 
             if let owned = outcome.ownedItem {
-                Text("x\(owned.ownedCount)")
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("x\(owned.ownedCount)")
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    if let stardust = outcome.log.stardustDelta, stardust > 0 {
+                        Text("+\(stardust)✦")
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.goYellow)
+                    }
+                }
             } else if outcome.log.instantCoconutDelta > 0 {
                 Text("+\(outcome.log.instantCoconutDelta)🥥")
                     .font(OhanaFont.callout(.black))
@@ -477,6 +785,34 @@ extension GachaView {
         }
         .padding(12)
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
+    }
+
+    private var nonCollectibleResultActions: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) { nonCollectibleResultButtons }
+            VStack(spacing: 10) { nonCollectibleResultButtons }
+        }
+        .padding(.horizontal, 12)
+    }
+
+    @ViewBuilder
+    private var nonCollectibleResultButtons: some View {
+        Button {
+            settleNonCollectible(drawAgain: false)
+        } label: {
+            Label(l.tr(zh: "收下", en: "Collect", de: "Annehmen"), systemImage: "checkmark")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+
+        Button {
+            settleNonCollectible(drawAgain: true)
+        } label: {
+            Label(l.tr(zh: "再来一次", en: "Open another", de: "Noch einmal"), systemImage: "sparkles")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(Color.goPrimary)
     }
 
     private func outcomeTitle(_ outcome: GachaDrawOutcome) -> String {
@@ -502,7 +838,7 @@ extension GachaView {
 
     private var drawButton: some View {
         Button {
-            draw()
+            requestDraw()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: canDraw ? "sparkles" : "lock.fill")
@@ -553,7 +889,7 @@ extension GachaView {
                     .contentTransition(.numericText())
             }
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5), spacing: 8) {
+            LazyVGrid(columns: collectionColumns, spacing: 8) {
                 ForEach(series.items) { item in
                     collectionCell(item)
                 }
@@ -594,6 +930,7 @@ extension GachaView {
         }
     }
 
+    @ViewBuilder
     private func collectionCell(_ item: GachaItemEntry) -> some View {
         let owned = ownedItems.first {
             $0.ownerHumanId == currentHuman?.id.uuidString &&
@@ -604,38 +941,24 @@ extension GachaView {
         let isPulsing = collectionPulseItemId == item.id
         let completionIndex = series.items.firstIndex { $0.id == item.id } ?? 0
         let isCompletionCelebrating = isCollectionCompletionCelebrating && ownedCount > 0
-        return Button {
-            guard ownedCount > 0 else { return }
-            selectedCollectionItemId = item.id
-            OhanaFeedback.light()
-        } label: {
-            VStack(spacing: 4) {
-                GachaCollectibleThumbnailView(
-                    item: item,
-                    ownedCount: ownedCount,
-                    isPulsing: isPulsing
-                )
-                .overlay(alignment: .topTrailing) {
-                    if ownedCount > 1 {
-                        Text("x\(ownedCount)")
-                            .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(Color.arkInk)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.goPrimary, in: Capsule())
-                            .offset(x: 5, y: -5)
-                    }
+        Group {
+            if ownedCount > 0 {
+                Button {
+                    selectedCollectionItemId = item.id
+                    OhanaFeedback.light()
+                } label: {
+                    collectionCellLabel(
+                        item,
+                        ownedCount: ownedCount,
+                        isPulsing: isPulsing
+                    )
                 }
-                Text(collectionDisplayName(for: item))
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(ownedCount == 0 ? Color.ohanaTertiaryText : item.rarity.tint)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.62)
-                    .frame(minHeight: 24)
+                .buttonStyle(ScaleButtonStyle())
+            } else {
+                collectionCellLabel(item, ownedCount: 0, isPulsing: false)
+                    .accessibilityElement(children: .ignore)
             }
         }
-        .buttonStyle(ScaleButtonStyle())
         .opacity(ownedCount > 0 ? 1 : 0.82)
         .accessibilityLabel(collectionCellAccessibilityLabel(item, ownedCount: ownedCount))
         .frame(maxWidth: .infinity)
@@ -646,6 +969,38 @@ extension GachaView {
                 : GoMotion.reduced,
             value: isCollectionCompletionCelebrating
         )
+    }
+
+    private func collectionCellLabel(
+        _ item: GachaItemEntry,
+        ownedCount: Int,
+        isPulsing: Bool
+    ) -> some View {
+        VStack(spacing: 4) {
+            GachaCollectibleThumbnailView(
+                item: item,
+                ownedCount: ownedCount,
+                isPulsing: isPulsing
+            )
+            .overlay(alignment: .topTrailing) {
+                if ownedCount > 1 {
+                    Text("x\(ownedCount)")
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.goPrimary, in: Capsule())
+                        .offset(x: 5, y: -5)
+                }
+            }
+            Text(collectionDisplayName(for: item))
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(ownedCount == 0 ? Color.ohanaTertiaryText : item.rarity.tint)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.62)
+                .frame(minHeight: 24)
+        }
     }
 
     private func collectionCellAccessibilityLabel(_ item: GachaItemEntry, ownedCount: Int) -> String {
@@ -838,16 +1193,34 @@ extension GachaView {
         return (symbol, title, badge, tint, log.instantCoconutDelta > 0)
     }
 
-    private func draw() {
+    private func requestDraw() {
+        guard !isDrawing, let currentHuman else { return }
+        let preview = appServices.gacha.fundingPreview(human: currentHuman, context: modelContext)
+        guard preview.missing == 0 else {
+            feedbackText = message(for: .insufficientBalance(missing: preview.missing))
+            OhanaFeedback.error()
+            return
+        }
+        if preview.requiresCofundingConfirmation {
+            presentedFlowSheet = .funding(preview)
+            OhanaFeedback.light()
+        } else {
+            draw(approvedFunding: nil)
+        }
+    }
+
+    private func draw(approvedFunding: GachaFundingPreview?) {
         guard !isDrawing else { return }
         do {
             let countSnapshot = currentOwnedCounts()
             let outcome = try appServices.gacha.draw(
                 seriesId: series.id,
                 human: currentHuman,
-                context: modelContext
+                context: modelContext,
+                approvedFunding: approvedFunding
             )
             drawOutcome = outcome
+            refreshStardustBalance()
             feedbackText = nil
             isDrawing = true
             revealResetToken += 1
@@ -876,7 +1249,7 @@ extension GachaView {
                     revealingCollectibleItemId = nil
                 }
                 OhanaFeedback.success()
-                returnToCoconut(resetToken: resetToken, delay: 1.12)
+                announceOutcome(outcome)
                 return
             }
 
@@ -930,13 +1303,13 @@ extension GachaView {
                     }
                 }
                 isGrandBundle ? OhanaFeedback.strong() : OhanaFeedback.light()
+                announceOutcome(outcome)
                 if isGrandBundle {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.46) {
                         guard resetToken == revealResetToken else { return }
                         OhanaFeedback.medium()
                     }
                 }
-                returnToCoconut(resetToken: resetToken, delay: isGrandBundle ? 1.86 : 1.18)
             }
         }
     }
@@ -964,6 +1337,7 @@ extension GachaView {
                             revealCardPhase = .revealed
                         }
                         OhanaFeedback.light()
+                        announceOutcome(outcome)
                     }
                 }
             }
@@ -973,9 +1347,12 @@ extension GachaView {
     private func runReducedCollectibleReveal() {
         withAnimation(GoMotion.reduced) {
             revealPhase = .reveal
-            revealCardPhase = .revealed
+            revealCardPhase = .toyReady
         }
         OhanaFeedback.light()
+        if let outcome = drawOutcome {
+            announceOutcome(outcome)
+        }
     }
 
     private func revealCollectibleToyOnCard() {
@@ -1024,11 +1401,11 @@ extension GachaView {
         }
     }
 
-    private func releaseCollectibleFromCard() {
+    private func releaseCollectibleFromCard(drawAgain: Bool) {
         guard isDrawing, drawOutcome?.item != nil, revealCardPhase == .toyReady else { return }
 
         guard shouldAnimateReveal else {
-            finishCollectibleReveal()
+            finishCollectibleReveal(drawAgain: drawAgain)
             return
         }
 
@@ -1041,12 +1418,12 @@ extension GachaView {
                 revealCardPhase = .flying
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.23) {
-                finishCollectibleReveal()
+                finishCollectibleReveal(drawAgain: drawAgain)
             }
         }
     }
 
-    private func finishCollectibleReveal() {
+    private func finishCollectibleReveal(drawAgain: Bool) {
         let itemId = drawOutcome?.item?.id
         withAnimation(shouldAnimateReveal ? GoMotion.stateChange : GoMotion.reduced) {
             revealPhase = .idle
@@ -1058,6 +1435,7 @@ extension GachaView {
         }
         OhanaFeedback.success()
         isDrawing = false
+        refreshStardustBalance()
         triggerCollectionCompletionAnimationIfNeeded()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.64) {
             withAnimation(GoMotion.reduced) {
@@ -1067,22 +1445,43 @@ extension GachaView {
                 preRevealOwnedCounts = [:]
             }
         }
+        guard drawAgain else { return }
+        DispatchQueue.main.async {
+            requestDraw()
+        }
     }
 
-    private func returnToCoconut(resetToken: Int, delay: Double) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            guard resetToken == revealResetToken else { return }
-            withAnimation(shouldAnimateReveal ? GoMotion.stateChange : GoMotion.reduced) {
-                revealPhase = .idle
-                revealCardPhase = .idle
-                showPrize = false
-                drawOutcome = nil
-                revealingCollectibleItemId = nil
-                collectionPulseItemId = nil
-                preRevealOwnedCounts = [:]
-            }
-            isDrawing = false
+    private func settleNonCollectible(drawAgain: Bool) {
+        guard isDrawing, drawOutcome?.item == nil else { return }
+        revealResetToken += 1
+        withAnimation(shouldAnimateReveal ? GoMotion.stateChange : GoMotion.reduced) {
+            revealPhase = .idle
+            revealCardPhase = .idle
+            showPrize = false
+            drawOutcome = nil
+            revealingCollectibleItemId = nil
+            collectionPulseItemId = nil
+            preRevealOwnedCounts = [:]
         }
+        isDrawing = false
+        OhanaFeedback.success()
+        guard drawAgain else { return }
+        DispatchQueue.main.async {
+            requestDraw()
+        }
+    }
+
+    private func refreshStardustBalance() {
+        displayedStardustBalance = appServices.gacha.stardustBalance(context: modelContext)
+    }
+
+    private func announceOutcome(_ outcome: GachaDrawOutcome) {
+        let stardust = outcome.log.stardustDelta ?? 0
+        let supplement = stardust > 0
+            ? l.tr(zh: "，重复补偿 \(stardust) 星光", en: ", duplicate compensation \(stardust) stardust", de: ", Duplikat-Ausgleich \(stardust) Sternlicht")
+            : ""
+        let announcement = "\(outcomeTitle(outcome))，\(outcomeSubtitle(outcome))\(supplement)"
+        UIAccessibility.post(notification: .announcement, argument: announcement)
     }
 
     private func triggerCollectionCompletionAnimationIfNeeded() {
@@ -1115,6 +1514,30 @@ extension GachaView {
             l.tr(zh: "这个系列概率配置不完整", en: "This series has invalid odds", de: "Diese Serie hat ungültige Chancen")
         case .lockedSeries:
             lockedSeriesMessage
+        case .fundingConfirmationRequired:
+            l.tr(
+                zh: "需要先确认其他成员的出资明细。",
+                en: "Review and confirm the other members' contributions first.",
+                de: "Bitte zuerst die Beiträge der anderen Mitglieder prüfen und bestätigen."
+            )
+        case .fundingChanged:
+            l.tr(
+                zh: "余额或出资已变化，请重新确认。",
+                en: "Balances changed. Please review funding again.",
+                de: "Guthaben geändert. Bitte Finanzierung erneut prüfen."
+            )
+        case .backupOrRestoreInProgress:
+            l.tr(
+                zh: "正在备份或恢复，请稍后再试。",
+                en: "Backup or restore is in progress. Try again shortly.",
+                de: "Sicherung oder Wiederherstellung läuft. Bitte später erneut versuchen."
+            )
+        case .persistenceFailed:
+            l.tr(
+                zh: "这次没有扣款，请稍后再试。",
+                en: "Nothing was charged. Please try again.",
+                de: "Es wurde nichts abgebucht. Bitte erneut versuchen."
+            )
         }
     }
 

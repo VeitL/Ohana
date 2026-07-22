@@ -76,6 +76,7 @@ struct ProtectionDocumentContentPopup: View {
                             Text("\(option.emoji) \(option.rawValue)").tag(option)
                         }
                     }
+                    .accessibilityIdentifier("protection-document-category-picker")
 
                     if !formSpec.quickTitles.isEmpty {
                         Menu(l.tr(zh: "快速标题", en: "Quick title", de: "Schnelltitel")) {
@@ -86,9 +87,12 @@ struct ProtectionDocumentContentPopup: View {
                     }
 
                     TextField(formSpec.titlePlaceholder, text: $title)
+                        .accessibilityIdentifier("protection-document-title-input")
                     TextField(formSpec.authorityPlaceholder, text: $issuingAuthority)
+                        .accessibilityIdentifier("protection-document-authority-input")
                     TextField(formSpec.notesPlaceholder, text: $notes, axis: .vertical)
                         .lineLimit(2 ... 4)
+                        .accessibilityIdentifier("protection-document-notes-input")
                 } header: {
                     Text(formSpec.sectionTitle)
                 }
@@ -156,13 +160,16 @@ struct ProtectionDocumentContentPopup: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(l.cancel, role: .cancel, action: close)
+                        .accessibilityIdentifier("protection-document-cancel-action")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(l.tr(zh: "保存", en: "Save", de: "Sichern"), action: save)
                         .disabled(!canSave)
+                        .accessibilityIdentifier("protection-document-save-action")
                 }
             }
         }
+        .accessibilityIdentifier("protection-document-editor")
         .onAppear {
             selectedPayerId = currentPayerId
             if !isEdit {

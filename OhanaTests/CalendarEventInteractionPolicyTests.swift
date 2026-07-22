@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import SwiftData
 import Testing
 @testable import Ohana
 
@@ -148,6 +149,84 @@ struct CalendarEventInteractionPolicyTests {
     }
 
     @MainActor
+    @Test func familyTaskProjectionOpensReadOnlyDetailWithoutCalendarActions() {
+        let event = Event(
+            title: "Weekly kitchen duty",
+            startDate: Date(timeIntervalSince1970: 1_800_000_000),
+            eventType: EventType.chore.rawValue
+        )
+        event.familyTaskPlanId = UUID().uuidString
+        event.familyTaskOccurrenceKey = "family-occurrence"
+
+        #expect(CalendarEventInteractionPolicy.tapInteraction(for: event, pets: []) == .userEventDetail)
+        #expect(CalendarEventInteractionPolicy.allowsUserEventDetail(for: event, pets: []))
+        #expect(!CalendarEventInteractionPolicy.allowsDirectMutation(for: event))
+        #expect(CalendarEventInteractionPolicy.detailActions(for: event, allowsEditing: true).isEmpty)
+        #expect(CalendarEventInteractionPolicy.detailDeletionScopes(for: event).isEmpty)
+    }
+
+    @MainActor
+    @Test func calendarCommandsRejectFamilyTaskProjectionMutationWithoutChangingEvent() throws {
+        let schema = Schema(ArkSchemaV95.models)
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let event = Event(
+            title: "Weekly kitchen duty",
+            startDate: start,
+            eventType: EventType.chore.rawValue
+        )
+        event.familyTaskPlanId = UUID().uuidString
+        event.familyTaskOccurrenceKey = "family-occurrence"
+        context.insert(event)
+        try context.save()
+
+        let update = CalendarEventPlanCommandInput(
+            title: "Changed outside collaboration",
+            startDate: start.addingTimeInterval(3600),
+            isAllDay: false,
+            eventType: .task,
+            relatedEntityType: "",
+            relatedEntityId: "",
+            recurrenceDays: 0,
+            recurrenceEndDate: nil,
+            reminderLeadMinutes: nil,
+            assigneeId: nil
+        )
+        #expect(throws: CalendarCommandError.familyTaskProjectionRequiresCollaboration) {
+            try CalendarEventPlanCommandService.updateEvent(
+                event: event,
+                input: update,
+                context: context,
+                scheduleNotifications: false
+            )
+        }
+        #expect(throws: CalendarCommandError.familyTaskProjectionRequiresCollaboration) {
+            try CalendarEventCommandService.toggleCompletion(
+                event: event,
+                occurrenceDate: start,
+                pets: [],
+                context: context,
+                executorId: nil
+            )
+        }
+        #expect(throws: CalendarCommandError.familyTaskProjectionRequiresCollaboration) {
+            try CalendarEventCommandService.delete(
+                event: event,
+                occurrenceDate: start,
+                scope: .wholeEvent,
+                context: context
+            )
+        }
+
+        #expect(event.title == "Weekly kitchen duty")
+        #expect(event.startDate == start)
+        #expect(!event.isCompleted)
+        #expect(try context.fetchCount(FetchDescriptor<Event>()) == 1)
+    }
+
+    @MainActor
     @Test func detailDeleteScopesMirrorSwipeDeleteScopes() {
         let single = Event(
             title: "Single task",
@@ -187,6 +266,8 @@ struct CalendarEventInteractionPolicyTests {
         #expect(rowSource.contains(".highPriorityGesture("))
         #expect(rowSource.contains("TapGesture().onEnded"))
         #expect(rowSource.contains("onOpenDetail?()"))
+        #expect(rowSource.contains("var allowsMutation = true"))
+        #expect(listSource.contains("allowsMutation: allowsDirectMutation"))
         #expect(!rowSource.contains("showDetail = true"))
         #expect(viewSource.contains("@State var eventDetailPresentation"))
         #expect(viewSource.contains(".fullScreenCover(item: $eventDetailPresentation)"))

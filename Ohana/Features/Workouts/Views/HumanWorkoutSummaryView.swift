@@ -324,57 +324,59 @@ struct HumanWorkoutSummaryView: View {
 
     private func workoutRow(_ row: WorkoutSummaryRow) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: row.type.icon)
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color(hex: row.type.colorHex))
-                .frame(width: 44, height: 44)
-                .background(Color(hex: row.type.colorHex).opacity(0.16), in: Circle())
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(row.title)
-                        .font(OhanaFont.subheadline(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                    if row.isHealthKit {
-                        sourceBadge(row.sourceName.isEmpty ? "Apple Health" : row.sourceName, tint: .goPrimary)
-                    }
-                    if row.isPetWalk {
-                        sourceBadge(l.tr(zh: "遛狗", en: "Dog Walk", de: "Hundegang"), tint: .goCardCyan)
-                    }
-                    if row.isMatched {
-                        sourceBadge(l.tr(zh: "已匹配", en: "Matched", de: "Abgeglichen"), tint: .goYellow)
-                    }
-                }
-                Text(row.date, format: .dateTime.month().day().hour().minute())
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                if let overlapText = row.overlapText {
-                    Text(overlapText)
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(Color.goYellow)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("\(row.durationMinutes) min")
-                    .font(OhanaFont.subheadline(.black))
+            HStack(spacing: 12) {
+                Image(systemName: row.type.icon)
+                    .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color(hex: row.type.colorHex))
-                Text(row.secondaryMetric)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
+                    .frame(width: 44, height: 44)
+                    .background(Color(hex: row.type.colorHex).opacity(0.16), in: Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(row.title)
+                            .font(OhanaFont.subheadline(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                        if row.isHealthKit {
+                            sourceBadge(row.sourceName.isEmpty ? "Apple Health" : row.sourceName, tint: .goPrimary)
+                        }
+                        if row.isPetWalk {
+                            sourceBadge(l.tr(zh: "遛狗", en: "Dog Walk", de: "Hundegang"), tint: .goCardCyan)
+                        }
+                        if row.isMatched {
+                            sourceBadge(l.tr(zh: "已匹配", en: "Matched", de: "Abgeglichen"), tint: .goYellow)
+                        }
+                    }
+                    Text(row.date, format: .dateTime.month().day().hour().minute())
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                    if let overlapText = row.overlapText {
+                        Text(overlapText)
+                            .font(OhanaFont.caption2(.bold))
+                            .foregroundStyle(Color.goYellow)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text("\(row.durationMinutes) min")
+                        .font(OhanaFont.subheadline(.black))
+                        .foregroundStyle(Color(hex: row.type.colorHex))
+                    Text(row.secondaryMetric)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                }
             }
+            .accessibilityElement(children: .combine)
 
             rowAction(row)
         }
         .padding(.vertical, 10)
-        .accessibilityElement(children: .combine)
     }
 
     private func sourceBadge(_ title: String, tint: Color) -> some View {

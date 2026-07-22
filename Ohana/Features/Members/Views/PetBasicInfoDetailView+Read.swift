@@ -10,83 +10,200 @@ import SwiftUI
 
 extension PetBasicInfoDetailView {
     var readContent: some View {
-        VStack(spacing: 16) {
-            // 品种护理小贴士（有品种且有数据时显示）
-            if !pet.breed.isEmpty, let tips = PetBreedDatabase.careTips(for: pet.breed, l: l) {
-                breedTipsCard(breed: pet.breed, tips: tips)
-            }
-
-            infoSection(title: l.tr(zh: "基本信息", en: "Basic info", de: "Basisdaten"), icon: "pawprint.fill", iconColor: Color.goPrimary) {
-                infoRow(label: l.tr(zh: "名字", en: "Name", de: "Name"), value: pet.name)
-                infoRow(label: l.tr(zh: "物种", en: "Species", de: "Art"), value: pet.localizedSpeciesName(l: l))
-                infoRow(label: l.tr(zh: "品种", en: "Breed", de: "Rasse"), value: pet.breed.isEmpty ? petProfileEmptyValue : pet.breed)
-                infoRow(
-                    label: l.tr(zh: "主性格", en: "Primary vibe", de: "Hauptcharakter"),
-                    value: pet.personalityTagIdList.first
-                        .map { PetPersonalityTag.displayTitle(for: $0, l: l) }
-                        ?? petProfileEmptyValue
-                )
-                infoRow(label: l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), value: localizedPetGenderSummary)
-                if let birthday = pet.birthday {
-                    infoRow(label: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), value: birthday.formatted(.dateTime.year().month().day()))
-                }
-                if let homeDate = pet.homeDate {
-                    infoRow(label: l.tr(zh: "到家日", en: "Home date", de: "Einzugstag"), value: homeDate.formatted(.dateTime.year().month().day()))
-                }
-                infoRow(label: l.tr(zh: "相处天数", en: "Days together", de: "Gemeinsame Tage"), value: localizedPetDays(pet.daysTogether))
-                infoRow(label: l.tr(zh: "成长椰子", en: "Growth coconuts", de: "Wachstums-Kokosnuesse"), value: "\(pet.coconutBalance) 🥥")
-                infoRow(label: l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"), value: "#\(pet.safeThemeColorHex.uppercased())")
-            }
-            if !pet.coatColor.isEmpty {
-                infoSection(title: l.tr(zh: "外貌特征", en: "Appearance", de: "Aussehen"), icon: "paintpalette.fill", iconColor: Color.goCardCyan) {
-                    if !pet.coatColor.isEmpty { infoRow(label: l.tr(zh: "毛色", en: "Coat color", de: "Fellfarbe"), value: pet.coatColor) }
-                }
-            }
-            infoSection(title: l.tr(zh: "健康与医疗", en: "Health & medical", de: "Gesundheit & Medizin"), icon: "cross.circle.fill", iconColor: Color.goRed) {
-                infoRow(label: l.tr(zh: "芯片号", en: "Microchip", de: "Mikrochip"), value: pet.microchipID.isEmpty ? l.tr(zh: "未登记", en: "Not registered", de: "Nicht registriert") : pet.microchipID)
-                infoRow(label: l.tr(zh: "诊所名称", en: "Clinic", de: "Praxis"), value: pet.vetClinicName.isEmpty ? petProfileEmptyValue : pet.vetClinicName)
-                infoRow(label: l.tr(zh: "主治医生", en: "Doctor", de: "Tierarzt"), value: pet.vetDoctorName.isEmpty ? petProfileEmptyValue : pet.vetDoctorName)
-                infoRow(label: l.tr(zh: "联系电话", en: "Phone", de: "Telefon"), value: pet.vetContact.isEmpty ? petProfileEmptyValue : pet.vetContact)
-                if !pet.vetAddress.isEmpty {
-                    infoRow(label: l.tr(zh: "诊所地址", en: "Clinic address", de: "Praxisadresse"), value: pet.vetAddress)
-                }
-                infoRow(label: l.tr(zh: "过敏原", en: "Allergies", de: "Allergien"), value: pet.allergies.isEmpty ? l.tr(zh: "无记录", en: "No record", de: "Kein Eintrag") : pet.allergies)
-            }
+        VStack(spacing: 24) {
+            petMemorialStatus
+            petProfileCompletionCard
+            petCoreProfileSection
+            petCareGuidance
+            petAppearanceSection
+            petHealthSection
             vetVisitSummaryCard
-            infoSection(title: l.tr(zh: "证件信息", en: "Documents", de: "Dokumente"), icon: "doc.badge.fill", iconColor: Color.goYellow) {
-                infoRow(label: l.tr(zh: "护照编号", en: "Passport number", de: "Passnummer"), value: pet.passportNumber.isEmpty ? petProfileEmptyValue : pet.passportNumber)
-                if let expiry = pet.passportExpiryDate {
-                    infoRow(label: l.tr(zh: "护照有效期", en: "Passport expiry", de: "Pass gueltig bis"), value: expiry.formatted(.dateTime.year().month().day()))
-                } else {
-                    infoRow(label: l.tr(zh: "护照有效期", en: "Passport expiry", de: "Pass gueltig bis"), value: petProfileEmptyValue)
-                }
-            }
-            if !pet.formerName.isEmpty || !pet.lineageInfo.isEmpty || !pet.birthCountry.isEmpty {
-                infoSection(title: l.tr(zh: "血统来源", en: "Lineage", de: "Herkunft"), icon: "list.star", iconColor: Color.goMint) {
-                    if !pet.formerName.isEmpty {
-                        infoRow(label: l.tr(zh: "曾用名", en: "Former name", de: "Frueherer Name"), value: pet.formerName)
-                    }
-                    if !pet.birthCountry.isEmpty {
-                        infoRow(label: l.tr(zh: "出生地", en: "Birthplace", de: "Geburtsort"), value: pet.birthCountry + (pet.birthCity.isEmpty ? "" : " · \(pet.birthCity)"))
-                    }
-                    if !pet.lineageInfo.isEmpty {
-                        infoRow(label: l.tr(zh: "血统", en: "Lineage", de: "Abstammung"), value: pet.lineageInfo)
-                    }
-                }
-            }
-            if !pet.notes.isEmpty {
-                infoSection(title: l.tr(zh: "备注", en: "Notes", de: "Notizen"), icon: "note.text", iconColor: Color.goOrange) {
-                    Text(pet.notes)
-                        .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityIdentifier("pet-basic-info-notes-readback")
-                }
-            }
-
+            petMoreDetailsSection
+            petNotesSection
             rainbowBridgeSection
             deleteDangerZone
         }
+    }
+
+    private var petProfileCompletionCard: some View {
+        ProfileCompletionCard(
+            snapshot: MemberProfileCompletenessPolicy.pet(
+                pet,
+                explicitlyResolvedCategories: profileCompletionResolutions
+            ),
+            onContinue: pet.hasPassedAway ? nil : { presentEditor() }
+        )
+    }
+
+    @ViewBuilder
+    private var petMemorialStatus: some View {
+        if pet.hasPassedAway {
+            ProfileStatusBanner(
+                title: l.tr(zh: "已进入彩虹桥纪念状态", en: "Rainbow Bridge memorial", de: "Gedenkstatus Regenbogenbrücke"),
+                detail: pet.passedAwayDate.map {
+                    l.tr(
+                        zh: "离世日期：\($0.formatted(.dateTime.year().month().day()))",
+                        en: "Date of passing: \($0.formatted(.dateTime.year().month().day()))",
+                        de: "Sterbedatum: \($0.formatted(.dateTime.year().month().day()))"
+                    )
+                },
+                systemImage: "rainbow",
+                tint: Color.purple
+            )
+        }
+    }
+
+    private var petCoreProfileSection: some View {
+        infoSection(title: l.tr(zh: "基本信息", en: "Basic info", de: "Basisdaten"), icon: "pawprint.fill", iconColor: Color.goPrimary) {
+            infoRow(label: l.tr(zh: "名字", en: "Name", de: "Name"), value: pet.name)
+            infoRow(label: l.tr(zh: "物种", en: "Species", de: "Art"), value: pet.localizedSpeciesName(l: l))
+            infoRow(label: l.tr(zh: "品种", en: "Breed", de: "Rasse"), value: pet.breed.isEmpty ? petProfileEmptyValue : pet.breed)
+            infoRow(
+                label: l.tr(zh: "主性格", en: "Primary vibe", de: "Hauptcharakter"),
+                value: pet.personalityTagIdList.first
+                    .map { PetPersonalityTag.displayTitle(for: $0, l: l) }
+                    ?? petProfileEmptyValue
+            )
+            infoRow(label: l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), value: localizedPetGenderSummary)
+            if let birthday = pet.birthday {
+                infoRow(label: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), value: birthday.formatted(.dateTime.year().month().day()))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var petCareGuidance: some View {
+        // Care guidance stays available, but no longer precedes identity and core facts.
+        if !pet.breed.isEmpty, let tips = PetBreedDatabase.careTips(for: pet.breed, l: l) {
+            breedTipsCard(breed: pet.breed, tips: tips)
+        }
+
+        if let onCreateCareTask, !pet.hasPassedAway {
+            infoSection(
+                title: l.tr(zh: "快捷操作", en: "Quick actions", de: "Schnellaktionen"),
+                icon: "checklist",
+                iconColor: Color.goMint
+            ) {
+                Menu {
+                    ForEach(TaskCareKind.allCases.filter { $0.subjectKind == .pet }) { careKind in
+                        petCareTaskButton(careKind, action: onCreateCareTask)
+                    }
+                } label: {
+                    Label(
+                        l.tr(zh: "安排照顾", en: "Schedule care", de: "Pflege planen"),
+                        systemImage: "calendar.badge.plus"
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var petAppearanceSection: some View {
+        if !pet.coatColor.isEmpty {
+            infoSection(title: l.tr(zh: "外貌特征", en: "Appearance", de: "Aussehen"), icon: "paintpalette.fill", iconColor: Color.goCardCyan) {
+                infoRow(label: l.tr(zh: "毛色", en: "Coat color", de: "Fellfarbe"), value: pet.coatColor)
+            }
+        }
+    }
+
+    private var petHealthSection: some View {
+        infoSection(title: l.tr(zh: "健康与医疗", en: "Health & medical", de: "Gesundheit & Medizin"), icon: "cross.circle.fill", iconColor: Color.goRed) {
+            infoRow(label: l.tr(zh: "芯片号", en: "Microchip", de: "Mikrochip"), value: pet.microchipID.isEmpty ? l.tr(zh: "未登记", en: "Not registered", de: "Nicht registriert") : pet.microchipID)
+            infoRow(label: l.tr(zh: "诊所名称", en: "Clinic", de: "Praxis"), value: pet.vetClinicName.isEmpty ? petProfileEmptyValue : pet.vetClinicName)
+            infoRow(label: l.tr(zh: "主治医生", en: "Doctor", de: "Tierarzt"), value: pet.vetDoctorName.isEmpty ? petProfileEmptyValue : pet.vetDoctorName)
+            infoRow(label: l.tr(zh: "联系电话", en: "Phone", de: "Telefon"), value: pet.vetContact.isEmpty ? petProfileEmptyValue : pet.vetContact)
+            if !pet.vetAddress.isEmpty {
+                infoRow(label: l.tr(zh: "诊所地址", en: "Clinic address", de: "Praxisadresse"), value: pet.vetAddress)
+            }
+            infoRow(label: l.tr(zh: "过敏原", en: "Allergies", de: "Allergien"), value: pet.allergies.isEmpty ? l.tr(zh: "无记录", en: "No record", de: "Kein Eintrag") : pet.allergies)
+        }
+    }
+
+    private var petMoreDetailsSection: some View {
+        DisclosureGroup(isExpanded: $showsMoreDetails) {
+            VStack(spacing: 24) {
+                petArchiveFactsSection
+                petDocumentsSection
+                petLineageSection
+            }
+            .padding(.top, 16)
+        } label: {
+            Label(l.tr(zh: "更多资料", en: "More details", de: "Weitere Details"), systemImage: "list.bullet.rectangle")
+                .font(OhanaFont.headline(.bold))
+                .foregroundStyle(Color.ohanaPrimaryText)
+        }
+        .tint(Color.goPrimary)
+        .accessibilityIdentifier("pet-profile-more-details")
+    }
+
+    private var petArchiveFactsSection: some View {
+        infoSection(title: l.tr(zh: "档案信息", en: "Profile details", de: "Profildetails"), icon: "calendar", iconColor: Color.goTeal) {
+            if let homeDate = pet.homeDate {
+                infoRow(label: l.tr(zh: "到家日", en: "Home date", de: "Einzugstag"), value: homeDate.formatted(.dateTime.year().month().day()))
+            }
+            infoRow(label: l.tr(zh: "相处天数", en: "Days together", de: "Gemeinsame Tage"), value: localizedPetDays(pet.daysTogether))
+            infoRow(label: l.tr(zh: "成长椰子", en: "Growth coconuts", de: "Wachstums-Kokosnuesse"), value: "\(pet.coconutBalance) 🥥")
+            infoRow(label: l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"), value: "#\(pet.safeThemeColorHex.uppercased())")
+        }
+    }
+
+    private var petDocumentsSection: some View {
+        infoSection(title: l.tr(zh: "证件信息", en: "Documents", de: "Dokumente"), icon: "doc.badge.fill", iconColor: Color.goYellow) {
+            if pet.passportNumber.isEmpty, pet.passportExpiryDate == nil {
+                petEmptySectionRow
+            } else {
+                if !pet.passportNumber.isEmpty {
+                    infoRow(label: l.tr(zh: "护照编号", en: "Passport number", de: "Passnummer"), value: pet.passportNumber)
+                }
+                if let expiry = pet.passportExpiryDate {
+                    infoRow(label: l.tr(zh: "护照有效期", en: "Passport expiry", de: "Pass gueltig bis"), value: expiry.formatted(.dateTime.year().month().day()))
+                }
+            }
+        }
+    }
+
+    private var petLineageSection: some View {
+        infoSection(title: l.tr(zh: "血统来源", en: "Lineage", de: "Herkunft"), icon: "list.star", iconColor: Color.goMint) {
+            if pet.formerName.isEmpty, pet.lineageInfo.isEmpty, pet.birthCountry.isEmpty {
+                petEmptySectionRow
+            } else {
+                if !pet.formerName.isEmpty {
+                    infoRow(label: l.tr(zh: "曾用名", en: "Former name", de: "Frueherer Name"), value: pet.formerName)
+                }
+                if !pet.birthCountry.isEmpty {
+                    infoRow(label: l.tr(zh: "出生地", en: "Birthplace", de: "Geburtsort"), value: pet.birthCountry + (pet.birthCity.isEmpty ? "" : " · \(pet.birthCity)"))
+                }
+                if !pet.lineageInfo.isEmpty {
+                    infoRow(label: l.tr(zh: "血统", en: "Lineage", de: "Abstammung"), value: pet.lineageInfo)
+                }
+            }
+        }
+    }
+
+    private var petNotesSection: some View {
+        infoSection(title: l.tr(zh: "备注", en: "Notes", de: "Notizen"), icon: "note.text", iconColor: Color.goOrange) {
+            if !pet.notes.isEmpty {
+                Text(pet.notes)
+                    .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("pet-basic-info-notes-readback")
+            } else {
+                petEmptySectionRow
+            }
+        }
+    }
+
+    private var petEmptySectionRow: some View {
+        ProfileEmptySectionRow(
+            title: l.tr(zh: "尚未填写", en: "Not added yet", de: "Noch nicht ausgefüllt"),
+            editTitle: l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"),
+            onEdit: pet.hasPassedAway ? nil : { presentEditor() }
+        )
     }
 
     func breedTipsCard(breed: String, tips: [String]) -> some View {

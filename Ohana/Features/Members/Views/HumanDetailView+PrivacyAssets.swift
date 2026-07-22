@@ -36,6 +36,7 @@ extension HumanDetailView {
             .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-detail-wishlist-action")
         .padding(.horizontal, 16)
     }
 
@@ -66,6 +67,7 @@ extension HumanDetailView {
             .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-detail-expense-action")
         .padding(.horizontal, 16)
     }
 
@@ -77,6 +79,7 @@ extension HumanDetailView {
                 .padding(.horizontal, 16)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-detail-co-health-action")
     }
 
     // MARK: - Privacy Placeholder

@@ -44,7 +44,8 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(addPlantCatalogPickerSource.contains("case floweringBalcony"))
         XCTAssertTrue(addPlantCatalogPickerSource.contains("func includes(_ entry: PlantCatalogEntry) -> Bool"))
         XCTAssertTrue(addPlantCatalogPickerSource.contains("static func entries(for group: PlantCatalogBrowsingGroup)"))
-        XCTAssertTrue(addPlantSource.contains(".searchable("))
+        XCTAssertTrue(addPlantSource.contains("plantCatalogSearchField"))
+        XCTAssertTrue(addPlantSource.contains("add-plant-catalog-search"))
         XCTAssertTrue(addPlantSource.contains("catalogSearchResultsList"))
         XCTAssertTrue(addPlantSource.contains("PlantCatalog.searchResults(catalogQuery, limit: 8)"))
         XCTAssertTrue(addPlantSource.contains("carePlanPreviewSummary"))
@@ -146,10 +147,14 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(addPlantSource.contains("add-plant-step-care-details"))
         XCTAssertTrue(addPlantSource.contains("add-plant-step-confirm"))
         XCTAssertTrue(addPlantSource.contains("PlantCreationMetricPill"))
+        XCTAssertTrue(addPlantSource.contains("PlantCreationCardLayoutMode"))
+        XCTAssertTrue(addPlantSource.contains("OhanaAppBackground()"))
+        XCTAssertTrue(addPlantSource.contains(".environment(\\.colorScheme, .light)"))
+        XCTAssertTrue(addPlantSource.contains("add-plant-card-preview"))
         XCTAssertTrue(addPlantSource.contains("entry.localizedCareDifficulty"))
         XCTAssertTrue(addPlantSource.contains("entry.lightRequirement.displayName"))
         XCTAssertTrue(addPlantSource.contains("entry.localizedHumidity"))
-        XCTAssertTrue(addPlantSource.contains("title: l.tr(zh: \"房间信息\""))
+        XCTAssertTrue(addPlantSource.contains("title: l.tr(zh: \"摆放位置\""))
         XCTAssertTrue(addPlantSource.contains("selectedAvatarSource == .customImage"))
         XCTAssertTrue(addPlantSource.contains("avatarImageData: avatarImageData"))
         XCTAssertTrue(addPlantSource.contains("onPlantSaved?(result.plantID)"))
@@ -158,7 +163,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertFalse(addPlantSource.contains("Add plant 🌿"))
         XCTAssertFalse(addPlantSource.contains("Pflanze hinzufügen 🌿"))
         XCTAssertTrue(plantUITestSource.contains("let plantName = addPlantFromHomePlantsTab(in: app)"))
-        XCTAssertTrue(plantUITestSource.contains("let expectedPlantName = \"pothos\""))
+        XCTAssertTrue(plantUITestSource.contains("expectedPlantName: \"monstera\""))
         XCTAssertTrue(plantUITestSource.contains("testAddPlantPrimaryPathUsesCatalogAndChoiceChipsWithoutTyping"))
         XCTAssertTrue(plantUITestSource.contains("assertAddPlantPrimaryPathKeepsCustomTextFieldsHidden"))
         XCTAssertTrue(plantUITestSource.contains("app.textFields[\"add-plant-name-input\"].exists"))
@@ -180,9 +185,15 @@ final class PlantDetailExperienceTests: XCTestCase {
         let homePlantSource = [componentsSource, plantsPageSource].joined(separator: "\n")
         let homeQuickActionsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+QuickActions.swift", rootURL: rootURL)
         let careFeatureViewSource = try source("Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift", rootURL: rootURL)
+        let careFeatureSupportSource = try source("Ohana/Features/Plants/Views/PlantCareFeatureDetailView+Support.swift", rootURL: rootURL)
         let careFeatureWaterSource = try source("Ohana/Features/Plants/Views/PlantCareFeatureWaterComponents.swift", rootURL: rootURL)
         let waterScheduleControlSource = try source("Ohana/Features/Plants/Views/PlantWaterScheduleControlSection.swift", rootURL: rootURL)
-        let careFeatureSource = [careFeatureViewSource, careFeatureWaterSource, waterScheduleControlSource]
+        let careFeatureSource = [
+            careFeatureViewSource,
+            careFeatureSupportSource,
+            careFeatureWaterSource,
+            waterScheduleControlSource
+        ]
             .joined(separator: "\n")
         let careFeatureScheduleCommandSource = try source("Ohana/Features/Plants/PlantCareFeatureScheduleCommandExecutor.swift", rootURL: rootURL)
         let plantCareCommandExecutorSource = try source("Ohana/Features/Plants/PlantCareCommandExecutor.swift", rootURL: rootURL)
@@ -226,7 +237,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(homeQuickActionsSource.contains(".plantFeature(plant.id, destination)"))
         XCTAssertTrue(homeQuickActionsSource.contains("commandExecutor.recordPlantCare("))
         XCTAssertTrue(careFeatureSource.contains("struct PlantCareFeatureDetailView"))
-        XCTAssertTrue(careFeatureSource.contains("@State private var routeSnapshot"))
+        XCTAssertTrue(careFeatureSource.contains("@State var routeSnapshot"))
         XCTAssertTrue(careFeatureSource.contains("PlantCareFeatureRouteSnapshotActor(modelContainer: container)"))
         XCTAssertTrue(careFeatureSource.contains("routeSnapshot.records"))
         XCTAssertTrue(careFeatureSource.contains("routeSnapshot.wateringTasksByPlantID[plant.id]"))
@@ -368,6 +379,7 @@ final class PlantDetailExperienceTests: XCTestCase {
     func testPlantDashboardReadsLikeCareHubInsteadOfIconGrid() throws {
         let rootURL = repositoryRootURL()
         let dashboardBaseSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift", rootURL: rootURL)
+        let dashboardActionsSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift", rootURL: rootURL)
         let dashboardSectionsSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+Sections.swift", rootURL: rootURL)
         let dashboardDiscoverySource = try source("Ohana/Features/Plants/Views/PlantDashboardView+DiscoverySections.swift", rootURL: rootURL)
         let dashboardWalletSource = try source("Ohana/Features/Plants/Views/PlantDashboardView+WalletDeck.swift", rootURL: rootURL)
@@ -378,6 +390,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         let plantBaselineSeederSource = try source("Ohana/App/UITestPlantBaselineSeeder.swift", rootURL: rootURL)
         let dashboardSource = [
             dashboardBaseSource,
+            dashboardActionsSource,
             dashboardSectionsSource,
             dashboardDiscoverySource,
             dashboardWalletSource,
@@ -587,12 +600,12 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(dashboardRoomRailSource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)"))
         XCTAssertFalse(dashboardBaseSource.contains("alignment: .topTrailing"))
         XCTAssertFalse(dashboardBaseSource.contains(".padding(.top, 78)"))
-        XCTAssertTrue(plantBaselineSeederSource.contains("return min(max(count, 1), 12)"))
-        XCTAssertTrue(plantUITestSource.contains("testPlantWalletLongListKeepsCardsInOneBalancedDeck"))
+        XCTAssertTrue(plantBaselineSeederSource.contains("return min(max(count, 1), 24)"))
+        XCTAssertTrue(plantUITestSource.contains("testPlantWalletLongListGroupsCardsIntoRoomStacks"))
         XCTAssertTrue(plantUITestSource.contains("plantBaselineSeedCount: 8"))
-        XCTAssertTrue(plantUITestSource.contains("Eight seeded plant cards should stay mounted in one balanced deck."))
-        XCTAssertTrue(plantUITestSource.contains("Plant cards should be evenly distributed without a detached seventh-card section."))
-        XCTAssertTrue(plantUITestSource.contains("without scrolling to a separate section"))
+        XCTAssertTrue(plantUITestSource.contains("The two room stacks should expose all eight seeded plants."))
+        XCTAssertTrue(plantUITestSource.contains("Eight alternating seeded plants should produce two room stacks."))
+        XCTAssertTrue(plantUITestSource.contains("Each seeded room should contain four real plant cards."))
         XCTAssertTrue(plantUITestSource.contains("openPlantFeatureCollectionFromPlantsTab"))
         XCTAssertTrue(plantUITestSource.contains("home-plant-data-action"))
         XCTAssertTrue(dashboardSource.contains("searchAndFilterSection"))
@@ -759,7 +772,7 @@ final class PlantDetailExperienceTests: XCTestCase {
         XCTAssertTrue(groupSource.contains("title: l.tr(zh: \"成长照片\", en: \"Growth Photos\""))
         XCTAssertFalse(groupSource.contains("title: l.tr(zh: \"植物日历\", en: \"Plant Calendar\""))
         XCTAssertTrue(groupSource.contains("accessibilityIdentifier(\"function-menu-group-segment-\\(item.id)"))
-        XCTAssertTrue(groupSource.contains("accessibilityValue(effectiveSelectedItemID == item.id"))
+        XCTAssertTrue(groupSource.contains("accessibilityValue(segmentAccessibilityValue(for: item, access: access))"))
         XCTAssertTrue(groupSource.contains("content(for: selectedItem)"))
         XCTAssertFalse(groupSource.contains("TabView(selection:"))
         XCTAssertTrue(groupSource.contains("let plants: [Plant]"))

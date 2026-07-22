@@ -384,6 +384,9 @@ nonisolated struct DomainGachaDrawLogRehydrateSnapshot: Equatable {
     let instantCoconutDelta: Int
     let costCoconuts: Int
     let dailySequence: Int
+    let oddsVersion: Int?
+    let guaranteeKindRaw: String?
+    let stardustDelta: Int?
     let drawDate: Date
     let createdAt: Date
 }
@@ -848,7 +851,17 @@ nonisolated enum DomainGeneralRehydrateWriter {
     ) throws -> DomainGeneralRehydrateResult<OasisElectronicPet> {
         let plan = authorizeHousehold(source: source, context: context)
         if let existing = try fetchOasisElectronicPet(id: snapshot.id, context: context) {
+            applyCompanionLifecycleCompatibility(to: existing)
             return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
+        }
+        let importedLifeState = OasisCritterLifeState(rawValue: snapshot.lifeStateRaw) ?? .healthy
+        let normalizedLifeState: OasisCritterLifeState = switch importedLifeState {
+        case .dead, .critical:
+            .sleeping
+        case .needsCare, .atRisk, .sick:
+            .healthy
+        case .healthy, .sleeping:
+            importedLifeState
         }
         let critter = OasisElectronicPet(
             id: snapshot.id,
@@ -867,7 +880,7 @@ nonisolated enum DomainGeneralRehydrateWriter {
             health: snapshot.health,
             bond: snapshot.bond,
             appearanceStage: snapshot.appearanceStage,
-            isFeaturedOnOasis: snapshot.isFeaturedOnOasis,
+            isFeaturedOnOasis: normalizedLifeState == .sleeping ? false : snapshot.isFeaturedOnOasis,
             habitatSlot: snapshot.habitatSlot,
             equippedDecorId: snapshot.equippedDecorId,
             favoriteItemId: snapshot.favoriteItemId,
@@ -877,17 +890,34 @@ nonisolated enum DomainGeneralRehydrateWriter {
             obtainedAt: snapshot.obtainedAt,
             lastInteractionAt: snapshot.lastInteractionAt,
             lastStateRefreshAt: snapshot.lastStateRefreshAt,
-            lifeStateRaw: snapshot.lifeStateRaw,
-            deathReasonRaw: snapshot.deathReasonRaw,
-            riskStartedAt: snapshot.riskStartedAt,
-            criticalStartedAt: snapshot.criticalStartedAt,
-            diedAt: snapshot.diedAt,
-            lastGentlePromptAt: snapshot.lastGentlePromptAt,
+            lifeStateRaw: normalizedLifeState.rawValue,
+            deathReasonRaw: "",
+            riskStartedAt: nil,
+            criticalStartedAt: nil,
+            diedAt: nil,
+            lastGentlePromptAt: nil,
             isArchived: snapshot.isArchived
         )
         plan.consumeAuthorization()
         context.insert(critter)
         return DomainGeneralRehydrateResult(model: critter, inserted: true, plan: plan)
+    }
+
+    private static func applyCompanionLifecycleCompatibility(to critter: OasisElectronicPet) {
+        switch critter.lifeState {
+        case .dead, .critical:
+            critter.lifeState = .sleeping
+            critter.isFeaturedOnOasis = false
+        case .needsCare, .atRisk, .sick:
+            critter.lifeState = .healthy
+        case .healthy, .sleeping:
+            break
+        }
+        critter.deathReasonRaw = ""
+        critter.riskStartedAt = nil
+        critter.criticalStartedAt = nil
+        critter.diedAt = nil
+        critter.lastGentlePromptAt = nil
     }
 
     @discardableResult
@@ -900,10 +930,21 @@ nonisolated enum DomainGeneralRehydrateWriter {
         if let existing = try fetchOasisCritterFragment(id: snapshot.id, context: context) {
             return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
         }
+        if let existing = try fetchOasisCritterFragment(catalogID: snapshot.catalogId, context: context) {
+            // Fragment and reserved stardust rows are catalog balances. A
+            // restore may carry the same logical row under another UUID; use
+            // last-write-wins instead of creating a split balance that runtime
+            // readers could select arbitrarily.
+            if snapshot.updatedAt >= existing.updatedAt {
+                existing.amount = max(0, snapshot.amount)
+                existing.updatedAt = snapshot.updatedAt
+            }
+            return DomainGeneralRehydrateResult(model: existing, inserted: false, plan: plan)
+        }
         let fragment = OasisCritterFragmentBalance(
             id: snapshot.id,
             catalogId: snapshot.catalogId,
-            amount: snapshot.amount,
+            amount: max(0, snapshot.amount),
             updatedAt: snapshot.updatedAt
         )
         plan.consumeAuthorization()
@@ -1172,6 +1213,9 @@ nonisolated enum DomainGeneralRehydrateWriter {
         log.instantCoconutDelta = snapshot.instantCoconutDelta
         log.costCoconuts = snapshot.costCoconuts
         log.dailySequence = snapshot.dailySequence
+        log.oddsVersion = snapshot.oddsVersion
+        log.guaranteeKindRaw = snapshot.guaranteeKindRaw
+        log.stardustDelta = snapshot.stardustDelta
         log.drawDate = snapshot.drawDate
         log.createdAt = snapshot.createdAt
     }
