@@ -5,6 +5,7 @@ final class HumanProfileExperienceTests: XCTestCase {
     func testHumanProfileUsesSharedReadFirstScaffoldAndSafeDeletionPresentation() throws {
         let shared = try source("Ohana/Shared/Components/ProfileDetailComponents.swift")
         let human = try source("Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift")
+        let lifecycle = try source("Ohana/Features/Members/Views/HumanBasicInfoLifecycleViews.swift")
         let creation = try source("Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift")
 
         for component in [
@@ -25,10 +26,10 @@ final class HumanProfileExperienceTests: XCTestCase {
         XCTAssertFalse(human.contains("showsEditAction: isViewingOwnProfile"))
         XCTAssertTrue(human.contains("completion(.failed(message:"))
         XCTAssertTrue(human.contains("completion(.deleted)"))
-        XCTAssertTrue(human.contains("all related local data"))
-        XCTAssertTrue(human.contains(".interactiveDismissDisabled(isDeleting)"))
-        XCTAssertFalse(human.contains(".height(360)"))
-        XCTAssertTrue(human.contains("human-lifecycle-management-disclosure"))
+        XCTAssertTrue(lifecycle.contains("all related local data"))
+        XCTAssertTrue(lifecycle.contains(".interactiveDismissDisabled(isDeleting)"))
+        XCTAssertFalse((human + lifecycle).contains(".height(360)"))
+        XCTAssertTrue(lifecycle.contains("human-lifecycle-management-disclosure"))
         XCTAssertTrue(shared.contains(".toolbarBackground(Color.ohanaCardSurfaceElevated, for: .navigationBar)"))
         XCTAssertTrue(shared.contains("DisclosureGroup(isExpanded: $showsCompletionExplanation)"))
         XCTAssertTrue(creation.contains("if HumanLocalPrivacyPolicy.isEnabled"))
