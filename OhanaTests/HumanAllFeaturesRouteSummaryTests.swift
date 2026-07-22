@@ -61,6 +61,35 @@ struct HumanAllFeaturesRouteSummaryTests {
         #expect(summary.metricsChartPoints.reduce(0) { $0 + $1.value } == 1)
     }
 
+    @MainActor
+    @Test func humanAllFeaturesSummaryUsesCanonicalProfileCompletionPolicy() {
+        let human = Human(name: "Defaults do not count")
+
+        let emptySummary = HumanAllFeaturesActivitySummary.load(
+            human: human,
+            allMeds: [],
+            allReports: [],
+            allExpenses: []
+        )
+        #expect(emptySummary.profileChartPoints.first?.value == 0)
+
+        human.avatarEmoji = "🧑‍🚀"
+        human.birthday = Date(timeIntervalSince1970: 1_000_000)
+        let resolvedSummary = HumanAllFeaturesActivitySummary.load(
+            human: human,
+            allMeds: [],
+            allReports: [],
+            allExpenses: [],
+            explicitlyResolvedProfileCategories: [.humanBodyProfile]
+        )
+
+        #expect(resolvedSummary.profileChartPoints.first?.value == 3)
+        #expect(MemberProfileCompletenessPolicy.human(
+            human,
+            explicitlyResolvedCategories: [.humanBodyProfile]
+        ).completionPercent == 75)
+    }
+
     @Test func humanAllFeaturesSheetDoesNotReadRelationshipLogs() throws {
         let sheetSource = try source(
             "Ohana/Features/Members/Views/HumanAllFeaturesSheet.swift",

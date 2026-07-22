@@ -53,9 +53,14 @@ struct EditHumanSheet: View {
                 formField(l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), text: $nationality)
                 formField(l.tr(zh: "城市", en: "City", de: "Stadt"), text: $city)
 
-                Picker(l.tr(zh: "角色", en: "Role", de: "Rolle"), selection: $role) {
-                    Text(l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")).tag("owner")
-                    Text(l.tr(zh: "成员", en: "Member", de: "Mitglied")).tag("member")
+                Picker(l.tr(
+                    zh: "家庭角色", en: "Household role", de: "Rolle im Haushalt",
+                    es: "Rol en el hogar", pt: "Papel na família", fr: "Rôle dans le foyer",
+                    ja: "家族での役割", ko: "가족 역할", it: "Ruolo familiare"
+                ), selection: $role) {
+                    ForEach(HumanProfileOptions.permissionRoles, id: \.key) { option in
+                        Text(HumanProfileOptions.localizedRoleTitle(option.key, l: l)).tag(option.key)
+                    }
                 }
                 .pickerStyle(.segmented)
 

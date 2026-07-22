@@ -60,6 +60,12 @@ enum HouseholdStarterJourneyService {
         "\(HouseholdStarterJourneyTask.journeyKey):\(task.rawValue):\(checkpoint.rawValue):\(checkpoint.targetKind.rawValue):\(subjectID.uuidString.lowercased())"
     }
 
+    nonisolated static func checkpointResolutions(
+        from events: [CareLedgerEvent]
+    ) -> [String: HouseholdStarterJourneyResolution] {
+        latestCheckpointResolutions(from: events)
+    }
+
     @MainActor
     static func isEnabled(defaults: UserDefaults = .standard) -> Bool {
         defaults.bool(forKey: "ohana_has_onboarded")

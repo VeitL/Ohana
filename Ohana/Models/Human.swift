@@ -37,10 +37,19 @@ nonisolated enum HumanLocalPrivacyPolicy {
     static let isEnabled = false
 }
 
+nonisolated enum HumanProfileEditPolicy {
+    /// Human records are household content, not authenticated operators. The
+    /// locally selected Human only supplies task attribution and never grants
+    /// or removes profile-editing authority.
+    static func canEdit(hasPassedAway: Bool) -> Bool {
+        !hasPassedAway
+    }
+}
+
 nonisolated enum HumanProfileOptions {
     static let permissionRoles: [(key: String, title: String, description: String, icon: String)] = [
-        ("owner", "管理者", "可管理家庭资料与核心设置", "crown.fill"),
-        ("member", "成员", "可进行日常记录与照护打卡", "person.fill")
+        ("owner", "主要成员", "家庭资料中的主要成员", "crown.fill"),
+        ("member", "家庭成员", "家庭资料中的其他成员", "person.fill")
     ]
 
     static let genderOptions: [(key: String, icon: String)] = [
@@ -58,9 +67,17 @@ nonisolated enum HumanProfileOptions {
     static func localizedRoleTitle(_ raw: String, l: L10n) -> String {
         switch normalizedRole(raw) {
         case "owner":
-            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
+            l.tr(
+                zh: "主要成员", en: "Primary member", de: "Hauptmitglied",
+                es: "Miembro principal", pt: "Membro principal", fr: "Membre principal",
+                ja: "主なメンバー", ko: "주요 구성원", it: "Membro principale"
+            )
         default:
-            l.tr(zh: "成员", en: "Member", de: "Mitglied")
+            l.tr(
+                zh: "家庭成员", en: "Family member", de: "Familienmitglied",
+                es: "Familiar", pt: "Membro da família", fr: "Membre de la famille",
+                ja: "家族メンバー", ko: "가족 구성원", it: "Membro della famiglia"
+            )
         }
     }
 
@@ -108,13 +125,29 @@ nonisolated enum HumanProfileOptions {
     static func localizedGenderTitle(_ raw: String, l: L10n) -> String {
         switch storedGenderIdentity(raw) {
         case "female":
-            l.tr(zh: "女", en: "Female", de: "Weiblich")
+            l.tr(
+                zh: "女", en: "Female", de: "Weiblich",
+                es: "Mujer", pt: "Feminino", fr: "Femme",
+                ja: "女性", ko: "여성", it: "Donna"
+            )
         case "male":
-            l.tr(zh: "男", en: "Male", de: "Männlich")
+            l.tr(
+                zh: "男", en: "Male", de: "Männlich",
+                es: "Hombre", pt: "Masculino", fr: "Homme",
+                ja: "男性", ko: "남성", it: "Uomo"
+            )
         case "nonbinary":
-            l.tr(zh: "非二元", en: "Non-binary", de: "Nichtbinaer")
+            l.tr(
+                zh: "非二元", en: "Non-binary", de: "Nichtbinär",
+                es: "No binario", pt: "Não binário", fr: "Non binaire",
+                ja: "ノンバイナリー", ko: "논바이너리", it: "Non binario"
+            )
         case "private":
-            l.tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
+            l.tr(
+                zh: "不透露", en: "Prefer not to say", de: "Keine Angabe",
+                es: "Prefiero no decirlo", pt: "Prefiro não informar", fr: "Je préfère ne pas répondre",
+                ja: "回答しない", ko: "공개하지 않음", it: "Preferisco non dirlo"
+            )
         default:
             raw.trimmingCharacters(in: .whitespacesAndNewlines)
         }
@@ -144,18 +177,18 @@ nonisolated enum HumanPermissionRole {
     static func title(for raw: String) -> String {
         switch HumanProfileOptions.normalizedRole(raw) {
         case "owner":
-            "管理者"
+            "主要成员"
         default:
-            "成员"
+            "家庭成员"
         }
     }
 
     static func description(for raw: String) -> String {
         switch HumanProfileOptions.normalizedRole(raw) {
         case "owner":
-            "可管理家庭资料与核心设置"
+            "家庭资料中的主要成员"
         default:
-            "可进行日常记录与照护打卡"
+            "家庭资料中的其他成员"
         }
     }
 

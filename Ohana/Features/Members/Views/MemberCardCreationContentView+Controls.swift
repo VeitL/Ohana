@@ -76,7 +76,7 @@ extension MemberCardCreationContentView {
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
-    func humanNameInput(width: CGFloat) -> some View {
+    func humanNameInput(width: CGFloat? = nil) -> some View {
         OhanaTextField(
             placeholder: l.tr(zh: "名字", en: "Name", de: "Name"),
             text: $draft.name,
@@ -84,6 +84,50 @@ extension MemberCardCreationContentView {
         )
         .frame(width: width, height: 44)
         .accessibilityIdentifier("member-name-input")
+    }
+
+    func compactHumanGenderGrid(
+        options: [String],
+        selection: Binding<String>,
+        label: @escaping (String) -> String
+    ) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 150 : 92), spacing: 7)],
+            spacing: 7
+        ) {
+            ForEach(options, id: \.self) { option in
+                let isSelected = selection.wrappedValue == option
+                Button {
+                    withAnimation(GoMotion.selection) {
+                        selection.wrappedValue = option
+                    }
+                    OhanaFeedback.selection()
+                } label: {
+                    HStack(spacing: 5) {
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill") // a11y: allow decorative selected-state icon; the button exposes label, value, and selected trait
+                                .accessibilityHidden(true)
+                        }
+                        Text(label(option))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                    }
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.horizontal, 6)
+                    .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(isSelected ? cardAccent.opacity(0.62) : cardControlStroke, lineWidth: 1)
+                    }
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("member-gender-\(option)")
+                .accessibilityLabel(label(option))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
     }
 
     func petNameInput() -> some View {
@@ -176,15 +220,6 @@ extension MemberCardCreationContentView {
         case "boy", "male", "男": "♂"
         case "girl", "female", "女": "♀"
         default: ""
-        }
-    }
-
-    func humanGenderIcon(_ gender: String) -> String {
-        switch HumanProfileOptions.normalizedGender(gender) {
-        case "男": "♂"
-        case "女": "♀"
-        case "非二元": "⚧"
-        default: "•"
         }
     }
 

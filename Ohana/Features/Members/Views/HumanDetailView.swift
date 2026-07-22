@@ -57,11 +57,13 @@ struct HumanDetailView: View {
     @State var showingMedication = false
     @State var showingHealthReport = false
     @State var showingHealthMetrics = false
+    @State var isDeleting = false
     @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var avatarSignature = ""
     @State var avatarCacheKey = "human-detail-avatar-empty"
 
     var isViewingOwnProfile: Bool { activeHumanId == human.id }
+    var canEditProfile: Bool { HumanProfileEditPolicy.canEdit(hasPassedAway: human.hasPassedAway) }
     var isAllPrivateForViewer: Bool {
         HumanLocalPrivacyPolicy.isEnabled &&
             !isViewingOwnProfile &&
@@ -207,7 +209,7 @@ struct HumanDetailView: View {
                             presentCoconutLog()
                         }
                     }
-                    if isViewingOwnProfile {
+                    if canEditProfile {
                         Button { showingEditSheet = true } label: {
                             Image(systemName: "pencil.circle") // a11y: allow decorative icon covered by surrounding text or control
                                 .foregroundStyle(Color.ohanaPrimaryText)

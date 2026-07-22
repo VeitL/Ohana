@@ -20,15 +20,20 @@ extension MemberCardCreationContentView {
             foreground: cardForeground
         ) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    humanNameInput(width: 148)
-                    compactGenderIconRow(
-                        options: humanGenderOptions,
-                        selection: $draft.humanGender,
-                        label: humanGenderLabel,
-                        icon: humanGenderIcon
-                    )
-                }
+                humanNameInput()
+                    .frame(maxWidth: .infinity)
+                Text(l.tr(
+                    zh: "性别或身份（可选）", en: "Gender or identity (optional)", de: "Geschlecht oder Identität (optional)",
+                    es: "Género o identidad (opcional)", pt: "Gênero ou identidade (opcional)", fr: "Genre ou identité (facultatif)",
+                    ja: "性別・アイデンティティ（任意）", ko: "성별 또는 정체성(선택 사항)", it: "Genere o identità (facoltativo)"
+                ))
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(cardSecondaryForeground)
+                compactHumanGenderGrid(
+                    options: humanGenderOptions,
+                    selection: $draft.humanGender,
+                    label: humanGenderLabel
+                )
                 MemberCompactDateRow(
                     title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
                     icon: "birthday.cake.fill",
@@ -451,7 +456,9 @@ extension MemberCardCreationContentView {
                         maxFractionDigits: 1
                     )
                 }
-                privacyPillGrid
+                if HumanLocalPrivacyPolicy.isEnabled {
+                    privacyPillGrid
+                }
             }
         }
     }

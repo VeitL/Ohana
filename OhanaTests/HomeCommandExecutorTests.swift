@@ -3866,6 +3866,28 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func memberDeletionFailureRollsBackAndKeepsHumanData() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Still here")
+        context.insert(human)
+        try context.save()
+
+        let result = MemberDeletionCommandService.deleteHuman(
+            human,
+            activeHumanID: human.id.uuidString,
+            context: context,
+            saveChanges: { _ in
+                .failed(NSError(domain: "HumanDeletionPresentationTests", code: 1))
+            }
+        )
+
+        #expect(!result.didPersist)
+        #expect(result.persistenceErrorDescription != nil)
+        #expect(try context.fetch(FetchDescriptor<Human>()).map(\.id) == [human.id])
+    }
+
+    @MainActor
     @Test func memberDeletionServiceDeletesPlant() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
