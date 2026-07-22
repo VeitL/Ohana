@@ -102,9 +102,9 @@ struct OnboardingPreferenceCoordinatorTests {
             await Task.yield()
         }
         // 模拟用户在对话框停留:给被误用的紧超时充分机会触发。
-        for _ in 0 ..< 20 {
-            await Task.yield()
-        }
+        // 不反复 yield: 并行测试争用 MainActor 时会不断排到队尾,反而让
+        // 测试任务晚于宽限时任务恢复。
+        try? await Task.sleep(nanoseconds: 10_000_000)
         // 用户授予后定位到达。
         provider.complete(.success(CLLocation(latitude: 37.7749, longitude: -122.4194)))
         await task.value
