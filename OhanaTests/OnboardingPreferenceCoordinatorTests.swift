@@ -246,7 +246,8 @@ struct OnboardingPreferenceCoordinatorTests {
 
         #expect(controls.contains("func humanNameInput"))
         #expect(controls.contains("OhanaTextField("))
-        #expect(steps.contains("humanNameInput(width: 148)"))
+        #expect(steps.contains("humanNameInput()"))
+        #expect(steps.contains("compactHumanGenderGrid("))
         #expect(shell.contains("presentationStyle != .onboarding && !usesTransparentHomeJoinHandoffBackdrop"))
         #expect(layout.contains("presentationStyle != .onboarding"))
         #expect(layout.contains("MemberCreationJoinHandoffCard(snapshot: joinHandoffSnapshot)"))
