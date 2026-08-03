@@ -51,7 +51,16 @@ nonisolated struct PersonalUpgradePrompt: Identifiable, Equatable, Sendable {
 
     func title(_ l: L10n) -> String {
         switch reason {
-        case .quota(.activePet):
+        case let .quota(resource):
+            quotaTitle(resource, l: l)
+        case let .feature(feature):
+            featureTitle(feature, l: l)
+        }
+    }
+
+    private func quotaTitle(_ resource: PersonalLimitedResource, l: L10n) -> String {
+        switch resource {
+        case .activePet:
             l.tr(
                 zh: "添加另一只宠物",
                 en: "Add another pet",
@@ -63,45 +72,86 @@ nonisolated struct PersonalUpgradePrompt: Identifiable, Equatable, Sendable {
                 ko: "다른 반려동물 추가",
                 it: "Aggiungi un altro animale"
             )
-        case .quota(.activeHuman):
+        case .activeHuman:
             l.tr(
                 zh: "添加更多 Human",
                 en: "Add more Humans",
-                de: "Weitere Menschen hinzufügen"
+                de: "Weitere Menschen hinzufügen",
+                es: "Añadir más Human",
+                pt: "Adicionar mais Human",
+                fr: "Ajouter d’autres Human",
+                ja: "Humanをさらに追加",
+                ko: "Human 더 추가",
+                it: "Aggiungi altri Human"
             )
-        case .quota(.activePlant):
+        case .activePlant:
             l.tr(
                 zh: "添加更多活跃植物",
                 en: "Add more active plants",
-                de: "Weitere aktive Pflanzen hinzufügen"
+                de: "Weitere aktive Pflanzen hinzufügen",
+                es: "Añadir más plantas activas",
+                pt: "Adicionar mais plantas ativas",
+                fr: "Ajouter d’autres plantes actives",
+                ja: "アクティブな植物をさらに追加",
+                ko: "활성 식물 더 추가",
+                it: "Aggiungi altre piante attive"
             )
-        case .quota(.ordinaryActivePlan):
+        case .ordinaryActivePlan:
             l.tr(
                 zh: "创建更多普通计划",
                 en: "Create more everyday plans",
-                de: "Weitere Alltagspläne erstellen"
+                de: "Weitere Alltagspläne erstellen",
+                es: "Crear más planes cotidianos",
+                pt: "Criar mais planos do dia a dia",
+                fr: "Créer plus de plans courants",
+                ja: "通常プランをさらに作成",
+                ko: "일반 플랜 더 만들기",
+                it: "Crea altri piani quotidiani"
             )
-        case .feature(.extendedTrends):
+        }
+    }
+
+    private func featureTitle(_ feature: PersonalFeature, l: L10n) -> String {
+        switch feature {
+        case .extendedTrends:
             l.tr(
                 zh: "查看更长期趋势",
                 en: "See longer-term trends",
-                de: "Längerfristige Trends ansehen"
+                de: "Längerfristige Trends ansehen",
+                es: "Ver tendencias a más largo plazo",
+                pt: "Ver tendências de prazo mais longo",
+                fr: "Voir les tendances à plus long terme",
+                ja: "より長期の傾向を見る",
+                ko: "더 장기적인 추세 보기",
+                it: "Visualizza tendenze a più lungo termine"
             )
-        case .feature(.vetSummaryPDF):
+        case .vetSummaryPDF:
             l.tr(
                 zh: "生成兽医 PDF 摘要",
                 en: "Create a vet PDF summary",
-                de: "Tierarzt-PDF erstellen"
+                de: "Tierarzt-PDF erstellen",
+                es: "Crear un resumen veterinario en PDF",
+                pt: "Criar um resumo veterinário em PDF",
+                fr: "Créer un résumé vétérinaire en PDF",
+                ja: "獣医向けPDF要約を作成",
+                ko: "수의사용 PDF 요약 만들기",
+                it: "Crea un riepilogo veterinario in PDF"
             )
-        case .feature(.supporterAppearance):
+        case .supporterAppearance:
             l.tr(
                 zh: "使用 Personal 外观",
                 en: "Use Personal appearances",
-                de: "Personal-Designs verwenden"
+                de: "Personal-Designs verwenden",
+                es: "Usar estilos de Ohana Personal",
+                pt: "Usar visuais do Ohana Personal",
+                fr: "Utiliser les styles Ohana Personal",
+                ja: "Ohana Personalの外観を使用",
+                ko: "Ohana Personal 디자인 사용",
+                it: "Usa gli stili di Ohana Personal"
             )
-        case .feature(.presenceLongRangeAnalytics),
-             .feature(.presenceCrossSubjectComparison),
-             .feature(.presenceDataExport):
+        case .presenceLongRangeAnalytics,
+             .presenceCrossSubjectComparison,
+             .presenceDataExport:
             l.tr(
                 zh: "解锁佛系趋势与分析",
                 en: "Unlock Zen trends and insights",
@@ -113,7 +163,7 @@ nonisolated struct PersonalUpgradePrompt: Identifiable, Equatable, Sendable {
                 ko: "마음 편한 트렌드와 분석 잠금 해제",
                 it: "Sblocca tendenze e analisi Zen"
             )
-        case .feature(.presenceAdvancedReminders):
+        case .presenceAdvancedReminders:
             l.tr(
                 zh: "解锁高级打卡提醒",
                 en: "Unlock advanced check-in reminders",
@@ -125,7 +175,7 @@ nonisolated struct PersonalUpgradePrompt: Identifiable, Equatable, Sendable {
                 ko: "고급 체크인 알림 잠금 해제",
                 it: "Sblocca i promemoria di check-in avanzati"
             )
-        case .feature(.presenceEditableMessageTemplate):
+        case .presenceEditableMessageTemplate:
             l.tr(
                 zh: "自定义联系文案",
                 en: "Customize the contact message",
@@ -137,7 +187,19 @@ nonisolated struct PersonalUpgradePrompt: Identifiable, Equatable, Sendable {
                 ko: "연락 메시지 사용자 지정",
                 it: "Personalizza il messaggio di contatto"
             )
-        case .feature(.systemWidgets):
+        case .documentScanning:
+            l.tr(
+                zh: "扫描并整理文档",
+                en: "Scan and organize documents",
+                de: "Dokumente scannen und ordnen",
+                es: "Escanea y organiza documentos",
+                pt: "Digitalize e organize documentos",
+                fr: "Numérisez et organisez des documents",
+                ja: "書類をスキャンして整理",
+                ko: "문서를 스캔하고 정리",
+                it: "Scansiona e organizza documenti"
+            )
+        case .systemWidgets:
             l.tr(
                 zh: "在桌面查看今日照护",
                 en: "See today’s care on your Home Screen",
@@ -220,19 +282,37 @@ nonisolated struct PersonalUpgradePrompt: Identifiable, Equatable, Sendable {
             l.tr(
                 zh: "Free 提供最近 30 天的基础趋势；Ohana Personal 解锁 90 天与全部时间分析。现有记录始终可用。",
                 en: "Free includes basic trends for the last 30 days. Ohana Personal unlocks 90-day and all-time analysis. Existing records always remain available.",
-                de: "Free enthält Basistrends der letzten 30 Tage. Ohana Personal schaltet 90-Tage- und Gesamtanalysen frei. Vorhandene Einträge bleiben immer verfügbar."
+                de: "Free enthält Basistrends der letzten 30 Tage. Ohana Personal schaltet 90-Tage- und Gesamtanalysen frei. Vorhandene Einträge bleiben immer verfügbar.",
+                es: "Free incluye tendencias básicas de los últimos 30 días. Ohana Personal desbloquea análisis de 90 días y de todo el historial. Los registros existentes siguen siempre disponibles.",
+                pt: "Free inclui tendências básicas dos últimos 30 dias. Ohana Personal libera análises de 90 dias e de todo o histórico. Os registros existentes continuam sempre disponíveis.",
+                fr: "Free inclut les tendances de base des 30 derniers jours. Ohana Personal débloque les analyses sur 90 jours et sur tout l’historique. Les données existantes restent toujours disponibles.",
+                ja: "Freeでは直近30日間の基本的な傾向を確認できます。Ohana Personalでは90日間と全期間の分析を利用できます。既存の記録は常に利用できます。",
+                ko: "Free에서는 최근 30일의 기본 추세를 볼 수 있습니다. Ohana Personal에서는 90일 및 전체 기간 분석을 이용할 수 있습니다. 기존 기록은 항상 이용할 수 있습니다.",
+                it: "Free include le tendenze di base degli ultimi 30 giorni. Ohana Personal sblocca analisi a 90 giorni e dell’intero storico. I dati esistenti restano sempre disponibili."
             )
         case .vetSummaryPDF:
             l.tr(
                 zh: "Ohana Personal 可从本地记录生成兽医 PDF 摘要；原始记录与手动导出始终可用。",
                 en: "Ohana Personal creates vet PDF summaries from local records. Raw records and manual export always remain available.",
-                de: "Ohana Personal erstellt Tierarzt-PDFs aus lokalen Einträgen. Rohdaten und manueller Export bleiben immer verfügbar."
+                de: "Ohana Personal erstellt Tierarzt-PDFs aus lokalen Einträgen. Rohdaten und manueller Export bleiben immer verfügbar.",
+                es: "Ohana Personal crea resúmenes veterinarios en PDF a partir de registros locales. Los registros originales y la exportación manual siguen siempre disponibles.",
+                pt: "Ohana Personal cria resumos veterinários em PDF a partir de registros locais. Os registros originais e a exportação manual continuam sempre disponíveis.",
+                fr: "Ohana Personal crée des résumés vétérinaires en PDF à partir des données locales. Les données brutes et l’export manuel restent toujours disponibles.",
+                ja: "Ohana Personalではローカルの記録から獣医向けPDF要約を作成できます。元の記録と手動エクスポートは常に利用できます。",
+                ko: "Ohana Personal은 로컬 기록으로 수의사용 PDF 요약을 만들 수 있습니다. 원본 기록과 수동 내보내기는 항상 이용할 수 있습니다.",
+                it: "Ohana Personal crea riepiloghi veterinari in PDF dai dati locali. I dati originali e l’esportazione manuale restano sempre disponibili."
             )
         case .supporterAppearance:
             l.tr(
                 zh: "Ohana Personal 解锁全部 Founding Supporter 外观权益。",
                 en: "Ohana Personal unlocks every Founding Supporter appearance extra.",
-                de: "Ohana Personal schaltet alle Founding-Supporter-Designextras frei."
+                de: "Ohana Personal schaltet alle Founding-Supporter-Designextras frei.",
+                es: "Ohana Personal desbloquea todos los extras visuales de Founding Supporter.",
+                pt: "Ohana Personal libera todos os extras visuais de Founding Supporter.",
+                fr: "Ohana Personal débloque tous les extras visuels Founding Supporter.",
+                ja: "Ohana PersonalではFounding Supporterのすべての外観特典を利用できます。",
+                ko: "Ohana Personal은 Founding Supporter의 모든 디자인 혜택을 잠금 해제합니다.",
+                it: "Ohana Personal sblocca tutti gli extra estetici Founding Supporter."
             )
         case .presenceLongRangeAnalytics, .presenceCrossSubjectComparison, .presenceDataExport:
             l.tr(
@@ -269,6 +349,18 @@ nonisolated struct PersonalUpgradePrompt: Identifiable, Equatable, Sendable {
                 ja: "Freeでは固定の控えめな文面を使用します。Personalでは端末上で編集し、連絡先を3人まで保存できます。SMSの送信は毎回あなたが確認します。",
                 ko: "Free는 신중한 고정 문구를 사용합니다. Personal은 기기에서 문구를 편집하고 연락처를 최대 3명까지 저장할 수 있습니다. 문자 전송은 매번 직접 확인합니다.",
                 it: "Free usa un messaggio fisso e prudente. Personal permette di modificarlo sul dispositivo e conservare fino a tre contatti. Confermi comunque ogni SMS."
+            )
+        case .documentScanning:
+            l.tr(
+                zh: "Ohana Personal 可在本机扫描文档、逐项复核并保存结构化记录；原始图片和完整识别文本不会长期保存。",
+                en: "Ohana Personal scans documents on device for item-by-item review and structured records. Source images and full recognized text are not retained long term.",
+                de: "Ohana Personal scannt Dokumente auf dem Gerät zur Einzelprüfung und für strukturierte Einträge. Quellbilder und der vollständig erkannte Text werden nicht dauerhaft gespeichert.",
+                es: "Ohana Personal escanea documentos en el dispositivo para revisarlos elemento por elemento y guardar registros estructurados. Las imágenes originales y el texto reconocido completo no se conservan a largo plazo.",
+                pt: "O Ohana Personal digitaliza documentos no dispositivo para revisão item a item e registros estruturados. As imagens de origem e o texto reconhecido completo não são mantidos a longo prazo.",
+                fr: "Ohana Personal numérise les documents sur l’appareil pour une vérification élément par élément et des données structurées. Les images sources et le texte reconnu intégral ne sont pas conservés à long terme.",
+                ja: "Ohana Personalは端末上で書類をスキャンし、項目ごとに確認して構造化された記録として保存します。元画像と認識した全文は長期保存されません。",
+                ko: "Ohana Personal은 기기에서 문서를 스캔하고 항목별로 검토해 구조화된 기록으로 저장합니다. 원본 이미지와 전체 인식 텍스트는 장기간 보관하지 않습니다.",
+                it: "Ohana Personal scansiona i documenti sul dispositivo per la revisione voce per voce e il salvataggio di dati strutturati. Le immagini originali e il testo riconosciuto completo non vengono conservati a lungo termine."
             )
         case .systemWidgets:
             l.tr(

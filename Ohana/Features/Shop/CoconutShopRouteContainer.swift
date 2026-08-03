@@ -11,7 +11,7 @@ struct CoconutShopRouteContainer: View {
 
     let initialCategory: ShopItem.ShopCategory
 
-    init(initialCategory: ShopItem.ShopCategory = .appIcon) {
+    init(initialCategory: ShopItem.ShopCategory = .effect) {
         self.initialCategory = initialCategory
     }
 
@@ -130,7 +130,7 @@ private struct CoconutShopRouteData {
         for attempt in attempts where settlements[attempt.itemId] == nil {
             settlements[attempt.itemId] = switch attempt.state {
             case .purchased, .fulfilling: .pending
-            case .refundPending: .refunding
+            case .refundPending: .pending
             case .manualReview: .needsAttention
             case .fulfilled, .refunded: nil
             }

@@ -451,31 +451,11 @@ struct AppRuntimeHost<Content: View>: View {
             guard configuration.isEnabled else { return }
             switch await appServices.userNotifications.authorizationStatus() {
             case .authorized, .provisional, .ephemeral:
-                let l = L10n.current
+                let content = PresenceReminderNotificationContent.localized(L10n.current)
                 let requests = PresenceReminderRequestFactory.makeRequests(
                     configuration: configuration,
-                    title: l.tr(
-                        zh: "佛系打卡提醒",
-                        en: "Zen check-in reminder",
-                        de: "Zen-Check-in-Erinnerung",
-                        es: "Recordatorio de check-in zen",
-                        pt: "Lembrete de check-in zen",
-                        fr: "Rappel de check-in Zen",
-                        ja: "佛系チェックインのリマインダー",
-                        ko: "마음 편한 체크인 알림",
-                        it: "Promemoria check-in Zen"
-                    ),
-                    body: l.tr(
-                        zh: "今天还没有收到你的打卡。",
-                        en: "We haven't received your check-in today.",
-                        de: "Dein Check-in für heute fehlt noch.",
-                        es: "Aún no hemos recibido tu check-in de hoy.",
-                        pt: "Ainda não recebemos seu check-in de hoje.",
-                        fr: "Nous n’avons pas encore reçu votre check-in aujourd’hui.",
-                        ja: "今日のチェックインがまだ届いていません。",
-                        ko: "오늘 체크인을 아직 받지 못했어요.",
-                        it: "Non abbiamo ancora ricevuto il tuo check-in di oggi."
-                    )
+                    title: content.title,
+                    body: content.body
                 )
                 let scheduler = SystemPresenceReminderScheduler()
                 do {

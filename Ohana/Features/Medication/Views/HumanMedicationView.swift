@@ -5,6 +5,26 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
+
+private enum HumanMedicationToastKind: Equatable {
+    case success
+    case failure
+
+    var icon: String {
+        switch self {
+        case .success: "checkmark.circle.fill"
+        case .failure: "exclamationmark.triangle.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .success: .goTeal
+        case .failure: .goRed
+        }
+    }
+}
 
 // MARK: - Main View
 
@@ -12,8 +32,10 @@ struct HumanMedicationContentView: View {
     let human: Human
     let allMeds: [HumanMedication]
     let allLogs: [HumanMedicationLog]
+    let readCompleteness: HumanMedicationRouteReadCompleteness
     var showsDoneButton: Bool = true
     var onDoseTaken: (() -> Void)?
+    let referenceNow: Date
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -25,23 +47,31 @@ struct HumanMedicationContentView: View {
     @State private var editingMed: HumanMedication? = nil
     @State private var showToast = false
     @State private var toastMessage = ""
-    @State private var pendingDoseStatusByID: [String: HumanMedicationStatus] = [:]
-    @State private var pendingMedicationActiveByID: [UUID: Bool] = [:]
-    @State private var pendingMedicationActivationIDs: Set<UUID> = []
+    @State private var toastKind = HumanMedicationToastKind.success
+    @State private var toastSequence = 0
+    @State private var medicationPresentationState = HumanMedicationPresentationState()
+    @State private var timelineNow: Date
+    @State private var planPendingDeactivation: HumanMedication?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     init(
         human: Human,
         allMeds: [HumanMedication],
         allLogs: [HumanMedicationLog],
+        readCompleteness: HumanMedicationRouteReadCompleteness = .complete,
         showsDoneButton: Bool = true,
-        onDoseTaken: (() -> Void)? = nil
+        onDoseTaken: (() -> Void)? = nil,
+        referenceNow: Date = Date()
     ) {
         self.human = human
         self.allMeds = allMeds
         self.allLogs = allLogs
+        self.readCompleteness = readCompleteness
         self.showsDoneButton = showsDoneButton
         self.onDoseTaken = onDoseTaken
+        self.referenceNow = referenceNow
+        _timelineNow = State(initialValue: referenceNow)
+        _planPendingDeactivation = State(initialValue: nil)
     }
 
     private var myMeds: [HumanMedication] {
@@ -65,48 +95,42 @@ struct HumanMedicationContentView: View {
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var isPrivacyLocked: Bool { human.isPrivate(.medication, viewedBy: activeHumanId) }
+    private var didReachReadLimit: Bool {
+        !readCompleteness.all
+    }
 
     private var todayLogs: [HumanMedicationLog] {
         allLogs.filter { log in
-            Calendar.current.isDateInToday(log.scheduledTime) && log.humanId == human.id.uuidString
+            Calendar.current.isDate(log.scheduledTime, inSameDayAs: timelineNow)
+                && HumanMedicationLogStore.canonicalID(log.humanId) == human.id.uuidString
         }
     }
 
-    private var adherenceDays: [MedicationAdherenceDay] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let weekdayFormatter = DateFormatter()
-        weekdayFormatter.locale = AppLanguage.effectiveLocale
-        weekdayFormatter.dateFormat = "E"
-
-        return (0 ..< 7).reversed().compactMap { offset in
-            guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
-            let planned = plannedDoseCount(on: day)
-            let taken = allLogs.count(where: {
-                $0.humanId == human.id.uuidString &&
-                    $0.status == .taken &&
-                    calendar.isDate($0.scheduledTime, inSameDayAs: day)
-            })
-
-            return MedicationAdherenceDay(
-                date: day,
-                dayLabel: weekdayFormatter.string(from: day),
-                planned: planned,
-                taken: min(taken, max(planned, taken))
-            )
-        }
+    private var adherenceSnapshot: HumanMedicationAdherenceSnapshot {
+        HumanMedicationAdherenceAnalysis.snapshot(
+            medications: myMeds,
+            logs: allLogs,
+            now: timelineNow
+        )
     }
 
-    private var sevenDayCompletionRate: Int {
-        let planned = adherenceDays.reduce(0) { $0 + $1.planned }
-        guard planned > 0 else { return 0 }
-        let taken = adherenceDays.reduce(0) { $0 + $1.taken }
-        return Int((Double(taken) / Double(planned) * 100).rounded())
+    private var sevenDayCompletionLabel: String {
+        guard readCompleteness.sevenDayAnalysis else {
+            return l.tr(zh: "七日趋势为部分数据", en: "Partial 7-day trend", de: "Teilweiser 7-Tage-Verlauf")
+        }
+        guard let completionRate = adherenceSnapshot.completionRate else {
+            return l.tr(zh: "暂无到期剂量", en: "No doses due", de: "Keine Dosis fällig")
+        }
+        return l.tr(
+            zh: "\(completionRate)% 七日估算",
+            en: "\(completionRate)% 7-day estimate",
+            de: "\(completionRate)% 7-Tage-Schätzung"
+        )
     }
 
     private var todayScheduleItems: [DailyDoseItem] {
         HumanMedicationSchedulePlan
-            .doses(on: Date(), medications: myMeds)
+            .doses(on: timelineNow, medications: myMeds)
             .map { dose in
                 let existingLog = HumanMedicationLogStore.matchingLog(
                     in: todayLogs,
@@ -128,13 +152,18 @@ struct HumanMedicationContentView: View {
     }
 
     private var overdueItems: [DailyDoseItem] {
-        let now = Date()
-        return pendingScheduleItems.filter { $0.scheduledTime < now }
+        pendingScheduleItems.filter { $0.scheduledTime < timelineNow }
     }
 
     private var nextPendingItem: DailyDoseItem? {
-        let now = Date()
-        return pendingScheduleItems.first { $0.scheduledTime >= now } ?? overdueItems.first
+        pendingScheduleItems.first { $0.scheduledTime >= timelineNow } ?? overdueItems.first
+    }
+
+    private var nextPresentationDeadline: Date? {
+        HumanMedicationTimelineRefreshPolicy.nextDosePresentationDeadline(
+            after: timelineNow,
+            medications: myMeds
+        )
     }
 
     private func meds(in group: HumanMedicationDisplayGroup) -> [HumanMedication] {
@@ -144,12 +173,17 @@ struct HumanMedicationContentView: View {
     var body: some View {
         Group {
             if isPrivacyLocked {
-                privacyLockedView
+                HumanMedicationPrivacyLockedPage(
+                    human: human,
+                    showsDoneButton: showsDoneButton,
+                    l: l,
+                    onClose: { dismiss() }
+                )
             } else {
                 medicationContent
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(showsDoneButton ? .hidden : .visible, for: .navigationBar)
         .sheet(isPresented: $showAddSheet) {
             AddMedicationSheet(human: human)
                 .ohanaSheetPagePresentation() // ui-v4: allow complex medication editor uses full-height system sheet
@@ -158,11 +192,60 @@ struct HumanMedicationContentView: View {
             AddMedicationSheet(human: human, editing: med)
                 .ohanaSheetPagePresentation() // ui-v4: allow complex medication editor uses full-height system sheet
         }
+        .onChange(of: referenceNow) { _, newValue in
+            timelineNow = newValue
+        }
+        .task(id: nextPresentationDeadline) {
+            await refreshAtNextDoseDeadline(nextPresentationDeadline)
+        }
+        .confirmationDialog(
+            l.tr(zh: "停用用药计划？", en: "Stop medication plan?", de: "Medikamentenplan stoppen?"),
+            isPresented: Binding(
+                get: { planPendingDeactivation != nil },
+                set: { if !$0 { planPendingDeactivation = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let medication = planPendingDeactivation {
+                Button(
+                    l.tr(zh: "停用 \(spokenMedicationName(medication)) 的计划", en: "Stop \(spokenMedicationName(medication)) plan", de: "Plan für \(spokenMedicationName(medication)) stoppen"),
+                    role: .destructive
+                ) {
+                    planPendingDeactivation = nil
+                    setMedicationActive(medication, isActive: false)
+                }
+            }
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {
+                planPendingDeactivation = nil
+            }
+        } message: {
+            Text(l.tr(
+                zh: "这会停止未来日程和提醒，并影响后续依从率统计；既有服药记录会保留，也可随时恢复计划。",
+                en: "This stops future schedules and reminders and affects future adherence totals. Existing dose logs stay saved, and the plan can be resumed anytime.",
+                de: "Dadurch werden künftige Zeitpläne und Erinnerungen gestoppt und künftige Adhärenzwerte beeinflusst. Vorhandene Einnahmen bleiben gespeichert; der Plan kann jederzeit fortgesetzt werden."
+            ))
+        }
         .onDisappear {
             commandQueue.cancelAll()
-            pendingMedicationActiveByID.removeAll()
-            pendingMedicationActivationIDs.removeAll()
+            medicationPresentationState.cancelAll()
+            planPendingDeactivation = nil
         }
+    }
+}
+
+private extension HumanMedicationContentView {
+    private func refreshAtNextDoseDeadline(_ deadline: Date?) async {
+        guard AppWorkloadPolicy.shared.shouldRunEssentialDeadlineTimer(),
+              let deadline else { return }
+        let delaySeconds = max(0.25, deadline.timeIntervalSince(Date()) + 0.1)
+        do {
+            try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+        } catch {
+            return
+        }
+        guard !Task.isCancelled,
+              AppWorkloadPolicy.shared.shouldRunEssentialDeadlineTimer() else { return }
+        timelineNow = Date()
     }
 
     private var medicationContent: some View {
@@ -172,22 +255,55 @@ struct HumanMedicationContentView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
                     // ── 人物标识栏
-                    humanIdentityHeader
+                    HumanMedicationIdentityHeader(
+                        human: human,
+                        showsDoneButton: showsDoneButton,
+                        todayTotal: todayPlannedCount,
+                        todayDone: todayTakenCount,
+                        isTodayReadComplete: readCompleteness.today,
+                        showsPrivacyToggle: isViewingOwnProfile,
+                        l: l,
+                        onClose: { dismiss() }
+                    )
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
 
                     HumanPrivateDataNotice(human: human, field: .medication)
                         .padding(.horizontal, 16)
 
-                    todayFocusCard
+                    if didReachReadLimit {
+                        HumanMedicationBoundedReadNotice(l: l)
+                            .padding(.horizontal, 16)
+                    }
+
+                    HumanMedicationTodayFocusCard(
+                        hasOverdueDose: !overdueItems.isEmpty,
+                        todayCompletion: todayCompletion,
+                        isTodayReadComplete: readCompleteness.today,
+                        todayPlannedCount: todayPlannedCount,
+                        currentMedicationCount: currentMeds.count,
+                        isActivePlansReadComplete: readCompleteness.activePlans,
+                        sevenDayCompletionLabel: sevenDayCompletionLabel,
+                        title: todayOverviewTitle,
+                        subtitle: todayOverviewSubtitle,
+                        l: l
+                    )
                         .padding(.horizontal, 16)
 
-                    overviewMetricGrid
+                    HumanMedicationOverviewMetricGrid(
+                        isTodayReadComplete: readCompleteness.today,
+                        todayTakenCount: todayTakenCount,
+                        todaySkippedCount: todaySkippedCount,
+                        todayPlannedCount: todayPlannedCount,
+                        pendingCount: pendingScheduleItems.count,
+                        overdueCount: overdueItems.count,
+                        l: l
+                    )
                         .padding(.horizontal, 16)
 
                     if !todayScheduleItems.isEmpty {
                         sectionLabel(l.tr(zh: "今日时间表", en: "Today", de: "Heute"))
-                        medicationSurface {
+                        HumanMedicationSurface {
                             VStack(spacing: 0) {
                                 ForEach(Array(todayScheduleItems.enumerated()), id: \.element.id) { index, item in
                                     scheduleRow(item)
@@ -242,12 +358,16 @@ struct HumanMedicationContentView: View {
                     }
 
                     if !myMeds.isEmpty {
-                        adherenceChartCard
+                        HumanMedicationAdherenceCard(
+                            snapshot: adherenceSnapshot,
+                            isSevenDayReadComplete: readCompleteness.sevenDayAnalysis,
+                            l: l
+                        )
                             .padding(.horizontal, 16)
                     }
 
                     if myMeds.isEmpty {
-                        emptyState
+                        HumanMedicationEmptyState(l: l)
                             .padding(.horizontal, 16)
                             .padding(.top, 20)
                     }
@@ -260,6 +380,10 @@ struct HumanMedicationContentView: View {
             VStack(spacing: 0) {
                 if showToast {
                     HStack(spacing: 8) {
+                        Image(systemName: toastKind.icon)
+                            .font(OhanaFont.subheadline(.black))
+                            .foregroundStyle(toastKind.tint)
+                            .accessibilityHidden(true)
                         Text(toastMessage)
                             .font(OhanaFont.subheadline(.bold))
                             .foregroundStyle(Color.ohanaPrimaryText)
@@ -267,8 +391,13 @@ struct HumanMedicationContentView: View {
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .background(Color.ohanaCardSurfaceElevated, in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
+                    .overlay(Capsule().strokeBorder(toastKind.tint.opacity(0.7), lineWidth: 1))
                     .padding(.horizontal, 16).padding(.bottom, 8)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(toastMessage)
+                    .accessibilityIdentifier(toastKind == .failure
+                        ? "human-medication-error-toast"
+                        : "human-medication-success-toast")
                 }
 
                 Button { showAddSheet = true } label: {
@@ -289,147 +418,6 @@ struct HumanMedicationContentView: View {
         }
     }
 
-    // MARK: - Human Identity Header
-    private var humanIdentityHeader: some View {
-        HumanModulePageHeader(
-            human: human,
-            title: l.tr(zh: "用药管理", en: "Medication", de: "Medikamente"),
-            subtitle: human.name,
-            showsCloseButton: showsDoneButton,
-            onClose: { dismiss() }
-        ) {
-            let todayTotal = todayScheduleItems.count
-            let todayDone = todayScheduleItems.count(where: { $0.log?.status == .taken })
-            if todayTotal > 0 {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(todayDone)/\(todayTotal)")
-                        .font(OhanaFont.metric(size: 20))
-                        .foregroundStyle(todayDone == todayTotal ? Color.goTeal : Color.goPrimary)
-                    Text(l.tr(zh: "今日服药", en: "Today", de: "Heute"))
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-            }
-            if isViewingOwnProfile {
-                HumanPrivacyToggleButton(human: human, field: .medication)
-            }
-        }
-    }
-
-    private var privacyLockedView: some View {
-        ZStack {
-            OhanaAppBackground().ignoresSafeArea()
-            VStack(spacing: 20) {
-                HumanModulePageHeader(
-                    human: human,
-                    title: l.tr(zh: "用药管理", en: "Medication", de: "Medikamente"),
-                    subtitle: human.name,
-                    showsCloseButton: showsDoneButton,
-                    onClose: { dismiss() }
-                )
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-
-                Spacer(minLength: 16)
-                HumanModulePrivacyLockedView(
-                    title: l.tr(zh: "吃药提醒仅本人可见", en: "Medication is private", de: "Medikamente sind privat"),
-                    message: l.tr(zh: "当前家庭成员无权查看用药计划、剂量和服药记录。", en: "This household member cannot view medication plans, doses, or logs.", de: "Dieses Haushaltsmitglied kann Medikamentenpläne, Dosen oder Protokolle nicht sehen.")
-                )
-                Spacer()
-            }
-        }
-    }
-
-    // MARK: - Summary Bento
-
-    private var todayFocusCard: some View {
-        medicationSurface {
-            HStack(spacing: 18) {
-                medicationProgressRing
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 6) {
-                        Image(systemName: overdueItems.isEmpty ? "pills.fill" : "exclamationmark.triangle.fill")
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(overdueItems.isEmpty ? Color.goPrimary : Color.goRed)
-                        Text(l.tr(zh: "TODAY FOCUS", en: "TODAY FOCUS", de: "HEUTE"))
-                            .font(OhanaFont.caption(.black))
-                            .tracking(1.2)
-                            .foregroundStyle(tertiaryText)
-                    }
-
-                    Text(todayOverviewTitle)
-                        .font(OhanaFont.title2(.black))
-                        .foregroundStyle(primaryText)
-                        .lineLimit(2)
-
-                    Text(todayOverviewSubtitle)
-                        .font(OhanaFont.callout(.semibold))
-                        .foregroundStyle(secondaryText)
-                        .lineLimit(2)
-
-                    HStack(spacing: 8) {
-                        overviewPill(l.tr(zh: "\(currentMeds.count) 个固定用药", en: "\(currentMeds.count) scheduled", de: "\(currentMeds.count) geplant"), color: Color.goRed)
-                        overviewPill(l.tr(zh: "\(sevenDayCompletionRate)% 七日完成", en: "\(sevenDayCompletionRate)% 7-day", de: "\(sevenDayCompletionRate)% 7 Tage"), color: Color.goPrimary)
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(18)
-        }
-    }
-
-    private var overviewMetricGrid: some View {
-        HStack(spacing: 10) {
-            overviewMetricCard(
-                icon: "checkmark.seal.fill",
-                label: l.tr(zh: "今日已服", en: "Taken", de: "Genommen"),
-                value: "\(todayTakenCount)",
-                suffix: todayPlannedCount > 0 ? "/\(todayPlannedCount)" : "",
-                color: Color.goTeal
-            )
-            overviewMetricCard(
-                icon: "forward.fill",
-                label: l.tr(zh: "已跳过", en: "Skipped", de: "Übersprungen"),
-                value: "\(todaySkippedCount)",
-                suffix: l.tr(zh: "次", en: "", de: ""),
-                color: Color.goOrange
-            )
-            overviewMetricCard(
-                icon: overdueItems.isEmpty ? "clock.badge.checkmark" : "exclamationmark.triangle.fill",
-                label: overdueItems.isEmpty ? l.tr(zh: "待记录", en: "Pending", de: "Offen") : l.tr(zh: "已超时", en: "Overdue", de: "Überfällig"),
-                value: "\(overdueItems.isEmpty ? pendingScheduleItems.count : overdueItems.count)",
-                suffix: l.tr(zh: "次", en: "", de: ""),
-                color: overdueItems.isEmpty ? Color.goYellow : Color.goRed
-            )
-        }
-    }
-
-    private var medicationProgressRing: some View {
-        ZStack {
-            Circle()
-                .stroke(controlFill, lineWidth: 12)
-                .frame(width: 108, height: 108)
-            Circle()
-                .trim(from: 0, to: todayCompletion)
-                .stroke(
-                    LinearGradient(colors: [Color.goPrimary, Color.goTeal], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .frame(width: 108, height: 108)
-            VStack(spacing: 0) {
-                Text(todayPlannedCount == 0 ? "--" : "\(Int((todayCompletion * 100).rounded()))%")
-                    .font(OhanaFont.metric(size: 26))
-                    .foregroundStyle(primaryText)
-                Text(l.tr(zh: "今日", en: "Today", de: "Heute"))
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(tertiaryText)
-            }
-        }
-    }
-
     private var todayPlannedCount: Int { todayScheduleItems.count }
     private var todayTakenCount: Int { todayScheduleItems.count(where: { $0.log?.status == .taken }) }
     private var todaySkippedCount: Int { todayScheduleItems.count(where: { $0.log?.status == .skipped }) }
@@ -440,6 +428,9 @@ struct HumanMedicationContentView: View {
     }
 
     private var todayOverviewTitle: String {
+        guard readCompleteness.today else {
+            return l.tr(zh: "今日记录仅显示部分", en: "Only part of today is shown", de: "Heute nur teilweise angezeigt")
+        }
         if todayPlannedCount == 0 {
             return myMeds.isEmpty
                 ? l.tr(zh: "还没有服药计划", en: "No medication plan yet", de: "Noch kein Medikamentenplan")
@@ -465,6 +456,13 @@ struct HumanMedicationContentView: View {
     }
 
     private var todayOverviewSubtitle: String {
+        guard readCompleteness.today else {
+            return l.tr(
+                zh: "已达到本地显示上限，请勿据此判断所有剂量已完成。",
+                en: "The local display limit was reached; do not use this view to infer that every dose is complete.",
+                de: "Das lokale Anzeigelimit ist erreicht; daraus lässt sich nicht ableiten, dass alle Dosen erledigt sind."
+            )
+        }
         if todayPlannedCount == 0 {
             if !manualMeds.isEmpty {
                 return l.tr(zh: "按需药物可在下方手动记录一次。", en: "As-needed medication can be logged below.", de: "Bedarfsmedikamente kannst du unten manuell protokollieren.")
@@ -486,117 +484,6 @@ struct HumanMedicationContentView: View {
         activeMeds.count(where: { $0.endDate == nil })
     }
 
-    private func plannedDoseCount(on day: Date) -> Int {
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: day)
-
-        return HumanMedicationSchedulePlan.plannedDoseCount(on: startOfDay, medications: myMeds, calendar: calendar)
-    }
-
-    private var adherenceChartCard: some View {
-        medicationSurface {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(l.tr(zh: "近 7 天服药趋势", en: "7-day medication trend", de: "7-Tage-Verlauf"))
-                            .font(OhanaFont.headline(.bold))
-                            .foregroundStyle(primaryText)
-                        Text(l.tr(zh: "计划剂量与已完成剂量对比", en: "Planned doses vs completed doses", de: "Geplante und erledigte Dosen"))
-                            .font(OhanaFont.caption())
-                            .foregroundStyle(secondaryText)
-                    }
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(sevenDayCompletionRate)%")
-                            .font(OhanaFont.metric(size: 24))
-                            .foregroundStyle(Color.goPrimary)
-                        Text(l.tr(zh: "完成率", en: "Done", de: "Erledigt"))
-                            .font(OhanaFont.caption2(.bold))
-                            .foregroundStyle(secondaryText)
-                    }
-                }
-
-                OhanaMinimalBarChart(
-                    points: adherenceDays.map { item in
-                        OhanaMinimalChartPoint(
-                            date: item.date,
-                            value: Double(item.taken),
-                            label: item.dayLabel,
-                            id: item.id.uuidString
-                        )
-                    },
-                    tint: Color.goPrimary,
-                    showsLabels: true,
-                    maxBarHeight: 104
-                )
-                .frame(height: 150)
-
-                HStack(spacing: 14) {
-                    chartLegendDot(color: secondaryText.opacity(0.55), label: l.tr(zh: "计划", en: "Planned", de: "Geplant"))
-                    chartLegendDot(color: .goPrimary, label: l.tr(zh: "已服", en: "Taken", de: "Genommen"))
-                    Spacer()
-                    Text(l.tr(zh: "按药物排程计算计划剂量", en: "Planned doses follow the medication schedule", de: "Geplante Dosen folgen dem Zeitplan"))
-                        .font(OhanaFont.caption2())
-                        .foregroundStyle(tertiaryText)
-                }
-            }
-            .padding(16)
-        }
-    }
-
-    private func chartLegendDot(color: Color, label: String) -> some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(color)
-                .frame(width: 7, height: 7) // a11y: allow decorative non-interactive frame; hit area handled by parent
-            Text(label)
-                .font(OhanaFont.caption2(.bold))
-                .foregroundStyle(secondaryText)
-        }
-    }
-
-    private func overviewMetricCard(icon: String, label: String, value: String, suffix: String, color: Color) -> some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(color)
-                Text(label)
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(tertiaryText)
-                    .lineLimit(1)
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value)
-                    .font(OhanaFont.metric(size: 24))
-                    .foregroundStyle(primaryText)
-                if !suffix.isEmpty {
-                    Text(suffix)
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(secondaryText)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
-                .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
-        }
-    }
-
-    private func overviewPill(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(OhanaFont.caption2(.black))
-            .foregroundStyle(color)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(color.opacity(0.12), in: Capsule())
-    }
-
     // MARK: - Schedule Timeline
 
     private func scheduleRow(_ item: DailyDoseItem) -> some View {
@@ -604,7 +491,7 @@ struct HumanMedicationContentView: View {
         let isTaken = status == .taken
         let isSkipped = status == .skipped
         let isResolved = isTaken || isSkipped
-        let isOverdue = !isResolved && item.scheduledTime < Date()
+        let isOverdue = !isResolved && item.scheduledTime < timelineNow
         let tint = isTaken ? Color.goTeal : (isSkipped ? Color.goOrange : (isOverdue ? Color.goRed : Color.goPrimary))
 
         return HStack(spacing: 16) {
@@ -653,6 +540,9 @@ struct HumanMedicationContentView: View {
                         .background(isTaken ? controlFill : Color.goTeal, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityLabel(doseTakenActionAccessibilityLabel(item, isTaken: isTaken))
 
                 Button {
                     setDoseStatus(isSkipped ? .pending : .skipped, for: item)
@@ -665,10 +555,54 @@ struct HumanMedicationContentView: View {
                         .background((isSkipped ? Color.goOrange : controlFill).opacity(isSkipped ? 0.16 : 1), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityLabel(doseSkippedActionAccessibilityLabel(item, isSkipped: isSkipped))
             }
+            .disabled(medicationPresentationState.pendingStatus(for: item.id) != nil)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 16)
+    }
+
+    private func doseTakenActionAccessibilityLabel(
+        _ item: DailyDoseItem,
+        isTaken: Bool
+    ) -> String {
+        let name = spokenMedicationName(item.medication)
+        let time = item.scheduledTime.formatted(date: .omitted, time: .shortened)
+        if isTaken {
+            return l.tr(
+                zh: "撤回 \(name) \(time) 的已服记录",
+                en: "Undo taken record for \(name) at \(time)",
+                de: "Einnahme von \(name) um \(time) rückgängig machen"
+            )
+        }
+        return l.tr(
+            zh: "记录 \(name) \(time) 已服",
+            en: "Mark \(name) at \(time) as taken",
+            de: "\(name) um \(time) als eingenommen markieren"
+        )
+    }
+
+    private func doseSkippedActionAccessibilityLabel(
+        _ item: DailyDoseItem,
+        isSkipped: Bool
+    ) -> String {
+        let name = spokenMedicationName(item.medication)
+        let time = item.scheduledTime.formatted(date: .omitted, time: .shortened)
+        if isSkipped {
+            return l.tr(
+                zh: "撤回 \(name) \(time) 的跳过记录",
+                en: "Undo skipped record for \(name) at \(time)",
+                de: "Überspringen von \(name) um \(time) rückgängig machen"
+            )
+        }
+        return l.tr(
+            zh: "跳过 \(name) \(time) 的剂量",
+            en: "Skip \(name) dose at \(time)",
+            de: "Dosis von \(name) um \(time) überspringen"
+        )
     }
 
     private func doseStatusText(_ item: DailyDoseItem) -> String {
@@ -682,7 +616,7 @@ struct HumanMedicationContentView: View {
         case .skipped:
             l.tr(zh: "已跳过", en: "Skipped", de: "Überspr.")
         default:
-            item.scheduledTime < Date()
+            item.scheduledTime < timelineNow
                 ? l.tr(zh: "已超时", en: "Overdue", de: "Überfällig")
                 : l.tr(zh: "待记录", en: "Pending", de: "Offen")
         }
@@ -699,22 +633,21 @@ struct HumanMedicationContentView: View {
         case .skipped:
             "minus"
         default:
-            item.scheduledTime < Date() ? "exclamationmark" : "clock"
+            item.scheduledTime < timelineNow ? "exclamationmark" : "clock"
         }
     }
 
     private func effectiveDoseStatus(for item: DailyDoseItem) -> HumanMedicationStatus? {
-        pendingDoseStatusByID[item.id] ?? item.log?.status
+        medicationPresentationState.effectiveStatus(
+            for: item.id,
+            persistedStatus: item.log?.status
+        )
     }
 
     private func setDoseStatus(_ status: HumanMedicationStatus, for item: DailyDoseItem) {
+        guard medicationPresentationState.pendingStatus(for: item.id) == nil else { return }
         withAnimation(GoMotion.feedback) {
-            pendingDoseStatusByID[item.id] = status
-            toastMessage = doseToastMessage(status, medicationName: item.medication.name)
-            showToast = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                withAnimation { showToast = false }
-            }
+            medicationPresentationState.begin(itemID: item.id, status: status)
         }
 
         let medicationID = item.medication.id
@@ -734,8 +667,19 @@ struct HumanMedicationContentView: View {
                 scheduledTime: scheduledTime,
                 status: status
             )
-            if result.status == .taken, result.didChange {
-                onDoseTaken?()
+            let completion = medicationPresentationState.complete(itemID: item.id, result: result)
+            switch completion {
+            case let .persisted(shouldNotifyDoseTaken):
+                presentMedicationToast(
+                    doseToastMessage(status, medicationName: item.medication.name),
+                    kind: .success
+                )
+                if shouldNotifyDoseTaken {
+                    onDoseTaken?()
+                }
+            case .failed:
+                let message = doseFailureMessage(medicationName: item.medication.name)
+                presentMedicationFailure(message)
             }
         }
     }
@@ -757,10 +701,52 @@ struct HumanMedicationContentView: View {
         }
     }
 
+    private func doseFailureMessage(medicationName: String) -> String {
+        let name = medicationName.isEmpty
+            ? l.tr(zh: "药物", en: "Medication", de: "Medikament")
+            : medicationName
+        if human.hasPassedAway {
+            return l.tr(
+                zh: "纪念模式为只读，未记录 \(name) 的用药状态。",
+                en: "Memorial mode is read-only. \(name)'s medication status was not logged.",
+                de: "Der Gedenkmodus ist schreibgeschützt. Der Medikamentenstatus für \(name) wurde nicht erfasst."
+            )
+        }
+        return l.tr(
+            zh: "未能保存 \(name) 的用药状态，请重试。",
+            en: "Could not save \(name)'s medication status. Try again.",
+            de: "Der Medikamentenstatus für \(name) konnte nicht gespeichert werden. Versuche es erneut."
+        )
+    }
+
+    private func presentMedicationToast(
+        _ message: String,
+        kind: HumanMedicationToastKind,
+        duration: TimeInterval = 2.0
+    ) {
+        toastSequence &+= 1
+        let sequence = toastSequence
+        withAnimation(GoMotion.feedback) {
+            toastMessage = message
+            toastKind = kind
+            showToast = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+            guard toastSequence == sequence else { return }
+            withAnimation(GoMotion.quick) { showToast = false }
+        }
+    }
+
+    private func presentMedicationFailure(_ message: String) {
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        presentMedicationToast(message, kind: .failure, duration: 3.5)
+        UIAccessibility.post(notification: .announcement, argument: message)
+    }
+
     // MARK: - Medication Row
 
     private func manualMedicationRow(_ med: HumanMedication) -> some View {
-        medicationSurface {
+        HumanMedicationSurface {
             HStack(spacing: 14) {
                 medicationIcon(for: med)
 
@@ -787,6 +773,13 @@ struct HumanMedicationContentView: View {
                         .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityLabel(l.tr(
+                    zh: "记录一次 \(spokenMedicationName(med))",
+                    en: "Log one dose of \(spokenMedicationName(med))",
+                    de: "Eine Dosis \(spokenMedicationName(med)) eintragen"
+                ))
 
                 Button {
                     editingMed = med
@@ -798,6 +791,13 @@ struct HumanMedicationContentView: View {
                         .background(controlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityLabel(l.tr(
+                    zh: "编辑 \(spokenMedicationName(med))",
+                    en: "Edit \(spokenMedicationName(med))",
+                    de: "\(spokenMedicationName(med)) bearbeiten"
+                ))
             }
             .padding(14)
         }
@@ -817,8 +817,8 @@ struct HumanMedicationContentView: View {
 
     private func medicationRow(_ med: HumanMedication) -> some View {
         let isMedicationActive = effectiveMedicationActive(med)
-        let isActivationPending = pendingMedicationActivationIDs.contains(med.id)
-        return medicationSurface {
+        let isActivationPending = medicationPresentationState.isPlanActivationPending(medicationID: med.id)
+        return HumanMedicationSurface {
             HStack(spacing: 14) {
                 medicationIcon(for: med)
 
@@ -873,9 +873,20 @@ struct HumanMedicationContentView: View {
                         .background(controlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityLabel(l.tr(
+                    zh: "编辑 \(spokenMedicationName(med))",
+                    en: "Edit \(spokenMedicationName(med))",
+                    de: "\(spokenMedicationName(med)) bearbeiten"
+                ))
 
                 Button {
-                    toggleMedicationActive(med)
+                    if isMedicationActive {
+                        planPendingDeactivation = med
+                    } else {
+                        setMedicationActive(med, isActive: true)
+                    }
                 } label: {
                     Image(systemName: isMedicationActive ? "pause.circle.fill" : "play.circle.fill")
                         .font(OhanaFont.title3(.bold))
@@ -883,6 +894,19 @@ struct HumanMedicationContentView: View {
                         .opacity(isActivationPending ? 0.55 : 1)
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityLabel(isMedicationActive
+                    ? l.tr(
+                        zh: "停用 \(spokenMedicationName(med)) 的用药计划",
+                        en: "Stop medication plan for \(spokenMedicationName(med))",
+                        de: "Medikamentenplan für \(spokenMedicationName(med)) stoppen"
+                    )
+                    : l.tr(
+                        zh: "恢复 \(spokenMedicationName(med)) 的用药计划",
+                        en: "Resume medication plan for \(spokenMedicationName(med))",
+                        de: "Medikamentenplan für \(spokenMedicationName(med)) fortsetzen"
+                    ))
                 .disabled(isActivationPending)
             }
             .padding(14)
@@ -898,6 +922,13 @@ struct HumanMedicationContentView: View {
                 .font(OhanaFont.title3(.bold))
                 .foregroundStyle(Color(hex: med.colorHex))
         }
+    }
+
+    private func spokenMedicationName(_ med: HumanMedication) -> String {
+        let name = med.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty
+            ? l.tr(zh: "未命名药物", en: "Unnamed medication", de: "Unbenanntes Medikament")
+            : name
     }
 
     private func medicationStateBadge(for med: HumanMedication) -> some View {
@@ -930,13 +961,16 @@ struct HumanMedicationContentView: View {
     }
 
     private func effectiveMedicationActive(_ med: HumanMedication) -> Bool {
-        pendingMedicationActiveByID[med.id] ?? med.isActive
+        medicationPresentationState.effectivePlanActive(
+            medicationID: med.id,
+            persistedIsActive: med.isActive
+        )
     }
 
     private func displayGroup(for med: HumanMedication) -> HumanMedicationDisplayGroup {
         guard effectiveMedicationActive(med) else { return .stopped }
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: timelineNow)
         if today < calendar.startOfDay(for: med.startDate) { return .notStarted }
         if let endDate = med.endDate, today > calendar.startOfDay(for: endDate) { return .ended }
         if med.frequency.isManualEntry { return .manual }
@@ -949,7 +983,7 @@ struct HumanMedicationContentView: View {
         }
         let minutes = HumanMedicationSchedulePlan.doseMinutes(for: med)
         let timeText = minutes.compactMap {
-            HumanMedicationSchedulePlan.date(on: Date(), minuteOfDay: $0)?.formatted(date: .omitted, time: .shortened)
+            HumanMedicationSchedulePlan.date(on: timelineNow, minuteOfDay: $0)?.formatted(date: .omitted, time: .shortened)
         }.joined(separator: " / ")
         if med.frequency == .weekly {
             let weekday = HumanMedicationScheduleMetadata.parse(from: med.notes)?.weeklyWeekday
@@ -966,57 +1000,63 @@ struct HumanMedicationContentView: View {
         return symbols[max(0, min(6, weekday - 1))]
     }
 
-    private func toggleMedicationActive(_ med: HumanMedication) {
-        guard !pendingMedicationActivationIDs.contains(med.id) else { return }
-        let nextIsActive = !effectiveMedicationActive(med)
+    private func setMedicationActive(_ med: HumanMedication, isActive: Bool) {
+        guard !medicationPresentationState.isPlanActivationPending(medicationID: med.id) else { return }
+        guard effectiveMedicationActive(med) != isActive else { return }
         withAnimation(GoMotion.feedback) {
-            pendingMedicationActiveByID[med.id] = nextIsActive
-            pendingMedicationActivationIDs.insert(med.id)
-            toastMessage = nextIsActive
-                ? l.tr(zh: "\(med.name) 已恢复", en: "\(med.name) resumed", de: "\(med.name) fortgesetzt")
-                : l.tr(zh: "\(med.name) 已停药", en: "\(med.name) stopped", de: "\(med.name) pausiert")
-            showToast = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                withAnimation(GoMotion.quick) { showToast = false }
-            }
+            medicationPresentationState.beginPlanActivation(
+                medicationID: med.id,
+                isActive: isActive
+            )
         }
 
         let command = DomainCommand.humanMedicationPlanActivation(
             humanID: human.id,
             medicationID: med.id,
-            isActive: nextIsActive
+            isActive: isActive
         )
         commandQueue.enqueue(command) {
-            HumanCareCommandExecutor(context: modelContext, services: appServices).setMedicationPlanActive(
+            let result = HumanCareCommandExecutor(context: modelContext, services: appServices).setMedicationPlanActive(
                 human: human,
                 medication: med,
-                isActive: nextIsActive,
+                isActive: isActive,
                 appLanguage: appLanguage
             )
-            pendingMedicationActivationIDs.remove(med.id)
-            pendingMedicationActiveByID[med.id] = nil
+            let completion = medicationPresentationState.completePlanActivation(
+                medicationID: med.id,
+                result: result
+            )
+            switch completion {
+            case let .persisted(isActive):
+                presentMedicationToast(
+                    isActive
+                        ? l.tr(zh: "\(med.name) 已恢复", en: "\(med.name) resumed", de: "\(med.name) fortgesetzt")
+                        : l.tr(zh: "\(med.name) 已停药", en: "\(med.name) stopped", de: "\(med.name) pausiert"),
+                    kind: .success,
+                    duration: 2.5
+                )
+            case .failed:
+                presentMedicationFailure(planActivationFailureMessage(medicationName: med.name))
+            }
         }
     }
 
-    // MARK: - Empty State
-
-    private var emptyState: some View {
-        medicationSurface {
-            VStack(spacing: 16) {
-                ZStack {
-                    Circle().fill(Color.goRed.opacity(0.12)).frame(width: 72, height: 72)
-                    Image(systemName: "pills").font(OhanaFont.adaptive(size: 32)).foregroundStyle(Color.goRed) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                }
-                Text(l.tr(zh: "还没有添加药物", en: "No medication yet", de: "Noch keine Medikamente"))
-                    .font(OhanaFont.title3(.bold))
-                    .foregroundStyle(primaryText)
-                Text(l.tr(zh: "添加第一个服药提醒，今天的待处理剂量会显示在这里。", en: "Add the first medication reminder to see today's doses here.", de: "Füge die erste Erinnerung hinzu, um heutige Dosen hier zu sehen."))
-                    .font(OhanaFont.callout())
-                    .foregroundStyle(secondaryText)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 32)
+    private func planActivationFailureMessage(medicationName: String) -> String {
+        let name = medicationName.isEmpty
+            ? l.tr(zh: "药物", en: "Medication", de: "Medikament")
+            : medicationName
+        if human.hasPassedAway {
+            return l.tr(
+                zh: "纪念模式为只读，未更改 \(name) 的用药计划。",
+                en: "Memorial mode is read-only. \(name)'s medication plan was not changed.",
+                de: "Der Gedenkmodus ist schreibgeschützt. Der Medikamentenplan für \(name) wurde nicht geändert."
+            )
         }
+        return l.tr(
+            zh: "未能更改 \(name) 的用药计划，请重试。",
+            en: "Could not change \(name)'s medication plan. Try again.",
+            de: "Der Medikamentenplan für \(name) konnte nicht geändert werden. Versuche es erneut."
+        )
     }
 
     private func sectionLabel(_ text: String) -> some View {
@@ -1027,14 +1067,5 @@ struct HumanMedicationContentView: View {
             .tracking(1.0)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
-    }
-
-    private func medicationSurface(@ViewBuilder content: () -> some View) -> some View {
-        content()
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
-                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
-            }
     }
 }

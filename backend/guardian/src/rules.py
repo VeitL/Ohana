@@ -7,8 +7,8 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-INITIAL_ALERT_MISS_COUNT = 2
-FOLLOW_UP_MISS_COUNT = 3
+INITIAL_ALERT_MISS_COUNT = 1
+FOLLOW_UP_MISS_COUNT = 2
 MAXIMUM_PAUSE_DAYS = 30
 MINIMUM_GRACE_MINUTES = 15
 MAXIMUM_GRACE_MINUTES = 180
@@ -172,13 +172,13 @@ def evaluate(
         consecutive_misses=max(0, previous.consecutive_misses) + 1,
         last_guard_day_key=day_key,
     )
-    if progress.consecutive_misses == INITIAL_ALERT_MISS_COUNT and not progress.initial_submitted:
+    if progress.consecutive_misses >= INITIAL_ALERT_MISS_COUNT and not progress.initial_submitted:
         return Evaluation(
             replace(progress, incident_open=True, initial_submitted=True),
             "initial",
         )
     if (
-        progress.consecutive_misses == FOLLOW_UP_MISS_COUNT
+        progress.consecutive_misses >= FOLLOW_UP_MISS_COUNT
         and progress.incident_open
         and progress.initial_submitted
         and not progress.follow_up_submitted

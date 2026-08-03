@@ -623,12 +623,28 @@ struct HomeSnapshotBuilderTests {
             from: makeVerticalSource(
                 humans: [human],
                 activeHumanIdRaw: human.id.uuidString,
-                equippedTitleRaw: "title_guardian"
+                equippedTitleRaw: "title_guardian",
+                language: "zh"
             )
         )
         let card = try #require(snapshot.cards.first)
 
         #expect(card.equippedTitleBadgeText == "🛡️ 守护者")
+    }
+
+    @Test func verticalSnapshotLocalizesEquippedTitleBadge() throws {
+        let human = Human(name: "Owner")
+
+        let snapshot = makeVerticalSnapshot(
+            from: makeVerticalSource(
+                humans: [human],
+                activeHumanIdRaw: human.id.uuidString,
+                equippedTitleRaw: "title_guardian",
+                language: "en"
+            )
+        )
+
+        #expect(try #require(snapshot.cards.first).equippedTitleBadgeText == "🛡️ Guardian")
     }
 
     @Test func verticalSnapshotDoesNotShowFirstPetEmptyStateForHumanOnlyHome() {
@@ -760,7 +776,8 @@ struct HomeSnapshotBuilderTests {
         hiddenPetIDsRaw: String = "",
         activeHumanIdRaw: String = "",
         petBondVaultRevision: Int = 0,
-        equippedTitleRaw: String = ""
+        equippedTitleRaw: String = "",
+        language: String = AppLanguage.code
     ) -> VerticalSolidHomeSourceState {
         VerticalSolidHomeSourceState(
             pets: pets,
@@ -785,7 +802,7 @@ struct HomeSnapshotBuilderTests {
             showDummyCards: false,
             petBondVaultRevision: petBondVaultRevision,
             equippedTitleRaw: equippedTitleRaw,
-            language: AppLanguage.code
+            language: language
         )
     }
 

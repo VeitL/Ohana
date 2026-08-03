@@ -22,6 +22,9 @@ fail() {
 
 mkdir -p "${fake_repo}/.build" "${fake_home}" "${fake_bin}" "${fake_tmp}"
 fake_repo="$(cd "${fake_repo}" && pwd)"
+fake_home="$(cd "${fake_home}" && pwd)"
+fake_bin="$(cd "${fake_bin}" && pwd)"
+fake_tmp="$(cd "${fake_tmp}" && pwd)"
 printf '%s\n' 'DOGFOOD-UDID' > "${fake_repo}/.build/dogfood-simulator.udid"
 
 cat > "${fake_bin}/xcrun" <<'SH'
@@ -84,14 +87,20 @@ export OHANA_LOCAL_BUILD_STORAGE_FIXTURE_MODE=1
 export OHANA_LOCAL_BUILD_STORAGE_FIXTURE_ROOT="${fixture_root}"
 export OHANA_XCODE_DERIVED_DATA_ROOT="${fake_home}/Library/Developer/Xcode/DerivedData"
 export HOME="${fake_home}"
+export TMPDIR="${fake_tmp}"
 export PATH="${fake_bin}:${PATH}"
 
 # shellcheck source=scripts/lib/local-build-environment.sh
 source "${repo_root}/scripts/lib/local-build-environment.sh"
+# shellcheck source=scripts/lib/xcode-storage-lifecycle.sh
+source "${repo_root}/scripts/lib/xcode-storage-lifecycle.sh"
 
-[[ "${OHANA_TEST_DERIVED_DATA_PATH}" == "${fake_repo}/.build/DerivedData/tests" ]] || \
+expected_cache_root="${fake_home}/Library/Developer/Xcode/OhanaLocalBuild/Ohana-${OHANA_LOCAL_BUILD_CACHE_ID}"
+[[ "${OHANA_LOCAL_BUILD_CACHE_ROOT}" == "${expected_cache_root}" ]] || \
+  fail "shared external cache root drifted"
+[[ "${OHANA_TEST_DERIVED_DATA_PATH}" == "${expected_cache_root}/DerivedData/tests" ]] || \
   fail "tests DerivedData lane drifted"
-[[ "${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}" == "${fake_repo}/.build/DerivedData/dogfood" ]] || \
+[[ "${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}" == "${expected_cache_root}/DerivedData/dogfood" ]] || \
   fail "dogfood DerivedData lane drifted"
 [[ "${OHANA_DOGFOOD_STORE_IDENTITY_FILE}" == "${fake_repo}/.build/dogfood-store.identity" ]] || \
   fail "dogfood store identity pin escaped the ignored local build root"
@@ -99,8 +108,12 @@ source "${repo_root}/scripts/lib/local-build-environment.sh"
   fail "dogfood initialization transaction escaped the ignored local build root"
 [[ "${OHANA_DOGFOOD_SIMULATOR_NAME_FIXED}" == "iPhone 17 Dogfood" ]] || \
   fail "fixed Dogfood Simulator name drifted"
-[[ "${OHANA_RELEASE_DERIVED_DATA_PATH}" == "${fake_repo}/.build/DerivedData/release" ]] || \
+[[ "${OHANA_RELEASE_DERIVED_DATA_PATH}" == "${expected_cache_root}/DerivedData/release" ]] || \
   fail "release DerivedData lane drifted"
+[[ "${OHANA_TEST_RESULT_ROOT}" == "${expected_cache_root}/TestResults" ]] || \
+  fail "managed result root drifted"
+[[ "${OHANA_XCODE_LOCK_ROOT}" == "${expected_cache_root}/Locks" ]] || \
+  fail "shared project lock root drifted"
 [[ "$(ohana_tmp_artifact_ttl_seconds)" == "$((48 * 60 * 60))" ]] || \
   fail "fixture tmp TTL override was ignored"
 OHANA_LOCAL_BUILD_TMP_TTL_HOURS=23
@@ -141,6 +154,53 @@ fi
 if ohana_assert_fixed_derived_data_path tests "${fake_repo}/.build/DerivedData/tfu-123" >/dev/null 2>&1; then
   fail "one-off TFU DerivedData path was accepted"
 fi
+
+mkdir -p "${OHANA_XCODE_PROJECT_LOCK_DIR}"
+printf '%s\n' "$$" > "${OHANA_XCODE_PROJECT_LOCK_DIR}/pid"
+printf 'fixture-active\n' > "${OHANA_XCODE_PROJECT_LOCK_DIR}/purpose"
+if ohana_acquire_xcode_project_lock fixture >/dev/null 2>&1; then
+  fail "active project-wide Xcode lock was bypassed"
+fi
+rm -rf "${OHANA_XCODE_PROJECT_LOCK_DIR}"
+mkdir -p "${OHANA_XCODE_PROJECT_LOCK_DIR}"
+printf '99999999\n' > "${OHANA_XCODE_PROJECT_LOCK_DIR}/pid"
+if ! ohana_acquire_xcode_project_lock fixture-stale; then
+  fail "stale project-wide Xcode lock was not recovered"
+fi
+[[ "$(tr -d '[:space:]' < "${OHANA_XCODE_PROJECT_LOCK_DIR}/pid")" == "$$" ]] || \
+  fail "recovered project-wide lock did not record its owner"
+ohana_release_xcode_project_lock
+if find "${OHANA_XCODE_LOCK_ROOT}" -mindepth 1 -maxdepth 1 -name '*.stale.*' -print -quit | grep -q .; then
+  fail "stale lock recovery accumulated quarantine directories"
+fi
+
+OHANA_KEEP_SUCCESS_XCRESULT=0
+for fixture_index in 1 2 3 4; do
+  fixture_result="${OHANA_TEST_RESULT_ROOT}/staging/failure-${fixture_index}.xcresult"
+  mkdir -p "${fixture_result}"
+  printf 'failure\n' > "${fixture_result}/payload.txt"
+  ohana_finalize_managed_result_bundle 1 "${fixture_result}"
+done
+retained_failure_count="$({
+  find "${OHANA_TEST_RESULT_ROOT}/failed" -mindepth 1 -maxdepth 1 -type d -name '*.xcresult' -print
+} | wc -l | tr -d ' ')"
+[[ "${retained_failure_count}" == "3" ]] || fail "managed failure count cap did not retain exactly three"
+old_failure="$(find "${OHANA_TEST_RESULT_ROOT}/failed" -mindepth 1 -maxdepth 1 -type d -name '*.xcresult' -print | head -n 1)"
+find "${old_failure}" -exec touch -t 202001010000 {} +
+ohana_prune_managed_test_results
+[[ ! -e "${old_failure}" ]] || fail "managed failure older than seven days was retained"
+
+success_result="${OHANA_TEST_RESULT_ROOT}/staging/success-delete.xcresult"
+mkdir -p "${success_result}"
+ohana_finalize_managed_result_bundle 0 "${success_result}"
+[[ ! -e "${success_result}" ]] || fail "successful xcresult was not deleted by default"
+OHANA_KEEP_SUCCESS_XCRESULT=1
+success_result="${OHANA_TEST_RESULT_ROOT}/staging/success-keep.xcresult"
+mkdir -p "${success_result}"
+ohana_finalize_managed_result_bundle 0 "${success_result}"
+[[ -d "${OHANA_TEST_RESULT_ROOT}/success/latest.xcresult" ]] || \
+  fail "explicit successful xcresult was not retained as latest"
+OHANA_KEEP_SUCCESS_XCRESULT=0
 
 set +e
 dogfood_output="$(ohana_assert_test_simulator_udid DOGFOOD-UDID 2>&1)"
@@ -249,10 +309,32 @@ grep -qF 'run_xcodebuild_action build-for-testing' "${repo_root}/scripts/test-si
   fail "test entrypoint no longer builds test products first"
 grep -qF 'run_xcodebuild_action test-without-building' "${repo_root}/scripts/test-simulator.sh" || \
   fail "test entrypoint no longer reuses built products"
-grep -qF 'OHANA_TEST_ACTION=build-for-testing' "${repo_root}/scripts/test-ui-nightly.sh" || \
-  fail "UI nightly lane no longer builds once before its shards"
-grep -qF 'scripts/test-ui-shard.sh --without-building' "${repo_root}/scripts/test-ui-nightly.sh" || \
-  fail "UI nightly lane no longer runs shards without rebuilding"
+grep -qF 'scripts/test-ui-shard.sh "${shard}"' "${repo_root}/scripts/test-ui-nightly.sh" || \
+  fail "UI nightly lane no longer gives every shard a complete build-then-test lifecycle"
+grep -qF 'scripts/test-ui-shard.sh --print "${shard}"' \
+  "${repo_root}/scripts/test-ui-nightly.sh" || \
+  fail "UI nightly print mode no longer mirrors the normal shard lifecycle"
+if rg -q -- '--build-for-testing|--without-building' \
+  "${repo_root}/scripts/test-ui-nightly.sh"; then
+  fail "UI nightly lane reintroduced a split build/test Simulator lifecycle"
+fi
+grep -qF 'OHANA_XCODE_PROJECT_LOCK_DIR="${OHANA_XCODE_LOCK_ROOT}/project.lock"' \
+  "${repo_root}/scripts/lib/xcode-storage-lifecycle.sh" || \
+  fail "project-wide Xcode lock is missing"
+grep -qF 'OHANA_TEST_FAILURE_RETENTION_COUNT="${OHANA_TEST_FAILURE_RETENTION_COUNT:-3}"' \
+  "${repo_root}/scripts/lib/local-build-environment.sh" || \
+  fail "failure result count cap drifted"
+grep -qF 'OHANA_TEST_FAILURE_RETENTION_DAYS="${OHANA_TEST_FAILURE_RETENTION_DAYS:-7}"' \
+  "${repo_root}/scripts/lib/local-build-environment.sh" || \
+  fail "failure result expiry drifted"
+grep -qF 'TEST_CODE_COVERAGE="${OHANA_TEST_CODE_COVERAGE:-NO}"' \
+  "${repo_root}/scripts/test-simulator.sh" || fail "coverage no longer defaults off"
+grep -qF 'TEST_PARALLEL_ENABLED="${OHANA_TEST_PARALLEL_ENABLED:-NO}"' \
+  "${repo_root}/scripts/test-simulator.sh" || fail "parallel testing no longer defaults off"
+
+if ! "${repo_root}/scripts/tests/run-ui-nightly-receipt-tests.sh"; then
+  fail "UI Nightly receipt fixtures failed"
+fi
 
 if rg -n '/tmp/OhanaDerivedData|DerivedData/(ui-tests|task-|tfu-)' \
   "${repo_root}/scripts/test-simulator.sh" \
@@ -286,11 +368,15 @@ ln -s "${outside_tmp}" "${symlink_tmp}"
 export FAKE_LSOF_ACTIVE_PATH="${active_tmp}"
 export FAKE_LSOF_ERROR_PATH="${error_tmp}"
 
-mkdir -p "${fake_repo}/.build/DerivedData/Tests/Build/Products" \
-  "${fake_repo}/.build/DerivedData/Tests/Logs/Build" \
+mkdir -p "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products" \
+  "${OHANA_TEST_DERIVED_DATA_PATH}/Logs/Build" \
+  "${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}" \
+  "${OHANA_RELEASE_DERIVED_DATA_PATH}" \
+  "${fake_repo}/.build/DerivedData/Tests/Build/Products" \
   "${fake_repo}/.build/DerivedData/Dogfood" \
   "${fake_repo}/.build/DerivedData/Release"
-printf 'fixed\n' > "${fake_repo}/.build/DerivedData/Tests/Build/Products/proof.txt"
+printf 'fixed\n' > "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/proof.txt"
+printf 'legacy\n' > "${fake_repo}/.build/DerivedData/Tests/Build/Products/proof.txt"
 
 if ohana_assert_safe_tmp_artifact_path "${outside_tmp}" >/dev/null 2>&1; then
   fail "out-of-bound Ohana tmp artifact was accepted"
@@ -381,10 +467,153 @@ set -e
 [[ -d "${archive_child}" ]] || fail "correct cleanup token deleted protected OhanaArchives content"
 [[ -d "${outside_tmp}" ]] || fail "correct cleanup token deleted out-of-bound content"
 [[ -L "${symlink_tmp}" ]] || fail "correct cleanup token deleted refused symlink"
-[[ -d "${fake_repo}/.build/DerivedData/Tests" ]] || fail "case-variant Tests fixed lane was deleted"
-[[ -d "${fake_repo}/.build/DerivedData/Tests/Logs/Build" ]] || fail "fixed Tests Logs/Build child was deleted"
-[[ -d "${fake_repo}/.build/DerivedData/Dogfood" ]] || fail "case-variant Dogfood fixed lane was deleted"
-[[ -d "${fake_repo}/.build/DerivedData/Release" ]] || fail "case-variant Release fixed lane was deleted"
+[[ -d "${OHANA_TEST_DERIVED_DATA_PATH}" ]] || fail "active shared Tests lane was deleted"
+[[ -d "${OHANA_TEST_DERIVED_DATA_PATH}/Logs/Build" ]] || fail "active shared Tests Logs/Build child was deleted"
+[[ -d "${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}" ]] || fail "active shared Dogfood build lane was deleted"
+[[ -d "${OHANA_RELEASE_DERIVED_DATA_PATH}" ]] || fail "active shared Release lane was deleted"
+[[ ! -e "${fake_repo}/.build/DerivedData/Tests" ]] || fail "legacy worktree Tests lane was retained"
+[[ ! -e "${fake_repo}/.build/DerivedData/Dogfood" ]] || fail "legacy worktree Dogfood build cache was retained"
+[[ ! -e "${fake_repo}/.build/DerivedData/Release" ]] || fail "legacy worktree Release lane was retained"
+
+mkdir -p "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Intermediates.noindex"
+printf 'intermediate\n' > \
+  "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Intermediates.noindex/rebuildable.txt"
+mkdir -p \
+  "${OHANA_TEST_DERIVED_DATA_PATH}/ModuleCache.noindex" \
+  "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.app.dSYM" \
+  "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.swiftmodule"
+printf 'module cache\n' > "${OHANA_TEST_DERIVED_DATA_PATH}/ModuleCache.noindex/rebuildable.txt"
+printf 'symbols\n' > \
+  "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.app.dSYM/rebuildable.txt"
+printf 'module output\n' > \
+  "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.swiftmodule/rebuildable.txt"
+printf 'runtime product\n' > \
+  "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.app"
+set +e
+intermediates_report_output="$(
+  "${repo_root}/scripts/cleanup-local-build-storage.sh" --scope test-intermediates 2>&1
+)"
+intermediates_report_status=$?
+set -e
+[[ "${intermediates_report_status}" == "0" ]] || \
+  fail "test-intermediates report exited ${intermediates_report_status}"
+grep -qF "test-rebuildable-cache" <<< "${intermediates_report_output}" || \
+  fail "test-intermediates report omitted the candidate kind"
+grep -qF "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products" <<< "${intermediates_report_output}" || \
+  fail "test-intermediates report omitted the preserved Products tree"
+intermediates_token="$(
+  awk '/^Plan token:/ { print $3 }' <<< "${intermediates_report_output}"
+)"
+set +e
+intermediates_apply_output="$(
+  "${repo_root}/scripts/cleanup-local-build-storage.sh" \
+    --scope test-intermediates \
+    --apply "${intermediates_token}" 2>&1
+)"
+intermediates_apply_status=$?
+set -e
+[[ "${intermediates_apply_status}" == "0" ]] || \
+  fail "test-intermediates apply exited ${intermediates_apply_status}: ${intermediates_apply_output}"
+[[ ! -e "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Intermediates.noindex" ]] || \
+  fail "test-intermediates apply retained rebuildable intermediates"
+[[ ! -e "${OHANA_TEST_DERIVED_DATA_PATH}/ModuleCache.noindex" ]] || \
+  fail "test-intermediates apply retained the module cache"
+[[ ! -e "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.app.dSYM" ]] || \
+  fail "test-intermediates apply retained standalone dSYMs"
+[[ ! -e "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.swiftmodule" ]] || \
+  fail "test-intermediates apply retained standalone Swift modules"
+[[ -f "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/proof.txt" ]] || \
+  fail "test-intermediates apply deleted a built test product"
+[[ -f "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.app" ]] || \
+  fail "test-intermediates apply deleted an executable product"
+
+test_dead_root="${fake_home}/Library/Developer/CoreSimulator/Devices/TEST-UDID/data/Library/Caches/com.apple.containermanagerd/Dead"
+safe_dead_cache="${test_dead_root}/temp.ohana"
+unrelated_dead_cache="${test_dead_root}/temp.unrelated"
+mkdir -p \
+  "${safe_dead_cache}/APP-UUID/Ohana.app" \
+  "${unrelated_dead_cache}/APP-UUID/Other.app"
+printf '%s\n' \
+  '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.guanchen.li.Ohana</string></dict></plist>' \
+  > "${safe_dead_cache}/APP-UUID/Ohana.app/Info.plist"
+printf '%s\n' \
+  '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>MCMMetadataIdentifier</key><string>com.guanchen.li.Ohana</string></dict></plist>' \
+  > "${safe_dead_cache}/APP-UUID/.com.apple.mobile_container_manager.metadata.plist"
+printf '%s\n' \
+  '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.example.Other</string></dict></plist>' \
+  > "${unrelated_dead_cache}/APP-UUID/Other.app/Info.plist"
+printf '%s\n' \
+  '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>MCMMetadataIdentifier</key><string>com.example.Other</string></dict></plist>' \
+  > "${unrelated_dead_cache}/APP-UUID/.com.apple.mobile_container_manager.metadata.plist"
+set +e
+app_cache_report_output="$(
+  "${repo_root}/scripts/cleanup-local-build-storage.sh" --scope test-app-cache 2>&1
+)"
+app_cache_report_status=$?
+set -e
+[[ "${app_cache_report_status}" == "0" ]] || \
+  fail "test-app-cache report exited ${app_cache_report_status}"
+grep -qF "${safe_dead_cache}" <<< "${app_cache_report_output}" || \
+  fail "test-app-cache report omitted a metadata-verified Ohana candidate"
+if grep -qF "${unrelated_dead_cache}" <<< "${app_cache_report_output}"; then
+  fail "test-app-cache report included an unrelated app"
+fi
+app_cache_token="$(awk '/^Plan token:/ { print $3 }' <<< "${app_cache_report_output}")"
+set +e
+app_cache_apply_output="$(
+  "${repo_root}/scripts/cleanup-local-build-storage.sh" \
+    --scope test-app-cache \
+    --apply "${app_cache_token}" 2>&1
+)"
+app_cache_apply_status=$?
+set -e
+[[ "${app_cache_apply_status}" == "0" ]] || \
+  fail "test-app-cache apply exited ${app_cache_apply_status}: ${app_cache_apply_output}"
+[[ ! -e "${safe_dead_cache}" ]] || \
+  fail "test-app-cache apply retained a verified dead Ohana replacement"
+[[ -d "${unrelated_dead_cache}" ]] || \
+  fail "test-app-cache apply deleted an unrelated app cache"
+
+download_cache_root="${fake_home}/Library/Developer/CoreSimulator/Devices/TEST-UDID/data/Library/Caches/com.apple.nsurlsessiond/Downloads/com.apple.MobileAsset.DownloadService"
+partial_download="${download_cache_root}/CFNetworkDownload_fixture.tmp"
+installed_asset="${download_cache_root}/installed.asset"
+host_profile_cache="${fake_tmp}/com.ohana.trip.local"
+mkdir -p "${partial_download}" "${installed_asset}" "${host_profile_cache}/SESSION"
+printf 'partial\n' > "${partial_download}/payload.bin"
+printf 'installed\n' > "${installed_asset}/payload.bin"
+printf 'profile\n' > "${host_profile_cache}/SESSION/profile.profraw"
+set +e
+transient_report_output="$(
+  "${repo_root}/scripts/cleanup-local-build-storage.sh" --scope test-transient-cache 2>&1
+)"
+transient_report_status=$?
+set -e
+[[ "${transient_report_status}" == "0" ]] || \
+  fail "test-transient-cache report exited ${transient_report_status}"
+grep -qF "${partial_download}" <<< "${transient_report_output}" || \
+  fail "test-transient-cache report omitted an unfinished download"
+grep -qF "${host_profile_cache}" <<< "${transient_report_output}" || \
+  fail "test-transient-cache report omitted an Ohana host profile cache"
+if grep -qF "${installed_asset}" <<< "${transient_report_output}"; then
+  fail "test-transient-cache report included an installed asset"
+fi
+transient_token="$(awk '/^Plan token:/ { print $3 }' <<< "${transient_report_output}")"
+set +e
+transient_apply_output="$(
+  "${repo_root}/scripts/cleanup-local-build-storage.sh" \
+    --scope test-transient-cache \
+    --apply "${transient_token}" 2>&1
+)"
+transient_apply_status=$?
+set -e
+[[ "${transient_apply_status}" == "0" ]] || \
+  fail "test-transient-cache apply exited ${transient_apply_status}: ${transient_apply_output}"
+[[ ! -e "${partial_download}" ]] || \
+  fail "test-transient-cache apply retained an unfinished download"
+[[ ! -e "${host_profile_cache}" ]] || \
+  fail "test-transient-cache apply retained an Ohana host profile cache"
+[[ -d "${installed_asset}" ]] || \
+  fail "test-transient-cache apply deleted an installed asset"
 
 set +e
 stale_token_output="$("${repo_root}/scripts/cleanup-local-build-storage.sh" --apply "${plan_token}" 2>&1)"

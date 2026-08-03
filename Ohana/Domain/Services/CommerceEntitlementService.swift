@@ -264,19 +264,37 @@ nonisolated enum CommerceStorefrontError: LocalizedError, Equatable {
             return l.tr(
                 zh: "Ohana Personal 暂时无法使用。",
                 en: "Ohana Personal is temporarily unavailable.",
-                de: "Ohana Personal ist vorübergehend nicht verfügbar."
+                de: "Ohana Personal ist vorübergehend nicht verfügbar.",
+                es: "Ohana Personal no está disponible temporalmente.",
+                pt: "Ohana Personal está temporariamente indisponível.",
+                fr: "Ohana Personal est temporairement indisponible.",
+                ja: "Ohana Personalは現在利用できません。",
+                ko: "Ohana Personal을 일시적으로 사용할 수 없습니다.",
+                it: "Ohana Personal non è temporaneamente disponibile."
             )
         case .familyUnavailable:
             return l.tr(
                 zh: "Ohana Family 守护尚未开放。",
                 en: "Ohana Family guardian is not available yet.",
-                de: "Ohana Family-Schutz ist noch nicht verfügbar."
+                de: "Ohana Family-Schutz ist noch nicht verfügbar.",
+                es: "La protección de Ohana Family aún no está disponible.",
+                pt: "A proteção do Ohana Family ainda não está disponível.",
+                fr: "La protection Ohana Family n’est pas encore disponible.",
+                ja: "Ohana Familyの見守り機能はまだ利用できません。",
+                ko: "Ohana Family 보호 기능은 아직 사용할 수 없습니다.",
+                it: "La protezione Ohana Family non è ancora disponibile."
             )
         case .verificationFailed:
             return l.tr(
                 zh: "此购买无法验证，未解锁任何付费内容。",
                 en: "This purchase could not be verified. No paid content was unlocked.",
-                de: "Dieser Kauf konnte nicht verifiziert werden. Es wurden keine bezahlten Inhalte freigeschaltet."
+                de: "Dieser Kauf konnte nicht verifiziert werden. Es wurden keine bezahlten Inhalte freigeschaltet.",
+                es: "No se pudo verificar esta compra. No se ha desbloqueado ningún contenido de pago.",
+                pt: "Não foi possível verificar esta compra. Nenhum conteúdo pago foi desbloqueado.",
+                fr: "Cet achat n’a pas pu être vérifié. Aucun contenu payant n’a été débloqué.",
+                ja: "この購入を検証できなかったため、有料コンテンツはアンロックされていません。",
+                ko: "이 구매를 확인할 수 없어 유료 콘텐츠가 잠금 해제되지 않았습니다.",
+                it: "Non è stato possibile verificare l’acquisto. Nessun contenuto a pagamento è stato sbloccato."
             )
         }
     }

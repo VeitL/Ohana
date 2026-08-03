@@ -109,6 +109,7 @@ assert_scope_floor() {
 }
 
 fixtures="scripts/tests/fixtures/Views"
+system_surface_fixtures="scripts/tests/fixtures/SystemSurfaces"
 agent_skill_fixtures="scripts/tests/fixtures/AgentSkills"
 architecture_fixture_path="Ohana/Domain/__ArchitectureBoundaryFixture.swift"
 architecture_model_fixture_path="Ohana/Models/__ArchitectureModelBoundaryFixture.swift"
@@ -121,6 +122,7 @@ release_device_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-release-device-m
 dogfood_manifest_path="docs/governance/manifests/dogfood-user-profile.json"
 dogfood_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-dogfood-profile.XXXXXX")"
 ui_shard_manifest_fixture=""
+ui_selector_entrypoint_fixture=""
 cp "$governance_manifest_path" "$governance_manifest_backup"
 cp "$release_device_manifest_path" "$release_device_manifest_backup"
 cp "$dogfood_manifest_path" "$dogfood_manifest_backup"
@@ -149,6 +151,9 @@ cleanup_governance_fixture() {
   if [[ -n "$ui_shard_manifest_fixture" ]]; then
     rm -f "$ui_shard_manifest_fixture"
   fi
+  if [[ -n "$ui_selector_entrypoint_fixture" ]]; then
+    rm -f "$ui_selector_entrypoint_fixture"
+  fi
 }
 
 trap 'cleanup_architecture_fixture; cleanup_governance_fixture' EXIT
@@ -175,6 +180,23 @@ else
 fi
 rm -f "$ui_shard_manifest_fixture"
 ui_shard_manifest_fixture=""
+
+ui_selector_entrypoint_fixture="$(mktemp "${TMPDIR:-/tmp}/ohana-ui-selector-entrypoint-bad.XXXXXX")"
+printf "%s\n" "--only-testing 'OhanaUITests/OhanaUITests/testRemovedReleaseSmokeSelector'" \
+  > "$ui_selector_entrypoint_fixture"
+set +e
+output="$(OHANA_UI_TEST_SELECTOR_ENTRYPOINTS="$ui_selector_entrypoint_fixture" scripts/audit-ui-test-shards.sh 2>&1)"
+status=$?
+set -e
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-ui-test-shards.sh stale-entrypoint fixture: expected exit 1, got $status"
+elif ! grep -qF "entrypoint selectors not found in source" <<<"$output"; then
+  fail "scripts/audit-ui-test-shards.sh stale-entrypoint fixture: selector guard no longer fires"
+else
+  echo "ok  scripts/audit-ui-test-shards.sh catches a stale release entrypoint selector"
+fi
+rm -f "$ui_selector_entrypoint_fixture"
+ui_selector_entrypoint_fixture=""
 
 assert_bad scripts/audit-ui-v4.sh "$fixtures/UiV4Bad.swift" \
   background system-text-color hardcoded-white-black material shadow \
@@ -221,7 +243,7 @@ run_audit scripts/audit-architecture-boundaries.sh "$architecture_fixture_path"
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesBad.swift: expected strict exit 1, got $status"
 else
-  for rule in domain-feature-command-dependency domain-feature-reward-type-dependency domain-feature-implementation-dependency domain-feature-live-default-dependency domain-feature-taxonomy-literal domain-presentation-framework-dependency domain-platform-ui-framework-dependency; do
+  for rule in human-deletion-fail-open-entrypoint domain-feature-command-dependency domain-feature-reward-type-dependency domain-feature-implementation-dependency domain-feature-live-default-dependency domain-feature-taxonomy-literal domain-presentation-framework-dependency domain-platform-ui-framework-dependency; do
     if ! grep -qF "[$rule]" <<<"$output"; then
       fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesBad.swift: rule [$rule] no longer fires"
     fi
@@ -308,6 +330,20 @@ else
       fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: rule [$rule] no longer fires"
     fi
   done
+  schedule_delete_result_warning_count="$(grep -cF "func scheduleDeleteResult" <<<"$output" || true)"
+  if [[ "$schedule_delete_result_warning_count" -ne 4 ]]; then
+    fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: expected 4 independently bound schedule-delete result warnings, got $schedule_delete_result_warning_count"
+  fi
+  for function_name in \
+    scheduleDeleteResultCommentBypass \
+    scheduleDeleteResultStringBypass \
+    scheduleDeleteResultWrongBindingBypass \
+    scheduleDeleteResultUnrelatedIDsBypass \
+    deleteRenamedScheduleValueBypass; do
+    if ! grep -qF "func $function_name" <<<"$output"; then
+      fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: missing exact schedule-delete warning for $function_name"
+    fi
+  done
   echo "ok  scripts/audit-member-lifecycle-gate.sh --all catches member lifecycle fixture rules"
 fi
 assert_good scripts/audit-member-lifecycle-gate.sh "$fixtures/MemberLifecycleGateGoodCommands.swift"
@@ -323,6 +359,35 @@ assert_good scripts/audit-agent-skill-governance.sh "$agent_skill_fixtures/Gener
 assert_bad scripts/audit-swiftdata-save-failures.sh "$fixtures/SaveFailureBoundaryBad.swift" \
   swiftdata-silent-save-discard swiftdata-ambiguous-safe-save
 assert_good scripts/audit-swiftdata-save-failures.sh "$fixtures/SaveFailureBoundaryGood.swift"
+
+assert_bad scripts/audit-system-surface-contract.sh \
+  "$system_surface_fixtures/SystemSurfaceBackupExclusionBad.swift" \
+  system-surface-atomic-write \
+  system-surface-backup-exclusion-set \
+  system-surface-backup-exclusion-order \
+  system-surface-backup-exclusion-readback \
+  system-surface-backup-exclusion-verification
+assert_good scripts/audit-system-surface-contract.sh \
+  "$system_surface_fixtures/SystemSurfaceBackupExclusionGood.swift"
+
+assert_bad scripts/audit-system-surface-reset-fence.sh \
+  "$system_surface_fixtures/SystemSurfaceResetFenceBad.swift" \
+  reset-fence-schedule-pause \
+  reset-fence-prepare-pause \
+  reset-fence-prepare-generation \
+  reset-fence-prepare-cancel \
+  reset-fence-post-await \
+  reset-fence-prewrite \
+  reset-fence-finish-generation \
+  reset-fence-runtime-order \
+  reset-fence-runtime-defer \
+  reset-fence-failure-recovery \
+  reset-fence-success-boundary \
+  reset-fence-live-wiring \
+  reset-fence-deterministic-test \
+  reset-fence-failure-test
+assert_good scripts/audit-system-surface-reset-fence.sh \
+  "$system_surface_fixtures/SystemSurfaceResetFenceGood.swift"
 
 run_audit scripts/audit-governance-manifests.sh
 if [[ "$status" -ne 0 ]]; then

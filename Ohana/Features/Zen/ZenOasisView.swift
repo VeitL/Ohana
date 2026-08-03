@@ -16,7 +16,6 @@ struct ZenOasisView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var isInjectingEnergy = false
-    @State private var isClaimingStarterGift = false
     @State private var injectionPulseToken = 0
     @State private var isVisible = false
 
@@ -40,7 +39,7 @@ struct ZenOasisView: View {
             OhanaStaticAppBackground()
                 .allowsHitTesting(false)
 
-            if snapshot.isReady {
+            if snapshot.isReady, snapshot.starterGiftState == .claimed {
                 OasisHomeTabHost(
                     lifecycle: activeOasisLifecycle,
                     treeSnapshot: standardTreeSnapshot,
@@ -56,15 +55,10 @@ struct ZenOasisView: View {
                     onOpenGacha: actions.onOpenGacha,
                     onOpenGrowthRoadmap: actions.onOpenGrowthRoadmap
                 )
+            } else if snapshot.isReady {
+                dormantTree
             } else {
                 loadingContent
-            }
-
-            if snapshot.starterGiftState == .claimable {
-                starterGiftCard
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .frame(maxHeight: .infinity, alignment: .top)
             }
         }
         .task {
@@ -104,80 +98,90 @@ struct ZenOasisView: View {
         )
     }
 
-    private var starterGiftCard: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "gift.fill") // a11y: allow decorative gift glyph is hidden below
-                .font(OhanaFont.adaptive(size: 24, weight: .bold))
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(Color.goPrimary)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(
-                    zh: "佛系起航礼",
-                    en: "Zen welcome gift",
-                    de: "Zen-Willkommensgeschenk",
-                    es: "Regalo de bienvenida zen",
-                    pt: "Presente de boas-vindas zen",
-                    fr: "Cadeau de bienvenue Zen",
-                    ja: "佛系スタートギフト",
-                    ko: "마음 편한 모드 시작 선물",
-                    it: "Regalo di benvenuto Zen"
-                ))
-                    .font(OhanaFont.callout(.bold))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(
-                    zh: "首次添加宠物或植物 · 50 椰子",
-                    en: "First pet or plant · 50 coconuts",
-                    de: "Erstes Tier oder erste Pflanze · 50 Kokosnüsse",
-                    es: "Primera mascota o planta · 50 cocos",
-                    pt: "Primeiro pet ou planta · 50 cocos",
-                    fr: "Premier animal ou première plante · 50 noix de coco",
-                    ja: "最初のペットまたは植物 · ココナッツ50個",
-                    ko: "첫 반려동물 또는 식물 · 코코넛 50개",
-                    it: "Primo animale o prima pianta · 50 noci di cocco"
-                ))
-                    .font(OhanaFont.footnote())
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+    private var dormantTree: some View {
+        VStack(spacing: 22) {
+            ZStack {
+                Circle()
+                    .fill(Color.goPrimary.opacity(0.08))
+                    .frame(width: 190, height: 190)
+                Circle()
+                    .fill(Color.ohanaCardSurfaceElevated)
+                    .frame(width: 126, height: 126)
+                Image(systemName: "leaf.fill") // a11y: allow decorative dormant-seed icon; the following text names the state
+                    .font(OhanaFont.adaptive(size: 48, weight: .black))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.goPrimary)
+                    .rotationEffect(.degrees(-28))
+                    .accessibilityHidden(true)
             }
 
-            Spacer(minLength: 8)
+            VStack(spacing: 7) {
+                Text(l.tr(
+                    zh: "一颗休眠的种子",
+                    en: "A sleeping seed",
+                    de: "Ein schlafender Samen",
+                    es: "Una semilla dormida",
+                    pt: "Uma semente adormecida",
+                    fr: "Une graine endormie",
+                    ja: "眠っている種",
+                    ko: "잠든 씨앗",
+                    it: "Un seme addormentato"
+                ))
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+
+                Text(l.tr(
+                    zh: "领取新人礼包后，Lv.0 椰子树会在这里醒来。",
+                    en: "Claim the welcome gift and your Lv.0 coconut tree will wake here.",
+                    de: "Nach dem Willkommensgeschenk erwacht hier dein Kokosbaum auf Lv. 0.",
+                    es: "Reclama el regalo y tu cocotero de Nv. 0 despertará aquí.",
+                    pt: "Resgate o presente e seu coqueiro Nv. 0 despertará aqui.",
+                    fr: "Récupérez le cadeau et votre cocotier niv. 0 s’éveillera ici.",
+                    ja: "ウェルカムギフトを受け取ると、Lv.0の木がここで目覚めます。",
+                    ko: "환영 선물을 받으면 Lv.0 코코넛 나무가 여기서 깨어나요.",
+                    it: "Riscatta il regalo e l’albero di Lv. 0 si risveglierà qui."
+                ))
+                .font(OhanaFont.callout())
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            }
 
             Button {
-                claimStarterGift()
+                OhanaFeedback.light()
+                actions.onOpenStarterJourney()
             } label: {
-                if isClaimingStarterGift {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Text(l.tr(
-                        zh: "领取",
-                        en: "Claim",
-                        de: "Abholen",
-                        es: "Reclamar",
-                        pt: "Resgatar",
-                        fr: "Récupérer",
-                        ja: "受け取る",
-                        ko: "받기",
-                        it: "Riscatta"
-                    ))
-                        .font(OhanaFont.footnote(.bold))
-                }
+                Label(
+                    l.tr(
+                        zh: "查看新手任务",
+                        en: "View starter tasks",
+                        de: "Starter-Aufgaben ansehen",
+                        es: "Ver tareas iniciales",
+                        pt: "Ver tarefas iniciais",
+                        fr: "Voir les tâches de départ",
+                        ja: "はじめのタスクを見る",
+                        ko: "시작 과제 보기",
+                        it: "Vedi attività iniziali"
+                    ),
+                    systemImage: "sparkles"
+                )
+                .font(OhanaFont.callout(.black))
+                .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(.borderedProminent)
             .tint(Color.goPrimary)
-            .disabled(isClaimingStarterGift)
-            .accessibilityIdentifier("zen-oasis-starter-gift-action")
+            .accessibilityIdentifier("zen-oasis-open-starter-journey")
         }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
-                .strokeBorder(Color.goPrimary.opacity(0.28), lineWidth: 1)
-        }
+        .padding(24)
+        .frame(maxWidth: 520)
+        .background(
+            Color.ohanaCardSurface,
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
+        )
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("zen-oasis-starter-gift")
+        .accessibilityIdentifier("zen-oasis-dormant-tree")
     }
 
     private var loadingContent: some View {
@@ -208,16 +212,6 @@ struct ZenOasisView: View {
             await actions.onInjectEnergy()
             await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: feedbackDelay)
             isInjectingEnergy = false
-        }
-    }
-
-    private func claimStarterGift() {
-        guard !isClaimingStarterGift else { return }
-        isClaimingStarterGift = true
-        Task {
-            await OhanaFrameScheduler.waitAfterNextFrame()
-            await actions.onClaimStarterGift()
-            isClaimingStarterGift = false
         }
     }
 }

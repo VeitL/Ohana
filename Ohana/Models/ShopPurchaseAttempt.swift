@@ -12,6 +12,8 @@ nonisolated enum ShopPurchaseAttemptState: String, Codable, CaseIterable, Sendab
     case purchased
     case fulfilling
     case fulfilled
+    /// Legacy compatibility only. New final-sale purchases never enter either
+    /// refund state; recovery converts an unfinished legacy refund to delivery.
     case refundPending
     case refunded
     case manualReview

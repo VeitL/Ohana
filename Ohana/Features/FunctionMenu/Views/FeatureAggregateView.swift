@@ -309,7 +309,9 @@ struct FeatureAggregateView: View {
         let summary = petAggregateSummaries[pet.id] ?? .empty
         switch feature {
         case .basicInfo:
-            return pet.breed.isEmpty ? Pet.localizedSpeciesName(pet.species, l: l) : pet.breed
+            return pet.breed.isEmpty
+                ? Pet.localizedSpeciesName(pet.species, l: l)
+                : l.resourceName(pet.breed)
         case .documents:
             return l.tr(zh: "\(summary.documentCount) 份证件", en: "\(summary.documentCount) documents", de: "\(summary.documentCount) Dokumente")
         case .moments:

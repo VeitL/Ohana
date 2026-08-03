@@ -3,6 +3,7 @@
 //  Ohana
 //
 
+import Combine
 import SwiftData
 import SwiftUI
 
@@ -35,7 +36,8 @@ struct DocumentsListView: View {
                 routeInsurances: data.insurances
             )
         }
-        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates.dropFirst()) { revision in
+            guard routeRevision != revision else { return }
             routeRevision = revision
         }
     }

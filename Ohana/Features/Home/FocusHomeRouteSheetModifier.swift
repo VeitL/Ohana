@@ -579,7 +579,7 @@ private extension FocusHomeRouteSheetModifier {
             petSheetDestination(for: route)
         case .humanAllFeatures, .humanBasicInfo, .humanMedicationQuick, .humanMedication,
              .humanWeightQuick, .humanWeight, .humanWorkoutQuick, .humanWorkout,
-             .humanWorkoutDashboard, .humanMetrics, .humanReport, .humanExpenseQuick,
+             .humanWorkoutDashboard, .humanMetrics, .humanConditions, .humanReport, .humanExpenseQuick,
              .humanExpense, .humanWishlist, .humanNoteQuick, .humanNote:
             humanSheetDestination(for: route)
         case let .plantCareLog(id, initialCareType):
@@ -721,6 +721,9 @@ private extension FocusHomeRouteSheetModifier {
         case let .humanMetrics(id):
             humanRouteContainer(id: id, destination: .metrics)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+        case let .humanConditions(id):
+            humanRouteContainer(id: id, destination: .conditions)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanReport(id):
             humanRouteContainer(id: id, destination: .report)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
@@ -819,6 +822,8 @@ private extension FocusHomeRouteSheetModifier {
             .humanWorkoutDashboard(humanID)
         case .metrics:
             .humanMetrics(humanID)
+        case .conditions:
+            .humanConditions(humanID)
         case .medication:
             .humanMedication(humanID)
         case .report:
@@ -857,6 +862,8 @@ private extension FocusHomeRouteSheetModifier {
             .humanWorkoutDashboard(humanID)
         case .metrics:
             .humanMetrics(humanID)
+        case .conditions:
+            .humanConditions(humanID)
         case .report:
             .humanReport(humanID)
         case .expenseQuick:

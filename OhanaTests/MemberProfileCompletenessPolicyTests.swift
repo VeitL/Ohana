@@ -66,24 +66,44 @@ struct MemberProfileCompletenessPolicyTests {
         #expect(complete.missingCategories.isEmpty)
     }
 
-    @Test func explicitPrivacyChoicesCompleteCategoriesWithoutInventingProfileFacts() {
+    @Test func birthdayAndGenderMustBeActualWhileOptionalChoicesStillCount() {
         let human = Human(name: "Private")
-        let snapshot = MemberProfileCompletenessPolicy.human(
+        let missingRequired = MemberProfileCompletenessPolicy.human(
             human,
             explicitlyResolvedCategories: [
                 .humanAppearance,
                 .humanLifeStage,
-                .humanBodyProfile
+                .humanBodyProfile,
+                .humanPersonalityContext
             ]
         )
 
-        #expect(snapshot.completionPercent == 75)
-        #expect(snapshot.reachesProfileThreshold)
-        #expect(snapshot.explicitlyResolvedCategories.count == 3)
-        #expect(snapshot.missingCategories == [.humanPersonalityContext])
+        #expect(missingRequired.completionPercent == 50)
+        #expect(!missingRequired.reachesProfileThreshold)
+        #expect(missingRequired.explicitlyResolvedCategories == [
+            .humanAppearance,
+            .humanPersonalityContext
+        ])
+        #expect(missingRequired.missingRequiredCategories == [
+            .humanLifeStage,
+            .humanBodyProfile
+        ])
+
+        human.birthday = Date(timeIntervalSince1970: 1_000_000)
+        human.genderIdentityRaw = "private"
+        let complete = MemberProfileCompletenessPolicy.human(
+            human,
+            explicitlyResolvedCategories: [
+                .humanAppearance,
+                .humanPersonalityContext
+            ]
+        )
+        #expect(complete.completionPercent == 100)
+        #expect(complete.reachesProfileThreshold)
+        #expect(complete.missingRequiredCategories.isEmpty)
     }
 
-    @Test func legacyHumanOptionalCheckpointMapsToAllThreeFocusedOptionalCategories() {
+    @Test func legacyHumanOptionalCheckpointMapsOnlyToTheStillOptionalCategory() {
         let humanID = UUID()
         let legacyKey = HouseholdStarterJourneyService.checkpointRecordKey(
             task: .humanProfile,
@@ -97,16 +117,23 @@ struct MemberProfileCompletenessPolicyTests {
             resolutions: [legacyKey: .preferNotToSay]
         )
 
-        #expect(resolved == [
-            .humanLifeStage,
-            .humanBodyProfile,
-            .humanPersonalityContext
-        ])
-        #expect(MemberProfileCompletenessPolicy.evaluate(
-            kind: .human,
-            actualCategories: [],
+        #expect(resolved == [.humanPersonalityContext])
+        let snapshot = MemberProfileCompletenessPolicy.human(
+            HumanProfileCompletionDraft(
+                hasMeaningfulAppearance: false,
+                birthday: nil,
+                genderIdentityRaw: "",
+                bloodType: "",
+                heightCm: 0,
+                mbti: "",
+                nationality: "",
+                city: "",
+                notes: ""
+            ),
             explicitlyResolvedCategories: resolved
-        ).completionPercent == 75)
+        )
+        #expect(snapshot.completionPercent == 25)
+        #expect(!snapshot.reachesProfileThreshold)
     }
 
     @Test func completionThresholdIsExactlyThreeOfFour() {

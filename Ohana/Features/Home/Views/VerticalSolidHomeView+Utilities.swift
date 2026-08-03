@@ -276,9 +276,9 @@ extension VerticalSolidHomeView {
     ) async -> Data? {
         switch request.source {
         case .pet:
-            await loader.petAvatarImageData(modelID: request.modelID)
+            await loader.petAvatarImageData(id: request.id)
         case .human:
-            await loader.humanAvatarImageData(modelID: request.modelID)
+            await loader.humanAvatarImageData(id: request.id)
         }
     }
 
@@ -288,7 +288,7 @@ extension VerticalSolidHomeView {
         loader: SwiftDataMediaBlobLoader
     ) async -> Data? {
         guard request.source == .pet else { return nil }
-        if let data = await loader.petCardPopoutImageData(modelID: request.modelID) {
+        if let data = await loader.petCardPopoutImageData(id: request.id) {
             return data
         }
         guard request.popoutSignature == request.avatarSignature else { return nil }

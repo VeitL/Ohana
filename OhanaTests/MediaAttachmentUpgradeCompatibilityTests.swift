@@ -213,6 +213,36 @@ struct MediaAttachmentUpgradeCompatibilityTests {
         #expect(repairedPlantLog?.photoImageSignature == MediaPayloadSignature.signature(for: photoData))
     }
 
+    @Test func blobLoaderReturnsNilForDeletedMembersWhenLoadingByDomainID() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let avatarData = Data([21, 22, 23, 24])
+        let pet = Pet(name: "Momo")
+        pet.avatarImageData = avatarData
+        pet.avatarAttachmentStateRaw = MemberAvatarAttachmentState.present.rawValue
+        let human = Human(name: "Nico")
+        human.avatarImageData = avatarData
+        human.avatarAttachmentStateRaw = MemberAvatarAttachmentState.present.rawValue
+        let petID = pet.id
+        let humanID = human.id
+
+        context.insert(pet)
+        context.insert(human)
+        try context.save()
+
+        let loader = SwiftDataMediaBlobLoader(modelContainer: container)
+        #expect(await loader.petAvatarImageData(id: petID) == avatarData)
+        #expect(await loader.humanAvatarImageData(id: humanID) == avatarData)
+
+        context.delete(pet)
+        context.delete(human)
+        try context.save()
+
+        #expect(await loader.petAvatarImageData(id: petID) == nil)
+        #expect(await loader.petCardPopoutImageData(id: petID) == nil)
+        #expect(await loader.humanAvatarImageData(id: humanID) == nil)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV85.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)

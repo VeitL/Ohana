@@ -411,7 +411,7 @@ extension MemberCardCreationContentView {
                         usesCustomValue: usesCustomNationality
                     )
                 ) {
-                    ForEach(PetBreedDatabase.countries, id: \.self) { country in
+                    ForEach(regionCountryOptions, id: \.self) { country in
                         Button(localizedRegionOption(country)) {
                             if profileExperienceStyle == .zen, country == "其他" {
                                 usesCustomNationality = true
@@ -432,13 +432,17 @@ extension MemberCardCreationContentView {
                 }
 
                 menuPicker(
-                    title: l.tr(zh: "现居国家", en: "Residence", de: "Wohnort"),
+                    title: l.tr(
+                        zh: "现居国家",
+                        en: "Residence country",
+                        de: "Wohnland"
+                    ),
                     value: regionPickerValue(
                         draft.residenceCountry,
                         usesCustomValue: usesCustomResidenceCountry
                     )
                 ) {
-                    ForEach(PetBreedDatabase.countries, id: \.self) { country in
+                    ForEach(regionCountryOptions, id: \.self) { country in
                         Button(localizedRegionOption(country)) {
                             if profileExperienceStyle == .zen, country == "其他" {
                                 usesCustomResidenceCountry = true
@@ -477,13 +481,11 @@ extension MemberCardCreationContentView {
         }
         return value.isEmpty
             ? l.tr(zh: "未设置", en: "Not set", de: "Nicht gesetzt")
-            : value
+            : localizedRegionOption(value)
     }
 
     private func localizedRegionOption(_ value: String) -> String {
-        value == "其他"
-            ? l.tr(zh: "其他", en: "Other", de: "Andere")
-            : value
+        PetBreedDatabase.localizedRegionName(value, l: l)
     }
 
     private func zenRegionTextField(
@@ -683,7 +685,12 @@ extension MemberCardCreationContentView {
     }
 
     var speciesOptions: [String] {
-        Pet.canonicalSpeciesOptions
+        l.sortedCatalogKeys(
+            Pet.canonicalSpeciesOptions,
+            otherKey: "other"
+        ) {
+            Pet.localizedSpeciesName($0, l: l)
+        }
     }
 
     var petGenderOptions: [String] {
@@ -707,19 +714,18 @@ extension MemberCardCreationContentView {
     }
 
     var petBreedPickerOptions: [BreedInfo] {
-        let options = petBreedOptions
-        guard options.count > 40,
-              let other = options.first(where: { $0.name == "其他" }) else {
-            return options
-        }
-        return Array(options.filter { $0.name != "其他" }.prefix(39)) + [other]
+        l.sortedCatalogValues(petBreedOptions, key: \.name)
     }
 
     var petCoatOptions: [String] {
         let options = PetAvatarAssetCatalog.coatColors(species: draft.resolvedSpecies, breed: draft.resolvedBreed)
             ?? petBreedOptions.first(where: { $0.name == draft.resolvedBreed })?.coatColors
             ?? PetBreedDatabase.genericCoatColors
-        return options.map(\.name)
+        return l.sortedCatalogKeys(options.map(\.name), otherKey: nil)
+    }
+
+    var regionCountryOptions: [String] {
+        PetBreedDatabase.sortedCountries(l: l)
     }
 
     var petThemeSelectionDescription: String {

@@ -35,28 +35,31 @@ struct ShopPurchaseAttemptRecoveryTests {
         #expect(ShopInventoryStateStore.snapshot(defaults: defaults).backdatePassCount == 3)
     }
 
-    @Test func expiredStreakPurchaseDoesNotGrantOrCheckpointInventory() throws {
+    @Test func delayedStreakPurchaseStartsAFullWindowAndCheckpointsInventory() throws {
         let (name, defaults) = try isolatedDefaults()
         defer { defaults.removePersistentDomain(forName: name) }
         let attemptID = UUID()
         let now = Date(timeIntervalSinceReferenceDate: 400_000)
 
-        #expect(!ShopInventoryStateStore.fulfillPurchase(
+        #expect(ShopInventoryStateStore.fulfillPurchase(
             itemID: "boost_streak",
             attemptID: attemptID,
             purchasedAt: now.addingTimeInterval(-172_800),
             now: now,
             defaults: defaults
         ))
-        #expect(ShopInventoryStateStore.snapshot(defaults: defaults).streakShieldExpiry == nil)
-        #expect(!ShopInventoryStateStore.hasAppliedPurchase(attemptID: attemptID, defaults: defaults))
+        #expect(
+            ShopInventoryStateStore.snapshot(defaults: defaults).streakShieldExpiry
+                == now.addingTimeInterval(172_800)
+        )
+        #expect(ShopInventoryStateStore.hasAppliedPurchase(attemptID: attemptID, defaults: defaults))
     }
 
     @Test func unresolvedConsumablePurchaseReturnsExistingAttemptWithoutSecondDebit() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
-        let item = try #require(ShopCatalog.item(id: "boost_backdate_pack"))
+        let item = try #require(ShopCatalog.item(id: "boost_streak"))
         let startingBalance = item.cost * 2
         human.coconutBalance = startingBalance
         context.insert(human)
@@ -79,7 +82,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         let first = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Backdate Pack",
+            itemName: "Streak Shield",
             context: context,
             questManager: questManager,
             wallet: wallet,
@@ -88,7 +91,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         let second = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Backdate Pack",
+            itemName: "Streak Shield",
             context: context,
             questManager: questManager,
             wallet: wallet,
@@ -168,7 +171,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         #expect(inventory.consumableSnapshot().backdatePassCount == 3)
     }
 
-    @Test func startupRecoveryRefundsAStreakShieldThatExpiredBeforeFulfillment() throws {
+    @Test func startupRecoveryAppliesAFullStreakShieldWithoutRefunding() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let (name, defaults) = try isolatedDefaults()
@@ -215,15 +218,15 @@ struct ShopPurchaseAttemptRecoveryTests {
             maximumCount: 1
         )
 
-        #expect(results.first?.disposition == .refunded)
-        #expect(attempt.state == .refunded)
-        #expect(human.coconutBalance == item.cost)
-        #expect(inventory.consumableSnapshot().streakShieldExpiry == nil)
+        #expect(results.first?.disposition == .fulfilled)
+        #expect(attempt.state == .fulfilled)
+        #expect(human.coconutBalance == 0)
+        #expect((inventory.consumableSnapshot().streakShieldExpiry ?? .distantPast) > Date())
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
-        #expect(walletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 1)
+        #expect(walletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 0)
     }
 
-    @Test func freshAppIconAttemptWaitsForItsOSCallbackGraceBeforeRefundingMismatch() throws {
+    @Test func appIconRecoveryPreservesOwnershipWhenTheSystemIconDiffers() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let item = try #require(ShopCatalog.item(id: "appicon_lime_night"))
@@ -287,14 +290,15 @@ struct ShopPurchaseAttemptRecoveryTests {
             maximumCount: 1
         )
 
-        #expect(expiredResults.first?.disposition == .refunded)
-        #expect(attempt.state == .refunded)
-        #expect(human.coconutBalance == item.cost)
+        #expect(expiredResults.first?.disposition == .fulfilled)
+        #expect(attempt.state == .fulfilled)
+        #expect(human.coconutBalance == 0)
+        #expect(try ShopPurchaseRecordStore.isOwned(itemID: item.id, context: context))
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
-        #expect(walletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 1)
+        #expect(walletEntries.isEmpty)
     }
 
-    @Test func cofundedRecoveryRefundsTheExactFundingSnapshotOnlyOnce() throws {
+    @Test func legacyRefundPendingCofundedPurchaseFulfillsWithoutChangingFunding() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let (name, defaults) = try isolatedDefaults()
@@ -302,7 +306,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         let inventory = UserDefaultsShopInventoryManager(defaults: defaults)
         let base = AppServices(modelContainer: container)
         let services = appServices(base: base, replacingInventoryWith: inventory)
-        let item = try #require(ShopCatalog.item(id: "boost_backdate_pack"))
+        let item = try #require(ShopCatalog.item(id: "boost_streak"))
         let buyer = Human(name: "Buyer")
         let contributor = Human(name: "Contributor")
         buyer.coconutBalance = 100
@@ -317,7 +321,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         let purchase = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: buyer,
-            itemName: "Backdate Pack",
+            itemName: "Streak Shield",
             context: context,
             questManager: services.questManager,
             wallet: services.coconutWallet,
@@ -342,23 +346,25 @@ struct ShopPurchaseAttemptRecoveryTests {
             maximumCount: 1
         )
 
-        #expect(firstRecovery.first?.disposition == .refunded)
-        #expect(attempt.state == .refunded)
-        #expect(buyer.coconutBalance == buyerStartingBalance)
-        #expect(contributor.coconutBalance == contributorStartingBalance)
+        #expect(firstRecovery.first?.disposition == .fulfilled)
+        #expect(attempt.state == .fulfilled)
+        #expect(buyer.coconutBalance == 0)
+        #expect(contributor.coconutBalance == 0)
+        #expect(inventory.consumableSnapshot().streakShieldExpiry != nil)
         let firstWalletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         #expect(firstWalletEntries.count(where: { $0.source == .shop && $0.delta < 0 }) == 2)
-        #expect(firstWalletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 2)
+        #expect(firstWalletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 0)
 
         #expect(ShopPurchaseRecoveryService.settleRecoverable(
             context: context,
             services: services,
             maximumCount: 1
         ).isEmpty)
-        #expect(buyer.coconutBalance == buyerStartingBalance)
-        #expect(contributor.coconutBalance == contributorStartingBalance)
+        #expect(buyer.coconutBalance == 0)
+        #expect(contributor.coconutBalance == 0)
+        #expect(inventory.consumableSnapshot().streakShieldExpiry != nil)
         let finalWalletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
-        #expect(finalWalletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 2)
+        #expect(finalWalletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 0)
     }
 
     @Test func refundPendingAndManualReviewAttemptsCannotTriggerASecondDebit() throws {
@@ -394,7 +400,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         }
     }
 
-    @Test func missingRefundFundingSnapshotMovesAttemptToManualReviewWithoutMintingCoconuts() throws {
+    @Test func legacyRefundPendingDoesNotNeedFundingSnapshotToFulfill() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let (name, defaults) = try isolatedDefaults()
@@ -414,9 +420,10 @@ struct ShopPurchaseAttemptRecoveryTests {
         context.insert(attempt)
         try context.save()
         let base = AppServices(modelContainer: container)
+        let inventory = UserDefaultsShopInventoryManager(defaults: defaults)
         let services = appServices(
             base: base,
-            replacingInventoryWith: UserDefaultsShopInventoryManager(defaults: defaults)
+            replacingInventoryWith: inventory
         )
 
         let results = ShopPurchaseRecoveryService.settleRecoverable(
@@ -425,10 +432,10 @@ struct ShopPurchaseAttemptRecoveryTests {
             maximumCount: 1
         )
 
-        #expect(results.first?.disposition == .manualReview)
-        #expect(attempt.state == .manualReview)
-        #expect(attempt.lastError == "missingFundingSnapshot")
+        #expect(results.first?.disposition == .fulfilled)
+        #expect(attempt.state == .fulfilled)
         #expect(buyer.coconutBalance == 0)
+        #expect(inventory.consumableSnapshot().backdatePassCount == 3)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 

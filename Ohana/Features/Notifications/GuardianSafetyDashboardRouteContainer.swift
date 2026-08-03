@@ -357,9 +357,9 @@ private struct GuardianSafetyDashboardContentView: View {
                         .font(OhanaFont.body(.semibold))
                 }
                 Text(t(
-                    "最多 3 位 App 内守护人、星期计划、宽限期、两次克制提醒。无试用，不增加椰子奖励或扭蛋概率。",
-                    "Up to three in-app guardians, weekday schedules, a grace period, and two restrained alerts. No trial and no coconut or gacha advantage.",
-                    "Bis zu drei App-Vertrauenspersonen, Wochentage, Karenzzeit und zwei zurückhaltende Hinweise. Kein Probeabo und keine Kokosnuss- oder Gacha-Vorteile."
+                    "让已同意的亲友一起守护。最多 3 位 App 内守护人、星期计划、宽限期和两次克制提醒；不增加椰子奖励或扭蛋概率。",
+                    "Let trusted people who accepted your invitation help look out for you. Includes up to three in-app guardians, weekday schedules, a grace period, and two restrained alerts; no coconut or gacha advantage.",
+                    "Lass eingeladene Vertrauenspersonen mit auf dich achten. Enthalten sind bis zu drei App-Vertrauenspersonen, Wochentage, Karenzzeit und zwei zurückhaltende Hinweise; ohne Kokosnuss- oder Gacha-Vorteile."
                 ))
                 .font(OhanaFont.footnote())
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -541,9 +541,9 @@ private struct GuardianSafetyDashboardContentView: View {
             Text(t("我的守护计划", "My guardian schedule", "Mein Schutzplan"))
         } footer: {
             Text(t(
-                "默认 20:00 截止、60 分钟宽限。第 1 个漏签守护日仅记录；第 2 日提交首次推送；第 3 日最多跟进一次。APNs 为尽力而为，只能表述服务器尚未收到打卡。",
-                "Default: 20:00 deadline and 60-minute grace. The first missed guard day is recorded; day two submits the first alert; day three submits at most one follow-up. APNs is best effort and only means the server has not received a check-in.",
-                "Standard: 20:00 Uhr und 60 Minuten Karenz. Der erste fehlende Schutztag wird erfasst, am zweiten wird der erste Hinweis eingereicht, am dritten höchstens eine Nachfrage. APNs arbeitet nach bestem Bemühen; der Server hat nur noch keinen Check-in erhalten."
+                "默认 20:00 截止、60 分钟宽限。第 1 个漏签守护日提交首次推送，第 2 个漏签守护日最多跟进一次，此后不重复轰炸。APNs 为尽力而为，只能表述服务器尚未收到平安确认。",
+                "Default: 20:00 deadline and 60-minute grace. The first missed guard day submits the first alert; the second submits at most one follow-up, with no repeated alerts after that. APNs is best effort and only means the server has not received a safety confirmation.",
+                "Standard: 20:00 Uhr und 60 Minuten Karenz. Am ersten fehlenden Schutztag wird der erste Hinweis eingereicht, am zweiten höchstens eine Nachfrage; danach folgen keine weiteren Hinweise. APNs arbeitet nach bestem Bemühen; der Server hat nur noch keine Bestätigung erhalten."
             ))
         }
     }
@@ -934,16 +934,16 @@ private struct GuardianSafetyDashboardContentView: View {
         case .initialSubmitted: t("首次推送已提交", "Initial alert submitted", "Erster Hinweis eingereicht")
         case .followUpSubmitted: t("跟进推送已提交", "Follow-up submitted", "Nachfrage eingereicht")
         case .acknowledged: t("已确认联系", "Contact acknowledged", "Kontakt bestätigt")
-        case .recovered: t("已恢复打卡", "Check-in resumed", "Check-in fortgesetzt")
+        case .recovered: t("已恢复平安确认", "Safety confirmation resumed", "Bestätigung fortgesetzt")
         case .closed: t("事件已关闭", "Incident closed", "Ereignis geschlossen")
         }
     }
 
     private func incidentDetail(_ incident: GuardianRemoteIncidentDTO) -> String {
         let misses = t(
-            "连续 \(incident.consecutiveMisses) 个守护日尚未收到打卡",
-            "No check-in received for \(incident.consecutiveMisses) consecutive guard days",
-            "Seit \(incident.consecutiveMisses) Schutztagen kein Check-in empfangen"
+            "连续 \(incident.consecutiveMisses) 个守护日尚未收到平安确认",
+            "No safety confirmation received for \(incident.consecutiveMisses) consecutive guard days",
+            "Seit \(incident.consecutiveMisses) Schutztagen keine Bestätigung empfangen"
         )
         switch incident.status {
         case .initialSubmitted, .followUpSubmitted:
@@ -951,7 +951,7 @@ private struct GuardianSafetyDashboardContentView: View {
         case .acknowledged:
             return t("守护人已表示联系到本人；这不是签到。", "A guardian reported making contact; this is not a check-in.", "Eine Vertrauensperson meldete Kontakt; dies ist kein Check-in.")
         case .recovered:
-            return t("服务器后来收到新的本人签到，事件已关闭。", "The server later received a new owner check-in and closed the incident.", "Der Server erhielt später einen neuen Check-in und schloss das Ereignis.")
+            return t("服务器后来收到新的本人平安确认，事件已关闭。", "The server later received a new owner safety confirmation and closed the incident.", "Der Server erhielt später eine neue Bestätigung und schloss das Ereignis.")
         case .monitoring, .closed:
             return misses
         }

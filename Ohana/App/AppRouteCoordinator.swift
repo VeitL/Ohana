@@ -88,6 +88,7 @@ enum AppSheetRoute: Hashable, Identifiable {
     case humanWorkout(UUID)
     case humanWorkoutDashboard(UUID)
     case humanMetrics(UUID)
+    case humanConditions(UUID)
     case humanReport(UUID)
     case humanExpenseQuick(UUID)
     case humanExpense(UUID)
@@ -181,6 +182,8 @@ enum AppSheetRoute: Hashable, Identifiable {
             "human-workout-dashboard-\(id.uuidString)"
         case let .humanMetrics(id):
             "human-metrics-\(id.uuidString)"
+        case let .humanConditions(id):
+            "human-conditions-\(id.uuidString)"
         case let .humanReport(id):
             "human-report-\(id.uuidString)"
         case let .humanExpenseQuick(id):
@@ -353,6 +356,12 @@ final class AppRouteCoordinator: ObservableObject {
         currentLevel: Int? = nil
     ) -> AppRoutePresentationDecision<AppSheetRoute> {
         let level = currentLevel ?? self.currentFeatureLevel
+        if case .guardianSafety = route,
+           !OnlineFeatureGate.allows(.guardianSafety) {
+            return .suppressed(
+                reason: AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: level)
+            )
+        }
         guard AppFeatureRouteGuard.allowsSheetRoute(route, currentLevel: level) else {
             return .redirected(
                 from: route,
@@ -520,6 +529,10 @@ final class AppRouteCoordinator: ObservableObject {
             }
             return .none
         case let .guardianSafetyRouteRequested(invitationCode, incidentID):
+            guard OnlineFeatureGate.allows(.guardianSafety) else {
+                AppFeatureRouteGuard.recordIntercept("onlineGateNotification:guardianSafety")
+                return .none
+            }
             resetToHome()
             presentSheet(.guardianSafety(invitationCode: invitationCode, incidentID: incidentID))
             return .none
@@ -530,12 +543,18 @@ final class AppRouteCoordinator: ObservableObject {
 
     @discardableResult
     func handleExternalURL(_ url: URL) -> Bool {
-        guard let route = OhanaExternalRoute.parse(url) else { return false }
+        guard let route = OhanaExternalRoute.parse(url),
+              AppFeatureRouteGuard.allowsExternalRoute(route)
+        else { return false }
         handleExternalRoute(route)
         return true
     }
 
     func handleExternalRoute(_ route: OhanaExternalRoute) {
+        guard AppFeatureRouteGuard.allowsExternalRoute(route) else {
+            AppFeatureRouteGuard.recordIntercept("onlineGateExternal:\(route)")
+            return
+        }
         resetToHome()
         switch route {
         case let .taskCenter(focusedItemID):

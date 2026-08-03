@@ -159,23 +159,50 @@ struct ShopTreePurchaseRecoveryTests {
         let services = AppServices(modelContainer: container)
         let item = try #require(ShopCatalog.item(id: "boost_tree"))
         let buyer = Human(name: "Buyer")
-        buyer.coconutBalance = item.cost
+        buyer.coconutBalance = 0
+        let attemptID = UUID()
+        let purchasedAt = Date()
+        let transactionKey = "shop:\(item.id):\(buyer.id.uuidString):\(attemptID.uuidString)"
+        let attempt = ShopPurchaseAttempt(
+            id: attemptID,
+            transactionKey: transactionKey,
+            itemId: item.id,
+            buyerHumanId: buyer.id.uuidString,
+            price: item.cost,
+            state: .purchased,
+            fundingContributionsJSON: try encoded([
+                ShopPurchaseFundingContribution(humanID: buyer.id, amount: item.cost)
+            ]),
+            fulfillmentPayloadJSON: try encoded(
+                ShopPurchaseFulfillmentPayload(purchasedAt: purchasedAt)
+            ),
+            createdAt: purchasedAt,
+            updatedAt: purchasedAt
+        )
+        let debit = CoconutLedgerEntry(
+            transactionKey: transactionKey,
+            accountKey: CoconutAccountKey.human(buyer.id),
+            ownerKind: .human,
+            ownerId: buyer.id.uuidString,
+            ownerName: buyer.name,
+            delta: -item.cost,
+            balanceBefore: item.cost,
+            balanceAfter: 0,
+            entryKind: .spend,
+            source: .shop,
+            title: "Tree Energy",
+            emoji: item.emoji,
+            actorId: buyer.id.uuidString,
+            actorName: buyer.name,
+            sourceModelName: "ShopCatalog",
+            sourceModelId: item.id,
+            occurredAt: purchasedAt,
+            createdAt: purchasedAt
+        )
         context.insert(buyer)
+        context.insert(attempt)
+        context.insert(debit)
         try context.save()
-
-        let purchase = ShopPurchaseCommandService.purchase(
-            item: item,
-            buyer: buyer,
-            itemName: "Tree Energy",
-            context: context,
-            questManager: services.questManager,
-            wallet: services.coconutWallet,
-            careLedger: services.careLedger
-        )
-        let attemptID = try #require(purchase.attemptID)
-        let attempt = try #require(
-            context.fetch(FetchDescriptor<ShopPurchaseAttempt>()).first { $0.id == attemptID }
-        )
 
         #expect(services.shopPurchaseFulfillment.fulfillConsumable(
             item: item,
@@ -238,6 +265,11 @@ struct ShopTreePurchaseRecoveryTests {
         let schema = Schema(ArkSchemaV92.models)
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    private func encoded(_ value: some Encodable) throws -> String {
+        let data = try JSONEncoder().encode(value)
+        return try #require(String(data: data, encoding: .utf8))
     }
 
     private func restore(_ value: Any?, forKey key: String, defaults: UserDefaults) {

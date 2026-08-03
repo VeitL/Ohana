@@ -244,7 +244,7 @@ struct GrowthUnlockPolicyTests {
         }
     }
 
-    @Test func visibleHomeTabsOnlyAppendWhenOasisUnlocksBeforeGrandfatheredPlants() {
+    @Test func committedGiftRevealsOasisBeforeCeremonyAndKeepsGrandfatheredPlantsOrdered() {
         PlantUnlockPolicy.clearExistingPlantData()
         defer { PlantUnlockPolicy.clearExistingPlantData() }
 
@@ -260,19 +260,18 @@ struct GrowthUnlockPolicyTests {
         defaults.set(false, forKey: StarterGiftStorageKey.ceremonySeen)
 
         #expect(AppFeatureRouteGuard.allowsHomeTab(.plants, currentLevel: 3, starterGiftDefaults: defaults))
-        let beforeOasisUnlock = AppFeatureRouteGuard.visibleHomeTabs(
+        let afterGiftCommit = AppFeatureRouteGuard.visibleHomeTabs(
             currentLevel: 3,
             starterGiftDefaults: defaults
         )
-        #expect(beforeOasisUnlock == [.home, .calendar])
+        #expect(afterGiftCommit == [.home, .calendar, .oasis, .plants])
 
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
 
-        let afterOasisUnlock = AppFeatureRouteGuard.visibleHomeTabs(
+        let afterCeremony = AppFeatureRouteGuard.visibleHomeTabs(
             currentLevel: 3,
             starterGiftDefaults: defaults
         )
-        #expect(afterOasisUnlock == [.home, .calendar, .oasis, .plants])
-        #expect(Array(afterOasisUnlock.prefix(beforeOasisUnlock.count)) == beforeOasisUnlock)
+        #expect(afterCeremony == afterGiftCommit)
     }
 }

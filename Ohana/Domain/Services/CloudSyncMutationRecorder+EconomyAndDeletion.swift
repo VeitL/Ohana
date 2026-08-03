@@ -324,6 +324,40 @@ nonisolated extension CloudSyncMutationRecorder {
 
     @discardableResult
     static func markDeleted(
+        _ condition: HumanHealthCondition,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markHumanScopedDeleted(
+            HumanHealthCondition.self,
+            id: condition.id,
+            humanId: condition.humanId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ observation: HumanHealthObservation,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markHumanScopedDeleted(
+            HumanHealthObservation.self,
+            id: observation.id,
+            humanId: observation.humanId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
         _ item: WishlistItem,
         context: ModelContext,
         deletedAt: Date = Date(),

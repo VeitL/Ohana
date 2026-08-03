@@ -12,13 +12,12 @@ import SwiftUI
 struct ZenShell: View {
     @Binding var snapshot: ZenPresenceSnapshot
     @Binding var oasisSnapshot: ZenOasisSnapshot
+    let starterJourney: StarterJourneyExperienceProjection
     let actions: ZenShellActions
     let profileTransitionNamespace: Namespace.ID
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
-    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab: ZenTab = .home
-    @State private var requestedAutoCheckInToastSubjectID: String?
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -40,17 +39,6 @@ struct ZenShell: View {
         .tint(Color.goPrimary)
         .tabBarMinimizeBehavior(.onScrollDown)
         .accessibilityIdentifier("zen-native-tab-view")
-        .task(id: ownerAutoCheckInKey) {
-            await autoCheckInOwnerIfNeeded()
-        }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { await autoCheckInOwnerIfNeeded() }
-        }
-    }
-
-    private var ownerAutoCheckInKey: String {
-        "\(snapshot.dayKey):\(snapshot.ownerID ?? "none"):\(snapshot.isReady)"
     }
 
     @ViewBuilder
@@ -59,7 +47,7 @@ struct ZenShell: View {
         case .home:
             ZenHomeView(
                 snapshot: $snapshot,
-                requestedAutoCheckInToastSubjectID: $requestedAutoCheckInToastSubjectID,
+                starterJourney: starterJourney,
                 actions: actions,
                 profileTransitionNamespace: profileTransitionNamespace
             )
@@ -131,24 +119,6 @@ struct ZenShell: View {
             .accessibilityIdentifier("zen-toolbar-settings")
         }
     }
-
-    private func autoCheckInOwnerIfNeeded() async {
-        guard scenePhase == .active,
-              snapshot.isReady,
-              let ownerID = snapshot.ownerID,
-              let index = snapshot.subjects.firstIndex(where: {
-                  $0.id == ownerID && $0.isOwner
-              }),
-              !snapshot.subjects[index].checkedToday
-        else { return }
-
-        snapshot.subjects[index].checkedToday = true
-        snapshot.subjects[index].checkedAt = Date()
-        let didCreateCheckIn = await actions.onAutoCheckInOwner()
-        guard didCreateCheckIn else { return }
-        selectedTab = .home
-        requestedAutoCheckInToastSubjectID = ownerID
-    }
 }
 
 #if DEBUG
@@ -213,6 +183,7 @@ struct ZenShell: View {
             ZenShell(
                 snapshot: .constant(snapshot),
                 oasisSnapshot: .constant(oasisSnapshot),
+                starterJourney: .empty,
                 actions: .noop,
                 profileTransitionNamespace: profileTransitionNamespace
             )

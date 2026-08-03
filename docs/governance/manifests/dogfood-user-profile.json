@@ -24,7 +24,7 @@
     "simulatorName": "iPhone 17 Dogfood",
     "bundleIdentifier": "com.guanchen.li.Ohana",
     "configuration": "Release",
-    "derivedDataPath": ".build/DerivedData/dogfood"
+    "derivedDataPath": "shared-external/DerivedData/dogfood"
   },
   "readiness": {
     "requireOnboardingComplete": true,

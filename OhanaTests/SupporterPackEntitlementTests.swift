@@ -385,6 +385,60 @@ struct SupporterPackEntitlementTests {
         #expect(await storefront.finishedTransactionIDs() == [15])
     }
 
+    @Test func verifiedUpdateWaitsForSuccessfulReconciliationBeforeFinishing() async {
+        let storefront = TestCommerceStorefront()
+        let cache = TestCommerceEntitlementCache(initialValue: false)
+        let service = CommerceEntitlementService(storefront: storefront, persistence: cache)
+        await service.start()
+        let entitlementCallsBeforeUpdate = await storefront.entitlementInvocationCount()
+        await storefront.setOffline(true)
+
+        await storefront.sendUpdate(.verified(activeTransaction(id: 16)))
+        let failedRefreshWasAttempted = await waitUntilAsync {
+            await storefront.entitlementInvocationCount() > entitlementCallsBeforeUpdate
+        }
+
+        #expect(failedRefreshWasAttempted)
+        #expect(!service.hasSupporterPack)
+        #expect(service.entitlementStatus == .temporarilyUnknown)
+        #expect(!cache.cachedSupporterPackEntitlement())
+        #expect(await storefront.finishedTransactionIDs().isEmpty)
+
+        await storefront.setOffline(false)
+        await storefront.sendUpdate(.verified(activeTransaction(id: 16)))
+        await waitUntil { service.hasSupporterPack }
+
+        #expect(service.hasSupporterPack)
+        #expect(service.entitlementStatus == .ownedVerified)
+        #expect(cache.cachedSupporterPackEntitlement())
+        #expect(await storefront.finishedTransactionIDs() == [16])
+    }
+
+    @Test func unverifiedUpdateNeverUnlocksOrFinishesBeforeLaterVerifiedUpdate() async {
+        let storefront = TestCommerceStorefront()
+        let cache = TestCommerceEntitlementCache(initialValue: false)
+        let service = CommerceEntitlementService(storefront: storefront, persistence: cache)
+        await service.start()
+
+        await storefront.sendUpdate(.unverified(
+            productID: SupporterPackCatalog.personalLifetimeProductID
+        ))
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+
+        #expect(!service.hasSupporterPack)
+        #expect(!cache.cachedSupporterPackEntitlement())
+        #expect(await storefront.finishedTransactionIDs().isEmpty)
+
+        await storefront.sendUpdate(.verified(activeTransaction(id: 17)))
+        await waitUntil { service.hasSupporterPack }
+
+        #expect(service.hasSupporterPack)
+        #expect(cache.cachedSupporterPackEntitlement())
+        #expect(await storefront.finishedTransactionIDs() == [17])
+    }
+
     @Test func verifiedRevocationUpdateRemovesCachedEntitlementAndFinishes() async {
         let storefront = TestCommerceStorefront()
         let cache = TestCommerceEntitlementCache(initialValue: true)
@@ -817,8 +871,8 @@ private actor TestCommerceStorefront: CommerceStorefrontClient {
     }
 
     func currentEntitlements(productID: String) async throws -> [CommerceStorefrontVerification] {
-        if isOffline { throw TestCommerceError.offline }
         entitlementCount += 1
+        if isOffline { throw TestCommerceError.offline }
         if !queuedEntitlementResponses.isEmpty {
             let response = queuedEntitlementResponses.removeFirst()
             if response.delayNanoseconds > 0 {
@@ -830,8 +884,8 @@ private actor TestCommerceStorefront: CommerceStorefrontClient {
     }
 
     func currentEntitlements(productIDs: Set<String>) async throws -> [CommerceStorefrontVerification] {
-        if isOffline { throw TestCommerceError.offline }
         entitlementCount += 1
+        if isOffline { throw TestCommerceError.offline }
         let response: [CommerceStorefrontVerification]
         if !queuedEntitlementResponses.isEmpty {
             let queued = queuedEntitlementResponses.removeFirst()

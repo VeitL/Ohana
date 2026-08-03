@@ -48,6 +48,25 @@ struct UITestPlantBaselineSeederTests {
         ) == 6)
     }
 
+    @Test func storeOpenFailureCountSupportsOneShotAndBoundedRepeatedFailures() {
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: []) == 0)
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: [
+            "-OHANA_UI_TEST_FAIL_STORE_OPEN_ONCE"
+        ]) == 1)
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: [
+            "-OHANA_UI_TEST_FAIL_STORE_OPEN_COUNT", "2"
+        ]) == 2)
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: [
+            "-OHANA_UI_TEST_FAIL_STORE_OPEN_COUNT", "99"
+        ]) == 8)
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: [
+            "-OHANA_UI_TEST_FAIL_STORE_OPEN_COUNT", "-3"
+        ]) == 0)
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: [
+            "-OHANA_UI_TEST_FAIL_STORE_OPEN_COUNT", "invalid"
+        ]) == 0)
+    }
+
     @Test func seedAddsMissingPlantsWithoutDuplicatingExistingBaseline() throws {
         let container = try makeInMemoryContainer()
         let services = AppServices(modelContainer: container)

@@ -30,6 +30,17 @@ nonisolated enum AppCapabilityProfile: Equatable, Sendable {
         current == .family
     }
 
+    /// The minimum-data online guardian is a separate future service from
+    /// CloudKit collaboration. Solo 1.0 does not compile an authority that can
+    /// turn it on, even if a runtime configuration is accidentally supplied.
+    nonisolated static var shipsGuardianSafetyCapabilities: Bool {
+        #if OHANA_GUARDIAN_CAPABILITIES
+            true
+        #else
+            false
+        #endif
+    }
+
     /// Runtime work requires both a signed Family profile and the product gate.
     static var permitsCloudSyncRuntime: Bool {
         shipsCloudFamilyCapabilities && OnlineFeatureGate.allows(.onlineCollaboration)

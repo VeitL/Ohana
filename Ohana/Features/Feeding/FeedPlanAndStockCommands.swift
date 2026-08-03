@@ -91,6 +91,7 @@ enum TreatFeedCommand {
 struct SaveFeedPlanCommandResult {
     let mode: FeedOperatingMode
     let targetCount: Int
+    let affectedPetIDs: Set<UUID>
     let events: [Event]
     let planReminders: [Reminder]
     let stockReminders: [Reminder]
@@ -105,13 +106,18 @@ enum SaveFeedPlanCommand {
         kind: FeedRuleKind,
         draft: FeedPlanDraft,
         allEvents: [Event],
-        context: ModelContext
+        context: ModelContext,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
+        persist: @MainActor (ModelContext) throws -> Void = { context in
+            _ = try FeedCommandPersistence.save(context: context)
+        }
     ) throws -> SaveFeedPlanCommandResult {
         let normalizedTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
         guard !normalizedTargets.isEmpty else {
             return SaveFeedPlanCommandResult(
                 mode: FeedOperatingMode.resolved(pet: pet, allEvents: allEvents),
                 targetCount: 0,
+                affectedPetIDs: [],
                 events: allEvents,
                 planReminders: [],
                 stockReminders: [],
@@ -120,64 +126,91 @@ enum SaveFeedPlanCommand {
         }
         let feedPlanGroupId = normalizedTargets.count > 1 ? UUID().uuidString : ""
         let targetMode: FeedOperatingMode = kind == .manualReminder ? .manualReminder : .autoFeeder
-        var latestEvents = allEvents
+        let expectedMealCount = draft.dailyCount
+        var pendingSuppressionEffects = CarePlanCalendarSync.PendingSideEffects.none
+        var pendingScheduleEffects = DomainSchedulePendingEffects.none
+        for target in normalizedTargets {
+            pendingSuppressionEffects.merge(CarePlanCalendarSync.stageDefaultPlanSuppression(
+                kind: "feed",
+                pet: target,
+                context: context
+            ))
+        }
+
+        var latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: allEvents)
         var planReminders: [Reminder] = []
         var stockReminders: [Reminder] = []
 
-        for target in normalizedTargets {
-            let result = try FeedingPlanWriter.replacePlan(
-                pet: target,
-                draft: draft,
-                allEvents: latestEvents,
-                context: context,
-                feedPlanGroupId: feedPlanGroupId
-            )
-            latestEvents = latestEvents
-                .filter { existing in
-                    switch kind {
-                    case .manualReminder:
-                        !FeedRuleMetadata.isManualReminderEvent(existing, pet: target)
-                    case .autoFeeder:
-                        !FeedRuleMetadata.isAutoFeederEvent(existing, pet: target)
-                    }
-                } + result.events
-
-            if kind == .manualReminder {
-                try FeedingPlanWriter.deletePlan(
+        do {
+            for target in normalizedTargets {
+                let result = try FeedingPlanWriter.replacePlan(
                     pet: target,
-                    kind: .autoFeeder,
+                    draft: draft,
                     allEvents: latestEvents,
-                    context: context
+                    context: context,
+                    feedPlanGroupId: feedPlanGroupId,
+                    suppressDefaultPlan: false,
+                    saveChanges: false
                 )
+                pendingScheduleEffects.merge(result.pendingScheduleEffects)
+                latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: latestEvents)
+                guard result.events.count == expectedMealCount else {
+                    throw FeedCommandPersistenceError.persistenceFailed(nil)
+                }
+
+                if kind == .manualReminder {
+                    pendingScheduleEffects.merge(try FeedingPlanWriter.deletePlan(
+                        pet: target,
+                        kind: .autoFeeder,
+                        allEvents: latestEvents,
+                        context: context,
+                        save: false
+                    ))
+                    planReminders.append(contentsOf: result.reminders)
+                } else {
+                    pendingScheduleEffects.merge(try FeedingPlanWriter.deactivateManualReminderOperations(
+                        pet: target,
+                        allEvents: latestEvents,
+                        context: context,
+                        saveChanges: false
+                    ))
+                }
                 latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: latestEvents)
             }
 
-            if kind == .manualReminder {
-                planReminders.append(contentsOf: result.reminders)
-            } else {
-                try FeedingPlanWriter.deactivateManualReminderOperations(
-                    pet: target,
-                    allEvents: latestEvents,
-                    context: context
-                )
+            try persist(context)
+        } catch {
+            context.rollback()
+            throw error
+        }
+
+        pendingSuppressionEffects.commit(notifications: notifications)
+        pendingScheduleEffects.commit(notifications: notifications)
+        latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: latestEvents)
+        for target in normalizedTargets {
+            latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: [])
+            SetFeedModeCommand.run(targetMode, pet: target)
+            if kind == .autoFeeder {
                 _ = FeedAutoLogMaterializer.materializeDueLogs(
                     pet: target,
                     allEvents: latestEvents,
                     context: context
                 )
+                latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: [])
             }
-            SetFeedModeCommand.run(targetMode, pet: target)
             stockReminders.append(contentsOf: FeedingPlanWriter.rebuildFoodStockReminders(
                 pet: target,
                 allEvents: latestEvents,
                 context: context
             ))
+            latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: [])
         }
 
         latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: latestEvents)
         return SaveFeedPlanCommandResult(
             mode: targetMode,
             targetCount: normalizedTargets.count,
+            affectedPetIDs: Set(normalizedTargets.map(\.id)),
             events: latestEvents,
             planReminders: planReminders,
             stockReminders: stockReminders,

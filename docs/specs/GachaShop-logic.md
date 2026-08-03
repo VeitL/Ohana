@@ -1,6 +1,7 @@
 # Gacha + Shop 规则书
 
 确认日期：2026-06-13  
+最近更新：2026-07-24
 适用范围：Phase 7 Gacha + Shop 模块；覆盖盲盒抽取、扭蛋概率与期望值、商店价格、商店购买与发放、App Icon、2.5D 头像券、隐藏的线下兑换价格表、Gacha / Shop 云同步与备份演进。
 
 本规则书覆盖宪法 D2/D3/D4/D7/D13/D14/G1/G2/G3/G4/G7/G8/G10 在 Gacha + Shop 模块中的首发语义。Shop/Gacha 是椰子经济的消费出口；所有钱包写入必须满足 Economy 规则书的合资、冻结、账本可重放与服务层硬边界。
@@ -12,11 +13,14 @@
 - Gacha 抽取消费支持岛屿合资：当前抽取人 / 买家优先出资，余额不足时从其他未冻结人类钱包补差额；藏品、抽取日志和即时奖励仍归抽取人，出资人只记录补差支出。
 - 当前 active human 缺失时，Gacha / Shop 可回退第一位可写人类；若 active human 明确存在但已离世，则阻止操作并显示冻结反馈，不自动切人。被删除的人类已物理移除，不是可选择钱包。
 - Gacha 默认系列始终可抽；Noir 系列必须在同一 owner 集齐 Nana 8 个普通款后解锁；隐藏款必须在同一系列普通款集齐后才可能产出。
-- Shop 价格按首发经济合理性固定：金色幸运券 80🥥，Streak 保护盾 180🥥，补签券 ×1 为 240🥥，补签券 ×3 为 580🥥，2.5D 头像券 1200🥥。
-- 保护盾是事前保险，必须低于确定性事后补救的补签券；补签包保留折扣但不能比保护盾便宜到反向激励。
+- Shop 价格按首发经济合理性固定：金色幸运券 20🥥，Streak 保护盾 180🥥，2.5D 头像券 1200🥥。
+- 补签券写入路径已随旧打卡系统退役，因此不再陈列或新增出售；旧 ×1/×3 目录项只保留 240🥥/580🥥 的历史订单履约与备份恢复能力，不删除既有库存。
+- 生命树能量只在 Oasis 内注入，不在 Shop 重复陈列；历史 `boost_tree` / `boost_tree_large` 订单仍保留可解析 fulfilment，以免升级后成为死单。
 - 线下兑换功能首发仍由 `CoconutExchangeFeatureGate` 关闭；但保留的兑换价格表必须线性一致。JPY 为 500🥥→¥75、1000🥥→¥150、2000🥥→¥300；CNY 为 500🥥→¥2.5、1000🥥→¥5、2000🥥→¥10。
-- App Icon 购买必须先完成 Shop 扣款 / 账本事实，再尝试系统图标切换；切换成功后才标记拥有和选中，切换失败必须按原出资人退款。
+- Shop 为最终销售：用户确认前可取消，校验或保存失败不得扣款；钱包支出与购买事实一旦同事务提交成功，不允许撤销或退款。应用暂时失败时保留 entitlement / outbox，自动或手动重试，不得再次扣款。
+- App Icon 购买先原子提交 Shop 扣款、账本与所有权事实，再尝试系统图标切换；系统拒绝或暂时失败不撤销所有权，用户可从百宝箱重试应用。
 - Shop 所有道具发放必须收进服务层 fulfilment 边界，不由 View 直接承担业务发放。View 只负责触发购买、展示结果、打开后续 picker / sheet。
+- 每个 catalog ID 必须在单一 `ShopProductApplicationCatalog` 中映射到实际应用路径；有宠物 / 狗狗前置条件的效果必须在扣款前失败关闭，未知 ID 不得出售。
 - `purchasedShopItems` 的非消耗品所有权必须从 `UserDefaults` 迁入 SwiftData append-only 购买记录；偏好与设备态（当前图标、称号、特效开关）继续保留在 `UserDefaults`。
 - GachaOwnedItem、GachaDrawLog 与 Shop 非消耗品购买记录必须接入 CloudSync serializer / applier；首发不启用 CloudKit，但同步地基语义必须闭合。
 - Shop / Gacha 只允许对未离世的人类钱包消费；2.5D 头像升级与 Popout card 目标只允许活跃人类 / 宠物。
@@ -32,24 +36,24 @@
 - GS-007：Gacha 对离世 active human 必须抛冻结错误；对缺失 active human 可选择第一位可写人类；没有可写人类时不可抽。
 - GS-008：Shop 分类 `cashExchange` 在 `CoconutExchangeFeatureGate.isEnabled == false` 时不可见；直接调用 create/confirm/cancel 也不得写入请求或钱包。
 - GS-009：Shop 正式购买必须通过 `ShopPurchaseCommandService` / `RewardEconomyCommandExecutor`；买家不足时使用岛屿合资，仍不得透支，不得写 system 钱包。
-- GS-010：Shop 道具发放必须在购买成功后由 fulfilment 服务完成；发放失败必须退款给实际出资人，并在 metadata 中记录失败原因。
-- GS-011：App Icon 购买顺序为扣款成功 -> setIcon -> 成功标记拥有 / 选中；setIcon 失败 -> 退款 -> 不标记拥有 / 不选中。
+- GS-010：Shop 道具发放必须在购买成功后由 fulfilment 服务完成；发放失败必须保留已购买 entitlement / outbox、记录原因并重试，禁止生成补偿退款或删除所有权。
+- GS-011：App Icon 购买顺序为原子提交扣款 / 账本 / 所有权 -> setIcon；setIcon 失败只影响当前设备选择状态，不影响永久所有权，重试应用不得再次扣款。
 - GS-012：非消耗品所有权是持久业务事实，存入 SwiftData append-only 购买记录并参与备份 / 恢复 / CloudSync；设备偏好仍留在 `UserDefaults`。
-- GS-013：消耗品库存（补签券、头像券库存、保护盾有效期、幸运券状态）是当前设备消费状态，首发继续由现有 inventory/defaults 管理，但发放入口必须服务化。
-- GS-014：2.5D 头像券购买入口（含 Members 建档流程）必须复用 Shop 消费语义：合资、冻结钱包、账本、退款边界一致。
+- GS-013：当前在售消耗品（头像券库存、保护盾有效期、幸运券状态）是当前设备消费状态，首发继续由现有 inventory/defaults 管理，但发放入口必须服务化；补签券仅作为旧订单/备份兼容库存保留，不得重新陈列。
+- GS-014：2.5D 头像券购买入口（含 Members 建档流程）必须复用 Shop 消费语义：合资、冻结钱包、账本、最终销售与幂等 fulfilment 边界一致。
 - GS-015：2.5D 升级目标和 Popout card 目标只允许活跃人类 / 宠物；离世对象保留历史，不参与新外观消费。
 - GS-016：隐藏兑换价格表虽然首发不可达，仍必须保持每个国家同一线性汇率，避免未来打开时出现反直觉套利。
-- GS-017：Gacha / Shop 规则必须有自动测试护栏：概率总和与区间、价格表、汇率线性、合资消费、冻结拒绝、App Icon 失败退款、SwiftData 所有权迁移、CloudSync serializer / applier。
+- GS-017：Gacha / Shop 规则必须有自动测试护栏：概率总和与区间、价格表、catalog 全映射、应用前置条件、合资消费与执行前重校验、冻结拒绝、App Icon 失败保留所有权、重试不重复扣款、SwiftData 所有权迁移、CloudSync serializer / applier。
 
 ## 九类全域问题雷达
 
 1. **表面与入口完整性**：入口包括 GrowthUnlock / route guard、FunctionMenu、Oasis 弹层、Shop route container、Gacha route container、Shop View 命令、Gacha service 直接调用、Members 建档头像券购买、备份 / 恢复、CloudSync serializer / applier。首发兑换入口由 `CoconutExchangeFeatureGate` 关闭，但价格表仍作为未来地基保留。
-2. **可用性与操作闭环**：Gacha 余额不足必须按岛屿可支配余额判断；Shop 购买失败需显示缺口或冻结反馈；App Icon 系统失败必须退款且不留下“已拥有”错觉；发放失败必须显示退款反馈。
+2. **可用性与操作闭环**：Gacha 余额不足必须按岛屿可支配余额判断；Shop 购买失败需显示缺口、前置对象或冻结反馈；确认页展示每位出资额与“购买后不可撤销/退款”；App Icon 或库存应用失败必须展示保留所有权和重试入口。
 3. **必要性与产品价值**：Gacha / Shop 均是 D2 留存经济的消费出口，首发必要；线下兑换为未来能力，首发必要性只在地基一致性；非消耗品 SwiftData 所有权迁移必要，因为所有权是跨设备 / 备份业务事实。
-4. **业务合理性与数值合理性**：大奖 5% 使期望返还过高，降至 2%；幸运券、保护盾、补签券与头像券价格按收益确定性和月级目标调整；兑换小额不得比大额费率更优或更差。
+4. **业务合理性与数值合理性**：大奖 5% 使期望返还过高，降至 2%；幸运券、保护盾与头像券价格按收益确定性和月级目标调整；没有有效消费端的旧补签券停止销售；兑换小额不得比大额费率更优或更差。
 5. **身份 / 归属 / 隐私边界**：抽取日志与藏品归买家；合资者只出资不获得藏品；冻结钱包不能消费 / 获奖；system 钱包不参与 Shop/Gacha 正式消费；隐私人类钱包计入合资可支配总额但 UI 明细仍按 Economy 隐私规则处理。
-6. **状态机、时间与并发**：购买状态为 pending -> purchased -> fulfilled / refunded；Gacha 抽取为 funded -> rolled -> logged -> walletApplied -> saved；重复命令需依靠 transactionKey / append-only record 避免非消耗品重复拥有。
-7. **副作用顺序与派生状态**：核心事实和钱包先于 UI 副作用；App Icon、库存、外观、Oasis XP、购买所有权属于 fulfilment；失败要退款并刷新投影；购买成功后发布 read-model revision。
+6. **状态机、时间与并发**：购买状态为 pending -> purchased -> fulfilling -> fulfilled，无法自动处理时进入 manualReview；旧 `refundPending/refunded` 仅为数据兼容，新购买不得进入。Gacha 抽取为 funded -> rolled -> logged -> walletApplied -> saved；重复命令依靠 transactionKey / append-only record 阻止重复扣款和重复所有权。
+7. **副作用顺序与派生状态**：核心事实、钱包与 entitlement 先于设备副作用；App Icon、库存、外观与历史 Oasis XP 属于 fulfilment；失败只重试应用并刷新投影，不能逆转已提交购买；购买成功后发布 read-model revision。
 8. **持久化与演进边界**：新增 `ShopPurchaseRecord` 需 schema 升版、轻量迁移、启动旧 `purchasedShopItems` 导入、备份兼容、CloudSync 注册；Gacha records 需 serializer / applier 闭合，但不启用 CloudKit。
 9. **验证与可观测性**：自动测试覆盖服务层不变量；无法自动验收的真实系统图标切换和 UI 遍历写入统一中文 track list。
 
@@ -68,11 +72,13 @@ Gacha 抽取：
 Shop 购买：
 
 1. `pendingPurchase`：用户确认某 ShopItem。
-2. `fundingPlanned`：用 Shop 合资计划确认资金足够。
-3. `purchased`：写 CareLedgerEvent 与钱包支出。
-4. `fulfilled`：fulfilment 服务发放库存 / 所有权 / 外观效果 / App Icon。
-5. `refunded`：fulfilment 失败时按原出资人退款。
-6. `visible`：UI 更新 toast、picker、库存或装备状态。
+2. `preflight`：确认 catalog 有实际应用、所需 active Pet / Dog 存在，并生成合资预览。
+3. `fundingRevalidated`：实际执行前按当前钱包与冻结状态重新校验每位出资额；失败则不写任何事实。
+4. `purchased`：同事务写 CareLedgerEvent、钱包支出、购买 entitlement 与 fulfilment outbox；从此不可撤销或退款。
+5. `fulfilling`：服务幂等应用库存 / 所有权 / 外观效果 / App Icon；失败保持 outbox 并有界重试。
+6. `manualReview`：自动重试无法解决时保留购买，百宝箱提供手动重试；不得再次扣款。
+7. `fulfilled`：应用 checkpoint 与完成状态提交。
+8. `visible`：UI 更新 toast、picker、库存或装备状态。
 
 非消耗品所有权迁移：
 
@@ -82,17 +88,13 @@ Shop 购买：
 4. `migrationMarked`：写入迁移标记；旧 key 暂保留供回退。
 5. `queryBacked`：Shop / Inventory 从 SwiftData records 聚合所有权。
 
-## 当前代码来源与差距
+## 当前代码来源
 
-- Gacha 概率与大奖当前定义在 `Ohana/Features/Gacha/GachaModels.swift:132`、`Ohana/Features/Gacha/GachaModels.swift:166`、`Ohana/Features/Gacha/GachaModels.swift:200`；当前大奖 500bp，需降至 200bp。
-- Gacha 抽取服务当前在 `Ohana/Features/Gacha/GachaModels.swift:645`，使用单人余额检查与单人扣款，需改为合资计划与冻结硬门。
-- Shop 价格当前在 `Ohana/Features/Shop/ShopCatalog.swift:207`、`Ohana/Features/Shop/ShopCatalog.swift:234`，需按本规则书重定价。
-- Shop 主购买服务已支持合资：`Ohana/Features/Economy/RewardEconomyCommands.swift:277`。
-- App Icon 当前先调用系统 setIcon 再扣款：`Ohana/Features/Shop/Views/CoconutShopView+Commands.swift:98`，需改为先扣款后副作用失败退款。
-- Shop fulfilment 当前在 View 中直接改库存 / UserDefaults：`Ohana/Features/Shop/Views/CoconutShopView+Commands.swift:287`，需收进服务层。
-- Members 建档头像券购买当前单人扣款：`Ohana/Features/Members/MemberCreationService.swift:79`，需复用 Shop 消费语义。
-- 隐藏兑换价格表当前 JPY / CNY 小额不线性：`Ohana/Models/CoconutExchangeRequest.swift:106`、`Ohana/Models/CoconutExchangeRequest.swift:124`。
-- 非消耗品所有权当前使用 `UserDefaults.purchasedShopItems`：`Ohana/Features/Shop/Views/CoconutShopView.swift:84`，需迁入 SwiftData。
+- Catalog、定价与 catalog-to-runtime 应用映射：`Ohana/Features/Shop/ShopCatalog.swift`。
+- 合资预览与原子购买命令：`Ohana/Features/Economy/RewardEconomyCommands.swift`。
+- 幂等库存 / 所有权发放：`Ohana/Features/Shop/ShopPurchaseFulfillmentService.swift`。
+- 启动恢复、手动重试与 legacy refund 状态收口：`Ohana/Features/Shop/ShopPurchaseRecoveryService.swift`。
+- Append-only 所有权与 durable outbox：`Ohana/Features/Shop/ShopPurchaseRecordStore.swift`、`Ohana/Models/ShopPurchaseAttempt.swift`。
 
 ## 边界
 

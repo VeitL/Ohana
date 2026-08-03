@@ -10,13 +10,11 @@ import SwiftUI
 
 extension PetBasicInfoDetailView {
     var profileEditAccent: Color {
-        guard profileExperienceStyle == .zen else { return Color.goPrimary }
         let value = eThemeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? Color.goPrimary : Color(hex: value)
     }
 
     var profileEditAccentForeground: Color {
-        guard profileExperienceStyle == .zen else { return Color.arkInk }
         let value = eThemeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
         let hex = value.isEmpty ? "C8F34A" : value
         return WalletPetCardTheme.prefersDarkForeground(for: hex)
@@ -119,10 +117,10 @@ extension PetBasicInfoDetailView {
                 Divider().opacity(0.1)
                 Toggle(isOn: $eHasPassportExpiry) {
                     editLabel(l.tr(zh: "护照有效期", en: "Passport expiry", de: "Pass gueltig bis"))
-                }.tint(profileExperienceStyle == .zen ? profileEditAccent : Color.goYellow)
+                }.tint(profileEditAccent)
                 if eHasPassportExpiry {
                     DatePicker("", selection: $ePassportExpiry, displayedComponents: .date)
-                        .datePickerStyle(.compact).tint(profileExperienceStyle == .zen ? profileEditAccent : Color.goYellow).labelsHidden()
+                        .datePickerStyle(.compact).tint(profileEditAccent).labelsHidden()
                 }
             }
             // 血统
@@ -162,7 +160,7 @@ extension PetBasicInfoDetailView {
                 TextField(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)"), text: $eNotes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .tint(profileExperienceStyle == .zen ? profileEditAccent : Color.goOrange)
+                    .tint(profileEditAccent)
                     .lineLimit(3 ... 6)
                     .accessibilityIdentifier("pet-basic-info-notes-input")
             }
@@ -250,7 +248,7 @@ extension PetBasicInfoDetailView {
             .frame(maxWidth: .infinity, alignment: .leading)
         } header: {
             Label(title, systemImage: icon)
-                .foregroundStyle(profileExperienceStyle == .zen ? profileEditAccent : iconColor)
+                .foregroundStyle(profileEditAccent)
         }
     }
 
@@ -343,7 +341,10 @@ extension PetBasicInfoDetailView {
             set: { newSpecies in
                 guard newSpecies != eSpecies else { return }
                 eSpecies = newSpecies
-                let firstBreed = PetBreedDatabase.breeds(for: newSpecies).first
+                let firstBreed = l.sortedCatalogValues(
+                    PetBreedDatabase.breeds(for: newSpecies),
+                    key: \.name
+                ).first
                 eBreed = firstBreed?.name ?? ""
                 eCoatColor = firstBreed?.coatColors.first?.name ?? ""
                 if let hex = firstBreed?.suggestedThemeHex {
@@ -354,7 +355,9 @@ extension PetBasicInfoDetailView {
     }
 
     var breedOptions: [String] {
-        var options = [""] + PetBreedDatabase.breeds(for: eSpecies).map(\.name)
+        var options = [""] + l.sortedCatalogKeys(
+            PetBreedDatabase.breeds(for: eSpecies).map(\.name)
+        )
         if !eBreed.isEmpty, !options.contains(eBreed) {
             options.insert(eBreed, at: 1)
         }
@@ -365,11 +368,15 @@ extension PetBasicInfoDetailView {
         let options = PetAvatarAssetCatalog.coatColors(species: eSpecies, breed: eBreed)
             ?? selectedBreedInfo?.coatColors
             ?? PetBreedDatabase.genericCoatColors
-        return uniqueColorOptions(options.map { ($0.name, $0.hex) }, current: eCoatColor)
+        return l.sortedCatalogValues(
+            uniqueColorOptions(options.map { ($0.name, $0.hex) }, current: eCoatColor),
+            key: { $0.name },
+            otherKey: nil
+        )
     }
 
     var countryOptions: [String] {
-        var options = [""] + PetBreedDatabase.countries
+        var options = [""] + PetBreedDatabase.sortedCountries(l: l)
         if !eBirthCountry.isEmpty, !options.contains(eBirthCountry) {
             options.insert(eBirthCountry, at: 1)
         }
@@ -379,7 +386,7 @@ extension PetBasicInfoDetailView {
     var birthCityOptions: [String] {
         let cities = eBirthCountry.isEmpty
             ? [""]
-            : [""] + PetBreedDatabase.cities(for: eBirthCountry)
+            : [""] + PetBreedDatabase.sortedCities(for: eBirthCountry, l: l)
         var options = cities
         if !eBirthCity.isEmpty, !options.contains(eBirthCity) {
             options.insert(eBirthCity, at: 1)
@@ -400,7 +407,8 @@ extension PetBasicInfoDetailView {
         petProfileEditableRow(label) {
             Picker("", selection: selection) {
                 ForEach(options, id: \.self) { option in
-                    Text(option.isEmpty ? petProfileEmptyValue : option).tag(option)
+                    Text(option.isEmpty ? petProfileEmptyValue : PetBreedDatabase.localizedRegionName(option, l: l))
+                        .tag(option)
                 }
             }
             .pickerStyle(.menu)
@@ -409,7 +417,8 @@ extension PetBasicInfoDetailView {
         } stackedContent: {
             Picker("", selection: selection) {
                 ForEach(options, id: \.self) { option in
-                    Text(option.isEmpty ? petProfileEmptyValue : option).tag(option)
+                    Text(option.isEmpty ? petProfileEmptyValue : PetBreedDatabase.localizedRegionName(option, l: l))
+                        .tag(option)
                 }
             }
             .pickerStyle(.menu)
@@ -450,7 +459,7 @@ extension PetBasicInfoDetailView {
                         .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(
                             isSelected
-                                ? (profileExperienceStyle == .zen ? profileEditAccent : Color.goPrimary)
+                                ? profileEditAccent
                                 : Color.ohanaPrimaryText.opacity(0.82)
                         )
                         .padding(.horizontal, 10)
@@ -458,7 +467,7 @@ extension PetBasicInfoDetailView {
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .background(
                             isSelected
-                                ? (profileExperienceStyle == .zen ? profileEditAccent.opacity(0.16) : Color.goPrimary.opacity(0.16))
+                                ? profileEditAccent.opacity(0.16)
                                 : Color.ohanaPrimaryText.opacity(0.06),
                             in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                         )
@@ -487,7 +496,9 @@ extension PetBasicInfoDetailView {
     }
 
     func localizedBreedSummary(_ breed: String) -> String {
-        breed.isEmpty ? l.tr(zh: "未填写品种", en: "Breed not set", de: "Rasse nicht festgelegt") : breed
+        breed.isEmpty
+            ? l.tr(zh: "未填写品种", en: "Breed not set", de: "Rasse nicht festgelegt")
+            : l.resourceName(breed)
     }
 
     func colorOptionGrid(title: String, selection: Binding<String>, items: [(name: String, hex: String)]) -> some View {
@@ -503,7 +514,7 @@ extension PetBasicInfoDetailView {
                                 .fill(Color(hex: item.hex))
                                 .frame(width: 14, height: 14) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                 .overlay(Circle().strokeBorder(Color.primary.opacity(0.14), lineWidth: 1))
-                            Text(item.name)
+                            Text(l.resourceName(item.name))
                                 .font(OhanaFont.adaptive(size: 12, weight: selection.wrappedValue == item.name ? .black : .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
@@ -517,7 +528,7 @@ extension PetBasicInfoDetailView {
                         .padding(.vertical, 7)
                         .background(
                             selection.wrappedValue == item.name
-                                ? (profileExperienceStyle == .zen ? profileEditAccent : Color.goPrimary)
+                                ? profileEditAccent
                                 : Color.ohanaPrimaryText.opacity(0.07),
                             in: Capsule()
                         )

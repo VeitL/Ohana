@@ -14,20 +14,23 @@ import WidgetKit
 protocol SystemSurfaceSnapshotRefreshing: AnyObject {
     func start()
     func scheduleRefresh(reason: String)
+    func prepareForAppReset()
+    func finishAppReset()
 }
 
 @MainActor
 final class SystemSurfaceSnapshotCoordinator: SystemSurfaceSnapshotRefreshing {
-    private let modelContainer: ModelContainer
-    private let activeHumanSelection: ActiveHumanSelecting
-    private let commerce: CommerceEntitlementService
     private let revisions: DomainRevisionPublishing
     private let store: SystemSurfaceSnapshotStore
-    private let workloadPolicy: AppWorkloadPolicy
     private let reloadWidget: () -> Void
+    private let debounceMilliseconds: () -> Int64
+    private let allowsSystemWidgets: () -> Bool
+    private let loadSnapshot: () async throws -> TaskCenterSnapshot
     private var subscriptions: Set<AnyCancellable> = []
     private var refreshTask: Task<Void, Never>?
     private var didStart = false
+    private var refreshGeneration: UInt64 = 0
+    private var isResetInProgress = false
 
     init(
         modelContainer: ModelContainer,
@@ -40,12 +43,39 @@ final class SystemSurfaceSnapshotCoordinator: SystemSurfaceSnapshotRefreshing {
             WidgetCenter.shared.reloadTimelines(ofKind: OhanaSystemSurfaceConstants.todayCareWidgetKind)
         }
     ) {
-        self.modelContainer = modelContainer
-        self.activeHumanSelection = activeHumanSelection
-        self.commerce = commerce
         self.revisions = revisions
         self.store = store
-        self.workloadPolicy = workloadPolicy ?? AppWorkloadPolicy.shared
+        self.reloadWidget = reloadWidget
+        let workloadPolicy = workloadPolicy ?? AppWorkloadPolicy.shared
+        debounceMilliseconds = {
+            workloadPolicy.systemSurfaceSnapshotDebounceMilliseconds()
+        }
+        allowsSystemWidgets = {
+            commerce.allows(.systemWidgets)
+        }
+        loadSnapshot = {
+            let actor = TaskCenterRouteDataActor(modelContainer: modelContainer)
+            let reference = try await actor.load(
+                loadPlants: AppFeatureRouteGuard.shouldLoadPlantData,
+                activeHumanID: activeHumanSelection.currentHumanId
+            )
+            return reference.snapshot
+        }
+    }
+
+    init(
+        revisions: DomainRevisionPublishing,
+        store: SystemSurfaceSnapshotStore,
+        debounceMilliseconds: @escaping () -> Int64,
+        allowsSystemWidgets: @escaping () -> Bool,
+        loadSnapshot: @escaping () async throws -> TaskCenterSnapshot,
+        reloadWidget: @escaping () -> Void = {}
+    ) {
+        self.revisions = revisions
+        self.store = store
+        self.debounceMilliseconds = debounceMilliseconds
+        self.allowsSystemWidgets = allowsSystemWidgets
+        self.loadSnapshot = loadSnapshot
         self.reloadWidget = reloadWidget
     }
 
@@ -65,43 +95,64 @@ final class SystemSurfaceSnapshotCoordinator: SystemSurfaceSnapshotRefreshing {
     }
 
     func scheduleRefresh(reason: String) {
+        guard !isResetInProgress else { return }
         refreshTask?.cancel()
-        let debounceMilliseconds = workloadPolicy.systemSurfaceSnapshotDebounceMilliseconds()
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
+        let debounceMilliseconds = debounceMilliseconds()
         refreshTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(debounceMilliseconds))
-            guard let self, !Task.isCancelled else { return }
-            await refresh(reason: reason)
+            guard let self,
+                  !Task.isCancelled,
+                  isCurrent(generation: generation) else { return }
+            await refresh(reason: reason, generation: generation)
         }
     }
 
-    private func refresh(reason: String) async {
+    func prepareForAppReset() {
+        isResetInProgress = true
+        refreshGeneration &+= 1
+        refreshTask?.cancel()
+    }
+
+    func finishAppReset() {
+        refreshGeneration &+= 1
+        isResetInProgress = false
+    }
+
+    func waitForRefreshQuiescenceForTesting() async {
+        await refreshTask?.value
+    }
+
+    private func refresh(reason: String, generation: UInt64) async {
+        guard isCurrent(generation: generation) else { return }
         let languageCode = AppLanguage.code
-        if !commerce.allows(.systemWidgets) {
+        if !allowsSystemWidgets() {
             write(
                 TodayCareWidgetSnapshot.upgradeRequired(languageCode: languageCode),
-                reason: reason
+                reason: reason,
+                generation: generation
             )
             return
         }
 
         do {
-            let actor = TaskCenterRouteDataActor(modelContainer: modelContainer)
-            let reference = try await actor.load(
-                loadPlants: AppFeatureRouteGuard.shouldLoadPlantData,
-                activeHumanID: activeHumanSelection.currentHumanId
-            )
-            guard !Task.isCancelled else { return }
+            let taskCenterSnapshot = try await loadSnapshot()
+            guard !Task.isCancelled,
+                  isCurrent(generation: generation) else { return }
             let snapshot = TodayCareWidgetSnapshotBuilder.make(
-                taskCenter: reference.snapshot,
+                taskCenter: taskCenterSnapshot,
                 languageCode: languageCode
             )
-            write(snapshot, reason: reason)
+            write(snapshot, reason: reason, generation: generation)
         } catch is CancellationError {
             return
         } catch {
+            guard isCurrent(generation: generation) else { return }
             write(
                 TodayCareWidgetSnapshot.unavailable(languageCode: languageCode),
-                reason: "\(reason).safeFallback"
+                reason: "\(reason).safeFallback",
+                generation: generation
             )
             OhanaLog.warning(
                 "Widget snapshot refresh failed (\(reason)): \(error.localizedDescription)",
@@ -110,7 +161,12 @@ final class SystemSurfaceSnapshotCoordinator: SystemSurfaceSnapshotRefreshing {
         }
     }
 
-    private func write(_ snapshot: TodayCareWidgetSnapshot, reason: String) {
+    private func write(
+        _ snapshot: TodayCareWidgetSnapshot,
+        reason: String,
+        generation: UInt64
+    ) {
+        guard isCurrent(generation: generation) else { return }
         do {
             try store.write(snapshot)
             reloadWidget()
@@ -124,10 +180,16 @@ final class SystemSurfaceSnapshotCoordinator: SystemSurfaceSnapshotRefreshing {
             )
         }
     }
+
+    private func isCurrent(generation: UInt64) -> Bool {
+        !isResetInProgress && generation == refreshGeneration
+    }
 }
 
 @MainActor
 final class NoopSystemSurfaceSnapshotCoordinator: SystemSurfaceSnapshotRefreshing {
     func start() {}
     func scheduleRefresh(reason _: String) {}
+    func prepareForAppReset() {}
+    func finishAppReset() {}
 }

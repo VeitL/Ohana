@@ -17,10 +17,10 @@ struct PresenceCheckInCommandServiceTests {
             String(describing: SafetyContact.self)
         ])
         #expect(v92.subtracting(v93).isEmpty)
-        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV96.self))
+        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV98.self))
     }
 
-    @Test func ownerAutoCheckInCheckAllAndStatusRewardsAreIdempotent() throws {
+    @Test func explicitSubjectCheckInsAndStatusRewardsAreIdempotentWithoutAllCompleteBonus() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let owner = Human(name: "Owner")
@@ -36,9 +36,16 @@ struct PresenceCheckInCommandServiceTests {
         let now = date(2026, 7, 18)
         try service.startParticipation(ownerHumanId: owner.id, source: .onboarding, now: now)
 
-        let first = try service.autoCheckInOwner(now: now)
-        let replay = try service.autoCheckInOwner(now: now.addingTimeInterval(30))
-        let all = try service.checkInAll(now: now.addingTimeInterval(60))
+        let first = try service.checkInOwner(source: .card, now: now)
+        let replay = try service.checkInOwner(source: .card, now: now.addingTimeInterval(30))
+        let petResult = try service.checkIn(
+            subject: .init(kind: .pet, id: pet.id),
+            now: now.addingTimeInterval(60)
+        )
+        let plantResult = try service.checkIn(
+            subject: .init(kind: .plant, id: plant.id),
+            now: now.addingTimeInterval(75)
+        )
         let firstStatus = try service.updateTodayStatus(
             subject: .init(kind: .pet, id: pet.id),
             status: .score10,
@@ -59,13 +66,17 @@ struct PresenceCheckInCommandServiceTests {
         #expect(first.awardedCoconuts == 1)
         #expect(!replay.didCreateCheckIn)
         #expect(replay.awardedCoconuts == 0)
-        #expect(all.awardedCoconuts == 2)
+        #expect(petResult.awardedCoconuts == 0)
+        #expect(plantResult.awardedCoconuts == 0)
         #expect(firstStatus.awardedCoconuts == 1)
         #expect(changedStatus.awardedCoconuts == 0)
         #expect(clearedStatus.awardedCoconuts == 0)
         #expect(try context.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 3)
-        #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 3)
-        #expect(awardedKinds(awarder) == [.ownerDaily, .allComplete, .dailyStatus])
+        #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 2)
+        #expect(awardedKinds(awarder) == [.ownerDaily, .dailyStatus])
+        #expect(try context.fetch(FetchDescriptor<PresenceRewardReceipt>()).allSatisfy {
+            $0.rewardKind != .allComplete
+        })
 
         let petKey = PresenceCheckInCommandService.checkInKey(
             subject: .init(kind: .pet, id: pet.id),
@@ -77,7 +88,7 @@ struct PresenceCheckInCommandServiceTests {
         #expect(petCheckIn.status == nil)
     }
 
-    @Test func undoKeepsRewardReceiptsAndSuppressesLaterAutomaticForegroundCheckIn() throws {
+    @Test func undoKeepsRewardReceiptAndExplicitRecheckDoesNotDuplicateReward() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let owner = Human(name: "Owner")
@@ -89,17 +100,14 @@ struct PresenceCheckInCommandServiceTests {
         let now = date(2026, 7, 22)
         try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: now)
 
-        let first = try service.autoCheckInOwner(now: now)
+        let first = try service.checkInOwner(source: .card, now: now)
         let removed = try service.undoTodayCheckIn(
             subject: .init(kind: .human, id: owner.id),
             now: now.addingTimeInterval(60)
         )
-        let laterForeground = try service.autoCheckInOwner(now: now.addingTimeInterval(120))
 
         #expect(first.didCreateCheckIn)
         #expect(removed.removedCheckIn.dayKey == "2026-07-22")
-        #expect(!laterForeground.didCreateCheckIn)
-        #expect(laterForeground.checkIns.isEmpty)
         #expect(try context.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 1)
 
@@ -114,6 +122,37 @@ struct PresenceCheckInCommandServiceTests {
         #expect(try context.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 1)
         #expect(awardedKinds(awarder) == [.ownerDaily])
+    }
+
+    @Test func automaticAndBatchSourcesCannotCreateCurrentFacts() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        let pet = Pet(name: "Miso", species: "cat")
+        context.insert(owner)
+        context.insert(pet)
+        try context.save()
+
+        let service = makeService(
+            context: context,
+            ownerId: owner.id,
+            awarder: RecordingPresenceRewardAwarder()
+        )
+        let now = date(2026, 7, 22)
+        try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: now)
+
+        #expect(throws: PresenceCheckInCommandError.nonExplicitCheckInSource(.automaticForeground)) {
+            try service.checkInOwner(source: .automaticForeground, now: now)
+        }
+        #expect(throws: PresenceCheckInCommandError.nonExplicitCheckInSource(.checkAll)) {
+            try service.checkIn(
+                subject: .init(kind: .pet, id: pet.id),
+                source: .checkAll,
+                now: now
+            )
+        }
+        #expect(try context.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 0)
     }
 
     @Test func zenActiveSubjectSnapshotCarriesMediaIdentityAndDerivesZodiacFromBirthday() throws {
@@ -154,14 +193,14 @@ struct PresenceCheckInCommandServiceTests {
 
         let day1 = date(2026, 7, 1)
         try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: day1)
-        _ = try service.autoCheckInOwner(now: day1)
-        _ = try service.autoCheckInOwner(now: date(2026, 7, 2))
+        _ = try service.checkInOwner(source: .card, now: day1)
+        _ = try service.checkInOwner(source: .card, now: date(2026, 7, 2))
         try service.endParticipation(now: date(2026, 7, 3))
 
         let day10 = date(2026, 7, 10)
         try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: day10)
-        let milestoneResult = try service.autoCheckInOwner(now: day10)
-        let replay = try service.autoCheckInOwner(now: day10.addingTimeInterval(60))
+        let milestoneResult = try service.checkInOwner(source: .card, now: day10)
+        let replay = try service.checkInOwner(source: .card, now: day10.addingTimeInterval(60))
         let streak = try PresenceCheckInReadService.streakSnapshot(
             context: context,
             ownerHumanId: owner.id,
@@ -457,7 +496,7 @@ struct PresenceCheckInCommandServiceTests {
             to: firstDay
         ))
 
-        let result = try service.autoCheckInOwner(now: day365)
+        let result = try service.checkInOwner(source: .card, now: day365)
         let milestones = result.rewards
             .filter { $0.kind == .streakMilestone }
             .map { ($0.milestoneDays, $0.awardedAmount) }
@@ -525,7 +564,7 @@ struct PresenceCheckInCommandServiceTests {
         try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: now)
 
         #expect(throws: PresenceCheckInCommandError.rewardPersistenceFailed("forced reward failure")) {
-            try service.autoCheckInOwner(now: now)
+            try service.checkInOwner(source: .card, now: now)
         }
         #expect(try context.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 0)
@@ -548,8 +587,8 @@ struct PresenceCheckInCommandServiceTests {
         let now = date(2026, 7, 18)
         try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: now)
 
-        let first = try service.autoCheckInOwner(now: now)
-        let replay = try service.autoCheckInOwner(now: now.addingTimeInterval(30))
+        let first = try service.checkInOwner(source: .card, now: now)
+        let replay = try service.checkInOwner(source: .card, now: now.addingTimeInterval(30))
         let receipt = try #require(context.fetch(FetchDescriptor<PresenceRewardReceipt>()).first)
 
         #expect(first.awardedCoconuts == 0)
@@ -558,7 +597,7 @@ struct PresenceCheckInCommandServiceTests {
         #expect(receipt.awardedAmount == 0)
     }
 
-    @Test func concurrentForegroundCommandsRemainSingleFactAndSingleReward() async throws {
+    @Test func concurrentExplicitOwnerCommandsRemainSingleFactAndSingleReward() async throws {
         let container = try makeContainer()
         let context = container.mainContext
         let owner = Human(name: "Owner")
@@ -571,7 +610,10 @@ struct PresenceCheckInCommandServiceTests {
 
         let tasks = (0 ..< 12).map { offset in
             Task { @MainActor in
-                try service.autoCheckInOwner(now: now.addingTimeInterval(Double(offset)))
+                try service.checkInOwner(
+                    source: .card,
+                    now: now.addingTimeInterval(Double(offset))
+                )
             }
         }
         let results = try await tasks.asyncMap { try await $0.value }
@@ -580,6 +622,34 @@ struct PresenceCheckInCommandServiceTests {
         #expect(results.reduce(0) { $0 + $1.awardedCoconuts } == 1)
         #expect(try context.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 1)
+    }
+
+    @Test func repeatedNotificationActionsRemainSingleFactAndSingleReward() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        context.insert(owner)
+        try context.save()
+        let awarder = RecordingPresenceRewardAwarder()
+        let service = makeService(context: context, ownerId: owner.id, awarder: awarder)
+        let now = date(2026, 7, 18)
+        try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: now)
+
+        let tasks = (0 ..< 12).map { offset in
+            Task { @MainActor in
+                try service.checkInOwner(
+                    source: .notificationAction,
+                    now: now.addingTimeInterval(Double(offset))
+                )
+            }
+        }
+        let results = try await tasks.asyncMap { try await $0.value }
+
+        #expect(results.count { $0.didCreateCheckIn } == 1)
+        #expect(results.reduce(0) { $0 + $1.awardedCoconuts } == 1)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceCheckIn>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 1)
+        #expect(awardedKinds(awarder) == [.ownerDaily])
     }
 
     @Test func homeTodayProjectionKeepsSubjectFactsAfterOwnerRebinding() throws {
@@ -641,6 +711,7 @@ struct PresenceCheckInCommandServiceTests {
         memorialPet.passedAwayDate = date(2026, 7, 3)
         let archivedPlant = Plant(name: "Archived")
         archivedPlant.createdAt = date(2026, 6, 1)
+        archivedPlant.acquiredDate = date(2026, 5, 15)
         archivedPlant.archivedAt = date(2026, 7, 5)
         context.insert(previousOwner)
         context.insert(currentOwner)
@@ -722,7 +793,14 @@ struct PresenceCheckInCommandServiceTests {
         #expect(!activeSubjects.contains { $0.subject == .init(kind: .plant, id: archivedPlant.id) })
         #expect(!activeSubjects.contains { $0.subject == deletedSubject })
         #expect(historicalSubjects.first { $0.subject == .init(kind: .pet, id: memorialPet.id) }?.isActive == false)
-        #expect(historicalSubjects.first { $0.subject == .init(kind: .plant, id: archivedPlant.id) }?.isActive == false)
+        let archivedPlantSnapshot = historicalSubjects.first {
+            $0.subject == .init(kind: .plant, id: archivedPlant.id)
+        }
+        #expect(archivedPlantSnapshot?.isActive == false)
+        #expect(
+            archivedPlantSnapshot?.expandedProfile?.plantCompanionStartedAt
+                == archivedPlant.acquiredDate
+        )
         #expect(historicalSubjects.first { $0.subject == deletedSubject }?.isAnonymousHistory == true)
         #expect(previousOwnerStreak.days.first { $0.dayKey == "2026-07-01" }?.isCheckedIn == true)
         #expect(previousOwnerStreak.days.first { $0.dayKey == "2026-07-02" }?.isParticipating == true)
@@ -759,8 +837,8 @@ struct PresenceCheckInCommandServiceTests {
         )
         try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: now)
 
-        let first = try service.autoCheckInOwner(now: now)
-        let replay = try service.autoCheckInOwner(now: now.addingTimeInterval(30))
+        let first = try service.checkInOwner(source: .card, now: now)
+        let replay = try service.checkInOwner(source: .card, now: now.addingTimeInterval(30))
         let receipts = try context.fetch(FetchDescriptor<PresenceRewardReceipt>())
         let ledger = try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).filter {
             $0.sourceModelName == "PresenceRewardReceipt"
@@ -985,7 +1063,7 @@ struct PresenceCheckInCommandServiceTests {
         )
         try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: now)
 
-        let result = try service.autoCheckInOwner(now: now)
+        let result = try service.checkInOwner(source: .notificationAction, now: now)
         let receipt = try #require(context.fetch(FetchDescriptor<PresenceRewardReceipt>()).first)
         let presenceLedger = try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).filter {
             $0.sourceModelName == "PresenceRewardReceipt"
@@ -1041,7 +1119,10 @@ struct PresenceCheckInCommandServiceTests {
             source: .settings,
             now: date(2026, 6, 3)
         )
-        let sameDayAutomaticCheckIn = try commandService.autoCheckInOwner(now: date(2026, 6, 3))
+        let sameDayExplicitCheckIn = try commandService.checkInOwner(
+            source: .card,
+            now: date(2026, 6, 3)
+        )
 
         #expect(first.migratedCheckInCount == 3)
         #expect(first.migratedMilestoneReceiptCount == 2)
@@ -1054,8 +1135,8 @@ struct PresenceCheckInCommandServiceTests {
         let receipts = try context.fetch(FetchDescriptor<PresenceRewardReceipt>())
         #expect(receipts.count == 2)
         #expect(receipts.allSatisfy { $0.isLegacy && $0.awardedAmount == 0 })
-        #expect(!sameDayAutomaticCheckIn.didCreateCheckIn)
-        #expect(sameDayAutomaticCheckIn.awardedCoconuts == 0)
+        #expect(!sameDayExplicitCheckIn.didCreateCheckIn)
+        #expect(sameDayExplicitCheckIn.awardedCoconuts == 0)
         #expect(awarder.requests.isEmpty)
         #expect(try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>()) == 0)
     }

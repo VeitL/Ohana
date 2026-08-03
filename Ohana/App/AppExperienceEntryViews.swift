@@ -68,10 +68,10 @@ struct AppExperienceIntroductionBanner: View {
                 ko: "소개 닫기",
                 it: "Chiudi introduzione"
             ))
+            .accessibilityIdentifier("zen-introduction-banner")
         }
         .padding(14)
         .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.card, style: .continuous))
-        .accessibilityIdentifier("zen-introduction-banner")
     }
 }
 
@@ -224,15 +224,15 @@ struct ZenOwnerSelectionView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             Text(l.tr(
-                zh: "佛系模式会在你打开 App 时自动为这位成员打卡。",
-                en: "Zen mode automatically checks in this person when you open the app.",
-                de: "Der Zen-Modus checkt diese Person beim Öffnen der App automatisch ein.",
-                es: "El modo zen registra automáticamente el check-in de esta persona cuando abres la app.",
-                pt: "O modo zen faz o check-in automático dessa pessoa quando você abre o app.",
-                fr: "Le mode Zen enregistre automatiquement cette personne quand vous ouvrez l’app.",
-                ja: "佛系モードでは、Appを開くとこのメンバーを自動でチェックインします。",
-                ko: "마음 편한 모드에서는 앱을 열 때 이 구성원을 자동으로 체크인해요.",
-                it: "La modalità Zen effettua automaticamente il check-in di questa persona quando apri l’app."
+                zh: "只有你明确轻点本人卡片、长按选择状态，或选择通知中的“我今天平安”，才会完成平安确认。",
+                en: "A safety confirmation is recorded only when you tap your card, hold to choose a status, or choose “I'm safe today” in a notification.",
+                de: "Eine Bestätigung wird nur erfasst, wenn du deine Karte antippst, einen Status auswählst oder in der Mitteilung „Mir geht es heute gut“ wählst.",
+                es: "Solo se confirma cuando tocas tu tarjeta, mantienes pulsado para elegir un estado o eliges «Estoy bien hoy» en la notificación.",
+                pt: "A confirmação só é registrada quando você toca no seu cartão, escolhe um estado ou seleciona “Estou bem hoje” na notificação.",
+                fr: "La confirmation n’est enregistrée que si vous touchez votre carte, choisissez un état ou sélectionnez « Tout va bien aujourd’hui » dans la notification.",
+                ja: "本人カードをタップ、長押しで状態を選択、または通知の「今日は無事です」を選んだときだけ無事確認されます。",
+                ko: "본인 카드를 탭하거나 길게 눌러 상태를 고르거나 알림에서 ‘오늘은 무사해요’를 선택할 때만 확인돼요.",
+                it: "La conferma viene registrata solo toccando la tua scheda, scegliendo uno stato o selezionando “Oggi sto bene” nella notifica."
             ))
             .font(OhanaFont.body(.semibold))
             .foregroundStyle(Color.ohanaSecondaryText)
@@ -320,15 +320,15 @@ struct ZenOwnerUnavailableView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .multilineTextAlignment(.center)
             Text(l.tr(
-                zh: "自动打卡和提醒已经停止。请在普通模式中建立成员，或在设置中切换模式。",
-                en: "Automatic check-ins and reminders are stopped. Add a person in Standard mode or switch modes in Settings.",
-                de: "Automatische Check-ins und Erinnerungen sind gestoppt. Lege im Standardmodus eine Person an oder wechsle in den Einstellungen.",
-                es: "Los check-ins automáticos y recordatorios están detenidos. Añade una persona en el modo Estándar o cambia de modo en Ajustes.",
-                pt: "Os check-ins automáticos e lembretes foram interrompidos. Adicione uma pessoa no modo Padrão ou mude de modo nos Ajustes.",
-                fr: "Les check-ins automatiques et les rappels sont arrêtés. Ajoutez une personne en mode Standard ou changez de mode dans les réglages.",
-                ja: "自動チェックインとリマインダーを停止しました。通常モードでメンバーを追加するか、設定からモードを切り替えてください。",
-                ko: "자동 체크인과 알림을 중지했어요. 일반 모드에서 구성원을 추가하거나 설정에서 모드를 바꾸세요.",
-                it: "I check-in automatici e i promemoria sono stati interrotti. Aggiungi una persona in modalità Standard o cambia modalità nelle Impostazioni."
+                zh: "本人平安确认和提醒已经停止。请在普通模式中建立成员，或在设置中切换模式。",
+                en: "Owner safety confirmations and reminders are stopped. Add a person in Standard mode or switch modes in Settings.",
+                de: "Bestätigungen und Erinnerungen für die eigene Person sind gestoppt. Lege im Standardmodus eine Person an oder wechsle in den Einstellungen.",
+                es: "Las confirmaciones y los recordatorios de la persona propietaria están detenidos. Añade una persona en el modo Estándar o cambia de modo en Ajustes.",
+                pt: "As confirmações e os lembretes da pessoa principal foram interrompidos. Adicione uma pessoa no modo Padrão ou mude de modo nos Ajustes.",
+                fr: "Les confirmations et rappels du profil principal sont arrêtés. Ajoutez une personne en mode Standard ou changez de mode dans les réglages.",
+                ja: "本人の無事確認とリマインダーを停止しました。通常モードでメンバーを追加するか、設定からモードを切り替えてください。",
+                ko: "본인의 무사 확인과 알림이 중지되었어요. 일반 모드에서 구성원을 추가하거나 설정에서 모드를 바꾸세요.",
+                it: "Le conferme e i promemoria del titolare sono stati interrotti. Aggiungi una persona in modalità Standard o cambia modalità nelle Impostazioni."
             ))
             .font(OhanaFont.body(.semibold))
             .foregroundStyle(Color.ohanaSecondaryText)

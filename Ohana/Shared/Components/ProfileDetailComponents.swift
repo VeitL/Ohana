@@ -472,6 +472,24 @@ struct ProfileCompletionCard: View {
 
             ProgressView(value: Double(snapshot.completionPercent), total: 100)
                 .tint(tint)
+                .animation(GoMotion.selection, value: snapshot.completionPercent)
+
+            if !snapshot.requiredActualCategories.isEmpty {
+                Label(
+                    requiredProfileFieldsTitle,
+                    systemImage: snapshot.missingRequiredCategories.isEmpty
+                        ? "checkmark.circle.fill"
+                        : "exclamationmark.circle.fill"
+                )
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(
+                    snapshot.missingRequiredCategories.isEmpty
+                        ? Color.goTeal
+                        : Color.ohanaSecondaryText
+                )
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("profile-completion-required-fields")
+            }
 
             if snapshot.missingCategories.isEmpty {
                 Label(
@@ -502,17 +520,7 @@ struct ProfileCompletionCard: View {
             }
 
             DisclosureGroup(isExpanded: $showsCompletionExplanation) {
-                Text(l.tr(
-                    zh: "已填写，或已明确确认暂不清楚、不适用、暂不填写与不愿透露的类别，都会计入完成度。",
-                    en: "A category counts when filled in or explicitly marked unknown, not applicable, skipped for now, or private.",
-                    de: "Ein Bereich zählt, wenn er ausgefüllt oder ausdrücklich als unbekannt, nicht zutreffend, vorerst übersprungen oder privat markiert ist.",
-                    es: "Una categoría cuenta si está rellenada o se marca como desconocida, no aplicable, pendiente o privada.",
-                    pt: "Uma categoria conta quando preenchida ou marcada como desconhecida, não aplicável, adiada ou privada.",
-                    fr: "Une catégorie compte si elle est remplie ou indiquée comme inconnue, non applicable, reportée ou privée.",
-                    ja: "入力済み、または不明・該当なし・後で・非公開を明確に選んだ項目が完成度に含まれます。",
-                    ko: "입력했거나 모름, 해당 없음, 나중에 입력, 비공개를 명확히 선택한 항목은 완성도에 포함됩니다.",
-                    it: "Una categoria conta se compilata o indicata come sconosciuta, non applicabile, rimandata o privata."
-                ))
+                Text(completionExplanation)
                 .font(OhanaFont.caption())
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -573,6 +581,60 @@ struct ProfileCompletionCard: View {
             it: "Profilo completato al \(snapshot.completionPercent) per cento, \(snapshot.completedCategoryCount) categorie su \(snapshot.totalCategoryCount)"
         ))
         .accessibilityIdentifier("profile-completion-card")
+    }
+
+    private var requiredProfileFieldsTitle: String {
+        if snapshot.missingRequiredCategories.isEmpty {
+            return l.tr(
+                zh: "必填项已完成：生日与性别/身份",
+                en: "Required fields complete: birthday and gender/identity",
+                de: "Pflichtfelder vollständig: Geburtstag und Geschlecht/Identität",
+                es: "Campos obligatorios completos: cumpleaños y género/identidad",
+                pt: "Campos obrigatórios concluídos: aniversário e gênero/identidade",
+                fr: "Champs requis complétés : anniversaire et genre/identité",
+                ja: "必須項目完了：誕生日と性別／本人情報",
+                ko: "필수 항목 완료: 생일 및 성별/정체성",
+                it: "Campi obbligatori completi: compleanno e genere/identità"
+            )
+        }
+        return l.tr(
+            zh: "必填：生日与性别/身份",
+            en: "Required: birthday and gender/identity",
+            de: "Erforderlich: Geburtstag und Geschlecht/Identität",
+            es: "Obligatorio: cumpleaños y género/identidad",
+            pt: "Obrigatório: aniversário e gênero/identidade",
+            fr: "Requis : anniversaire et genre/identité",
+            ja: "必須：誕生日と性別／本人情報",
+            ko: "필수: 생일 및 성별/정체성",
+            it: "Obbligatorio: compleanno e genere/identità"
+        )
+    }
+
+    private var completionExplanation: String {
+        if !snapshot.requiredActualCategories.isEmpty {
+            return l.tr(
+                zh: "生日必须填写；性别/身份必须作出选择，“不愿透露”也算有效选择。形象与其他资料可填写，或明确选择暂不填写。",
+                en: "Birthday must be entered. Gender or identity must be selected; “Prefer not to say” is valid. Appearance and other details may be filled in or explicitly skipped.",
+                de: "Der Geburtstag muss eingetragen werden. Geschlecht oder Identität muss ausgewählt werden; „Keine Angabe“ ist gültig. Erscheinungsbild und weitere Angaben können ausgefüllt oder ausdrücklich übersprungen werden.",
+                es: "Debes indicar el cumpleaños y elegir género o identidad; «Prefiero no decirlo» es válido. La imagen y los demás datos pueden completarse u omitirse de forma explícita.",
+                pt: "É necessário informar o aniversário e escolher gênero ou identidade; “Prefiro não informar” é válido. Aparência e outros detalhes podem ser preenchidos ou ignorados explicitamente.",
+                fr: "L’anniversaire doit être renseigné et le genre ou l’identité sélectionné ; « Je préfère ne pas répondre » est valide. L’apparence et les autres informations peuvent être remplies ou explicitement ignorées.",
+                ja: "誕生日は入力必須です。性別または本人情報も選択が必要で、「回答しない」も有効です。外見とその他の情報は入力するか、明示的に後回しにできます。",
+                ko: "생일은 반드시 입력해야 해요. 성별 또는 정체성도 선택해야 하며 ‘공개하지 않음’도 유효해요. 외형과 기타 정보는 입력하거나 명시적으로 건너뛸 수 있어요.",
+                it: "Il compleanno deve essere inserito. È richiesta una scelta di genere o identità; “Preferisco non dirlo” è valida. Aspetto e altri dettagli possono essere compilati o saltati esplicitamente."
+            )
+        }
+        return l.tr(
+            zh: "已填写，或已明确确认暂不清楚、不适用、暂不填写与不愿透露的类别，都会计入完成度。",
+            en: "A category counts when filled in or explicitly marked unknown, not applicable, skipped for now, or private.",
+            de: "Ein Bereich zählt, wenn er ausgefüllt oder ausdrücklich als unbekannt, nicht zutreffend, vorerst übersprungen oder privat markiert ist.",
+            es: "Una categoría cuenta si está rellenada o se marca como desconocida, no aplicable, pendiente o privada.",
+            pt: "Uma categoria conta quando preenchida ou marcada como desconhecida, não aplicável, adiada ou privada.",
+            fr: "Une catégorie compte si elle est remplie ou indiquée comme inconnue, non applicable, reportée ou privée.",
+            ja: "入力済み、または不明・該当なし・後で・非公開を明確に選んだ項目が完成度に含まれます。",
+            ko: "입력했거나 모름, 해당 없음, 나중에 입력, 비공개를 명확히 선택한 항목은 완성도에 포함됩니다.",
+            it: "Una categoria conta se compilata o indicata come sconosciuta, non applicabile, rimandata o privata."
+        )
     }
 }
 

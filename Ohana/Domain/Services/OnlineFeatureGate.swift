@@ -18,9 +18,8 @@ enum OnlineFeatureGate {
         case .onlineCollaboration:
             AppCapabilityProfile.shipsCloudFamilyCapabilities && false
         case .guardianSafety:
-            // The build contains the client, but the shipped Info.plist keeps
-            // this off until the signed backend/APNs release gate is complete.
-            GuardianSafetyConfiguration.current != nil
+            AppCapabilityProfile.shipsGuardianSafetyCapabilities &&
+                GuardianSafetyConfiguration.current != nil
         }
     }
 }

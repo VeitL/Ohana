@@ -4,6 +4,30 @@ import SwiftData
 import UserNotifications
 
 @MainActor
+enum BackgroundTaskRuntimeAdapter {
+    static func makeMedicationReminders() -> any MedicationReminderManaging {
+        SharedMedicationReminderManager()
+    }
+}
+
+#if DEBUG
+    @MainActor
+    enum UITestSystemSurfaceSnapshotRuntimeAdapter {
+        static func sanitizeIfAvailable() throws {
+            // Unsigned Simulator test products cannot resolve the App Group
+            // container. In that environment no system-surface payload is
+            // reachable, so persistent test-state reset can safely continue.
+            // Signed app resets keep the production fail-closed sanitizer.
+            guard SystemSurfaceSnapshotStore.live.containerURL != nil else {
+                OhanaStartupProbe.mark("ui-test-reset.system-surface-unavailable")
+                return
+            }
+            try AppResetService.sanitizeLiveSystemSurfaceSnapshot()
+        }
+    }
+#endif
+
+@MainActor
 protocol AppIconManaging {
     var supportsAlternateIcons: Bool { get }
     var currentDescriptor: AppIconShopDescriptor { get }
@@ -102,7 +126,11 @@ final class StaticAppResetter: AppResetting {
     private let defaults: UserDefaults
     private let attachmentStorage: HumanNoteAttachmentStorage
     private let deletePersistentData: (ModelContainer) throws -> Void
+    private let systemSurfaceSnapshotSanitizer: @MainActor () throws -> Void
     private let prepareRuntimeForReset: () -> Void
+    private let fenceRuntimeBeforePersistentReset: () -> Void
+    private let finishRuntimeAfterReset: () -> Void
+    private let recoverRuntimeAfterFailedReset: () -> Void
 
     init(
         questManager: QuestManager,
@@ -110,14 +138,22 @@ final class StaticAppResetter: AppResetting {
         defaults: UserDefaults = .standard,
         attachmentStorage: HumanNoteAttachmentStorage = .live,
         deletePersistentData: @escaping (ModelContainer) throws -> Void = { $0.deleteAllData() },
-        prepareRuntimeForReset: @escaping () -> Void = {}
+        systemSurfaceSnapshotSanitizer: @escaping @MainActor () throws -> Void = AppResetService.sanitizeLiveSystemSurfaceSnapshot,
+        prepareRuntimeForReset: @escaping () -> Void = {},
+        fenceRuntimeBeforePersistentReset: @escaping () -> Void = {},
+        finishRuntimeAfterReset: @escaping () -> Void = {},
+        recoverRuntimeAfterFailedReset: @escaping () -> Void = {}
     ) {
         self.questManager = questManager
         self.automaticBackups = automaticBackups
         self.defaults = defaults
         self.attachmentStorage = attachmentStorage
         self.deletePersistentData = deletePersistentData
+        self.systemSurfaceSnapshotSanitizer = systemSurfaceSnapshotSanitizer
         self.prepareRuntimeForReset = prepareRuntimeForReset
+        self.fenceRuntimeBeforePersistentReset = fenceRuntimeBeforePersistentReset
+        self.finishRuntimeAfterReset = finishRuntimeAfterReset
+        self.recoverRuntimeAfterFailedReset = recoverRuntimeAfterFailedReset
     }
 
     func reset(context: ModelContext) async throws -> AppResetService.ResetResult {
@@ -125,19 +161,33 @@ final class StaticAppResetter: AppResetting {
     }
 
     func reset(context: ModelContext, options: AppResetService.Options) async throws -> AppResetService.ResetResult {
+        var didCompletePersistentReset = false
         prepareRuntimeForReset()
+        defer {
+            finishRuntimeAfterReset()
+            if !didCompletePersistentReset {
+                recoverRuntimeAfterFailedReset()
+            }
+        }
         if options.cleanUpAutomaticBackups {
             await automaticBackups.prepareForAppReset()
         }
 
+        // `prepareForAppReset()` is an intentional suspension point. Refresh
+        // the runtime generation fence immediately before the synchronous
+        // store-and-system-surface reset so work started during that wait cannot
+        // publish stale effects after notification cleanup.
+        fenceRuntimeBeforePersistentReset()
         let humanNoteAttachmentCleanup = try AppResetService.reset(
             context: context,
             defaults: defaults,
             options: options,
             questManager: questManager,
             attachmentStorage: attachmentStorage,
+            systemSurfaceSnapshotSanitizer: systemSurfaceSnapshotSanitizer,
             deletePersistentData: deletePersistentData
         )
+        didCompletePersistentReset = true
         guard options.cleanUpAutomaticBackups else {
             return AppResetService.ResetResult(
                 automaticBackupCleanup: .notRequested,
@@ -153,7 +203,15 @@ final class StaticAppResetter: AppResetting {
     }
 
     func resetForUITests(context: ModelContext) throws {
+        var didCompletePersistentReset = false
         prepareRuntimeForReset()
+        defer {
+            finishRuntimeAfterReset()
+            if !didCompletePersistentReset {
+                recoverRuntimeAfterFailedReset()
+            }
+        }
+        fenceRuntimeBeforePersistentReset()
         try AppResetService.reset(
             context: context,
             defaults: defaults,
@@ -166,8 +224,10 @@ final class StaticAppResetter: AppResetting {
             ),
             questManager: questManager,
             attachmentStorage: attachmentStorage,
+            systemSurfaceSnapshotSanitizer: systemSurfaceSnapshotSanitizer,
             deletePersistentData: deletePersistentData
         )
+        didCompletePersistentReset = true
     }
 }
 

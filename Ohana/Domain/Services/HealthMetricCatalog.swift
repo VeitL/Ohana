@@ -222,6 +222,7 @@ enum HealthMetricCatalog {
         list.append(contentsOf: kidney)
         list.append(contentsOf: bloodCount)
         list.append(contentsOf: inflammationVitamin)
+        list.append(contentsOf: HealthMetricCatalogImmuneGroup.metrics)
         list.append(contentsOf: electrolyte)
         list.append(contentsOf: vitals)
         return list
@@ -280,6 +281,18 @@ enum HealthMetricCatalog {
     // MARK: - 血糖
 
     private static let glucose: [HealthMetric] = [
+        HealthMetric(
+            key: "glucose",
+            category: .glucose,
+            nameZh: "血糖", nameEn: "Glucose", nameDe: "Glukose",
+            shortNames: ["GLU"],
+            units: [
+                HealthMetricUnit(code: "mmol_L", label: "mmol/L", normalLow: nil, normalHigh: nil),
+                HealthMetricUnit(code: "mg_dL", label: "mg/dL", normalLow: nil, normalHigh: nil)
+            ],
+            countryDefaultUnit: ["US": "mg_dL"],
+            hintZh: "未注明空腹或餐后条件的血糖结果。", hintEn: "Glucose without a stated fasting or post-meal condition.", hintDe: "Glukose ohne angegebene Nüchtern- oder Mahlzeitenbedingung."
+        ),
         HealthMetric(
             key: "fbg",
             category: .glucose,
@@ -423,6 +436,45 @@ enum HealthMetricCatalog {
             hintZh: "黄疸/溶血/胆道。", hintEn: "Jaundice / hemolysis / biliary.", hintDe: "Gelbsucht / Hämolyse / Galle."
         ),
         HealthMetric(
+            key: "ldh",
+            category: .liver,
+            nameZh: "乳酸脱氢酶", nameEn: "LDH", nameDe: "Lactatdehydrogenase",
+            shortNames: ["LDH"],
+            units: [HealthMetricUnit(code: "U_L", label: "U/L", normalLow: 120, normalHigh: 250)],
+            countryDefaultUnit: [:],
+            hintZh: "多组织细胞损伤相关酶。", hintEn: "An enzyme associated with tissue-cell injury.", hintDe: "Enzymarker bei Zellschädigung verschiedener Gewebe."
+        ),
+        HealthMetric(
+            key: "alp",
+            category: .liver,
+            nameZh: "碱性磷酸酶", nameEn: "Alkaline Phosphatase", nameDe: "Alkalische Phosphatase",
+            shortNames: ["ALP", "AP"],
+            units: [HealthMetricUnit(code: "U_L", label: "U/L", normalLow: 40, normalHigh: 130)],
+            countryDefaultUnit: [:],
+            hintZh: "胆道与骨代谢相关酶。", hintEn: "An enzyme related to biliary and bone metabolism.", hintDe: "Enzymarker für Gallenwege und Knochenstoffwechsel."
+        ),
+        HealthMetric(
+            key: "amylase",
+            category: .liver,
+            nameZh: "淀粉酶", nameEn: "Amylase", nameDe: "Amylase",
+            shortNames: ["AMY"],
+            units: [HealthMetricUnit(code: "U_L", label: "U/L", normalLow: 25, normalHigh: 100)],
+            countryDefaultUnit: [:],
+            hintZh: "胰腺与唾液腺相关消化酶。", hintEn: "A digestive enzyme associated with the pancreas and salivary glands.", hintDe: "Verdauungsenzym aus Pankreas und Speicheldrüsen."
+        ),
+        HealthMetric(
+            key: "total_protein",
+            category: .liver,
+            nameZh: "总蛋白", nameEn: "Total Protein", nameDe: "Gesamtprotein",
+            shortNames: ["TP"],
+            units: [
+                HealthMetricUnit(code: "g_L", label: "g/L", normalLow: 64, normalHigh: 83),
+                HealthMetricUnit(code: "g_dL", label: "g/dL", normalLow: 6.4, normalHigh: 8.3)
+            ],
+            countryDefaultUnit: ["US": "g_dL", "DE": "g_dL"],
+            hintZh: "血清蛋白总量。", hintEn: "Total serum protein.", hintDe: "Gesamtkonzentration der Serumproteine."
+        ),
+        HealthMetric(
             key: "alb",
             category: .liver,
             nameZh: "白蛋白", nameEn: "Albumin", nameDe: "Albumin",
@@ -454,14 +506,26 @@ enum HealthMetricCatalog {
         HealthMetric(
             key: "bun",
             category: .kidney,
-            nameZh: "尿素氮", nameEn: "BUN", nameDe: "Harnstoff (BUN)",
-            shortNames: ["BUN"],
+            nameZh: "尿素氮", nameEn: "BUN", nameDe: "Harnstoff-Stickstoff",
+            shortNames: ["BUN", "Harnstoff-N"],
             units: [
                 HealthMetricUnit(code: "mmol_L", label: "mmol/L", normalLow: 2.9, normalHigh: 8.2),
                 HealthMetricUnit(code: "mg_dL", label: "mg/dL", normalLow: 8, normalHigh: 23)
             ],
             countryDefaultUnit: ["US": "mg_dL"],
             hintZh: "肾脏排泄能力 / 蛋白代谢。", hintEn: "Renal excretion / protein metabolism.", hintDe: "Nierenfunktion / Proteinabbau."
+        ),
+        HealthMetric(
+            key: "urea",
+            category: .kidney,
+            nameZh: "尿素", nameEn: "Urea", nameDe: "Harnstoff",
+            shortNames: ["UREA"],
+            units: [
+                HealthMetricUnit(code: "mmol_L", label: "mmol/L", normalLow: 2.8, normalHigh: 7.2),
+                HealthMetricUnit(code: "mg_dL", label: "mg/dL", normalLow: 17, normalHigh: 43)
+            ],
+            countryDefaultUnit: ["US": "mg_dL", "DE": "mg_dL"],
+            hintZh: "蛋白质代谢产物与肾脏排泄指标。", hintEn: "A protein-metabolism product used to assess renal excretion.", hintDe: "Proteinabbauprodukt zur Beurteilung der Nierenausscheidung."
         ),
         HealthMetric(
             key: "egfr",
@@ -489,6 +553,96 @@ enum HealthMetricCatalog {
     // MARK: - 血常规
 
     private static let bloodCount: [HealthMetric] = [
+        HealthMetric(
+            key: "quick",
+            category: .bloodCount,
+            nameZh: "凝血酶原活动度", nameEn: "Quick / Prothrombin Activity", nameDe: "Quick-Wert",
+            shortNames: ["Quick", "PT activity"],
+            units: [HealthMetricUnit(code: "percent", label: "%", normalLow: 70, normalHigh: 120)],
+            countryDefaultUnit: [:],
+            hintZh: "外源性凝血途径筛查。", hintEn: "Screen of the extrinsic coagulation pathway.", hintDe: "Screening des extrinsischen Gerinnungswegs."
+        ),
+        HealthMetric(
+            key: "inr",
+            category: .bloodCount,
+            nameZh: "国际标准化比值", nameEn: "INR", nameDe: "INR",
+            shortNames: ["INR"],
+            units: [HealthMetricUnit(code: "ratio", label: "ratio", normalLow: 0.8, normalHigh: 1.2)],
+            countryDefaultUnit: [:],
+            hintZh: "标准化凝血酶原时间比值。", hintEn: "Standardized prothrombin-time ratio.", hintDe: "Standardisiertes Verhältnis der Prothrombinzeit."
+        ),
+        HealthMetric(
+            key: "aptt",
+            category: .bloodCount,
+            nameZh: "活化部分凝血活酶时间", nameEn: "aPTT", nameDe: "Partielle Thromboplastinzeit",
+            shortNames: ["aPTT", "PTT"],
+            units: [HealthMetricUnit(code: "seconds", label: "s", normalLow: 25, normalHigh: 40)],
+            countryDefaultUnit: [:],
+            hintZh: "内源性凝血途径筛查。", hintEn: "Screen of the intrinsic coagulation pathway.", hintDe: "Screening des intrinsischen Gerinnungswegs."
+        ),
+        HealthMetric(
+            key: "hct",
+            category: .bloodCount,
+            nameZh: "红细胞压积", nameEn: "Hematocrit", nameDe: "Hämatokrit",
+            shortNames: ["HCT"],
+            units: [HealthMetricUnit(code: "percent", label: "%", normalLow: 35, normalHigh: 52)],
+            countryDefaultUnit: [:],
+            hintZh: "红细胞占全血体积比例。", hintEn: "Proportion of blood volume occupied by red cells.", hintDe: "Anteil der Erythrozyten am Blutvolumen."
+        ),
+        HealthMetric(
+            key: "mcv",
+            category: .bloodCount,
+            nameZh: "平均红细胞体积", nameEn: "MCV", nameDe: "Mittleres Erythrozytenvolumen",
+            shortNames: ["MCV"],
+            units: [HealthMetricUnit(code: "fL", label: "fL", normalLow: 80, normalHigh: 100)],
+            countryDefaultUnit: [:],
+            hintZh: "平均红细胞体积。", hintEn: "Mean red-cell volume.", hintDe: "Mittleres Volumen der Erythrozyten."
+        ),
+        HealthMetric(
+            key: "mch",
+            category: .bloodCount,
+            nameZh: "平均红细胞血红蛋白量", nameEn: "MCH", nameDe: "Mittleres korpuskuläres Hämoglobin",
+            shortNames: ["MCH"],
+            units: [HealthMetricUnit(code: "pg", label: "pg", normalLow: 27, normalHigh: 34)],
+            countryDefaultUnit: [:],
+            hintZh: "单个红细胞平均血红蛋白量。", hintEn: "Mean hemoglobin amount per red cell.", hintDe: "Mittlere Hämoglobinmenge pro Erythrozyt."
+        ),
+        HealthMetric(
+            key: "mchc",
+            category: .bloodCount,
+            nameZh: "平均红细胞血红蛋白浓度", nameEn: "MCHC", nameDe: "Mittlere korpuskuläre Hämoglobinkonzentration",
+            shortNames: ["MCHC"],
+            units: [HealthMetricUnit(code: "g_dL", label: "g/dL", normalLow: 31, normalHigh: 36)],
+            countryDefaultUnit: [:],
+            hintZh: "红细胞内平均血红蛋白浓度。", hintEn: "Mean hemoglobin concentration in red cells.", hintDe: "Mittlere Hämoglobinkonzentration in Erythrozyten."
+        ),
+        HealthMetric(
+            key: "rdw_cv",
+            category: .bloodCount,
+            nameZh: "红细胞分布宽度", nameEn: "RDW-CV", nameDe: "Erythrozytenverteilungsbreite",
+            shortNames: ["RDW", "RDW-CV"],
+            units: [HealthMetricUnit(code: "percent", label: "%", normalLow: 11.5, normalHigh: 15)],
+            countryDefaultUnit: [:],
+            hintZh: "红细胞体积差异的变异系数。", hintEn: "Variation in red-cell size.", hintDe: "Variationskoeffizient der Erythrozytengröße."
+        ),
+        HealthMetric(
+            key: "rdw_sd",
+            category: .bloodCount,
+            nameZh: "红细胞分布宽度 SD", nameEn: "RDW-SD", nameDe: "Erythrozytenverteilungsbreite SD",
+            shortNames: ["RDW-SD"],
+            units: [HealthMetricUnit(code: "fL", label: "fL", normalLow: 37, normalHigh: 54)],
+            countryDefaultUnit: [:],
+            hintZh: "红细胞体积分布的标准差。", hintEn: "Standard deviation of red-cell volume.", hintDe: "Standardabweichung der Erythrozytengröße."
+        ),
+        HealthMetric(
+            key: "mpv",
+            category: .bloodCount,
+            nameZh: "平均血小板体积", nameEn: "MPV", nameDe: "Mittleres Thrombozytenvolumen",
+            shortNames: ["MPV"],
+            units: [HealthMetricUnit(code: "fL", label: "fL", normalLow: 7.5, normalHigh: 12.5)],
+            countryDefaultUnit: [:],
+            hintZh: "血小板平均体积。", hintEn: "Mean platelet volume.", hintDe: "Mittleres Volumen der Thrombozyten."
+        ),
         HealthMetric(
             key: "hgb",
             category: .bloodCount,
@@ -527,6 +681,86 @@ enum HealthMetricCatalog {
             units: [HealthMetricUnit(code: "x10_9_L", label: "×10⁹/L", normalLow: 125, normalHigh: 350)],
             countryDefaultUnit: [:],
             hintZh: "凝血与出血风险评估。", hintEn: "Coagulation / bleeding risk.", hintDe: "Gerinnung / Blutungsrisiko."
+        ),
+        HealthMetric(
+            key: "neut_pct", category: .bloodCount,
+            nameZh: "中性粒细胞比例", nameEn: "Neutrophils %", nameDe: "Neutrophile Granulozyten %",
+            shortNames: ["NEUT%"],
+            units: [HealthMetricUnit(code: "percent", label: "%", normalLow: 40, normalHigh: 75)],
+            countryDefaultUnit: [:],
+            hintZh: "中性粒细胞占白细胞比例。", hintEn: "Neutrophil proportion of white cells.", hintDe: "Anteil neutrophiler Granulozyten."
+        ),
+        HealthMetric(
+            key: "neut_abs", category: .bloodCount,
+            nameZh: "中性粒细胞绝对值", nameEn: "Neutrophils Absolute", nameDe: "Neutrophile Granulozyten absolut",
+            shortNames: ["NEUT#"],
+            units: [HealthMetricUnit(code: "x10_9_L", label: "×10⁹/L", normalLow: 1.5, normalHigh: 7.5)],
+            countryDefaultUnit: [:],
+            hintZh: "中性粒细胞绝对计数。", hintEn: "Absolute neutrophil count.", hintDe: "Absolute Zahl neutrophiler Granulozyten."
+        ),
+        HealthMetric(
+            key: "lymph_pct", category: .bloodCount,
+            nameZh: "淋巴细胞比例", nameEn: "Lymphocytes %", nameDe: "Lymphozyten %",
+            shortNames: ["LYM%"],
+            units: [HealthMetricUnit(code: "percent", label: "%", normalLow: 20, normalHigh: 50)],
+            countryDefaultUnit: [:],
+            hintZh: "淋巴细胞占白细胞比例。", hintEn: "Lymphocyte proportion of white cells.", hintDe: "Anteil der Lymphozyten."
+        ),
+        HealthMetric(
+            key: "lymph_abs", category: .bloodCount,
+            nameZh: "淋巴细胞绝对值", nameEn: "Lymphocytes Absolute", nameDe: "Lymphozyten absolut",
+            shortNames: ["LYM#"],
+            units: [HealthMetricUnit(code: "x10_9_L", label: "×10⁹/L", normalLow: 1, normalHigh: 4)],
+            countryDefaultUnit: [:],
+            hintZh: "淋巴细胞绝对计数。", hintEn: "Absolute lymphocyte count.", hintDe: "Absolute Zahl der Lymphozyten."
+        ),
+        HealthMetric(
+            key: "mono_pct", category: .bloodCount,
+            nameZh: "单核细胞比例", nameEn: "Monocytes %", nameDe: "Monozyten %",
+            shortNames: ["MONO%"],
+            units: [HealthMetricUnit(code: "percent", label: "%", normalLow: 2, normalHigh: 12)],
+            countryDefaultUnit: [:],
+            hintZh: "单核细胞占白细胞比例。", hintEn: "Monocyte proportion of white cells.", hintDe: "Anteil der Monozyten."
+        ),
+        HealthMetric(
+            key: "mono_abs", category: .bloodCount,
+            nameZh: "单核细胞绝对值", nameEn: "Monocytes Absolute", nameDe: "Monozyten absolut",
+            shortNames: ["MONO#"],
+            units: [HealthMetricUnit(code: "x10_9_L", label: "×10⁹/L", normalLow: 0.2, normalHigh: 1)],
+            countryDefaultUnit: [:],
+            hintZh: "单核细胞绝对计数。", hintEn: "Absolute monocyte count.", hintDe: "Absolute Zahl der Monozyten."
+        ),
+        HealthMetric(
+            key: "eos_pct", category: .bloodCount,
+            nameZh: "嗜酸性粒细胞比例", nameEn: "Eosinophils %", nameDe: "Eosinophile %",
+            shortNames: ["EOS%"],
+            units: [HealthMetricUnit(code: "percent", label: "%", normalLow: 0, normalHigh: 6)],
+            countryDefaultUnit: [:],
+            hintZh: "嗜酸性粒细胞占白细胞比例。", hintEn: "Eosinophil proportion of white cells.", hintDe: "Anteil der Eosinophilen."
+        ),
+        HealthMetric(
+            key: "eos_abs", category: .bloodCount,
+            nameZh: "嗜酸性粒细胞绝对值", nameEn: "Eosinophils Absolute", nameDe: "Eosinophile absolut",
+            shortNames: ["EOS#"],
+            units: [HealthMetricUnit(code: "x10_9_L", label: "×10⁹/L", normalLow: 0, normalHigh: 0.5)],
+            countryDefaultUnit: [:],
+            hintZh: "嗜酸性粒细胞绝对计数。", hintEn: "Absolute eosinophil count.", hintDe: "Absolute Zahl der Eosinophilen."
+        ),
+        HealthMetric(
+            key: "baso_pct", category: .bloodCount,
+            nameZh: "嗜碱性粒细胞比例", nameEn: "Basophils %", nameDe: "Basophile %",
+            shortNames: ["BASO%"],
+            units: [HealthMetricUnit(code: "percent", label: "%", normalLow: 0, normalHigh: 2)],
+            countryDefaultUnit: [:],
+            hintZh: "嗜碱性粒细胞占白细胞比例。", hintEn: "Basophil proportion of white cells.", hintDe: "Anteil der Basophilen."
+        ),
+        HealthMetric(
+            key: "baso_abs", category: .bloodCount,
+            nameZh: "嗜碱性粒细胞绝对值", nameEn: "Basophils Absolute", nameDe: "Basophile absolut",
+            shortNames: ["BASO#"],
+            units: [HealthMetricUnit(code: "x10_9_L", label: "×10⁹/L", normalLow: 0, normalHigh: 0.1)],
+            countryDefaultUnit: [:],
+            hintZh: "嗜碱性粒细胞绝对计数。", hintEn: "Absolute basophil count.", hintDe: "Absolute Zahl der Basophilen."
         )
     ]
 

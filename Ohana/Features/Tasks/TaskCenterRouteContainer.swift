@@ -191,6 +191,9 @@ struct TaskCenterRouteContainer: View {
             onClaimSystemJourneyReward: { item in
                 claimStarterJourneyReward(for: item)
             },
+            onDismissSuggestion: { item in
+                dismissStarterSuggestion(item)
+            },
             onOpen: openTask,
             onScrollOffsetChange: onEmbeddedScrollOffsetChange
         )
@@ -425,6 +428,9 @@ struct TaskCenterRouteContainer: View {
                 guard !Task.isCancelled, generation == routeDataGeneration else { return }
                 let loaded = TaskCenterRouteData(reference: reference, context: modelContext)
                 routeData = loaded
+                if loaded.pets.contains(where: { !$0.hasPassedAway }) {
+                    StarterPetSuggestionPolicy.markResolved()
+                }
                 refreshFamilyTaskActivities()
                 onPlantsLoaded?(loaded.plants)
                 let actionableSnapshot = loaded.snapshot.filtered(for: .actionRequired)
@@ -745,22 +751,22 @@ struct TaskCenterRouteContainer: View {
 
     private var requestedSystemDestinations: Set<TaskCenterSystemDestination> {
         let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: "ohana_has_onboarded"),
-              defaults.bool(forKey: StarterGiftStorageKey.pending),
-              !defaults.bool(forKey: StarterGiftStorageKey.claimed) else { return [] }
-        return [.createFirstPet, .claimStarterGift]
+        guard defaults.bool(forKey: "ohana_has_onboarded") else { return [] }
+        var destinations: Set<TaskCenterSystemDestination> = []
+        if defaults.bool(forKey: StarterGiftStorageKey.pending),
+           !defaults.bool(forKey: StarterGiftStorageKey.claimed) {
+            destinations.insert(.claimStarterGift)
+        }
+        if defaults.object(forKey: OnboardingJourneyCoordinator.Key.journeyStartedAt) != nil,
+           !defaults.bool(forKey: StarterPetSuggestionStorageKey.resolved) {
+            destinations.insert(.createFirstPet)
+        }
+        return destinations
     }
 
     private var isStarterJourneyEnabled: Bool {
         let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: "ohana_has_onboarded"),
-              !defaults.bool(forKey: StarterGiftStorageKey.pending) else { return false }
-        if defaults.bool(forKey: StarterGiftStorageKey.claimed) {
-            return starterGiftCeremonySeen
-        }
-        // Existing users predate the starter-gift flags. Keep their journey
-        // available instead of reclassifying them as a fresh install.
-        return true
+        return defaults.bool(forKey: "ohana_has_onboarded")
     }
 
     private func starterJourneyState(
@@ -782,6 +788,14 @@ struct TaskCenterRouteContainer: View {
         case .recordFirstCare: .firstCare
         case .createFirstPet, .claimStarterGift, nil: nil
         }
+    }
+
+    private func dismissStarterSuggestion(_ item: TaskCenterItemSnapshot) {
+        guard item.source == .suggestion,
+              item.systemDestination == .createFirstPet else { return }
+        StarterPetSuggestionPolicy.markResolved()
+        OhanaFeedback.light()
+        scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
     }
 }
 
@@ -865,7 +879,9 @@ private extension TaskCenterRouteContainer {
                     HumanBasicInfoDetailView(
                         human: human,
                         startsEditing: true,
-                        onSave: dismissSystemJourneyEditor
+                        requiresStarterProfileFields: true,
+                        onSave: dismissSystemJourneyEditor,
+                        onClose: dismissSystemJourneyEditor
                     )
                 }
             } else {

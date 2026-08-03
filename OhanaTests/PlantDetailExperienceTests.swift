@@ -1359,10 +1359,26 @@ final class PlantDetailExperienceTests: XCTestCase {
         let rootURL = repositoryRootURL()
         let cardSource = try source("Ohana/Features/Workouts/Views/HumanWorkoutCard.swift", rootURL: rootURL)
         let summarySource = try source("Ohana/Features/Workouts/Views/HumanWorkoutSummaryView.swift", rootURL: rootURL)
+        let routeSource = try source("Ohana/Features/Members/HumanDetailSheetRouteContainer.swift", rootURL: rootURL)
+        let healthSummarySource = try source("Ohana/Features/HumanHealth/Summary/HumanHealthSummaryView.swift", rootURL: rootURL)
+        let functionMenuSource = try source("Ohana/Features/FunctionMenu/Views/FunctionMenuDestinationRouter.swift", rootURL: rootURL)
 
-        XCTAssertTrue(cardSource.contains(".sheet(isPresented: $showWorkoutHistory) {\n            HumanWorkoutSummaryView(human: human)\n                .ohanaSheetPagePresentation()"))
-        XCTAssertTrue(summarySource.contains(".frame(maxWidth: .infinity, maxHeight: .infinity)\n            .toolbar(.hidden, for: .navigationBar)"))
-        XCTAssertTrue(summarySource.contains("}\n        .frame(maxWidth: .infinity, maxHeight: .infinity)\n    }"))
+        XCTAssertTrue(cardSource.contains(".sheet(isPresented: $showWorkoutHistory) {\n            NavigationStack {\n                HumanWorkoutSummaryView(human: human)\n            }\n            .ohanaSheetPagePresentation()"))
+        XCTAssertFalse(summarySource.contains("var body: some View {\n        NavigationStack {"))
+        XCTAssertTrue(summarySource.contains(".toolbar(.hidden, for: .navigationBar)"))
+        XCTAssertTrue(routeSource.contains("case .workout:\n                NavigationStack { HumanWorkoutSummaryView(human: human) }"))
+        XCTAssertTrue(routeSource.contains("case .workoutDashboard:\n                NavigationStack { HumanWorkoutSummaryView(human: human) }"))
+        XCTAssertTrue(healthSummarySource.contains("case .workouts:\n                HumanWorkoutSummaryView(human: human)"))
+        XCTAssertTrue(functionMenuSource.contains("case let .humanWorkout(id):\n            if let human = human(for: id) { HumanWorkoutSummaryView(human: human) }"))
+    }
+
+    func testHumanReportSheetProvidesNavigationHost() throws {
+        let rootURL = repositoryRootURL()
+        let routeSource = try source("Ohana/Features/Members/HumanDetailSheetRouteContainer.swift", rootURL: rootURL)
+        let reportSource = try source("Ohana/Features/HumanHealth/Views/HumanHealthReportView.swift", rootURL: rootURL)
+
+        XCTAssertTrue(routeSource.contains("case .report:\n                NavigationStack { HumanHealthReportView(human: human) }"))
+        XCTAssertTrue(reportSource.contains("NavigationLink {\n            HumanHealthReportDetailView(human: human, report: report)"))
     }
 
     private func repositoryRootURL() -> URL {

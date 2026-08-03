@@ -446,9 +446,13 @@ struct ContentView: View {
     }
 
     private var starterGiftAmount: Int? {
+        let requiredHomeProjectionIsReady = StarterGiftClaimPresentationPolicy.isReady(
+            requiredEntityID: pendingStarterGiftHomeEntityID,
+            isRequiredEntitySnapshotReady: isStarterGiftHomeSnapshotReady
+        )
         guard hasOnboarded,
               starterGiftCeremonyRequested,
-              isStarterGiftHomeSnapshotReady,
+              requiredHomeProjectionIsReady,
               case let .starterGiftReady(amount) = onboardingJourneyPhase else {
             return nil
         }
@@ -723,9 +727,9 @@ private extension ContentView {
         guard result.completesClaimRequest else {
             isClaimingStarterGift = false
             starterGiftClaimErrorMessage = L10n(routeLanguageCode).tr(
-                zh: "领取失败，请重试。你的宠物和进度都已保存。",
-                en: "Couldn’t claim the gift. Try again; your pet and progress are saved.",
-                de: "Geschenk konnte nicht abgeholt werden. Versuche es erneut; Tier und Fortschritt sind gespeichert."
+                zh: "领取失败，请重试。你的成员资料和进度都已保存。",
+                en: "Couldn’t claim the gift. Try again; your profile and progress are saved.",
+                de: "Geschenk konnte nicht abgeholt werden. Profil und Fortschritt sind gespeichert."
             )
             return
         }

@@ -717,7 +717,8 @@ enum PresenceCheckInReadService {
                 light: plant.lightLevel,
                 health: plant.healthStatus,
                 localization: l
-            )
+            ),
+            plantCompanionStartedAt: referenceDate
         )
     }
 
@@ -891,7 +892,8 @@ enum PresenceCheckInReadService {
             FetchDescriptor<Plant>(sortBy: [SortDescriptor(\.createdAt), SortDescriptor(\.name)])
         )
         results += plants.map {
-            PresenceSubjectSnapshot(
+            let companionStartedAt = $0.acquiredDate ?? $0.createdAt
+            return PresenceSubjectSnapshot(
                 subject: .init(kind: .plant, id: $0.id),
                 name: $0.name,
                 avatarEmoji: $0.avatarEmoji,
@@ -902,6 +904,9 @@ enum PresenceCheckInReadService {
                 isOwner: false,
                 isCheckedInToday: false,
                 status: nil,
+                expandedProfile: ZenExpandedProfileDTO(
+                    plantCompanionStartedAt: companionStartedAt
+                ),
                 isActive: !$0.isArchived,
                 isAnonymousHistory: false
             )

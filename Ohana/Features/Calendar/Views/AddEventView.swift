@@ -152,7 +152,11 @@ struct AddEventContentView: View {
         _recurrenceDays = State(initialValue: initial.recurrenceDays)
         _recurrenceEndDate = State(initialValue: initial.recurrenceEndDate)
         _reminderLeadOption = State(initialValue: initial.reminderLeadOption)
-        _hasReminder = State(initialValue: initial.hasReminder)
+        _hasReminder = State(
+            initialValue: ProcessInfo.processInfo.environment[
+                "OHANA_UI_TEST_ADD_EVENT_REMINDER_DEFAULT_OFF"
+            ] == "1" ? false : initial.hasReminder
+        )
         _assigneeId = State(initialValue: initial.assigneeId)
     }
 
@@ -300,26 +304,16 @@ extension AddEventContentView {
                         }
                         .accessibilityIdentifier("add-event-locked-care-subject")
                     } else {
-                        Picker(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen"), selection: relatedEntitySelection) {
-                            Label(l.tr(zh: "无", en: "None", de: "Keine"), systemImage: "circle.slash")
-                                .tag("")
-                            ForEach(activePlants) { plant in
-                                Label(plant.name, systemImage: "leaf.fill")
-                                    .tag("\(EntityKind.plant.rawValue)|\(plant.id.uuidString)")
-                                    .accessibilityIdentifier("add-event-related-plant-\(plant.name)")
-                            }
-                            ForEach(activePets) { pet in
-                                Label(pet.name, systemImage: "pawprint.fill")
-                                    .tag("\(EntityKind.pet.rawValue)|\(pet.id.uuidString)")
-                                    .accessibilityIdentifier("add-event-related-pet-\(pet.name)")
-                            }
-                            ForEach(activeHumans) { human in
-                                Label(human.name, systemImage: "person.fill")
-                                    .tag("\(EntityKind.human.rawValue)|\(human.id.uuidString)")
-                                    .accessibilityIdentifier("add-event-related-human-\(human.name)")
-                            }
+                        LabeledContent(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen")) {
+                            Label(selectedRelatedEntityTitle, systemImage: selectedRelatedEntityIcon)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen"))
                         .accessibilityIdentifier("add-event-related-entity-picker")
+                        .accessibilityValue(selectedRelatedEntityTitle)
+
+                        relatedEntityOptions
                     }
                 }
 
@@ -429,6 +423,7 @@ extension AddEventContentView {
                     }
                 }
             }
+            .accessibilityIdentifier("add-event-form")
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(editorTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -503,17 +498,100 @@ extension AddEventContentView {
         }
     }
 
-    private var relatedEntitySelection: Binding<String> {
-        Binding(
-            get: {
-                guard !relatedEntityType.isEmpty, !relatedEntityId.isEmpty else { return "" }
-                return "\(relatedEntityType)|\(relatedEntityId)"
-            },
-            set: { value in
-                let parts = value.split(separator: "|", maxSplits: 1).map(String.init)
-                relatedEntityType = parts.first ?? ""
-                relatedEntityId = parts.count == 2 ? parts[1] : ""
+    private var selectedRelatedEntityTitle: String {
+        if relatedEntityType == EntityKind.plant.rawValue,
+           let plant = activePlants.first(where: { $0.id.uuidString == relatedEntityId }) {
+            return plant.name
+        }
+        if relatedEntityType == EntityKind.pet.rawValue,
+           let pet = activePets.first(where: { $0.id.uuidString == relatedEntityId }) {
+            return pet.name
+        }
+        if relatedEntityType == EntityKind.human.rawValue,
+           let human = activeHumans.first(where: { $0.id.uuidString == relatedEntityId }) {
+            return human.name
+        }
+        return l.tr(zh: "无", en: "None", de: "Keine")
+    }
+
+    private var selectedRelatedEntityIcon: String {
+        switch relatedEntityType {
+        case EntityKind.plant.rawValue: "leaf.fill"
+        case EntityKind.pet.rawValue: "pawprint.fill"
+        case EntityKind.human.rawValue: "person.fill"
+        default: "circle.slash"
+        }
+    }
+
+    @ViewBuilder
+    private var relatedEntityOptions: some View {
+        relatedEntitySelectionButton(
+            title: l.tr(zh: "无", en: "None", de: "Keine"),
+            icon: "circle.slash",
+            identifier: "add-event-related-none",
+            type: "",
+            id: ""
+        )
+
+        ForEach(activePlants) { plant in
+            relatedEntitySelectionButton(
+                title: plant.name,
+                icon: "leaf.fill",
+                identifier: "add-event-related-plant-\(plant.name)",
+                type: EntityKind.plant.rawValue,
+                id: plant.id.uuidString
+            )
+        }
+
+        ForEach(activePets) { pet in
+            relatedEntitySelectionButton(
+                title: pet.name,
+                icon: "pawprint.fill",
+                identifier: "add-event-related-pet-\(pet.name)",
+                type: EntityKind.pet.rawValue,
+                id: pet.id.uuidString
+            )
+        }
+
+        ForEach(activeHumans) { human in
+            relatedEntitySelectionButton(
+                title: human.name,
+                icon: "person.fill",
+                identifier: "add-event-related-human-\(human.name)",
+                type: EntityKind.human.rawValue,
+                id: human.id.uuidString
+            )
+        }
+    }
+
+    private func relatedEntitySelectionButton(
+        title: String,
+        icon: String,
+        identifier: String,
+        type: String,
+        id: String
+    ) -> some View {
+        Button {
+            relatedEntityType = type
+            relatedEntityId = id
+        } label: {
+            HStack {
+                Label(title, systemImage: icon)
+                Spacer()
+                if relatedEntityType == type, relatedEntityId == id {
+                    Image(systemName: "checkmark") // a11y: allow decorative selection mark; the Button exposes the selected trait
+                        .foregroundStyle(Color.goPrimary)
+                        .accessibilityHidden(true)
+                }
             }
+            .contentShape(Rectangle())
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(identifier)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(
+            relatedEntityType == type && relatedEntityId == id ? .isSelected : []
         )
     }
 

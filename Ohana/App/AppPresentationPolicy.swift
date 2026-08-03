@@ -349,6 +349,8 @@ private extension AppSheetRoute {
             "humanWorkoutDashboard"
         case .humanMetrics:
             "humanMetrics"
+        case .humanConditions:
+            "humanConditions"
         case .humanReport:
             "humanReport"
         case .humanExpenseQuick:

@@ -38,18 +38,6 @@ extension CoconutShopView {
                 icon: "checkmark.circle.fill",
                 tint: Color.goPrimary
             )
-        case .refunded:
-            blockedPurchaseItemIDs.remove(itemID)
-            OhanaFeedback.success()
-            showToast(
-                l.tr(
-                    zh: "原付款已安全退回，没有再次扣款。",
-                    en: "The original payment was safely refunded without another charge.",
-                    de: "Die ursprüngliche Zahlung wurde ohne erneute Belastung sicher erstattet."
-                ),
-                icon: "arrow.uturn.backward.circle.fill",
-                tint: Color.goTeal
-            )
         case .retryScheduled:
             blockedPurchaseItemIDs.remove(itemID)
             OhanaFeedback.warning()
@@ -87,27 +75,27 @@ extension CoconutShopView {
             )
         case "catalogPriceChanged":
             l.tr(
-                zh: "商品价格与原付款记录不一致，已停止自动处理以避免错误结算。",
-                en: "The current item price does not match the original payment, so automatic settlement remains stopped.",
-                de: "Der aktuelle Artikelpreis stimmt nicht mit der ursprünglichen Zahlung überein; die automatische Abwicklung bleibt daher gestoppt."
+                zh: "商品价格已经更新；原订单仍按成交时金额保留，可继续尝试应用。",
+                en: "The item price changed. The original order keeps its purchase amount and can continue application.",
+                de: "Der Artikelpreis hat sich geändert. Die ursprüngliche Bestellung behält ihren Kaufbetrag und kann weiter angewendet werden."
             )
         case "missingFundingSnapshot":
             l.tr(
-                zh: "原付款成员明细不完整，无法确认应退给谁；本机记录不会被删除。",
-                en: "The original payer snapshot is incomplete, so a safe refund recipient cannot be confirmed. The local record will not be removed.",
-                de: "Die ursprüngliche Zahlerübersicht ist unvollständig; ein sicherer Erstattungsempfänger kann nicht bestätigt werden. Der lokale Datensatz wird nicht entfernt."
+                zh: "旧订单的出资明细不完整；成交记录仍会保留，并只继续应用商品。",
+                en: "The legacy payer snapshot is incomplete. The final-sale record remains and recovery only continues applying the item.",
+                de: "Die Zahlerübersicht der älteren Bestellung ist unvollständig. Der endgültige Kauf bleibt erhalten und die Wiederherstellung setzt nur die Anwendung fort."
             )
         case "invalidFundingSnapshot":
             l.tr(
-                zh: "原付款明细未通过安全校验；系统会仅依据原始扣款账本尝试重建，不会再次扣款。",
-                en: "The original payer details failed validation. Recovery will only use the original debit ledger and cannot charge again.",
-                de: "Die ursprünglichen Zahlerdaten haben die Sicherheitsprüfung nicht bestanden. Die Wiederherstellung verwendet nur das ursprüngliche Belastungsjournal und belastet nicht erneut."
+                zh: "旧订单的出资明细未通过校验；系统只继续原商品应用，不会再次扣款。",
+                en: "The legacy payer details failed validation. Recovery only continues the original item application and cannot charge again.",
+                de: "Die Zahlerdaten der älteren Bestellung haben die Prüfung nicht bestanden. Die Wiederherstellung setzt nur die ursprüngliche Anwendung ohne erneute Belastung fort."
             )
         case "missingOrFrozenRefundRecipient":
             l.tr(
-                zh: "原付款成员不存在或钱包已冻结；恢复该成员后可重新尝试退款。",
-                en: "An original payer is missing or has a frozen wallet. Restore that member before retrying the refund.",
-                de: "Ein ursprünglicher Zahler fehlt oder hat ein eingefrorenes Wallet. Stelle das Mitglied wieder her, bevor du die Erstattung erneut versuchst."
+                zh: "这是旧版退款流程留下的状态；现在会保留成交并改为继续应用商品。",
+                en: "This state came from the legacy refund flow. The purchase now remains final and recovery continues applying the item.",
+                de: "Dieser Status stammt aus dem früheren Erstattungsablauf. Der Kauf bleibt jetzt endgültig und die Anwendung wird fortgesetzt."
             )
         case "unsupportedFulfillmentKind":
             l.tr(
@@ -117,15 +105,15 @@ extension CoconutShopView {
             )
         case "invalidPurchaseSnapshot":
             l.tr(
-                zh: "商品与原兑换记录不一致，自动结算已安全停止；本机记录会继续保留。",
-                en: "The item does not match the original redemption record, so automatic settlement remains safely stopped. The local record is preserved.",
-                de: "Der Artikel stimmt nicht mit dem ursprünglichen Einlösungsdatensatz überein; die automatische Abwicklung bleibt sicher gestoppt. Der lokale Datensatz bleibt erhalten."
+                zh: "商品与旧兑换记录不一致；本机成交记录会保留，可在目录恢复后继续应用。",
+                en: "The item does not match the legacy redemption record. The final-sale record remains and can continue once the catalog is restored.",
+                de: "Der Artikel stimmt nicht mit dem älteren Einlösedatensatz überein. Der endgültige Kauf bleibt erhalten und kann nach Wiederherstellung des Katalogs fortgesetzt werden."
             )
         case "legacyFulfillmentUnverifiable":
             l.tr(
-                zh: "旧版兑换可能已经发放，但缺少可靠的幂等凭据；为避免重复发放或错误退款，已停止自动处理。",
-                en: "This legacy redemption may already have been fulfilled but lacks reliable idempotency evidence. Automatic processing is stopped to avoid a duplicate grant or incorrect refund.",
-                de: "Diese ältere Einlösung wurde möglicherweise bereits erfüllt, besitzt aber keinen verlässlichen Idempotenznachweis. Die automatische Verarbeitung wurde gestoppt, um eine doppelte Gewährung oder falsche Erstattung zu vermeiden."
+                zh: "旧版兑换可能已经发放，但缺少可靠的幂等凭据；为避免重复发放，已停止自动处理。",
+                en: "This legacy redemption may already have been fulfilled but lacks reliable idempotency evidence. Automatic processing is stopped to avoid a duplicate grant.",
+                de: "Diese ältere Einlösung wurde möglicherweise bereits erfüllt, besitzt aber keinen verlässlichen Idempotenznachweis. Die automatische Verarbeitung wurde gestoppt, um eine doppelte Gewährung zu vermeiden."
             )
         case "manualReviewAttemptUnavailable":
             l.tr(
@@ -326,22 +314,50 @@ extension CoconutShopView {
                         refreshData()
                     }
                 case let .failure(error):
-                    let refunded = refundPurchase(item, purchase: result, reason: "appIconApplyFailed")
                     purchaseInFlightItemID = nil
-                    OhanaFeedback.error()
-                    let message = refunded
-                        ? l.tr(
-                            zh: "图标切换失败，已退回 \(item.cost)🥥。\(error.localizedDescription)",
-                            en: "The icon could not be changed. \(item.cost)🥥 was refunded. \(error.localizedDescription)",
-                            de: "Das Symbol konnte nicht geändert werden. \(item.cost)🥥 wurden erstattet. \(error.localizedDescription)"
+                    do {
+                        let ownershipSaved = try appServices.shopPurchaseFulfillment.completeAppIconPurchase(
+                            item: item,
+                            purchase: result,
+                            context: modelContext
                         )
-                        : l.tr(
-                            zh: "图标切换失败，退款也未能保存。请不要重复兑换并稍后重试。",
-                            en: "The icon change failed and the refund could not be saved. Do not redeem again; try later.",
-                            de: "Symbolwechsel und Erstattung konnten nicht gespeichert werden. Nicht erneut einlösen; später versuchen."
+                        guard ownershipSaved else {
+                            setPurchaseError(
+                                pendingAppIconFinalizationMessage,
+                                itemID: item.id,
+                                blocksRetry: true
+                            )
+                            refreshData()
+                            return
+                        }
+                        blockedPurchaseItemIDs.remove(item.id)
+                        pendingPurchaseItem = nil
+                        refreshData()
+                        OhanaFeedback.warning()
+                        showToast(
+                            l.tr(
+                                zh: "图标已归你所有，但系统暂未切换。可稍后在百宝箱重试，不会再次扣款。\(error.localizedDescription)",
+                                en: "You own this icon, but the system did not switch it. Retry later from the Treasure Box without another charge. \(error.localizedDescription)",
+                                de: "Das Symbol gehört dir, wurde vom System aber nicht gewechselt. Versuche es später ohne erneute Belastung in der Schatzkiste. \(error.localizedDescription)",
+                                es: "El icono ya es tuyo, pero el sistema no lo cambió. Inténtalo más tarde desde el cofre sin otro cargo. \(error.localizedDescription)",
+                                pt: "O ícone já é seu, mas o sistema não o trocou. Tente depois no baú sem nova cobrança. \(error.localizedDescription)",
+                                fr: "L’icône vous appartient, mais le système ne l’a pas activée. Réessayez plus tard depuis le coffre sans nouveau débit. \(error.localizedDescription)",
+                                ja: "アイコンは所有済みですが、システムで切り替えられませんでした。追加料金なしで宝箱から後ほど再試行できます。\(error.localizedDescription)",
+                                ko: "아이콘은 소유되었지만 시스템에서 전환하지 못했습니다. 추가 결제 없이 보물 상자에서 나중에 다시 시도하세요. \(error.localizedDescription)",
+                                it: "L’icona è tua, ma il sistema non l’ha attivata. Riprova più tardi dal forziere senza nuovi addebiti. \(error.localizedDescription)"
+                            ),
+                            icon: "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90",
+                            tint: Color.goOrange
                         )
-                    setPurchaseError(message, itemID: item.id, blocksRetry: !refunded)
-                    if !refunded { refreshData() }
+                    } catch {
+                        OhanaFeedback.warning()
+                        setPurchaseError(
+                            pendingAppIconFinalizationMessage,
+                            itemID: item.id,
+                            blocksRetry: true
+                        )
+                        refreshData()
+                    }
                 }
             }
         }
@@ -365,22 +381,26 @@ extension CoconutShopView {
         enqueueShopPurchase(item, note: "coconutShop.purchase") { result in
             if item.isConsumable {
                 guard activateBoost(item, purchase: result) else {
-                    let refunded = refundPurchasedConsumable(item, purchase: result)
                     purchaseInFlightItemID = nil
+                    pendingPurchaseItem = nil
+                    blockedPurchaseItemIDs.insert(item.id)
                     OhanaFeedback.warning()
-                    let message = refunded
-                        ? l.tr(
-                            zh: "这个道具当前无法生效，已退回 \(item.cost)🥥。",
-                            en: "This item could not be activated. \(item.cost)🥥 was refunded.",
-                            de: "Dieser Artikel konnte nicht aktiviert werden. \(item.cost)🥥 wurden erstattet."
-                        )
-                        : l.tr(
-                            zh: "道具未能生效，退款也未能保存。请不要重复兑换并稍后重试。",
-                            en: "The item was not activated and the refund could not be saved. Do not redeem again; try later.",
-                            de: "Artikel und Erstattung konnten nicht gespeichert werden. Nicht erneut einlösen; später versuchen."
-                        )
-                    setPurchaseError(message, itemID: item.id, blocksRetry: !refunded)
-                    if !refunded { refreshData() }
+                    refreshData()
+                    showToast(
+                        l.tr(
+                            zh: "购买已完成，商品正在继续应用。权益会保留且不会再次扣款，请稍后在商店重试恢复。",
+                            en: "The purchase is complete and application will continue. Your entitlement is preserved with no second charge; retry recovery from the shop later.",
+                            de: "Der Kauf ist abgeschlossen und die Anwendung wird fortgesetzt. Dein Anspruch bleibt ohne erneute Belastung erhalten; versuche die Wiederherstellung später im Shop erneut.",
+                            es: "La compra se completó y la aplicación continuará. El derecho se conserva sin otro cargo; reintenta la recuperación más tarde en la tienda.",
+                            pt: "A compra foi concluída e a aplicação continuará. O direito fica preservado sem nova cobrança; tente a recuperação depois na loja.",
+                            fr: "L’achat est terminé et l’application va continuer. Votre droit est conservé sans nouveau débit ; relancez la récupération plus tard dans la boutique.",
+                            ja: "購入は完了し、適用処理は継続されます。権利は保持され再課金されません。後ほどショップで復旧を再試行してください。",
+                            ko: "구매가 완료되었으며 적용은 계속됩니다. 권리는 유지되고 추가 결제되지 않으니 나중에 상점에서 복구를 다시 시도하세요.",
+                            it: "L’acquisto è completato e l’applicazione continuerà. Il diritto resta valido senza nuovi addebiti; riprova il recupero più tardi nel negozio."
+                        ),
+                        icon: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                        tint: Color.goOrange
+                    )
                     return
                 }
             } else {
@@ -445,6 +465,39 @@ extension CoconutShopView {
                     en: "This wallet is frozen. History remains available.",
                     de: "Dieses Wallet ist eingefroren. Der Verlauf bleibt sichtbar."
                 )
+            case let .applicationUnavailable(requirement):
+                switch requirement {
+                case .none:
+                    l.tr(
+                        zh: "这个商品当前无法应用。",
+                        en: "This item cannot be applied right now.",
+                        de: "Dieser Artikel kann gerade nicht angewendet werden."
+                    )
+                case .activePet:
+                    l.tr(
+                        zh: "请先添加一位在世宠物。",
+                        en: "Add an active pet first.",
+                        de: "Füge zuerst ein aktives Tier hinzu.",
+                        es: "Añade primero una mascota activa.",
+                        pt: "Adicione primeiro um pet ativo.",
+                        fr: "Ajoutez d’abord un animal actif.",
+                        ja: "先に有効なペットを追加してください。",
+                        ko: "먼저 활성 반려동물을 추가하세요.",
+                        it: "Aggiungi prima un animale attivo."
+                    )
+                case .activeDog:
+                    l.tr(
+                        zh: "请先添加一位在世狗狗。",
+                        en: "Add an active dog first.",
+                        de: "Füge zuerst einen aktiven Hund hinzu.",
+                        es: "Añade primero un perro activo.",
+                        pt: "Adicione primeiro um cão ativo.",
+                        fr: "Ajoutez d’abord un chien actif.",
+                        ja: "先に有効な犬を追加してください。",
+                        ko: "먼저 활성 반려견을 추가하세요.",
+                        it: "Aggiungi prima un cane attivo."
+                    )
+                }
             case .backupOrRestoreInProgress:
                 l.tr(
                     zh: "正在备份或恢复数据，请完成后再兑换。",
@@ -491,9 +544,26 @@ extension CoconutShopView {
 
     func showPurchaseSuccess(_ item: ShopItem) {
         OhanaFeedback.success()
-        let message = item.isConsumable
-            ? l.tr(zh: "「\(item.name(l))」已生效", en: "\(item.name(l)) is active", de: "\(item.name(l)) ist aktiv")
-            : l.tr(zh: "「\(item.name(l))」已加入百宝箱", en: "\(item.name(l)) unlocked", de: "\(item.name(l)) freigeschaltet")
+        let message: String = switch item.application {
+        case .avatarPass, .backdatePasses:
+            l.tr(
+                zh: "「\(item.name(l))」已加入百宝箱",
+                en: "\(item.name(l)) was added to the Treasure Box",
+                de: "\(item.name(l)) wurde der Schatzkiste hinzugefügt"
+            )
+        case .goldenLuck, .streakShield, .treeEnergy:
+            l.tr(
+                zh: "「\(item.name(l))」已生效",
+                en: "\(item.name(l)) is active",
+                de: "\(item.name(l)) ist aktiv"
+            )
+        default:
+            l.tr(
+                zh: "「\(item.name(l))」已解锁并应用",
+                en: "\(item.name(l)) was unlocked and applied",
+                de: "\(item.name(l)) wurde freigeschaltet und angewendet"
+            )
+        }
         showToast(message, icon: "checkmark.circle.fill", tint: Color.goPrimary)
     }
 
@@ -536,55 +606,23 @@ extension CoconutShopView {
         )
     }
 
-    func refundPurchasedConsumable(_ item: ShopItem, purchase: ShopPurchaseCommandResult) -> Bool {
-        refundPurchase(item, purchase: purchase, reason: "consumableActivationFailed")
-    }
-
-    func refundPurchase(_ item: ShopItem, purchase: ShopPurchaseCommandResult, reason: String) -> Bool {
-        let title = l.tr(
-            zh: "退回「\(item.name(l))」",
-            en: "Refunded \(item.name(l))",
-            de: "\(item.name(l)) erstattet"
-        )
-        do {
-            let didRefund = try appServices.shopPurchaseFulfillment.refundPurchase(
-                item: item,
-                purchase: purchase,
-                humans: humans,
-                context: modelContext,
-                services: appServices,
-                title: title,
-                reason: reason
-            )
-            if didRefund {
-                blockedPurchaseItemIDs.remove(item.id)
-                refreshData()
-            }
-            return didRefund
-        } catch {
-            modelContext.rollback()
-            appServices.coconutWallet.refreshQuestProjection(context: modelContext, manager: appServices.questManager)
-            return false
-        }
-    }
-
     func activateOwnedItem(_ item: ShopItem) {
-        switch item.id {
-        case "fx_lime_glow":
+        switch item.application {
+        case .effect(.limeGlow):
             equipFxLimeGlow = true
-        case "fx_rainbow":
+        case .effect(.rainbowTrail):
             equipFxRainbow = true
-        case "fx_rainbow_poop":
+        case .effect(.rainbowPoop):
             equipFxRainbowPoop = true
-        case "fx_popout_card":
+        case .effect(.popoutCard):
             equipFxPopoutCard = true
-        case "fx_stars":
+        case .effect(.starfall):
             equipFxStars = true
-        case "fx_firework":
+        case .effect(.firework):
             equipFxFirework = true
-        case let itemID where OasisPlantDecorID.isPlantDecor(itemID):
-            equipPlantDecor(itemID)
-        case "title_guardian", "title_pioneer", "title_chef":
+        case .plantDecor:
+            equipPlantDecor(item.id)
+        case .title:
             equippedTitle = item.id
         default:
             break
@@ -592,15 +630,15 @@ extension CoconutShopView {
     }
 
     func isOwnedItemEquipped(_ item: ShopItem) -> Bool {
-        switch item.id {
-        case "fx_lime_glow": equipFxLimeGlow
-        case "fx_rainbow": equipFxRainbow
-        case "fx_rainbow_poop": equipFxRainbowPoop
-        case "fx_popout_card": equipFxPopoutCard && activePets.contains { $0.cardStyleRaw == "popout" }
-        case "fx_stars": equipFxStars
-        case "fx_firework": equipFxFirework
-        case let itemID where OasisPlantDecorID.isPlantDecor(itemID): isPlantDecorEquipped(itemID)
-        case "title_guardian", "title_pioneer", "title_chef": equippedTitle == item.id
+        switch item.application {
+        case .effect(.limeGlow): equipFxLimeGlow
+        case .effect(.rainbowTrail): equipFxRainbow
+        case .effect(.rainbowPoop): equipFxRainbowPoop
+        case .effect(.popoutCard): equipFxPopoutCard && activePets.contains { $0.cardStyleRaw == "popout" }
+        case .effect(.starfall): equipFxStars
+        case .effect(.firework): equipFxFirework
+        case .plantDecor: isPlantDecorEquipped(item.id)
+        case .title: equippedTitle == item.id
         default: false
         }
     }
@@ -626,15 +664,15 @@ extension CoconutShopView {
 
     func activeConsumableStatus(for item: ShopItem) -> String? {
         let snapshot = appServices.shopInventory.consumableSnapshot()
-        switch item.id {
-        case "boost_double":
+        switch item.application {
+        case .goldenLuck:
             return snapshot.isDoubleRewardBoostActive ? l.tr(zh: "已激活", en: "Active", de: "Aktiv") : nil
-        case "boost_streak":
+        case .streakShield:
             if let expiry = snapshot.streakShieldExpiry, expiry > Date() {
                 return l.tr(zh: "保护中", en: "Protected", de: "Geschützt")
             }
             return nil
-        case Avatar2DAccess.shopItemId:
+        case .avatarPass:
             let count = Avatar2DAccess.extraPassCount
             return count > 0 ? l.tr(zh: "库存 \(count) 张", en: "\(count) available", de: "\(count) verfügbar") : nil
         default:

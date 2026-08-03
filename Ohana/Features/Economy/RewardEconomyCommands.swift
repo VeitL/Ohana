@@ -457,6 +457,7 @@ enum BackdateCheckInCommandService {
 enum ShopPurchaseFailure: Equatable {
     case invalidItem
     case missingActiveHuman
+    case applicationUnavailable(ShopApplicationRequirement)
     case insufficientBalance(missing: Int)
     case walletFrozen
     case backupOrRestoreInProgress
@@ -478,30 +479,6 @@ struct ShopPurchaseCommandResult: Equatable {
 nonisolated struct ShopPurchaseFundingContribution: Codable, Equatable, Sendable {
     let humanID: UUID
     let amount: Int
-}
-
-nonisolated enum ShopPurchaseFundingSnapshotValidator {
-    static func isValid(
-        _ contributions: [ShopPurchaseFundingContribution],
-        expectedTotal: Int
-    ) -> Bool {
-        guard expectedTotal >= 0 else { return false }
-        guard expectedTotal > 0 else { return contributions.isEmpty }
-        guard !contributions.isEmpty else { return false }
-
-        var seenHumanIDs = Set<UUID>()
-        var total = 0
-        for contribution in contributions {
-            guard contribution.amount > 0,
-                  seenHumanIDs.insert(contribution.humanID).inserted else {
-                return false
-            }
-            let addition = total.addingReportingOverflow(contribution.amount)
-            guard !addition.overflow else { return false }
-            total = addition.partialValue
-        }
-        return total == expectedTotal
-    }
 }
 
 nonisolated struct ShopPurchaseFulfillmentPayload: Codable, Equatable, Sendable {
@@ -678,87 +655,79 @@ enum ShopPurchaseCommandService {
               submittedItem.category == item.category,
               submittedItem.isConsumable == item.isConsumable,
               submittedItem.appIcon == item.appIcon else {
-            return .finished(ShopPurchaseCommandResult(
-                attemptID: nil,
+            return .finished(purchaseFailure(
+                item: submittedItem,
                 humanID: buyer?.id,
-                itemID: submittedItem.id,
-                cost: submittedItem.cost,
-                didPurchase: false,
-                failure: .invalidItem,
-                ledgerEventID: nil,
-                transactionKey: nil,
-                fundingContributions: []
+                failure: .invalidItem
+            ))
+        }
+        if !ShopCatalog.isSellable(itemID: item.id) {
+            do {
+                // Historical items are not new-sale eligible, but an existing
+                // final-sale outbox must remain resumable without another
+                // charge after the item leaves the visible shelf.
+                if let pending = try pendingAttempt(itemID: item.id, context: context) {
+                    return .finished(pendingResult(for: pending))
+                }
+            } catch {
+                return .finished(purchaseFailure(
+                    item: item,
+                    humanID: buyer?.id,
+                    failure: .persistenceFailed
+                ))
+            }
+            return .finished(purchaseFailure(
+                item: item,
+                humanID: buyer?.id,
+                failure: .invalidItem
             ))
         }
         guard item.cost > 0 else {
-            return .finished(ShopPurchaseCommandResult(
-                attemptID: nil,
-                humanID: buyer?.id,
-                itemID: item.id,
-                cost: item.cost,
-                didPurchase: true,
-                failure: nil,
-                ledgerEventID: nil,
-                transactionKey: nil,
-                fundingContributions: []
-            ))
+            return .finished(purchaseWithoutCharge(item: item, humanID: buyer?.id))
         }
         guard let buyer else {
-            return .finished(ShopPurchaseCommandResult(
-                attemptID: nil,
+            return .finished(purchaseFailure(
+                item: item,
                 humanID: nil,
-                itemID: item.id,
-                cost: item.cost,
-                didPurchase: false,
-                failure: .missingActiveHuman,
-                ledgerEventID: nil,
-                transactionKey: nil,
-                fundingContributions: []
+                failure: .missingActiveHuman
             ))
         }
         guard EconomyWalletWritePolicy.canWrite(buyer) else {
-            return .finished(ShopPurchaseCommandResult(
-                attemptID: nil,
+            return .finished(purchaseFailure(
+                item: item,
                 humanID: buyer.id,
-                itemID: item.id,
-                cost: item.cost,
-                didPurchase: false,
-                failure: .walletFrozen,
-                ledgerEventID: nil,
-                transactionKey: nil,
-                fundingContributions: []
+                failure: .walletFrozen
+            ))
+        }
+        do {
+            if let requirement = try unmetApplicationRequirement(for: item, context: context) {
+                return .finished(purchaseFailure(
+                    item: item,
+                    humanID: buyer.id,
+                    failure: .applicationUnavailable(requirement)
+                ))
+            }
+        } catch {
+            return .finished(purchaseFailure(
+                item: item,
+                humanID: buyer.id,
+                failure: .persistenceFailed
             ))
         }
         if !item.isConsumable {
             do {
                 if try ShopPurchaseRecordStore.isOwned(itemID: item.id, context: context) {
-                    return .finished(ShopPurchaseCommandResult(
-                        attemptID: nil,
-                        humanID: buyer.id,
-                        itemID: item.id,
-                        cost: item.cost,
-                        didPurchase: true,
-                        failure: nil,
-                        ledgerEventID: nil,
-                        transactionKey: nil,
-                        fundingContributions: []
-                    ))
+                    return .finished(purchaseWithoutCharge(item: item, humanID: buyer.id))
                 }
                 if item.appIcon != nil,
                    let pending = try pendingAttempt(itemID: item.id, context: context) {
                     return .finished(pendingResult(for: pending))
                 }
             } catch {
-                return .finished(ShopPurchaseCommandResult(
-                    attemptID: nil,
+                return .finished(purchaseFailure(
+                    item: item,
                     humanID: buyer.id,
-                    itemID: item.id,
-                    cost: item.cost,
-                    didPurchase: false,
-                    failure: .persistenceFailed,
-                    ledgerEventID: nil,
-                    transactionKey: nil,
-                    fundingContributions: []
+                    failure: .persistenceFailed
                 ))
             }
         }
@@ -768,20 +737,32 @@ enum ShopPurchaseCommandService {
                     return .finished(pendingResult(for: pending))
                 }
             } catch {
-                return .finished(ShopPurchaseCommandResult(
-                    attemptID: nil,
+                return .finished(purchaseFailure(
+                    item: item,
                     humanID: buyer.id,
-                    itemID: item.id,
-                    cost: item.cost,
-                    didPurchase: false,
-                    failure: .persistenceFailed,
-                    ledgerEventID: nil,
-                    transactionKey: nil,
-                    fundingContributions: []
+                    failure: .persistenceFailed
                 ))
             }
         }
         return .ready(item, buyer)
+    }
+
+    private static func unmetApplicationRequirement(
+        for item: ShopItem,
+        context: ModelContext
+    ) throws -> ShopApplicationRequirement? {
+        let requirement = item.applicationRequirement
+        guard requirement != .none else { return nil }
+        let pets = try context.fetch(FetchDescriptor<Pet>())
+            .filter(EconomyWalletWritePolicy.canWrite)
+        switch requirement {
+        case .none:
+            return nil
+        case .activePet:
+            return pets.isEmpty ? requirement : nil
+        case .activeDog:
+            return pets.contains(where: { Pet.isDogSpecies($0.species) }) ? nil : requirement
+        }
     }
 
     private static func preparePurchase(
@@ -888,6 +869,23 @@ enum ShopPurchaseCommandService {
             cost: item.cost,
             didPurchase: false,
             failure: failure,
+            ledgerEventID: nil,
+            transactionKey: nil,
+            fundingContributions: []
+        )
+    }
+
+    private static func purchaseWithoutCharge(
+        item: ShopItem,
+        humanID: UUID?
+    ) -> ShopPurchaseCommandResult {
+        ShopPurchaseCommandResult(
+            attemptID: nil,
+            humanID: humanID,
+            itemID: item.id,
+            cost: item.cost,
+            didPurchase: true,
+            failure: nil,
             ledgerEventID: nil,
             transactionKey: nil,
             fundingContributions: []

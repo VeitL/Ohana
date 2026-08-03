@@ -72,6 +72,18 @@ enum HouseholdStarterJourneyService {
             && StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults)
     }
 
+    @MainActor
+    static func isEnabled(
+        for task: HouseholdStarterJourneyTask,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        guard defaults.bool(forKey: "ohana_has_onboarded") else { return false }
+        if task == .humanProfile {
+            return true
+        }
+        return StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults)
+    }
+
     nonisolated static func carePlanEvidence(
         targetPet: Pet,
         events: [Event],
@@ -291,7 +303,7 @@ enum HouseholdStarterJourneyService {
         let questManager = providedQuestManager ?? QuestManager()
         let wallet = providedWallet ?? SwiftDataCoconutWalletManager()
 
-        guard isEnabled(defaults: defaults) else {
+        guard isEnabled(for: task, defaults: defaults) else {
             return .notEligible(task: task)
         }
 
@@ -473,12 +485,11 @@ private extension HouseholdStarterJourneyService {
                     ],
                     resolutions: resolutions,
                     fallbackResolutions: legacyResolution.map { resolution in
-                        [
-                            .humanLifeStage: resolution,
-                            .humanBodyProfile: resolution,
-                            .humanPersonalityContext: resolution
-                        ]
-                    } ?? [:]
+                        [.humanPersonalityContext: resolution]
+                    } ?? [:],
+                    requiredActualCheckpoints: HouseholdStarterJourneyTask
+                        .humanProfile
+                        .requiredActualCheckpoints
                 )
             },
             preferredID: activeHumanID,
@@ -598,7 +609,10 @@ private extension HouseholdStarterJourneyService {
             .claimed
         } else if !hasRequiredSubject {
             .locked
-        } else if completedCount >= requiredCount {
+        } else if completedCount >= requiredCount,
+                  task.requiredActualCheckpoints.isSubset(
+                      of: candidate?.completed ?? []
+                  ) {
             .claimable
         } else {
             .actionRequired
@@ -609,7 +623,7 @@ private extension HouseholdStarterJourneyService {
         case .carePlan, .firstCare:
             []
         case .humanProfile, .petProfile, .identityProtection, .healthProtection:
-            Set(task.checkpoints)
+            Set(task.checkpoints.filter { !$0.allowedResolutions.isEmpty })
         }
         return HouseholdStarterJourneyTaskState(
             task: task,
@@ -631,7 +645,8 @@ private extension HouseholdStarterJourneyService {
         checkpoints: [HouseholdStarterJourneyCheckpoint],
         actual: [HouseholdStarterJourneyCheckpoint: Bool],
         resolutions: [String: HouseholdStarterJourneyResolution],
-        fallbackResolutions: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution] = [:]
+        fallbackResolutions: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution] = [:],
+        requiredActualCheckpoints: Set<HouseholdStarterJourneyCheckpoint> = []
     ) -> CandidateProgress {
         var completed: Set<HouseholdStarterJourneyCheckpoint> = []
         var resolved: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution] = [:]
@@ -643,7 +658,8 @@ private extension HouseholdStarterJourneyService {
             )
             if actual[checkpoint] == true {
                 completed.insert(checkpoint)
-            } else if let resolution = resolutions[key] ?? fallbackResolutions[checkpoint] {
+            } else if !requiredActualCheckpoints.contains(checkpoint),
+                      let resolution = resolutions[key] ?? fallbackResolutions[checkpoint] {
                 completed.insert(checkpoint)
                 resolved[checkpoint] = resolution
             }

@@ -738,7 +738,7 @@ struct PhysicalDeletionServiceTests {
         )
         let reminder = Reminder(event: event)
         event.reminders = [reminder]
-        let medication = HumanMedication(humanId: humanId, name: "Vitamin")
+        let medication = HumanMedication(humanId: "  \(humanId.lowercased())  ", name: "Vitamin")
         let dose = HumanMedicationLog(humanId: humanId, medicationId: medication.id.uuidString, scheduledTime: Date())
         let report = HumanHealthReport(humanId: humanId)
         let wishlist = WishlistItem(title: "Treat", creatorId: humanId)
@@ -779,12 +779,28 @@ struct PhysicalDeletionServiceTests {
         )
         let weight = HumanWeightLog(weight: 70, human: human, executorId: humanId)
         let workout = HumanWorkoutLog(durationMinutes: 30, human: human)
-        let metric = HumanHealthMetricLog(metricKey: "tsh", unitCode: "mIU_L", value: 2.1, human: human)
+        let metric = HumanHealthMetricLog(
+            metricKey: "tsh",
+            unitCode: "mIU_L",
+            value: 2.1,
+            sourceReportID: report.id,
+            human: human
+        )
+        let unownedReportMetric = HumanHealthMetricLog(
+            metricKey: "ldl",
+            unitCode: "mg_dL",
+            value: 120,
+            sourceReportID: report.id,
+            sourceLabel: "LDL"
+        )
         let retainedMetric = HumanHealthMetricLog(
             metricKey: "hba1c",
             unitCode: "percent",
             value: 5.4,
             recordedByHumanId: humanId,
+            sourceReportID: report.id,
+            sourceLabel: "HbA1c",
+            referenceRangeText: "4.0–5.6",
             human: survivor
         )
         let retainedReport = HumanHealthReport(
@@ -901,6 +917,7 @@ struct PhysicalDeletionServiceTests {
         context.insert(weight)
         context.insert(workout)
         context.insert(metric)
+        context.insert(unownedReportMetric)
         context.insert(retainedMetric)
         context.insert(retainedReport)
         context.insert(account)
@@ -944,6 +961,10 @@ struct PhysicalDeletionServiceTests {
         let retainedHealthMetrics = try context.fetch(FetchDescriptor<HumanHealthMetricLog>())
         #expect(retainedHealthMetrics.map(\.id) == [retainedMetric.id])
         #expect(retainedHealthMetrics.first?.recordedByHumanId == nil)
+        #expect(retainedHealthMetrics.first?.sourceReportID == nil)
+        #expect(retainedHealthMetrics.first?.sourceLabel == "HbA1c")
+        #expect(retainedHealthMetrics.first?.referenceRangeText == "4.0–5.6")
+        #expect(deletionTombstone(HumanHealthMetricLog.self, id: unownedReportMetric.id, context: context) != nil)
         let retiredAccount = try #require(try context.fetch(FetchDescriptor<CoconutAccount>()).first { $0.ownerId == humanId })
         #expect(retiredAccount.balance == 0)
         #expect(CoconutWalletAccountLifecycleMetadata.isDeletedOwner(retiredAccount))
@@ -972,6 +993,21 @@ struct PhysicalDeletionServiceTests {
         let pet = Pet(name: "Momo")
         let humanId = human.id.uuidString
         let medication = HumanMedication(humanId: humanId, name: "Vitamin")
+        let medicationLog = HumanMedicationLog(
+            humanId: survivor.id.uuidString,
+            medicationId: medication.id.uuidString.lowercased(),
+            scheduledTime: Date(),
+            status: .taken,
+            recordedTime: Date()
+        )
+        let healthReport = HumanHealthReport(
+            humanId: humanId.lowercased(),
+            reportType: .physical,
+            conclusion: .normal,
+            hospitalName: "Clinic",
+            doctorName: "Doctor",
+            reportDate: Date()
+        )
         let medicationEvent = Event(
             title: "Human medication",
             eventType: EventType.medication.rawValue,
@@ -1006,6 +1042,8 @@ struct PhysicalDeletionServiceTests {
         context.insert(survivor)
         context.insert(pet)
         context.insert(medication)
+        context.insert(medicationLog)
+        context.insert(healthReport)
         context.insert(medicationEvent)
         context.insert(noteEvent)
         context.insert(retainedPetEvent)
@@ -1023,6 +1061,9 @@ struct PhysicalDeletionServiceTests {
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(events.map(\.id) == [retainedPetEvent.id])
         #expect(reminders.map(\.id) == [retainedReminder.id])
+        #expect(try context.fetch(FetchDescriptor<HumanMedication>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanHealthReport>()).isEmpty)
         #expect(events.first?.assigneeId == nil)
         #expect(deletionTombstone(Event.self, id: medicationEvent.id, context: context) != nil)
         #expect(deletionTombstone(Event.self, id: noteEvent.id, context: context) != nil)

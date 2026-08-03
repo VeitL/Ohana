@@ -21,13 +21,21 @@ nonisolated extension TaskCenterSystemJourneyProjection {
             humans: humans,
             now: now
         )
-        guard starterItems.isEmpty else { return starterItems }
-        return Array(makeItems(
+        let journeyItems = makeItems(
             starterJourney: starterJourney,
             pets: pets,
             humans: humans,
             now: now
-        ).prefix(HouseholdStarterJourneyPolicy.maximumVisibleTaskCount))
+        )
+        let visibleJourneyItems = destinations.contains(.claimStarterGift)
+            ? journeyItems.filter { $0.systemDestination == .completeHumanProfile }
+            : journeyItems
+        let rewardedItems = starterItems.filter { $0.source == .systemJourney }
+            + visibleJourneyItems
+        let suggestions = starterItems.filter { $0.source == .suggestion }
+
+        return Array(rewardedItems.prefix(HouseholdStarterJourneyPolicy.maximumVisibleTaskCount))
+            + suggestions
     }
 
     static func makeItems(

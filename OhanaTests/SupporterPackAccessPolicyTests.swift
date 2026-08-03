@@ -160,6 +160,65 @@ struct SupporterPackAccessPolicyTests {
         #expect(planSource.contains("components.append(choiceDetail(choice))"))
     }
 
+    @Test("Personal commerce inline copy covers every registered language")
+    func personalCommerceInlineCopyCoversEveryRegisteredLanguage() throws {
+        let paths = [
+            "Ohana/Features/SupporterPack/PersonalUpgradePrompt.swift",
+            "Ohana/Features/SupporterPack/SupporterPackView.swift",
+            "Ohana/Domain/Services/CommerceEntitlementService.swift"
+        ]
+
+        for path in paths {
+            let calls = inlineLocalizationCalls(in: try source(path))
+            #expect(!calls.isEmpty)
+            for call in calls {
+                for language in AppLanguage.supported.map(\.code) {
+                    #expect(call.contains("\(language):"))
+                }
+            }
+        }
+    }
+
+    private func inlineLocalizationCalls(in source: String) -> [String] {
+        var calls: [String] = []
+        var searchStart = source.startIndex
+
+        while let opening = source.range(
+            of: "l.tr(",
+            range: searchStart..<source.endIndex
+        ) {
+            var cursor = opening.upperBound
+            var depth = 1
+            var isInsideString = false
+            var isEscaped = false
+
+            while cursor < source.endIndex, depth > 0 {
+                let character = source[cursor]
+                if isInsideString {
+                    if isEscaped {
+                        isEscaped = false
+                    } else if character == "\\" {
+                        isEscaped = true
+                    } else if character == "\"" {
+                        isInsideString = false
+                    }
+                } else if character == "\"" {
+                    isInsideString = true
+                } else if character == "(" {
+                    depth += 1
+                } else if character == ")" {
+                    depth -= 1
+                }
+                cursor = source.index(after: cursor)
+            }
+
+            guard depth == 0 else { break }
+            calls.append(String(source[opening.lowerBound..<cursor]))
+            searchStart = cursor
+        }
+        return calls
+    }
+
     private func source(_ path: String) throws -> String {
         let rootURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

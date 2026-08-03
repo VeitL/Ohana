@@ -63,7 +63,7 @@ If simctl still reports CoreSimulatorService, simdiskimaged, or connection inval
 
 After simctl works, rerun:
   scripts/prepare-test-simulator.sh
-  scripts/test-simulator.sh <same -only-testing args>
+  scripts/xcode-test.sh --only-testing <same selector>
 EOF
 }
 

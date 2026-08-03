@@ -69,36 +69,57 @@ extension ZenPresenceSubjectDTO {
 
     func zenCompactStatusText(_ localization: L10n) -> String {
         guard checkedToday else {
-            return localization.tr(
-                zh: "待打卡",
-                en: "PENDING",
-                de: "OFFEN",
-                es: "PENDIENTE",
-                pt: "PENDENTE",
-                fr: "À FAIRE",
-                ja: "未完了",
-                ko: "미완료",
-                it: "DA FARE"
-            )
+            if isOwner {
+                return localization.tr(
+                    zh: "待确认", en: "CONFIRM", de: "BESTÄTIGEN", es: "CONFIRMAR",
+                    pt: "CONFIRMAR", fr: "CONFIRMER", ja: "未確認", ko: "확인 필요", it: "CONFERMA"
+                )
+            }
+            return kind == .human
+                ? localization.tr(
+                    zh: "待联系", en: "CONTACT", de: "KONTAKT", es: "CONTACTAR",
+                    pt: "CONTATO", fr: "CONTACT", ja: "未連絡", ko: "연락 필요", it: "CONTATTO"
+                )
+                : localization.tr(
+                    zh: "待观察", en: "OBSERVE", de: "BEOBACHTEN", es: "OBSERVAR",
+                    pt: "OBSERVAR", fr: "OBSERVER", ja: "未観察", ko: "관찰 필요", it: "OSSERVA"
+                )
         }
         guard let persistedStatus = status else {
-            return localization.tr(
-                zh: "已打卡",
-                en: "CHECKED",
-                de: "ERLEDIGT",
-                es: "HECHO",
-                pt: "FEITO",
-                fr: "FAIT",
-                ja: "完了",
-                ko: "완료",
-                it: "FATTO"
-            )
+            if isOwner {
+                return localization.tr(
+                    zh: "已确认", en: "SAFE", de: "BESTÄTIGT", es: "CONFIRMADO",
+                    pt: "CONFIRMADO", fr: "CONFIRMÉ", ja: "確認済み", ko: "확인됨", it: "CONFERMATO"
+                )
+            }
+            return kind == .human
+                ? localization.tr(
+                    zh: "已联系", en: "CONTACTED", de: "KONTAKT", es: "CONTACTADO",
+                    pt: "CONTATO", fr: "CONTACTÉ", ja: "連絡済み", ko: "연락함", it: "CONTATTATO"
+                )
+                : localization.tr(
+                    zh: "已观察", en: "OBSERVED", de: "BEOBACHTET", es: "OBSERVADO",
+                    pt: "OBSERVADO", fr: "OBSERVÉ", ja: "観察済み", ko: "관찰함", it: "OSSERVATO"
+                )
         }
         return "\(persistedStatus.score)/10"
     }
 
     func zenStatusText(_ localization: L10n) -> String {
         if let persistedStatus = status {
+            if kind == .pet || kind == .plant {
+                return localization.tr(
+                    zh: "今日观察：\(persistedStatus.title(localization))",
+                    en: "Observed today: \(persistedStatus.title(localization))",
+                    de: "Heute beobachtet: \(persistedStatus.title(localization))",
+                    es: "Observado hoy: \(persistedStatus.title(localization))",
+                    pt: "Observado hoje: \(persistedStatus.title(localization))",
+                    fr: "Observé aujourd’hui : \(persistedStatus.title(localization))",
+                    ja: "今日の観察：\(persistedStatus.title(localization))",
+                    ko: "오늘 관찰: \(persistedStatus.title(localization))",
+                    it: "Osservato oggi: \(persistedStatus.title(localization))"
+                )
+            }
             return localization.tr(
                 zh: "今日状态：\(persistedStatus.title(localization))",
                 en: "Today: \(persistedStatus.title(localization))",
@@ -112,29 +133,79 @@ extension ZenPresenceSubjectDTO {
             )
         }
         if checkedToday {
+            if isOwner {
+                return localization.tr(
+                    zh: "今天已平安确认 · 可添加状态",
+                    en: "Safety confirmed today · Add a status",
+                    de: "Heute bestätigt · Status hinzufügen",
+                    es: "Confirmación de hoy hecha · Añadir estado",
+                    pt: "Confirmação de hoje feita · Adicionar estado",
+                    fr: "Confirmation du jour effectuée · Ajouter un état",
+                    ja: "今日の無事を確認済み · 状態を追加",
+                    ko: "오늘 무사 확인 완료 · 상태 추가",
+                    it: "Conferma di oggi completata · Aggiungi uno stato"
+                )
+            }
+            return kind == .human
+                ? localization.tr(
+                    zh: "今天已记录联系 · 可添加状态",
+                    en: "Contact recorded today · Add a status",
+                    de: "Kontakt heute erfasst · Status hinzufügen",
+                    es: "Contacto registrado hoy · Añadir estado",
+                    pt: "Contato registrado hoje · Adicionar status",
+                    fr: "Contact du jour enregistré · Ajouter un état",
+                    ja: "今日の連絡を記録済み · 状態を追加",
+                    ko: "오늘 연락 기록 완료 · 상태 추가",
+                    it: "Contatto di oggi registrato · Aggiungi uno stato"
+                )
+                : localization.tr(
+                    zh: "今天已观察 · 可添加状态",
+                    en: "Observed today · Add a status",
+                    de: "Heute beobachtet · Status hinzufügen",
+                    es: "Observado hoy · Añadir estado",
+                    pt: "Observado hoje · Adicionar status",
+                    fr: "Observé aujourd’hui · Ajouter un état",
+                    ja: "今日の観察を記録済み · 状態を追加",
+                    ko: "오늘 관찰 기록 완료 · 상태 추가",
+                    it: "Osservazione di oggi registrata · Aggiungi uno stato"
+                )
+        }
+        if isOwner {
             return localization.tr(
-                zh: "今天已打卡 · 可添加状态",
-                en: "Checked in · Add a status",
-                de: "Eingecheckt · Status hinzufügen",
-                es: "Check-in hecho · Añadir estado",
-                pt: "Check-in feito · Adicionar status",
-                fr: "Check-in effectué · Ajouter un état",
-                ja: "チェックイン済み · 状態を追加",
-                ko: "체크인 완료 · 상태 추가",
-                it: "Check-in fatto · Aggiungi uno stato"
+                zh: "轻点卡片确认今天平安",
+                en: "Tap the card to confirm you're safe today",
+                de: "Tippe auf die Karte, um dich heute zu bestätigen",
+                es: "Toca la tarjeta para confirmar que estás bien hoy",
+                pt: "Toque no cartão para confirmar que está bem hoje",
+                fr: "Touchez la carte pour confirmer que tout va bien aujourd’hui",
+                ja: "カードをタップして今日の無事を確認",
+                ko: "카드를 탭해 오늘의 무사를 확인하세요",
+                it: "Tocca la scheda per confermare che oggi stai bene"
             )
         }
-        return localization.tr(
-            zh: "点击卡片打卡",
-            en: "Tap to check in",
-            de: "Zum Einchecken tippen",
-            es: "Toca para hacer check-in",
-            pt: "Toque para fazer check-in",
-            fr: "Touchez pour enregistrer",
-            ja: "タップしてチェックイン",
-            ko: "탭하여 체크인",
-            it: "Tocca per il check-in"
-        )
+        return kind == .human
+            ? localization.tr(
+                zh: "轻点记录今天已联系",
+                en: "Tap to record contact today",
+                de: "Tippen, um heutigen Kontakt zu erfassen",
+                es: "Toca para registrar el contacto de hoy",
+                pt: "Toque para registrar o contato de hoje",
+                fr: "Touchez pour noter le contact du jour",
+                ja: "タップして今日の連絡を記録",
+                ko: "탭하여 오늘의 연락을 기록하세요",
+                it: "Tocca per registrare il contatto di oggi"
+            )
+            : localization.tr(
+                zh: "轻点记录今天的观察",
+                en: "Tap to record today's observation",
+                de: "Tippen, um die heutige Beobachtung zu erfassen",
+                es: "Toca para registrar la observación de hoy",
+                pt: "Toque para registrar a observação de hoje",
+                fr: "Touchez pour noter l’observation du jour",
+                ja: "タップして今日の観察を記録",
+                ko: "탭하여 오늘의 관찰을 기록하세요",
+                it: "Tocca per registrare l’osservazione di oggi"
+            )
     }
 
     func zenAccessibilityLabel(_ localization: L10n) -> String {
@@ -145,40 +216,40 @@ extension ZenPresenceSubjectDTO {
         switch ZenPresencePresentation.cardBackgroundState(for: self) {
         case .pending:
             return localization.tr(
-                zh: "磨砂玻璃覆盖，今天未打卡",
-                en: "Frosted glass cover, not checked in today",
-                de: "Mattglas-Abdeckung, heute nicht eingecheckt",
-                es: "Cubierta de vidrio esmerilado, sin check-in hoy",
-                pt: "Cobertura de vidro fosco, sem check-in hoje",
-                fr: "Voile en verre dépoli, aucun check-in aujourd’hui",
-                ja: "すりガラスで覆われています。今日は未チェックイン",
-                ko: "반투명 유리로 덮임, 오늘 체크인하지 않음",
-                it: "Copertura in vetro satinato, nessun check-in oggi"
+                zh: "磨砂玻璃覆盖，\(zenCompactStatusText(localization))",
+                en: "Frosted glass cover, \(zenCompactStatusText(localization))",
+                de: "Mattglas-Abdeckung, \(zenCompactStatusText(localization))",
+                es: "Cubierta de vidrio esmerilado, \(zenCompactStatusText(localization))",
+                pt: "Cobertura de vidro fosco, \(zenCompactStatusText(localization))",
+                fr: "Voile en verre dépoli, \(zenCompactStatusText(localization))",
+                ja: "すりガラス、\(zenCompactStatusText(localization))",
+                ko: "반투명 유리, \(zenCompactStatusText(localization))",
+                it: "Vetro satinato, \(zenCompactStatusText(localization))"
             )
         case .checked:
             return localization.tr(
-                zh: "中性状态背景，今天已打卡，未选择状态",
-                en: "Neutral status background, checked in today, no status selected",
-                de: "Neutraler Statushintergrund, heute eingecheckt, kein Status gewählt",
-                es: "Fondo de estado neutro, check-in hecho hoy, sin estado elegido",
-                pt: "Fundo de status neutro, check-in feito hoje, sem status selecionado",
-                fr: "Fond d’état neutre, check-in effectué aujourd’hui, aucun état choisi",
-                ja: "ニュートラルな状態背景、今日のチェックイン済み、状態未選択",
-                ko: "중립 상태 배경, 오늘 체크인 완료, 상태 미선택",
-                it: "Sfondo di stato neutro, check-in effettuato oggi, nessuno stato scelto"
+                zh: "中性状态背景，\(zenStatusText(localization))",
+                en: "Neutral status background, \(zenStatusText(localization))",
+                de: "Neutraler Statushintergrund, \(zenStatusText(localization))",
+                es: "Fondo de estado neutro, \(zenStatusText(localization))",
+                pt: "Fundo de status neutro, \(zenStatusText(localization))",
+                fr: "Fond d’état neutre, \(zenStatusText(localization))",
+                ja: "ニュートラルな状態背景、\(zenStatusText(localization))",
+                ko: "중립 상태 배경, \(zenStatusText(localization))",
+                it: "Sfondo di stato neutro, \(zenStatusText(localization))"
             )
         case .score:
             let statusName = status?.title(localization) ?? zenCompactStatusText(localization)
             return localization.tr(
-                zh: "状态背景：\(statusName)，今天已打卡",
-                en: "Status background: \(statusName), checked in today",
-                de: "Statushintergrund: \(statusName), heute eingecheckt",
-                es: "Fondo de estado: \(statusName), check-in hecho hoy",
-                pt: "Fundo de status: \(statusName), check-in feito hoje",
-                fr: "Fond d’état : \(statusName), check-in effectué aujourd’hui",
-                ja: "状態背景：\(statusName)、今日のチェックイン済み",
-                ko: "상태 배경: \(statusName), 오늘 체크인 완료",
-                it: "Sfondo di stato: \(statusName), check-in effettuato oggi"
+                zh: "状态背景：\(statusName)，\(zenStatusText(localization))",
+                en: "Status background: \(statusName), \(zenStatusText(localization))",
+                de: "Statushintergrund: \(statusName), \(zenStatusText(localization))",
+                es: "Fondo de estado: \(statusName), \(zenStatusText(localization))",
+                pt: "Fundo de status: \(statusName), \(zenStatusText(localization))",
+                fr: "Fond d’état : \(statusName), \(zenStatusText(localization))",
+                ja: "状態背景：\(statusName)、\(zenStatusText(localization))",
+                ko: "상태 배경: \(statusName), \(zenStatusText(localization))",
+                it: "Sfondo di stato: \(statusName), \(zenStatusText(localization))"
             )
         }
     }

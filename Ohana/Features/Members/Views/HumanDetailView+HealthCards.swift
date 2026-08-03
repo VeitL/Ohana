@@ -8,6 +8,61 @@ import SwiftUI
 import UIKit
 
 extension HumanDetailView {
+    var humanHealthSummaryCard: some View {
+        HumanHealthSummaryDataContainer(
+            human: human,
+            bodyIsVisible: !human.isPrivate(.weight, viewedBy: activeHumanId),
+            medicationIsVisible: !human.isPrivate(.medication, viewedBy: activeHumanId),
+            workoutIsVisible: !human.isPrivate(.workout, viewedBy: activeHumanId)
+        ) { snapshot in
+            HumanHealthSummaryCompactCard(
+                snapshot: snapshot,
+                onOpen: { showingHealthSummary = true }
+            )
+        }
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Health Condition Card
+    var healthConditionCard: some View {
+        Button { showingHealthConditions = true } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle().fill(Color.goPurple.opacity(0.18)).frame(width: 48, height: 48)
+                    Image(systemName: "cross.case.fill").accessibilityHidden(true)
+                        .font(OhanaFont.title3(.bold))
+                        .foregroundStyle(Color.goPurple)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(l.tr(zh: "健康状况", en: "Health Conditions", de: "Gesundheitszustände"))
+                        .font(OhanaFont.callout(.bold))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.tr(
+                        zh: "心理、甲状腺、过敏、毛发等状态与趋势",
+                        en: "Track mental health, thyroid, allergy, hair, and more",
+                        de: "Psyche, Schilddrüse, Allergien, Haar und mehr verfolgen"
+                    ))
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(2)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-detail-health-conditions-action")
+        .accessibilityHint(human.hasPassedAway
+            ? l.tr(zh: "查看历史健康状况", en: "View health condition history", de: "Verlauf der Gesundheitszustände anzeigen")
+            : l.tr(zh: "查看和记录健康状况", en: "View and log health conditions", de: "Gesundheitszustände anzeigen und erfassen"))
+        .padding(.horizontal, 16)
+    }
+
     var medicationCard: some View {
         Button { showingMedication = true } label: {
             HStack(spacing: 14) {

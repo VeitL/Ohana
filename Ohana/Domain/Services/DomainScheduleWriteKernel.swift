@@ -190,6 +190,41 @@ nonisolated struct DomainScheduleDeleteResult: Equatable {
     )
 }
 
+/// Notification side effects staged by a schedule mutation that has not been
+/// committed yet. Callers merge these values while building one SwiftData
+/// transaction and dispatch them only after that transaction saves.
+nonisolated struct DomainSchedulePendingEffects: Equatable, Sendable {
+    private(set) var notificationIdsToCancel: Set<String> = []
+
+    static let none = DomainSchedulePendingEffects()
+
+    mutating func stage(delete result: DomainScheduleDeleteResult) {
+        guard result.didDelete else { return }
+        for notificationID in result.notificationIdsToCancel {
+            stage(notificationID: notificationID)
+        }
+    }
+
+    mutating func stage(notificationID: String) {
+        let normalizedID = notificationID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedID.isEmpty else { return }
+        notificationIdsToCancel.insert(normalizedID)
+    }
+
+    mutating func merge(_ other: DomainSchedulePendingEffects) {
+        notificationIdsToCancel.formUnion(other.notificationIdsToCancel)
+    }
+
+    func commit(
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+    ) {
+        DomainRehydrateEffectsDispatcher.cancelNotifications(
+            notificationIdsToCancel.sorted(),
+            notifications: notifications
+        )
+    }
+}
+
 nonisolated enum DomainScheduleEffectsDispatcher {
     static func dispatch(
         delete result: DomainScheduleDeleteResult,

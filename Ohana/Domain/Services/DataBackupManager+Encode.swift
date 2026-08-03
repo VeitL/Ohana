@@ -504,6 +504,12 @@ nonisolated extension DataBackupManager {
             notes: l.notes,
             humanId: l.human?.id.uuidString,
             recordedByHumanId: l.recordedByHumanId,
+            sourceReportID: l.sourceReportID?.uuidString,
+            sourceLabel: l.sourceLabel,
+            referenceLow: l.referenceLow,
+            referenceHigh: l.referenceHigh,
+            referenceRangeText: l.referenceRangeText,
+            reportedFlagRaw: l.reportedFlagRaw,
             createdAt: d(l.createdAt)
         )
     }
@@ -521,6 +527,7 @@ nonisolated extension DataBackupManager {
             summary: report.summary,
             notes: report.notes,
             recordedByHumanId: report.recordedByHumanId,
+            captureSourceRaw: report.captureSourceRaw,
             colorHex: report.colorHex,
             createdAt: d(report.createdAt)
         )

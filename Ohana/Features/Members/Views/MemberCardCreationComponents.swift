@@ -399,7 +399,7 @@ struct MemberCompactCityPicker: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var cities: [String] {
-        country.isEmpty ? [] : PetBreedDatabase.cities(for: country)
+        country.isEmpty ? [] : PetBreedDatabase.sortedCities(for: country, l: l)
     }
 
     var body: some View {
@@ -464,7 +464,7 @@ struct MemberCompactCityPicker: View {
     }
 
     private func localizedCity(_ value: String) -> String {
-        value == "其他" ? l.tr(zh: "其他", en: "Other", de: "Andere") : value
+        PetBreedDatabase.localizedRegionName(value, l: l)
     }
 }
 

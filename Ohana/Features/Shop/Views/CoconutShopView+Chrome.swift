@@ -12,6 +12,7 @@ extension CoconutShopView {
             Group {
                 if dynamicTypeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: 12) {
+                        personalBalanceMetric
                         spendableMetric
                         inventoryMetric
                         if CoconutExchangeFeatureGate.isEnabled {
@@ -20,6 +21,7 @@ extension CoconutShopView {
                     }
                 } else {
                     HStack(spacing: 18) {
+                        personalBalanceMetric
                         spendableMetric
                         inventoryMetric
                         if CoconutExchangeFeatureGate.isEnabled {
@@ -79,10 +81,40 @@ extension CoconutShopView {
 
     var spendableMetric: some View {
         metric(
-            label: l.tr(zh: "全岛可兑换", en: "Island spendable", de: "Inselweit verfügbar"),
+            label: l.tr(
+                zh: "全岛可用",
+                en: "Island available",
+                de: "Inselweit verfügbar",
+                es: "Disponible en la isla",
+                pt: "Disponível na ilha",
+                fr: "Disponible sur l’île",
+                ja: "島全体で利用可能",
+                ko: "섬 전체 사용 가능",
+                it: "Disponibile sull’isola"
+            ),
             value: "\(islandSpendableHumanBalance)",
             suffix: "🥥",
             tint: Color.goYellow,
+            accessibilityIdentifier: "coconut-shop-island-spendable-balance"
+        )
+    }
+
+    var personalBalanceMetric: some View {
+        metric(
+            label: l.tr(
+                zh: "当前成员",
+                en: "Current member",
+                de: "Aktuelles Mitglied",
+                es: "Miembro actual",
+                pt: "Membro atual",
+                fr: "Membre actuel",
+                ja: "現在のメンバー",
+                ko: "현재 구성원",
+                it: "Membro attuale"
+            ),
+            value: "\(currentHumanBalance)",
+            suffix: "🥥",
+            tint: Color.goTeal,
             accessibilityIdentifier: "coconut-shop-current-human-balance"
         )
     }
@@ -128,14 +160,14 @@ extension CoconutShopView {
                     Text(
                         needsAttention
                             ? l.tr(
-                                zh: "有一笔兑换尚未安全完成或退款。它不会再次扣款，保留本机数据即可继续恢复。",
-                                en: "A redemption has not safely completed or refunded. It cannot be charged again; keep the local data to continue recovery.",
-                                de: "Eine Einlösung wurde noch nicht sicher abgeschlossen oder erstattet. Sie wird nicht erneut belastet; behalte die lokalen Daten für die Wiederherstellung."
+                                zh: "有一笔最终成交正在等待应用。商品权益已保留，不会再次扣款；可继续恢复。",
+                                en: "A final-sale purchase is waiting to be applied. Its entitlement is preserved with no second charge; recovery can continue.",
+                                de: "Ein endgültiger Kauf wartet auf die Anwendung. Der Anspruch bleibt ohne erneute Belastung erhalten; die Wiederherstellung kann fortgesetzt werden."
                             )
                             : l.tr(
-                                zh: "上一笔兑换或退款仍在安全结算；对应商品暂时不会再次扣款。",
-                                en: "A previous redemption or refund is still settling safely. That item cannot be charged again.",
-                                de: "Eine frühere Einlösung oder Erstattung wird noch sicher verarbeitet. Dieser Artikel wird nicht erneut belastet."
+                                zh: "上一笔最终成交仍在应用；对应商品不会再次扣款。",
+                                en: "A previous final-sale purchase is still being applied. That item cannot be charged again.",
+                                de: "Ein früherer endgültiger Kauf wird noch angewendet. Dieser Artikel wird nicht erneut belastet."
                             )
                     )
                     .fixedSize(horizontal: false, vertical: true)

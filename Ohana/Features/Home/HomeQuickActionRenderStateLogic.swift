@@ -138,7 +138,9 @@ nonisolated enum HomeQuickActionRenderStateLogic {
             human: human,
             isLocked: isLocked,
             activeMedications: source.humanMedications,
-            todayMedicationLogs: source.humanMedicationLogs
+            todayMedicationLogs: source.humanMedicationLogs,
+            expenses: source.humanExpenseEntries,
+            now: now
         )
         return HomeQuickActionRenderSnapshot(
             status: status,
@@ -146,7 +148,9 @@ nonisolated enum HomeQuickActionRenderStateLogic {
                 item: item,
                 human: human,
                 isLocked: isLocked,
-                todayMedicationLogs: source.humanMedicationLogs
+                todayMedicationLogs: source.humanMedicationLogs,
+                expenses: source.humanExpenseEntries,
+                now: now
             ),
             attentionLevel: attentionLevel,
             isLocked: isLocked,

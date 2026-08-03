@@ -6,21 +6,85 @@
 OHANA_LOCAL_BUILD_REPO_ROOT_INPUT="${OHANA_LOCAL_BUILD_REPO_ROOT:-$(dirname "${BASH_SOURCE[0]}")/../..}"
 OHANA_LOCAL_BUILD_REPO_ROOT="$(cd "${OHANA_LOCAL_BUILD_REPO_ROOT_INPUT}" && pwd)"
 unset OHANA_LOCAL_BUILD_REPO_ROOT_INPUT
-OHANA_LOCAL_DERIVED_DATA_ROOT="${OHANA_LOCAL_BUILD_REPO_ROOT}/.build/DerivedData"
-OHANA_TEST_DERIVED_DATA_PATH="${OHANA_LOCAL_DERIVED_DATA_ROOT}/tests"
-OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED="${OHANA_LOCAL_DERIVED_DATA_ROOT}/dogfood"
-OHANA_RELEASE_DERIVED_DATA_PATH="${OHANA_LOCAL_DERIVED_DATA_ROOT}/release"
-OHANA_DOGFOOD_PIN_FILE="${OHANA_LOCAL_BUILD_REPO_ROOT}/.build/dogfood-simulator.udid"
-OHANA_DOGFOOD_STORE_IDENTITY_FILE="${OHANA_LOCAL_BUILD_REPO_ROOT}/.build/dogfood-store.identity"
-OHANA_DOGFOOD_INITIALIZATION_STATE_FILE="${OHANA_LOCAL_BUILD_REPO_ROOT}/.build/dogfood-initialization.pending"
+OHANA_LOCAL_BUILD_COMMON_GIT_DIR="$(
+  git -C "${OHANA_LOCAL_BUILD_REPO_ROOT}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true
+)"
+if [[ -n "${OHANA_LOCAL_BUILD_COMMON_GIT_DIR}" && \
+  "$(basename "${OHANA_LOCAL_BUILD_COMMON_GIT_DIR}")" == ".git" ]]; then
+  OHANA_LOCAL_BUILD_COMMON_REPO_ROOT="$(dirname "${OHANA_LOCAL_BUILD_COMMON_GIT_DIR}")"
+else
+  OHANA_LOCAL_BUILD_COMMON_REPO_ROOT="${OHANA_LOCAL_BUILD_REPO_ROOT}"
+fi
+OHANA_LOCAL_BUILD_CACHE_PARENT_CONFIG="${OHANA_LOCAL_BUILD_COMMON_REPO_ROOT}/.build/xcode-cache-parent"
+OHANA_LOCAL_BUILD_CACHE_PARENT_INPUT="${OHANA_LOCAL_BUILD_CACHE_PARENT:-}"
+OHANA_LOCAL_BUILD_CACHE_PARENT_SOURCE="environment"
+if [[ -z "${OHANA_LOCAL_BUILD_CACHE_PARENT_INPUT}" ]]; then
+  OHANA_LOCAL_BUILD_CACHE_PARENT_SOURCE="default"
+  if [[ -e "${OHANA_LOCAL_BUILD_CACHE_PARENT_CONFIG}" ]]; then
+    if [[ ! -f "${OHANA_LOCAL_BUILD_CACHE_PARENT_CONFIG}" || \
+      -L "${OHANA_LOCAL_BUILD_CACHE_PARENT_CONFIG}" || \
+      "$(awk 'END { print NR + 0 }' "${OHANA_LOCAL_BUILD_CACHE_PARENT_CONFIG}")" != "1" ]]; then
+      echo "Invalid local Xcode cache-parent config: ${OHANA_LOCAL_BUILD_CACHE_PARENT_CONFIG}" >&2
+      return 2 2>/dev/null || exit 2
+    fi
+    IFS= read -r OHANA_LOCAL_BUILD_CACHE_PARENT_INPUT \
+      < "${OHANA_LOCAL_BUILD_CACHE_PARENT_CONFIG}" || true
+    if [[ -z "${OHANA_LOCAL_BUILD_CACHE_PARENT_INPUT}" || \
+      "${OHANA_LOCAL_BUILD_CACHE_PARENT_INPUT}" != /* ]]; then
+      echo "Local Xcode cache parent must be one absolute path: ${OHANA_LOCAL_BUILD_CACHE_PARENT_CONFIG}" >&2
+      return 2 2>/dev/null || exit 2
+    fi
+    if [[ "${OHANA_LOCAL_BUILD_CACHE_PARENT_INPUT}" == /Volumes/* ]]; then
+      OHANA_LOCAL_BUILD_CACHE_VOLUME_ROOT="/Volumes/$(
+        cut -d / -f 3 <<< "${OHANA_LOCAL_BUILD_CACHE_PARENT_INPUT}"
+      )"
+      if [[ ! -d "${OHANA_LOCAL_BUILD_CACHE_VOLUME_ROOT}" ]] || \
+        ! mount | grep -Fq "on ${OHANA_LOCAL_BUILD_CACHE_VOLUME_ROOT} "; then
+        echo "Configured Xcode cache volume is not mounted: ${OHANA_LOCAL_BUILD_CACHE_VOLUME_ROOT}" >&2
+        echo "Refusing to fall back to the internal disk." >&2
+        return 74 2>/dev/null || exit 74
+      fi
+    fi
+    OHANA_LOCAL_BUILD_CACHE_PARENT_SOURCE="config:${OHANA_LOCAL_BUILD_CACHE_PARENT_CONFIG}"
+  else
+    OHANA_LOCAL_BUILD_CACHE_PARENT_INPUT="${HOME}/Library/Developer/Xcode/OhanaLocalBuild"
+  fi
+fi
+OHANA_LOCAL_BUILD_CACHE_ID="${OHANA_LOCAL_BUILD_CACHE_ID:-$(
+  printf '%s' "${OHANA_LOCAL_BUILD_COMMON_REPO_ROOT}" | shasum -a 256 | awk '{ print substr($1, 1, 16) }'
+)}"
+if [[ ! "${OHANA_LOCAL_BUILD_CACHE_ID}" =~ ^[a-f0-9]{16}$ ]]; then
+  echo "Invalid OHANA_LOCAL_BUILD_CACHE_ID: ${OHANA_LOCAL_BUILD_CACHE_ID}" >&2
+  return 2 2>/dev/null || exit 2
+fi
+OHANA_LOCAL_BUILD_CACHE_PARENT="$(
+  python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' \
+    "${OHANA_LOCAL_BUILD_CACHE_PARENT_INPUT}"
+)"
+unset OHANA_LOCAL_BUILD_CACHE_PARENT_INPUT
+OHANA_LOCAL_BUILD_CACHE_ROOT="${OHANA_LOCAL_BUILD_CACHE_PARENT}/Ohana-${OHANA_LOCAL_BUILD_CACHE_ID}"
+OHANA_SHARED_DERIVED_DATA_ROOT="${OHANA_LOCAL_BUILD_CACHE_ROOT}/DerivedData"
+# Compatibility alias for callers that enumerate the active fixed lanes.
+OHANA_LOCAL_DERIVED_DATA_ROOT="${OHANA_SHARED_DERIVED_DATA_ROOT}"
+OHANA_LEGACY_LOCAL_DERIVED_DATA_ROOT="${OHANA_LOCAL_BUILD_REPO_ROOT}/.build/DerivedData"
+OHANA_TEST_DERIVED_DATA_PATH="${OHANA_SHARED_DERIVED_DATA_ROOT}/tests"
+OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED="${OHANA_SHARED_DERIVED_DATA_ROOT}/dogfood"
+OHANA_RELEASE_DERIVED_DATA_PATH="${OHANA_SHARED_DERIVED_DATA_ROOT}/release"
+OHANA_TEST_RESULT_ROOT="${OHANA_LOCAL_BUILD_CACHE_ROOT}/TestResults"
+OHANA_XCODE_LOCK_ROOT="${OHANA_LOCAL_BUILD_CACHE_ROOT}/Locks"
+OHANA_DOGFOOD_PIN_FILE="${OHANA_LOCAL_BUILD_COMMON_REPO_ROOT}/.build/dogfood-simulator.udid"
+OHANA_DOGFOOD_STORE_IDENTITY_FILE="${OHANA_LOCAL_BUILD_COMMON_REPO_ROOT}/.build/dogfood-store.identity"
+OHANA_DOGFOOD_INITIALIZATION_STATE_FILE="${OHANA_LOCAL_BUILD_COMMON_REPO_ROOT}/.build/dogfood-initialization.pending"
 OHANA_DOGFOOD_SIMULATOR_NAME_FIXED="iPhone 17 Dogfood"
 OHANA_TEST_SIMULATOR_NAME_FIXED="iPhone 17 Tests"
 OHANA_LOCAL_BUILD_TMP_ROOT="${OHANA_LOCAL_BUILD_TMP_ROOT:-/private/tmp}"
 OHANA_LOCAL_BUILD_TMP_TTL_HOURS="${OHANA_LOCAL_BUILD_TMP_TTL_HOURS:-24}"
 OHANA_XCODE_DERIVED_DATA_ROOT="${OHANA_XCODE_DERIVED_DATA_ROOT:-${HOME}/Library/Developer/Xcode/DerivedData}"
-OHANA_MINIMUM_FREE_GIB=20
-OHANA_BUILD_WARNING_GIB=25
-OHANA_SIMULATOR_CACHE_WARNING_GIB=10
+OHANA_MINIMUM_FREE_GIB="${OHANA_MINIMUM_FREE_GIB:-20}"
+OHANA_BUILD_WARNING_GIB="${OHANA_BUILD_WARNING_GIB:-25}"
+OHANA_SIMULATOR_CACHE_WARNING_GIB="${OHANA_SIMULATOR_CACHE_WARNING_GIB:-10}"
+OHANA_TEST_FAILURE_RETENTION_COUNT="${OHANA_TEST_FAILURE_RETENTION_COUNT:-3}"
+OHANA_TEST_FAILURE_RETENTION_DAYS="${OHANA_TEST_FAILURE_RETENTION_DAYS:-7}"
 
 ohana_absolute_path() {
   python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$1"
@@ -93,11 +157,13 @@ ohana_assert_storage_fixture_configuration() {
 
   tmp_root_absolute="$(ohana_absolute_path "${OHANA_LOCAL_BUILD_TMP_ROOT}")"
   ohana_tmp_artifact_ttl_seconds >/dev/null || return
+  ohana_assert_safe_shared_cache_root || return
   if [[ "${fixture_mode}" == "1" ]]; then
     if [[ -z "${fixture_root}" || ! -d "${fixture_root}" || \
       ! -d "${OHANA_LOCAL_BUILD_REPO_ROOT}" || ! -d "${OHANA_LOCAL_BUILD_TMP_ROOT}" ]] || \
       ! ohana_path_is_equal_or_beneath "${OHANA_LOCAL_BUILD_REPO_ROOT}" "${fixture_root}" || \
-      ! ohana_path_is_equal_or_beneath "${tmp_root_absolute}" "${fixture_root}"; then
+      ! ohana_path_is_equal_or_beneath "${tmp_root_absolute}" "${fixture_root}" || \
+      ! ohana_path_is_equal_or_beneath "${OHANA_LOCAL_BUILD_CACHE_ROOT}" "${fixture_root}"; then
       echo "Refusing invalid local-build storage fixture boundaries." >&2
       return 2
     fi
@@ -152,6 +218,28 @@ ohana_path_is_equal_or_beneath() {
   path_absolute="$(ohana_real_path "$1")"
   root_absolute="$(ohana_real_path "$2")"
   [[ "${path_absolute}" == "${root_absolute}" || "${path_absolute}" == "${root_absolute}/"* ]]
+}
+
+ohana_assert_safe_shared_cache_root() {
+  local cache_parent_absolute
+  local cache_root_absolute
+  local home_absolute
+  local repo_absolute
+
+  cache_parent_absolute="$(ohana_absolute_path "${OHANA_LOCAL_BUILD_CACHE_PARENT}")"
+  cache_root_absolute="$(ohana_absolute_path "${OHANA_LOCAL_BUILD_CACHE_ROOT}")"
+  home_absolute="$(ohana_absolute_path "${HOME}")"
+  repo_absolute="$(ohana_absolute_path "${OHANA_LOCAL_BUILD_REPO_ROOT}")"
+
+  if [[ "${cache_parent_absolute}" == "/" || "${cache_parent_absolute}" == "${home_absolute}" || \
+    "${cache_root_absolute}" == "/" || "${cache_root_absolute}" == "${home_absolute}" || \
+    "${cache_root_absolute}" == "${repo_absolute}" || \
+    "$(basename "${cache_root_absolute}")" != "Ohana-${OHANA_LOCAL_BUILD_CACHE_ID}" ]] || \
+    ! ohana_path_is_equal_or_beneath "${cache_root_absolute}" "${cache_parent_absolute}" || \
+    ohana_path_is_equal_or_beneath "${cache_root_absolute}" "${repo_absolute}"; then
+    echo "Refusing unsafe shared Xcode cache root: ${cache_root_absolute}" >&2
+    return 2
+  fi
 }
 
 ohana_paths_refer_to_same_item() {
@@ -302,6 +390,23 @@ ohana_path_has_open_files() {
   return 2
 }
 
+ohana_xcresult_is_successful() {
+  local path="$1"
+
+  [[ -d "${path}" && "${path}" == *.xcresult ]] || return 1
+  xcrun xcresulttool get test-results summary \
+    --path "${path}" --format json 2>/dev/null | python3 -c '
+import json
+import sys
+
+try:
+    payload = json.load(sys.stdin)
+except (json.JSONDecodeError, OSError):
+    raise SystemExit(1)
+raise SystemExit(0 if payload.get("result") == "Passed" and payload.get("failedTests", 0) == 0 else 1)
+'
+}
+
 ohana_tmp_artifact_state() {
   local path="$1"
   local age_seconds
@@ -409,6 +514,13 @@ ohana_print_largest_storage_sources() {
         size_kib="$(ohana_path_size_kib "${path}")"
         ((size_kib > 0)) && printf '%s\t%s\n' "${size_kib}" "${path}"
       done
+      for path in "${OHANA_LEGACY_LOCAL_DERIVED_DATA_ROOT}"/*; do
+        [[ -e "${path}" ]] || continue
+        size_kib="$(ohana_path_size_kib "${path}")"
+        ((size_kib > 0)) && printf '%s\t%s (legacy worktree cache)\n' "${size_kib}" "${path}"
+      done
+      size_kib="$(ohana_path_size_kib "${OHANA_TEST_RESULT_ROOT}")"
+      ((size_kib > 0)) && printf '%s\t%s\n' "${size_kib}" "${OHANA_TEST_RESULT_ROOT}"
       for path in "${OHANA_LOCAL_BUILD_TMP_ROOT}"/ohana-* \
         "${OHANA_LOCAL_BUILD_TMP_ROOT}"/OhanaDerivedData*; do
         [[ -e "${path}" || -L "${path}" ]] || continue
@@ -444,6 +556,7 @@ ohana_print_largest_storage_sources() {
 ohana_warn_storage_pressure() {
   local reason="${1:-warning}"
   local build_kib
+  local shared_cache_kib
   local simulator_cache_kib
   local build_limit_kib=$((OHANA_BUILD_WARNING_GIB * 1024 * 1024))
   local simulator_limit_kib=$((OHANA_SIMULATOR_CACHE_WARNING_GIB * 1024 * 1024))
@@ -453,12 +566,18 @@ ohana_warn_storage_pressure() {
     echo "WARNING: repo .build is $(ohana_format_kib_as_gib "${build_kib}"); policy warning limit is ${OHANA_BUILD_WARNING_GIB} GiB." >&2
   fi
 
+  shared_cache_kib="$(ohana_path_size_kib "${OHANA_LOCAL_BUILD_CACHE_ROOT}")"
+  if ((shared_cache_kib > build_limit_kib)); then
+    echo "WARNING: shared Ohana Xcode cache is $(ohana_format_kib_as_gib "${shared_cache_kib}"); policy warning limit is ${OHANA_BUILD_WARNING_GIB} GiB." >&2
+  fi
+
   simulator_cache_kib="$(ohana_simulator_cache_size_kib)"
   if ((simulator_cache_kib > simulator_limit_kib)); then
     echo "WARNING: Simulator Library/Caches total is $(ohana_format_kib_as_gib "${simulator_cache_kib}"); policy warning limit is ${OHANA_SIMULATOR_CACHE_WARNING_GIB} GiB." >&2
   fi
 
-  if ((build_kib > build_limit_kib || simulator_cache_kib > simulator_limit_kib)); then
+  if ((build_kib > build_limit_kib || shared_cache_kib > build_limit_kib || \
+    simulator_cache_kib > simulator_limit_kib)); then
     echo "Run scripts/report-local-build-storage.sh before approving any cleanup." >&2
   fi
   if [[ "${reason}" == "low-disk" ]]; then
@@ -468,7 +587,14 @@ ohana_warn_storage_pressure() {
 
 ohana_require_build_disk_space() {
   local available_kib
-  local minimum_kib=$((OHANA_MINIMUM_FREE_GIB * 1024 * 1024))
+  local minimum_kib
+
+  if [[ ! "${OHANA_MINIMUM_FREE_GIB}" =~ ^[1-9][0-9]*$ || \
+    ${#OHANA_MINIMUM_FREE_GIB} -gt 3 ]]; then
+    echo "Invalid OHANA_MINIMUM_FREE_GIB: ${OHANA_MINIMUM_FREE_GIB}" >&2
+    return 2
+  fi
+  minimum_kib=$((10#${OHANA_MINIMUM_FREE_GIB} * 1024 * 1024))
 
   available_kib="$(ohana_available_disk_kib)"
   if ((available_kib < minimum_kib)); then

@@ -254,6 +254,15 @@ enum AppFeatureRouteGuard {
         return currentLevel >= requiredLevel
     }
 
+    static func allowsExternalRoute(_ route: OhanaExternalRoute) -> Bool {
+        switch route {
+        case .guardianInvite, .guardianIncident:
+            OnlineFeatureGate.allows(.guardianSafety)
+        case .taskCenter, .activeWalk, .settings:
+            true
+        }
+    }
+
     static func allowsOasisSheetRoute(_ route: OasisSheetRoute, currentLevel: Int) -> Bool {
         guard let requiredLevel = requiredLevel(for: route) else { return true }
         return currentLevel >= requiredLevel
@@ -306,10 +315,13 @@ enum AppFeatureRouteGuard {
         }
     }
 
-    private static func allowsOnlineSheetRoute(_: AppSheetRoute) -> Bool {
+    private static func allowsOnlineSheetRoute(_ route: AppSheetRoute) -> Bool {
         // Members collaboration is an on-device Solo feature. Remote family
         // destinations continue to use the function-menu gate above.
-        true
+        if case .guardianSafety = route {
+            return OnlineFeatureGate.allows(.guardianSafety)
+        }
+        return true
     }
 
     private static func allowsPlantDestination(_ destination: FMDest) -> Bool {

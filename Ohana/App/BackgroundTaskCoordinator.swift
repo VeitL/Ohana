@@ -9,6 +9,8 @@ import BackgroundTasks
 import Foundation
 import SwiftData
 
+typealias BackgroundMedicationReminderFactory = @MainActor @Sendable () -> any MedicationReminderManaging
+
 /// `BGTask` must receive exactly one terminal completion signal. The task body
 /// and expiration handler race by design, so they claim the signal through this
 /// main-actor gate rather than independently calling `setTaskCompleted`.
@@ -34,7 +36,9 @@ enum BackgroundTaskCoordinator {
 
     private static var didRegister = false
 
-    static func registerTasks() {
+    static func registerTasks(
+        makeMedicationReminders: @escaping BackgroundMedicationReminderFactory
+    ) {
         guard !didRegister else { return }
         didRegister = true
 
@@ -46,7 +50,10 @@ enum BackgroundTaskCoordinator {
                 task.setTaskCompleted(success: false)
                 return
             }
-            handleReminderRefill(task: refreshTask)
+            handleReminderRefill(
+                task: refreshTask,
+                makeMedicationReminders: makeMedicationReminders
+            )
         }
     }
 
@@ -58,7 +65,8 @@ enum BackgroundTaskCoordinator {
                 allowWhileBackground: true
             )
             submitReminderRefill(
-                continuation: ReminderMaintenanceCursorStore.hasContinuation(),
+                continuation: ReminderMaintenanceCursorStore.hasContinuation()
+                    || HumanMedicationReminderRollingCursorStore.hasContinuation(),
                 budget: budget
             )
         }
@@ -93,10 +101,17 @@ enum BackgroundTaskCoordinator {
         }
     }
 
-    private static func handleReminderRefill(task: BGAppRefreshTask) {
+    private static func handleReminderRefill(
+        task: BGAppRefreshTask,
+        makeMedicationReminders: @escaping BackgroundMedicationReminderFactory
+    ) {
         let completionGate = ReminderBackgroundTaskCompletionGate()
         let work = Task { @MainActor in
-            await performReminderRefill(task: task, completionGate: completionGate)
+            await performReminderRefill(
+                task: task,
+                completionGate: completionGate,
+                medicationReminders: makeMedicationReminders()
+            )
         }
 
         task.expirationHandler = {
@@ -117,7 +132,8 @@ enum BackgroundTaskCoordinator {
     @MainActor
     private static func performReminderRefill(
         task: BGAppRefreshTask,
-        completionGate: ReminderBackgroundTaskCompletionGate
+        completionGate: ReminderBackgroundTaskCompletionGate,
+        medicationReminders: any MedicationReminderManaging
     ) async {
         let startedAt = CFAbsoluteTimeGetCurrent()
         let budgetStartedAt = Date()
@@ -159,6 +175,37 @@ enum BackgroundTaskCoordinator {
         }
 
         let modelContext = ModelContext(modelContainer)
+        guard !Task.isCancelled, budget.hasTimeRemaining(since: budgetStartedAt) else {
+            completeRefill(task, gate: completionGate, success: false, retry: true)
+            return
+        }
+        let privacyResult = await medicationReminders
+            .recoverMedicationNotificationPrivacyIfNeeded(context: modelContext)
+        if !privacyResult.failureDescriptions.isEmpty {
+            AppPerformanceMonitor.shared.record(
+                "background_medication_notification_privacy_recovery_incomplete",
+                valueMS: 0,
+                note: "failures=\(privacyResult.failureDescriptions.count)"
+            )
+        }
+        let medicationResult = await medicationReminders
+            .reconcileHumanMedicationRollingWindow(
+                context: modelContext,
+                budget: budget,
+                now: Date()
+            )
+        if !medicationResult.failureDescriptions.isEmpty {
+            AppPerformanceMonitor.shared.record(
+                "background_human_medication_reminder_refill_incomplete",
+                valueMS: 0,
+                note: "failures=\(medicationResult.failureDescriptions.count), continuation=\(medicationResult.hasMoreWork)"
+            )
+        }
+        guard !Task.isCancelled, budget.hasTimeRemaining(since: budgetStartedAt) else {
+            completeRefill(task, gate: completionGate, success: false, retry: true)
+            return
+        }
+
         let plan: ReminderMaintenancePlan
         do {
             plan = try await ReminderMaintenanceService.makeBackgroundPlan(

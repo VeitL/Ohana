@@ -161,8 +161,8 @@ if dogfood:
         fail("dogfood environment must use Release configuration.")
     if environment.get("bundleIdentifier") != "com.guanchen.li.Ohana":
         fail("dogfood environment must use the production app bundle identifier.")
-    if environment.get("derivedDataPath") != ".build/DerivedData/dogfood":
-        fail("dogfood environment must use the fixed Dogfood DerivedData lane.")
+    if environment.get("derivedDataPath") != "shared-external/DerivedData/dogfood":
+        fail("dogfood environment must use the shared external Dogfood DerivedData lane.")
     for key in (
         "minActiveHumans",
         "minActivePets",

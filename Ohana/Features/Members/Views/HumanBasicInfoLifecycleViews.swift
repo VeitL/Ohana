@@ -82,11 +82,17 @@ struct HumanLifecycleDangerZone: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("human-lifecycle-management-disclosure")
+            .accessibilityValue(
+                isExpanded
+                    ? l.tr(zh: "已展开", en: "Expanded", de: "Erweitert")
+                    : l.tr(zh: "已收起", en: "Collapsed", de: "Reduziert")
+            )
         }
         .padding(14)
         .goTranslucentCard(cornerRadius: OhanaRadius.control)
         .tint(Color.goRed)
-        .accessibilityIdentifier("human-lifecycle-management-disclosure")
         .onAppear {
             passedDate = human.passedAwayDate ?? Date()
         }

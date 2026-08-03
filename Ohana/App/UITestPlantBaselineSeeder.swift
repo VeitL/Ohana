@@ -53,6 +53,33 @@ enum OhanaUITestLaunchOptions {
         isRunningUITests && ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_FAIL_STORE_OPEN_ONCE")
     }
 
+    static var requestedStoreOpenFailureCount: Int {
+        guard isRunningUITests else { return 0 }
+        return storeOpenFailureCount(arguments: ProcessInfo.processInfo.arguments)
+    }
+
+    static func storeOpenFailureCount(arguments: [String]) -> Int {
+        if arguments.contains("-OHANA_UI_TEST_FAIL_STORE_OPEN_ONCE") {
+            return 1
+        }
+        guard let flagIndex = arguments.firstIndex(of: "-OHANA_UI_TEST_FAIL_STORE_OPEN_COUNT"),
+              arguments.indices.contains(arguments.index(after: flagIndex)),
+              let count = Int(arguments[arguments.index(after: flagIndex)]) else {
+            return 0
+        }
+        return min(max(count, 0), 8)
+    }
+
+    static var requestsEmptyCommerceFixture: Bool {
+        isRunningUITests
+            && ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_LOCAL_COMMERCE_EMPTY")
+    }
+
+    static var requestsOwnedCommerceFixture: Bool {
+        isRunningUITests
+            && ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_LOCAL_COMMERCE_OWNED")
+    }
+
     static var requestedPlantBaselineSeedCount: Int? {
         let arguments = ProcessInfo.processInfo.arguments
         guard isRunningUITests,
@@ -93,6 +120,14 @@ enum OhanaUITestLaunchOptions {
         let name = arguments[arguments.index(after: flagIndex)]
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return String((name.isEmpty ? "Codex Human Baseline" : name).prefix(80))
+    }
+
+    static var requestsImportedLabFixture: Bool {
+        isRunningUITests
+            && resetsPersistentState
+            && requestsOwnedCommerceFixture
+            && requestedHumanBaselineName != nil
+            && ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TEST_SEED_IMPORTED_LAB_FIXTURE")
     }
 
     static var requestsMemberCardBaseline: Bool {
@@ -232,6 +267,11 @@ enum UITestHumanBaselineSeeder {
                 UserDefaults.standard.set(true, forKey: StarterGiftStorageKey.pending)
                 OnboardingJourneyCoordinator.markFirstHumanCreated(human.id)
             }
+            UITestHumanLabFixtureSeeder.seedIfRequested(
+                context: context,
+                services: services,
+                human: human
+            )
             let matureHouseholdResult = UITestMatureHouseholdBaselineSeeder.seedIfRequested(
                 modelContainer: modelContainer,
                 services: services,

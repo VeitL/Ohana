@@ -19,49 +19,49 @@ SNS = boto3.client("sns")
 
 COPY = {
     "zh": {
-        "initial": "连续 2 个守护日未收到打卡，请主动联系确认",
-        "follow_up": "连续 3 个守护日仍未收到打卡，请再次主动联系确认",
-        "recovery": "已恢复打卡",
+        "initial": "尚未收到今天的平安确认，请主动联系确认",
+        "follow_up": "连续 2 个守护日尚未收到平安确认，请再次主动联系确认",
+        "recovery": "已收到平安确认",
     },
     "en": {
-        "initial": "No check-in has reached Ohana for 2 guard days. Please contact them to confirm.",
-        "follow_up": "No check-in has reached Ohana for 3 guard days. Please contact them again.",
-        "recovery": "Check-ins have resumed.",
+        "initial": "Ohana has not received today's safety confirmation. Please contact them to confirm.",
+        "follow_up": "Ohana has not received a safety confirmation for 2 guard days. Please contact them again.",
+        "recovery": "Ohana has received a safety confirmation.",
     },
     "de": {
-        "initial": "Ohana hat seit 2 Schutztagen keinen Check-in erhalten. Bitte nimm Kontakt auf.",
-        "follow_up": "Ohana hat seit 3 Schutztagen keinen Check-in erhalten. Bitte frage erneut nach.",
-        "recovery": "Die Check-ins wurden wieder aufgenommen.",
+        "initial": "Ohana hat die heutige Sicherheitsbestätigung noch nicht erhalten. Bitte nimm Kontakt auf.",
+        "follow_up": "Ohana hat an 2 Schutztagen keine Sicherheitsbestätigung erhalten. Bitte frage erneut nach.",
+        "recovery": "Ohana hat eine Sicherheitsbestätigung erhalten.",
     },
     "es": {
-        "initial": "Ohana no ha recibido un registro durante 2 días de seguimiento. Contacta para confirmar.",
-        "follow_up": "Ohana sigue sin recibir un registro tras 3 días. Vuelve a contactar.",
-        "recovery": "Se han reanudado los registros.",
+        "initial": "Ohana aún no ha recibido la confirmación de bienestar de hoy. Contacta para confirmar.",
+        "follow_up": "Ohana aún no ha recibido una confirmación de bienestar tras 2 días de seguimiento. Vuelve a contactar.",
+        "recovery": "Ohana ha recibido una confirmación de bienestar.",
     },
     "pt": {
-        "initial": "Ohana não recebeu check-in por 2 dias de proteção. Entre em contato para confirmar.",
-        "follow_up": "Ohana continua sem receber check-in após 3 dias. Entre em contato novamente.",
-        "recovery": "Os check-ins foram retomados.",
+        "initial": "Ohana ainda não recebeu a confirmação de bem-estar de hoje. Entre em contato para confirmar.",
+        "follow_up": "Ohana ainda não recebeu uma confirmação de bem-estar após 2 dias de proteção. Entre em contato novamente.",
+        "recovery": "Ohana recebeu uma confirmação de bem-estar.",
     },
     "fr": {
-        "initial": "Ohana n’a reçu aucun pointage pendant 2 jours de veille. Prenez contact pour vérifier.",
-        "follow_up": "Ohana n’a toujours rien reçu après 3 jours. Reprenez contact.",
-        "recovery": "Les pointages ont repris.",
+        "initial": "Ohana n’a pas encore reçu la confirmation que tout va bien aujourd’hui. Prenez contact pour vérifier.",
+        "follow_up": "Ohana n’a toujours pas reçu de confirmation après 2 jours de veille. Reprenez contact.",
+        "recovery": "Ohana a reçu une confirmation que tout va bien.",
     },
     "ja": {
-        "initial": "2回の見守り日にチェックインを受信していません。本人へ連絡して確認してください。",
-        "follow_up": "3回の見守り日もチェックインを受信していません。もう一度連絡してください。",
-        "recovery": "チェックインが再開しました。",
+        "initial": "今日の安全確認をまだ受信していません。本人へ連絡して確認してください。",
+        "follow_up": "2回の見守り日も安全確認を受信していません。もう一度連絡してください。",
+        "recovery": "安全確認を受信しました。",
     },
     "ko": {
-        "initial": "2번의 보호일 동안 체크인을 받지 못했습니다. 직접 연락해 확인해 주세요.",
-        "follow_up": "3번의 보호일이 지나도 체크인을 받지 못했습니다. 다시 연락해 주세요.",
-        "recovery": "체크인이 다시 시작되었습니다.",
+        "initial": "오늘의 안전 확인을 아직 받지 못했습니다. 직접 연락해 확인해 주세요.",
+        "follow_up": "2번의 보호일 동안 안전 확인을 받지 못했습니다. 다시 연락해 주세요.",
+        "recovery": "안전 확인을 받았습니다.",
     },
     "it": {
-        "initial": "Ohana non ha ricevuto check-in per 2 giorni di tutela. Contatta la persona per verificare.",
-        "follow_up": "Ohana non ha ancora ricevuto check-in dopo 3 giorni. Contattala di nuovo.",
-        "recovery": "I check-in sono ripresi.",
+        "initial": "Ohana non ha ancora ricevuto la conferma di sicurezza di oggi. Contatta la persona per verificare.",
+        "follow_up": "Ohana non ha ancora ricevuto una conferma di sicurezza dopo 2 giorni di tutela. Contattala di nuovo.",
+        "recovery": "Ohana ha ricevuto una conferma di sicurezza.",
     },
 }
 
@@ -145,7 +145,7 @@ def _process(payload: dict[str, Any]) -> None:
         initial_submitted_at = parse_iso(incident.get("initial_submitted_at"))
         follow_up_queued_at = parse_iso(delivery.get("created_at"))
         if not follow_up_may_submit(initial_submitted_at, follow_up_queued_at):
-            # If the day-two attempt was delayed until after the day-three
+            # If the initial attempt was delayed until after the second-day
             # follow-up was queued, submit only the first alert. This avoids two
             # back-to-back notifications when a device or queue recovers.
             _cancel_delivery(delivery, now)

@@ -433,6 +433,13 @@ private final class FakeMedicationReminderManager: MedicationReminderManaging {
     }
 
     func scheduleHumanMedicationReminders(for _: Human, meds _: [HumanMedication], context _: ModelContext?) {}
+
+    func refreshScheduledMedicationReminders(
+        context _: ModelContext,
+        hidingDetails _: Bool
+    ) async -> MedicationNotificationPrivacyRefreshResult {
+        .unavailable
+    }
 }
 
 @MainActor

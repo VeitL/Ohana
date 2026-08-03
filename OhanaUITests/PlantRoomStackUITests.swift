@@ -37,6 +37,20 @@ final class PlantRoomStackUITests: XCTestCase {
 
         let plantsTab = app.buttons["home-tab-plants"]
         XCTAssertTrue(plantsTab.waitForExistence(timeout: 20), "Plants tab did not appear for the room-stack fixture.")
+        let zenIntroductionDismiss = app.buttons["zen-introduction-banner"]
+        if zenIntroductionDismiss.waitForExistence(timeout: 3) {
+            XCTAssertTrue(
+                waitUntil(timeout: 3) {
+                    zenIntroductionDismiss.isEnabled && zenIntroductionDismiss.isHittable
+                },
+                "The Zen introduction obscured Home without exposing its dismiss action."
+            )
+            zenIntroductionDismiss.tap()
+            XCTAssertTrue(
+                waitUntil(timeout: 4) { !zenIntroductionDismiss.exists },
+                "The Zen introduction stayed visible after dismissal."
+            )
+        }
         plantsTab.tap()
 
         let overview = app.descendants(matching: .any)["home-plants-room-stack-overview"]
@@ -86,9 +100,13 @@ final class PlantRoomStackUITests: XCTestCase {
         keepScreenshot(named: "plant-room-stack-open", app: app)
 
         closeRoom.tap()
-        XCTAssertTrue(overview.waitForExistence(timeout: 8), "Closing the room did not restore the stack overview.")
-
         let expandAll = app.buttons["home-plants-expand-all"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                overview.exists || expandAll.exists
+            },
+            "Closing the room did not restore the stack overview."
+        )
         XCTAssertTrue(expandAll.waitForExistence(timeout: 8), "Expand all did not appear on the stack overview.")
         expandAll.tap()
 
@@ -146,7 +164,7 @@ final class PlantRoomStackUITests: XCTestCase {
     private func keepScreenshot(named name: String, app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name
-        attachment.lifetime = .keepAlways
+        attachment.lifetime = .deleteOnSuccess
         add(attachment)
     }
 }

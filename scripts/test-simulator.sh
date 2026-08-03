@@ -6,6 +6,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # shellcheck source=scripts/lib/local-build-environment.sh
 source "${REPO_ROOT}/scripts/lib/local-build-environment.sh"
+# shellcheck source=scripts/lib/xcode-storage-lifecycle.sh
+source "${REPO_ROOT}/scripts/lib/xcode-storage-lifecycle.sh"
 # shellcheck source=scripts/lib/test-build-provenance.sh
 source "${REPO_ROOT}/scripts/lib/test-build-provenance.sh"
 
@@ -34,15 +36,19 @@ fi
 SDK="${SDK:-iphonesimulator}"
 CODE_SIGNING_ALLOWED_VALUE="${CODE_SIGNING_ALLOWED:-NO}"
 TEST_ACTION="${OHANA_TEST_ACTION:-build-then-test}"
-RESULT_BUNDLE_PATH="${OHANA_RESULT_BUNDLE_PATH:-}"
+TEST_CODE_COVERAGE="${OHANA_TEST_CODE_COVERAGE:-NO}"
+TEST_PARALLEL_ENABLED="${OHANA_TEST_PARALLEL_ENABLED:-NO}"
+TEST_MAXIMUM_WORKERS="${OHANA_TEST_MAXIMUM_WORKERS:-1}"
+RESULT_BUNDLE_PATH=""
 STRIP_XATTRS_SCRIPT="${REPO_ROOT}/scripts/strip-build-xattrs.sh"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-${OHANA_TEST_DERIVED_DATA_ROOT:-${OHANA_TEST_DERIVED_DATA_PATH}}}"
-LOCK_ROOT="${REPO_ROOT}/.build/locks"
-LOCK_DIR="${LOCK_ROOT}/lane-tests.lock"
-LOCK_ACQUIRED=0
 resolved_test_udid=""
 PROVENANCE_SOURCE_HASH=""
 PROVENANCE_FIELDS=()
+pre_available_kib=0
+pre_derived_kib=0
+pre_results_kib=0
+TEST_SIMULATOR_SHUTDOWN_DONE=0
 
 case "${TEST_ACTION}" in
   build-then-test|build-for-testing|test-without-building)
@@ -63,6 +69,45 @@ if [[ "${SDK}" != "iphonesimulator" ]]; then
   echo "Refusing to test with SDK=${SDK}. Use iphonesimulator." >&2
   exit 2
 fi
+
+case "${TEST_CODE_COVERAGE}" in
+  YES|NO) ;;
+  *)
+    echo "OHANA_TEST_CODE_COVERAGE must be YES or NO." >&2
+    exit 2
+    ;;
+esac
+case "${TEST_PARALLEL_ENABLED}:${TEST_MAXIMUM_WORKERS}" in
+  NO:1) ;;
+  YES:[1-9]|YES:[1-9][0-9]*)
+    if [[ "${OHANA_ALLOW_PARALLEL_TESTING:-0}" != "1" ]]; then
+      echo "Parallel testing requires explicit OHANA_ALLOW_PARALLEL_TESTING=1." >&2
+      exit 2
+    fi
+    ;;
+  *)
+    echo "Local tests default to parallel testing off and one worker." >&2
+    echo "Set OHANA_ALLOW_PARALLEL_TESTING=1 with a positive worker count to opt in." >&2
+    exit 2
+    ;;
+esac
+
+for ((argument_index = 0; argument_index < ${#ORIGINAL_XCODEBUILD_ARGS[@]}; argument_index++)); do
+  argument="${ORIGINAL_XCODEBUILD_ARGS[argument_index]}"
+  case "${argument}" in
+    -test-iterations|-retry-tests-on-failure|-run-tests-until-failure)
+      if [[ "${OHANA_ALLOW_TEST_REPETITION:-0}" != "1" ]]; then
+        echo "Test repetition is off by default; ${argument} requires OHANA_ALLOW_TEST_REPETITION=1." >&2
+        exit 2
+      fi
+      ;;
+    -enableCodeCoverage|-parallel-testing-enabled|-maximum-parallel-testing-workers)
+      echo "Do not pass ${argument} directly." >&2
+      echo "Use the governed OHANA_TEST_CODE_COVERAGE or OHANA_TEST_PARALLEL_* controls." >&2
+      exit 2
+      ;;
+  esac
+done
 
 ohana_assert_fixed_derived_data_path tests "${DERIVED_DATA_PATH}"
 DERIVED_DATA_PATH="${OHANA_TEST_DERIVED_DATA_PATH}"
@@ -124,12 +169,35 @@ resolve_test_destination() {
 }
 
 cleanup() {
-  if [[ "${LOCK_ACQUIRED}" == "1" ]]; then
-    rm -f "${LOCK_DIR}/pid"
-    rmdir "${LOCK_DIR}" 2>/dev/null || true
+  local exit_status=$?
+  set +e
+  if [[ -n "${RESULT_BUNDLE_PATH}" ]]; then
+    ohana_finalize_managed_result_bundle "${exit_status}" "${RESULT_BUNDLE_PATH}"
+    RESULT_BUNDLE_PATH=""
   fi
+  shutdown_test_simulator
+  ohana_release_xcode_project_lock
 }
 trap cleanup EXIT
+
+shutdown_test_simulator() {
+  [[ "${TEST_SIMULATOR_SHUTDOWN_DONE}" == "0" ]] || return 0
+  [[ -n "${resolved_test_udid}" ]] || return 0
+  case "${OHANA_KEEP_TEST_SIMULATOR_BOOTED:-0}" in
+    0)
+      xcrun simctl shutdown "${resolved_test_udid}" >/dev/null 2>&1 || true
+      echo "Test Simulator left shutdown: ${OHANA_TEST_SIMULATOR_NAME_FIXED} (${resolved_test_udid})"
+      ;;
+    1)
+      echo "Explicitly leaving the Tests Simulator booted."
+      ;;
+    *)
+      echo "OHANA_KEEP_TEST_SIMULATOR_BOOTED must be 0 or 1." >&2
+      return 2
+      ;;
+  esac
+  TEST_SIMULATOR_SHUTDOWN_DONE=1
+}
 
 sanitize_derived_data_products() {
   local products_dir="${DERIVED_DATA_PATH}/Build/Products"
@@ -161,6 +229,7 @@ refresh_test_build_provenance_contract() {
     scripts/resolve-test-scheme.sh
     scripts/strip-build-xattrs.sh
     scripts/lib/local-build-environment.sh
+    scripts/lib/xcode-storage-lifecycle.sh
     scripts/lib/test-build-provenance.sh
   )
   input_scope="$(provenance_input_scope)"
@@ -205,6 +274,9 @@ refresh_test_build_provenance_contract() {
     "xcode_version_sha256=${xcode_version_hash}"
     "destination_udid=${resolved_test_udid}"
     "code_signing_allowed=${CODE_SIGNING_ALLOWED_VALUE}"
+    "code_coverage=${TEST_CODE_COVERAGE}"
+    "parallel_testing=${TEST_PARALLEL_ENABLED}"
+    "maximum_workers=${TEST_MAXIMUM_WORKERS}"
     "copyfile_disable=${COPYFILE_DISABLE}"
     "build_args_sha256=${build_args_hash}"
     "input_scope=${input_scope}"
@@ -251,40 +323,14 @@ validate_test_build_provenance() {
 
 resolve_test_destination
 ohana_require_build_disk_space
-
-if [[ -n "${RESULT_BUNDLE_PATH}" && -e "${RESULT_BUNDLE_PATH}" ]]; then
-  echo "Refusing to overwrite existing result bundle: ${RESULT_BUNDLE_PATH}" >&2
-  exit 2
-fi
-
-mkdir -p "${LOCK_ROOT}" "${DERIVED_DATA_PATH}"
-while ! mkdir "${LOCK_DIR}" 2>/dev/null; do
-  if [[ -f "${LOCK_DIR}/pid" ]]; then
-    LOCK_PID="$(tr -d '[:space:]' < "${LOCK_DIR}/pid" 2>/dev/null || true)"
-    if [[ -n "${LOCK_PID}" ]] && ! kill -0 "${LOCK_PID}" 2>/dev/null; then
-      STALE_LOCK_DIR="${LOCK_DIR}.stale.$(date +%s).$$"
-      echo "Test lock owner ${LOCK_PID} is gone; moving stale lock to ${STALE_LOCK_DIR}."
-      mv "${LOCK_DIR}" "${STALE_LOCK_DIR}" 2>/dev/null || rm -rf "${LOCK_DIR}"
-      continue
-    fi
-  else
-    STALE_LOCK_DIR="${LOCK_DIR}.malformed.$(date +%s).$$"
-    echo "Test lock is missing pid; moving malformed lock to ${STALE_LOCK_DIR}."
-    mv "${LOCK_DIR}" "${STALE_LOCK_DIR}" 2>/dev/null || rm -rf "${LOCK_DIR}"
-    continue
-  fi
-  echo "Another build or test is already using the fixed tests cache."
-  echo "Waiting on lock: ${LOCK_DIR}"
-  sleep 2
-done
-LOCK_ACQUIRED=1
-printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+ohana_acquire_xcode_project_lock "tests:${SCHEME}:${TEST_ACTION}"
+mkdir -p "${DERIVED_DATA_PATH}"
+RESULT_BUNDLE_PATH="$(ohana_prepare_managed_result_bundle "${SCHEME}-${TEST_ACTION}")"
+pre_available_kib="$(ohana_available_disk_kib)"
+pre_derived_kib="$(ohana_path_size_kib "${DERIVED_DATA_PATH}")"
+pre_results_kib="$(ohana_path_size_kib "${OHANA_TEST_RESULT_ROOT}")"
 
 ohana_quiesce_test_simulator_companion_apps "${resolved_test_udid}"
-
-if [[ -n "${RESULT_BUNDLE_PATH}" ]]; then
-  mkdir -p "$(dirname "${RESULT_BUNDLE_PATH}")"
-fi
 
 echo "Xcode action: ${TEST_ACTION} (${SCHEME})"
 if [[ "${SCHEME_SOURCE}" == "automatic" ]]; then
@@ -294,9 +340,10 @@ echo "SDK: ${SDK}"
 echo "Destination: ${DESTINATION}"
 echo "DerivedData: ${DERIVED_DATA_PATH}"
 echo "Code signing: CODE_SIGNING_ALLOWED=${CODE_SIGNING_ALLOWED_VALUE}"
-if [[ -n "${RESULT_BUNDLE_PATH}" ]]; then
-  echo "Result bundle: ${RESULT_BUNDLE_PATH}"
-fi
+echo "Code coverage: ${TEST_CODE_COVERAGE}"
+echo "Parallel testing: ${TEST_PARALLEL_ENABLED} (workers ${TEST_MAXIMUM_WORKERS})"
+echo "Managed result bundle: ${RESULT_BUNDLE_PATH}"
+echo "Storage before: free $(ohana_format_kib_as_gib "${pre_available_kib}"), DerivedData $(ohana_format_kib_human "${pre_derived_kib}"), results $(ohana_format_kib_human "${pre_results_kib}")"
 
 sanitize_derived_data_products
 
@@ -311,11 +358,14 @@ run_xcodebuild_action() {
     -derivedDataPath "${DERIVED_DATA_PATH}"
     -disableAutomaticPackageResolution
     -skipPackagePluginValidation
+    -enableCodeCoverage "${TEST_CODE_COVERAGE}"
+    -parallel-testing-enabled "${TEST_PARALLEL_ENABLED}"
+    -maximum-parallel-testing-workers "${TEST_MAXIMUM_WORKERS}"
     CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED_VALUE}"
     "${action}"
   )
 
-  if [[ "${include_result_bundle}" == "1" && -n "${RESULT_BUNDLE_PATH}" ]]; then
+  if [[ "${include_result_bundle}" == "1" ]]; then
     xcodebuild_args+=(
       -resultBundlePath "${RESULT_BUNDLE_PATH}"
     )
@@ -395,5 +445,44 @@ if [[ "${TEST_ACTION}" != "build-for-testing" && -n "${source_hash_before_test}"
 fi
 set -e
 
+shutdown_test_simulator
+
+set +e
+ohana_finalize_managed_result_bundle "${test_status}" "${RESULT_BUNDLE_PATH}"
+result_lifecycle_status=$?
+RESULT_BUNDLE_PATH=""
+if [[ "${test_status}" == "0" && "${result_lifecycle_status}" != "0" ]]; then
+  test_status="${result_lifecycle_status}"
+fi
+set -e
+
 sanitize_derived_data_products
+post_available_kib="$(ohana_available_disk_kib)"
+post_derived_kib="$(ohana_path_size_kib "${DERIVED_DATA_PATH}")"
+post_results_kib="$(ohana_path_size_kib "${OHANA_TEST_RESULT_ROOT}")"
+awk \
+  -v before_free="${pre_available_kib}" \
+  -v after_free="${post_available_kib}" \
+  -v before_derived="${pre_derived_kib}" \
+  -v after_derived="${post_derived_kib}" \
+  -v before_results="${pre_results_kib}" \
+  -v after_results="${post_results_kib}" \
+  'BEGIN {
+    printf "Storage after: free %.1f GiB (%+.1f MiB), DerivedData %.1f MiB (%+.1f MiB), results %.1f MiB (%+.1f MiB)\n",
+      after_free / 1024 / 1024, (after_free - before_free) / 1024,
+      after_derived / 1024, (after_derived - before_derived) / 1024,
+      after_results / 1024, (after_results - before_results) / 1024
+  }'
+remaining_test_processes="$(
+  {
+    pgrep -x -l xcodebuild 2>/dev/null || true
+    pgrep -x -l xctest 2>/dev/null || true
+  } | LC_ALL=C sort -u
+)"
+if [[ -n "${remaining_test_processes}" ]]; then
+  echo "WARNING: Xcode test processes still visible after the action:" >&2
+  printf '  %s\n' "${remaining_test_processes}" >&2
+else
+  echo "Residual xcodebuild/xctest processes: none"
+fi
 exit "${test_status}"

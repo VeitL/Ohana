@@ -35,6 +35,19 @@ struct HumanAllFeaturesRouteSummaryTests {
             date: date(year: 2026, month: 7, day: 5),
             human: human
         )
+        let condition = HumanHealthCondition(
+            humanId: human.id.uuidString,
+            name: "Seasonal allergy",
+            category: .allergy,
+            trackingStatus: .monitoring
+        )
+        let observation = HumanHealthObservation(
+            humanId: human.id.uuidString,
+            conditionId: condition.id.uuidString,
+            recordedAt: date(year: 2026, month: 7, day: 6),
+            severity: 4,
+            symptomTags: ["congestion"]
+        )
 
         let summary = HumanAllFeaturesActivitySummary.load(
             human: human,
@@ -44,6 +57,8 @@ struct HumanAllFeaturesRouteSummaryTests {
             weightLogs: [olderWeight, latestWeight],
             workoutLogs: [olderWorkout, latestWorkout],
             healthMetricLogs: [metric],
+            healthConditions: [condition],
+            healthObservations: [observation],
             now: now,
             calendar: calendar
         )
@@ -59,6 +74,9 @@ struct HumanAllFeaturesRouteSummaryTests {
         #expect(summary.weightChartPoints.map(\.value) == [66, 67.2])
         #expect(summary.workoutChartPoints.reduce(0) { $0 + $1.value } == 45)
         #expect(summary.metricsChartPoints.reduce(0) { $0 + $1.value } == 1)
+        #expect(summary.activeHealthConditionCount == 1)
+        #expect(summary.recentHealthObservationCount == 1)
+        #expect(summary.conditionChartPoints.reduce(0) { $0 + $1.value } == 1)
     }
 
     @MainActor
@@ -75,19 +93,16 @@ struct HumanAllFeaturesRouteSummaryTests {
 
         human.avatarEmoji = "🧑‍🚀"
         human.birthday = Date(timeIntervalSince1970: 1_000_000)
+        human.genderIdentityRaw = "private"
         let resolvedSummary = HumanAllFeaturesActivitySummary.load(
             human: human,
             allMeds: [],
             allReports: [],
-            allExpenses: [],
-            explicitlyResolvedProfileCategories: [.humanBodyProfile]
+            allExpenses: []
         )
 
         #expect(resolvedSummary.profileChartPoints.first?.value == 3)
-        #expect(MemberProfileCompletenessPolicy.human(
-            human,
-            explicitlyResolvedCategories: [.humanBodyProfile]
-        ).completionPercent == 75)
+        #expect(MemberProfileCompletenessPolicy.human(human).completionPercent == 75)
     }
 
     @Test func humanAllFeaturesSheetDoesNotReadRelationshipLogs() throws {
@@ -109,9 +124,15 @@ struct HumanAllFeaturesRouteSummaryTests {
         #expect(routeSource.contains("FetchDescriptor<HumanWeightLog>"))
         #expect(routeSource.contains("FetchDescriptor<HumanWorkoutLog>"))
         #expect(routeSource.contains("FetchDescriptor<HumanHealthMetricLog>"))
+        #expect(routeSource.contains("FetchDescriptor<HumanHealthCondition>"))
+        #expect(routeSource.contains("FetchDescriptor<HumanHealthObservation>"))
         #expect(routeSource.contains("weightLogs: weightLogs"))
         #expect(routeSource.contains("workoutLogs: workoutLogs"))
         #expect(routeSource.contains("healthMetricLogs: healthMetricLogs"))
+        #expect(routeSource.contains("healthConditions: healthRows.conditions"))
+        #expect(routeSource.contains("healthObservations: healthRows.observations"))
+        #expect(routeSource.contains("conditionDescriptor.fetchLimit = 64"))
+        #expect(routeSource.contains("observationDescriptor.fetchLimit = 256"))
     }
 
     private func repositoryRootURL() -> URL {

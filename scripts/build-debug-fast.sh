@@ -6,6 +6,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # shellcheck source=scripts/lib/local-build-environment.sh
 source "${REPO_ROOT}/scripts/lib/local-build-environment.sh"
+# shellcheck source=scripts/lib/xcode-storage-lifecycle.sh
+source "${REPO_ROOT}/scripts/lib/xcode-storage-lifecycle.sh"
 
 cd "${REPO_ROOT}"
 
@@ -22,9 +24,6 @@ COMPILER_INDEX_STORE_ENABLE_VALUE="${OHANA_COMPILER_INDEX_STORE_ENABLE:-}"
 BUILD_LANE="${OHANA_BUILD_LANE:-tests}"
 EXPECTED_DERIVED_DATA_PATH="$(ohana_expected_derived_data_path "${BUILD_LANE}")"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-${EXPECTED_DERIVED_DATA_PATH}}"
-LOCK_ROOT="${REPO_ROOT}/.build/locks"
-LOCK_DIR="${LOCK_ROOT}/lane-${BUILD_LANE}.lock"
-LOCK_ACQUIRED=0
 
 case "${SWIFT_COMPILATION_MODE_VALUE}" in
   ""|incremental|wholemodule)
@@ -129,10 +128,7 @@ resolve_build_destination() {
 }
 
 cleanup() {
-  if [[ "${LOCK_ACQUIRED}" == "1" ]]; then
-    rm -f "${LOCK_DIR}/pid"
-    rmdir "${LOCK_DIR}" 2>/dev/null || true
-  fi
+  ohana_release_xcode_project_lock
 }
 trap cleanup EXIT
 
@@ -146,28 +142,8 @@ sanitize_derived_data_products() {
 resolve_build_destination
 ohana_require_build_disk_space
 
-mkdir -p "${LOCK_ROOT}" "${DERIVED_DATA_PATH}"
-while ! mkdir "${LOCK_DIR}" 2>/dev/null; do
-  if [[ -f "${LOCK_DIR}/pid" ]]; then
-    LOCK_PID="$(tr -d '[:space:]' < "${LOCK_DIR}/pid" 2>/dev/null || true)"
-    if [[ -n "${LOCK_PID}" ]] && ! kill -0 "${LOCK_PID}" 2>/dev/null; then
-      STALE_LOCK_DIR="${LOCK_DIR}.stale.$(date +%s).$$"
-      echo "Build lock owner ${LOCK_PID} is gone; moving stale lock to ${STALE_LOCK_DIR}."
-      mv "${LOCK_DIR}" "${STALE_LOCK_DIR}" 2>/dev/null || rm -rf "${LOCK_DIR}"
-      continue
-    fi
-  else
-    STALE_LOCK_DIR="${LOCK_DIR}.malformed.$(date +%s).$$"
-    echo "Build lock is missing pid; moving malformed lock to ${STALE_LOCK_DIR}."
-    mv "${LOCK_DIR}" "${STALE_LOCK_DIR}" 2>/dev/null || rm -rf "${LOCK_DIR}"
-    continue
-  fi
-  echo "Another ${BUILD_LANE} build is already using its fixed cache."
-  echo "Waiting on lock: ${LOCK_DIR}"
-  sleep 2
-done
-LOCK_ACQUIRED=1
-printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+ohana_acquire_xcode_project_lock "build:${BUILD_LANE}:${CONFIGURATION}"
+mkdir -p "${DERIVED_DATA_PATH}"
 
 echo "Building ${SCHEME} (${CONFIGURATION})"
 echo "Build lane: ${BUILD_LANE}"

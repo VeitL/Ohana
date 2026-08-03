@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct DataBackupCoverageTests {
     @Test func latestSwiftDataModelsHaveExternalBackupCoverageOrExplicitHealthExemption() {
-        let schemaModels = Set(ArkSchemaV96.models.map { String(describing: $0) })
+        let schemaModels = Set(ArkSchemaV98.models.map { String(describing: $0) })
         let externallyCoveredModels: Set<String> = [
             String(describing: Pet.self),
             String(describing: Human.self),
@@ -61,6 +61,8 @@ struct DataBackupCoverageTests {
             String(describing: HumanMedication.self),
             String(describing: HumanMedicationLog.self),
             String(describing: HumanHealthReport.self),
+            String(describing: HumanHealthCondition.self),
+            String(describing: HumanHealthObservation.self),
             String(describing: HumanNoteRecord.self),
             String(describing: HumanHealthMetricLog.self),
             // Family-task text is free-form and legacy tasks may not link to
@@ -98,7 +100,7 @@ struct DataBackupCoverageTests {
             Issue.record("SwiftData models missing external backup coverage or explicit classification: \(missingModels.sorted())")
         }
         if !staleCoverageModels.isEmpty {
-            Issue.record("External backup coverage lists models no longer in ArkSchemaV96: \(staleCoverageModels.sorted())")
+            Issue.record("External backup coverage lists models no longer in ArkSchemaV98: \(staleCoverageModels.sorted())")
         }
         if !staleExemptModels.isEmpty {
             Issue.record("External backup exclusion list contains stale models: \(staleExemptModels.sorted())")
@@ -238,6 +240,29 @@ struct DataBackupCoverageTests {
             summary: "private summary",
             recordedByHumanId: human.id.uuidString
         )
+        let labSourceCanary = "HLAB-SOURCE-LABEL-CANARY-DO-NOT-EXPORT"
+        let labRangeCanary = "HLAB-REFERENCE-RANGE-CANARY-DO-NOT-EXPORT"
+        healthReport.captureSource = .documentScan
+        healthMetric.sourceReportID = healthReport.id
+        healthMetric.sourceLabel = labSourceCanary
+        healthMetric.referenceRangeText = labRangeCanary
+        healthMetric.reportedFlag = .high
+        let healthConditionCanary = "HHC-CONDITION-CANARY-DO-NOT-EXPORT"
+        let healthObservationCanary = "HHO-OBSERVATION-CANARY-DO-NOT-EXPORT"
+        let healthCondition = HumanHealthCondition(
+            humanId: human.id.uuidString,
+            name: healthConditionCanary,
+            notes: healthConditionCanary,
+            recordedByHumanId: human.id.uuidString
+        )
+        let healthObservation = HumanHealthObservation(
+            humanId: human.id.uuidString,
+            conditionId: healthCondition.id.uuidString,
+            recordedAt: occurredAt,
+            severity: 4,
+            notes: healthObservationCanary,
+            recordedByHumanId: human.id.uuidString
+        )
         let firstPet = Pet(name: "Miso", species: "猫")
         firstPet.id = try #require(UUID(uuidString: "22222222-2222-4222-8222-222222222222"))
         let secondPet = Pet(name: "Luna", species: "猫")
@@ -271,13 +296,19 @@ struct DataBackupCoverageTests {
         sourceContext.insert(noteRecord)
         sourceContext.insert(healthMetric)
         sourceContext.insert(healthReport)
+        sourceContext.insert(healthCondition)
+        sourceContext.insert(healthObservation)
         sourceContext.insert(firstPet)
         sourceContext.insert(secondPet)
         sourceContext.insert(relationship)
         sourceContext.insert(budgetEvent)
         try sourceContext.save()
+        #expect(try sourceContext.fetchCount(FetchDescriptor<HumanHealthCondition>()) == 1)
+        #expect(try sourceContext.fetchCount(FetchDescriptor<HumanHealthObservation>()) == 1)
 
         let backup = try TestDataBackupManagerProjection.manager.buildBackup(context: sourceContext)
+        let encodedBackup = try TestDataBackupManagerProjection.manager.encode(backup)
+        let encodedManifest = try #require(String(data: encodedBackup, encoding: .utf8))
 
         #expect(backup.petRelationships?.count == 1)
         #expect(backup.petRelationships?.first?.relationshipTypeRaw == PetRelationshipType.sibling.rawValue)
@@ -287,6 +318,13 @@ struct DataBackupCoverageTests {
         #expect(backup.humanNoteRecords?.isEmpty == true)
         #expect(backup.humanHealthMetricLogs?.isEmpty == true)
         #expect(backup.humanHealthReports?.isEmpty == true)
+        #expect(!encodedManifest.contains(healthConditionCanary))
+        #expect(!encodedManifest.contains(healthObservationCanary))
+        #expect(!encodedManifest.contains(healthCondition.id.uuidString))
+        #expect(!encodedManifest.contains(healthObservation.id.uuidString))
+        #expect(!encodedManifest.contains(labSourceCanary))
+        #expect(!encodedManifest.contains(labRangeCanary))
+        #expect(!encodedManifest.contains(healthReport.id.uuidString))
 
         let target = try makeInMemoryContainer()
         try TestDataBackupManagerProjection.manager.applyBackup(
@@ -308,6 +346,8 @@ struct DataBackupCoverageTests {
         #expect(try target.mainContext.fetch(FetchDescriptor<HumanNoteRecord>()).isEmpty)
         #expect(try target.mainContext.fetch(FetchDescriptor<HumanHealthMetricLog>()).isEmpty)
         #expect(try target.mainContext.fetch(FetchDescriptor<HumanHealthReport>()).isEmpty)
+        #expect(try target.mainContext.fetch(FetchDescriptor<HumanHealthCondition>()).isEmpty)
+        #expect(try target.mainContext.fetch(FetchDescriptor<HumanHealthObservation>()).isEmpty)
     }
 
     @Test func backupPackageRoundTripsAllExternalStorageMediaFields() async throws {
@@ -735,7 +775,7 @@ struct DataBackupCoverageTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV96.models)
+        let schema = Schema(ArkSchemaV97.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, migrationPlan: ArkMigrationPlan.self, configurations: [config])
     }

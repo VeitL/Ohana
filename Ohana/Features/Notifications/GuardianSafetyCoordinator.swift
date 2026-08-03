@@ -222,6 +222,11 @@ final class GuardianSafetyCoordinator: GuardianSafetyManaging {
         await performAndApply(ownerHumanID: ownerHumanID) { api, token in
             try await api.updatePolicy(request, accessToken: token)
         }
+        if request.isEnabled {
+            // Enabling monitoring after an earlier explicit confirmation must
+            // upload that fact before today's first server evaluation.
+            await flushOutbox()
+        }
         await registerCurrentDeviceIfPossible()
     }
 
@@ -460,6 +465,8 @@ final class GuardianSafetyCoordinator: GuardianSafetyManaging {
     ) throws {
         let context = modelContainer.mainContext
         let ownerHumanID = explicitOwnerHumanID ?? UserDefaultsPresenceOwnerSelection().ownerHumanId
+        let appliedAt = Date()
+        var ownerSignalSeed: (ownerHumanID: UUID, timeZone: TimeZone)?
 
         if let remote = snapshot.policy, let ownerHumanID {
             let key = GuardianSafetyPolicyProjection.key(ownerHumanId: ownerHumanID)
@@ -483,8 +490,14 @@ final class GuardianSafetyCoordinator: GuardianSafetyManaging {
             local.scheduleRevision = remote.scheduleRevision
             local.acceptedGuardianCount = remote.acceptedGuardianCount
             local.reachableGuardianCount = remote.reachableGuardianCount
-            local.lastSyncedAt = Date()
+            local.lastSyncedAt = appliedAt
             local.updatedAt = remote.updatedAt
+            if remote.isEnabled, remote.status != .stopped {
+                ownerSignalSeed = (
+                    ownerHumanID: ownerHumanID,
+                    timeZone: TimeZone(identifier: remote.timeZoneIdentifier) ?? .current
+                )
+            }
         }
 
         for remote in snapshot.relationships {
@@ -548,6 +561,20 @@ final class GuardianSafetyCoordinator: GuardianSafetyManaging {
         guard context.safeSaveResult(publishFailureEvent: true).didSave else {
             context.rollback()
             throw GuardianSafetyAPIError.invalidResponse
+        }
+        if let ownerSignalSeed {
+            let didStage = try LiveGuardianSafetyOutboxStager()
+                .stageExistingExplicitOwnerCheckInForCurrentDay(
+                    ownerHumanId: ownerSignalSeed.ownerHumanID,
+                    now: appliedAt,
+                    timeZone: ownerSignalSeed.timeZone,
+                    context: context
+                )
+            if didStage,
+               !context.safeSaveResult(publishFailureEvent: true).didSave {
+                context.rollback()
+                throw GuardianSafetyAPIError.invalidResponse
+            }
         }
     }
 

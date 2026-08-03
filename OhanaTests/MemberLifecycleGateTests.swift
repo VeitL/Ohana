@@ -1985,7 +1985,7 @@ struct MemberLifecycleGateTests {
         #expect(petResult.removedRelatedEventIDs.contains(petMedicationEvent.id))
         #expect(try petContext.fetch(FetchDescriptor<Event>()).isEmpty)
 
-        let humanContainer = try makeInMemoryContainer()
+        let humanContainer = try makeLatestInMemoryContainer()
         let humanContext = humanContainer.mainContext
         let human = Human(name: "Mira")
         let survivor = Human(name: "Ava")
@@ -2512,6 +2512,7 @@ struct MemberLifecycleGateTests {
         #expect(HumanAllFeatureDestination.basicInfo.isAvailableInMemorialMode)
         #expect(HumanAllFeatureDestination.notes.isAvailableInMemorialMode)
         #expect(!HumanAllFeatureDestination.medication.isAvailableInMemorialMode)
+        #expect(!HumanAllFeatureDestination.conditions.isAvailableInMemorialMode)
         #expect(!HumanAllFeatureDestination.weight.isAvailableInMemorialMode)
         #expect(!HumanAllFeatureDestination.expense.isAvailableInMemorialMode)
         #expect(!HumanAllFeatureDestination.wishlist.isAvailableInMemorialMode)
@@ -2966,6 +2967,8 @@ struct MemberLifecycleGateTests {
         let memberCreationSource = try source("Ohana/Features/Members/MemberCardCreationSupport.swift", rootURL: rootURL)
         let healthSource = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView+HealthSummary.swift", rootURL: rootURL)
         let sitterSource = try source("Ohana/Features/Members/Views/SitterCardPreviewSheet.swift", rootURL: rootURL)
+        let compactEditSource = editSource.filter { !$0.isWhitespace }
+        let compactHumanBasicSource = humanBasicSource.filter { !$0.isWhitespace }
 
         for source in [healthSource, sitterSource] {
             #expect(!source.contains("pet.healthLogs"))
@@ -2993,13 +2996,17 @@ struct MemberLifecycleGateTests {
         let legacyEmptyValue = "\u{672A}\u{586B}\u{5199}"
         #expect(!editSource.contains("selection.wrappedValue.isEmpty ? \"\(legacyEmptyValue)\""))
         #expect(!editSource.contains("$0 == \"\(legacyEmptyValue)\" ? \"\" : $0"))
-        #expect(editSource.contains("Text(option.isEmpty ? petProfileEmptyValue : option).tag(option)"))
+        #expect(compactEditSource.contains(
+            "Text(option.isEmpty?petProfileEmptyValue:PetBreedDatabase.localizedRegionName(option,l:l)).tag(option)"
+        ))
         #expect(!editSource.contains("ForEach(speciesOptions, id: \\.self) { Text($0) }"))
         #expect(editSource.contains("Text(Pet.localizedSpeciesName(species, l: l)).tag(species)"))
         #expect(!humanBasicSource.contains("selection.wrappedValue.isEmpty ? \"\(legacyEmptyValue)\""))
         #expect(!humanBasicSource.contains("$0 == \"\(legacyEmptyValue)\" ? \"\" : $0"))
         #expect(humanBasicSource.contains("Text(localizedOptionTitle(option)).tag(option)"))
-        #expect(humanBasicSource.contains("option.isEmpty ? localizedEmptyValue : option"))
+        #expect(compactHumanBasicSource.contains(
+            "option.isEmpty?localizedEmptyValue:PetBreedDatabase.localizedRegionName(option,l:l)"
+        ))
         #expect(!humanBasicSource.contains("eGender = human.genderRaw.isEmpty ? \"不透露\" : human.genderRaw"))
         #expect(!humanEditSource.contains("@State private var gender: String = \"不透露\""))
         #expect(!humanEditSource.contains("gender = human.genderRaw.isEmpty ? \"不透露\" : human.genderRaw"))
@@ -5139,6 +5146,12 @@ struct MemberLifecycleGateTests {
 
     private func makeInMemoryContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV94.models)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func makeLatestInMemoryContainer() throws -> ModelContainer {
+        let schema = Schema(ArkSchemaV98.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

@@ -68,8 +68,10 @@ extension QuickFeedDetailContent {
     }
 
     func syncDisplayedFeedMode(animated: Bool = false, force: Bool = false) {
+        guard force || !draftStore.isSavingFeedPlan else { return }
         guard force || feedHomeController.modeTransition == nil else { return }
-        let resolvedMode = FeedOperatingMode.resolved(pet: pet, allEvents: currentAllEvents, now: clockTick)
+        let resolvedMode = runtimeState.expectedModeDuringPendingRuleWrite(for: pet.id) ??
+            FeedOperatingMode.resolved(pet: pet, allEvents: currentAllEvents, now: clockTick)
         feedHomeController.syncDisplayedMode(resolvedMode, pet: pet, animated: animated, force: force)
     }
 
@@ -78,6 +80,9 @@ extension QuickFeedDetailContent {
     }
 
     func bootstrap() {
+        runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(
+            with: QuickFeedModelReadability.readableEvents(allEvents)
+        )
         feedHomeController.setAuxiliaryReady(false)
         if draftStore.manualGramsText.isEmpty, let grams = currentPortionAmount {
             draftStore.manualGramsText = String(format: "%.0f", grams)
@@ -204,7 +209,7 @@ extension QuickFeedDetailContent {
     }
 
     func preparePlanEditorDraft(_ kind: FeedRuleKind) {
-        let events = FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: currentAllEvents)
+        let events = currentPlanRuleSnapshots(kind)
         draftStore.selectedSharedPlanPetIds = SharedPetSelectionMemory.restoredSelection(
             sourcePet: pet,
             scope: "feeding.plan.\(kind.rawValue)",
@@ -218,10 +223,19 @@ extension QuickFeedDetailContent {
             draftStore.planMeals = draftStore.planTimes.map { FeedPlanMealDraft(time: $0, foodKind: pet.mainFoodKind, grams: grams) }
         } else {
             draftStore.planCount = min(max(events.count, 1), 6)
-            let grams = FeedRuleMetadata.amountGrams(from: events.first!, fallback: currentPortionAmount ?? 50)
+            let fallbackGrams = currentPortionAmount ?? 50
+            let grams = events.first.map {
+                $0.feedAmountGrams > 0 ? $0.feedAmountGrams : fallbackGrams
+            } ?? fallbackGrams
             draftStore.planTimes = FeedPlanDraft.normalizedTimes(events.map(\.startDate), count: draftStore.planCount)
             draftStore.planMeals = FeedPlanDraft.normalizedMeals(
-                events.map { FeedPlanMealDraft(time: $0.startDate, foodKind: $0.foodKind, grams: FeedRuleMetadata.amountGrams(from: $0, fallback: grams)) },
+                events.map {
+                    FeedPlanMealDraft(
+                        time: $0.startDate,
+                        foodKind: $0.foodKind,
+                        grams: $0.feedAmountGrams > 0 ? $0.feedAmountGrams : grams
+                    )
+                },
                 count: draftStore.planCount
             )
         }

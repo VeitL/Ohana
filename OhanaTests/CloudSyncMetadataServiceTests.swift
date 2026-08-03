@@ -335,7 +335,7 @@ struct CloudSyncMetadataServiceTests {
 
     @MainActor
     @Test func entityRegistryCoversCurrentSwiftDataSchema() {
-        let schemaNames = Set(ArkSchemaV96.models.map { String(describing: $0) })
+        let schemaNames = Set(ArkSchemaV98.models.map { String(describing: $0) })
             .subtracting(CloudSyncEntityRegistry.localOnlySchemaEntityNames)
         let descriptorNames = Set(CloudSyncEntityRegistry.descriptors.map(\.entityName))
 
@@ -345,7 +345,29 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
-    @Test func soloProjectKeepsCloudKitDisabledWhileDeclaringOptionalGuardianCapabilities() throws {
+    @Test func humanConditionTrackingHasMetadataPoliciesWithoutEnteringUploadPipeline() {
+        let condition = CloudSyncEntityRegistry.descriptor(for: HumanHealthCondition.self)
+        let observation = CloudSyncEntityRegistry.descriptor(for: HumanHealthObservation.self)
+
+        #expect(condition?.role == .mutableRecord)
+        #expect(condition?.defaultConflictPolicy == .lastWriterWins)
+        #expect(observation?.role == .appendOnlyFact)
+        #expect(observation?.defaultConflictPolicy == .appendOnly)
+        #expect(!CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: HumanHealthCondition.self)))
+        #expect(!CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: HumanHealthObservation.self)))
+    }
+
+    @MainActor
+    @Test func labMetricProvenanceIsMutableLocallyWithoutEnteringUploadPipeline() {
+        let metric = CloudSyncEntityRegistry.descriptor(for: HumanHealthMetricLog.self)
+
+        #expect(metric?.role == .mutableRecord)
+        #expect(metric?.defaultConflictPolicy == .lastWriterWins)
+        #expect(!CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: HumanHealthMetricLog.self)))
+    }
+
+    @MainActor
+    @Test func soloProjectKeepsOnlyShippingCapabilities() throws {
         let rootURL = repositoryRootURL()
         let entitlements = try propertyListDictionary(
             rootURL.appendingPathComponent("Ohana/Ohana.entitlements")
@@ -360,14 +382,18 @@ struct CloudSyncMetadataServiceTests {
 
         let containers = try #require(entitlements["com.apple.developer.icloud-container-identifiers"] as? [String])
         let services = try #require(entitlements["com.apple.developer.icloud-services"] as? [String])
+        let appGroups = try #require(entitlements["com.apple.security.application-groups"] as? [String])
         let backgroundModes = try #require(infoPlist["UIBackgroundModes"] as? [String])
 
         #expect(containers.contains(CloudSyncEngineRuntime.containerIdentifier))
         #expect(services == ["CloudDocuments"])
-        #expect(entitlements["aps-environment"] as? String == "development")
-        #expect(entitlements["com.apple.developer.applesignin"] as? [String] == ["Default"])
+        #expect(appGroups == ["group.com.guanchen.li.Ohana"])
+        #expect(entitlements["com.apple.developer.healthkit"] as? Bool == true)
+        #expect(entitlements["aps-environment"] == nil)
+        #expect(entitlements["com.apple.developer.applesignin"] == nil)
         #expect(entitlements["com.apple.developer.associated-domains"] == nil)
-        #expect(backgroundModes.contains("remote-notification"))
+        #expect(Set(backgroundModes) == ["fetch", "location"])
+        #expect(!infoPlist.keys.contains { $0.hasPrefix("OHANAGuardian") })
         #expect(infoPlist["CKSharingSupported"] == nil)
         #expect(!project.contains("INFOPLIST_KEY_CKSharingSupported = YES;"))
         #expect(project.contains("SWIFT_ACTIVE_COMPILATION_CONDITIONS = \"OHANA_SOLO_CAPABILITIES $(inherited)\";"))

@@ -579,6 +579,7 @@ struct VerticalSolidHomePlantsPage: View {
         .overlay {
             Capsule()
                 .strokeBorder(Color.ohanaGlassStroke.opacity(0.58), lineWidth: 1)
+                .allowsHitTesting(false)
         }
         .padding(.horizontal, 14)
         .padding(.trailing, 50)

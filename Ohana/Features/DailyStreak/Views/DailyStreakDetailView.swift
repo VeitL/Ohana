@@ -94,17 +94,6 @@ struct DailyStreakDetailView: View {
         activeHuman?.id.uuidString ?? currentActiveHumanId
     }
 
-    private var currentTreeLevel: Int {
-        appServices.oasisTree.treeLevel.rawValue
-    }
-
-    private var coconutShopLockedLevel: Int? {
-        guard let requiredLevel = AppFeatureRouteGuard.requiredLevel(for: AppSheetRoute.coconutShop(.boost)) else {
-            return nil
-        }
-        return currentTreeLevel >= requiredLevel ? nil : requiredLevel
-    }
-
     var body: some View {
         OhanaSheetPageScaffold(
             title: l.tr(zh: "打卡连击", en: "Check-in streak", de: "Check-in-Serie"),
@@ -182,17 +171,6 @@ struct DailyStreakDetailView: View {
         onPresentCoconutLog?(nil)
     }
 
-    private func presentCoconutShop(_ category: ShopItem.ShopCategory) {
-        guard AppFeatureRouteGuard.allowsSheetRoute(.coconutShop(category), currentLevel: currentTreeLevel) else {
-            AppFeatureRouteGuard.recordIntercept(
-                AppFeatureRouteGuard.lockedRouteNote(for: AppSheetRoute.coconutShop(category), currentLevel: currentTreeLevel)
-            )
-            OhanaFeedback.error()
-            return
-        }
-        onPresentCoconutShop?(category)
-    }
-
     // MARK: - 我的连击卡片
     private var coconutLogShortcut: some View {
         let balance = activeHuman?.coconutBalance ?? 0
@@ -262,7 +240,7 @@ struct DailyStreakDetailView: View {
                     Text(activeHuman?.name ?? l.tr(zh: "我", en: "Me", de: "Ich"))
                         .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "每天打开 App 即打卡", en: "Open the app daily to check in", de: "Oeffne die App taeglich zum Check-in"))
+                    Text(l.tr(zh: "历史连续记录会保留", en: "Your streak history stays", de: "Dein Serienverlauf bleibt erhalten"))
                         .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
@@ -473,18 +451,33 @@ struct DailyStreakDetailView: View {
                 }
                 Spacer()
                 if makeupPackCount > 0 {
-                    Text(l.tr(zh: "点击灰色日期补签", en: "Tap a gray date to make it up", de: "Tippe ein graues Datum zum Nachholen"))
+                    Text(l.tr(
+                        zh: "旧库存已保留 · 当前连击不支持补签",
+                        en: "Legacy stock preserved · makeup is unavailable",
+                        de: "Altbestand bleibt · Nachtragen ist nicht verfügbar",
+                        es: "Stock anterior conservado · no se admite recuperar días",
+                        pt: "Estoque antigo preservado · reposição indisponível",
+                        fr: "Ancien stock conservé · rattrapage indisponible",
+                        ja: "旧在庫は保持済み・現在は振替不可",
+                        ko: "기존 재고 보존됨 · 현재 소급 체크인 불가",
+                        it: "Scorte precedenti conservate · recupero non disponibile"
+                    ))
                         .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.goPrimary.opacity(0.7))
-                } else if let coconutShopLockedLevel {
-                    lockedShopLabel(level: coconutShopLockedLevel)
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 } else {
-                    Button { presentCoconutShop(.boost) } label: {
-                        Text(l.tr(zh: "去商店购买 →", en: "Buy in shop →", de: "Im Shop kaufen →"))
-                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.goYellow.opacity(0.85))
-                    }
-                    .buttonStyle(ScaleButtonStyle())
+                    Text(l.tr(
+                        zh: "当前版本不再出售",
+                        en: "No longer sold in this version",
+                        de: "In dieser Version nicht mehr erhältlich",
+                        es: "Ya no se vende en esta versión",
+                        pt: "Não é mais vendido nesta versão",
+                        fr: "N’est plus vendu dans cette version",
+                        ja: "現在のバージョンでは販売終了",
+                        ko: "현재 버전에서 판매 종료",
+                        it: "Non più in vendita in questa versione"
+                    ))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
 
@@ -537,23 +530,6 @@ struct DailyStreakDetailView: View {
                 isEnabled ? Color.ohanaControlFill : Color.ohanaControlFill.opacity(0.72),
                 in: Circle()
             )
-    }
-
-    private func lockedShopLabel(level: Int) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: "lock.fill") // a11y: allow decorative lock icon; capsule label describes the locked shop.
-                .font(OhanaFont.adaptive(size: 9, weight: .black))
-                .accessibilityHidden(true)
-            Text(l.tr(zh: "商店 Lv.\(level) 解锁", en: "Shop unlocks at Lv.\(level)", de: "Shop wird auf Lv.\(level) freigeschaltet"))
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                .lineLimit(1)
-                .minimumScaleFactor(0.74)
-        }
-        .foregroundStyle(Color.ohanaSecondaryText)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
-        .accessibilityLabel(l.tr(zh: "椰子商店生命之树 Lv.\(level) 解锁", en: "Coconut shop unlocks at Life Tree Lv.\(level)", de: "Kokosnuss-Shop wird mit Lebensbaum Lv.\(level) freigeschaltet"))
     }
 
     private var checkInMilestoneRow: some View {
@@ -690,7 +666,10 @@ struct DailyStreakDetailView: View {
     }
 
     private func isMakeupEligible(_ cell: CalendarCell) -> Bool {
-        !cell.isChecked && !cell.isToday && !cell.isFuture && makeupPackCount > 0
+        // V93 Presence intentionally has no historical makeup write command.
+        // Keep legacy inventory visible without offering an action that cannot
+        // create a supported domain fact.
+        false
     }
 
     private func calendarDayCellContent(_ cell: CalendarCell) -> some View {

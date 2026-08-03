@@ -26,6 +26,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         "companion_lifecycle_compatibility",
         "auto_feeder_materialization",
         "reminder_refill",
+        "human_medication_reminder_refill",
         "media_attachment_presence_backfill",
         "member_theme_normalization",
         "plant_care_orphan_maintenance",
@@ -128,6 +129,15 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 if result.completed {
                     self.defaults.set(Date().timeIntervalSince1970, forKey: Keys.reminderMaintenanceLastRunAt)
                 }
+            }) else {
+                return
+            }
+
+            guard await runStep("human_medication_reminder_refill", delayMilliseconds: 400, operation: {
+                await self.reconcileHumanMedicationReminders(
+                    context: context,
+                    services: services
+                )
             }) else {
                 return
             }
@@ -292,6 +302,38 @@ final class StartupMaintenanceCoordinator: ObservableObject {
             #endif
             return ReminderMaintenanceRunResult(pendingCount: 0, completed: false, hasMoreWork: true)
         }
+    }
+
+    private func reconcileHumanMedicationReminders(
+        context: ModelContext,
+        services: AppServices
+    ) async {
+        let privacyResult = await services.medicationReminders
+            .recoverMedicationNotificationPrivacyIfNeeded(context: context)
+        if !privacyResult.failureDescriptions.isEmpty {
+            OhanaLog.warning(
+                "Startup medication notification privacy recovery had \(privacyResult.failureDescriptions.count) incomplete request(s).",
+                category: "Care"
+            )
+        }
+        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+            operation: "startup_human_medication_reminder_refill",
+            requestedItemCount: 64
+        )
+        guard budget.hasWorkCapacity else { return }
+        let result = await services.medicationReminders.reconcileHumanMedicationRollingWindow(
+            context: context,
+            budget: budget,
+            now: Date()
+        )
+        if result.hasMoreWork {
+            BackgroundTaskCoordinator.scheduleReminderRefill()
+        }
+        AppPerformanceMonitor.shared.record(
+            "startup_human_medication_reminder_refill",
+            valueMS: 0,
+            note: "scheduled=\(result.scheduledNotificationCount), removed=\(result.removedNotificationCount), continuation=\(result.hasMoreWork), failures=\(result.failureDescriptions.count)"
+        )
     }
 
     private func runCareLedgerBackfillIfNeeded(context: ModelContext) async {

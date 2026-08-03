@@ -26,6 +26,7 @@ enum AppLifecycleCommand: Equatable {
     case walkBackground
     case walkInactive
     case walkForeground
+    case refreshHumanMedicationReminders
     case pauseWalkingForTermination
     case scheduleReminderRefill
     case runAutomaticBackupIfDue(reason: String)
@@ -76,6 +77,7 @@ struct AppLifecycleReducer {
         switch phase {
         case .active:
             commands.append(.walkForeground)
+            commands.append(.refreshHumanMedicationReminders)
         case .inactive:
             commands.append(.walkInactive)
         case .background:
@@ -96,12 +98,14 @@ final class AppLifecycleCoordinator: AppLifecycleHandling {
         var handleWalkBackground: () -> Void
         var handleWalkInactive: () -> Void
         var handleWalkForeground: () -> Void
+        var refreshHumanMedicationReminders: () -> Void
         var pauseWalkForTermination: () -> Void
         var scheduleReminderRefill: () -> Void
         var runAutomaticBackupIfDue: (String) -> Void
 
         static func live(
             walkingManager: PetWalkingManager,
+            medicationReminders: MedicationReminderManaging? = nil,
             automaticBackups: AutomaticBackupManaging? = nil,
             modelContainer: ModelContainer? = nil
         ) -> Dependencies {
@@ -123,6 +127,36 @@ final class AppLifecycleCoordinator: AppLifecycleHandling {
                 },
                 handleWalkForeground: {
                     walkingManager.handleAppForegroundTransition()
+                },
+                refreshHumanMedicationReminders: {
+                    guard let medicationReminders, let modelContainer else { return }
+                    Task { @MainActor in
+                        let context = ModelContext(modelContainer)
+                        let privacyResult = await medicationReminders
+                            .recoverMedicationNotificationPrivacyIfNeeded(context: context)
+                        if !privacyResult.failureDescriptions.isEmpty {
+                            OhanaLog.warning(
+                                "Foreground medication notification privacy recovery had \(privacyResult.failureDescriptions.count) incomplete request(s).",
+                                category: "Care"
+                            )
+                        }
+                        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+                            operation: "foreground_human_medication_reminder_refill",
+                            requestedItemCount: 64
+                        )
+                        guard budget.hasWorkCapacity else { return }
+                        let result = await medicationReminders.reconcileHumanMedicationRollingWindow(
+                            context: context,
+                            budget: budget,
+                            now: Date()
+                        )
+                        if !result.failureDescriptions.isEmpty {
+                            OhanaLog.warning(
+                                "Foreground Human medication reminder refresh had \(result.failureDescriptions.count) incomplete request(s).",
+                                category: "Care"
+                            )
+                        }
+                    }
                 },
                 pauseWalkForTermination: {
                     walkingManager.pauseForAppBackground()
@@ -170,6 +204,8 @@ final class AppLifecycleCoordinator: AppLifecycleHandling {
                 dependencies.handleWalkInactive()
             case .walkForeground:
                 dependencies.handleWalkForeground()
+            case .refreshHumanMedicationReminders:
+                dependencies.refreshHumanMedicationReminders()
             case .pauseWalkingForTermination:
                 dependencies.pauseWalkForTermination()
             case .scheduleReminderRefill:

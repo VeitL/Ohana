@@ -11,48 +11,244 @@ ohana_assert_storage_fixture_configuration "${REPO_ROOT}"
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/cleanup-local-build-storage.sh
-  scripts/cleanup-local-build-storage.sh --apply <plan-token>
+  scripts/cleanup-local-build-storage.sh [--scope safe|results|test-app-cache|test-transient-cache|test-intermediates|derived-data|all]
+  scripts/cleanup-local-build-storage.sh [--scope ...] --apply <plan-token>
 
-The default is report-only. It preserves the fixed tests, dogfood, and release
-DerivedData lanes and the complete local Release Archive tree. --apply succeeds
-only when its token exactly matches the current candidate snapshot.
+The default scope is `safe` and the default mode is report-only. Safe cleanup
+includes expired Ohana temporary artifacts, legacy worktree-local DerivedData,
+and legacy worktree result bundles. The active DerivedData lanes outside the
+source tree and managed result store require the explicit `derived-data`,
+`results`, or `all` scope. --apply succeeds only when its token exactly matches
+the current candidate snapshot.
 
-Simulator devices/caches and Xcode DeviceSupport are never deleted. Direct
-Ohana `ohana-*` temporary artifacts are eligible only after their newest
+Simulator devices and Xcode DeviceSupport are never deleted.
+`test-app-cache` is one narrow Simulator-cache exception: it accepts only dead
+replacement copies whose container metadata and app bundle identifier both
+prove that they are Ohana builds inside the shutdown `iPhone 17 Tests` device.
+Direct Ohana `ohana-*` temporary artifacts are eligible only after their newest
 content exceeds the configured TTL and no open files are detected.
+
+`test-transient-cache` is a separate, explicit pressure-relief scope for
+unfinished `CFNetworkDownload_*.tmp` MobileAsset downloads inside that same
+shutdown Tests device and Ohana-only host `.profraw` temporary trees. It never
+removes installed MobileAssets. It runs automatically after a test only when
+free space has fallen below the configured safety gate.
+
+`test-intermediates` removes only reproducible compiler intermediates, module
+and index caches, SDK stat caches, and standalone dSYMs from the fixed Tests
+lane. It preserves executable products, the xctestrun file, and the provenance
+stamp so a previously built test can still run with
+`scripts/xcode-test.sh --without-building`.
+
+`derived-data` may remove the Dogfood build cache, but never the pinned Dogfood
+Simulator, its app container, SwiftData store, identity seal, or evidence.
 USAGE
 }
 
 mode="report"
 provided_token=""
-if [[ $# -gt 0 ]]; then
-  if [[ "$1" == "--apply" && $# -eq 2 ]]; then
-    mode="apply"
-    provided_token="$2"
-  elif [[ "$1" == "--help" || "$1" == "-h" ]]; then
-    usage
-    exit 0
-  else
-    usage >&2
+scope="safe"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --scope)
+      [[ $# -ge 2 ]] || {
+        usage >&2
+        exit 2
+      }
+      scope="$2"
+      shift 2
+      ;;
+    --apply)
+      [[ $# -ge 2 ]] || {
+        usage >&2
+        exit 2
+      }
+      mode="apply"
+      provided_token="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+case "${scope}" in
+  safe|results|test-app-cache|test-transient-cache|test-intermediates|derived-data|all) ;;
+  *)
+    echo "Unknown cleanup scope: ${scope}" >&2
     exit 2
-  fi
-fi
+    ;;
+esac
 
-current_test_bridge=""
-if [[ ! -d "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products" ]]; then
-  current_test_bridge="$({
-    for path in "${OHANA_LOCAL_DERIVED_DATA_ROOT}"/* \
-      "${OHANA_LOCAL_BUILD_TMP_ROOT}"/OhanaDerivedData*; do
-      [[ -e "${path}" ]] || continue
-      if ohana_is_fixed_derived_data_lane "${path}"; then
+test_simulator_udid=""
+test_simulator_dead_cache_root=""
+test_simulator_download_cache_root=""
+
+prepare_test_simulator_cache_scope() {
+  local metadata
+  local state
+
+  [[ "${scope}" == "test-app-cache" || "${scope}" == "test-transient-cache" ]] || return 0
+  test_simulator_udid="$(
+    ohana_resolve_simulator_by_name "${OHANA_TEST_SIMULATOR_NAME_FIXED}" || true
+  )"
+  if [[ -z "${test_simulator_udid}" ]]; then
+    echo "Cannot inspect test app cache: '${OHANA_TEST_SIMULATOR_NAME_FIXED}' is unavailable." >&2
+    return 70
+  fi
+  ohana_assert_test_simulator_udid "${test_simulator_udid}" || return
+  metadata="$(ohana_simulator_metadata "${test_simulator_udid}")" || return 70
+  state="$(printf '%s' "${metadata}" | awk -F '\t' '{ print $3 }')"
+  if [[ "${state}" != "Shutdown" ]]; then
+    echo "Refusing test app cache cleanup while ${OHANA_TEST_SIMULATOR_NAME_FIXED} is ${state}." >&2
+    return 75
+  fi
+  test_simulator_dead_cache_root="$(
+    ohana_absolute_path \
+      "${HOME}/Library/Developer/CoreSimulator/Devices/${test_simulator_udid}/data/Library/Caches/com.apple.containermanagerd/Dead"
+  )"
+  test_simulator_download_cache_root="$(
+    ohana_absolute_path \
+      "${HOME}/Library/Developer/CoreSimulator/Devices/${test_simulator_udid}/data/Library/Caches/com.apple.nsurlsessiond/Downloads/com.apple.MobileAsset.DownloadService"
+  )"
+}
+
+assert_safe_test_app_cache_candidate() {
+  local path="$1"
+  local path_absolute
+  local owner_uid
+  local mount_boundary_status
+
+  [[ -n "${test_simulator_udid}" && -n "${test_simulator_dead_cache_root}" ]] || return 2
+  [[ -d "${path}" && ! -L "${path}" ]] || return 2
+  path_absolute="$(ohana_absolute_path "${path}")"
+  if [[ "$(dirname "${path_absolute}")" != "${test_simulator_dead_cache_root}" || \
+    "$(basename "${path_absolute}")" != temp.* || \
+    -L "${test_simulator_dead_cache_root}" || \
+    "$(ohana_real_path "$(dirname "${path_absolute}")")" != \
+      "$(ohana_real_path "${test_simulator_dead_cache_root}")" ]]; then
+    return 2
+  fi
+  owner_uid="$(stat -f '%u' "${path}" 2>/dev/null || true)"
+  [[ "${owner_uid}" == "$(id -u)" ]] || return 2
+  ohana_path_is_mount_point "${path}" && return 2
+  if ohana_tree_has_mount_boundary "${path}"; then
+    return 2
+  else
+    mount_boundary_status=$?
+  fi
+  [[ "${mount_boundary_status}" == "1" ]] || return 2
+
+  python3 - "${path_absolute}" <<'PY'
+import os
+import plistlib
+import sys
+
+candidate = os.path.abspath(sys.argv[1])
+allowed = {
+    "com.guanchen.li.Ohana",
+    "com.guanchen.li.Ohana.LocalDevice",
+}
+app_identifiers = []
+metadata_identifiers = []
+
+for root, directories, files in os.walk(candidate, followlinks=False):
+    if os.path.islink(root):
+        raise SystemExit(2)
+    if any(os.path.islink(os.path.join(root, name)) for name in directories + files):
+        raise SystemExit(2)
+    if root.endswith(".app") and "Info.plist" in files:
+        with open(os.path.join(root, "Info.plist"), "rb") as handle:
+            app_identifiers.append(plistlib.load(handle).get("CFBundleIdentifier"))
+        directories[:] = []
         continue
-      fi
-      modified="$(stat -f '%m' "${path}" 2>/dev/null || true)"
-      [[ -n "${modified}" ]] && printf '%s\t%s\n' "${modified}" "${path}"
-    done
-  } | sort -nr | head -n 1 | cut -f 2- || true)"
-fi
+    if ".com.apple.mobile_container_manager.metadata.plist" in files:
+        metadata_path = os.path.join(
+            root, ".com.apple.mobile_container_manager.metadata.plist"
+        )
+        with open(metadata_path, "rb") as handle:
+            metadata_identifiers.append(
+                plistlib.load(handle).get("MCMMetadataIdentifier")
+            )
+
+if not app_identifiers or not metadata_identifiers:
+    raise SystemExit(2)
+if any(identifier not in allowed for identifier in app_identifiers):
+    raise SystemExit(2)
+if any(identifier not in allowed for identifier in metadata_identifiers):
+    raise SystemExit(2)
+PY
+}
+
+assert_safe_test_transient_cache_candidate() {
+  local path="$1"
+  local path_absolute
+  local owner_uid
+  local mount_boundary_status
+
+  [[ -n "${test_simulator_udid}" && -n "${test_simulator_download_cache_root}" ]] || return 2
+  [[ -d "${path}" && ! -L "${path}" ]] || return 2
+  path_absolute="$(ohana_absolute_path "${path}")"
+  if [[ "$(dirname "${path_absolute}")" != "${test_simulator_download_cache_root}" || \
+    "$(basename "${path_absolute}")" != CFNetworkDownload_*.tmp || \
+    -L "${test_simulator_download_cache_root}" || \
+    "$(ohana_real_path "$(dirname "${path_absolute}")")" != \
+      "$(ohana_real_path "${test_simulator_download_cache_root}")" ]]; then
+    return 2
+  fi
+  owner_uid="$(stat -f '%u' "${path}" 2>/dev/null || true)"
+  [[ "${owner_uid}" == "$(id -u)" ]] || return 2
+  ohana_path_is_mount_point "${path}" && return 2
+  if ohana_tree_has_mount_boundary "${path}"; then
+    return 2
+  else
+    mount_boundary_status=$?
+  fi
+  [[ "${mount_boundary_status}" == "1" ]] || return 2
+  [[ -z "$(find "${path}" -xdev -type l -print -quit 2>/dev/null)" ]]
+}
+
+assert_safe_ohana_host_profile_cache_candidate() {
+  local path="$1"
+  local path_absolute
+  local host_tmp_root
+  local owner_uid
+  local mount_boundary_status
+
+  [[ -d "${path}" && ! -L "${path}" ]] || return 2
+  path_absolute="$(ohana_absolute_path "${path}")"
+  host_tmp_root="$(ohana_absolute_path "${TMPDIR:-/tmp}")"
+  if [[ "$(dirname "${path_absolute}")" != "${host_tmp_root}" ]]; then
+    return 2
+  fi
+  case "$(basename "${path_absolute}")" in
+    com.ohana.trip.local|com.ohana.trip.local.uitests.xctrunner) ;;
+    *) return 2 ;;
+  esac
+  owner_uid="$(stat -f '%u' "${path}" 2>/dev/null || true)"
+  [[ "${owner_uid}" == "$(id -u)" ]] || return 2
+  ohana_path_is_mount_point "${path}" && return 2
+  if ohana_tree_has_mount_boundary "${path}"; then
+    return 2
+  else
+    mount_boundary_status=$?
+  fi
+  [[ "${mount_boundary_status}" == "1" ]] || return 2
+  [[ -z "$(find "${path}" -xdev -type l -print -quit 2>/dev/null)" ]] || return 2
+  [[ -z "$(find "${path}" -xdev -type f ! -name '*.profraw' -print -quit 2>/dev/null)" ]] || return 2
+  [[ -n "$(find "${path}" -xdev -type f -name '*.profraw' -print -quit 2>/dev/null)" ]]
+}
+
+prepare_test_simulator_cache_scope
+
+worktree_rows="$(git -C "${OHANA_LOCAL_BUILD_REPO_ROOT}" worktree list --porcelain 2>/dev/null | \
+  awk '/^worktree / { sub(/^worktree /, ""); print }' || true)"
+[[ -n "${worktree_rows}" ]] || worktree_rows="${OHANA_LOCAL_BUILD_REPO_ROOT}"
 
 cleanup_candidate_kind() {
   local path="$1"
@@ -60,14 +256,49 @@ cleanup_candidate_kind() {
   local parent_absolute
   local basename_value
   local mount_boundary_status
+  local worktree_root
 
   [[ -e "${path}" && ! -L "${path}" ]] || return 2
   path_absolute="$(ohana_absolute_path "${path}")"
   parent_absolute="$(dirname "${path_absolute}")"
   basename_value="$(basename "${path_absolute}")"
 
-  if [[ "${parent_absolute}" == "${OHANA_LOCAL_DERIVED_DATA_ROOT}" ]]; then
-    ohana_is_fixed_derived_data_lane "${path}" && return 2
+  if [[ "${scope}" == "test-app-cache" ]] && \
+    assert_safe_test_app_cache_candidate "${path}"; then
+    printf 'dead-ohana-test-app-cache\n'
+    return
+  fi
+  if [[ "${scope}" == "test-transient-cache" ]] && \
+    assert_safe_test_transient_cache_candidate "${path}"; then
+    printf 'test-simulator-partial-download\n'
+    return
+  fi
+  if [[ "${scope}" == "test-transient-cache" ]] && \
+    assert_safe_ohana_host_profile_cache_candidate "${path}"; then
+    printf 'ohana-host-profraw-cache\n'
+    return
+  fi
+
+  if [[ "${path_absolute}" == \
+      "$(ohana_absolute_path "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Intermediates.noindex")" || \
+    "${path_absolute}" == \
+      "$(ohana_absolute_path "${OHANA_TEST_DERIVED_DATA_PATH}/ModuleCache.noindex")" || \
+    "${path_absolute}" == \
+      "$(ohana_absolute_path "${OHANA_TEST_DERIVED_DATA_PATH}/Index.noindex")" || \
+    "${path_absolute}" == \
+      "$(ohana_absolute_path "${OHANA_TEST_DERIVED_DATA_PATH}/SDKStatCaches.noindex")" || \
+    "${path_absolute}" == \
+      "$(ohana_absolute_path "${OHANA_TEST_DERIVED_DATA_PATH}/CompilationCache.noindex")" || \
+    "${path_absolute}" == \
+      "$(ohana_absolute_path "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.app.dSYM")" || \
+    "${path_absolute}" == \
+      "$(ohana_absolute_path "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/OhanaWidgets.appex.dSYM")" || \
+    "${path_absolute}" == \
+      "$(ohana_absolute_path "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.swiftmodule")" || \
+    "${path_absolute}" == \
+      "$(ohana_absolute_path "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/OhanaTests.swiftmodule")" || \
+    "${path_absolute}" == \
+      "$(ohana_absolute_path "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/OhanaWidgets.swiftmodule")" ]]; then
     ohana_path_is_mount_point "${path}" && return 2
     if ohana_tree_has_mount_boundary "${path}"; then
       return 2
@@ -75,7 +306,61 @@ cleanup_candidate_kind() {
       mount_boundary_status=$?
     fi
     [[ "${mount_boundary_status}" == "1" ]] || return 2
-    printf 'legacy-derived-data\n'
+    printf 'test-rebuildable-cache\n'
+    return
+  fi
+
+  if [[ "${parent_absolute}" == "${OHANA_SHARED_DERIVED_DATA_ROOT}" ]] && \
+    ohana_is_fixed_derived_data_lane "${path}"; then
+    ohana_path_is_mount_point "${path}" && return 2
+    if ohana_tree_has_mount_boundary "${path}"; then
+      return 2
+    else
+      mount_boundary_status=$?
+    fi
+    [[ "${mount_boundary_status}" == "1" ]] || return 2
+    printf 'shared-derived-data\n'
+    return
+  fi
+  while IFS= read -r worktree_root; do
+    [[ -n "${worktree_root}" ]] || continue
+    if [[ "${parent_absolute}" == "$(ohana_absolute_path "${worktree_root}/.build/DerivedData")" ]]; then
+      ohana_path_is_mount_point "${path}" && return 2
+      if ohana_tree_has_mount_boundary "${path}"; then
+        return 2
+      else
+        mount_boundary_status=$?
+      fi
+      [[ "${mount_boundary_status}" == "1" ]] || return 2
+      printf 'legacy-worktree-derived-data\n'
+      return
+    fi
+    if [[ "${parent_absolute}" == "$(ohana_absolute_path "${worktree_root}/.build")" && \
+      "${basename_value}" == *.xcresult ]] || \
+      [[ "${path_absolute}" == "$(ohana_absolute_path "${worktree_root}/.build/TestResults")" ]]; then
+      if [[ "${scope}" == "safe" ]]; then
+        ohana_xcresult_is_successful "${path}" || return 2
+      fi
+      ohana_path_is_mount_point "${path}" && return 2
+      if [[ -d "${path}" ]] && ohana_tree_has_mount_boundary "${path}"; then
+        return 2
+      else
+        mount_boundary_status=$?
+      fi
+      [[ ! -d "${path}" || "${mount_boundary_status}" == "1" ]] || return 2
+      printf 'legacy-worktree-result\n'
+      return
+    fi
+  done <<< "${worktree_rows}"
+  if [[ "${path_absolute}" == "$(ohana_absolute_path "${OHANA_TEST_RESULT_ROOT}")" ]]; then
+    ohana_path_is_mount_point "${path}" && return 2
+    if ohana_tree_has_mount_boundary "${path}"; then
+      return 2
+    else
+      mount_boundary_status=$?
+    fi
+    [[ "${mount_boundary_status}" == "1" ]] || return 2
+    printf 'managed-test-results\n'
     return
   fi
   if [[ "$(ohana_real_path "${parent_absolute}")" == "$(ohana_real_path "${OHANA_LOCAL_BUILD_TMP_ROOT}")" && \
@@ -99,21 +384,85 @@ cleanup_candidate_kind() {
 
 candidate_stream() {
   local path
+  local worktree_root
 
-  for path in "${OHANA_LOCAL_DERIVED_DATA_ROOT}"/*; do
-    [[ -e "${path}" ]] || continue
-    ohana_is_fixed_derived_data_lane "${path}" && continue
-    [[ "${path}" != "${current_test_bridge}" ]] || continue
-    printf '%s\n' "${path}"
-  done
+  if [[ "${scope}" == "safe" || "${scope}" == "all" ]]; then
+    while IFS= read -r worktree_root; do
+      [[ -n "${worktree_root}" ]] || continue
+      for path in "${worktree_root}/.build/DerivedData"/* \
+        "${worktree_root}"/.build/*.xcresult; do
+        [[ -e "${path}" ]] || continue
+        if [[ "${path}" == *.xcresult ]] && ! ohana_xcresult_is_successful "${path}"; then
+          continue
+        fi
+        printf '%s\n' "${path}"
+      done
+    done <<< "${worktree_rows}"
 
-  for path in "${OHANA_LOCAL_BUILD_TMP_ROOT}"/OhanaDerivedData*; do
-    [[ -e "${path}" ]] || continue
-    [[ "${path}" != "${current_test_bridge}" ]] || continue
-    printf '%s\n' "${path}"
-  done
+    for path in "${OHANA_LOCAL_BUILD_TMP_ROOT}"/OhanaDerivedData*; do
+      [[ -e "${path}" ]] || continue
+      printf '%s\n' "${path}"
+    done
+    ohana_tmp_artifact_candidate_stream
+  fi
 
-  ohana_tmp_artifact_candidate_stream
+  if [[ "${scope}" == "results" || "${scope}" == "all" ]]; then
+    [[ -e "${OHANA_TEST_RESULT_ROOT}" ]] && printf '%s\n' "${OHANA_TEST_RESULT_ROOT}"
+    while IFS= read -r worktree_root; do
+      [[ -n "${worktree_root}" ]] || continue
+      for path in "${worktree_root}"/.build/*.xcresult \
+        "${worktree_root}/.build/TestResults"; do
+        [[ -e "${path}" ]] && printf '%s\n' "${path}"
+      done
+    done <<< "${worktree_rows}"
+  fi
+
+  if [[ "${scope}" == "test-intermediates" ]]; then
+    for path in \
+      "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Intermediates.noindex" \
+      "${OHANA_TEST_DERIVED_DATA_PATH}/ModuleCache.noindex" \
+      "${OHANA_TEST_DERIVED_DATA_PATH}/Index.noindex" \
+      "${OHANA_TEST_DERIVED_DATA_PATH}/SDKStatCaches.noindex" \
+      "${OHANA_TEST_DERIVED_DATA_PATH}/CompilationCache.noindex" \
+      "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.app.dSYM" \
+      "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/OhanaWidgets.appex.dSYM" \
+      "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.swiftmodule" \
+      "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/OhanaTests.swiftmodule" \
+      "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/OhanaWidgets.swiftmodule"; do
+      [[ -e "${path}" ]] && printf '%s\n' "${path}"
+    done
+  fi
+
+  if [[ "${scope}" == "test-app-cache" && -d "${test_simulator_dead_cache_root}" ]]; then
+    for path in "${test_simulator_dead_cache_root}"/temp.*; do
+      [[ -e "${path}" ]] || continue
+      assert_safe_test_app_cache_candidate "${path}" && printf '%s\n' "${path}"
+    done
+  fi
+
+  if [[ "${scope}" == "test-transient-cache" && \
+    -d "${test_simulator_download_cache_root}" ]]; then
+    for path in "${test_simulator_download_cache_root}"/CFNetworkDownload_*.tmp; do
+      [[ -e "${path}" ]] || continue
+      assert_safe_test_transient_cache_candidate "${path}" && printf '%s\n' "${path}"
+    done
+  fi
+  if [[ "${scope}" == "test-transient-cache" ]]; then
+    for path in \
+      "${TMPDIR:-/tmp}/com.ohana.trip.local" \
+      "${TMPDIR:-/tmp}/com.ohana.trip.local.uitests.xctrunner"; do
+      [[ -e "${path}" ]] || continue
+      path="$(ohana_absolute_path "${path}")"
+      assert_safe_ohana_host_profile_cache_candidate "${path}" && printf '%s\n' "${path}"
+    done
+  fi
+
+  if [[ "${scope}" == "derived-data" || "${scope}" == "all" ]]; then
+    for path in "${OHANA_SHARED_DERIVED_DATA_ROOT}"/*; do
+      [[ -e "${path}" ]] || continue
+      ohana_is_fixed_derived_data_lane "${path}" && printf '%s\n' "${path}"
+    done
+  fi
 }
 
 candidates=()
@@ -207,16 +556,48 @@ plan_token="$(candidate_plan_token)"
 reclaim_kib=0
 
 echo "Conservative cleanup plan"
+echo "Scope: ${scope}"
 echo "Preserve:"
-echo "  ${OHANA_TEST_DERIVED_DATA_PATH}"
-echo "  ${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}"
-echo "  ${OHANA_RELEASE_DERIVED_DATA_PATH}"
-if [[ -n "${current_test_bridge}" ]]; then
-  echo "  ${current_test_bridge} (newest current-test bridge until fixed tests products exist)"
+if [[ "${scope}" == "test-app-cache" ]]; then
+  echo "  active app and data containers in ${OHANA_TEST_SIMULATOR_NAME_FIXED}"
+  echo "  all non-Ohana and unverified Simulator caches"
+  echo "  every Simulator other than ${OHANA_TEST_SIMULATOR_NAME_FIXED}"
+  echo "  ${OHANA_TEST_DERIVED_DATA_PATH}"
+  echo "  ${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}"
+  echo "  ${OHANA_RELEASE_DERIVED_DATA_PATH}"
+elif [[ "${scope}" == "test-transient-cache" ]]; then
+  echo "  active app and all app data in ${OHANA_TEST_SIMULATOR_NAME_FIXED}"
+  echo "  installed MobileAssets and every non-partial-download cache"
+  echo "  every Simulator other than ${OHANA_TEST_SIMULATOR_NAME_FIXED}"
+  echo "  all shared DerivedData lanes outside the source tree and managed results"
+elif [[ "${scope}" == "test-intermediates" ]]; then
+  echo "  executable products and xctestrun under ${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products"
+  echo "  ${OHANA_TEST_DERIVED_DATA_PATH}/.ohana-test-build-provenance-v1.json"
+  echo "  all other content in the fixed Tests lane"
+  echo "  ${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}"
+  echo "  ${OHANA_RELEASE_DERIVED_DATA_PATH}"
+elif [[ "${scope}" != "derived-data" && "${scope}" != "all" ]]; then
+  echo "  ${OHANA_TEST_DERIVED_DATA_PATH}"
+  echo "  ${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}"
+  echo "  ${OHANA_RELEASE_DERIVED_DATA_PATH}"
 fi
-echo "  pinned Dogfood Simulator and all Simulator device data"
+if [[ "${scope}" != "results" && "${scope}" != "all" ]]; then
+  echo "  ${OHANA_TEST_RESULT_ROOT}"
+fi
+if [[ "${scope}" == "test-app-cache" || "${scope}" == "test-transient-cache" ]]; then
+  echo "  pinned Dogfood Simulator and all of its device data"
+else
+  echo "  pinned Dogfood Simulator and all Simulator device data"
+fi
+echo "  Dogfood SwiftData store, identity seal, initialization state, and evidence"
 echo "  all ${OHANA_LOCAL_BUILD_TMP_ROOT}/OhanaArchives content"
 echo "  ${OHANA_LOCAL_BUILD_TMP_ROOT}/ohana-* newer than ${OHANA_LOCAL_BUILD_TMP_TTL_HOURS} h, active, or uninspectable"
+if [[ "${scope}" == "results" || "${scope}" == "all" ]]; then
+  echo "  active shared DerivedData lanes outside the source tree (results scope does not remove build products)"
+fi
+if [[ "${scope}" == "derived-data" || "${scope}" == "all" ]]; then
+  echo "  all Simulator app data, including Dogfood (only reproducible build caches are candidates)"
+fi
 echo "Candidates:"
 for candidate in "${candidates[@]}"; do
   candidate_kib="$(ohana_path_size_kib "${candidate}")"
@@ -230,7 +611,7 @@ echo "Plan token: ${plan_token}"
 
 if [[ "${mode}" == "report" ]]; then
   echo "REPORT ONLY: nothing was deleted."
-  echo "After reviewing every path, rerun: scripts/cleanup-local-build-storage.sh --apply ${plan_token}"
+  echo "After reviewing every path, rerun: scripts/cleanup-local-build-storage.sh --scope ${scope} --apply ${plan_token}"
   exit 0
 fi
 
@@ -245,9 +626,8 @@ if pgrep -x xcodebuild >/dev/null 2>&1; then
   exit 75
 fi
 
-for active_lock in "${OHANA_LOCAL_BUILD_REPO_ROOT}/.build/locks/lane-tests.lock" \
-  "${OHANA_LOCAL_BUILD_REPO_ROOT}/.build/locks/lane-dogfood.lock" \
-  "${OHANA_LOCAL_BUILD_REPO_ROOT}/.build/locks/lane-release.lock"; do
+for active_lock in "${OHANA_XCODE_LOCK_ROOT}/project.lock" \
+  "${OHANA_LOCAL_BUILD_COMMON_REPO_ROOT}/.build/locks/dogfood-session.lock"; do
   if [[ -d "${active_lock}" ]]; then
     echo "Refusing cleanup while a current build/test lock exists: ${active_lock}" >&2
     exit 75
@@ -318,4 +698,12 @@ for candidate in "${candidates[@]}"; do
 done
 
 echo "Cleanup complete. Reclaimed approximately $(ohana_format_kib_human "${reclaim_kib}")."
-echo "Dogfood, Tests, Release, OhanaArchives, Simulator devices, and DeviceSupport were preserved."
+if [[ "${scope}" == "test-app-cache" ]]; then
+  echo "Only validated dead Ohana replacements in iPhone 17 Tests were removed."
+  echo "The active Tests app/data, Dogfood Simulator/data/identity/evidence, all devices, and DeviceSupport were preserved."
+elif [[ "${scope}" == "test-transient-cache" ]]; then
+  echo "Only validated partial downloads and Ohana host profraw temporary trees were removed."
+  echo "Installed assets, all app/data containers, Dogfood Simulator/data/identity/evidence, all devices, and DeviceSupport were preserved."
+else
+  echo "Dogfood Simulator data, identity/evidence, OhanaArchives, all Simulator devices, and DeviceSupport were preserved."
+fi

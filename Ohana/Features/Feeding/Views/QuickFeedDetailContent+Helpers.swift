@@ -117,7 +117,11 @@ extension QuickFeedDetailContent {
             .min()
     }
 
-    func nextOccurrence(for event: Event, after now: Date = Date(), calendar: Calendar = .current) -> Date? {
+    func nextOccurrence(
+        for event: QuickFeedPlanRenderEvent,
+        after now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Date? {
         if event.startDate > now { return event.startDate }
         let time = calendar.dateComponents([.hour, .minute, .second], from: event.startDate)
         var day = calendar.dateComponents([.year, .month, .day], from: now)
@@ -134,9 +138,9 @@ extension QuickFeedDetailContent {
         return candidate
     }
 
-    func nextFeedDetailText(events: [Event], fallback: String) -> String {
+    func nextFeedDetailText(events: [QuickFeedPlanRenderEvent], fallback: String) -> String {
         guard let next = events
-            .compactMap({ event -> (Event, Date)? in
+            .compactMap({ event -> (QuickFeedPlanRenderEvent, Date)? in
                 guard let date = nextOccurrence(for: event) else { return nil }
                 return (event, date)
             })
@@ -145,7 +149,7 @@ extension QuickFeedDetailContent {
             return fallback
         }
         let time = next.1.formatted(date: .omitted, time: .shortened)
-        let grams = formattedFoodWeight(FeedRuleMetadata.amountGrams(from: next.0, fallback: pet.dailyPortionGrams))
+        let grams = formattedFoodWeight(next.0.amountGrams > 0 ? next.0.amountGrams : pet.dailyPortionGrams)
         let kind = next.0.foodKind.title(l)
         return l.tr(
             zh: "下次 \(time) · \(kind) · \(grams)",

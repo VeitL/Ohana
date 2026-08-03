@@ -304,4 +304,18 @@ private final class DomainNoOpMedicationReminderManager: MedicationReminderManag
     func undoDose(for _: UUID) {}
     func scheduleMedicationReminders(for _: Pet, context _: ModelContext?) {}
     func scheduleHumanMedicationReminders(for _: Human, meds _: [HumanMedication], context _: ModelContext?) {}
+    func refreshScheduledMedicationReminders(
+        context _: ModelContext,
+        hidingDetails _: Bool
+    ) async -> MedicationNotificationPrivacyRefreshResult {
+        .unavailable
+    }
+
+    func reconcileHumanMedicationRollingWindow(
+        context _: ModelContext,
+        budget _: OhanaBackgroundWorkBudget,
+        now _: Date
+    ) async -> HumanMedicationReminderRollingRefreshResult {
+        .deferred
+    }
 }

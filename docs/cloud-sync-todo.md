@@ -6,10 +6,11 @@ multi-device evidence all exist. The current target keeps CloudDocuments for
 restricted iCloud Drive backup and its SwiftData containers use
 `cloudKitDatabase: .none`; it declares no CloudKit service entitlement.
 
-The target now declares APNs, `remote-notification`, and Sign in with Apple only
-for the separately approved, fail-closed Family guardian service. Those
-capabilities do not authorize CloudKit, do not change this TODO, and must not be
-used to infer that family data sync is active. Guardian release gates live in
+The local Free / Personal release target no longer declares APNs,
+`remote-notification`, or Sign in with Apple. The separately approved,
+fail-closed Family guardian code does not authorize CloudKit, does not change
+this TODO, and may not restore those capabilities without its independent
+release gates. Guardian release gates live in
 `docs/specs/GuardianSafety-logic.md`.
 
 The 2026-06-24 signed-development build below is historical provisioning

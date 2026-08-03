@@ -25,7 +25,6 @@ struct PetBasicInfoDetailView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(AppServices.self) var appServices
     @Environment(\.ohanaAppLanguageCode) var appLanguage
-    @Environment(\.memberProfileExperienceStyle) var profileExperienceStyle
 
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @State var didApplyInitialEditing = false
@@ -76,7 +75,14 @@ struct PetBasicInfoDetailView: View {
     @State var eAvatarImageData: Data? = nil
     @State var ePrimaryPersonalityTagID = ""
 
-    let speciesOptions = Pet.canonicalSpeciesOptions
+    var speciesOptions: [String] {
+        l.sortedCatalogKeys(
+            Pet.canonicalSpeciesOptions,
+            otherKey: "other"
+        ) {
+            Pet.localizedSpeciesName($0, l: l)
+        }
+    }
     let themePresets: [(String, String)] = [
         ("FF6B6B", "coral"), ("4ECDC4", "ocean"), ("B8A9C9", "lavender"),
         ("95E1D3", "mint"), ("F38181", "sunset"), ("AA96DA", "berry"),

@@ -43,6 +43,52 @@ struct LocalizationTests {
         #expect(text.missingSupportedLanguageCodes == ["de", "es", "pt", "fr", "ja", "ko", "it"])
     }
 
+    @Test func humanLabScanCopyResolvesEveryRegisteredLanguageWithoutFallback() {
+        #expect(
+            HumanLabScanCopy.coverageResources.count
+                == HumanLabScanCopy.Key.allCases.count + 6
+        )
+        for resource in HumanLabScanCopy.coverageResources {
+            #expect(resource.missingSupportedLanguageCodes.isEmpty)
+            for languageCode in AppLanguage.supported.map(\.code) {
+                #expect(!resource.resolve(languageCode).isEmpty)
+            }
+        }
+    }
+
+    @MainActor
+    @Test func humanLabScanCatalogCopyCoversEveryVisibleOption() {
+        #expect(HumanLabScanCatalogCopy.currentCatalogIsFullyCovered)
+        #expect(
+            HumanLabScanCatalogCopy.coverageResources.count
+                == HealthMetricCategory.allCases.count
+                    + HealthMetricCatalog.all.count
+                    + ReportConclusion.allCases.count
+        )
+        for resource in HumanLabScanCatalogCopy.coverageResources {
+            #expect(resource.missingSupportedLanguageCodes.isEmpty)
+        }
+    }
+
+    @Test func humanLabScanFailuresHideTechnicalDescriptionsInEveryLanguage() {
+        for languageCode in AppLanguage.supported.map(\.code) {
+            let localization = L10n(languageCode)
+            let recognition = HumanLabImportFailureCopy.recognition(
+                NSError(domain: "OCR.private", code: 731),
+                l: localization
+            )
+            let saving = HumanLabImportFailureCopy.saving(
+                "database.internal.constraint_731",
+                l: localization
+            )
+
+            #expect(!recognition.contains("OCR.private"))
+            #expect(!recognition.contains("731"))
+            #expect(!saving.contains("database.internal"))
+            #expect(!saving.contains("731"))
+        }
+    }
+
     @Test func personalCommerceStaticCopyResolvesRegisteredLanguages() {
         let englishFallback = "__personal_commerce_english_fallback__"
         let keys = [

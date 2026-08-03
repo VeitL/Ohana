@@ -27,6 +27,7 @@ nonisolated struct VerticalSolidHomeSourceState {
     let walkLedgerEntries: [HomeWalkQuickActionEntry]
     let pottyLedgerEntries: [HomePottyQuickActionEntry]
     let petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry]
+    let humanExpenseEntries: [HomeExpensePreviewEntry]
     let petWeightLedgerEntries: [HomePetWeightQuickActionEntry]
     let petMomentEntries: [HomePetMomentQuickActionEntry]
     let humanWeightLogs: [HumanWeightLog]
@@ -58,6 +59,7 @@ nonisolated struct VerticalSolidHomeSourceState {
         walkLedgerEntries: [HomeWalkQuickActionEntry],
         pottyLedgerEntries: [HomePottyQuickActionEntry],
         petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry] = [],
+        humanExpenseEntries: [HomeExpensePreviewEntry] = [],
         petWeightLedgerEntries: [HomePetWeightQuickActionEntry] = [],
         petMomentEntries: [HomePetMomentQuickActionEntry] = [],
         humanWeightLogs: [HumanWeightLog],
@@ -88,6 +90,7 @@ nonisolated struct VerticalSolidHomeSourceState {
         self.walkLedgerEntries = walkLedgerEntries
         self.pottyLedgerEntries = pottyLedgerEntries
         self.petExpenseLedgerEntries = petExpenseLedgerEntries
+        self.humanExpenseEntries = humanExpenseEntries
         self.petWeightLedgerEntries = petWeightLedgerEntries
         self.petMomentEntries = petMomentEntries
         self.humanWeightLogs = humanWeightLogs
@@ -246,6 +249,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             walkLedgerSignature(source.walkLedgerEntries),
             pottyLedgerSignature(source.pottyLedgerEntries),
             petExpenseLedgerSignature(source.petExpenseLedgerEntries),
+            humanExpenseSignature(source.humanExpenseEntries),
             petWeightLedgerSignature(source.petWeightLedgerEntries),
             petMomentSignature(source.petMomentEntries),
             source.activeHumanIdRaw,
@@ -299,20 +303,20 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 copy.avatarImageData = nil
                 copy.avatarImageSignature = human.avatarThumbnailSignature
                 if human.id.uuidString == activeHumanIdRaw {
-                    copy.equippedTitleBadgeText = equippedTitleBadgeText(for: equippedTitleRaw)
+                    copy.equippedTitleBadgeText = equippedTitleBadgeText(
+                        for: equippedTitleRaw,
+                        language: language
+                    )
                 }
             }
             return copy
         }
     }
 
-    private static func equippedTitleBadgeText(for raw: String) -> String? {
-        switch raw {
-        case "title_guardian": "🛡️ 守护者"
-        case "title_pioneer": "🚀 先行者"
-        case "title_chef": "👨‍🍳 首席厨师"
-        default: nil
-        }
+    private static func equippedTitleBadgeText(for raw: String, language: String) -> String? {
+        guard case .title = ShopProductApplicationCatalog.application(for: raw),
+              let item = ShopCatalog.item(id: raw) else { return nil }
+        return "\(item.emoji) \(item.name(L10n(language)))"
     }
 
     static func heroPreparationRevision(for cards: [FocusCard]) -> String {
@@ -610,6 +614,17 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             [
                 entry.id.uuidString,
                 entry.petId.uuidString,
+                String(Int(entry.date.timeIntervalSince1970)),
+                String(Int(entry.amount.rounded()))
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    private static func humanExpenseSignature(_ entries: [HomeExpensePreviewEntry]) -> String {
+        entries.map { entry in
+            [
+                entry.id.uuidString,
+                entry.actorId,
                 String(Int(entry.date.timeIntervalSince1970)),
                 String(Int(entry.amount.rounded()))
             ].joined(separator: ":")

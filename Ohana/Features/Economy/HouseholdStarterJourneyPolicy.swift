@@ -53,6 +53,15 @@ nonisolated enum HouseholdStarterJourneyTask: String, CaseIterable, Identifiable
         }
     }
 
+    var requiredActualCheckpoints: Set<HouseholdStarterJourneyCheckpoint> {
+        switch self {
+        case .humanProfile:
+            [.humanLifeStage, .humanBodyProfile]
+        case .petProfile, .identityProtection, .healthProtection, .carePlan, .firstCare:
+            []
+        }
+    }
+
     /// Retired checkpoints stay readable for old explicit answers, but never
     /// appear as new questions or receive new writes.
     var compatibilityCheckpoints: [HouseholdStarterJourneyCheckpoint] {
@@ -120,8 +129,9 @@ nonisolated enum HouseholdStarterJourneyCheckpoint: String, Codable, CaseIterabl
         switch self {
         case .humanAppearance:
             [.reviewed, .preferNotToSay]
-        case .humanLifeStage, .humanBodyProfile, .humanPersonalityContext,
-             .humanOptionalDetails:
+        case .humanLifeStage, .humanBodyProfile:
+            []
+        case .humanPersonalityContext, .humanOptionalDetails:
             [.reviewed, .unknown, .notApplicable, .preferNotToSay]
         case .petLifeStage, .petBodyProfile, .petPersonalityAppearance, .petDailyCare,
              .petIdentityDocuments, .petEmergencyContact, .petHealthProtection:

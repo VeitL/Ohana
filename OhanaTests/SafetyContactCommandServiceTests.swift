@@ -81,6 +81,19 @@ struct SafetyContactCommandServiceTests {
         #expect(try context.fetchCount(FetchDescriptor<SafetyContact>()) == 0)
     }
 
+    @Test func localLegacyCleanupDeletesEveryContactWithoutGuardianRuntime() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        context.insert(SafetyContact(name: "One", phoneNumber: "111"))
+        context.insert(SafetyContact(name: "Two", phoneNumber: "222"))
+        try context.save()
+
+        #expect(!OnlineFeatureGate.allows(.guardianSafety))
+        #expect(try SafetyContactCommandService.deleteAll(context: context) == 2)
+        #expect(try SafetyContactCommandService.deleteAll(context: context) == 0)
+        #expect(try SafetyContactCommandService.snapshots(context: context).isEmpty)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV94.models)
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)

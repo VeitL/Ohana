@@ -92,6 +92,7 @@ nonisolated enum PresenceCheckInCommandError: LocalizedError, Equatable, Sendabl
     case missingOwner
     case inactiveOwner
     case notParticipating
+    case nonExplicitCheckInSource(PresenceCheckInSource)
     case missingSubject(PresenceSubjectRef)
     case inactiveSubject(PresenceSubjectRef)
     case missingTodayCheckIn(PresenceSubjectRef)
@@ -111,6 +112,8 @@ nonisolated enum PresenceCheckInCommandError: LocalizedError, Equatable, Sendabl
             "The selected owner is no longer active."
         case .notParticipating:
             "Zen mode is not currently active."
+        case .nonExplicitCheckInSource:
+            "A current check-in requires an explicit card or notification action."
         case .missingSubject:
             "The selected check-in card no longer exists."
         case .inactiveSubject:
@@ -338,7 +341,13 @@ final class PresenceCheckInCommandService {
             wallet: wallet,
             projectionManager: projectionManager
         )
-        self.guardianSafetyOutbox = guardianSafetyOutbox ?? LiveGuardianSafetyOutboxStager()
+        if let guardianSafetyOutbox {
+            self.guardianSafetyOutbox = guardianSafetyOutbox
+        } else if OnlineFeatureGate.allows(.guardianSafety) {
+            self.guardianSafetyOutbox = LiveGuardianSafetyOutboxStager()
+        } else {
+            self.guardianSafetyOutbox = DisabledGuardianSafetyOutboxStager()
+        }
         self.migratesLegacyBeforeCommands = migratesLegacyBeforeCommands
         self.timeZoneProvider = timeZoneProvider
     }
@@ -416,41 +425,13 @@ final class PresenceCheckInCommandService {
     }
 
     @discardableResult
-    func autoCheckInOwner(now: Date = Date()) throws -> PresenceCheckInCommandResult {
-        let owner = try requireOwner()
-        try requireActiveParticipation(ownerHumanId: owner.id)
-        let ownerSubject = PresenceSubjectRef(kind: .human, id: owner.id)
-        let dayKey = PresenceDayKeyPolicy.key(for: now, timeZone: timeZoneProvider())
-
-        // A durable daily receipt with no matching fact means the user
-        // explicitly withdrew today's automatic check-in. Keep that choice
-        // stable across subsequent foreground entries; a card tap can still
-        // create the fact again without duplicating its reward.
-        if try fetchCheckIn(subject: ownerSubject, dayKey: dayKey) == nil,
-           try fetchReceipt(key: Self.ownerDailyReceiptKey(dayKey: dayKey)) != nil {
-            return PresenceCheckInCommandResult(
-                checkIns: [],
-                rewards: [],
-                didCreateCheckIn: false,
-                didChangeStatus: false
-            )
-        }
-
-        return try performCheckIn(
-            subjects: [ownerSubject],
-            status: nil,
-            source: .automaticForeground,
-            now: now,
-            owner: owner,
-            batchId: nil
-        )
-    }
-
-    @discardableResult
     func checkInOwner(
         source: PresenceCheckInSource,
         now: Date = Date()
     ) throws -> PresenceCheckInCommandResult {
+        guard source == .card || source == .notificationAction else {
+            throw PresenceCheckInCommandError.nonExplicitCheckInSource(source)
+        }
         let owner = try requireOwner()
         return try performCheckIn(
             subjects: [PresenceSubjectRef(kind: .human, id: owner.id)],
@@ -469,6 +450,9 @@ final class PresenceCheckInCommandService {
         source: PresenceCheckInSource = .card,
         now: Date = Date()
     ) throws -> PresenceCheckInCommandResult {
+        guard source == .card else {
+            throw PresenceCheckInCommandError.nonExplicitCheckInSource(source)
+        }
         let owner = try requireOwner()
         return try performCheckIn(
             subjects: [subject],
@@ -477,24 +461,6 @@ final class PresenceCheckInCommandService {
             now: now,
             owner: owner,
             batchId: nil
-        )
-    }
-
-    @discardableResult
-    func checkInAll(now: Date = Date()) throws -> PresenceCheckInCommandResult {
-        let owner = try requireOwner()
-        try requireActiveParticipation(ownerHumanId: owner.id)
-        let subjects = try PresenceCheckInReadService.activeSubjects(
-            context: context,
-            ownerHumanId: owner.id
-        ).map(\.subject)
-        return try performCheckIn(
-            subjects: subjects,
-            status: nil,
-            source: .checkAll,
-            now: now,
-            owner: owner,
-            batchId: UUID()
         )
     }
 
@@ -699,10 +665,6 @@ final class PresenceCheckInCommandService {
            try fetchReceipt(key: Self.statusReceiptKey(dayKey: dayKey)) == nil,
            let related = checkIns.first {
             requests.append(Self.statusRewardRequest(dayKey: dayKey, relatedCheckInId: related.id))
-        }
-        if try shouldAwardAllComplete(ownerHumanId: owner.id, dayKey: dayKey),
-           try fetchReceipt(key: Self.allCompleteReceiptKey(dayKey: dayKey)) == nil {
-            requests.append(Self.allCompleteRewardRequest(dayKey: dayKey, relatedCheckInId: checkIns.first?.id))
         }
         if createdCheckIns.contains(where: \.isOwner) {
             requests += try milestoneRewardRequests(ownerHumanId: owner.id, now: now)
@@ -955,15 +917,6 @@ final class PresenceCheckInCommandService {
         return try context.fetch(descriptor).first
     }
 
-    private func shouldAwardAllComplete(ownerHumanId: UUID, dayKey: String) throws -> Bool {
-        let subjects = try PresenceCheckInReadService.activeSubjects(context: context, ownerHumanId: ownerHumanId)
-        guard subjects.contains(where: { !$0.isOwner }) else { return false }
-        for subject in subjects {
-            guard try fetchCheckIn(subject: subject.subject, dayKey: dayKey) != nil else { return false }
-        }
-        return true
-    }
-
     private func milestoneRewardRequests(ownerHumanId: UUID, now: Date) throws -> [PresenceRewardRequest] {
         let snapshot = try PresenceCheckInReadService.streakSnapshot(
             context: context,
@@ -1056,15 +1009,4 @@ final class PresenceCheckInCommandService {
         )
     }
 
-    private static func allCompleteRewardRequest(dayKey: String, relatedCheckInId: UUID?) -> PresenceRewardRequest {
-        PresenceRewardRequest(
-            receiptKey: allCompleteReceiptKey(dayKey: dayKey),
-            kind: .allComplete,
-            requestedAmount: 2,
-            dayKey: dayKey,
-            milestoneDays: 0,
-            relatedCheckInId: relatedCheckInId,
-            isBudgeted: true
-        )
-    }
 }

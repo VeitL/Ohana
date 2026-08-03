@@ -11,6 +11,20 @@ import UIKit
 enum MemberAvatarImageProcessor {
     nonisolated static let portraitAspect: CGFloat = 1.58
 
+    nonisolated static func portraitCropSize(
+        in container: CGSize,
+        horizontalMargin: CGFloat,
+        reservedVerticalSpace: CGFloat
+    ) -> CGSize {
+        guard container.width > 0, container.height > 0 else { return .zero }
+        let availableWidth = max(0, container.width - max(0, horizontalMargin) * 2)
+        let availableHeight = max(0, container.height - max(0, reservedVerticalSpace))
+        guard availableWidth > 0, availableHeight > 0 else { return .zero }
+
+        let cropWidth = min(availableWidth, availableHeight / portraitAspect)
+        return CGSize(width: cropWidth, height: cropWidth * portraitAspect)
+    }
+
     nonisolated static func image(from data: Data, maxPixel: CGFloat = 2400) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             return UIImage(data: data).map(normalized) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline

@@ -547,17 +547,20 @@ nonisolated struct CalendarEventCompletionOptions {
     let economy: CareEventEconomyAwarding?
     let schedulePlantCareNotifications: Bool
     let personalAccessLevel: PersonalAccessLevel
+    let allowsManagedProjection: Bool
 
     init(
         reminderCompletion: ReminderCompleting? = nil,
         economy: CareEventEconomyAwarding? = nil,
         schedulePlantCareNotifications: Bool = true,
-        personalAccessLevel: PersonalAccessLevel = .personal
+        personalAccessLevel: PersonalAccessLevel = .personal,
+        allowsManagedProjection: Bool = false
     ) {
         self.reminderCompletion = reminderCompletion
         self.economy = economy
         self.schedulePlantCareNotifications = schedulePlantCareNotifications
         self.personalAccessLevel = personalAccessLevel
+        self.allowsManagedProjection = allowsManagedProjection
     }
 }
 
@@ -832,7 +835,8 @@ struct CalendarCommandExecutor {
         occurrenceDate: Date,
         pets: [Pet],
         executorId: String?,
-        note: String
+        note: String,
+        allowsManagedProjection: Bool = false
     ) throws -> CalendarEventCompletionResult {
         let result = try CalendarEventCommandService.toggleCompletion(
             event: event,
@@ -842,7 +846,8 @@ struct CalendarCommandExecutor {
             executorId: executorId,
             options: CalendarEventCompletionOptions(
                 reminderCompletion: reminderCompletion,
-                personalAccessLevel: personalAccessLevel
+                personalAccessLevel: personalAccessLevel,
+                allowsManagedProjection: allowsManagedProjection
             )
         )
         deriveCalendarCompletion(result, occurrenceDate: occurrenceDate, note: note)

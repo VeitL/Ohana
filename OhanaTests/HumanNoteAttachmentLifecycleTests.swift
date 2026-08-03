@@ -203,6 +203,7 @@ struct HumanNoteAttachmentLifecycleTests {
             defaults: fixture.defaults,
             options: resetOptions,
             attachmentStorage: fixture.storage,
+            systemSurfaceSnapshotSanitizer: {},
             deletePersistentData: { _ in
                 context.delete(human)
                 try context.save()
@@ -232,6 +233,7 @@ struct HumanNoteAttachmentLifecycleTests {
                 defaults: fixture.defaults,
                 options: resetOptions,
                 attachmentStorage: fixture.storage,
+                systemSurfaceSnapshotSanitizer: {},
                 deletePersistentData: injectedStoreDeletionFailure
             )
         } catch {
@@ -259,7 +261,7 @@ struct HumanNoteAttachmentLifecycleTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let suiteName = "HumanNoteAttachmentLifecycleTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
-        let schema = Schema(ArkSchemaV94.models)
+        let schema = Schema(ArkSchemaV98.models)
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: [configuration])
         return Fixture(

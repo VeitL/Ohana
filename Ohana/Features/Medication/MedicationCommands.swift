@@ -300,9 +300,10 @@ enum HumanMedicationCommandService {
 
     @MainActor
     private static func fetchHumanMedications(humanID: String, context: ModelContext) -> [HumanMedication] {
+        let humanIDLower = humanID.lowercased()
         let descriptor = FetchDescriptor<HumanMedication>(
             predicate: #Predicate<HumanMedication> { medication in
-                medication.humanId == humanID
+                medication.humanId == humanID || medication.humanId == humanIDLower
             },
             sortBy: [SortDescriptor(\HumanMedication.createdAt)]
         )

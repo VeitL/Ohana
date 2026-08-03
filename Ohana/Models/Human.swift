@@ -20,7 +20,7 @@ enum HumanPrivateField: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .weight: "体重"
+        case .weight: "身体与健康记录"
         case .workout: "运动"
         case .medication: "吃药提醒"
         case .wishlist: "椰子资产与心愿"

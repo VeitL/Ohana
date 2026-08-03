@@ -11,8 +11,10 @@ import SwiftData
 struct PlantCareScheduleSyncResult: Equatable {
     enum Action: String, Equatable {
         case wroteCareFact
+        case removedCareFact
         case wroteSkipFeedback
         case skippedExistingCare
+        case skippedMissingCare
         case noPlantTarget
         case unsupportedCareType
         case notGeneratedPlantPlan
@@ -52,7 +54,8 @@ struct PlantCareScheduleSyncResult: Equatable {
     /// Non-generated events remain ordinary calendar/reminder items.
     var allowsScheduleCompletion: Bool {
         switch action {
-        case .wroteCareFact, .skippedExistingCare, .notGeneratedPlantPlan:
+        case .wroteCareFact, .removedCareFact, .skippedExistingCare, .skippedMissingCare,
+             .notGeneratedPlantPlan:
             true
         case .wroteSkipFeedback, .noPlantTarget, .unsupportedCareType, .unauthorized, .persistenceFailed:
             false
@@ -61,6 +64,10 @@ struct PlantCareScheduleSyncResult: Equatable {
 
     var didWriteCareFact: Bool {
         action == .wroteCareFact
+    }
+
+    var didRemoveCareFact: Bool {
+        action == .removedCareFact
     }
 
     static func persistenceFailed(
@@ -264,6 +271,7 @@ enum PlantCareScheduleSyncService {
     ) -> PlantCareScheduleSyncResult {
         let plant = persistence.plant
         let context = persistence.modelContext
+        let previousCareDate = currentCareDate(type: persistence.careType, for: plant)
         applyCareDate(persistence.careDate, type: persistence.careType, to: plant)
         let log = PlantCareLog(
             date: persistence.careDate,
@@ -293,7 +301,7 @@ enum PlantCareScheduleSyncService {
             coconutDelta: 0,
             rewardLogId: nil,
             privacyFieldRaw: nil,
-            metadataJSON: "{\"scheduleCompletion\":true}",
+            metadataJSON: scheduleCompletionMetadata(previousCareDate: previousCareDate),
             context: context,
             save: false
         )
@@ -320,6 +328,159 @@ enum PlantCareScheduleSyncService {
             logID: log.id,
             ledgerEventID: ledger.id,
             careType: persistence.careType
+        )
+    }
+
+    @discardableResult
+    static func syncReopenedEvent(
+        _ event: Event,
+        occurrenceDate: Date,
+        executorId: String?,
+        context: ModelContext,
+        now: Date = Date(),
+        saveChanges: Bool = true
+    ) -> PlantCareScheduleSyncResult {
+        guard isPlantCareEvent(event) else {
+            return PlantCareScheduleSyncResult(
+                action: .notGeneratedPlantPlan,
+                plantID: DomainEntityLinkRegistry.plantId(for: event),
+                logID: nil,
+                ledgerEventID: nil,
+                careType: careType(for: event)
+            )
+        }
+        guard let type = careType(for: event) else {
+            return PlantCareScheduleSyncResult(
+                action: .unsupportedCareType,
+                plantID: nil,
+                logID: nil,
+                ledgerEventID: nil,
+                careType: nil
+            )
+        }
+        guard let plantID = DomainEntityLinkRegistry.plantId(for: event),
+              let plant = fetchPlant(id: plantID, context: context) else {
+            return PlantCareScheduleSyncResult(
+                action: .noPlantTarget,
+                plantID: nil,
+                logID: nil,
+                ledgerEventID: nil,
+                careType: type
+            )
+        }
+
+        let ledgers = generatedCareLedgers(
+            for: event,
+            occurrenceDate: occurrenceDate,
+            plantID: plantID,
+            careType: type,
+            context: context
+        )
+        guard !ledgers.isEmpty else {
+            return PlantCareScheduleSyncResult(
+                action: .skippedMissingCare,
+                plantID: plantID,
+                logID: nil,
+                ledgerEventID: nil,
+                careType: type
+            )
+        }
+
+        let generatedLogIDs = Set(ledgers.compactMap(\.legacyModelId).compactMap(UUID.init(uuidString:)))
+        let recordedPreviousDate = ledgers.lazy.compactMap {
+            recordedPreviousCareDate(in: $0.metadataJSON)
+        }.first
+        var removedLogID: UUID?
+        for log in fetchPlantCareLogs(ids: generatedLogIDs, context: context) {
+            removedLogID = removedLogID ?? log.id
+            CloudSyncMutationRecorder.markDeleted(
+                log,
+                plant: plant,
+                context: context,
+                deletedAt: now,
+                deletedByHumanId: executorId
+            )
+            context.delete(log)
+        }
+        for ledger in ledgers {
+            CloudSyncMutationRecorder.markDeleted(
+                ledger,
+                context: context,
+                deletedAt: now,
+                deletedByHumanId: executorId
+            )
+            context.delete(ledger)
+        }
+
+        let fallbackDate = latestRemainingCareDate(
+            type: type,
+            plantID: plantID,
+            excludingLogIDs: generatedLogIDs,
+            context: context
+        )
+        applyCareDate(recordedPreviousDate ?? fallbackDate, type: type, to: plant)
+        CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
+        if saveChanges {
+            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            guard saveResult.didSave else {
+                context.rollback()
+                return .persistenceFailed(
+                    plantID: plantID,
+                    careType: type,
+                    errorDescription: saveResult.errorDescription
+                )
+            }
+        }
+
+        return PlantCareScheduleSyncResult(
+            action: .removedCareFact,
+            plantID: plantID,
+            logID: removedLogID,
+            ledgerEventID: ledgers.first?.id,
+            careType: type
+        )
+    }
+
+    @discardableResult
+    static func syncReopenedReminder(
+        _ reminder: Reminder,
+        executorId: String?,
+        context: ModelContext,
+        now: Date = Date(),
+        saveChanges: Bool = true
+    ) -> PlantCareScheduleSyncResult {
+        guard let event = reminder.event else {
+            return PlantCareScheduleSyncResult(
+                action: .noPlantTarget,
+                plantID: nil,
+                logID: nil,
+                ledgerEventID: nil,
+                careType: nil
+            )
+        }
+        let reminderID = reminder.id.uuidString
+        let sourceEventID = event.id.uuidString
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { ledger in
+                ledger.sourceReminderId == reminderID &&
+                    ledger.sourceEventId == sourceEventID
+            }
+        )
+        descriptor.fetchLimit = 20
+        let occurrenceDate = ((try? context.fetch(descriptor)) ?? [])
+            .first { ledger in
+                CalendarTaskCompletionSyncService.metadataDictionary(
+                    from: ledger.metadataJSON
+                )["scheduleCompletion"] as? Bool == true
+            }?
+            .occurredAt ?? reminder.scheduledAt
+        return syncReopenedEvent(
+            event,
+            occurrenceDate: occurrenceDate,
+            executorId: executorId,
+            context: context,
+            now: now,
+            saveChanges: saveChanges
         )
     }
 
@@ -490,7 +651,7 @@ enum PlantCareScheduleSyncService {
         return logs.contains { $0.plant?.id == plantID }
     }
 
-    private static func applyCareDate(_ date: Date, type: PlantCareType, to plant: Plant) {
+    private static func applyCareDate(_ date: Date?, type: PlantCareType, to plant: Plant) {
         switch type {
         case .watering:
             plant.lastWateredDate = date
@@ -501,6 +662,112 @@ enum PlantCareScheduleSyncService {
         case .repotting, .pruning, .misting, .rotating, .leafCleaning:
             break
         }
+    }
+
+    private static func currentCareDate(type: PlantCareType, for plant: Plant) -> Date? {
+        switch type {
+        case .watering:
+            plant.lastWateredDate
+        case .fertilizing:
+            plant.lastFertilizedDate
+        case .pestCheck, .pestFound, .yellowLeaf, .newLeaf, .photo, .customNote:
+            plant.lastHealthCheckDate
+        case .repotting, .pruning, .misting, .rotating, .leafCleaning:
+            nil
+        }
+    }
+
+    private static func generatedCareLedgers(
+        for event: Event,
+        occurrenceDate: Date,
+        plantID: UUID,
+        careType: PlantCareType,
+        context: ModelContext,
+        calendar: Calendar = .current
+    ) -> [CareLedgerEvent] {
+        let eventID = event.id.uuidString
+        let plantIDString = plantID.uuidString
+        let actionType = careType.rawValue
+        let eventKind = CareLedgerEventKind.plantCare.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { ledger in
+                ledger.sourceEventId == eventID &&
+                    ledger.subjectId == plantIDString &&
+                    ledger.actionType == actionType &&
+                    ledger.eventKind == eventKind
+            }
+        )
+        descriptor.fetchLimit = 20
+        return ((try? context.fetch(descriptor)) ?? []).filter { ledger in
+            calendar.isDate(ledger.occurredAt, inSameDayAs: occurrenceDate) &&
+                ledger.legacyModelName == String(describing: PlantCareLog.self) &&
+                CalendarTaskCompletionSyncService.metadataDictionary(
+                    from: ledger.metadataJSON
+                )["scheduleCompletion"] as? Bool == true
+        }
+    }
+
+    private static func fetchPlantCareLogs(
+        ids: Set<UUID>,
+        context: ModelContext
+    ) -> [PlantCareLog] {
+        guard !ids.isEmpty else { return [] }
+        return ((try? context.fetch(FetchDescriptor<PlantCareLog>())) ?? []).filter {
+            ids.contains($0.id)
+        }
+    }
+
+    private static func latestRemainingCareDate(
+        type: PlantCareType,
+        plantID: UUID,
+        excludingLogIDs: Set<UUID>,
+        context: ModelContext
+    ) -> Date? {
+        ((try? context.fetch(FetchDescriptor<PlantCareLog>())) ?? [])
+            .filter { log in
+                log.plant?.id == plantID &&
+                    !excludingLogIDs.contains(log.id) &&
+                    careTypesSharingSummaryDate(with: type).contains(log.careType)
+            }
+            .map(\.date)
+            .max()
+    }
+
+    private static func careTypesSharingSummaryDate(with type: PlantCareType) -> Set<PlantCareType> {
+        switch type {
+        case .watering:
+            [.watering]
+        case .fertilizing:
+            [.fertilizing]
+        case .pestCheck, .pestFound, .yellowLeaf, .newLeaf, .photo, .customNote:
+            [.pestCheck, .pestFound, .yellowLeaf, .newLeaf, .photo, .customNote]
+        case .repotting, .pruning, .misting, .rotating, .leafCleaning:
+            []
+        }
+    }
+
+    private static func scheduleCompletionMetadata(previousCareDate: Date?) -> String {
+        var object: [String: Any] = [
+            "scheduleCompletion": true,
+            "hasPreviousCareDate": previousCareDate != nil
+        ]
+        if let previousCareDate {
+            object["previousCareDate"] = previousCareDate.timeIntervalSince1970
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{\"scheduleCompletion\":true}"
+        }
+        return json
+    }
+
+    private static func recordedPreviousCareDate(in metadataJSON: String) -> Date? {
+        let metadata = CalendarTaskCompletionSyncService.metadataDictionary(from: metadataJSON)
+        guard metadata["hasPreviousCareDate"] as? Bool == true,
+              let interval = metadata["previousCareDate"] as? TimeInterval else {
+            return nil
+        }
+        return Date(timeIntervalSince1970: interval)
     }
 
     private static func scheduleCompletionNote(for event: Event) -> String {

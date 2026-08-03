@@ -114,6 +114,15 @@ enum SafetyContactCommandService {
         try saveOrRollback(context)
     }
 
+    @discardableResult
+    static func deleteAll(context: ModelContext) throws -> Int {
+        let contacts = try context.fetch(FetchDescriptor<SafetyContact>())
+        guard !contacts.isEmpty else { return 0 }
+        contacts.forEach { context.delete($0) } // derived-state: allow user-requested local legacy cleanup
+        try saveOrRollback(context)
+        return contacts.count
+    }
+
     private static func contact(id: UUID, context: ModelContext) throws -> SafetyContact? {
         var descriptor = FetchDescriptor<SafetyContact>(
             predicate: #Predicate<SafetyContact> { $0.id == id }

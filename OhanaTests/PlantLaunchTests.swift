@@ -1818,6 +1818,68 @@ struct PlantLaunchTests {
         })
     }
 
+    @Test func reopeningPlantCalendarEventRemovesGeneratedCareAndRestoresPreviousDate() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 9, hour: 8)
+        let previousWateredDate = makeDate(year: 2026, month: 6, day: 4, hour: 7)
+        let plant = Plant(name: "Monstera", wateringIntervalDays: 3)
+        plant.lastWateredDate = previousWateredDate
+        let event = Event(
+            title: "给龟背竹浇水植物计划",
+            startDate: now,
+            isAllDay: true,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+        event.recurrenceDays = 3
+        context.insert(plant)
+        context.insert(event)
+        try context.save()
+
+        let completed = try CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: now,
+            pets: [],
+            context: context,
+            executorId: nil,
+            now: now,
+            options: CalendarEventCompletionOptions(schedulePlantCareNotifications: false)
+        )
+        let generatedLog = try #require(context.fetch(FetchDescriptor<PlantCareLog>()).first)
+        let generatedLedger = try #require(context.fetch(FetchDescriptor<CareLedgerEvent>()).first {
+            $0.legacyModelId == generatedLog.id.uuidString
+        })
+
+        let reopened = try CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: now,
+            pets: [],
+            context: context,
+            executorId: nil,
+            now: now.addingTimeInterval(60),
+            options: CalendarEventCompletionOptions(schedulePlantCareNotifications: false)
+        )
+
+        #expect(completed.isCompleted)
+        #expect(!reopened.isCompleted)
+        #expect(reopened.didChange)
+        #expect(plant.lastWateredDate == previousWateredDate)
+        #expect(try context.fetchCount(FetchDescriptor<PlantCareLog>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<CareLedgerEvent>()) == 0)
+        #expect(try context.fetch(FetchDescriptor<CloudSyncRecordState>()).contains {
+            $0.entityName == String(describing: PlantCareLog.self) &&
+                $0.localRecordId == generatedLog.id.uuidString.lowercased() &&
+                $0.isDeletionTombstone
+        })
+        #expect(try context.fetch(FetchDescriptor<CloudSyncRecordState>()).contains {
+            $0.entityName == String(describing: CareLedgerEvent.self) &&
+                $0.localRecordId == generatedLedger.id.uuidString.lowercased() &&
+                $0.isDeletionTombstone
+        })
+    }
+
     @Test func completingDirectPlantUserCalendarEventDoesNotWriteCareFact() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -1897,6 +1959,79 @@ struct PlantLaunchTests {
             $0.eventKind == CareLedgerEventKind.reminder.rawValue &&
             $0.actionType == "complete" &&
                 $0.sourceReminderId == reminder.id.uuidString
+        })
+    }
+
+    @Test func reopeningPlantReminderRemovesOnlyGeneratedCareAndRestoresPreviousDate() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 10, hour: 10)
+        let previousFertilizedDate = makeDate(year: 2026, month: 5, day: 20, hour: 9)
+        let human = Human(name: "Plant Keeper")
+        let plant = Plant(name: "Basil", fertilizingIntervalDays: 14)
+        plant.lastFertilizedDate = previousFertilizedDate
+        let event = Event(
+            title: "给罗勒施肥植物计划",
+            startDate: now,
+            isAllDay: true,
+            eventType: EventType.fertilizing.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+        event.recurrenceDays = 14
+        let reminder = Reminder(event: event, scheduledAt: now)
+        context.insert(human)
+        context.insert(plant)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let didComplete = ReminderCompletionService.complete(
+            reminder,
+            by: human.id.uuidString,
+            context: context,
+            notifications: NoopReminderNotificationScheduler(),
+            schedulePlantCareNotifications: false
+        )
+        let generatedLog = try #require(context.fetch(FetchDescriptor<PlantCareLog>()).first)
+        let generatedLedger = try #require(context.fetch(FetchDescriptor<CareLedgerEvent>()).first {
+            $0.eventKind == CareLedgerEventKind.plantCare.rawValue
+        })
+
+        let didReopen = ReminderCompletionService.reopen(
+            reminder,
+            by: human.id.uuidString,
+            context: context,
+            reschedule: false
+        )
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+
+        #expect(didComplete)
+        #expect(didReopen)
+        #expect(reminder.statusEnum == .pending)
+        #expect(plant.lastFertilizedDate == previousFertilizedDate)
+        #expect(try context.fetchCount(FetchDescriptor<PlantCareLog>()) == 0)
+        #expect(!ledgers.contains { $0.eventKind == CareLedgerEventKind.plantCare.rawValue })
+        #expect(ledgers.contains {
+            $0.eventKind == CareLedgerEventKind.reminder.rawValue &&
+                $0.actionType == "complete"
+        })
+        #expect(ledgers.contains {
+            $0.eventKind == CareLedgerEventKind.reminder.rawValue &&
+                $0.actionType == "reopen"
+        })
+        let syncStates = try context.fetch(FetchDescriptor<CloudSyncRecordState>())
+        #expect(syncStates.contains {
+            $0.recordKey == CloudSyncRecordState.recordKey(
+                entityName: String(describing: PlantCareLog.self),
+                localRecordId: generatedLog.id
+            ) && $0.isDeletionTombstone
+        })
+        #expect(syncStates.contains {
+            $0.recordKey == CloudSyncRecordState.recordKey(
+                entityName: String(describing: CareLedgerEvent.self),
+                localRecordId: generatedLedger.id
+            ) && $0.isDeletionTombstone
         })
     }
 

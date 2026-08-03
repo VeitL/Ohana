@@ -30,6 +30,38 @@ nonisolated struct PresenceDatedLocalNotificationRequest: Equatable, Sendable {
     let checkInDayKey: String
 }
 
+nonisolated struct PresenceReminderNotificationContent: Equatable, Sendable {
+    let title: String
+    let body: String
+
+    static func localized(_ localization: L10n = L10n()) -> Self {
+        Self(
+            title: localization.tr(
+                zh: "今天平安吗？",
+                en: "Are you safe today?",
+                de: "Geht es dir heute gut?",
+                es: "¿Estás bien hoy?",
+                pt: "Está tudo bem hoje?",
+                fr: "Tout va bien aujourd’hui ?",
+                ja: "今日は無事ですか？",
+                ko: "오늘은 무사한가요?",
+                it: "Tutto bene oggi?"
+            ),
+            body: localization.tr(
+                zh: "解锁设备并选择“我今天平安”，即可完成确认。",
+                en: "Unlock the device and choose “I'm safe today” to confirm.",
+                de: "Entsperre das Gerät und wähle „Mir geht es heute gut“.",
+                es: "Desbloquea el dispositivo y elige «Estoy bien hoy» para confirmar.",
+                pt: "Desbloqueie o dispositivo e escolha “Estou bem hoje” para confirmar.",
+                fr: "Déverrouillez l’appareil et choisissez « Tout va bien aujourd’hui ».",
+                ja: "端末を解除して「今日は無事です」を選ぶと確認できます。",
+                ko: "기기를 잠금 해제하고 ‘오늘은 무사해요’를 선택하세요.",
+                it: "Sblocca il dispositivo e scegli “Oggi sto bene” per confermare."
+            )
+        )
+    }
+}
+
 nonisolated enum PresenceReminderRequestFactory {
     static let identifierPrefix = "presence.deadline."
     static let categoryIdentifier = "OHANA_PRESENCE_CHECK_IN"
@@ -337,6 +369,51 @@ enum PresenceReminderActivationResult: Equatable {
     case denied(PresenceReminderConfigurationDenial)
     case notificationsNotAuthorized
     case schedulingFailed
+}
+
+@MainActor
+enum PresenceReminderRestorationResult: Equatable {
+    case restored
+    case disabled
+    case notificationsNotAuthorized
+    case schedulingFailed
+}
+
+@MainActor
+struct PresenceReminderRestorationCoordinator {
+    /// Restores a previously authorized device-local reminder schedule after
+    /// the owner retracts today's confirmation. This path never asks for
+    /// notification permission; only the explicit settings action may do so.
+    static func restoreIfAuthorized(
+        _ configuration: PresenceReminderConfiguration,
+        title: String,
+        body: String,
+        notifications: UserNotificationManaging,
+        scheduler: PresenceReminderScheduling
+    ) async -> PresenceReminderRestorationResult {
+        guard configuration.isEnabled else { return .disabled }
+        let isAuthorized: Bool = switch await notifications.authorizationStatus() {
+        case .authorized, .provisional, .ephemeral:
+            true
+        case .notDetermined, .denied:
+            false
+        @unknown default:
+            false
+        }
+        guard isAuthorized else { return .notificationsNotAuthorized }
+
+        let requests = PresenceReminderRequestFactory.makeRequests(
+            configuration: configuration,
+            title: title,
+            body: body
+        )
+        do {
+            try await scheduler.replaceRequests(requests)
+            return .restored
+        } catch {
+            return .schedulingFailed
+        }
+    }
 }
 
 @MainActor

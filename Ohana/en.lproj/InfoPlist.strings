@@ -1,6 +1,6 @@
 /* Localized Info.plist strings (English) */
-"NSCameraUsageDescription" = "Used when you choose to take a member or pet avatar, Moment photo, or receipt attachment.";
-"NSPhotoLibraryUsageDescription" = "Used to import avatars, Moment images, or receipt attachments that you select.";
+"NSCameraUsageDescription" = "Used when you choose to capture an avatar, Moment, receipt, or health report. Health report text is processed only on this device.";
+"NSPhotoLibraryUsageDescription" = "Used to import avatars, Moments, receipts, or health reports that you select. Health report text is recognized only on this device.";
 "NSHealthShareUsageDescription" = "Used when you set up Apple Health to read steps, distance, active energy, exercise and stand time, activity goals, and workouts for this member's local summary.";
 "NSLocationWhenInUseUsageDescription" = "Used when you add a location to a Moment or start a walk so Ohana can record that route.";
 "NSLocationAlwaysAndWhenInUseUsageDescription" = "Used only during an active walk to keep recording the current route when the app is in the background or the screen is locked.";

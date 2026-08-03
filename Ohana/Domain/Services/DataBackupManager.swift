@@ -1003,16 +1003,16 @@ extension DataBackupManager {
                 context: context
             )
         }
-        for dto in backup.humanHealthMetricLogs ?? [] {
-            try DomainMemberContentRehydrateWriter.insertHumanHealthMetricLogIfNeeded(
-                snapshot: decodeHumanHealthMetricLogSnapshot(dto),
+        for dto in backup.humanHealthReports ?? [] {
+            try DomainMemberContentRehydrateWriter.insertHumanHealthReportIfNeeded(
+                snapshot: decodeHumanHealthReportSnapshot(dto),
                 source: .backupRestore,
                 context: context
             )
         }
-        for dto in backup.humanHealthReports ?? [] {
-            try DomainMemberContentRehydrateWriter.insertHumanHealthReportIfNeeded(
-                snapshot: decodeHumanHealthReportSnapshot(dto),
+        for dto in backup.humanHealthMetricLogs ?? [] {
+            try DomainMemberContentRehydrateWriter.insertHumanHealthMetricLogIfNeeded(
+                snapshot: decodeHumanHealthMetricLogSnapshot(dto),
                 source: .backupRestore,
                 context: context
             )

@@ -311,7 +311,9 @@ struct PetRetentionHubView: View {
                 icon: "person.text.rectangle.fill",
                 accent: Color(hex: "6B82C4"),
                 title: l.tr(zh: "身份资料", en: "Profile", de: "Profil"),
-                value: pet.breed.isEmpty ? pet.species : pet.breed,
+                value: pet.breed.isEmpty
+                    ? Pet.localizedSpeciesName(pet.species, l: l)
+                    : l.resourceName(pet.breed),
                 subtitle: l.tr(zh: "名字、品种、生日、到家日", en: "Name, breed, birthday, home day", de: "Name, Rasse, Geburtstag, Einzug"),
                 destination: PetBasicInfoDetailView(pet: pet)
             )

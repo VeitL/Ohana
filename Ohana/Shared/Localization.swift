@@ -52,6 +52,65 @@ nonisolated struct L10n {
         return key
     }
 
+    /// Sorts catalog storage keys by the names shown in the selected app language.
+    /// Empty values can stay first while a catalog's catch-all value stays last.
+    func sortedCatalogKeys(
+        _ keys: [String],
+        emptyFirst: Bool = true,
+        otherKey: String? = "其他",
+        displayName: ((String) -> String)? = nil
+    ) -> [String] {
+        let title = displayName ?? { resourceName($0) }
+        return keys.sorted { lhs, rhs in
+            guard lhs != rhs else { return false }
+            if emptyFirst, lhs.isEmpty != rhs.isEmpty {
+                return lhs.isEmpty
+            }
+            if let otherKey, lhs == otherKey || rhs == otherKey {
+                return lhs != otherKey
+            }
+
+            let result = title(lhs).compare(
+                title(rhs),
+                options: [.caseInsensitive, .numeric],
+                range: nil,
+                locale: Locale(identifier: AppLanguage.option(for: lang).localeIdentifier)
+            )
+            if result == .orderedSame {
+                return lhs.compare(
+                    rhs,
+                    options: [.caseInsensitive, .numeric],
+                    range: nil,
+                    locale: Locale(identifier: "en_US_POSIX")
+                ) == .orderedAscending
+            }
+            return result == .orderedAscending
+        }
+    }
+
+    func sortedCatalogValues<Value>(
+        _ values: [Value],
+        key: (Value) -> String,
+        emptyFirst: Bool = true,
+        otherKey: String? = "其他",
+        displayName: ((String) -> String)? = nil
+    ) -> [Value] {
+        let order = sortedCatalogKeys(
+            values.map(key),
+            emptyFirst: emptyFirst,
+            otherKey: otherKey,
+            displayName: displayName
+        )
+        let rank = order.enumerated().reduce(into: [String: Int]()) { result, element in
+            if result[element.element] == nil {
+                result[element.element] = element.offset
+            }
+        }
+        return values.sorted {
+            (rank[key($0)] ?? Int.max) < (rank[key($1)] ?? Int.max)
+        }
+    }
+
     func tr(
         zh: String,
         en: String,

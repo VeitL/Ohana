@@ -26,23 +26,6 @@ struct ZenPresentationTests {
         ])
     }
 
-    @Test func allCheckedPresentationDoesNotTreatAnEmptyHouseholdAsComplete() {
-        #expect(!ZenPresencePresentation.allChecked([]))
-        #expect(!ZenPresencePresentation.allChecked([
-            subject(id: "owner", kind: .human, name: "Me", isOwner: true)
-        ]))
-        #expect(ZenPresencePresentation.allChecked([
-            subject(id: "owner", kind: .human, name: "Me", isOwner: true, checkedToday: true)
-        ]))
-        #expect(!ZenPresencePresentation.canEarnAllCheckedReward([
-            subject(id: "owner", kind: .human, name: "Me", isOwner: true, checkedToday: true)
-        ]))
-        #expect(ZenPresencePresentation.canEarnAllCheckedReward([
-            subject(id: "owner", kind: .human, name: "Me", isOwner: true, checkedToday: true),
-            subject(id: "pet", kind: .pet, name: "Milo", checkedToday: true)
-        ]))
-    }
-
     @Test func presenceCardBackgroundsFollowCheckInAndStatusInsteadOfMemberTheme() {
         #expect(ZenPresencePresentation.cardBackgroundState(for:
             subject(id: "pending", kind: .pet, name: "Milo", status: .great)
@@ -65,6 +48,44 @@ struct ZenPresentationTests {
         #expect(ZenPresencePresentation.cardBackgroundState(for:
             subject(id: "score", kind: .human, name: "Jo", checkedToday: true, status: .score10)
         ) == .score(10))
+    }
+
+    @Test @MainActor
+    func cardCopyDistinguishesOwnerConfirmationHumanContactAndCareObservation() {
+        let l = L10n("zh")
+        let owner = subject(id: "owner", kind: .human, name: "Me", isOwner: true)
+        let human = subject(id: "human", kind: .human, name: "Alex")
+        let pet = subject(id: "pet", kind: .pet, name: "Miso")
+        let checkedPlant = subject(
+            id: "plant",
+            kind: .plant,
+            name: "Fern",
+            checkedToday: true
+        )
+
+        #expect(owner.zenCompactStatusText(l) == "待确认")
+        #expect(human.zenCompactStatusText(l) == "待联系")
+        #expect(pet.zenCompactStatusText(l) == "待观察")
+        #expect(checkedPlant.zenCompactStatusText(l) == "已观察")
+    }
+
+    @Test func streakSemanticsDistinguishSafetyContactPetAndPlantObservation() {
+        #expect(
+            subject(id: "owner", kind: .human, name: "Me", isOwner: true).recordSemantic
+                == .ownerSafety
+        )
+        #expect(
+            subject(id: "human", kind: .human, name: "Family").recordSemantic
+                == .humanContact
+        )
+        #expect(
+            subject(id: "pet", kind: .pet, name: "Mochi").recordSemantic
+                == .petObservation
+        )
+        #expect(
+            subject(id: "plant", kind: .plant, name: "Fern").recordSemantic
+                == .plantObservation
+        )
     }
 
     @Test func currentStatusChoicesUseTenScoresAndBridgeLegacyFactsWithoutRewritingThem() {
@@ -155,6 +176,21 @@ struct ZenPresentationTests {
         #expect(!ZenCardScoreSelectionPolicy.suppressesQuickTap(
             now: endedAt.addingTimeInterval(0.18),
             deadline: deadline
+        ))
+    }
+
+    @Test func scoreGestureRequiresAConfirmedSelectionWindowBeforeCommit() {
+        #expect(!ZenCardScoreSelectionPolicy.permitsScoreCommit(
+            startedAtUptime: nil,
+            endedAtUptime: 100
+        ))
+        #expect(!ZenCardScoreSelectionPolicy.permitsScoreCommit(
+            startedAtUptime: 100,
+            endedAtUptime: 100.07
+        ))
+        #expect(ZenCardScoreSelectionPolicy.permitsScoreCommit(
+            startedAtUptime: 100,
+            endedAtUptime: 100.081
         ))
     }
 
@@ -407,6 +443,90 @@ struct ZenPresentationTests {
         }
     }
 
+    @Test func plantCompanionDaysPreferTypedAcquiredDateAndIncludeTheFirstDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let createdAt = try #require(calendar.date(
+            from: DateComponents(year: 2026, month: 6, day: 1, hour: 12)
+        ))
+        let acquiredAt = try #require(calendar.date(
+            from: DateComponents(year: 2026, month: 7, day: 18, hour: 23)
+        ))
+        let thirdDay = try #require(calendar.date(
+            from: DateComponents(year: 2026, month: 7, day: 20, hour: 1)
+        ))
+        let archivedAt = try #require(calendar.date(
+            from: DateComponents(year: 2026, month: 7, day: 19, hour: 18)
+        ))
+        let afterArchive = try #require(calendar.date(
+            from: DateComponents(year: 2026, month: 8, day: 20, hour: 1)
+        ))
+        let profile = ZenExpandedProfileDTO(
+            metrics: [
+                ZenExpandedMetricDTO(
+                    kind: .together,
+                    label: "Care days",
+                    value: "This localized text must not be parsed"
+                )
+            ],
+            plantCompanionStartedAt: acquiredAt
+        )
+        let plant = ZenPresenceSubjectDTO(
+            id: "plant",
+            kind: .plant,
+            name: "Fern",
+            createdAt: createdAt,
+            expandedProfile: profile,
+            currentDisplayStreak: 99
+        )
+
+        #expect(plant.plantCompanionDays(asOf: acquiredAt, calendar: calendar) == 1)
+        #expect(plant.plantCompanionDays(asOf: thirdDay, calendar: calendar) == 3)
+        #expect(plant.plantCompanionText(
+            L10n("zh"),
+            asOf: thirdDay,
+            calendar: calendar
+        ) == "已陪伴 3 天")
+
+        let fallbackPlant = ZenPresenceSubjectDTO(
+            id: "fallback-plant",
+            kind: .plant,
+            name: "Moss",
+            createdAt: createdAt,
+            currentDisplayStreak: 50
+        )
+        #expect(fallbackPlant.plantCompanionDays(asOf: thirdDay, calendar: calendar) == 50)
+
+        let archivedPlant = ZenPresenceSubjectDTO(
+            id: "archived-plant",
+            kind: .plant,
+            name: "Fern",
+            createdAt: createdAt,
+            inactiveAt: archivedAt,
+            isActive: false,
+            expandedProfile: profile
+        )
+        #expect(archivedPlant.plantCompanionDays(
+            asOf: afterArchive,
+            calendar: calendar
+        ) == 2)
+        #expect(archivedPlant.plantCompanionText(
+            L10n("zh"),
+            asOf: afterArchive,
+            calendar: calendar
+        ) == "已陪伴 2 天")
+
+        let pet = ZenPresenceSubjectDTO(
+            id: "pet",
+            kind: .pet,
+            name: "Miso",
+            createdAt: createdAt,
+            expandedProfile: profile
+        )
+        #expect(pet.plantCompanionDays(asOf: thirdDay, calendar: calendar) == nil)
+        #expect(pet.plantCompanionText(L10n("zh"), asOf: thirdDay, calendar: calendar) == nil)
+    }
+
     @Test func oasisSnapshotClampsUntrustedDisplayValues() {
         let snapshot = ZenOasisSnapshot(
             isReady: true,
@@ -459,6 +579,10 @@ struct ZenPresentationTests {
             contentsOf: root.appending(path: "Ohana/Features/Zen/ZenMembersView.swift"),
             encoding: .utf8
         )
+        let readService = try String(
+            contentsOf: root.appending(path: "Ohana/Features/Notifications/PresenceCheckInReadService.swift"),
+            encoding: .utf8
+        )
         let analytics = try String(
             contentsOf: root.appending(path: "Ohana/Features/Zen/ZenPersonalAnalyticsView.swift"),
             encoding: .utf8
@@ -480,6 +604,8 @@ struct ZenPresentationTests {
         #expect(home.contains("zen-home-expand-"))
         #expect(home.contains("zen-home-collapse-"))
         #expect(home.contains("compactMetricValueOverride:"))
+        #expect(home.contains("compactPrimaryMetricValue"))
+        #expect(home.contains("plantCompanionText"))
         #expect(home.contains("showsStatusBadge: false"))
         #expect(streak.contains("zen-streak-screen"))
         #expect(streak.contains("zen-streak-month-pager"))
@@ -489,6 +615,9 @@ struct ZenPresentationTests {
         #expect(streak.contains(".contentTransition(.numericText())"))
         #expect(streak.contains("calendarIsPresented"))
         #expect(streak.contains("day?.status?.score"))
+        #expect(streak.contains("selectedPresentationSubject?.plantCompanionDays"))
+        #expect(streak.contains("zh: \"观察记录\""))
+        #expect(streak.contains("zen-streak-reassurance"))
         #expect(oasis.contains("zen-oasis-screen"))
         #expect(oasis.contains("OasisHomeTabHost("))
         #expect(oasis.contains("OasisTreeRenderSnapshot("))
@@ -499,6 +628,8 @@ struct ZenPresentationTests {
         #expect(!oasis.contains("private var routeGrid"))
         #expect(members.contains("zen-members-screen"))
         #expect(members.contains("ZenPresenceSubjectKind.allCases"))
+        #expect(members.contains("primaryDayMetricText"))
+        #expect(readService.contains("plantCompanionStartedAt: referenceDate"))
         #expect(analytics.contains("zen-personal-analytics-screen"))
         #expect(analytics.contains("ShareLink(item: analytics.csvExport)"))
         #expect(analytics.contains("Chart(analytics.weeklyBins)"))
@@ -516,7 +647,10 @@ struct ZenPresentationTests {
         #expect(!home.contains("Up · better"))
         #expect(!home.contains("Down · attention"))
         #expect(home.contains("accessibilityAdjustableAction(action)"))
-        #expect(home.contains("zen-home-auto-check-in-toast"))
+        #expect(home.contains("zen-home-owner-confirmation-hint"))
+        #expect(!home.contains("requestedAutoCheckInToast"))
+        #expect(!home.contains("checkInAll"))
+        #expect(!shell.contains("autoCheckInOwner"))
         #expect(home.contains("ZenPresencePendingGlassOverlay("))
         #expect(home.contains("GoMotion.zenCardGlassDissolve"))
         #expect(home.contains("showsBorder: false"))

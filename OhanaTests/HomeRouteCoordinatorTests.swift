@@ -103,6 +103,7 @@ struct HomeRouteCoordinatorTests {
         coordinator.openSheet(.humanWeight(human.id))
         coordinator.openSheet(.humanWorkoutDashboard(human.id))
         coordinator.openSheet(.humanMetrics(human.id))
+        coordinator.openSheet(.humanConditions(human.id))
         coordinator.openSheet(.humanReport(human.id))
         coordinator.openSheet(.humanWishlist(human.id))
 
@@ -121,6 +122,7 @@ struct HomeRouteCoordinatorTests {
             .appSheet(.humanWeight(human.id)),
             .appSheet(.humanWorkoutDashboard(human.id)),
             .appSheet(.humanMetrics(human.id)),
+            .appSheet(.humanConditions(human.id)),
             .appSheet(.humanReport(human.id)),
             .appSheet(.humanWishlist(human.id))
         ]

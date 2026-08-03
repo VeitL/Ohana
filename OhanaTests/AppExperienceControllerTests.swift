@@ -130,6 +130,36 @@ struct AppExperienceControllerTests {
         #expect(defaults.string(forKey: AppExperienceMode.storageKey) == AppExperienceMode.zen.rawValue)
     }
 
+    @Test func zenStandardZenRoundTripPersistsModeAndOwnerAcrossRelaunches() async throws {
+        let (suite, defaults) = try makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let ownerID = UUID()
+        defaults.set(AppExperienceMode.zen.rawValue, forKey: AppExperienceMode.storageKey)
+        defaults.set(ownerID.uuidString, forKey: AppExperienceMode.zenOwnerHumanIDKey)
+        defaults.set(true, forKey: AppExperienceMode.zenIntroductionSeenKey)
+
+        let firstLaunch = AppExperienceController(defaults: defaults, hasCompletedOnboarding: true)
+        firstLaunch.switchAfterRouteDismissal(to: .standard, delayMilliseconds: 0)
+        try await Task.sleep(nanoseconds: 10_000_000)
+
+        #expect(firstLaunch.mode == .standard)
+        #expect(firstLaunch.zenOwnerHumanID == ownerID.uuidString)
+
+        let standardRelaunch = AppExperienceController(defaults: defaults, hasCompletedOnboarding: true)
+        #expect(standardRelaunch.mode == .standard)
+        #expect(standardRelaunch.zenOwnerHumanID == ownerID.uuidString)
+        #expect(!standardRelaunch.shouldOfferZenIntroduction)
+
+        standardRelaunch.switchAfterRouteDismissal(to: .zen, delayMilliseconds: 0)
+        try await Task.sleep(nanoseconds: 10_000_000)
+
+        let zenRelaunch = AppExperienceController(defaults: defaults, hasCompletedOnboarding: true)
+        #expect(zenRelaunch.mode == .zen)
+        #expect(zenRelaunch.zenOwnerHumanID == ownerID.uuidString)
+        #expect(!zenRelaunch.requiresInitialSelection)
+        #expect(!zenRelaunch.shouldOfferZenIntroduction)
+    }
+
     @Test func anExplicitOwnerChangeUpdatesTheLocalBindingWithoutChangingMode() throws {
         let (suite, defaults) = try makeDefaults()
         defer { defaults.removePersistentDomain(forName: suite) }

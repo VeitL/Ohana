@@ -166,7 +166,7 @@ final class MemberCreationService: MemberCreating {
                 throw ServiceError.walletFrozen
             case .backupOrRestoreInProgress:
                 throw ServiceError.saveFailed("Wait for the backup or restore to finish before buying an avatar pass.")
-            case .invalidItem, .persistenceFailed, nil:
+            case .applicationUnavailable, .invalidItem, .persistenceFailed, nil:
                 throw ServiceError.saveFailed("2.5D Avatar Pass purchase was not saved.")
             }
         }
@@ -662,9 +662,7 @@ final class MemberCreationService: MemberCreating {
     }
 
     private func residenceText(country: String, city: String) -> String {
-        if country.isEmpty { return city }
-        if city.isEmpty { return country }
-        return "\(country)·\(city)"
+        MemberResidenceValue(country: country, city: city).storedValue
     }
 
     private func humanNotes(draft: MemberCreationDraft) -> String {

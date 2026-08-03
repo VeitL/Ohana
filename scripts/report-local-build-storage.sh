@@ -31,23 +31,59 @@ else
 fi
 ohana_print_largest_storage_sources
 
-section "Fixed DerivedData lanes"
-print_path_size "${OHANA_TEST_DERIVED_DATA_PATH}" "tests (preserve)"
-print_path_size "${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}" "dogfood (preserve)"
-print_path_size "${OHANA_RELEASE_DERIVED_DATA_PATH}" "release (preserve)"
+section "Shared external Xcode cache"
+echo "Cache identity: ${OHANA_LOCAL_BUILD_CACHE_ID}"
+echo "Common repository: ${OHANA_LOCAL_BUILD_COMMON_REPO_ROOT}"
+print_path_size "${OHANA_TEST_DERIVED_DATA_PATH}" "tests (active shared lane)"
+print_path_size "${OHANA_DOGFOOD_DERIVED_DATA_PATH_FIXED}" "dogfood build cache (active; Simulator data separately protected)"
+print_path_size "${OHANA_RELEASE_DERIVED_DATA_PATH}" "release (active shared lane)"
+print_path_size "${OHANA_TEST_RESULT_ROOT}" "managed TestResults"
+print_path_size "${OHANA_LOCAL_BUILD_CACHE_ROOT}" "shared cache total"
 print_path_size "${OHANA_LOCAL_BUILD_REPO_ROOT}/.build" ".build total"
 
-section "Legacy DerivedData candidates"
+section "Legacy worktree-local DerivedData"
 legacy_count=0
-for path in "${OHANA_LOCAL_DERIVED_DATA_ROOT}"/*; do
-  [[ -e "${path}" ]] || continue
-  ohana_is_fixed_derived_data_lane "${path}" && continue
-  print_path_size "${path}" "${path}"
-  legacy_count=$((legacy_count + 1))
-done
+worktree_rows="$(git -C "${OHANA_LOCAL_BUILD_REPO_ROOT}" worktree list --porcelain 2>/dev/null | \
+  awk '/^worktree / { sub(/^worktree /, ""); print }' || true)"
+[[ -n "${worktree_rows}" ]] || worktree_rows="${OHANA_LOCAL_BUILD_REPO_ROOT}"
+while IFS= read -r worktree_root; do
+  [[ -n "${worktree_root}" ]] || continue
+  for path in "${worktree_root}/.build/DerivedData"/*; do
+    [[ -e "${path}" ]] || continue
+    print_path_size "${path}" "${path} (legacy candidate)"
+    legacy_count=$((legacy_count + 1))
+  done
+done <<< "${worktree_rows}"
 if [[ "${legacy_count}" == "0" ]]; then
   echo "none"
 fi
+
+section "Managed xcresult retention"
+failure_count="$({ find "${OHANA_TEST_RESULT_ROOT}/failed" -mindepth 1 -maxdepth 1 \
+  -type d -name '*.xcresult' 2>/dev/null || true; } | wc -l | tr -d ' ')"
+success_count="$({ find "${OHANA_TEST_RESULT_ROOT}/success" -mindepth 1 -maxdepth 1 \
+  -type d -name '*.xcresult' 2>/dev/null || true; } | wc -l | tr -d ' ')"
+staging_count="$({ find "${OHANA_TEST_RESULT_ROOT}/staging" -mindepth 1 -maxdepth 1 \
+  -type d -name '*.xcresult' 2>/dev/null || true; } | wc -l | tr -d ' ')"
+printf '%9s  %s retained failure(s); cap %s, expiry %s days\n' \
+  "$(ohana_format_kib_human "$(ohana_path_size_kib "${OHANA_TEST_RESULT_ROOT}/failed")")" \
+  "${failure_count}" "${OHANA_TEST_FAILURE_RETENTION_COUNT}" "${OHANA_TEST_FAILURE_RETENTION_DAYS}"
+printf '%9s  %s explicitly retained success result(s)\n' \
+  "$(ohana_format_kib_human "$(ohana_path_size_kib "${OHANA_TEST_RESULT_ROOT}/success")")" \
+  "${success_count}"
+printf '%9s  %s in-progress/stale staging result(s)\n' \
+  "$(ohana_format_kib_human "$(ohana_path_size_kib "${OHANA_TEST_RESULT_ROOT}/staging")")" \
+  "${staging_count}"
+legacy_result_count=0
+while IFS= read -r worktree_root; do
+  [[ -n "${worktree_root}" ]] || continue
+  for path in "${worktree_root}"/.build/*.xcresult "${worktree_root}"/.build/TestResults; do
+    [[ -e "${path}" ]] || continue
+    print_path_size "${path}" "${path} (legacy result candidate)"
+    legacy_result_count=$((legacy_result_count + 1))
+  done
+done <<< "${worktree_rows}"
+[[ "${legacy_result_count}" != "0" ]] || echo "no legacy worktree results"
 
 section "Simulator devices and cache"
 dogfood_udid="$(ohana_pinned_dogfood_udid || true)"
@@ -204,6 +240,82 @@ done
 printf '%9s  %s Ohana-named Xcode cache(s)\n' \
   "$(ohana_format_kib_human "${xcode_ohana_kib}")" "${xcode_ohana_count}"
 echo "These system caches sit outside Ohana's fixed lanes and may come from Xcode UI builds or older repo checkouts; inspect them separately."
+
+if [[ "${OHANA_LOCAL_BUILD_STORAGE_FIXTURE_MODE:-0}" == "0" ]]; then
+  section "CoreSimulator amplification detectors"
+  print_path_size "${HOME}/Library/Developer/CoreSimulator" "CoreSimulator user data total (report only)"
+  runtime_volume_kib="$({
+    du -sk "/Library/Developer/CoreSimulator/Volumes" 2>/dev/null || true
+  } | awk 'NR == 1 { print $1 + 0 }')"
+  printf '%9s  %s\n' \
+    "$(ohana_format_kib_human "${runtime_volume_kib:-0}")" \
+    "installed Simulator runtime volumes (report only)"
+  print_path_size "${HOME}/Library/Logs/CoreSimulator" "CoreSimulator logs currently linked on disk"
+  deleted_log_rows="$(
+    lsof -nP +L1 2>/dev/null | awk '
+      $NF ~ /\/CoreSimulator\.log$/ { print }
+    ' || true
+  )"
+  if [[ -n "${deleted_log_rows}" ]]; then
+    echo "WARNING: deleted-but-open CoreSimulator log(s) still consume blocks:"
+    printf '  %s\n' "${deleted_log_rows}"
+    echo "A failed diagnostics export can copy each hidden log in full, multiplying one leak into several GiB."
+  else
+    echo "no deleted-but-open CoreSimulator log detected"
+  fi
+
+  echo "Active Xcode/test processes:"
+  active_xcode_rows="$(
+    {
+      pgrep -x -l xcodebuild 2>/dev/null || true
+      pgrep -x -l xctest 2>/dev/null || true
+    } | LC_ALL=C sort -u
+  )"
+  if [[ -n "${active_xcode_rows}" ]]; then
+    printf '  %s\n' "${active_xcode_rows}"
+  else
+    echo "  none"
+  fi
+
+  diagnostic_roots=()
+  user_tmp_root="${TMPDIR:-$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null || true)}"
+  if [[ -n "${user_tmp_root}" && -d "${user_tmp_root}" ]]; then
+    while IFS= read -r path; do
+      [[ -n "${path}" ]] && diagnostic_roots+=("$(dirname "$(dirname "${path}")")")
+    done < <(
+      find "${user_tmp_root}" -maxdepth 5 -type f \
+        -path '*/simctl_diagnostics/CoreSimulator.log' -print 2>/dev/null || true
+    )
+  fi
+  if [[ ${#diagnostic_roots[@]} -gt 0 ]]; then
+    echo "Simulator diagnostic exports in user TMPDIR (report only; ownership may be another project):"
+    printf '%s\n' "${diagnostic_roots[@]}" | LC_ALL=C sort -u | while IFS= read -r path; do
+      print_path_size "${path}" "${path}"
+    done
+  else
+    echo "no Simulator diagnostic export with a copied CoreSimulator.log found in user TMPDIR"
+  fi
+
+  unavailable_count="$(
+    xcrun simctl list devices -j 2>/dev/null | python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+print(sum(1 for devices in payload.get("devices", {}).values()
+          for device in devices if not device.get("isAvailable", True)))
+' 2>/dev/null || echo 0
+  )"
+  clone_count="$(
+    xcrun simctl list devices -j 2>/dev/null | python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+print(sum(1 for devices in payload.get("devices", {}).values()
+          for device in devices if "clone" in device.get("name", "").lower()))
+' 2>/dev/null || echo 0
+  )"
+  echo "Unavailable Simulator devices: ${unavailable_count}"
+  echo "Clone-named Simulator devices: ${clone_count}"
+  echo "The audit never deletes runtimes, DeviceSupport, healthy devices, or the pinned Dogfood phone."
+fi
 
 section "Next step"
 echo "No files were changed or deleted."

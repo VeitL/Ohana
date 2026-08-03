@@ -12,14 +12,16 @@ MODE="${1:-smoke}"
 
 case "${MODE}" in
   smoke)
-    exec scripts/test-simulator.sh \
-      '-only-testing:OhanaUITests/OhanaUITests/testHumanFirstOnboardingCreatesPetClaimsGiftAndUnlocksOasis'
+    exec scripts/xcode-test.sh \
+      --only-testing 'OhanaUITests/OhanaUITests/testHumanFirstOnboardingWithProductionOverlaysCompletes'
     ;;
   first-pet-stability)
-    exec scripts/test-simulator.sh \
+    export OHANA_ALLOW_TEST_REPETITION=1
+    exec scripts/xcode-test.sh \
+      --only-testing 'OhanaUITests/OhanaUITests/testHumanFirstOnboardingWithProductionOverlaysCompletes' \
+      -- \
       -test-iterations 10 \
-      -test-repetition-relaunch-enabled YES \
-      '-only-testing:OhanaUITests/OhanaUITests/testHumanFirstOnboardingCreatesPetClaimsGiftAndUnlocksOasis'
+      -test-repetition-relaunch-enabled YES
     ;;
   full)
     exec scripts/test-ui-nightly.sh

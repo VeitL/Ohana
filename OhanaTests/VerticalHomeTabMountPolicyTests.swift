@@ -1435,7 +1435,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(componentsSource.contains(".accessibilityIdentifier(\"home-tab-\\(tab.rawValue)\")"))
     }
 
-    @Test func oasisTabIsHiddenUntilStarterGiftUnlocksTree() {
+    @Test func oasisTabUnlocksWhenStarterGiftTransactionCommits() {
         let suiteName = "VerticalHomeTabMountPolicyTests.oasisTabIsHiddenUntilStarterGiftUnlocksTree.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             Issue.record("Expected isolated defaults suite")
@@ -1455,9 +1455,11 @@ struct VerticalHomeTabMountPolicyTests {
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
         defaults.set(false, forKey: StarterGiftStorageKey.ceremonySeen)
         defaults.set(false, forKey: StarterGiftStorageKey.oasisTabPromptPending)
-        #expect(!AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
-        #expect(!AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults).contains(.oasis))
+        #expect(AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
+        #expect(AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults).contains(.oasis))
 
+        // The ceremony is presentation-only and cannot revoke an already
+        // committed household unlock.
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
         defaults.set(true, forKey: StarterGiftStorageKey.oasisTabPromptPending)
         #expect(AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))

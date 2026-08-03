@@ -30,7 +30,8 @@ extension PhysicalDeletionService {
             predicate: #Predicate { $0.eventKey == eventKey }
         )
         eventDescriptor.fetchLimit = 1
-        if try context.fetch(eventDescriptor).isEmpty {
+        if OnlineFeatureGate.allows(.guardianSafety),
+           try context.fetch(eventDescriptor).isEmpty {
             context.insert(GuardianSafetySyncOutbox(
                 eventKey: eventKey,
                 eventKind: .monitoringStopped,

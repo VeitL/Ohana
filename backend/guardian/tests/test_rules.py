@@ -28,7 +28,7 @@ class GuardianRuleTests(unittest.TestCase):
         self.assertFalse(follow_up_may_submit(queued + timedelta(seconds=1), queued))
         self.assertTrue(follow_up_may_submit(queued - timedelta(days=1), queued))
 
-    def test_second_miss_alerts_third_follows_up_and_later_days_are_quiet(self):
+    def test_first_miss_alerts_second_follows_up_and_later_days_are_quiet(self):
         progress = IncidentProgress()
         actions = []
         for day in range(1, 5):
@@ -42,7 +42,7 @@ class GuardianRuleTests(unittest.TestCase):
             )
             progress = result.progress
             actions.append(result.action)
-        self.assertEqual(actions, ["none", "initial", "follow_up", "none"])
+        self.assertEqual(actions, ["initial", "follow_up", "none", "none"])
         self.assertEqual(progress.consecutive_misses, 4)
 
     def test_unscheduled_days_neither_advance_nor_reset(self):
@@ -59,7 +59,25 @@ class GuardianRuleTests(unittest.TestCase):
             checked_in=False, day_key="2026-07-25",
         )
         self.assertEqual(skipped.progress, first.progress)
-        self.assertEqual(second.action, "initial")
+        self.assertEqual(second.action, "follow_up")
+
+    def test_legacy_silent_miss_progress_still_alerts_then_follows_up_once(self):
+        initial = evaluate(
+            IncidentProgress(consecutive_misses=1, last_guard_day_key="2026-07-20"),
+            eligible=True, scheduled=True, paused=False,
+            checked_in=False, day_key="2026-07-21",
+        )
+        follow_up = evaluate(
+            initial.progress, eligible=True, scheduled=True, paused=False,
+            checked_in=False, day_key="2026-07-22",
+        )
+        later = evaluate(
+            follow_up.progress, eligible=True, scheduled=True, paused=False,
+            checked_in=False, day_key="2026-07-23",
+        )
+        self.assertEqual(initial.action, "initial")
+        self.assertEqual(follow_up.action, "follow_up")
+        self.assertEqual(later.action, "none")
 
     def test_pause_and_structural_stop_end_the_sequence(self):
         previous = IncidentProgress(consecutive_misses=1)
@@ -76,7 +94,7 @@ class GuardianRuleTests(unittest.TestCase):
 
     def test_check_in_recovers_only_after_an_alert_was_queued(self):
         open_progress = IncidentProgress(
-            consecutive_misses=2,
+            consecutive_misses=1,
             incident_open=True,
             initial_submitted=True,
         )
@@ -93,7 +111,7 @@ class GuardianRuleTests(unittest.TestCase):
 
     def test_guardian_acknowledgement_resets_without_a_check_in(self):
         result = acknowledge(IncidentProgress(
-            consecutive_misses=2,
+            consecutive_misses=1,
             incident_open=True,
             initial_submitted=True,
         ))
@@ -186,10 +204,12 @@ class PrivacyContractTests(unittest.TestCase):
             self.assertNotIn(blocked, source)
 
     def test_push_copy_is_non_diagnostic_and_does_not_claim_delivery(self):
-        source = (ROOT / "src" / "push_worker.py").read_text(encoding="utf-8").lower()
+        source = (ROOT / "src" / "push_worker.py").read_text(encoding="utf-8")
+        lowered = source.lower()
         for blocked in ("death detection", "emergency service", "delivered to guardian"):
-            self.assertNotIn(blocked, source)
-        self.assertIn("no check-in has reached ohana", source)
+            self.assertNotIn(blocked, lowered)
+        self.assertIn("safety confirmation", lowered)
+        self.assertIn("尚未收到平安确认", source)
 
 
 class BackendSafetyContractTests(unittest.TestCase):

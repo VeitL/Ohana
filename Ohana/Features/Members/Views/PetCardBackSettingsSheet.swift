@@ -44,7 +44,16 @@ struct PetCardBackSettingsSheet: View {
                     Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) { dismiss() }
                 }
             }
-            .sheet(isPresented: $showEditPet) { EditPetSheet(pet: pet) }
+            .sheet(isPresented: $showEditPet) {
+                NavigationStack {
+                    PetBasicInfoDetailView(
+                        pet: pet,
+                        startsEditing: true,
+                        onClose: { showEditPet = false }
+                    )
+                }
+                .ohanaSheetPagePresentation()
+            }
             .sheet(isPresented: $showSitterCard) { SitterCardPreviewSheet(pet: pet) }
             .sheet(item: $personalUpgradePrompt) { prompt in
                 PersonalPlanView(prompt: prompt)
@@ -96,8 +105,10 @@ struct PetCardBackSettingsSheet: View {
 
     private var petInfoSection: some View {
         Section(l.tr(zh: "宠物信息", en: "Pet Info", de: "Haustierinfos")) {
-            Button { showEditPet = true } label: {
-                Label(l.tr(zh: "编辑资料", en: "Edit Profile", de: "Profil bearbeiten"), systemImage: "pencil.circle.fill")
+            if !pet.hasPassedAway {
+                Button { showEditPet = true } label: {
+                    Label(l.tr(zh: "编辑资料", en: "Edit Profile", de: "Profil bearbeiten"), systemImage: "pencil.circle.fill")
+                }
             }
             Button { showSitterCard = true } label: {
                 Label(l.tr(zh: "寄养卡", en: "Sitter Card", de: "Sitter-Karte"), systemImage: "person.crop.rectangle.fill")

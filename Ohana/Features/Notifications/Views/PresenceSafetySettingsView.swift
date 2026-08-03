@@ -43,7 +43,9 @@ struct PresenceSafetySettingsView: View {
     var body: some View {
         Form {
             reminderSection
-            guardianSection
+            if OnlineFeatureGate.allows(.guardianSafety) {
+                guardianSection
+            }
             if !contacts.isEmpty {
                 legacyContactsSection
             }
@@ -87,15 +89,15 @@ struct PresenceSafetySettingsView: View {
             Button(copy.cancel, role: .cancel) {}
         } message: {
             Text(copy.text(
-                zh: "这会永久删除仅保存在本机的旧姓名和电话号码。不会影响 App 内守护关系。",
-                en: "This permanently removes legacy names and phone numbers stored only on this device. App guardian relationships are unaffected.",
-                de: "Dabei werden nur auf diesem Gerät gespeicherte alte Namen und Telefonnummern dauerhaft gelöscht. App-Schutzbeziehungen bleiben erhalten.",
-                es: "Esto elimina de forma permanente los nombres y teléfonos antiguos guardados solo en este dispositivo. No afecta a los guardianes de la app.",
-                pt: "Isso remove permanentemente nomes e telefones antigos salvos apenas neste aparelho. As relações de proteção no app não mudam.",
-                fr: "Cette action supprime définitivement les anciens noms et numéros stockés uniquement sur cet appareil. Les relations de garde dans l’app restent intactes.",
-                ja: "このデバイスだけに保存された以前の名前と電話番号を完全に削除します。App内の見守り関係には影響しません。",
-                ko: "이 기기에만 저장된 이전 이름과 전화번호를 영구 삭제합니다. 앱 내 보호 관계에는 영향이 없습니다.",
-                it: "Rimuove definitivamente nomi e numeri precedenti salvati solo su questo dispositivo. Le relazioni di protezione nell’app non cambiano."
+                zh: "这会永久删除仅保存在本机的旧姓名和电话号码，只影响旧版联系人数据。",
+                en: "This permanently removes legacy names and phone numbers stored only on this device. It affects only legacy contact data.",
+                de: "Dadurch werden alte Namen und Telefonnummern dauerhaft von diesem Gerät entfernt. Betroffen sind nur alte Kontaktdaten.",
+                es: "Esto elimina de forma permanente los nombres y teléfonos guardados solo en este dispositivo. Solo afecta a contactos anteriores.",
+                pt: "Isso remove permanentemente nomes e telefones salvos apenas neste aparelho. Só afeta contatos antigos.",
+                fr: "Cette action supprime définitivement les anciens noms et numéros stockés sur cet appareil. Seules ces anciennes coordonnées sont concernées.",
+                ja: "このデバイスだけに保存された以前の名前と電話番号を完全に削除します。対象は以前の連絡先データのみです。",
+                ko: "이 기기에만 저장된 이전 이름과 전화번호를 영구 삭제합니다. 이전 연락처 데이터에만 영향을 줍니다.",
+                it: "Rimuove definitivamente nomi e numeri precedenti salvati solo su questo dispositivo. Interessa solo i vecchi contatti."
             ))
         }
         .alert(item: $notice) { notice in
@@ -373,15 +375,15 @@ struct PresenceSafetySettingsView: View {
 
     private var reminderFooter: String {
         copy.text(
-            zh: "只有你明确保存并启用时，Ohana 才会请求通知权限。通知中的“我没事”会完成本人当天打卡。",
-            en: "Ohana asks for notification permission only when you explicitly save an enabled reminder. “I’m okay” in the notification checks in the owner for today.",
-            de: "Ohana fragt nur nach der Mitteilungsberechtigung, wenn du eine aktivierte Erinnerung ausdrücklich speicherst. „Mir geht’s gut“ checkt die eigene Person für heute ein.",
-            es: "Ohana solo pide permiso al guardar explícitamente un recordatorio activo. “Estoy bien” registra hoy a la persona propietaria.",
-            pt: "O Ohana só pede permissão ao salvar explicitamente um lembrete ativo. “Estou bem” registra hoje a pessoa proprietária.",
-            fr: "Ohana ne demande l’autorisation qu’après l’enregistrement explicite d’un rappel actif. « Je vais bien » valide le pointage du propriétaire pour aujourd’hui.",
-            ja: "有効な通知を明示的に保存したときだけ通知許可を求めます。通知の「大丈夫」で本人の今日のチェックインが完了します。",
-            ko: "활성화된 알림을 직접 저장할 때만 알림 권한을 요청합니다. 알림의 ‘괜찮아요’를 누르면 본인이 오늘 체크인됩니다.",
-            it: "Ohana chiede il permesso solo quando salvi esplicitamente un promemoria attivo. “Sto bene” nella notifica registra il check-in odierno del titolare."
+            zh: "只有你明确保存并启用时，Ohana 才会请求通知权限。解锁设备并选择“我今天平安”才会完成本人当天确认。",
+            en: "Ohana asks for notification permission only when you explicitly save an enabled reminder. Unlock the device and choose “I'm safe today” to confirm for today.",
+            de: "Ohana fragt nur beim ausdrücklichen Speichern einer aktiven Erinnerung nach der Erlaubnis. Entsperre das Gerät und wähle „Mir geht es heute gut“.",
+            es: "Ohana solo pide permiso al guardar un recordatorio activo. Desbloquea el dispositivo y elige «Estoy bien hoy» para confirmar.",
+            pt: "O Ohana só pede permissão ao salvar um lembrete ativo. Desbloqueie o dispositivo e escolha “Estou bem hoje” para confirmar.",
+            fr: "Ohana ne demande l’autorisation qu’après l’enregistrement d’un rappel actif. Déverrouillez l’appareil et choisissez « Tout va bien aujourd’hui ».",
+            ja: "有効な通知を保存したときだけ通知許可を求めます。端末を解除して「今日は無事です」を選ぶと今日の確認が完了します。",
+            ko: "활성화된 알림을 저장할 때만 권한을 요청합니다. 기기를 잠금 해제하고 ‘오늘은 무사해요’를 선택하면 확인돼요.",
+            it: "Ohana chiede il permesso solo quando salvi un promemoria attivo. Sblocca il dispositivo e scegli “Oggi sto bene” per confermare."
         )
     }
 
@@ -544,7 +546,7 @@ struct PresenceSafetySettingsView: View {
 
     private func clearLegacyContacts() {
         do {
-            let removedCount = try appServices.guardianSafety.deleteLegacySafetyContacts()
+            let removedCount = try appServices.presenceSafety.deleteAllContacts(context: modelContext)
             reloadContacts()
             notice = PresenceSafetySettingsNotice(
                 title: copy.title,
@@ -618,31 +620,11 @@ struct PresenceSafetySettingsView: View {
     }
 
     private var notificationTitle: String {
-        copy.text(
-            zh: "今天打卡了吗？",
-            en: "Checked in today?",
-            de: "Heute eingecheckt?",
-            es: "¿Has registrado hoy?",
-            pt: "Fez check-in hoje?",
-            fr: "Pointage fait aujourd’hui ?",
-            ja: "今日チェックインしましたか？",
-            ko: "오늘 체크인했나요?",
-            it: "Check-in fatto oggi?"
-        )
+        PresenceReminderNotificationContent.localized(L10n(appLanguage)).title
     }
 
     private var notificationBody: String {
-        copy.text(
-            zh: "打开 Ohana 确认今天的状态。",
-            en: "Open Ohana to confirm today’s status.",
-            de: "Öffne Ohana und bestätige den heutigen Status.",
-            es: "Abre Ohana para confirmar el estado de hoy.",
-            pt: "Abra o Ohana para confirmar o estado de hoje.",
-            fr: "Ouvrez Ohana pour confirmer l’état du jour.",
-            ja: "Ohanaを開いて今日の状態を確認してください。",
-            ko: "Ohana를 열어 오늘 상태를 확인하세요.",
-            it: "Apri Ohana per confermare lo stato di oggi."
-        )
+        PresenceReminderNotificationContent.localized(L10n(appLanguage)).body
     }
 
     private static func requiresPersonal(_ configuration: PresenceReminderConfiguration) -> Bool {

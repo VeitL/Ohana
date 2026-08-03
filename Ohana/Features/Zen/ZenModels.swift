@@ -312,16 +312,19 @@ nonisolated struct ZenRecentStatusSummary: Equatable, Sendable {
 nonisolated struct ZenExpandedProfileDTO: Equatable, Sendable {
     let metrics: [ZenExpandedMetricDTO]
     let personalityStory: String?
+    let plantCompanionStartedAt: Date?
     var recentStatus: ZenRecentStatusSummary
 
     init(
         metrics: [ZenExpandedMetricDTO] = [],
         personalityStory: String? = nil,
+        plantCompanionStartedAt: Date? = nil,
         recentStatus: ZenRecentStatusSummary = .empty
     ) {
         self.metrics = Array(metrics.prefix(4))
         let trimmedStory = personalityStory?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         self.personalityStory = trimmedStory.isEmpty ? nil : trimmedStory
+        self.plantCompanionStartedAt = plantCompanionStartedAt
         self.recentStatus = recentStatus
     }
 }
@@ -333,6 +336,13 @@ nonisolated enum ZenPresenceCardTapIntent: Equatable, Sendable {
     static func resolve(checkedToday: Bool) -> ZenPresenceCardTapIntent {
         checkedToday ? .bringToFront : .checkIn
     }
+}
+
+nonisolated enum ZenPresenceRecordSemantic: Equatable, Sendable {
+    case ownerSafety
+    case humanContact
+    case petObservation
+    case plantObservation
 }
 
 nonisolated struct ZenPresenceSubjectDTO: Identifiable, Equatable, Sendable {
@@ -396,6 +406,55 @@ nonisolated struct ZenPresenceSubjectDTO: Identifiable, Equatable, Sendable {
         self.checkedToday = checkedToday
         self.status = status
         self.checkedAt = checkedAt
+    }
+}
+
+extension ZenPresenceSubjectDTO {
+    nonisolated var recordSemantic: ZenPresenceRecordSemantic {
+        if isOwner { return .ownerSafety }
+        switch kind {
+        case .human: return .humanContact
+        case .pet: return .petObservation
+        case .plant: return .plantObservation
+        }
+    }
+
+    /// The typed Plant profile projection resolves this start as
+    /// `acquiredDate ?? createdAt`. The card copy is inclusive, so the first
+    /// local day is presented as day one. Inactive Plants stop accumulating on
+    /// their archival day, while legacy rows safely fall back to creation.
+    nonisolated func plantCompanionDays(
+        asOf now: Date = Date(),
+        calendar inputCalendar: Calendar = .autoupdatingCurrent
+    ) -> Int? {
+        guard kind == .plant else { return nil }
+
+        let calendar = inputCalendar
+        let referenceDate = expandedProfile?.plantCompanionStartedAt ?? createdAt
+        let start = calendar.startOfDay(for: referenceDate)
+        let effectiveEnd = inactiveAt.map { min(now, $0) } ?? now
+        let end = calendar.startOfDay(for: effectiveEnd)
+        let elapsedDays = calendar.dateComponents([.day], from: start, to: end).day ?? 0
+        return max(1, elapsedDays + 1)
+    }
+
+    nonisolated func plantCompanionText(
+        _ l: L10n,
+        asOf now: Date = Date(),
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> String? {
+        guard let days = plantCompanionDays(asOf: now, calendar: calendar) else { return nil }
+        return l.tr(
+            zh: "已陪伴 \(days) 天",
+            en: days == 1 ? "Together for 1 day" : "Together for \(days) days",
+            de: days == 1 ? "Seit 1 Tag zusammen" : "Seit \(days) Tagen zusammen",
+            es: days == 1 ? "1 día juntos" : "\(days) días juntos",
+            pt: days == 1 ? "1 dia juntos" : "\(days) dias juntos",
+            fr: days == 1 ? "Ensemble depuis 1 jour" : "Ensemble depuis \(days) jours",
+            ja: "一緒に \(days) 日",
+            ko: "함께한 \(days)일",
+            it: days == 1 ? "Insieme da 1 giorno" : "Insieme da \(days) giorni"
+        )
     }
 }
 
@@ -574,7 +633,6 @@ nonisolated struct ZenOasisSnapshot: Equatable, Sendable {
 
 @MainActor
 struct ZenShellActions {
-    var onAutoCheckInOwner: () async -> Bool
     var onCheckIn: (
         _ subjectID: String,
         _ kind: ZenPresenceSubjectKind,
@@ -588,7 +646,6 @@ struct ZenShellActions {
         _ status: ZenPresenceStatus
     ) async -> Void
     var onUndoCheckIn: (_ subjectID: String, _ kind: ZenPresenceSubjectKind) async -> Void
-    var onCheckInAll: () async -> Void
     var onLoadStreak: () async -> Void
     var onLoadOasis: () async -> Void
     var onAdd: (_ kind: ZenPresenceSubjectKind) -> Void
@@ -596,6 +653,7 @@ struct ZenShellActions {
     var onOpenMembers: () -> Void
     var onOpenCoconutLog: () -> Void
     var onOpenSettings: () -> Void
+    var onOpenStarterJourney: () -> Void
     var onOpenPersonalAnalytics: () -> Void
     var onOpenShop: (_ category: ShopItem.ShopCategory) -> Void
     var onOpenAchievements: () -> Void
@@ -606,12 +664,10 @@ struct ZenShellActions {
     var onClaimStarterGift: () async -> Void
 
     static let noop = ZenShellActions(
-        onAutoCheckInOwner: { false },
         onCheckIn: { _, _, _ in },
         onUpdateStatus: { _, _, _ in },
         onRecordRetrospectiveStatus: { _, _, _, _ in },
         onUndoCheckIn: { _, _ in },
-        onCheckInAll: {},
         onLoadStreak: {},
         onLoadOasis: {},
         onAdd: { _ in },
@@ -619,6 +675,7 @@ struct ZenShellActions {
         onOpenMembers: {},
         onOpenCoconutLog: {},
         onOpenSettings: {},
+        onOpenStarterJourney: {},
         onOpenPersonalAnalytics: {},
         onOpenShop: { _ in },
         onOpenAchievements: {},
@@ -650,15 +707,6 @@ nonisolated enum ZenPresencePresentation {
             if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
             return lhs.id < rhs.id
         }
-    }
-
-    static func allChecked(_ subjects: [ZenPresenceSubjectDTO]) -> Bool {
-        !subjects.isEmpty && subjects.allSatisfy(\.checkedToday)
-    }
-
-    static func canEarnAllCheckedReward(_ subjects: [ZenPresenceSubjectDTO]) -> Bool {
-        guard allChecked(subjects) else { return false }
-        return subjects.contains { !$0.isOwner }
     }
 
     static func cardBackgroundState(for subject: ZenPresenceSubjectDTO) -> CardBackgroundState {

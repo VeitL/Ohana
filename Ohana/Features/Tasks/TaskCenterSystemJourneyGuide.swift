@@ -129,6 +129,9 @@ nonisolated struct TaskCenterSystemJourneyGuide: Equatable, Sendable {
     }
 
     var isComplete: Bool {
+        guard task.requiredActualCheckpoints.isSubset(of: completedCheckpoints) else {
+            return false
+        }
         if let completionPercent, let requiredCompletionPercent {
             return completionPercent >= requiredCompletionPercent
         }

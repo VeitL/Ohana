@@ -480,6 +480,8 @@ struct OhanaNotificationsSchedulingTests {
         #expect(managerSource.contains("identifier: \"SKIP\""))
         #expect(managerSource.contains("identifier: \"SNOOZE\""))
         #expect(managerSource.contains("actions: [completeAction, skipAction, snoozeAction]"))
+        #expect(managerSource.contains("zh: \"我今天平安\""))
+        #expect(managerSource.contains("options: [.authenticationRequired]"))
         #expect(managerSource.contains("case UNNotificationDefaultActionIdentifier:"))
         #expect(managerSource.contains("self.routeCenter.requestDefaultRoute(payload)"))
         #expect(managerSource.contains(
@@ -505,6 +507,22 @@ struct OhanaNotificationsSchedulingTests {
         ] {
             #expect(managerSource.contains("\"\(key)\""))
         }
+    }
+
+    @Test func explicitOwnerSafetyMutationsHandOffGuardianSyncAndUndoRestoresReminders() throws {
+        let rootSource = try source("Ohana/App/RootView.swift")
+        let zenSource = try source("Ohana/Features/Zen/ZenExperienceContainer.swift")
+        let guardianSource = try source("Ohana/Features/Notifications/GuardianSafetyCoordinator.swift")
+
+        #expect(rootSource.contains("service.checkInOwner(source: .notificationAction)"))
+        #expect(rootSource.contains("await guardian.flushOutbox()"))
+        #expect(zenSource.contains("scheduleOwnerCheckInSideEffects(checkedInAt:"))
+        #expect(zenSource.contains("scheduleOwnerUndoSideEffects()"))
+        #expect(zenSource.contains("PresenceReminderRestorationCoordinator.restoreIfAuthorized("))
+        #expect(zenSource.contains("await guardian.flushOutbox()"))
+        #expect(guardianSource.contains("stageExistingExplicitOwnerCheckInForCurrentDay("))
+        #expect(guardianSource.contains("if request.isEnabled {"))
+        #expect(guardianSource.contains("await flushOutbox()"))
     }
 
     @Test func ambientRemindersAllowOnlyOnePerDeliveryDay() async throws {

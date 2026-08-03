@@ -67,7 +67,6 @@ struct EditableProfileAvatarPicker: View {
     @State private var cropPresentationTask: Task<Void, Never>? = nil
     @State private var isPasting = false
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
-    @Environment(\.memberProfileExperienceStyle) private var experienceStyle
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -177,13 +176,7 @@ struct EditableProfileAvatarPicker: View {
     }
 
     private var avatarPreview: some View {
-        Group {
-            if experienceStyle == .zen {
-                portraitAvatarPreview
-            } else {
-                circularAvatarPreview
-            }
-        }
+        portraitAvatarPreview
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(l.tr(
@@ -198,38 +191,6 @@ struct EditableProfileAvatarPicker: View {
             it: "Avatar attuale"
         ))
         .accessibilityIdentifier("profile-avatar-current-preview")
-    }
-
-    private var circularAvatarPreview: some View {
-        ZStack {
-            Circle()
-                .fill(accentColor.opacity(0.16))
-                .frame(width: 76, height: 76)
-
-            if let avatarImageData {
-                AsyncDecodedImageView(data: avatarImageData) { image in
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } placeholder: {
-                    ProgressView()
-                        .tint(accentColor)
-                }
-                .frame(width: 76, height: 76)
-                .clipShape(Circle())
-            } else if let silhouetteSystemName {
-                Image(systemName: silhouetteSystemName)
-                    .font(OhanaFont.adaptive(size: 34, weight: .semibold))
-                    .foregroundStyle(accentColor)
-            } else {
-                Text(fallbackEmoji.isEmpty ? "🐾" : fallbackEmoji)
-                    .font(OhanaFont.adaptive(size: 38))
-            }
-        }
-        .overlay {
-            Circle()
-                .strokeBorder(accentColor.opacity(0.28), lineWidth: 1)
-        }
     }
 
     private var portraitAvatarPreview: some View {
@@ -300,8 +261,7 @@ struct EditableProfileAvatarPicker: View {
     }
 
     private var avatarActionForeground: Color {
-        guard experienceStyle == .zen,
-              let hex = accentColor.toHex() else { return Color.arkInk }
+        guard let hex = accentColor.toHex() else { return Color.arkInk }
         return WalletPetCardTheme.prefersDarkForeground(for: hex)
             ? Color.arkInk
             : Color.goCardWhite

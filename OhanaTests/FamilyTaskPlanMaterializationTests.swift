@@ -252,7 +252,7 @@ struct FamilyTaskPlanMaterializationTests {
             String(describing: FamilyTaskActivity.self)
         ])
         #expect(v94.subtracting(v95).isEmpty)
-        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV96.self))
+        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV98.self))
         #expect(ArkMigrationPlan.stages.isEmpty)
 
         let container = try makeContainer()

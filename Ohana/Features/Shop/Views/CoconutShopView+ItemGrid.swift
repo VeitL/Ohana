@@ -129,12 +129,6 @@ extension CoconutShopView {
                     tint: Color.goTeal,
                     isDisabled: true
                 )
-            case .refunding:
-                return .init(
-                    label: l.tr(zh: "退款处理中", en: "Refunding", de: "Erstattung läuft"),
-                    tint: Color.goOrange,
-                    isDisabled: true
-                )
             case .needsAttention:
                 let canRetry = ShopManualRecoveryActionPolicy.canRetry(
                     reasonCode: purchaseSettlementReasons[item.id]
@@ -219,6 +213,38 @@ extension CoconutShopView {
             )
         case .walletFrozen:
             .init(label: l.tr(zh: "钱包已冻结", en: "Wallet frozen", de: "Wallet eingefroren"), tint: Color.goOrange, isDisabled: true)
+        case .requiresActivePet:
+            .init(
+                label: l.tr(
+                    zh: "需要在世宠物",
+                    en: "Active pet required",
+                    de: "Aktives Tier erforderlich",
+                    es: "Requiere mascota activa",
+                    pt: "Requer pet ativo",
+                    fr: "Animal actif requis",
+                    ja: "有効なペットが必要",
+                    ko: "활성 반려동물 필요",
+                    it: "Serve un animale attivo"
+                ),
+                tint: tertiaryText,
+                isDisabled: true
+            )
+        case .requiresActiveDog:
+            .init(
+                label: l.tr(
+                    zh: "需要在世狗狗",
+                    en: "Active dog required",
+                    de: "Aktiver Hund erforderlich",
+                    es: "Requiere un perro activo",
+                    pt: "Requer cão ativo",
+                    fr: "Chien actif requis",
+                    ja: "有効な犬が必要",
+                    ko: "활성 반려견 필요",
+                    it: "Serve un cane attivo"
+                ),
+                tint: tertiaryText,
+                isDisabled: true
+            )
         case .missingBuyer:
             .init(label: l.tr(zh: "先选择成员", en: "Choose a member", de: "Mitglied wählen"), tint: tertiaryText, isDisabled: true)
         case .loading:
@@ -227,7 +253,17 @@ extension CoconutShopView {
     }
 
     func purchaseReadiness(for item: ShopItem) -> ShopPurchaseReadiness {
-        ShopPurchaseReadiness.resolve(
+        switch item.applicationRequirement {
+        case .none:
+            break
+        case .activePet where activePets.isEmpty:
+            return .requiresActivePet
+        case .activeDog where !activePets.contains(where: { Pet.isDogSpecies($0.species) }):
+            return .requiresActiveDog
+        case .activePet, .activeDog:
+            break
+        }
+        return ShopPurchaseReadiness.resolve(
             dataState: dataState,
             hasBuyer: currentHuman != nil,
             buyerCanWrite: currentHuman.map { EconomyWalletWritePolicy.canWrite($0) } ?? false,
@@ -299,6 +335,30 @@ extension CoconutShopView {
             l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig")
         case .walletFrozen:
             l.tr(zh: "当前成员的钱包已冻结。", en: "The current member's wallet is frozen.", de: "Das Wallet des aktuellen Mitglieds ist eingefroren.")
+        case .requiresActivePet:
+            l.tr(
+                zh: "请先添加一位在世宠物，才能使用这个商品。",
+                en: "Add an active pet before using this item.",
+                de: "Füge ein aktives Tier hinzu, bevor du diesen Artikel verwendest.",
+                es: "Añade una mascota activa antes de usar este artículo.",
+                pt: "Adicione um pet ativo antes de usar este item.",
+                fr: "Ajoutez un animal actif avant d’utiliser cet article.",
+                ja: "この商品を使う前に有効なペットを追加してください。",
+                ko: "이 상품을 사용하려면 먼저 활성 반려동물을 추가하세요.",
+                it: "Aggiungi un animale attivo prima di usare questo articolo."
+            )
+        case .requiresActiveDog:
+            l.tr(
+                zh: "这个商品用于遛狗体验，请先添加一位在世狗狗。",
+                en: "This item is for dog-walk experiences. Add an active dog first.",
+                de: "Dieser Artikel ist für Hundespaziergänge. Füge zuerst einen aktiven Hund hinzu.",
+                es: "Este artículo es para paseos de perros. Añade primero un perro activo.",
+                pt: "Este item é para passeios com cães. Adicione primeiro um cão ativo.",
+                fr: "Cet article concerne les promenades de chien. Ajoutez d’abord un chien actif.",
+                ja: "この商品は犬の散歩用です。先に有効な犬を追加してください。",
+                ko: "이 상품은 반려견 산책용입니다. 먼저 활성 반려견을 추가하세요.",
+                it: "Questo articolo è per le passeggiate con il cane. Aggiungi prima un cane attivo."
+            )
         case .missingBuyer:
             l.tr(zh: "请先选择一位在世家庭成员。", en: "Choose an active family member first.", de: "Wähle zuerst ein aktives Familienmitglied.")
         case .loading:

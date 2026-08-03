@@ -52,6 +52,7 @@ nonisolated enum TaskCenterItemSource: String, Equatable, Sendable {
     case familyTask
     case linked
     case systemJourney
+    case suggestion
 }
 
 nonisolated enum TaskCenterSystemDestination: String, Equatable, Hashable, Sendable {
@@ -338,7 +339,7 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
     )
 
     var pendingCount: Int {
-        overdue.count + today.count + upcoming.count + unscheduled.count
+        allItems.count { $0.source != .suggestion }
     }
 
     var allItems: [TaskCenterItemSnapshot] {
@@ -349,8 +350,16 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
         unscheduled.filter { $0.source == .systemJourney }
     }
 
+    var suggestionItems: [TaskCenterItemSnapshot] {
+        unscheduled.filter { $0.source == .suggestion }
+    }
+
+    var hasDisplayableItems: Bool {
+        !allItems.isEmpty
+    }
+
     var ordinaryUnscheduledItems: [TaskCenterItemSnapshot] {
-        unscheduled.filter { $0.source != .systemJourney }
+        unscheduled.filter { $0.source != .systemJourney && $0.source != .suggestion }
     }
 
     var showsMemberFilters: Bool {
@@ -412,7 +421,9 @@ nonisolated struct TaskCenterSnapshot: Equatable, Sendable {
             return self
         }
         let includes: (TaskCenterItemSnapshot) -> Bool = {
-            $0.source == .systemJourney || includedItemIDs.contains($0.id)
+            $0.source == .systemJourney
+                || $0.source == .suggestion
+                || includedItemIDs.contains($0.id)
         }
         let filteredToday = today.filter(includes)
         return TaskCenterSnapshot(

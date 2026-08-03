@@ -5,6 +5,7 @@ final class HumanProfileExperienceTests: XCTestCase {
     func testHumanProfileUsesSharedReadFirstScaffoldAndSafeDeletionPresentation() throws {
         let shared = try source("Ohana/Shared/Components/ProfileDetailComponents.swift")
         let human = try source("Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift")
+        let humanSupporting = try source("Ohana/Features/Members/Views/HumanBasicInfoDetailSupportingViews.swift")
         let lifecycle = try source("Ohana/Features/Members/Views/HumanBasicInfoLifecycleViews.swift")
         let creation = try source("Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift")
 
@@ -20,7 +21,8 @@ final class HumanProfileExperienceTests: XCTestCase {
         }
 
         XCTAssertTrue(human.contains("ProfileDetailScaffold("))
-        XCTAssertTrue(human.contains("ProfileIdentityHero("))
+        XCTAssertTrue(human.contains("HumanBasicInfoIdentityHero("))
+        XCTAssertTrue(humanSupporting.contains("ProfileIdentityHero("))
         XCTAssertTrue(human.contains("ProfileCompletionCard("))
         XCTAssertTrue(human.contains("HumanProfileEditPolicy.canEdit"))
         XCTAssertFalse(human.contains("showsEditAction: isViewingOwnProfile"))

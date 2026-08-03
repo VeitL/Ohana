@@ -57,7 +57,10 @@ extension PetBasicInfoDetailView {
         infoSection(title: l.tr(zh: "基本信息", en: "Basic info", de: "Basisdaten"), icon: "pawprint.fill", iconColor: Color.goPrimary) {
             infoRow(label: l.tr(zh: "名字", en: "Name", de: "Name"), value: pet.name)
             infoRow(label: l.tr(zh: "物种", en: "Species", de: "Art"), value: pet.localizedSpeciesName(l: l))
-            infoRow(label: l.tr(zh: "品种", en: "Breed", de: "Rasse"), value: pet.breed.isEmpty ? petProfileEmptyValue : pet.breed)
+            infoRow(
+                label: l.tr(zh: "品种", en: "Breed", de: "Rasse"),
+                value: pet.breed.isEmpty ? petProfileEmptyValue : l.resourceName(pet.breed)
+            )
             infoRow(
                 label: l.tr(zh: "主性格", en: "Primary vibe", de: "Hauptcharakter"),
                 value: pet.personalityTagIdList.first
@@ -75,7 +78,7 @@ extension PetBasicInfoDetailView {
     private var petCareGuidance: some View {
         // Care guidance stays available, but no longer precedes identity and core facts.
         if !pet.breed.isEmpty, let tips = PetBreedDatabase.careTips(for: pet.breed, l: l) {
-            breedTipsCard(breed: pet.breed, tips: tips)
+            breedTipsCard(breed: l.resourceName(pet.breed), tips: tips)
         }
 
         if let onCreateCareTask, !pet.hasPassedAway {
@@ -105,7 +108,10 @@ extension PetBasicInfoDetailView {
     private var petAppearanceSection: some View {
         if !pet.coatColor.isEmpty {
             infoSection(title: l.tr(zh: "外貌特征", en: "Appearance", de: "Aussehen"), icon: "paintpalette.fill", iconColor: Color.goCardCyan) {
-                infoRow(label: l.tr(zh: "毛色", en: "Coat color", de: "Fellfarbe"), value: pet.coatColor)
+                infoRow(
+                    label: l.tr(zh: "毛色", en: "Coat color", de: "Fellfarbe"),
+                    value: l.resourceName(pet.coatColor)
+                )
             }
         }
     }
@@ -175,7 +181,14 @@ extension PetBasicInfoDetailView {
                     infoRow(label: l.tr(zh: "曾用名", en: "Former name", de: "Frueherer Name"), value: pet.formerName)
                 }
                 if !pet.birthCountry.isEmpty {
-                    infoRow(label: l.tr(zh: "出生地", en: "Birthplace", de: "Geburtsort"), value: pet.birthCountry + (pet.birthCity.isEmpty ? "" : " · \(pet.birthCity)"))
+                    let birthplace = [pet.birthCountry, pet.birthCity]
+                        .filter { !$0.isEmpty }
+                        .map { PetBreedDatabase.localizedRegionName($0, l: l) }
+                        .joined(separator: " · ")
+                    infoRow(
+                        label: l.tr(zh: "出生地", en: "Birthplace", de: "Geburtsort"),
+                        value: birthplace
+                    )
                 }
                 if !pet.lineageInfo.isEmpty {
                     infoRow(label: l.tr(zh: "血统", en: "Lineage", de: "Abstammung"), value: pet.lineageInfo)

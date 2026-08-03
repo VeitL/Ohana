@@ -742,6 +742,12 @@ nonisolated struct HumanHealthMetricLogBackup: Codable {
     var notes: String
     var humanId: String?
     var recordedByHumanId: String? = nil
+    var sourceReportID: String? = nil
+    var sourceLabel: String? = nil
+    var referenceLow: Double? = nil
+    var referenceHigh: Double? = nil
+    var referenceRangeText: String? = nil
+    var reportedFlagRaw: String? = nil
     var createdAt: String
 }
 
@@ -757,6 +763,7 @@ nonisolated struct HumanHealthReportBackup: Codable {
     var summary: String
     var notes: String
     var recordedByHumanId: String? = nil
+    var captureSourceRaw: String? = nil
     var colorHex: String
     var createdAt: String
 }

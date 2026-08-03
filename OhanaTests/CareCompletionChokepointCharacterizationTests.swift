@@ -1154,6 +1154,13 @@ private final class MedicationReminderManagerSpy: MedicationReminderManaging {
     func undoDose(for _: UUID) {}
     func scheduleMedicationReminders(for _: Pet, context _: ModelContext?) {}
     func scheduleHumanMedicationReminders(for _: Human, meds _: [HumanMedication], context _: ModelContext?) {}
+
+    func refreshScheduledMedicationReminders(
+        context _: ModelContext,
+        hidingDetails _: Bool
+    ) async -> MedicationNotificationPrivacyRefreshResult {
+        .unavailable
+    }
 }
 
 private final class FakeWalkLocationManager: WalkLocationManaging {

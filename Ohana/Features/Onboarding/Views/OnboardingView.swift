@@ -111,9 +111,9 @@ struct OnboardingView: View {
         .environment(\.colorScheme, .dark)
         .onAppear {
             guard !isReplay else { return }
-            // Both shells share the same household starter journey key. Zen
-            // defers eligibility until the first Pet or Plant, while Standard
-            // continues to wait for the first Pet.
+            // Both shells share the same household starter journey. The first
+            // living Human makes the gift claimable; Pet and Plant creation are
+            // optional and never identify a second reward path.
             appServices.onboardingJourney.beginFreshJourney(context: modelContext)
             recoverInterruptedFlow()
         }

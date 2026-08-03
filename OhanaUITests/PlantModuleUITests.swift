@@ -498,12 +498,28 @@ final class PlantModuleUITests: XCTestCase {
     @MainActor
     private func ensureHouseholdHome(in app: XCUIApplication) {
         if app.buttons["home-settings-action"].waitForExistence(timeout: 8) {
+            dismissZenIntroductionIfPresent(in: app)
             return
         }
 
         createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
         XCTAssertTrue(app.buttons["home-settings-action"].waitForExistence(timeout: 12), "Home did not become available after creating the baseline household.")
+        dismissZenIntroductionIfPresent(in: app)
+    }
+
+    @MainActor
+    private func dismissZenIntroductionIfPresent(in app: XCUIApplication) {
+        let introduction = app.buttons["zen-introduction-banner"]
+        guard introduction.waitForExistence(timeout: 2) else { return }
+        XCTAssertTrue(
+            tapWhenFrameReady(introduction, timeout: 8),
+            "Zen introduction did not accept its semantic dismiss action."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !introduction.exists },
+            "Zen introduction stayed mounted after dismissal."
+        )
     }
 
     @MainActor
@@ -1075,6 +1091,19 @@ final class PlantModuleUITests: XCTestCase {
         let overview = app.descendants(matching: .any)["settings-plant-reminders-overview"]
         if overview.exists { return }
 
+        let notificationsCategory = app.buttons["settings-destination-notifications"]
+        scrollToElement(notificationsCategory, in: app, maxSwipes: 10)
+        XCTAssertTrue(
+            notificationsCategory.waitForExistence(timeout: 8),
+            "Settings did not expose the Notifications category."
+        )
+        tapWhenFrameReady(notificationsCategory, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-notifications-screen"]
+                .waitForExistence(timeout: 8),
+            "Settings did not open the Notifications page."
+        )
+
         let disclosure = app.buttons["settings-advanced-notifications-disclosure"]
         scrollToElement(disclosure, in: app, maxSwipes: 10)
         XCTAssertTrue(disclosure.waitForExistence(timeout: 8), "Advanced reminder settings disclosure did not appear in Settings.")
@@ -1316,26 +1345,26 @@ final class PlantModuleUITests: XCTestCase {
         dismissKeyboardIfPresent(in: app)
 
         if let linkedPlantName {
-            let relatedEntityPicker = app.buttons["add-event-related-entity-picker"]
+            let relatedEntityPicker = app.descendants(matching: .any)["add-event-related-entity-picker"]
             scrollToElement(relatedEntityPicker, in: app, maxSwipes: 6)
             XCTAssertTrue(
                 relatedEntityPicker.waitForExistence(timeout: 8),
                 "Calendar add-event sheet did not expose the related-entity picker."
             )
-            XCTAssertTrue(
-                tapWhenFrameReady(relatedEntityPicker, timeout: 8),
-                "Calendar related-entity picker did not become tappable."
-            )
 
             let plantOption = app.buttons["add-event-related-plant-\(linkedPlantName)"]
-            let fallbackPlantOption = app.buttons
-                .matching(NSPredicate(format: "label CONTAINS %@", linkedPlantName))
-                .firstMatch
             XCTAssertTrue(
-                waitUntil(timeout: 8) { plantOption.exists || fallbackPlantOption.exists },
+                plantOption.waitForExistence(timeout: 8),
                 "Calendar related-entity picker did not expose \(linkedPlantName)."
             )
-            tapWhenHittable(plantOption.exists ? plantOption : fallbackPlantOption, timeout: 8)
+            tapWhenHittable(plantOption, timeout: 8)
+            XCTAssertTrue(
+                waitUntil(timeout: 8) {
+                    relatedEntityPicker.exists
+                        && String(describing: relatedEntityPicker.value).contains(linkedPlantName)
+                },
+                "Calendar related-entity selection did not return \(linkedPlantName) to the editor."
+            )
         }
 
         let saveAction = app.buttons["add-event-save-action"]

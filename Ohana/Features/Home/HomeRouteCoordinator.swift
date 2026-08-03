@@ -40,6 +40,7 @@ enum HomeSheetRoute: Identifiable {
     case humanWorkout(UUID)
     case humanWorkoutDashboard(UUID)
     case humanMetrics(UUID)
+    case humanConditions(UUID)
     case humanReport(UUID)
     case humanExpenseQuick(UUID)
     case humanExpense(UUID)
@@ -81,6 +82,7 @@ enum HomeSheetRoute: Identifiable {
         case let .humanWorkout(id): "human-workout-\(id.uuidString)"
         case let .humanWorkoutDashboard(id): "human-workout-dashboard-\(id.uuidString)"
         case let .humanMetrics(id): "human-metrics-\(id.uuidString)"
+        case let .humanConditions(id): "human-conditions-\(id.uuidString)"
         case let .humanReport(id): "human-report-\(id.uuidString)"
         case let .humanExpenseQuick(id): "human-expense-quick-\(id.uuidString)"
         case let .humanExpense(id): "human-expense-\(id.uuidString)"
@@ -644,6 +646,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanConditions,
              .humanReport,
              .humanExpense,
              .humanWishlist,
@@ -695,6 +698,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanConditions,
              .humanReport,
              .humanExpense,
              .humanWishlist,
@@ -739,6 +743,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanConditions,
              .humanReport,
              .humanExpenseQuick,
              .humanExpense,
@@ -762,6 +767,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanConditions,
              .humanReport,
              .humanExpenseQuick,
              .humanExpense,
@@ -855,6 +861,8 @@ private extension HomeSheetRoute {
             .humanWorkoutDashboard(id)
         case let .humanMetrics(id):
             .humanMetrics(id)
+        case let .humanConditions(id):
+            .humanConditions(id)
         case let .humanReport(id):
             .humanReport(id)
         case let .humanExpenseQuick(id):

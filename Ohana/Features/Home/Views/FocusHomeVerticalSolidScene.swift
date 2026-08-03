@@ -8,6 +8,17 @@
 import SwiftUI
 import UIKit
 
+nonisolated enum HomeShopEffectPresentationPolicy {
+    static func showsLimeGlow(
+        isEquipped: Bool,
+        isHuman: Bool,
+        isElectronicPet: Bool,
+        hasPassedAway: Bool
+    ) -> Bool {
+        isEquipped && !isHuman && !isElectronicPet && !hasPassedAway
+    }
+}
+
 struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>: View {
     let cards: [FocusCard]
     let safeTop: CGFloat
@@ -41,6 +52,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     let onOpenDetails: (FocusCard) -> Void
 
     @Environment(AppServices.self) private var appServices
+    @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow = false
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var ambientFloatPhase = false
     @State private var ambientFloatResumeProgress: CGFloat = 0
@@ -340,11 +352,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         let arrival = arrivalTransform(for: renderCard)
         let dragY = isExpandedSurface ? max(0, expandedDragY) : 0
         let frozenInactiveGeometry = isExpandedSurface ? nil : inactiveHeroCollapsedGeometry(for: renderCard.id)
-        let freezesInactiveLayer = FocusHomeInactiveHeroLayerPolicy.disablesImplicitAnimations(
-            selectedCardId: selectedCardId,
-            cardId: renderCard.id,
-            freezesInactiveGeometry: freezesInactiveCollapsedGeometryDuringHero
-        )
+        let freezesInactiveLayer = freezesInactiveLayer(for: renderCard)
         let floating = frozenInactiveGeometry == nil
             ? floatingTransform(index: renderIndex, isSelected: isSelected)
             : (x: 0, y: 0, rotation: 0)
@@ -397,6 +405,9 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                         frozenAvatarSource: frozenAvatarSource,
                         allowsLiveAvatarFallback: selectedCardId == nil && motionSnapshot == nil
                     )
+                    .overlay {
+                        limeGlowBorder(for: renderCard, cornerRadius: cornerRadius)
+                    }
 
                     if embedsQuickActionsInCard,
                        isExpandedInteractionReady,
@@ -460,6 +471,24 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         }
     }
 
+    private func freezesInactiveLayer(for card: FocusCard) -> Bool {
+        FocusHomeInactiveHeroLayerPolicy.disablesImplicitAnimations(
+            selectedCardId: selectedCardId,
+            cardId: card.id,
+            freezesInactiveGeometry: freezesInactiveCollapsedGeometryDuringHero
+        )
+    }
+
+    @ViewBuilder
+    private func limeGlowBorder(for card: FocusCard, cornerRadius: CGFloat) -> some View {
+        if showsLimeGlow(for: card) {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color.goPrimary.opacity(0.48), lineWidth: 1.5)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
     @ViewBuilder
     private func cardTapLayer(
         _ content: some View,
@@ -493,6 +522,15 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         case .idle:
             return nil
         }
+    }
+
+    private func showsLimeGlow(for card: FocusCard) -> Bool {
+        HomeShopEffectPresentationPolicy.showsLimeGlow(
+            isEquipped: equipFxLimeGlow,
+            isHuman: card.isHuman,
+            isElectronicPet: card.isElectronicPet,
+            hasPassedAway: card.hasPassedAway
+        )
     }
 
     private func walkTrackingIdentity(for card: FocusCard, walkPet: Pet?) -> String {
@@ -725,7 +763,12 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     }
 
     private func expandedDetailButton(for card: FocusCard, frame: CGRect, reveal: CGFloat) -> some View {
-        VStack {
+        let isInteractive = FocusHomeExpandedInteractionPolicy.isDetailButtonInteractive(
+            isExpandedInteractionMounted: isExpandedInteractionMounted,
+            reveal: reveal
+        )
+
+        return VStack {
             HStack {
                 Spacer(minLength: 0)
                 Button {
@@ -763,10 +806,8 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         .frame(width: frame.width, height: frame.height, alignment: .topTrailing)
         .opacity(Double(reveal))
         .offset(y: -(1 - reveal) * FocusHomePostHeroControlRevealPolicy.detailButtonOffset)
-        .allowsHitTesting(FocusHomeExpandedInteractionPolicy.isDetailButtonInteractive(
-            isExpandedInteractionMounted: isExpandedInteractionMounted,
-            reveal: reveal
-        ))
+        .allowsHitTesting(isInteractive)
+        .accessibilityHidden(!isInteractive)
     }
 
     private func detailButtonIcon(for card: FocusCard) -> String {

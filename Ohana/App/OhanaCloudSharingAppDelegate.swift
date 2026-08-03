@@ -13,7 +13,9 @@ import CloudKit
 #endif
 
 final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
+#if OHANA_GUARDIAN_CAPABILITIES
     private var guardianSafety: (any GuardianSafetyManaging)?
+#endif
 #if OHANA_FAMILY_CAPABILITIES
     private var modelContainer: ModelContainer?
     private var cloudSync: (any CloudSyncManaging)?
@@ -27,10 +29,14 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
         cloudSync: any CloudSyncManaging,
         guardianSafety: any GuardianSafetyManaging
     ) {
+#if OHANA_GUARDIAN_CAPABILITIES
         self.guardianSafety = guardianSafety
         if OnlineFeatureGate.allows(.guardianSafety) {
             UIApplication.shared.registerForRemoteNotifications()
         }
+#else
+        _ = guardianSafety
+#endif
 #if OHANA_FAMILY_CAPABILITIES
         guard AppCapabilityProfile.permitsCloudSyncRuntime else { return }
         self.modelContainer = modelContainer
@@ -42,10 +48,12 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
 #endif
     }
 
+#if OHANA_GUARDIAN_CAPABILITIES
     func application(
         _: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
+        guard OnlineFeatureGate.allows(.guardianSafety) else { return }
         Task { @MainActor in
             await guardianSafety?.registerAPNSToken(deviceToken)
         }
@@ -60,6 +68,7 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
             category: "GuardianSafety"
         )
     }
+#endif
 
     func application(
         _ application: UIApplication,
@@ -73,18 +82,25 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
 
+#if OHANA_FAMILY_CAPABILITIES || OHANA_GUARDIAN_CAPABILITIES
     func application(
         _: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
+#if OHANA_GUARDIAN_CAPABILITIES
         if Self.isGuardianNotification(userInfo) {
+            guard OnlineFeatureGate.allows(.guardianSafety) else {
+                completionHandler(.noData)
+                return
+            }
             Task { @MainActor in
                 await guardianSafety?.refresh()
                 completionHandler(.newData)
             }
             return
         }
+#endif
 #if OHANA_FAMILY_CAPABILITIES
         guard shouldHandleCloudSyncRemoteNotification(userInfo) else {
             completionHandler(.noData)
@@ -104,10 +120,13 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
 #endif
     }
 
+#if OHANA_GUARDIAN_CAPABILITIES
     private static func isGuardianNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
         userInfo[GuardianRemoteNotificationContract.markerUserInfoKey] as? Bool == true ||
             userInfo[GuardianRemoteNotificationContract.incidentIDUserInfoKey] != nil
     }
+#endif
+#endif
 
 #if OHANA_FAMILY_CAPABILITIES
     func application(

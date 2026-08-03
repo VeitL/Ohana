@@ -7,6 +7,110 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
+
+nonisolated struct HumanHealthMetricLogSortKey: Equatable, Sendable {
+    let date: Date
+    let createdAt: Date
+    let id: UUID
+}
+
+nonisolated enum HumanHealthMetricLogOrdering {
+    @MainActor
+    static func key(for log: HumanHealthMetricLog) -> HumanHealthMetricLogSortKey {
+        HumanHealthMetricLogSortKey(date: log.date, createdAt: log.createdAt, id: log.id)
+    }
+
+    static func newestFirst(
+        _ lhs: HumanHealthMetricLogSortKey,
+        _ rhs: HumanHealthMetricLogSortKey
+    ) -> Bool {
+        if lhs.date != rhs.date { return lhs.date > rhs.date }
+        if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+        return lhs.id.uuidString > rhs.id.uuidString
+    }
+
+    static func oldestFirst(
+        _ lhs: HumanHealthMetricLogSortKey,
+        _ rhs: HumanHealthMetricLogSortKey
+    ) -> Bool {
+        if lhs.date != rhs.date { return lhs.date < rhs.date }
+        if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+        return lhs.id.uuidString < rhs.id.uuidString
+    }
+}
+
+nonisolated enum HumanHealthMetricUnitChangePolicy {
+    static func valueText(
+        afterChangingFrom previousUnitCode: String,
+        to nextUnitCode: String,
+        currentValueText: String
+    ) -> String {
+        previousUnitCode == nextUnitCode ? currentValueText : ""
+    }
+}
+
+enum HumanHealthMetricWriteStart: Equatable {
+    case started
+    case rejectedReadOnly
+    case ignoredPending
+}
+
+enum HumanHealthMetricSaveCompletion: Equatable {
+    case persisted
+    case failed
+}
+
+enum HumanHealthMetricDeleteCompletion: Equatable {
+    case deleted
+    case failed
+}
+
+struct HumanHealthMetricPresentationState {
+    private(set) var isSaving = false
+    private var pendingDeletionIDs: Set<UUID> = []
+
+    mutating func beginSave(isReadOnly: Bool) -> HumanHealthMetricWriteStart {
+        guard !isReadOnly else { return .rejectedReadOnly }
+        guard !isSaving else { return .ignoredPending }
+        isSaving = true
+        return .started
+    }
+
+    mutating func completeSave(
+        result: HumanHealthMetricCommandResult?
+    ) -> HumanHealthMetricSaveCompletion {
+        isSaving = false
+        guard let result, result.didPersist else { return .failed }
+        return .persisted
+    }
+
+    mutating func beginDelete(
+        logID: UUID,
+        isReadOnly: Bool
+    ) -> HumanHealthMetricWriteStart {
+        guard !isReadOnly else { return .rejectedReadOnly }
+        guard pendingDeletionIDs.insert(logID).inserted else { return .ignoredPending }
+        return .started
+    }
+
+    func isDeletePending(logID: UUID) -> Bool {
+        pendingDeletionIDs.contains(logID)
+    }
+
+    mutating func completeDelete(
+        logID: UUID,
+        result: HumanHealthMetricDeleteCommandResult
+    ) -> HumanHealthMetricDeleteCompletion {
+        pendingDeletionIDs.remove(logID)
+        return result.didChange ? .deleted : .failed
+    }
+
+    mutating func cancelAll() {
+        isSaving = false
+        pendingDeletionIDs.removeAll()
+    }
+}
 
 private struct HealthMetricEntryScrollHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -39,7 +143,9 @@ struct HumanHealthMetricEntrySheet: View {
     @State private var scrollContentHeight: CGFloat = 0
     @State private var popupVisible = false
     @State private var isClosing = false
-    @State private var isSaving = false
+    @State private var presentationState = HumanHealthMetricPresentationState()
+    @State private var errorMessage = ""
+    @State private var showingError = false
     @State private var popupDragOffset: CGFloat = 0
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -95,6 +201,9 @@ struct HumanHealthMetricEntrySheet: View {
                     Text(metric.displayName(l))
                         .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
+                    if human.hasPassedAway {
+                        readOnlyNotice
+                    }
                     valueBlock
                     EmbeddedDecimalKeypad(
                         text: $valueText,
@@ -131,9 +240,11 @@ struct HumanHealthMetricEntrySheet: View {
                     Button(l.cancel, role: .cancel) { close() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
-                        .disabled(!isValid || isSaving || requiresRecorderSelection)
-                        .accessibilityIdentifier("human-health-metric-entry-save-action")
+                    if !human.hasPassedAway {
+                        Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
+                            .disabled(!isValid || presentationState.isSaving || requiresRecorderSelection)
+                            .accessibilityIdentifier("human-health-metric-entry-save-action")
+                    }
                 }
             }
         }
@@ -152,15 +263,35 @@ struct HumanHealthMetricEntrySheet: View {
                 valueText = sanitized
             }
         }
-        .onChange(of: selectedUnitCode) { _, _ in
-            valueText = CountryDecimalInput.sanitize(
-                valueText,
-                countryCode: appCountry,
-                maxFractionDigits: inputFractionDigits
+        .onChange(of: selectedUnitCode) { previousUnitCode, nextUnitCode in
+            let previousValueText = valueText
+            valueText = HumanHealthMetricUnitChangePolicy.valueText(
+                afterChangingFrom: previousUnitCode,
+                to: nextUnitCode,
+                currentValueText: valueText
             )
+            if !previousValueText.isEmpty, valueText.isEmpty {
+                UIAccessibility.post(
+                    notification: .announcement,
+                    argument: l.tr(
+                        zh: "单位已更改，请按新单位重新输入数值。",
+                        en: "Unit changed. Enter the value again in the new unit.",
+                        de: "Einheit geändert. Wert bitte in der neuen Einheit erneut eingeben."
+                    )
+                )
+            }
         }
         .onDisappear {
             commandQueue.cancelAll()
+            presentationState.cancelAll()
+        }
+        .alert(
+            l.tr(zh: "未能保存指标", en: "Metric not saved", de: "Wert nicht gespeichert"),
+            isPresented: $showingError
+        ) {
+            Button(l.tr(zh: "知道了", en: "OK", de: "OK"), role: .cancel) {}
+        } message: {
+            Text(errorMessage)
         }
     }
 
@@ -381,9 +512,9 @@ struct HumanHealthMetricEntrySheet: View {
     private var saveBar: some View {
         Button { save() } label: {
             HStack(spacing: 8) {
-                Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
+                Image(systemName: presentationState.isSaving ? "hourglass" : "checkmark.circle.fill")
                     .font(OhanaFont.adaptive(size: 16, weight: .bold))
-                Text(isSaving
+                Text(presentationState.isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存指标", en: "Save metric", de: "Wert speichern")
                 )
@@ -394,11 +525,11 @@ struct HumanHealthMetricEntrySheet: View {
             .frame(minHeight: 52)
             .contentShape(Rectangle())
             .padding(.vertical, 14)
-            .background(isValid && !isSaving ? Color.goPrimary : Color.goPrimary.opacity(0.38), in: Capsule())
-            .opacity(isValid && !isSaving ? 1 : 0.62)
+            .background(isValid && !presentationState.isSaving ? Color.goPrimary : Color.goPrimary.opacity(0.38), in: Capsule())
+            .opacity(isValid && !presentationState.isSaving ? 1 : 0.62)
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!isValid || isSaving || requiresRecorderSelection)
+        .disabled(!isValid || presentationState.isSaving || requiresRecorderSelection || human.hasPassedAway)
         .accessibilityIdentifier("human-health-metric-entry-save-action")
         .padding(.horizontal, 20)
         .padding(.top, 10)
@@ -428,12 +559,19 @@ struct HumanHealthMetricEntrySheet: View {
 
     @MainActor
     private func save() {
-        guard !isSaving,
-              !requiresRecorderSelection,
+        guard !requiresRecorderSelection,
               let value = parsedValue,
               value > 0,
               value.isFinite else { return }
-        isSaving = true
+        switch presentationState.beginSave(isReadOnly: human.hasPassedAway) {
+        case .rejectedReadOnly:
+            presentSaveFailure(readOnlyFailureMessage)
+            return
+        case .ignoredPending:
+            return
+        case .started:
+            break
+        }
         let savedUnitCode = selectedUnit.code
         let savedDate = recordDate
         let savedNotes = notes
@@ -442,7 +580,7 @@ struct HumanHealthMetricEntrySheet: View {
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            guard let result = HumanCareCommandExecutor(context: modelContext, services: appServices).recordHealthMetric(
+            let result = HumanCareCommandExecutor(context: modelContext, services: appServices).recordHealthMetric(
                 human: human,
                 metricKey: metric.key,
                 unitCode: savedUnitCode,
@@ -451,13 +589,57 @@ struct HumanHealthMetricEntrySheet: View {
                 notes: savedNotes,
                 recordedByHumanId: savedRecorderID,
                 note: "human.health.metric"
-            ) else {
-                isSaving = false
-                return
+            )
+            switch presentationState.completeSave(result: result) {
+            case .persisted:
+                guard let result else { return }
+                onSaved?(result.log)
+                close()
+            case .failed:
+                presentSaveFailure(saveFailureMessage)
             }
-            onSaved?(result.log)
-            close()
         }
+    }
+
+    private var readOnlyNotice: some View {
+        Label(
+            l.tr(
+                zh: "纪念模式为只读，不能新增体检指标。",
+                en: "Memorial mode is read-only. New checkup metrics cannot be added.",
+                de: "Der Gedenkmodus ist schreibgeschützt. Neue Check-up-Werte können nicht hinzugefügt werden."
+            ),
+            systemImage: "lock.fill"
+        )
+        .font(OhanaFont.caption(.bold))
+        .foregroundStyle(Color.goRed)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+        .padding(.horizontal, 20)
+    }
+
+    private var readOnlyFailureMessage: String {
+        l.tr(
+            zh: "纪念模式为只读，输入内容已保留但不会保存。",
+            en: "Memorial mode is read-only. Your input remains here but was not saved.",
+            de: "Der Gedenkmodus ist schreibgeschützt. Deine Eingabe bleibt erhalten, wurde aber nicht gespeichert."
+        )
+    }
+
+    private var saveFailureMessage: String {
+        l.tr(
+            zh: "无法保存这条体检指标。输入内容已保留，请重试。",
+            en: "Could not save this checkup metric. Your input was kept; try again.",
+            de: "Dieser Check-up-Wert konnte nicht gespeichert werden. Deine Eingabe wurde beibehalten; versuche es erneut."
+        )
+    }
+
+    private func presentSaveFailure(_ message: String) {
+        errorMessage = message
+        showingError = true
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        UIAccessibility.post(notification: .announcement, argument: message)
     }
 
     private func close() {

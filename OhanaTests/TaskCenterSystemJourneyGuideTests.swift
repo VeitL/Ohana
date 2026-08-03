@@ -73,8 +73,8 @@ struct TaskCenterSystemJourneyGuideTests {
             HouseholdStarterJourneyCheckpoint: [HouseholdStarterJourneyResolution]
         ] = [
             .humanAppearance: [.reviewed, .preferNotToSay],
-            .humanLifeStage: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
-            .humanBodyProfile: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
+            .humanLifeStage: [],
+            .humanBodyProfile: [],
             .humanPersonalityContext: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
             .humanOptionalDetails: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
             .petLifeStage: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
@@ -129,6 +129,42 @@ struct TaskCenterSystemJourneyGuideTests {
                     #expect(!guide.isCompleted(guide.questions[nextIndex]))
                 }
             }
+        }
+    }
+
+    @Test func humanProfileNeedsBirthdayAndGenderEvenAtSeventyFivePercent() {
+        let required = HouseholdStarterJourneyTask.humanProfile.requiredActualCheckpoints
+        #expect(required == [.humanLifeStage, .humanBodyProfile])
+
+        for optional in [
+            HouseholdStarterJourneyCheckpoint.humanAppearance,
+            .humanPersonalityContext
+        ] {
+            let guide = TaskCenterSystemJourneyGuide(
+                task: .humanProfile,
+                completedCheckpoints: required.union([optional]),
+                availableResolutionCheckpoints: Set(
+                    HouseholdStarterJourneyTask.humanProfile.checkpoints
+                )
+            )
+            #expect(guide.completedCheckpointCount == 3)
+            #expect(guide.isComplete)
+        }
+
+        for missingRequired in required {
+            let completed = Set(
+                HouseholdStarterJourneyTask.humanProfile.checkpoints
+                    .filter { $0 != missingRequired }
+            )
+            let guide = TaskCenterSystemJourneyGuide(
+                task: .humanProfile,
+                completedCheckpoints: completed,
+                availableResolutionCheckpoints: Set(
+                    HouseholdStarterJourneyTask.humanProfile.checkpoints
+                )
+            )
+            #expect(guide.completedCheckpointCount == 3)
+            #expect(!guide.isComplete)
         }
     }
 

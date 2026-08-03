@@ -306,6 +306,7 @@ struct TaskCenterView: View {
     let focusRequestID: UUID?
     let onAction: (TaskCenterItemSnapshot, TaskCenterAvailableAction) -> Bool
     let onClaimSystemJourneyReward: (TaskCenterItemSnapshot) -> TaskCenterSystemJourneyMutationOutcome
+    let onDismissSuggestion: (TaskCenterItemSnapshot) -> Void
     let onOpen: (TaskCenterItemSnapshot) -> Void
     let onScrollOffsetChange: ((CGFloat) -> Void)?
 
@@ -324,7 +325,7 @@ struct TaskCenterView: View {
                     }
                     if isLoading {
                         loadingState
-                    } else if displayedSnapshot.pendingCount == 0 {
+                    } else if !displayedSnapshot.hasDisplayableItems {
                         emptyState
                     } else {
                         taskSection(
@@ -337,6 +338,7 @@ struct TaskCenterView: View {
                             tint: .goYellow,
                             badgeText: starterJourneyRewardProgressText
                         )
+                        suggestionSection
                         if showsDailyProgress, resolvedMemberFilter == .all {
                             dailyProgress
                         }
@@ -405,7 +407,9 @@ struct TaskCenterView: View {
         }
         .accessibilityIdentifier("task-center-scroll-view")
     }
+}
 
+private extension TaskCenterView {
     private var scrollFocus: TaskCenterScrollFocus {
         TaskCenterScrollFocus(itemID: focusedItemID, requestID: focusRequestID)
     }
@@ -654,6 +658,31 @@ struct TaskCenterView: View {
             .accessibilityIdentifier(rowAccessibilityIdentifier(item))
 
             actionButtons(for: item)
+
+            if item.source == .suggestion {
+                Button {
+                    onDismissSuggestion(item)
+                } label: {
+                    Image(systemName: "xmark") // a11y: allow decorative glyph; the dismiss Button supplies a localized label
+                        .font(OhanaFont.adaptive(size: 11, weight: .black))
+                        .frame(width: 44, height: 44)
+                        .background(Color.ohanaControlFill, in: Circle())
+                        .accessibilityHidden(true)
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(
+                    zh: "关闭添加宠物建议",
+                    en: "Dismiss pet suggestion",
+                    de: "Haustier-Vorschlag schließen",
+                    es: "Descartar sugerencia de mascota",
+                    pt: "Dispensar sugestão de pet",
+                    fr: "Ignorer la suggestion d’animal",
+                    ja: "ペットの提案を閉じる",
+                    ko: "반려동물 제안 닫기",
+                    it: "Chiudi il suggerimento dell’animale"
+                ))
+                .accessibilityIdentifier("task-center-dismiss-first-pet-suggestion")
+            }
         }
         .frame(minHeight: 68)
         .opacity(performingIDs.contains(item.id) ? 0.44 : 1)
@@ -784,6 +813,10 @@ struct TaskCenterView: View {
             .sorted { systemJourneyOrder($0) < systemJourneyOrder($1) }
     }
 
+    private var suggestionItems: [TaskCenterItemSnapshot] {
+        displayedSnapshot.suggestionItems
+    }
+
     private var ordinaryUnscheduledItems: [TaskCenterItemSnapshot] {
         nonReview(displayedSnapshot.ordinaryUnscheduledItems)
     }
@@ -791,6 +824,44 @@ struct TaskCenterView: View {
     private var starterJourneyRewardProgressText: String? {
         guard let journey = displayedSnapshot.starterJourney, journey.isEnabled else { return nil }
         return "\(journey.claimedRewardCoconuts) / \(journey.totalRewardCoconuts) 🥥"
+    }
+
+    @ViewBuilder
+    private var suggestionSection: some View {
+        let items = visible(suggestionItems)
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 9) {
+                Text(l.tr(
+                    zh: "可选建议",
+                    en: "Optional suggestion",
+                    de: "Optionaler Vorschlag",
+                    es: "Sugerencia opcional",
+                    pt: "Sugestão opcional",
+                    fr: "Suggestion facultative",
+                    ja: "任意の提案",
+                    ko: "선택 제안",
+                    it: "Suggerimento facoltativo"
+                ))
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+
+                VStack(spacing: 0) {
+                    ForEach(items) { item in
+                        taskRow(item)
+                            .id(item.id)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .background(
+                    Color.ohanaCardSurface,
+                    in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
+                        .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                }
+            }
+        }
     }
 
     private func nonReview(_ items: [TaskCenterItemSnapshot]) -> [TaskCenterItemSnapshot] {
@@ -964,9 +1035,29 @@ struct TaskCenterView: View {
         }
         switch item.systemDestination {
         case .createFirstPet:
-            return l.tr(zh: "开始建立宠物", en: "Start creating a pet", de: "Haustier erstellen")
+            return l.tr(
+                zh: "可选建立宠物；关闭不会影响奖励或新手进度",
+                en: "Optionally create a pet. Dismissing does not affect rewards or starter progress",
+                de: "Optional ein Haustier erstellen. Schließen ändert weder Belohnung noch Fortschritt",
+                es: "Crea una mascota si quieres. Cerrarlo no afecta recompensas ni progreso",
+                pt: "Crie um pet se quiser. Fechar não afeta recompensas nem progresso",
+                fr: "Créez un animal si vous le souhaitez. Fermer n’affecte ni récompense ni progression",
+                ja: "ペットの作成は任意です。閉じても報酬や進捗に影響しません",
+                ko: "반려동물 추가는 선택이에요. 닫아도 보상이나 진행에 영향이 없어요",
+                it: "Crea un animale se vuoi. Chiudere non influisce su ricompense o progressi"
+            )
         case .claimStarterGift:
-            return l.tr(zh: "打开首宠奖励领取弹窗", en: "Open the first-pet gift", de: "Belohnung für das erste Tier öffnen")
+            return l.tr(
+                zh: "打开新人礼包领取弹窗",
+                en: "Open the welcome gift",
+                de: "Willkommensgeschenk öffnen",
+                es: "Abrir el regalo de bienvenida",
+                pt: "Abrir o presente de boas-vindas",
+                fr: "Ouvrir le cadeau de bienvenue",
+                ja: "ウェルカムギフトを開く",
+                ko: "환영 선물 열기",
+                it: "Apri il regalo di benvenuto"
+            )
         case .completeHumanProfile:
             return l.tr(zh: "查看并完善人类资料", en: "Review and complete the human profile", de: "Menschenprofil ergänzen")
         case .completeFirstPetProfile:
@@ -1028,6 +1119,19 @@ struct TaskCenterView: View {
     }
 
     private func itemSubtitle(_ item: TaskCenterItemSnapshot) -> String {
+        if item.source == .suggestion {
+            return l.tr(
+                zh: "可关闭 · 无奖励 · 不影响进度",
+                en: "Dismissible · No reward · Does not block progress",
+                de: "Schließbar · Keine Belohnung · Blockiert nicht",
+                es: "Se puede cerrar · Sin recompensa · No bloquea el progreso",
+                pt: "Pode fechar · Sem recompensa · Não bloqueia o progresso",
+                fr: "Peut être fermé · Sans récompense · Ne bloque pas la progression",
+                ja: "閉じられます・報酬なし・進捗を妨げません",
+                ko: "닫기 가능 · 보상 없음 · 진행을 막지 않음",
+                it: "Puoi chiuderlo · Nessuna ricompensa · Non blocca i progressi"
+            )
+        }
         let category = item.eventType?.localizedLabel(l)
         let reward = item.rewardCoconuts > 0 ? "+\(item.rewardCoconuts) 🥥" : nil
         return [
@@ -1095,6 +1199,12 @@ struct TaskCenterView: View {
     }
 
     private func dueText(_ item: TaskCenterItemSnapshot) -> String {
+        if item.source == .suggestion {
+            return l.tr(
+                zh: "可选", en: "Optional", de: "Optional", es: "Opcional",
+                pt: "Opcional", fr: "Facultatif", ja: "任意", ko: "선택", it: "Facoltativo"
+            )
+        }
         if item.source == .systemJourney {
             if item.systemJourneyPresentationState == .rewardReady {
                 return l.tr(zh: "已完成", en: "Complete", de: "Erledigt")

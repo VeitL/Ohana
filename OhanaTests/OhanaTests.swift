@@ -5095,7 +5095,7 @@ struct OhanaTests {
     }
 
     @MainActor
-    @Test func islandQuestEnginePrioritizesFirstPetWhenNoActivePets() async throws {
+    @Test func islandQuestEngineDoesNotTurnOptionalFirstPetIntoAProgressQuest() async throws {
         let human = Human(name: "Li")
         let completedIntroProgress = TodayFocusQuestProgress(
             isPetWizardCompleted: true,
@@ -5110,9 +5110,7 @@ struct OhanaTests {
             questProgress: completedIntroProgress
         )
 
-        #expect(quests.first?.id == IslandQuestEngine.oasisPetWizardQuestId)
-        #expect(quests.first?.emoji == "🐾")
-        #expect(quests.first?.isCompleted == false)
+        #expect(!quests.contains { $0.id == IslandQuestEngine.oasisPetWizardQuestId })
 
         let refreshed = TodayFocusService.refreshedQuests(
             quests,
@@ -5124,8 +5122,7 @@ struct OhanaTests {
             questProgress: completedIntroProgress
         )
 
-        #expect(refreshed.first?.id == IslandQuestEngine.oasisPetWizardQuestId)
-        #expect(refreshed.first?.isCompleted == false)
+        #expect(!refreshed.contains { $0.id == IslandQuestEngine.oasisPetWizardQuestId })
     }
 
     @MainActor

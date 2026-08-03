@@ -227,6 +227,64 @@ struct PresenceReminderConfigurationTests {
     }
 
     @MainActor
+    @Test func ownerUndoRestoresTodaysEnabledReminderWithoutRequestingPermission() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2026,
+            month: 7,
+            day: 18,
+            hour: 10
+        )))
+        let notifications = StubPresenceNotifications(status: .authorized, permissionResult: false)
+        let notificationCenter = RecordingPresenceNotificationCenter()
+        let scheduler = SystemPresenceReminderScheduler(
+            notificationCenter: notificationCenter,
+            now: { now },
+            calendar: calendar
+        )
+        let configuration = PresenceReminderConfiguration(
+            isEnabled: true,
+            schedules: [.init(hour: 20, minute: 0)],
+            gracePeriodMinutes: nil,
+            sendsSecondLocalReminder: false,
+            messageTemplate: PresenceReminderConfiguration.fixedMessageTemplate
+        )
+
+        let result = await PresenceReminderRestorationCoordinator.restoreIfAuthorized(
+            configuration,
+            title: "Are you safe today?",
+            body: "Confirm from the notification.",
+            notifications: notifications,
+            scheduler: scheduler
+        )
+
+        #expect(result == .restored)
+        #expect(notifications.permissionRequestCount == 0)
+        #expect(notificationCenter.addedRequests.first?.identifier.hasSuffix(".2026-07-18") == true)
+    }
+
+    @MainActor
+    @Test func ownerUndoNeverPromptsWhenNotificationAuthorizationIsUndetermined() async {
+        let notifications = StubPresenceNotifications(status: .notDetermined, permissionResult: true)
+        let scheduler = RecordingPresenceReminderScheduler()
+        var configuration = PresenceReminderConfiguration.initial
+        configuration.isEnabled = true
+
+        let result = await PresenceReminderRestorationCoordinator.restoreIfAuthorized(
+            configuration,
+            title: "Check in",
+            body: "Open Ohana",
+            notifications: notifications,
+            scheduler: scheduler
+        )
+
+        #expect(result == .notificationsNotAuthorized)
+        #expect(notifications.permissionRequestCount == 0)
+        #expect(scheduler.replacedRequests.isEmpty)
+    }
+
+    @MainActor
     @Test func systemSchedulerUsesOnlyRoutineCapacityLeftAfterNonPresenceRequests() async throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))

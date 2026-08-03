@@ -10,7 +10,7 @@ import SwiftUI
 @MainActor
 struct ZenHomeView: View {
     @Binding var snapshot: ZenPresenceSnapshot
-    @Binding var requestedAutoCheckInToastSubjectID: String?
+    let starterJourney: StarterJourneyExperienceProjection
     let actions: ZenShellActions
     let profileTransitionNamespace: Namespace.ID
 
@@ -18,12 +18,10 @@ struct ZenHomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var cardExpansionNamespace
     @State private var pendingSubjectIDs: Set<String> = []
-    @State private var isCheckingInAll = false
-    @State private var transientNotice: ZenHomeTransientNotice?
-    @State private var transientNoticeTask: Task<Void, Never>?
     @State private var expandedSubjectID: String?
     @State private var scoreSelectingSubjectID: String?
     @State private var frontSubjectID: String?
+    @State private var undoConfirmationSubject: ZenPresenceSubjectDTO?
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -35,13 +33,18 @@ struct ZenHomeView: View {
             GeometryReader { viewport in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 14) {
-                        VStack(spacing: 14) {
-                            if snapshot.isReady, ownerSubject == nil {
-                                ownerBindingPrompt
-                            }
-                            checkInAllControl
+                        if starterJourney.shouldShowCommonJourney {
+                            starterJourneyCard
+                                .padding(.horizontal, 16)
                         }
-                        .padding(.horizontal, 16)
+
+                        if snapshot.isReady, ownerSubject == nil {
+                            ownerBindingPrompt
+                                .padding(.horizontal, 16)
+                        } else if let ownerSubject, !ownerSubject.checkedToday {
+                            ownerConfirmationHint(ownerSubject)
+                                .padding(.horizontal, 16)
+                        }
 
                         if !snapshot.isReady {
                             loadingCards(
@@ -70,24 +73,6 @@ struct ZenHomeView: View {
                     .transition(.opacity)
                     .zIndex(7)
             }
-
-            if let noticeSubject, let transientNotice {
-                ZenHomeCheckInNotice(
-                    subject: noticeSubject,
-                    notice: transientNotice,
-                    localization: l
-                )
-                    .id(transientNotice)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .frame(maxWidth: 560, maxHeight: .infinity, alignment: .top)
-                    .transition(
-                        .move(edge: .top)
-                            .combined(with: .opacity)
-                            .combined(with: .scale(scale: 0.96, anchor: .top))
-                    )
-                    .zIndex(8)
-            }
         }
         .navigationTitle(l.tr(
             zh: "佛系打卡",
@@ -101,12 +86,6 @@ struct ZenHomeView: View {
             it: "Check-in zen"
         ))
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            consumeRequestedAutoCheckInToast()
-        }
-        .onChange(of: requestedAutoCheckInToastSubjectID) { _, _ in
-            consumeRequestedAutoCheckInToast()
-        }
         .onChange(of: snapshot.subjects.map(\.id)) { _, subjectIDs in
             let validIDs = Set(subjectIDs)
             if let expandedSubjectID, !validIDs.contains(expandedSubjectID) {
@@ -118,17 +97,37 @@ struct ZenHomeView: View {
             if let frontSubjectID, !validIDs.contains(frontSubjectID) {
                 self.frontSubjectID = nil
             }
-            if let transientNotice, !validIDs.contains(transientNotice.subjectID) {
-                self.transientNotice = nil
+            if let undoConfirmationSubject, !validIDs.contains(undoConfirmationSubject.id) {
+                self.undoConfirmationSubject = nil
             }
         }
+        .confirmationDialog(
+            undoConfirmationTitle,
+            isPresented: Binding(
+                get: { undoConfirmationSubject != nil },
+                set: { if !$0 { undoConfirmationSubject = nil } }
+            ),
+            presenting: undoConfirmationSubject
+        ) { subject in
+            Button(undoConfirmationActionTitle, role: .destructive) {
+                undoConfirmationSubject = nil
+                undoCheckIn(subject)
+            }
+            .accessibilityIdentifier("zen-confirm-undo-check-in")
+            Button(l.tr(
+                zh: "取消", en: "Cancel", de: "Abbrechen", es: "Cancelar",
+                pt: "Cancelar", fr: "Annuler", ja: "キャンセル", ko: "취소", it: "Annulla"
+            ), role: .cancel) {
+                undoConfirmationSubject = nil
+            }
+        } message: { subject in
+            Text(undoConfirmationMessage(for: subject))
+        }
         .onDisappear {
-            transientNoticeTask?.cancel()
-            transientNoticeTask = nil
-            transientNotice = nil
             expandedSubjectID = nil
             scoreSelectingSubjectID = nil
             frontSubjectID = nil
+            undoConfirmationSubject = nil
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("zen-home-screen")
@@ -138,14 +137,154 @@ struct ZenHomeView: View {
         snapshot.subjects.first(where: { $0.id == snapshot.ownerID && $0.isOwner })
     }
 
-    private var noticeSubject: ZenPresenceSubjectDTO? {
-        guard let subjectID = transientNotice?.subjectID else { return nil }
-        return snapshot.subjects.first(where: { $0.id == subjectID })
+    private var starterJourneyCard: some View {
+        Button {
+            OhanaFeedback.light()
+            actions.onOpenStarterJourney()
+        } label: {
+            HStack(spacing: 13) {
+                ZStack {
+                    Circle()
+                        .fill(Color.goPrimary.opacity(0.14))
+                    Image(systemName: "sparkles") // a11y: allow decorative icon; the starter journey Button has a combined text label
+                        .font(OhanaFont.adaptive(size: 16, weight: .black))
+                        .foregroundStyle(Color.goPrimary)
+                        .accessibilityHidden(true)
+                }
+                .frame(width: 44, height: 44)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 8) {
+                        Text(l.tr(
+                            zh: "新手成长",
+                            en: "Starter growth",
+                            de: "Starter-Fortschritt",
+                            es: "Progreso inicial",
+                            pt: "Progresso inicial",
+                            fr: "Progression de départ",
+                            ja: "はじめの成長",
+                            ko: "시작 성장",
+                            it: "Crescita iniziale"
+                        ))
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+
+                        Text("\(starterJourney.completedTaskCount)/\(starterJourney.totalTaskCount)")
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.goPrimary)
+                            .monospacedDigit()
+                    }
+
+                    ProgressView(
+                        value: Double(starterJourney.completedTaskCount),
+                        total: Double(starterJourney.totalTaskCount)
+                    )
+                    .tint(Color.goPrimary)
+                }
+
+                Image(systemName: "chevron.right") // a11y: allow decorative disclosure glyph; the parent Button is labeled by its content
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .foregroundStyle(Color.ohanaTertiaryText)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 68)
+            .background(
+                Color.ohanaCardSurface,
+                in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(
+            zh: "新手成长，已完成 \(starterJourney.completedTaskCount) 项，共 \(starterJourney.totalTaskCount) 项",
+            en: "Starter growth, \(starterJourney.completedTaskCount) of \(starterJourney.totalTaskCount) complete",
+            de: "Starter-Fortschritt, \(starterJourney.completedTaskCount) von \(starterJourney.totalTaskCount) abgeschlossen",
+            es: "Progreso inicial, \(starterJourney.completedTaskCount) de \(starterJourney.totalTaskCount) completadas",
+            pt: "Progresso inicial, \(starterJourney.completedTaskCount) de \(starterJourney.totalTaskCount) concluídas",
+            fr: "Progression de départ, \(starterJourney.completedTaskCount) sur \(starterJourney.totalTaskCount) terminées",
+            ja: "はじめの成長、\(starterJourney.totalTaskCount)件中\(starterJourney.completedTaskCount)件完了",
+            ko: "시작 성장, \(starterJourney.totalTaskCount)개 중 \(starterJourney.completedTaskCount)개 완료",
+            it: "Crescita iniziale, \(starterJourney.completedTaskCount) di \(starterJourney.totalTaskCount) completate"
+        ))
+        .accessibilityHint(l.tr(
+            zh: "打开新手任务",
+            en: "Open starter tasks",
+            de: "Starter-Aufgaben öffnen",
+            es: "Abrir tareas iniciales",
+            pt: "Abrir tarefas iniciais",
+            fr: "Ouvrir les tâches de départ",
+            ja: "はじめのタスクを開く",
+            ko: "시작 과제 열기",
+            it: "Apri le attività iniziali"
+        ))
+        .accessibilityIdentifier("zen-starter-journey-card")
     }
 
     private var expandedSubject: ZenPresenceSubjectDTO? {
         guard let expandedSubjectID else { return nil }
         return snapshot.subjects.first(where: { $0.id == expandedSubjectID })
+    }
+
+    private var undoConfirmationTitle: String {
+        if undoConfirmationSubject?.isOwner == true {
+            return l.tr(
+                zh: "撤回今天的平安确认？",
+                en: "Undo today's safety confirmation?",
+                de: "Heutige Bestätigung zurücknehmen?",
+                es: "¿Deshacer la confirmación de hoy?",
+                pt: "Desfazer a confirmação de hoje?",
+                fr: "Annuler la confirmation du jour ?",
+                ja: "今日の無事確認を取り消しますか？",
+                ko: "오늘의 무사 확인을 취소할까요?",
+                it: "Annullare la conferma di oggi?"
+            )
+        }
+        return l.tr(
+            zh: "撤回今天的记录？",
+            en: "Undo today's record?",
+            de: "Heutigen Eintrag zurücknehmen?",
+            es: "¿Deshacer el registro de hoy?",
+            pt: "Desfazer o registro de hoje?",
+            fr: "Annuler la note du jour ?",
+            ja: "今日の記録を取り消しますか？",
+            ko: "오늘 기록을 취소할까요?",
+            it: "Annullare la registrazione di oggi?"
+        )
+    }
+
+    private var undoConfirmationActionTitle: String {
+        l.tr(
+            zh: "确认撤回", en: "Undo", de: "Zurücknehmen", es: "Deshacer",
+            pt: "Desfazer", fr: "Annuler", ja: "取り消す", ko: "취소하기", it: "Annulla"
+        )
+    }
+
+    private func undoConfirmationMessage(for subject: ZenPresenceSubjectDTO) -> String {
+        if subject.isOwner {
+            return l.tr(
+                zh: "已获得的椰子不会扣回，但今天会重新显示为未确认，直到你再次明确确认。",
+                en: "Earned coconuts stay, but today returns to unconfirmed until you explicitly confirm again.",
+                de: "Verdiente Kokosnüsse bleiben, aber heute gilt wieder als unbestätigt, bis du erneut ausdrücklich bestätigst.",
+                es: "Conservarás los cocos, pero hoy volverá a estar sin confirmar hasta que lo confirmes de nuevo.",
+                pt: "Os cocos ganhos permanecem, mas hoje volta a ficar sem confirmação até você confirmar novamente.",
+                fr: "Les noix de coco restent acquises, mais ce jour redevient non confirmé jusqu’à votre prochaine confirmation explicite.",
+                ja: "獲得済みのココナッツは残りますが、もう一度明示的に確認するまで今日は未確認に戻ります。",
+                ko: "받은 코코넛은 유지되지만 다시 직접 확인할 때까지 오늘은 미확인으로 표시돼요.",
+                it: "Le noci di cocco restano, ma oggi torna non confermato finché non confermi di nuovo."
+            )
+        }
+        return l.tr(
+            zh: "已获得的椰子不会扣回；今天的这条记录会被移除，同日重新记录也不会重复发奖。",
+            en: "Earned coconuts stay. Today's record is removed, and recording it again today will not award the same reward twice.",
+            de: "Verdiente Kokosnüsse bleiben. Der heutige Eintrag wird entfernt; ein erneuter Eintrag heute vergibt keine Belohnung doppelt.",
+            es: "Conservarás los cocos. Se elimina el registro de hoy y volver a registrarlo hoy no duplica la recompensa.",
+            pt: "Os cocos permanecem. O registro de hoje será removido e refazê-lo hoje não duplica a recompensa.",
+            fr: "Les noix de coco restent acquises. La note du jour sera supprimée et la refaire aujourd’hui ne doublera pas la récompense.",
+            ja: "獲得済みのココナッツは残ります。今日の記録は削除され、同日に再記録しても報酬は重複しません。",
+            ko: "받은 코코넛은 유지돼요. 오늘 기록은 삭제되며 같은 날 다시 기록해도 보상은 중복되지 않아요.",
+            it: "Le noci di cocco restano. La registrazione di oggi viene rimossa e rifarla oggi non duplica la ricompensa."
+        )
     }
 
     private var ownerBindingPrompt: some View {
@@ -170,15 +309,15 @@ struct ZenHomeView: View {
                     .font(OhanaFont.callout(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(
-                    zh: "指定后，打开 App 就会自动打卡",
-                    en: "Opening Ohana will check you in",
-                    de: "Ohana checkt dich beim Öffnen ein",
-                    es: "Ohana registrará tu check-in al abrirse",
-                    pt: "O Ohana fará seu check-in ao abrir",
-                    fr: "Ohana vous enregistrera à l’ouverture",
-                    ja: "Ohanaを開くと自動でチェックインします",
-                    ko: "Ohana를 열면 자동으로 체크인해요",
-                    it: "Ohana effettuerà il check-in all’apertura"
+                    zh: "只有你的明确操作才会完成平安确认",
+                    en: "Only your explicit action records a safety confirmation",
+                    de: "Nur deine bewusste Aktion bestätigt deinen Status",
+                    es: "Solo tu acción explícita registra la confirmación",
+                    pt: "Só sua ação explícita registra a confirmação",
+                    fr: "Seule votre action explicite enregistre la confirmation",
+                    ja: "明示的な操作でのみ無事確認されます",
+                    ko: "직접 동작할 때만 무사 확인이 기록돼요",
+                    it: "Solo una tua azione esplicita registra la conferma"
                 ))
                     .font(OhanaFont.footnote())
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -213,79 +352,35 @@ struct ZenHomeView: View {
         .accessibilityIdentifier("zen-home-owner-status")
     }
 
-    @ViewBuilder
-    private var checkInAllControl: some View {
-        let isComplete = ZenPresencePresentation.allChecked(snapshot.subjects)
-        if snapshot.isReady, !snapshot.subjects.isEmpty {
-            if isComplete {
-                Label(
-                    l.tr(
-                        zh: "今日全部完成",
-                        en: "All done today",
-                        de: "Heute alles erledigt",
-                        es: "Todo listo por hoy",
-                        pt: "Tudo pronto por hoje",
-                        fr: "Tout est fait aujourd’hui",
-                        ja: "今日はすべて完了",
-                        ko: "오늘 모두 완료",
-                        it: "Tutto fatto per oggi"
-                    ),
-                    systemImage: "checkmark.circle.fill"
-                )
-                .font(OhanaFont.footnote(.bold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .padding(.horizontal, 14)
-                .frame(minHeight: 40)
-                .background(Color.ohanaCardSurfaceElevated, in: Capsule())
-                .frame(maxWidth: .infinity, alignment: .center)
-                .accessibilityIdentifier("zen-home-all-complete-status")
-            } else {
-                Button {
-                    checkInAll()
-                } label: {
-                    HStack(spacing: 9) {
-                        if isCheckingInAll {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(Color.ohanaPrimaryActionText)
-                        } else {
-                            Image(systemName: "checkmark.circle.badge.plus").accessibilityHidden(true)
-                        }
-                        Text(l.tr(
-                            zh: "一键全部打卡",
-                            en: "Check in everyone",
-                            de: "Alle einchecken",
-                            es: "Hacer check-in de todos",
-                            pt: "Fazer check-in de todos",
-                            fr: "Tout enregistrer",
-                            ja: "まとめてチェックイン",
-                            ko: "모두 한번에 체크인",
-                            it: "Check-in per tutti"
-                        ))
-                        .font(OhanaFont.callout(.bold))
-                    }
-                    .padding(.horizontal, 18)
-                    .frame(minHeight: 48)
-                }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.capsule)
-                .tint(Color.goPrimary)
-                .disabled(isCheckingInAll)
-                .accessibilityIdentifier("zen-home-check-in-all-action")
-                .accessibilityHint(l.tr(
-                    zh: "为首页所有未打卡的人、宠物和植物完成今日打卡",
-                    en: "Checks in every person, pet, and plant that is not yet checked in",
-                    de: "Checkt alle Personen, Tiere und Pflanzen ein",
-                    es: "Registra el check-in de cada persona, mascota y planta pendiente",
-                    pt: "Faz o check-in de todas as pessoas, pets e plantas pendentes",
-                    fr: "Enregistre chaque personne, animal et plante encore en attente",
-                    ja: "未チェックインの家族、ペット、植物をまとめて記録します",
-                    ko: "아직 체크인하지 않은 가족, 반려동물과 식물을 모두 체크인해요",
-                    it: "Registra ogni persona, animale e pianta ancora in attesa"
-                ))
-                .frame(maxWidth: .infinity, alignment: .center)
-            }
+    private func ownerConfirmationHint(_ owner: ZenPresenceSubjectDTO) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "hand.tap.fill") // a11y: allow decorative icon; adjacent localized text provides the full instruction
+                .accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 17, weight: .bold))
+                .foregroundStyle(Color.goPrimary)
+
+            Text(l.tr(
+                zh: "轻点 \(owner.name) 的卡片，确认今天平安",
+                en: "Tap \(owner.name)'s card to confirm you're safe today",
+                de: "Tippe auf \(owner.name), um dich heute zu bestätigen",
+                es: "Toca la tarjeta de \(owner.name) para confirmar que estás bien",
+                pt: "Toque no cartão de \(owner.name) para confirmar que está tudo bem",
+                fr: "Touchez la carte de \(owner.name) pour confirmer que tout va bien",
+                ja: "\(owner.name)のカードをタップして今日の無事を確認",
+                ko: "\(owner.name) 카드를 탭해 오늘의 무사를 확인하세요",
+                it: "Tocca la scheda di \(owner.name) per confermare che oggi stai bene"
+            ))
+            .font(OhanaFont.footnote(.semibold))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 13)
+        .frame(minHeight: 44)
+        .background(Color.ohanaCardSurface, in: Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("zen-home-owner-confirmation-hint")
     }
 
     private func loadingCards(
@@ -318,8 +413,8 @@ struct ZenHomeView: View {
             )
         } description: {
             Text(l.tr(
-                zh: "添加家人、宠物或植物后，就能在这里快速打卡。",
-                en: "Add a person, pet, or plant to start checking in.",
+                zh: "添加家人、宠物或植物后，就能在这里确认、观察并留下今天的状态。",
+                en: "Add a person, pet, or plant to confirm, observe, and remember today.",
                 de: "Füge eine Person, ein Tier oder eine Pflanze hinzu.",
                 es: "Añade una persona, mascota o planta para empezar.",
                 pt: "Adicione uma pessoa, um pet ou uma planta para começar.",
@@ -400,7 +495,7 @@ struct ZenHomeView: View {
                     onScoreSelectionActivityChanged: { isActive in
                         setScoreSelectionActivity(isActive, for: subject)
                     },
-                    onUndoCheckIn: { undoCheckIn(subject) },
+                    onUndoCheckIn: { requestUndoCheckIn(subject) },
                     onAccessoryAction: { actions.onOpenProfile(subject) },
                     profileTransitionNamespace: profileTransitionNamespace
                 )
@@ -434,45 +529,8 @@ struct ZenHomeView: View {
         max(320, viewportHeight - 150)
     }
 
-    private func consumeRequestedAutoCheckInToast() {
-        guard let subjectID = requestedAutoCheckInToastSubjectID else { return }
-        requestedAutoCheckInToastSubjectID = nil
-        presentNotice(.automatic(subjectID: subjectID), durationMilliseconds: 5000)
-    }
-
-    private func presentNotice(
-        _ notice: ZenHomeTransientNotice,
-        durationMilliseconds: UInt64
-    ) {
-        transientNoticeTask?.cancel()
-        if reduceMotion {
-            transientNotice = notice
-        } else {
-            withAnimation(GoMotion.zStackPopup) {
-                transientNotice = notice
-            }
-        }
-        transientNoticeTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: durationMilliseconds) {
-            guard transientNotice == notice else { return }
-            if reduceMotion {
-                transientNotice = nil
-            } else {
-                withAnimation(GoMotion.quick) {
-                    transientNotice = nil
-                }
-            }
-            transientNoticeTask = nil
-        }
-    }
-
     private func finishManualCheckIn(subjectID: String) {
         pendingSubjectIDs.remove(subjectID)
-        OhanaFeedback.success()
-    }
-
-    private func finishCheckInAll() {
-        pendingSubjectIDs.removeAll()
-        isCheckingInAll = false
         OhanaFeedback.success()
     }
 
@@ -507,6 +565,12 @@ struct ZenHomeView: View {
         }
     }
 
+    private func requestUndoCheckIn(_ subject: ZenPresenceSubjectDTO) {
+        guard subject.checkedToday,
+              !pendingSubjectIDs.contains(subject.id) else { return }
+        undoConfirmationSubject = subject
+    }
+
     private func undoCheckIn(_ subject: ZenPresenceSubjectDTO) {
         guard subject.checkedToday,
               !pendingSubjectIDs.contains(subject.id) else { return }
@@ -522,27 +586,6 @@ struct ZenHomeView: View {
             await OhanaFrameScheduler.waitAfterNextFrame()
             await actions.onUndoCheckIn(subject.id, subject.kind)
             pendingSubjectIDs.remove(subject.id)
-        }
-    }
-
-    private func checkInAll() {
-        guard !isCheckingInAll,
-              !ZenPresencePresentation.allChecked(snapshot.subjects)
-        else { return }
-
-        let uncheckedSubjectIDs = snapshot.subjects
-            .filter { !$0.checkedToday }
-            .map(\.id)
-        isCheckingInAll = true
-        let now = Date()
-        for subjectID in uncheckedSubjectIDs {
-            beginPendingCheckIn(for: subjectID, at: now)
-        }
-
-        Task {
-            await OhanaFrameScheduler.waitAfterNextFrame()
-            await actions.onCheckInAll()
-            finishCheckInAll()
         }
     }
 
@@ -708,6 +751,7 @@ nonisolated enum ZenCardScoreSelectionPolicy {
     static let pointsPerStep: CGFloat = 18
     static let defaultScore = 5
     static let quickTapSuppressionDuration: TimeInterval = 0.18
+    static let minimumConfirmedSelectionDuration: TimeInterval = 0.08
 
     static func initialScore(currentScore: Int?) -> Int {
         min(max(currentScore ?? defaultScore, 1), 10)
@@ -724,6 +768,14 @@ nonisolated enum ZenCardScoreSelectionPolicy {
 
     static func suppressesQuickTap(now: Date, deadline: Date) -> Bool {
         now < deadline
+    }
+
+    static func permitsScoreCommit(
+        startedAtUptime: TimeInterval?,
+        endedAtUptime: TimeInterval
+    ) -> Bool {
+        guard let startedAtUptime else { return false }
+        return endedAtUptime - startedAtUptime >= minimumConfirmedSelectionDuration
     }
 }
 
@@ -748,6 +800,7 @@ private struct ZenPresenceWalletCard: View {
     @GestureState private var isScoreGestureActive = false
     @State private var gestureStartScore = ZenCardScoreSelectionPolicy.defaultScore
     @State private var gesturePreviewScore: Int?
+    @State private var scoreSelectionStartedAtUptime: TimeInterval?
     @State private var quickTapSuppressionDeadline = Date.distantPast
     @State private var displayedBackgroundState: ZenPresencePresentation.CardBackgroundState
     @State private var outgoingBackgroundState: ZenPresencePresentation.CardBackgroundState?
@@ -1045,17 +1098,47 @@ private struct ZenPresenceWalletCard: View {
                     ko: "길게 누른 채 위아래로 움직이고 놓아서 상태 점수를 저장하세요",
                     it: "Tieni premuto, scorri in alto o in basso e rilascia per salvare"
                 )
-            : localization.tr(
-                    zh: "轻点快速打卡；按住并上下滑动可同时选择状态分数",
-                    en: "Tap for a quick check-in; press and slide up or down to include a status score",
-                    de: "Tippen für schnellen Check-in; gedrückt halten und ziehen, um einen Statuswert hinzuzufügen",
-                    es: "Toca para un check-in rápido; mantén y desliza para incluir una puntuación",
-                    pt: "Toque para check-in rápido; mantenha e deslize para incluir uma pontuação",
-                    fr: "Touchez pour un check-in rapide ; maintenez et glissez pour ajouter un score",
-                    ja: "タップでクイックチェックイン。長押しして上下に動かすと状態スコアも記録",
-                    ko: "탭하여 빠르게 체크인하고 길게 눌러 위아래로 움직이면 상태 점수도 기록해요",
-                    it: "Tocca per il check-in rapido; tieni premuto e scorri per includere un punteggio"
-                )
+            : uncheckedCardActionAccessibilityHint
+    }
+
+    private var uncheckedCardActionAccessibilityHint: String {
+        if subject.isOwner {
+            return localization.tr(
+                zh: "轻点确认今天平安；按住并上下滑动可同时选择状态分数",
+                en: "Tap to confirm you're safe today; press and slide to include a status score",
+                de: "Tippen, um dich heute zu bestätigen; gedrückt halten und ziehen für einen Statuswert",
+                es: "Toca para confirmar que estás bien; mantén y desliza para incluir una puntuación",
+                pt: "Toque para confirmar que está tudo bem; mantenha e deslize para incluir uma pontuação",
+                fr: "Touchez pour confirmer que tout va bien ; maintenez et glissez pour ajouter un score",
+                ja: "タップで今日の無事を確認。長押しして上下に動かすと状態スコアも記録",
+                ko: "탭해 오늘의 무사를 확인하고 길게 눌러 움직이면 상태 점수도 기록해요",
+                it: "Tocca per confermare che oggi stai bene; tieni premuto e scorri per aggiungere un punteggio"
+            )
+        }
+        if subject.kind == .human {
+            return localization.tr(
+                zh: "轻点记录今天已联系；按住并上下滑动可同时选择状态分数",
+                en: "Tap to record today's contact; press and slide to include a status score",
+                de: "Tippen, um den heutigen Kontakt zu erfassen; gedrückt halten und ziehen für einen Statuswert",
+                es: "Toca para registrar el contacto de hoy; mantén y desliza para incluir una puntuación",
+                pt: "Toque para registrar o contato de hoje; mantenha e deslize para incluir uma pontuação",
+                fr: "Touchez pour noter le contact du jour ; maintenez et glissez pour ajouter un score",
+                ja: "タップで今日の連絡を記録。長押しして上下に動かすと状態スコアも記録",
+                ko: "탭해 오늘의 연락을 기록하고 길게 눌러 움직이면 상태 점수도 기록해요",
+                it: "Tocca per registrare il contatto di oggi; tieni premuto e scorri per aggiungere un punteggio"
+            )
+        }
+        return localization.tr(
+            zh: "轻点记录今天的观察；按住并上下滑动可同时选择状态分数",
+            en: "Tap to record today's observation; press and slide to include a status score",
+            de: "Tippen, um die heutige Beobachtung zu erfassen; gedrückt halten und ziehen für einen Statuswert",
+            es: "Toca para registrar la observación de hoy; mantén y desliza para incluir una puntuación",
+            pt: "Toque para registrar a observação de hoje; mantenha e deslize para incluir uma pontuação",
+            fr: "Touchez pour noter l’observation du jour ; maintenez et glissez pour ajouter un score",
+            ja: "タップで今日の観察を記録。長押しして上下に動かすと状態スコアも記録",
+            ko: "탭해 오늘의 관찰을 기록하고 길게 눌러 움직이면 상태 점수도 기록해요",
+            it: "Tocca per registrare l’osservazione di oggi; tieni premuto e scorri per aggiungere un punteggio"
+        )
     }
 
     private var profileTransitionSourceID: String {
@@ -1115,8 +1198,8 @@ private struct ZenPresenceWalletCard: View {
             showsBorder: false,
             usesPlantSpecificBackground: false,
             showsStatusBadge: false,
-            compactMetricValueOverride: "\(subject.currentDisplayStreak)",
-            compactMetricUnitOverride: streakUnit,
+            compactMetricValueOverride: compactPrimaryMetricValue,
+            compactMetricUnitOverride: compactPrimaryMetricUnit,
             expandedContentStyle: presentation == .expanded ? .zenProfile : .standard,
             contentStyle: contentStyle
         )
@@ -1172,13 +1255,14 @@ private struct ZenPresenceWalletCard: View {
         for state: ZenPresencePresentation.CardBackgroundState
     ) -> FocusCard {
         let profile = subject.expandedProfile
+        let plantCompanionText = subject.plantCompanionText(localization)
         var card = FocusCard(
             id: cardID,
             name: subject.name,
             kind: subject.subtitle?.isEmpty == false ? subject.subtitle ?? subject.kind.title(localization) : subject.kind.title(localization),
             emoji: fallbackEmoji,
             color: state.accentColor,
-            streak: subject.currentDisplayStreak,
+            streak: subject.kind == .plant ? 0 : subject.currentDisplayStreak,
             coconutBalance: max(displayedCoconutBalance, 0),
             createdAt: subject.createdAt,
             avatarImageSignature: subject.avatarThumbnailSignature,
@@ -1192,8 +1276,8 @@ private struct ZenPresenceWalletCard: View {
             actions: []
         )
         card.ageText = profile?.metricValue(for: .age)
-        card.daysTogetherText = profile?.metricValue(for: .together)
-        card.togetherHeadlineText = profile?.metricHeadline(for: .together)
+        card.daysTogetherText = plantCompanionText ?? profile?.metricValue(for: .together)
+        card.togetherHeadlineText = plantCompanionText ?? profile?.metricHeadline(for: .together)
         card.zodiacText = profile?.metricValue(for: .zodiac)
         card.mbtiText = profile?.metricValue(for: .mbti)
         card.humanEquivalentAgeText = profile?.metricValue(for: .humanEquivalentAge)
@@ -1211,6 +1295,30 @@ private struct ZenPresenceWalletCard: View {
 
     private var compactStatusText: String {
         subject.zenCompactStatusText(localization)
+    }
+
+    private var compactPrimaryMetricValue: String {
+        if let companionDays = subject.plantCompanionDays() {
+            return "\(companionDays)"
+        }
+        return "\(subject.currentDisplayStreak)"
+    }
+
+    private var compactPrimaryMetricUnit: String {
+        guard let companionDays = subject.plantCompanionDays() else {
+            return streakUnit
+        }
+        return localization.tr(
+            zh: "天",
+            en: companionDays == 1 ? "day" : "days",
+            de: companionDays == 1 ? "Tag" : "Tage",
+            es: companionDays == 1 ? "día" : "días",
+            pt: companionDays == 1 ? "dia" : "dias",
+            fr: companionDays == 1 ? "jour" : "jours",
+            ja: "日",
+            ko: "일",
+            it: companionDays == 1 ? "giorno" : "giorni"
+        )
     }
 
     private var streakUnit: String {
@@ -1241,7 +1349,9 @@ private struct ZenPresenceWalletCard: View {
     }
 
     private var accessibilityLabel: String {
-        subject.zenAccessibilityLabel(localization)
+        let base = subject.zenAccessibilityLabel(localization)
+        guard let companionText = subject.plantCompanionText(localization) else { return base }
+        return "\(base), \(companionText)"
     }
 
     private var backgroundAccessibilityValue: String {
@@ -1313,6 +1423,7 @@ private struct ZenPresenceWalletCard: View {
 
     private func beginScoreSelection() {
         guard !isPending, gesturePreviewScore == nil else { return }
+        scoreSelectionStartedAtUptime = ProcessInfo.processInfo.systemUptime
         let initialScore = ZenCardScoreSelectionPolicy.initialScore(
             currentScore: subject.status?.score
         )
@@ -1342,6 +1453,14 @@ private struct ZenPresenceWalletCard: View {
 
     private func commitScoreSelection() {
         guard let score = gesturePreviewScore else { return }
+        guard ZenCardScoreSelectionPolicy.permitsScoreCommit(
+            startedAtUptime: scoreSelectionStartedAtUptime,
+            endedAtUptime: ProcessInfo.processInfo.systemUptime
+        ) else {
+            cancelScoreSelection()
+            return
+        }
+        scoreSelectionStartedAtUptime = nil
         armQuickTapSuppression()
         onSelectScore(score)
         withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
@@ -1351,6 +1470,7 @@ private struct ZenPresenceWalletCard: View {
     }
 
     private func cancelScoreSelection() {
+        scoreSelectionStartedAtUptime = nil
         guard gesturePreviewScore != nil else { return }
         armQuickTapSuppression()
         withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
@@ -1578,96 +1698,6 @@ private struct ZenPresenceCardPlaceholderDeck: View {
     }
 }
 
-private enum ZenHomeTransientNotice: Hashable {
-    case automatic(subjectID: String)
-
-    var subjectID: String {
-        switch self {
-        case let .automatic(subjectID): subjectID
-        }
-    }
-}
-
-private struct ZenHomeCheckInNotice: View {
-    let subject: ZenPresenceSubjectDTO
-    let notice: ZenHomeTransientNotice
-    let localization: L10n
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 19, weight: .bold))
-                .foregroundStyle(Color(hex: "43A079"))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                .font(OhanaFont.callout(.bold))
-                .foregroundStyle(Color.ohanaPrimaryText)
-
-                if let detail {
-                    Text(detail)
-                        .font(OhanaFont.caption())
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-            }
-
-            Spacer(minLength: 6)
-        }
-        .padding(.horizontal, 15)
-        .frame(minHeight: 58)
-        .modifier(ZenNativeGlassSurfaceModifier(cornerRadius: OhanaRadius.controlLarge))
-        .shadow(color: Color.arkInk.opacity(0.12), radius: 14, y: 6) // ui-v4: allow transient success toast above moving cards
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier(accessibilityIdentifier)
-    }
-
-    private var title: String {
-        switch notice {
-        case .automatic:
-            localization.tr(
-                zh: "\(subject.name) 今天已自动打卡",
-                en: "\(subject.name) checked in automatically",
-                de: "\(subject.name) wurde automatisch eingecheckt",
-                es: "Check-in automático de \(subject.name) completado",
-                pt: "Check-in automático de \(subject.name) concluído",
-                fr: "Check-in automatique de \(subject.name) effectué",
-                ja: "\(subject.name)さんを自動でチェックインしました",
-                ko: "\(subject.name) 님이 자동으로 체크인했어요",
-                it: "Check-in automatico di \(subject.name) completato"
-            )
-        }
-    }
-
-    private var detail: String? {
-        let parts = [
-            subject.checkedAt?.formatted(date: .omitted, time: .shortened),
-            subject.status.map { "\($0.score)/10" }
-        ].compactMap(\.self)
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-
-    private var accessibilityIdentifier: String {
-        switch notice {
-        case .automatic: "zen-home-auto-check-in-toast"
-        }
-    }
-}
-
-private struct ZenNativeGlassSurfaceModifier: ViewModifier {
-    let cornerRadius: CGFloat
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        if reduceTransparency {
-            content.background(Color.ohanaCardSurfaceElevated, in: shape)
-        } else {
-            content.glassEffect(.regular.interactive(false), in: shape)
-        }
-    }
-}
-
 private struct ZenCardAccessorySurfaceModifier: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -1802,7 +1832,14 @@ private struct ZenExpandedCardDetails: View {
     }
 
     private var accessibilitySummary: String {
-        let metricText = profile.metrics.map { "\($0.label): \($0.value)" }.joined(separator: ", ")
+        let metricText = profile.metrics.map { metric in
+            if metric.kind == .together,
+               let companionText = subject.plantCompanionText(localization) {
+                return companionText
+            }
+            return "\(metric.label): \(metric.value)"
+        }
+        .joined(separator: ", ")
         return [metricText, profile.personalityStory, statusQuip]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty }
             .joined(separator: ". ")

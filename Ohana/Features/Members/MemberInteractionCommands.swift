@@ -146,7 +146,8 @@ enum MemberLifecycleCommandService {
     static func markHumanPassedAway(
         _ human: Human,
         date: Date,
-        context: ModelContext
+        context: ModelContext,
+        userDefaults: UserDefaults = .standard
     ) -> MemberLifecycleCommandResult {
         guard MemberLifecycleGate.disposition(human: human, writeKind: .lifecycle(.markPassedAway)).isAllowed else {
             return .noOp(entityID: human.id, kind: EntityKind.human.rawValue)
@@ -180,6 +181,7 @@ enum MemberLifecycleCommandService {
             context: context
         )
         if result.didPersist {
+            HumanAppleHealthBindingStore.invalidateIfBound(to: human.id, defaults: userDefaults)
             MemberLifecycleActiveScheduleNotifications.cancel(notificationIDs)
         }
         return result
@@ -459,13 +461,15 @@ struct MemberCommandExecutor {
     let revisions: DomainRevisionPublishing
     let questManager: QuestManager
     let personalAccessLevel: PersonalAccessLevel
+    let medicationReminders: MedicationReminderManaging?
 
     init(context: ModelContext) {
         self.init(
             context: context,
             revisions: SharedDomainRevisionPublisher(),
             questManager: QuestManager(),
-            personalAccessLevel: .personal
+            personalAccessLevel: .personal,
+            medicationReminders: nil
         )
     }
 
@@ -474,7 +478,8 @@ struct MemberCommandExecutor {
             context: context,
             revisions: SharedDomainRevisionPublisher(center: revisionCenter),
             questManager: QuestManager(),
-            personalAccessLevel: .personal
+            personalAccessLevel: .personal,
+            medicationReminders: nil
         )
     }
 
@@ -483,7 +488,8 @@ struct MemberCommandExecutor {
             context: context,
             revisions: services.domainRevisions,
             questManager: services.questManager,
-            personalAccessLevel: services.commerce.personalAccessLevel
+            personalAccessLevel: services.commerce.personalAccessLevel,
+            medicationReminders: services.medicationReminders
         )
     }
 
@@ -491,12 +497,14 @@ struct MemberCommandExecutor {
         context: ModelContext,
         revisions: DomainRevisionPublishing,
         questManager: QuestManager,
-        personalAccessLevel: PersonalAccessLevel = .personal
+        personalAccessLevel: PersonalAccessLevel = .personal,
+        medicationReminders: MedicationReminderManaging? = nil
     ) {
         self.context = context
         self.revisions = revisions
         self.questManager = questManager
         self.personalAccessLevel = personalAccessLevel
+        self.medicationReminders = medicationReminders
     }
 
     @discardableResult
@@ -508,9 +516,35 @@ struct MemberCommandExecutor {
 
     @discardableResult
     func updateHumanProfile(_ human: Human, input: HumanProfileCommandInput, note: String) -> MemberProfileCommandResult {
+        let medicationWasPrivate = human.privateFields.contains(HumanPrivateField.medication.rawValue)
+        let requestedMedicationPrivacy = input.privateFieldsRaw?.contains(HumanPrivateField.medication.rawValue)
+        let changesMedicationPrivacy = requestedMedicationPrivacy.map { $0 != medicationWasPrivate } ?? false
+        if changesMedicationPrivacy {
+            medicationReminders?.invalidateNotificationMutations()
+        }
         let result = MemberProfileCommandService.updateHuman(human, input: input, context: context)
         revisions.publishMemberProfile(result, note: note)
+        let medicationIsPrivate = human.privateFields.contains(HumanPrivateField.medication.rawValue)
+        if changesMedicationPrivacy && (!result.didPersist || medicationIsPrivate != medicationWasPrivate) {
+            refreshMedicationNotificationsAfterProfileMutation()
+        }
         return result
+    }
+
+    private func refreshMedicationNotificationsAfterProfileMutation() {
+        guard let medicationReminders else { return }
+        Task { @MainActor in
+            let result = await medicationReminders.refreshScheduledMedicationReminders(
+                context: context,
+                hidingDetails: MedicationNotificationPrivacyStore.hidesMedicationDetails()
+            )
+            if !result.failureDescriptions.isEmpty {
+                OhanaLog.warning(
+                    "Medication notification privacy refresh after member profile edit had \(result.failureDescriptions.count) incomplete request(s).",
+                    category: "Care"
+                )
+            }
+        }
     }
 
     @discardableResult

@@ -90,10 +90,35 @@ interactions light and changes focused.
   entrypoint must reject the pinned Dogfood UDID. Destructive Simulator setup
   goes through `scripts/reset-test-simulator.sh` and may target only that test
   device.
-- Reuse `.build/DerivedData/tests`, `.build/DerivedData/dogfood`, and
-  `.build/DerivedData/release`; do not create task-, TFU-, branch-, or
-  timestamp-named DerivedData. Build/test preflight stops below 20 GiB free and
-  reports oversized `.build` or Simulator caches before doing work.
+
+### Xcode Test and Disk Safety
+
+- Run local Xcode tests only through `scripts/xcode-test.sh`. Its default is one
+  narrow smoke suite; full Unit, UI, coverage, repetition, and parallel workers
+  require explicit options. Do not assemble ad hoc `xcodebuild test` commands.
+- Reuse the hashed cache outside the source tree printed by the entrypoint. It
+  is shared by every worktree and has only `tests`, `dogfood`, and `release`
+  lanes. Never create task-, TFU-, branch-, worktree-, or timestamp-named
+  DerivedData.
+- Honor an ignored `.build/xcode-cache-parent` machine override. If its volume
+  is unavailable, stop; never fall back and refill the internal disk.
+- One atomic project lock serializes all local Xcode builds/tests. Do not bypass
+  it unless the user explicitly accepts concurrent shared-cache risk.
+- Successful xcresults and screenshot attachments are deleted by default.
+  Keep at most the newest three failed xcresults for seven days; keep at most
+  one explicitly requested successful result.
+- The unified entrypoint may prune only metadata-verified dead Ohana app
+  replacements from the shutdown `iPhone 17 Tests`; it never prunes the active
+  app, unverified Simulator caches, another Simulator, or Dogfood data.
+- Build/test preflight stops below 20 GiB free and reports pre/post disk,
+  DerivedData, and result-store deltas. Use `scripts/xcode-storage-audit.sh`
+  before cleanup and apply only a reviewed token from
+  `scripts/cleanup-local-build-storage.sh`.
+- Never globally delete Xcode, Simulator, runtime, Archive, or DeviceSupport
+  data. If one test fails or grows abnormally twice, stop rerunning it and run
+  the storage audit before any retry.
+- Cleanup may remove Dogfood's reproducible build cache, but never the pinned
+  Dogfood Simulator, app data, SwiftData store, identity seal, or evidence.
 - Documentation-only changes need `git diff --check` and only the relevant
   documentation or governance audit; never build the app for them.
 - Small visual changes use path-scoped UI/accessibility checks when applicable;

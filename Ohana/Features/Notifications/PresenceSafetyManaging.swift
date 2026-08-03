@@ -18,6 +18,7 @@ protocol PresenceSafetyManaging {
         context: ModelContext
     ) throws
     func deleteContact(id: UUID, context: ModelContext) throws
+    func deleteAllContacts(context: ModelContext) throws -> Int
     func activateReminder(
         _ configuration: PresenceReminderConfiguration,
         capabilities: OhanaPlanCapabilities,
@@ -72,6 +73,10 @@ struct LivePresenceSafetyManager: PresenceSafetyManaging {
 
     func deleteContact(id: UUID, context: ModelContext) throws {
         try SafetyContactCommandService.delete(id: id, context: context) // derived-state: allow delegated device-local contact deletion
+    }
+
+    func deleteAllContacts(context: ModelContext) throws -> Int {
+        try SafetyContactCommandService.deleteAll(context: context)
     }
 
     func activateReminder(

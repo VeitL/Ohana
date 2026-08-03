@@ -66,22 +66,22 @@ struct CoconutShopPresentationTests {
         )
     }
 
-    @Test func manualRecoveryOnlyOffersRetryWhenAStoredPrerequisiteCanChange() {
+    @Test func manualRecoveryOffersRetryForRecoverableFinalSaleStates() {
         for reason in [
             "catalogItemMissing",
+            "catalogPriceChanged",
+            "unsupportedFulfillmentKind",
             "missingFundingSnapshot",
             "invalidFundingSnapshot",
             "missingOrFrozenRefundRecipient",
+            "invalidPurchaseSnapshot",
             "manualRecoveryPersistenceFailed"
         ] {
             #expect(ShopManualRecoveryActionPolicy.canRetry(reasonCode: reason))
         }
 
         for reason in [
-            "catalogPriceChanged",
-            "invalidPurchaseSnapshot",
             "legacyFulfillmentUnverifiable",
-            "unsupportedFulfillmentKind",
             "legacyUnknownFailure"
         ] {
             #expect(!ShopManualRecoveryActionPolicy.canRetry(reasonCode: reason))
@@ -89,24 +89,36 @@ struct CoconutShopPresentationTests {
         #expect(!ShopManualRecoveryActionPolicy.canRetry(reasonCode: nil))
     }
 
-    @Test func refundFundingSnapshotRequiresPositiveUniqueExactContributions() {
-        let first = UUID()
-        let second = UUID()
-        #expect(ShopPurchaseFundingSnapshotValidator.isValid([
-            ShopPurchaseFundingContribution(humanID: first, amount: 100),
-            ShopPurchaseFundingContribution(humanID: second, amount: 200)
-        ], expectedTotal: 300))
-        #expect(!ShopPurchaseFundingSnapshotValidator.isValid([
-            ShopPurchaseFundingContribution(humanID: first, amount: 150),
-            ShopPurchaseFundingContribution(humanID: first, amount: 150)
-        ], expectedTotal: 300))
-        #expect(!ShopPurchaseFundingSnapshotValidator.isValid([
-            ShopPurchaseFundingContribution(humanID: first, amount: -1),
-            ShopPurchaseFundingContribution(humanID: second, amount: 301)
-        ], expectedTotal: 300))
-        #expect(!ShopPurchaseFundingSnapshotValidator.isValid([
-            ShopPurchaseFundingContribution(humanID: first, amount: Int.max),
-            ShopPurchaseFundingContribution(humanID: second, amount: 1)
-        ], expectedTotal: Int.max))
+    @Test func limeGlowOnlyAppliesToActivePetCards() {
+        #expect(HomeShopEffectPresentationPolicy.showsLimeGlow(
+            isEquipped: true,
+            isHuman: false,
+            isElectronicPet: false,
+            hasPassedAway: false
+        ))
+        #expect(!HomeShopEffectPresentationPolicy.showsLimeGlow(
+            isEquipped: false,
+            isHuman: false,
+            isElectronicPet: false,
+            hasPassedAway: false
+        ))
+        #expect(!HomeShopEffectPresentationPolicy.showsLimeGlow(
+            isEquipped: true,
+            isHuman: true,
+            isElectronicPet: false,
+            hasPassedAway: false
+        ))
+        #expect(!HomeShopEffectPresentationPolicy.showsLimeGlow(
+            isEquipped: true,
+            isHuman: false,
+            isElectronicPet: true,
+            hasPassedAway: false
+        ))
+        #expect(!HomeShopEffectPresentationPolicy.showsLimeGlow(
+            isEquipped: true,
+            isHuman: false,
+            isElectronicPet: false,
+            hasPassedAway: true
+        ))
     }
 }

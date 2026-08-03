@@ -6,19 +6,6 @@
 import Foundation
 import SwiftData
 
-enum ShopPurchaseRefundOutcome: Equatable, Sendable {
-    case refunded
-    case alreadyRefunded
-    case manualReview(String)
-
-    var didRefund: Bool {
-        switch self {
-        case .refunded, .alreadyRefunded: true
-        case .manualReview: false
-        }
-    }
-}
-
 @MainActor
 protocol ShopPurchaseFulfilling {
     @discardableResult
@@ -52,52 +39,11 @@ protocol ShopPurchaseFulfilling {
     ) throws -> Bool
 
     @discardableResult
-    func refundPurchaseOutcome(
+    func completeOwnershipPurchase(
         item: ShopItem,
         purchase: ShopPurchaseCommandResult,
-        humans: [Human],
-        context: ModelContext,
-        services: AppServices,
-        title: String,
-        reason: String,
-        now: Date
-    ) throws -> ShopPurchaseRefundOutcome
-
-    @discardableResult
-    func refundPurchase(
-        item: ShopItem,
-        purchase: ShopPurchaseCommandResult,
-        humans: [Human],
-        context: ModelContext,
-        services: AppServices,
-        title: String,
-        reason: String,
-        now: Date
+        context: ModelContext
     ) throws -> Bool
-}
-
-extension ShopPurchaseFulfilling {
-    @discardableResult
-    func refundPurchase(
-        item: ShopItem,
-        purchase: ShopPurchaseCommandResult,
-        humans: [Human],
-        context: ModelContext,
-        services: AppServices,
-        title: String,
-        reason: String
-    ) throws -> Bool {
-        try refundPurchase(
-            item: item,
-            purchase: purchase,
-            humans: humans,
-            context: context,
-            services: services,
-            title: title,
-            reason: reason,
-            now: Date()
-        )
-    }
 }
 
 @MainActor
@@ -201,11 +147,11 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
         }
 
         guard didApply else {
-            attempt.state = .refundPending
-            attempt.lastError = "fulfillmentRejected"
-            attempt.updatedAt = Date()
-            attempt.nextRetryAt = nil
-            _ = context.safeSaveResult(publishFailureEvent: true)
+            markFulfillmentPending(
+                attempt,
+                reason: "fulfillmentRejected",
+                context: context
+            )
             return false
         }
 
@@ -261,16 +207,6 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
             return markLegacyFulfillmentForReview(attempt, context: context)
         }
         let payload = decodedPayload ?? ShopPurchaseFulfillmentPayload(purchasedAt: attempt.createdAt)
-        if item.id == "boost_streak",
-           payload.purchasedAt.addingTimeInterval(172_800) <= Date() {
-            attempt.state = .refundPending
-            attempt.lastError = "streakFulfillmentExpired"
-            attempt.updatedAt = Date()
-            attempt.nextRetryAt = nil
-            _ = context.safeSaveResult(publishFailureEvent: true)
-            return false
-        }
-
         attempt.state = .fulfilling
         attempt.attemptCount += 1
         attempt.lastError = nil
@@ -288,11 +224,11 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
             attemptID: attempt.id,
             purchasedAt: payload.purchasedAt
         ) else {
-            attempt.state = .refundPending
-            attempt.lastError = "fulfillmentRejected"
-            attempt.updatedAt = Date()
-            attempt.nextRetryAt = nil
-            _ = context.safeSaveResult(publishFailureEvent: true)
+            markFulfillmentPending(
+                attempt,
+                reason: "fulfillmentRejected",
+                context: context
+            )
             return false
         }
 
@@ -318,7 +254,26 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
         context: ModelContext
     ) throws -> Bool {
         guard let item = ShopCatalog.item(id: submittedItem.id),
-              item.appIcon != nil,
+              item.appIcon != nil else {
+            return false
+        }
+        return try completeOwnershipPurchase(
+            item: item,
+            purchase: purchase,
+            context: context
+        )
+    }
+
+    @discardableResult
+    func completeOwnershipPurchase(
+        item submittedItem: ShopItem,
+        purchase: ShopPurchaseCommandResult,
+        context: ModelContext
+    ) throws -> Bool {
+        guard let item = ShopCatalog.item(id: submittedItem.id),
+              normalized(item) == normalized(submittedItem),
+              !item.isConsumable,
+              item.id != AppIconCatalog.defaultItemId,
               let attemptID = purchase.attemptID,
               let attempt = fetchAttempt(id: attemptID, context: context),
               attempt.itemId == item.id else {
@@ -342,156 +297,6 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
         attempt.nextRetryAt = nil
         try save(context: context)
         return true
-    }
-
-    @discardableResult
-    func refundPurchaseOutcome(
-        item submittedItem: ShopItem,
-        purchase: ShopPurchaseCommandResult,
-        humans _: [Human],
-        context: ModelContext,
-        services: AppServices,
-        title: String,
-        reason: String,
-        now: Date = Date()
-    ) throws -> ShopPurchaseRefundOutcome {
-        guard let item = ShopCatalog.item(id: submittedItem.id),
-              normalized(item) == normalized(submittedItem) else {
-            return .manualReview("invalidItem")
-        }
-        let attempt = purchase.attemptID.flatMap { fetchAttempt(id: $0, context: context) }
-        if attempt?.state == .refunded { return .alreadyRefunded }
-        if attempt?.state == .manualReview {
-            return .manualReview(attempt?.lastError ?? "manualReview")
-        }
-
-        guard purchase.itemID == item.id,
-              purchase.cost == item.cost,
-              item.cost == 0 || attempt != nil,
-              attempt.map({
-                  $0.itemId == item.id &&
-                      $0.price == item.cost &&
-                      purchase.transactionKey == $0.transactionKey
-              }) ?? true else {
-            return try markManualReview(
-                attempt,
-                reason: "invalidPurchaseSnapshot",
-                context: context,
-                now: now
-            )
-        }
-
-        let contributions = attempt.flatMap { decodeContributions($0.fundingContributionsJSON) }
-            ?? purchase.fundingContributions
-        guard ShopPurchaseFundingSnapshotValidator.isValid(
-            contributions,
-            expectedTotal: item.cost
-        ) else {
-            return try markManualReview(
-                attempt,
-                reason: contributions.isEmpty ? "missingFundingSnapshot" : "invalidFundingSnapshot",
-                context: context,
-                now: now
-            )
-        }
-        let recipients = contributions.compactMap { contribution -> (ShopPurchaseFundingContribution, Human)? in
-            guard let human = fetchHuman(id: contribution.humanID.uuidString, context: context),
-                  EconomyWalletWritePolicy.canWrite(human) else { return nil }
-            return (contribution, human)
-        }
-        guard recipients.count == contributions.count else {
-            return try markManualReview(attempt, reason: "missingOrFrozenRefundRecipient", context: context, now: now)
-        }
-
-        if let attempt {
-            attempt.state = .refundPending
-            attempt.updatedAt = now
-            attempt.lastError = nil
-            attempt.nextRetryAt = nil
-        }
-        if !item.isConsumable, purchase.transactionKey != nil {
-            _ = try ShopPurchaseRecordStore.deleteOwnershipRecord(
-                itemID: item.id,
-                transactionKey: purchase.transactionKey,
-                context: context,
-                deletedAt: now
-            )
-        }
-
-        let refundSource = attempt?.transactionKey
-            ?? purchase.transactionKey
-            ?? purchase.ledgerEventID?.uuidString
-            ?? UUID().uuidString
-        let refundDeltas = recipients.map { pair in
-            let (contribution, recipient) = pair
-            return CoconutWalletDelta.human(
-                recipient,
-                delta: contribution.amount,
-                entryKind: .refund,
-                source: .shop,
-                title: title,
-                emoji: item.emoji,
-                actorId: recipient.id.uuidString,
-                actorName: recipient.name,
-                subjectKind: .system,
-                subjectId: nil,
-                sourceModelName: "ShopCatalog",
-                sourceModelId: item.id,
-                careLedgerEventId: purchase.ledgerEventID?.uuidString,
-                metadataJSON: "{\"shopItemId\":\"\(item.id)\",\"refund\":true,\"reason\":\"\(reason)\",\"purchaseTransactionKey\":\"\(refundSource)\"}",
-                transactionKey: "shop:\(item.id):refund:\(recipient.id.uuidString):\(refundSource)"
-            )
-        }
-        if !refundDeltas.isEmpty {
-            try services.coconutWallet.apply(
-                deltas: refundDeltas,
-                context: context,
-                save: false,
-                postsRewardFeedback: true,
-                updatesProjection: true,
-                projectionManager: services.questManager
-            )
-        }
-        if let attempt {
-            attempt.state = .refunded
-            attempt.refundedAt = now
-            attempt.updatedAt = now
-            attempt.lastError = nil
-            attempt.nextRetryAt = nil
-        }
-        do {
-            try save(context: context)
-        } catch {
-            services.coconutWallet.refreshQuestProjection(
-                context: context,
-                manager: services.questManager
-            )
-            throw error
-        }
-        return .refunded
-    }
-
-    @discardableResult
-    func refundPurchase(
-        item: ShopItem,
-        purchase: ShopPurchaseCommandResult,
-        humans: [Human],
-        context: ModelContext,
-        services: AppServices,
-        title: String,
-        reason: String,
-        now: Date = Date()
-    ) throws -> Bool {
-        try refundPurchaseOutcome(
-            item: item,
-            purchase: purchase,
-            humans: humans,
-            context: context,
-            services: services,
-            title: title,
-            reason: reason,
-            now: now
-        ).didRefund
     }
 
     private func latestRecoverableAttempt(itemID: String, context: ModelContext) -> ShopPurchaseAttempt? {
@@ -523,21 +328,6 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
         return try? context.fetch(descriptor).first
     }
 
-    private func markManualReview(
-        _ attempt: ShopPurchaseAttempt?,
-        reason: String,
-        context: ModelContext,
-        now: Date
-    ) throws -> ShopPurchaseRefundOutcome {
-        guard let attempt else { return .manualReview(reason) }
-        attempt.state = .manualReview
-        attempt.lastError = reason
-        attempt.updatedAt = now
-        attempt.nextRetryAt = nil
-        try save(context: context)
-        return .manualReview(reason)
-    }
-
     private func markLegacyFulfillmentForReview(
         _ attempt: ShopPurchaseAttempt,
         context: ModelContext
@@ -548,6 +338,21 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
         attempt.nextRetryAt = nil
         _ = context.safeSaveResult(publishFailureEvent: true)
         return false
+    }
+
+    private func markFulfillmentPending(
+        _ attempt: ShopPurchaseAttempt,
+        reason: String,
+        context: ModelContext
+    ) {
+        let now = Date()
+        attempt.state = .purchased
+        attempt.lastError = reason
+        attempt.updatedAt = now
+        attempt.nextRetryAt = now.addingTimeInterval(
+            min(300, Double(max(1, attempt.attemptCount)) * 10)
+        )
+        _ = context.safeSaveResult(publishFailureEvent: true)
     }
 
     private func isTreeEnergyItem(_ itemID: String) -> Bool {
@@ -564,10 +369,6 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
 
     private func decodePayload(_ raw: String) -> ShopPurchaseFulfillmentPayload? {
         decode(ShopPurchaseFulfillmentPayload.self, from: raw)
-    }
-
-    private func decodeContributions(_ raw: String) -> [ShopPurchaseFundingContribution]? {
-        decode([ShopPurchaseFundingContribution].self, from: raw)
     }
 
     private func decode<Value: Decodable>(_: Value.Type, from raw: String) -> Value? {
@@ -588,12 +389,7 @@ struct ShopPurchaseFulfillmentService: ShopPurchaseFulfilling {
     }
 
     private func isInventoryConsumable(_ itemID: String) -> Bool {
-        switch itemID {
-        case "boost_double", "boost_streak", "boost_backdate_single", "boost_backdate_pack", Avatar2DAccess.shopItemId:
-            true
-        default:
-            false
-        }
+        ShopProductApplicationCatalog.application(for: itemID).isInventoryConsumable
     }
 }
 
@@ -606,7 +402,7 @@ enum ShopPurchaseFulfillmentError: LocalizedError, Equatable {
             message ?? String(
                 localized: "shop.purchase.fulfillment.persistence.failed",
                 defaultValue: "Unable to save the shop purchase update.",
-                comment: "Shown when a shop purchase fulfillment or refund fails to save."
+                comment: "Shown when a shop purchase fulfillment update fails to save."
             )
         }
     }

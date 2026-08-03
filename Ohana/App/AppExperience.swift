@@ -202,7 +202,7 @@ final class AppExperienceController {
             zenOwnerBindingState = .unavailable
         case _ where requiresExplicitRebind:
             // Deleting or memorializing the bound owner is a safety boundary.
-            // Never silently move automatic check-ins to another person.
+            // Never silently move the explicit safety-confirmation identity.
             zenOwnerBindingState = .requiresSelection(orderedHumans)
         case 1:
             bindZenOwner(orderedHumans[0].id)

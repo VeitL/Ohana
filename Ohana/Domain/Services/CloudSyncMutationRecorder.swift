@@ -143,6 +143,36 @@ nonisolated enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markModified(
+        _ condition: HumanHealthCondition,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markHumanScopedModified(
+            HumanHealthCondition.self,
+            id: condition.id,
+            humanId: condition.humanId,
+            context: context,
+            modifiedAt: modifiedAt
+        )
+    }
+
+    @discardableResult
+    static func markModified(
+        _ observation: HumanHealthObservation,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markHumanScopedModified(
+            HumanHealthObservation.self,
+            id: observation.id,
+            humanId: observation.humanId,
+            context: context,
+            modifiedAt: modifiedAt
+        )
+    }
+
+    @discardableResult
+    static func markModified(
         _ log: HumanMedicationLog,
         context: ModelContext,
         modifiedAt: Date = Date()

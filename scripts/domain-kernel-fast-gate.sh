@@ -202,9 +202,9 @@ fi
 if [[ "${run_tests}" == "1" ]]; then
   test_args=()
   for target in "${TEST_TARGETS[@]}"; do
-    test_args+=("-only-testing:${target}")
+    test_args+=(--only-testing "${target}")
   done
-  run_step "targeted Domain/Economy kernel tests" scripts/test-simulator.sh "${test_args[@]}"
+  run_step "targeted Domain/Economy kernel tests" scripts/xcode-test.sh "${test_args[@]}"
 fi
 
 if [[ "${run_build}" == "1" ]]; then

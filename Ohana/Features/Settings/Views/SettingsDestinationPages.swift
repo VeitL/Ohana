@@ -123,7 +123,7 @@ struct SettingsRegionLanguagePage: View {
             }
             Spacer()
             Menu {
-                ForEach(AppCountry.supported) { country in
+                ForEach(sortedCountryOptions) { country in
                     Button {
                         applyCountryDefaults(country)
                     } label: {
@@ -135,6 +135,18 @@ struct SettingsRegionLanguagePage: View {
             }
         }
         .frame(minHeight: 44)
+    }
+
+    private var sortedCountryOptions: [AppCountry.Option] {
+        l.sortedCatalogValues(
+            AppCountry.supported,
+            key: \.code,
+            otherKey: nil,
+            displayName: { code in
+                AppCountry.supported.first(where: { $0.code == code })?
+                    .displayName.resolve(appLanguage) ?? code
+            }
+        )
     }
 
     private var languageRow: some View {

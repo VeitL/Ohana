@@ -4,6 +4,26 @@ import XCTest
 @testable import Ohana
 
 final class SharedModelContainerRecoveryTests: XCTestCase {
+    func testBackupExclusionFailureStopsBeforeAnyPersistentStoreOpenAttempt() {
+        var attemptedStoreKinds: [SharedModelContainerStoreKind] = []
+
+        XCTAssertThrowsError(try SharedModelContainerCreationPolicy.open(
+            preparingLocalPersistence: {
+                throw StoreOpenTestError.backupExclusionRejected
+            },
+            using: { storeKind -> String in
+                attemptedStoreKinds.append(storeKind)
+                return storeKind.rawValue
+            }
+        )) { error in
+            let failure = error as? SharedModelContainerPrivacyPreparationFailure
+            XCTAssertNotNil(failure)
+            XCTAssertTrue(failure?.underlyingDescription.isEmpty == false)
+        }
+
+        XCTAssertTrue(attemptedStoreKinds.isEmpty)
+    }
+
     func testEveryAutomaticOpenAttemptUsesOneWritablePrimaryIdentity() {
         XCTAssertEqual(
             SharedModelContainerOpenPolicy.orderedAttempts,
@@ -157,7 +177,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     func testCloudSyncTombstoneDefaultLandsOnLatestLightweightSchema() {
-        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV96.self))
+        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV98.self))
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
     }
 
@@ -476,6 +496,151 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
             XCTAssertEqual(noteRecord.recordedByHumanId, recorderID.uuidString)
             XCTAssertEqual(try context.fetch(FetchDescriptor<Human>()).map(\.name), ["FixtureHuman"])
             XCTAssertEqual(try context.fetch(FetchDescriptor<Plant>()).map(\.name), ["Codex Pothos Seed-1"])
+        }
+    }
+
+    @MainActor
+    func testRealV90HealthRowsBinaryStoreMigratesToV98WithoutLosingLegacyValues() throws {
+        let fixtureURL = try v90HealthRowsFixtureStoreURL()
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaRealV90HealthRowsToV98MigrationTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("default.store")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        try FileManager.default.copyItem(at: fixtureURL, to: storeURL)
+
+        XCTAssertEqual(
+            try sqliteScalar(at: storeURL, sql: "SELECT COUNT(*) FROM ZHUMANHEALTHREPORT"),
+            1
+        )
+        XCTAssertEqual(
+            try sqliteScalar(at: storeURL, sql: "SELECT COUNT(*) FROM ZHUMANHEALTHMETRICLOG"),
+            1
+        )
+        XCTAssertEqual(
+            try sqliteScalar(
+                at: storeURL,
+                sql: "SELECT Z_MAX FROM Z_PRIMARYKEY WHERE Z_NAME = 'HumanHealthReport'"
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try sqliteScalar(
+                at: storeURL,
+                sql: "SELECT Z_MAX FROM Z_PRIMARYKEY WHERE Z_NAME = 'HumanHealthMetricLog'"
+            ),
+            1
+        )
+        XCTAssertEqual(
+            try sqliteScalar(
+                at: storeURL,
+                sql: "SELECT COUNT(*) FROM pragma_table_info('ZHUMANHEALTHREPORT') "
+                    + "WHERE name IN ('ZRECORDEDBYHUMANID', 'ZCAPTURESOURCERAW')"
+            ),
+            0
+        )
+        XCTAssertEqual(
+            try sqliteScalar(
+                at: storeURL,
+                sql: "SELECT COUNT(*) FROM pragma_table_info('ZHUMANHEALTHMETRICLOG') "
+                    + "WHERE name IN ('ZRECORDEDBYHUMANID', 'ZSOURCEREPORTID', 'ZSOURCELABEL', "
+                    + "'ZREFERENCELOW', 'ZREFERENCEHIGH', 'ZREFERENCERANGETEXT', 'ZREPORTEDFLAGRAW')"
+            ),
+            0
+        )
+
+        let scanReportID = UUID()
+        let scanMetricID = UUID()
+        let recordedAt = Date(timeIntervalSince1970: 1_901_000_000)
+        let schema = Schema(ArkSchemaV98.models)
+
+        do {
+            let configuration = ModelConfiguration(
+                "RealV90HealthRowsToV98Migration",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [configuration]
+            )
+            let context = container.mainContext
+            let human = try assertMigratedV90HealthRows(context: context)
+
+            let report = HumanHealthReport(
+                id: scanReportID,
+                humanId: human.id.uuidString,
+                reportType: .bloodTest,
+                conclusion: .attention,
+                reportDate: recordedAt,
+                recordedByHumanId: human.id.uuidString,
+                captureSource: .documentScan
+            )
+            let metric = HumanHealthMetricLog(
+                id: scanMetricID,
+                metricKey: "tsh",
+                unitCode: "mIU_L",
+                value: 4.8,
+                date: recordedAt,
+                recordedByHumanId: human.id.uuidString,
+                sourceReportID: scanReportID,
+                sourceLabel: "TSH",
+                referenceLow: 0.4,
+                referenceHigh: 4.0,
+                referenceRangeText: "0.4–4.0",
+                reportedFlag: .high,
+                human: human
+            )
+            context.insert(report)
+            context.insert(metric)
+            try context.save()
+        }
+
+        do {
+            let configuration = ModelConfiguration(
+                "RealV90HealthRowsToV98Migration",
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            let container = try ModelContainer(
+                for: schema,
+                migrationPlan: ArkMigrationPlan.self,
+                configurations: [configuration]
+            )
+            let context = container.mainContext
+            let human = try assertMigratedV90HealthRows(context: context)
+            var reportDescriptor = FetchDescriptor<HumanHealthReport>(
+                predicate: #Predicate<HumanHealthReport> { $0.id == scanReportID }
+            )
+            reportDescriptor.fetchLimit = 1
+            var metricDescriptor = FetchDescriptor<HumanHealthMetricLog>(
+                predicate: #Predicate<HumanHealthMetricLog> { $0.id == scanMetricID }
+            )
+            metricDescriptor.fetchLimit = 1
+            let scanReport = try XCTUnwrap(context.fetch(reportDescriptor).first)
+            let scanMetric = try XCTUnwrap(context.fetch(metricDescriptor).first)
+
+            XCTAssertEqual(scanReport.humanId, human.id.uuidString)
+            XCTAssertEqual(scanReport.reportType, .bloodTest)
+            XCTAssertEqual(scanReport.conclusion, .attention)
+            XCTAssertEqual(scanReport.reportDate, recordedAt)
+            XCTAssertEqual(scanReport.recordedByHumanId, human.id.uuidString)
+            XCTAssertEqual(scanReport.captureSource, .documentScan)
+            XCTAssertEqual(scanMetric.human?.id, human.id)
+            XCTAssertEqual(scanMetric.value, 4.8)
+            XCTAssertEqual(scanMetric.date, recordedAt)
+            XCTAssertEqual(scanMetric.recordedByHumanId, human.id.uuidString)
+            XCTAssertEqual(scanMetric.sourceReportID, scanReportID)
+            XCTAssertEqual(scanMetric.sourceLabel, "TSH")
+            XCTAssertEqual(scanMetric.referenceLow, 0.4)
+            XCTAssertEqual(scanMetric.referenceHigh, 4.0)
+            XCTAssertEqual(scanMetric.reportedFlag, .high)
+            XCTAssertEqual(scanMetric.referenceRangeText, "0.4–4.0")
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<HumanHealthReport>()), 2)
+            XCTAssertEqual(try context.fetchCount(FetchDescriptor<HumanHealthMetricLog>()), 2)
         }
     }
 
@@ -990,28 +1155,118 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
 
 private extension SharedModelContainerRecoveryTests {
     func v90FixtureStoreURL() throws -> URL {
+        try migrationFixtureStoreURL(
+            directoryName: "ArkSchemaV90",
+            expectedHealthReportCount: 0
+        )
+    }
+
+    func v90HealthRowsFixtureStoreURL() throws -> URL {
+        try migrationFixtureStoreURL(
+            directoryName: "ArkSchemaV90HealthRows",
+            storeFileName: "ark-schema-v90-health-rows.store",
+            expectedHealthReportCount: 1
+        )
+    }
+
+    func migrationFixtureStoreURL(
+        directoryName: String,
+        storeFileName: String = "default.store",
+        expectedHealthReportCount: Int64
+    ) throws -> URL {
         let bundle = Bundle(for: SharedModelContainerRecoveryTests.self)
+        let resourceURL = URL(fileURLWithPath: storeFileName)
         if let nestedURL = bundle.url(
-            forResource: "default",
-            withExtension: "store",
-            subdirectory: "Fixtures/ArkSchemaV90"
+            forResource: resourceURL.deletingPathExtension().lastPathComponent,
+            withExtension: resourceURL.pathExtension,
+            subdirectory: "Fixtures/\(directoryName)"
         ) {
             return nestedURL
-        }
-        if let flatURL = bundle.url(forResource: "default", withExtension: "store") {
-            return flatURL
         }
 
         guard let enumerator = FileManager.default.enumerator(
             at: bundle.bundleURL,
             includingPropertiesForKeys: nil
         ) else {
-            throw migrationFixtureError("Unable to enumerate the OhanaTests bundle for the V90 fixture.")
+            throw migrationFixtureError("Unable to enumerate the OhanaTests bundle for the \(directoryName) fixture.")
         }
-        for case let candidate as URL in enumerator where candidate.lastPathComponent == "default.store" {
-            return candidate
+        var storeCandidates: [URL] = []
+        for case let candidate as URL in enumerator where candidate.lastPathComponent == storeFileName {
+            if candidate.deletingLastPathComponent().lastPathComponent == directoryName {
+                return candidate
+            }
+            storeCandidates.append(candidate)
         }
-        throw migrationFixtureError("Missing Fixtures/ArkSchemaV90/default.store in the OhanaTests bundle.")
+        for candidate in storeCandidates {
+            let healthReportCount = try? sqliteScalar(
+                at: candidate,
+                sql: "SELECT COUNT(*) FROM ZHUMANHEALTHREPORT"
+            )
+            if healthReportCount == expectedHealthReportCount {
+                return candidate
+            }
+        }
+        throw migrationFixtureError("Missing Fixtures/\(directoryName)/\(storeFileName) in the OhanaTests bundle.")
+    }
+
+    @MainActor
+    func assertMigratedV90HealthRows(context: ModelContext) throws -> Human {
+        let humanID = try XCTUnwrap(UUID(uuidString: "58B6F77F-1913-4951-BBBF-C08B56858D97"))
+        let reportID = try XCTUnwrap(UUID(uuidString: "977E9A6B-90B4-4B84-AEF3-000000000090"))
+        let metricID = try XCTUnwrap(UUID(uuidString: "987E9A6B-90B4-4B84-AEF3-000000000090"))
+        var humanDescriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { $0.id == humanID }
+        )
+        humanDescriptor.fetchLimit = 1
+        var reportDescriptor = FetchDescriptor<HumanHealthReport>(
+            predicate: #Predicate<HumanHealthReport> { $0.id == reportID }
+        )
+        reportDescriptor.fetchLimit = 1
+        var metricDescriptor = FetchDescriptor<HumanHealthMetricLog>(
+            predicate: #Predicate<HumanHealthMetricLog> { $0.id == metricID }
+        )
+        metricDescriptor.fetchLimit = 1
+
+        let human = try XCTUnwrap(context.fetch(humanDescriptor).first)
+        let report = try XCTUnwrap(context.fetch(reportDescriptor).first)
+        let metric = try XCTUnwrap(context.fetch(metricDescriptor).first)
+
+        XCTAssertEqual(human.name, "FixtureHuman")
+        XCTAssertEqual(report.humanId, human.id.uuidString)
+        XCTAssertEqual(report.reportType, .bloodTest)
+        XCTAssertEqual(report.conclusion, .attention)
+        XCTAssertEqual(report.hospitalName, "Legacy General Hospital")
+        XCTAssertEqual(report.doctorName, "Dr. Ada Legacy")
+        XCTAssertEqual(report.reportDate.timeIntervalSinceReferenceDate, 805_807_800, accuracy: 0.001)
+        XCTAssertEqual(
+            try XCTUnwrap(report.nextCheckDate).timeIntervalSinceReferenceDate,
+            806_412_600,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(report.summary, "Legacy thyroid follow-up")
+        XCTAssertEqual(report.notes, "V90 report row must survive migration.")
+        XCTAssertEqual(report.colorHex, "123ABC")
+        XCTAssertEqual(report.createdAt.timeIntervalSinceReferenceDate, 805_807_820, accuracy: 0.001)
+        XCTAssertNil(report.recordedByHumanId)
+        XCTAssertEqual(report.captureSourceRaw, HumanHealthReportCaptureSource.manual.rawValue)
+        XCTAssertEqual(report.captureSource, .manual)
+
+        XCTAssertEqual(metric.human?.id, human.id)
+        XCTAssertEqual(metric.metricKey, "tsh")
+        XCTAssertEqual(metric.unitCode, "mIU_L")
+        XCTAssertEqual(metric.value, 3.75, accuracy: 0.000_001)
+        XCTAssertEqual(metric.date.timeIntervalSinceReferenceDate, 805_807_800, accuracy: 0.001)
+        XCTAssertEqual(metric.notes, "V90 metric row must survive migration.")
+        XCTAssertEqual(metric.createdAt.timeIntervalSinceReferenceDate, 805_807_830, accuracy: 0.001)
+        XCTAssertNil(metric.recordedByHumanId)
+        XCTAssertNil(metric.sourceReportID)
+        XCTAssertEqual(metric.sourceLabel, "")
+        XCTAssertNil(metric.referenceLow)
+        XCTAssertNil(metric.referenceHigh)
+        XCTAssertEqual(metric.referenceRangeText, "")
+        XCTAssertEqual(metric.reportedFlagRaw, HumanHealthMetricReportedFlag.unknown.rawValue)
+        XCTAssertEqual(metric.reportedFlag, .unknown)
+        return human
     }
 
     func sqliteScalar(at storeURL: URL, sql: String) throws -> Int64 {
@@ -1061,6 +1316,7 @@ private enum StoreOpenTestError: Error {
     case migrationPlanRejected
     case primaryUnavailable
     case diskFull
+    case backupExclusionRejected
 }
 
 private enum ArkSchemaV67OnlyMigrationPlan: SchemaMigrationPlan {

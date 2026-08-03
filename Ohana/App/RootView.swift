@@ -362,8 +362,11 @@ struct RootView: View {
             )
             let result = try service.checkInOwner(source: .notificationAction)
             if let ownerCheckIn = result.checkIns.first(where: \.isOwner) {
+                let guardian = appServices.guardianSafety
                 Task { @MainActor in
+                    await OhanaFrameScheduler.waitAfterNextFrame()
                     await SystemPresenceReminderScheduler().cancelToday(now: ownerCheckIn.checkedInAt)
+                    await guardian.flushOutbox()
                 }
             }
         } catch {

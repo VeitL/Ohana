@@ -139,8 +139,8 @@ struct DataBackupAtomicRestoreTests {
         brokenMetricRecorder.humanHealthMetricLogs = [
             HumanHealthMetricLogBackup(
                 id: UUID().uuidString,
-                metricKey: "steps",
-                unitCode: "count",
+                metricKey: "tsh",
+                unitCode: "mIU_L",
                 value: 10,
                 date: timestamp,
                 notes: "",
@@ -209,6 +209,51 @@ struct DataBackupAtomicRestoreTests {
             try assertPreflightFailure(
                 backup,
                 expected: .relationship,
+                petID: source.petID
+            )
+        }
+
+        var brokenMetricSourceReport = source.backup
+        brokenMetricSourceReport.humanHealthMetricLogs = [
+            HumanHealthMetricLogBackup(
+                id: UUID().uuidString,
+                metricKey: "tsh",
+                unitCode: "mIU_L",
+                value: 2.1,
+                date: timestamp,
+                notes: "",
+                humanId: restoredHumanID,
+                sourceReportID: UUID().uuidString,
+                createdAt: timestamp
+            )
+        ]
+        try assertPreflightFailure(
+            brokenMetricSourceReport,
+            expected: .relationship,
+            petID: source.petID
+        )
+
+        for (metricKey, unitCode, value) in [
+            ("unknown_metric", "mIU_L", 2.1),
+            ("tsh", "wrong_unit", 2.1),
+            ("tsh", "mIU_L", -1)
+        ] {
+            var invalidMetric = source.backup
+            invalidMetric.humanHealthMetricLogs = [
+                HumanHealthMetricLogBackup(
+                    id: UUID().uuidString,
+                    metricKey: metricKey,
+                    unitCode: unitCode,
+                    value: value,
+                    date: timestamp,
+                    notes: "",
+                    humanId: restoredHumanID,
+                    createdAt: timestamp
+                )
+            ]
+            try assertPreflightFailure(
+                invalidMetric,
+                expected: .businessValue,
                 petID: source.petID
             )
         }
@@ -377,6 +422,118 @@ struct DataBackupAtomicRestoreTests {
         #expect(!fixture.container.mainContext.hasChanges)
     }
 
+    @Test func restrictedRestorePreservesExistingMedicationPrivacyAndLocalMedication() throws {
+        let source = try makeBackup(includingHumanMedication: true)
+        let humanBackup = try #require(source.backup.humans.first)
+        let humanID = try #require(UUID(uuidString: humanBackup.id))
+        #expect(humanBackup.bloodType.isEmpty)
+        #expect(humanBackup.notes.isEmpty)
+        #expect(humanBackup.heightCm == nil)
+        #expect(humanBackup.privateFieldsRaw == nil)
+        #expect((source.backup.humanMedications ?? []).isEmpty)
+
+        let fixture = try makeTarget(petID: source.petID)
+        defer { fixture.removeDefaults() }
+        let existingHuman = Human(name: "Existing Human")
+        existingHuman.id = humanID
+        existingHuman.bloodType = "O-"
+        existingHuman.heightCm = 181
+        existingHuman.notes = "Existing local health note"
+        existingHuman.setPrivate(.medication, true)
+        let existingMedication = HumanMedication(
+            humanId: humanID.uuidString,
+            name: "Local medication"
+        )
+        fixture.container.mainContext.insert(existingHuman)
+        fixture.container.mainContext.insert(existingMedication)
+        try fixture.container.mainContext.save()
+
+        try fixture.manager.applyBackup(
+            source.backup,
+            context: fixture.container.mainContext,
+            projectionManager: nil,
+            schedulePlantNotifications: false,
+            plantNotifications: fixture.notifications
+        )
+
+        let restoredHuman = try #require(
+            try fixture.container.mainContext.fetch(FetchDescriptor<Human>()).first {
+                $0.id == humanID
+            }
+        )
+        let localMedications = try fixture.container.mainContext.fetch(FetchDescriptor<HumanMedication>())
+        #expect(restoredHuman.bloodType == "O-")
+        #expect(restoredHuman.heightCm == 181)
+        #expect(restoredHuman.notes == "Existing local health note")
+        #expect(restoredHuman.privateFields.contains(HumanPrivateField.medication.rawValue))
+        #expect(localMedications.count == 1)
+        #expect(localMedications.first?.id == existingMedication.id)
+    }
+
+    @Test func linkedLabReportRestoresBeforeItsConfirmedMetrics() throws {
+        let source = try makeBackup()
+        let humanID = try #require(source.backup.humans.first?.id)
+        let reportID = UUID()
+        let logID = UUID()
+        let timestamp = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: 1_700_000_600))
+        var backup = source.backup
+        backup.humanHealthReports = [
+            HumanHealthReportBackup(
+                id: reportID.uuidString,
+                humanId: humanID,
+                reportTypeRaw: HealthReportType.bloodTest.rawValue,
+                conclusionRaw: ReportConclusion.attention.rawValue,
+                hospitalName: "Local Lab",
+                doctorName: "",
+                reportDate: timestamp,
+                nextCheckDate: nil,
+                summary: "",
+                notes: "",
+                captureSourceRaw: "documentScan",
+                colorHex: "",
+                createdAt: timestamp
+            )
+        ]
+        backup.humanHealthMetricLogs = [
+            HumanHealthMetricLogBackup(
+                id: logID.uuidString,
+                metricKey: "tsh",
+                unitCode: "mIU_L",
+                value: 5.2,
+                date: timestamp,
+                notes: "",
+                humanId: humanID,
+                sourceReportID: reportID.uuidString,
+                sourceLabel: "TSH",
+                referenceLow: 0.4,
+                referenceHigh: 4,
+                referenceRangeText: "0.4–4.0",
+                reportedFlagRaw: "high",
+                createdAt: timestamp
+            )
+        ]
+        let fixture = try makeTarget(petID: source.petID)
+        defer { fixture.removeDefaults() }
+
+        try fixture.manager.applyBackup(
+            backup,
+            context: fixture.container.mainContext,
+            projectionManager: nil,
+            schedulePlantNotifications: false,
+            plantNotifications: fixture.notifications
+        )
+
+        let report = try #require(try fixture.container.mainContext.fetch(FetchDescriptor<HumanHealthReport>()).first)
+        let log = try #require(try fixture.container.mainContext.fetch(FetchDescriptor<HumanHealthMetricLog>()).first)
+        #expect(report.id == reportID)
+        #expect(report.captureSourceRaw == "documentScan")
+        #expect(log.id == logID)
+        #expect(log.sourceReportID == reportID)
+        #expect(log.referenceLow == 0.4)
+        #expect(log.referenceHigh == 4)
+        #expect(log.reportedFlagRaw == "high")
+    }
+
     // MARK: - Fixtures
 
     private struct BackupFixture {
@@ -406,7 +563,7 @@ struct DataBackupAtomicRestoreTests {
         let accounts: Int
     }
 
-    private func makeBackup() throws -> BackupFixture {
+    private func makeBackup(includingHumanMedication: Bool = false) throws -> BackupFixture {
         let suiteName = "DataBackupAtomicRestoreTests.Source.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -420,6 +577,12 @@ struct DataBackupAtomicRestoreTests {
         pet.createdAt = Date(timeIntervalSince1970: 1_700_000_000)
         let human = Human(name: "Restored Human")
         human.createdAt = Date(timeIntervalSince1970: 1_700_000_100)
+        if includingHumanMedication {
+            human.bloodType = "AB+"
+            human.heightCm = 172
+            human.notes = "Source health note"
+            human.setPrivate(.medication, true)
+        }
         let plant = Plant(name: "Restored Plant", wateringIntervalDays: 7, fertilizingIntervalDays: 30)
         plant.createdAt = Date(timeIntervalSince1970: 1_700_000_200)
         plant.remindersEnabled = false
@@ -434,6 +597,12 @@ struct DataBackupAtomicRestoreTests {
         context.insert(human)
         context.insert(plant)
         context.insert(careLog)
+        if includingHumanMedication {
+            context.insert(HumanMedication(
+                humanId: human.id.uuidString,
+                name: "Source medication"
+            ))
+        }
         try context.save()
 
         let manager = DataBackupManager(defaults: defaults)

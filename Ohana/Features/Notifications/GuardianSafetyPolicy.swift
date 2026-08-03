@@ -176,8 +176,8 @@ nonisolated struct GuardianSafetyEvaluationResult: Equatable, Sendable {
 }
 
 nonisolated enum GuardianSafetyEvaluationPolicy {
-    static let initialAlertMissCount = 2
-    static let followUpMissCount = 3
+    static let initialAlertMissCount = 1
+    static let followUpMissCount = 2
     static let maximumPauseDays = 30
     static let defaultGracePeriodMinutes = 60
 
@@ -219,7 +219,7 @@ nonisolated enum GuardianSafetyEvaluationPolicy {
         progress.consecutiveMisses += 1
         progress.lastGuardDayKey = occurrence.dayKey
 
-        if progress.consecutiveMisses == initialAlertMissCount,
+        if progress.consecutiveMisses >= initialAlertMissCount,
            !progress.didSubmitInitial {
             progress.isIncidentOpen = true
             progress.didSubmitInitial = true
@@ -229,7 +229,7 @@ nonisolated enum GuardianSafetyEvaluationPolicy {
             )
         }
 
-        if progress.consecutiveMisses == followUpMissCount,
+        if progress.consecutiveMisses >= followUpMissCount,
            progress.isIncidentOpen,
            progress.didSubmitInitial,
            !progress.didSubmitFollowUp,

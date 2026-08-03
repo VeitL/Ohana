@@ -144,8 +144,19 @@ final class AppServices {
                 questManager: graph.questManager,
                 automaticBackups: graph.automaticBackups,
                 prepareRuntimeForReset: {
+                    graph.medicationReminders.invalidateNotificationMutations()
+                    graph.systemSurfaces.prepareForAppReset()
                     graph.walkingManager.reset()
                     graph.walkActivityPresenter.endAll(immediate: true)
+                },
+                fenceRuntimeBeforePersistentReset: {
+                    graph.medicationReminders.invalidateNotificationMutations()
+                },
+                finishRuntimeAfterReset: {
+                    graph.systemSurfaces.finishAppReset()
+                },
+                recoverRuntimeAfterFailedReset: {
+                    graph.systemSurfaces.scheduleRefresh(reason: "appReset.failed")
                 }
             ),
             medicationReminders: graph.medicationReminders,
@@ -174,6 +185,7 @@ final class AppServices {
             domainRevisions: graph.domainRevisions,
             lifecycle: AppLifecycleCoordinator(dependencies: .live(
                 walkingManager: graph.walkingManager,
+                medicationReminders: graph.medicationReminders,
                 automaticBackups: graph.automaticBackups,
                 modelContainer: modelContainer
             )),
@@ -232,7 +244,8 @@ final class AppServices {
         let reminderScheduling = ReminderSchedulingManager(careLedger: careLedger)
         let medicationReminders = SharedMedicationReminderManager(careLedger: careLedger)
         let userNotifications = SharedUserNotificationManager(manager: notificationManager)
-        let guardianSafety: any GuardianSafetyManaging = if let modelContainer {
+        let guardianSafety: any GuardianSafetyManaging = if let modelContainer,
+                                                           OnlineFeatureGate.allows(.guardianSafety) {
             GuardianSafetyCoordinator(
                 modelContainer: modelContainer,
                 commerce: commerce,

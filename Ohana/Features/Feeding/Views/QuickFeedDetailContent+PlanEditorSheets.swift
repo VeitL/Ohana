@@ -4,7 +4,7 @@ import UIKit
 extension QuickFeedDetailContent {
     func planEditorSheet(_ kind: FeedRuleKind) -> some View {
         let tint = kind == .manualReminder ? Color.goPurple : Color.goTeal
-        let hasExistingPlan = !FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: allEvents).isEmpty
+        let hasExistingPlan = !currentPlanRuleSnapshots(kind).isEmpty
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {

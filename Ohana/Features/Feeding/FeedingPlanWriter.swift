@@ -9,6 +9,17 @@ import SwiftData
 struct FeedingPlanWriteResult {
     let events: [Event]
     let reminders: [Reminder]
+    let pendingScheduleEffects: DomainSchedulePendingEffects
+
+    init(
+        events: [Event],
+        reminders: [Reminder],
+        pendingScheduleEffects: DomainSchedulePendingEffects = .none
+    ) {
+        self.events = events
+        self.reminders = reminders
+        self.pendingScheduleEffects = pendingScheduleEffects
+    }
 }
 
 enum FeedingPlanWriter {
@@ -24,13 +35,23 @@ enum FeedingPlanWriter {
         context: ModelContext,
         feedPlanGroupId: String = "",
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        suppressDefaultPlan: Bool = true,
+        saveChanges: Bool = true
     ) throws -> FeedingPlanWriteResult {
         guard canWriteActiveFeedData(for: pet) else {
             return FeedingPlanWriteResult(events: [], reminders: [])
         }
-        CarePlanCalendarSync.suppressDefaultPlan(kind: "feed", pet: pet, context: context)
-        try deletePlan(pet: pet, kind: draft.kind, allEvents: allEvents, context: context, save: false)
+        if suppressDefaultPlan {
+            CarePlanCalendarSync.suppressDefaultPlan(kind: "feed", pet: pet, context: context)
+        }
+        var pendingScheduleEffects = try deletePlan(
+            pet: pet,
+            kind: draft.kind,
+            allEvents: allEvents,
+            context: context,
+            save: false
+        )
 
         let meals = FeedPlanDraft.normalizedMeals(draft.meals, count: draft.dailyCount, now: now, calendar: calendar)
         var createdEvents: [Event] = []
@@ -70,39 +91,59 @@ enum FeedingPlanWriter {
             CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: now)
         }
 
-        try FeedCommandPersistence.save(context: context)
-        return FeedingPlanWriteResult(events: createdEvents, reminders: createdReminders)
+        if saveChanges {
+            try FeedCommandPersistence.save(context: context)
+            pendingScheduleEffects.commit()
+            pendingScheduleEffects = .none
+        }
+        return FeedingPlanWriteResult(
+            events: createdEvents,
+            reminders: createdReminders,
+            pendingScheduleEffects: pendingScheduleEffects
+        )
     }
 
     @MainActor
+    @discardableResult
     static func deletePlan(
         pet: Pet,
         kind: FeedRuleKind,
         allEvents: [Event],
         context: ModelContext,
         save: Bool = true
-    ) throws {
-        guard canWriteActiveFeedData(for: pet) else { return }
+    ) throws -> DomainSchedulePendingEffects {
+        guard canWriteActiveFeedData(for: pet) else { return .none }
         var didDelete = false
+        var pendingScheduleEffects = DomainSchedulePendingEffects.none
         for event in planEvents(pet: pet, kind: kind, allEvents: allEvents) {
-            if deleteEvent(event, context: context).didDelete {
+            if stageEventDeletion(
+                event,
+                context: context,
+                pendingScheduleEffects: &pendingScheduleEffects
+            ) {
                 didDelete = true
             }
         }
         if save, didDelete {
             try FeedCommandPersistence.save(context: context)
+            pendingScheduleEffects.commit()
+            return .none
         }
+        return pendingScheduleEffects
     }
 
     @MainActor
+    @discardableResult
     static func deactivateManualReminderOperations(
         pet: Pet,
         allEvents: [Event],
         context: ModelContext,
-        now: Date = Date()
-    ) throws {
-        guard canWriteActiveFeedData(for: pet) else { return }
+        now: Date = Date(),
+        saveChanges: Bool = true
+    ) throws -> DomainSchedulePendingEffects {
+        guard canWriteActiveFeedData(for: pet) else { return .none }
         var didChange = false
+        var pendingScheduleEffects = DomainSchedulePendingEffects.none
         for event in planEvents(pet: pet, kind: .manualReminder, allEvents: allEvents) {
             let pendingReminders = event.reminders.filter(\.isPending)
             for reminder in pendingReminders {
@@ -114,16 +155,21 @@ enum FeedingPlanWriter {
                         context: context
                     ) else { continue }
                     let result = DomainScheduleWriter.deleteReminder(reminder, mutation: mutation, context: context)
-                    DomainScheduleEffectsDispatcher.dispatch(delete: result)
+                    pendingScheduleEffects.stage(delete: result)
                     didChange = result.didDelete || didChange
                 } else {
-                    OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+                    pendingScheduleEffects.stage(notificationID: reminder.notificationId)
                 }
             }
         }
-        if didChange {
-            try FeedCommandPersistence.save(context: context)
+        if saveChanges {
+            if didChange {
+                try FeedCommandPersistence.save(context: context)
+            }
+            pendingScheduleEffects.commit()
+            return .none
         }
+        return pendingScheduleEffects
     }
 
     @MainActor
@@ -299,10 +345,10 @@ enum FeedingPlanWriter {
         calendar: Calendar = .current
     ) -> [Reminder] {
         guard !pets.isEmpty else { return [] }
-        let allEvents = allEventsForStockReminderRebuild(context: context)
         var seen = Set<UUID>()
         var reminders: [Reminder] = []
         for pet in pets where seen.insert(pet.id).inserted && canWriteActiveFeedData(for: pet) {
+            let allEvents = allEventsForStockReminderRebuild(context: context)
             reminders.append(contentsOf: rebuildFoodStockReminders(
                 pet: pet,
                 allEvents: allEvents,
@@ -323,22 +369,30 @@ enum FeedingPlanWriter {
         calendar: Calendar = .current
     ) -> [Reminder] {
         guard canWriteActiveFeedData(for: pet) else { return [] }
-        for event in currentStockReminderEvents(pet: pet, allEvents: allEvents, context: context) {
-            _ = deleteEvent(event, context: context)
+        let readableEvents = QuickFeedModelReadability.readableEvents(allEvents)
+        var pendingScheduleEffects = DomainSchedulePendingEffects.none
+        for event in currentStockReminderEvents(pet: pet, allEvents: readableEvents, context: context) {
+            _ = stageEventDeletion(
+                event,
+                context: context,
+                pendingScheduleEffects: &pendingScheduleEffects
+            )
         }
 
         guard pet.foodReminderEnabled else {
-            _ = FeedCommandPersistence.saveDerived(context: context)
+            if FeedCommandPersistence.saveDerived(context: context) {
+                pendingScheduleEffects.commit()
+            }
             return []
         }
 
         var reminders: [Reminder] = []
-        let stockLedgerEntries = feedingLedgerEntries(pet: pet, allEvents: allEvents, context: context)
+        let stockLedgerEntries = feedingLedgerEntries(pet: pet, allEvents: readableEvents, context: context)
         for foodKind in FeedFoodKind.allCases {
             let snapshot = FeedStockCalculator.snapshot(
                 for: pet,
                 foodKind: foodKind,
-                events: allEvents,
+                events: readableEvents,
                 feedingLedgerEntries: stockLedgerEntries,
                 now: now,
                 calendar: calendar
@@ -371,6 +425,7 @@ enum FeedingPlanWriter {
         guard FeedCommandPersistence.saveDerived(context: context) else {
             return []
         }
+        pendingScheduleEffects.commit()
         return reminders
     }
 
@@ -384,7 +439,7 @@ enum FeedingPlanWriter {
     }
 
     nonisolated static func stockReminderEvents(pet: Pet, allEvents: [Event]) -> [Event] {
-        allEvents.filter {
+        QuickFeedModelReadability.readableEvents(allEvents).filter {
             DomainEntityLinkRegistry.role(for: $0) == .petFoodStock &&
                 MemberLifecycleActiveScheduleResolver.eventBelongsToPet($0, petId: pet.id.uuidString)
         }
@@ -460,16 +515,21 @@ enum FeedingPlanWriter {
         return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: raw) ?? raw
     }
 
-    private nonisolated static func deleteEvent(_ event: Event, context: ModelContext) -> DomainScheduleDeleteResult {
+    @discardableResult
+    private nonisolated static func stageEventDeletion(
+        _ event: Event,
+        context: ModelContext,
+        pendingScheduleEffects: inout DomainSchedulePendingEffects
+    ) -> Bool {
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
             event: event,
             writeKind: .care,
             source: .domainService,
             context: context
-        ) else { return .notDeleted }
+        ) else { return false }
         let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
-        DomainScheduleEffectsDispatcher.dispatch(delete: result)
-        return result
+        pendingScheduleEffects.stage(delete: result)
+        return result.didDelete
     }
 
     private nonisolated static func allEventsForStockReminderRebuild(context: ModelContext) -> [Event] {

@@ -66,21 +66,26 @@ nonisolated struct DomainHumanRehydrateSnapshot: Equatable {
     let id: UUID
     let name: String
     let birthday: Date?
-    let bloodType: String
+    /// `nil` means a restricted source intentionally omitted the health field.
+    let bloodType: String?
     let avatarEmoji: String
     let avatarImageData: Data?
     let role: String
     let genderIdentityRaw: String?
-    let notes: String
+    /// `nil` preserves existing local notes when the backup redacts health data.
+    let notes: String?
     let createdAt: Date
     let nationality: String
     let city: String
     let coconutBalance: Int
     let shouldShowOnHome: Bool
     let mbti: String
-    let privateFieldsRaw: String
+    /// `nil` means the restore source deliberately omitted this sensitive field.
+    /// Existing members must retain their local privacy choices in that case.
+    let privateFieldsRaw: String?
     let themeColorHex: String
-    let heightCm: Double
+    /// `nil` preserves existing local height when the backup redacts health data.
+    let heightCm: Double?
     let passedAwayDate: Date?
 }
 
@@ -1172,24 +1177,32 @@ nonisolated enum DomainGeneralRehydrateWriter {
         plan.consumeAuthorization()
         human.name = snapshot.name
         human.birthday = snapshot.birthday
-        human.bloodType = snapshot.bloodType
+        if let bloodType = snapshot.bloodType {
+            human.bloodType = bloodType
+        }
         human.avatarEmoji = snapshot.avatarEmoji
         human.updateAvatarImageData(snapshot.avatarImageData)
         human.role = HumanProfileOptions.normalizedRole(snapshot.role)
         human.appleUserIdentifier = ""
         human.genderIdentityRaw = HumanProfileOptions.storedGenderIdentity(snapshot.genderIdentityRaw ?? "")
-        human.notes = snapshot.notes
+        if let notes = snapshot.notes {
+            human.notes = notes
+        }
         human.createdAt = snapshot.createdAt
         human.nationality = snapshot.nationality
         human.city = snapshot.city
         human.shouldShowOnHome = snapshot.shouldShowOnHome
         human.mbti = snapshot.mbti
-        human.privateFieldsRaw = snapshot.privateFieldsRaw
+        if let privateFieldsRaw = snapshot.privateFieldsRaw {
+            human.privateFieldsRaw = privateFieldsRaw
+        }
         human.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
             snapshot.themeColorHex,
             fallback: OhanaThemeColorPolicy.humanFallbackHex
         )
-        human.heightCm = snapshot.heightCm
+        if let heightCm = snapshot.heightCm {
+            human.heightCm = heightCm
+        }
         human.passedAwayDate = snapshot.passedAwayDate
     }
 

@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Family guardian safety rules")
 struct GuardianSafetyPolicyTests {
-    @Test func firstMissIsSilentSecondQueuesInitialAndThirdQueuesOneFollowUp() {
+    @Test func firstMissQueuesInitialSecondQueuesOnlyFollowUpAndLaterMissesAreQuiet() {
         let day1 = GuardianSafetyEvaluationPolicy.evaluate(
             previous: .empty,
             occurrence: missed("2026-07-20")
@@ -23,11 +23,11 @@ struct GuardianSafetyPolicyTests {
             occurrence: missed("2026-07-23")
         )
 
-        #expect(day1.action == .none)
+        #expect(day1.action == .queueInitialAlert(consecutiveMisses: 1))
         #expect(day1.progress.consecutiveMisses == 1)
-        #expect(day2.action == .queueInitialAlert(consecutiveMisses: 2))
-        #expect(day2.progress.isIncidentOpen)
-        #expect(day3.action == .queueFollowUp(consecutiveMisses: 3))
+        #expect(day1.progress.isIncidentOpen)
+        #expect(day2.action == .queueFollowUp(consecutiveMisses: 2))
+        #expect(day3.action == .none)
         #expect(day4.action == .none)
         #expect(day4.progress.consecutiveMisses == 4)
     }
@@ -51,13 +51,35 @@ struct GuardianSafetyPolicyTests {
 
         #expect(unscheduled.progress == firstMiss.progress)
         #expect(unscheduled.action == .none)
-        #expect(nextGuardDay.action == .queueInitialAlert(consecutiveMisses: 2))
+        #expect(nextGuardDay.action == .queueFollowUp(consecutiveMisses: 2))
+    }
+
+    @Test func legacySilentMissProgressStillQueuesInitialThenOneFollowUp() {
+        let initial = GuardianSafetyEvaluationPolicy.evaluate(
+            previous: GuardianSafetyIncidentProgress(
+                consecutiveMisses: 1,
+                lastGuardDayKey: "2026-07-20"
+            ),
+            occurrence: missed("2026-07-21")
+        )
+        let followUp = GuardianSafetyEvaluationPolicy.evaluate(
+            previous: initial.progress,
+            occurrence: missed("2026-07-22")
+        )
+        let later = GuardianSafetyEvaluationPolicy.evaluate(
+            previous: followUp.progress,
+            occurrence: missed("2026-07-23")
+        )
+
+        #expect(initial.action == .queueInitialAlert(consecutiveMisses: 2))
+        #expect(followUp.action == .queueFollowUp(consecutiveMisses: 3))
+        #expect(later.action == .none)
     }
 
     @Test func ownerCheckInQueuesRecoveryOnlyForAnOpenAlertedIncident() {
         let open = GuardianSafetyIncidentProgress(
-            consecutiveMisses: 2,
-            lastGuardDayKey: "2026-07-21",
+            consecutiveMisses: 1,
+            lastGuardDayKey: "2026-07-20",
             isIncidentOpen: true,
             didSubmitInitial: true
         )
@@ -83,8 +105,8 @@ struct GuardianSafetyPolicyTests {
 
     @Test func guardianAcknowledgementStopsFollowUpWithoutCreatingACheckInState() {
         let open = GuardianSafetyIncidentProgress(
-            consecutiveMisses: 2,
-            lastGuardDayKey: "2026-07-21",
+            consecutiveMisses: 1,
+            lastGuardDayKey: "2026-07-20",
             isIncidentOpen: true,
             didSubmitInitial: true
         )
@@ -97,7 +119,7 @@ struct GuardianSafetyPolicyTests {
         #expect(acknowledged.action == .resetWithoutNotification)
         #expect(acknowledged.progress == .empty)
         #expect(nextMiss.progress.consecutiveMisses == 1)
-        #expect(nextMiss.action == .none)
+        #expect(nextMiss.action == .queueInitialAlert(consecutiveMisses: 1))
     }
 
     @Test func pauseAndStructuralIneligibilityResetButUnscheduledDaysDoNot() {
@@ -251,6 +273,7 @@ struct GuardianSafetyPersistenceTests {
             context: context,
             ownerSelection: TestOwnerSelection(ownerHumanId: owner.id),
             rewardAwarder: TestPresenceRewardAwarder(),
+            guardianSafetyOutbox: LiveGuardianSafetyOutboxStager(),
             migratesLegacyBeforeCommands: false,
             timeZoneProvider: { TimeZone(secondsFromGMT: 0)! }
         )
@@ -274,6 +297,146 @@ struct GuardianSafetyPersistenceTests {
         #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 1)
     }
 
+    @Test func enablingGuardianAfterTodaysExplicitConfirmationStagesThatExistingFactIdempotently() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        context.insert(owner)
+        try context.save()
+        let timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let service = PresenceCheckInCommandService(
+            context: context,
+            ownerSelection: TestOwnerSelection(ownerHumanId: owner.id),
+            rewardAwarder: TestPresenceRewardAwarder(),
+            migratesLegacyBeforeCommands: false,
+            timeZoneProvider: { timeZone }
+        )
+        let now = date(2026, 7, 22)
+        try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: now)
+        let result = try service.checkInOwner(source: .card, now: now)
+        #expect(result.didCreateCheckIn)
+        #expect(try context.fetchCount(FetchDescriptor<GuardianSafetySyncOutbox>()) == 0)
+
+        context.insert(GuardianSafetyPolicyProjection(
+            serverPolicyId: "policy-enabled-after-check-in",
+            ownerHumanId: owner.id,
+            isEnabled: true,
+            status: .monitoring
+        ))
+        // GuardianSafetyCoordinator saves the authoritative remote projection
+        // before querying it to seed the reliable local outbox.
+        try context.save()
+        let stager = LiveGuardianSafetyOutboxStager()
+        #expect(try stager.stageExistingExplicitOwnerCheckInForCurrentDay(
+            ownerHumanId: owner.id,
+            now: now,
+            timeZone: timeZone,
+            context: context
+        ))
+        try context.save()
+        #expect(try stager.stageExistingExplicitOwnerCheckInForCurrentDay(
+            ownerHumanId: owner.id,
+            now: now.addingTimeInterval(60),
+            timeZone: timeZone,
+            context: context
+        ) == false)
+        try context.save()
+
+        let outbox = try context.fetch(FetchDescriptor<GuardianSafetySyncOutbox>())
+        #expect(outbox.count == 1)
+        #expect(outbox.first?.eventKind == .ownerCheckIn)
+        #expect(outbox.first?.dayKey == "2026-07-22")
+    }
+
+    @Test func enablingGuardianDoesNotPromoteALegacyAutomaticFactIntoSafetyConfirmation() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        let now = date(2026, 7, 22)
+        context.insert(owner)
+        context.insert(GuardianSafetyPolicyProjection(
+            serverPolicyId: "policy-1",
+            ownerHumanId: owner.id,
+            isEnabled: true,
+            status: .monitoring
+        ))
+        context.insert(PresenceCheckIn(
+            uniqueKey: "legacy-auto-owner",
+            subject: PresenceSubjectRef(kind: .human, id: owner.id),
+            ownerHumanId: owner.id,
+            isOwner: true,
+            dayKey: "2026-07-22",
+            timeZoneIdentifier: "GMT",
+            checkedInAt: now,
+            source: .automaticForeground,
+            operatorHumanId: owner.id
+        ))
+        try context.save()
+
+        let didFindExplicitFact = try LiveGuardianSafetyOutboxStager()
+            .stageExistingExplicitOwnerCheckInForCurrentDay(
+                ownerHumanId: owner.id,
+                now: now,
+                timeZone: try #require(TimeZone(secondsFromGMT: 0)),
+                context: context
+            )
+
+        #expect(!didFindExplicitFact)
+        #expect(try context.fetchCount(FetchDescriptor<GuardianSafetySyncOutbox>()) == 0)
+    }
+
+    @Test func guardianEnableMapsAnExplicitFactIntoThePolicyTimeZoneGuardDay() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        context.insert(owner)
+        try context.save()
+        let operationTimeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let guardianTimeZone = try #require(TimeZone(identifier: "Europe/Berlin"))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = operationTimeZone
+        let checkedInAt = try #require(calendar.date(from: DateComponents(
+            year: 2026,
+            month: 7,
+            day: 22,
+            hour: 23,
+            minute: 30
+        )))
+        let service = PresenceCheckInCommandService(
+            context: context,
+            ownerSelection: TestOwnerSelection(ownerHumanId: owner.id),
+            rewardAwarder: TestPresenceRewardAwarder(),
+            migratesLegacyBeforeCommands: false,
+            timeZoneProvider: { operationTimeZone }
+        )
+        try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: checkedInAt)
+        _ = try service.checkInOwner(source: .notificationAction, now: checkedInAt)
+        let checkIn = try #require(context.fetch(FetchDescriptor<PresenceCheckIn>()).first)
+        #expect(checkIn.dayKey == "2026-07-22")
+
+        context.insert(GuardianSafetyPolicyProjection(
+            serverPolicyId: "policy-berlin",
+            ownerHumanId: owner.id,
+            isEnabled: true,
+            status: .monitoring,
+            timeZoneIdentifier: guardianTimeZone.identifier
+        ))
+        try context.save()
+
+        #expect(try LiveGuardianSafetyOutboxStager()
+            .stageExistingExplicitOwnerCheckInForCurrentDay(
+                ownerHumanId: owner.id,
+                now: checkedInAt.addingTimeInterval(60),
+                timeZone: guardianTimeZone,
+                context: context
+            ))
+        try context.save()
+
+        let event = try #require(context.fetch(FetchDescriptor<GuardianSafetySyncOutbox>()).first)
+        #expect(event.dayKey == "2026-07-23")
+        #expect(event.timeZoneIdentifier == guardianTimeZone.identifier)
+    }
+
     @Test func nonOwnerAndRetrospectiveWritesNeverStageSafetySignals() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -294,6 +457,7 @@ struct GuardianSafetyPersistenceTests {
             context: context,
             ownerSelection: TestOwnerSelection(ownerHumanId: owner.id),
             rewardAwarder: TestPresenceRewardAwarder(),
+            guardianSafetyOutbox: LiveGuardianSafetyOutboxStager(),
             migratesLegacyBeforeCommands: false,
             timeZoneProvider: { TimeZone(secondsFromGMT: 0)! }
         )
@@ -334,6 +498,7 @@ struct GuardianSafetyPersistenceTests {
             context: context,
             ownerSelection: TestOwnerSelection(ownerHumanId: owner.id),
             rewardAwarder: TestPresenceRewardAwarder(),
+            guardianSafetyOutbox: LiveGuardianSafetyOutboxStager(),
             migratesLegacyBeforeCommands: false,
             timeZoneProvider: { TimeZone(secondsFromGMT: 0)! }
         )
@@ -349,7 +514,7 @@ struct GuardianSafetyPersistenceTests {
         #expect(policy.status == .stopped)
     }
 
-    @Test func memorializingTheOwnerStagesStopInTheSameLifecycleTransaction() throws {
+    @Test func memorializingTheOwnerStopsLocalPolicyWithoutSoloOutbox() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let owner = Human(name: "Owner")
@@ -369,15 +534,14 @@ struct GuardianSafetyPersistenceTests {
             context: context
         )
 
-        let event = try #require(context.fetch(FetchDescriptor<GuardianSafetySyncOutbox>()).first)
         #expect(result.didPersist)
         #expect(owner.passedAwayDate != nil)
-        #expect(event.eventKind == .monitoringStopped)
-        #expect(event.stopReason == .ownerUnavailable)
+        #expect(try context.fetchCount(FetchDescriptor<GuardianSafetySyncOutbox>()) == 0)
         #expect(!policy.isEnabled)
+        #expect(policy.status == .stopped)
     }
 
-    @Test func physicalOwnerDeletionRemovesRemoteProjectionsButRetainsStopOutbox() throws {
+    @Test func physicalOwnerDeletionRemovesRemoteProjectionsWithoutSoloOutbox() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let owner = Human(name: "Owner")
@@ -418,9 +582,7 @@ struct GuardianSafetyPersistenceTests {
         #expect(try context.fetchCount(FetchDescriptor<GuardianIncidentProjection>()) == 0)
         let relationships = try context.fetch(FetchDescriptor<GuardianRelationshipProjection>())
         #expect(relationships.map(\.serverRelationshipId) == ["guardian-role"])
-        let outbox = try context.fetch(FetchDescriptor<GuardianSafetySyncOutbox>())
-        #expect(outbox.count == 1)
-        #expect(outbox.first?.stopReason == .ownerUnavailable)
+        #expect(try context.fetchCount(FetchDescriptor<GuardianSafetySyncOutbox>()) == 0)
     }
 
     private func makeContainer() throws -> ModelContainer {

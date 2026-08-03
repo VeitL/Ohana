@@ -3236,13 +3236,14 @@ struct HomeCommandExecutorTests {
         #expect(syncSource.contains("var didPersist: Bool"))
         #expect(syncSource.contains("let persistenceErrorDescription: String?"))
         #expect(syncSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
-        #expect(syncSource.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 2)
-        #expect(syncSource.components(separatedBy: "context.rollback()").count - 1 == 2)
+        #expect(syncSource.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 3)
+        #expect(syncSource.components(separatedBy: "context.rollback()").count - 1 == 3)
         #expect(!syncSource.contains("context.safeSave()"))
         #expect(syncSource.contains("guard saveResult.didSave else"))
         #expect(syncSource.contains("return .persistenceFailed("))
         #expect(syncSource.contains("PlantCarePlanScheduleService.sync("))
-        #expect(calendarCommandSource.contains("let syncResult = PlantCareScheduleSyncService.syncCompletedEvent"))
+        #expect(calendarCommandSource.contains("PlantCareScheduleSyncService.syncCompletedEvent("))
+        #expect(calendarCommandSource.contains("PlantCareScheduleSyncService.syncReopenedEvent("))
         #expect(calendarCommandSource.contains("syncResult.allowsScheduleCompletion"))
         #expect(calendarCommandSource.contains("syncPlanSchedule: false"))
     }
@@ -3528,7 +3529,9 @@ struct HomeCommandExecutorTests {
         #expect(petRevisionIndex > saveGuardIndex)
 
         #expect(carePlanSource.contains("struct PendingSideEffects"))
-        #expect(carePlanSource.contains("func commit()"))
+        #expect(carePlanSource.contains("func commit("))
+        #expect(carePlanSource.contains("notifications: ReminderNotificationScheduling"))
+        #expect(carePlanSource.contains("scheduleEffects.commit(notifications: notifications)"))
         #expect(carePlanSource.contains("let saveResult = context.safeSaveResult(publishFailureEvent: true)"))
         #expect(carePlanSource.contains("guard saveResult.didSave else"))
         #expect(carePlanSource.contains("saveChanges: Bool = true"))
@@ -3552,7 +3555,9 @@ struct HomeCommandExecutorTests {
         #expect(metricViewSource.contains("recordedByHumanId: savedRecorderID"))
         #expect(reportViewSource.contains("role: .recorder"))
         #expect(reportViewSource.contains("recordedByHumanId: selectedRecorderID?.uuidString"))
-        #expect(reportViewSource.contains("if result.didChange {\n                    dismiss()\n                } else {\n                    isSaving = false\n                }"))
+        #expect(reportViewSource.contains("let succeeded = result.didChange && result.persistenceErrorDescription == nil"))
+        #expect(reportViewSource.contains("event: .completed(action, succeeded: succeeded)"))
+        #expect(reportViewSource.contains("guard succeeded else {"))
     }
 
     @Test func humanMedicationCommandsGateSideEffectsOnPersistence() throws {
@@ -3768,7 +3773,7 @@ struct HomeCommandExecutorTests {
 
     @MainActor
     @Test func memberDeletionServiceDeletesCurrentHumanAndRequestsAccountSwitch() throws {
-        let container = try makeInMemoryContainer()
+        let container = try makeLatestInMemoryContainer()
         let context = container.mainContext
         let activeHuman = Human(name: "Guan")
         let remainingHuman = Human(name: "Alex")
@@ -3794,7 +3799,7 @@ struct HomeCommandExecutorTests {
 
     @MainActor
     @Test func memberDeletionServiceDeletesHumanScopedGachaAndShopRecords() throws {
-        let container = try makeInMemoryContainer()
+        let container = try makeLatestInMemoryContainer()
         let context = container.mainContext
         let activeHuman = Human(name: "Guan")
         let remainingHuman = Human(name: "Alex")
@@ -3846,7 +3851,7 @@ struct HomeCommandExecutorTests {
 
     @MainActor
     @Test func memberDeletionServiceDeletesLastHumanWithoutForcingReplacement() throws {
-        let container = try makeInMemoryContainer()
+        let container = try makeLatestInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
         context.insert(human)
@@ -3868,7 +3873,7 @@ struct HomeCommandExecutorTests {
 
     @MainActor
     @Test func memberDeletionFailureRollsBackAndKeepsHumanData() throws {
-        let container = try makeInMemoryContainer()
+        let container = try makeLatestInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Still here")
         context.insert(human)
@@ -3886,6 +3891,94 @@ struct HomeCommandExecutorTests {
         #expect(!result.didPersist)
         #expect(result.persistenceErrorDescription != nil)
         #expect(try context.fetch(FetchDescriptor<Human>()).map(\.id) == [human.id])
+    }
+
+    @MainActor
+    @Test func memberDeletionHealthPreflightFailureKeepsEveryHealthRow() throws {
+        let container = try makeLatestInMemoryContainer()
+        let context = container.mainContext
+        let notifications = RecordingNotificationScheduler()
+        let human = Human(name: "Still healthy")
+        let event = Event(
+            title: "Keep appointment",
+            eventType: EventType.health.rawValue,
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: human.id.uuidString
+        )
+        let reminder = Reminder(event: event)
+        reminder.notificationId = "keep-human-health-reminder"
+        event.reminders.append(reminder)
+        let guardianPolicy = GuardianSafetyPolicyProjection(
+            serverPolicyId: "keep-policy",
+            ownerHumanId: human.id,
+            isEnabled: true,
+            status: .monitoring
+        )
+        let report = HumanHealthReport(
+            humanId: human.id.uuidString,
+            hospitalName: "Keep",
+            captureSource: .documentScan
+        )
+        let metric = HumanHealthMetricLog(
+            metricKey: "tsh",
+            unitCode: "mIU_L",
+            value: 2.4,
+            sourceReportID: report.id,
+            sourceLabel: "TSH",
+            human: human
+        )
+        let condition = HumanHealthCondition(
+            humanId: human.id.uuidString,
+            name: "Keep"
+        )
+        let observation = HumanHealthObservation(
+            humanId: human.id.uuidString,
+            conditionId: condition.id.uuidString,
+            severity: 4
+        )
+        context.insert(human)
+        context.insert(event)
+        context.insert(reminder)
+        context.insert(guardianPolicy)
+        context.insert(report)
+        context.insert(metric)
+        context.insert(condition)
+        context.insert(observation)
+        try context.save()
+
+        let result = MemberDeletionCommandService.deleteHuman(
+            human,
+            activeHumanID: human.id.uuidString,
+            context: context,
+            notifications: notifications,
+            requiredHealthRowsLoader: { _ in
+                throw NSError(domain: "HumanDeletionHealthPreflightTests", code: 1)
+            }
+        )
+
+        #expect(!result.didPersist)
+        #expect(result.persistenceErrorDescription != nil)
+        #expect(try context.fetch(FetchDescriptor<Human>()).map(\.id) == [human.id])
+        #expect(try context.fetch(FetchDescriptor<HumanHealthReport>()).map(\.id) == [report.id])
+        #expect(try context.fetch(FetchDescriptor<HumanHealthMetricLog>()).map(\.id) == [metric.id])
+        #expect(try context.fetch(FetchDescriptor<HumanHealthCondition>()).map(\.id) == [condition.id])
+        #expect(try context.fetch(FetchDescriptor<HumanHealthObservation>()).map(\.id) == [observation.id])
+        #expect(try context.fetch(FetchDescriptor<Event>()).map(\.id) == [event.id])
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).map(\.id) == [reminder.id])
+        #expect(try cloudSyncState(
+            entityName: String(describing: Event.self),
+            id: event.id,
+            context: context
+        ) == nil)
+        let retainedPolicy = try #require(
+            try context.fetch(FetchDescriptor<GuardianSafetyPolicyProjection>()).first
+        )
+        #expect(retainedPolicy.isEnabled)
+        #expect(retainedPolicy.status == .monitoring)
+        #expect(retainedPolicy.scheduleRevision == 1)
+        #expect(try context.fetchCount(FetchDescriptor<GuardianSafetySyncOutbox>()) == 0)
+        #expect(notifications.cancelledIds.isEmpty)
+        #expect(notifications.cancelledPrefixBatches.isEmpty)
     }
 
     @MainActor
@@ -9099,7 +9192,7 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let human = Human(name: "Guan")
         human.coconutBalance = 500
-        let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
+        let item = try #require(ShopCatalog.item(id: "fx_stars"))
         let questManager = TestQuestManagerProjection.manager
         let oldCoconutCount = questManager.coconutCount
         let oldCoconutLogs = questManager.coconutLogs
@@ -9115,7 +9208,7 @@ struct HomeCommandExecutorTests {
         let result = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Lime Glow",
+            itemName: "Redeemed Starfall",
             context: context,
             questManager: questManager,
             wallet: SwiftDataCoconutWalletManager(),
@@ -9150,7 +9243,7 @@ struct HomeCommandExecutorTests {
         let duplicate = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Lime Glow",
+            itemName: "Redeemed Starfall",
             context: context,
             questManager: questManager,
             wallet: SwiftDataCoconutWalletManager(),
@@ -9162,17 +9255,11 @@ struct HomeCommandExecutorTests {
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).count == 1)
 
-        let duplicateRefundDelete = try ShopPurchaseRecordStore.deleteOwnershipRecord(
-            itemID: item.id,
-            transactionKey: duplicate.transactionKey,
-            context: context
-        )
-        #expect(duplicateRefundDelete == false)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).count == 1)
     }
 
     @MainActor
-    @Test func shopCatalogRejectsUnknownItemAndDeleteUnknownOwnershipIsNoOp() throws {
+    @Test func shopCatalogRejectsUnknownItemWithoutMutatingOwnership() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
@@ -9200,13 +9287,6 @@ struct HomeCommandExecutorTests {
             careLedger: CareLedgerService()
         )
 
-        let deleted = try ShopPurchaseRecordStore.deleteOwnershipRecord(
-            itemID: "not_a_real_shop_item",
-            transactionKey: "shop:not_a_real_shop_item:missing-human",
-            context: context
-        )
-
-        #expect(deleted == false)
         #expect(purchase.didPurchase == false)
         #expect(purchase.failure == .invalidItem)
         #expect(human.coconutBalance == 1000)
@@ -9217,11 +9297,40 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func shopCatalogRejectsLegacyFulfillmentItemAsANewSale() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        human.coconutBalance = 1_000
+        let legacyItem = try #require(ShopCatalog.item(id: "boost_backdate_pack"))
+        context.insert(human)
+        try context.save()
+
+        #expect(!ShopCatalog.isSellable(itemID: legacyItem.id))
+
+        let purchase = ShopPurchaseCommandService.purchase(
+            item: legacyItem,
+            buyer: human,
+            itemName: "Legacy Backdate Pack",
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        #expect(!purchase.didPurchase)
+        #expect(purchase.failure == .invalidItem)
+        #expect(human.coconutBalance == 1_000)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<ShopPurchaseAttempt>()).isEmpty)
+    }
+
+    @MainActor
     @Test func consumableShopPurchaseSpendsButDoesNotCreateOwnershipRecordAndAddsInventory() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
-        let item = try #require(ShopCatalog.item(id: "boost_backdate_pack"))
+        let item = try #require(ShopCatalog.item(id: Avatar2DAccess.shopItemId))
         let startingBalance = item.cost + 20
         human.coconutBalance = startingBalance
         let inventoryDefaultsName = "HomeCommandExecutorTests.consumableShopPurchase.\(UUID().uuidString)"
@@ -9234,7 +9343,7 @@ struct HomeCommandExecutorTests {
         let result = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Backdate Pack",
+            itemName: "2.5D Avatar Pass",
             context: context,
             wallet: SwiftDataCoconutWalletManager(),
             careLedger: CareLedgerService()
@@ -9251,8 +9360,8 @@ struct HomeCommandExecutorTests {
         #expect(human.coconutBalance == startingBalance - item.cost)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
-        #expect(inventory.consumableSnapshot().backdatePassCount == 3)
-        #expect(inventory.consumeBackdatePass() == 2)
+        #expect(inventory.consumableSnapshot().avatar2DExtraPassCount == 1)
+        #expect(inventory.consumeAvatar2DPass())
     }
 
     @MainActor
@@ -9345,7 +9454,7 @@ struct HomeCommandExecutorTests {
         contributor.coconutBalance = 100
         contributor.createdAt = buyer.createdAt.addingTimeInterval(1)
         contributor.coconutBalance = 500
-        let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
+        let item = try #require(ShopCatalog.item(id: "fx_stars"))
         context.insert(buyer)
         context.insert(contributor)
         try context.save()
@@ -9386,7 +9495,7 @@ struct HomeCommandExecutorTests {
         let activeContributor = Human(name: "Guan")
         activeContributor.coconutBalance = 100
         activeContributor.coconutBalance = 500
-        let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
+        let item = try #require(ShopCatalog.item(id: "fx_stars"))
         context.insert(buyer)
         context.insert(frozenContributor)
         context.insert(activeContributor)
@@ -9419,7 +9528,7 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let human = Human(name: "Guan")
         human.coconutBalance = 0
-        let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
+        let item = try #require(ShopCatalog.item(id: "fx_stars"))
         let account = CoconutAccount(
             accountKey: CoconutAccountKey.human(human.id),
             ownerKind: .human,
@@ -9443,7 +9552,7 @@ struct HomeCommandExecutorTests {
         let result = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Lime Glow",
+            itemName: "Redeemed Starfall",
             context: context,
             questManager: questManager,
             wallet: SwiftDataCoconutWalletManager(),
@@ -9463,8 +9572,8 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
-        human.coconutBalance = 500
-        let item = try #require(ShopCatalog.item(id: "boost_backdate_single"))
+        human.coconutBalance = 2500
+        let item = try #require(ShopCatalog.item(id: Avatar2DAccess.shopItemId))
         let inventoryDefaultsName = "HomeCommandExecutorTests.repeatedConsumable.\(UUID().uuidString)"
         let inventoryDefaults = try #require(UserDefaults(suiteName: inventoryDefaultsName))
         defer { inventoryDefaults.removePersistentDomain(forName: inventoryDefaultsName) }
@@ -9476,7 +9585,7 @@ struct HomeCommandExecutorTests {
             questManager.coconutCount = oldCoconutCount
             questManager.coconutLogs = oldCoconutLogs
         }
-        questManager.coconutCount = 500
+        questManager.coconutCount = 2500
         questManager.coconutLogs = []
         context.insert(human)
         try context.save()
@@ -9484,7 +9593,7 @@ struct HomeCommandExecutorTests {
         let first = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Backdate Pass",
+            itemName: "2.5D Avatar Pass",
             context: context,
             questManager: questManager,
             wallet: SwiftDataCoconutWalletManager(),
@@ -9500,7 +9609,7 @@ struct HomeCommandExecutorTests {
         let second = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Backdate Pass",
+            itemName: "2.5D Avatar Pass",
             context: context,
             questManager: questManager,
             wallet: SwiftDataCoconutWalletManager(),
@@ -9514,10 +9623,10 @@ struct HomeCommandExecutorTests {
         #expect(first.transactionKey != nil)
         #expect(second.transactionKey != nil)
         #expect(first.transactionKey != second.transactionKey)
-        #expect(human.coconutBalance == 500 - item.cost * 2)
-        #expect(questManager.coconutCount == 500 - item.cost * 2)
+        #expect(human.coconutBalance == 2500 - item.cost * 2)
+        #expect(questManager.coconutCount == 2500 - item.cost * 2)
         #expect(walletEntries.count(where: { $0.source == .shop && $0.entryKind == .spend }) == 2)
-        #expect(inventory.consumableSnapshot().backdatePassCount == 1)
+        #expect(inventory.consumableSnapshot().avatar2DExtraPassCount == 1)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseAttempt>()).count == 2)
     }
 
@@ -9527,14 +9636,14 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let human = Human(name: "Guan")
         human.coconutBalance = 10
-        let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
+        let item = try #require(ShopCatalog.item(id: "fx_stars"))
         context.insert(human)
         try context.save()
 
         let result = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Lime Glow",
+            itemName: "Redeemed Starfall",
             context: context,
             wallet: SwiftDataCoconutWalletManager(),
             careLedger: CareLedgerService()
@@ -9548,12 +9657,11 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func shopPurchaseCommandServiceRejectsDeceasedHumanWalletWithoutWrites() throws {
+    @Test func shopPurchaseRejectsPetEffectWhenNoActivePetCanUseIt() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
-        human.coconutBalance = 500
-        human.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
+        human.coconutBalance = 1_000
         let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
         context.insert(human)
         try context.save()
@@ -9561,7 +9669,77 @@ struct HomeCommandExecutorTests {
         let result = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Lime Glow",
+            itemName: "Lime Glow",
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        #expect(!result.didPurchase)
+        #expect(result.failure == .applicationUnavailable(.activePet))
+        #expect(human.coconutBalance == 1_000)
+        #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+    }
+
+    @MainActor
+    @Test func dogEffectRequiresAnActiveDogAndThenPurchasesNormally() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        human.coconutBalance = 1_000
+        let cat = Pet(name: "Momo", species: "猫")
+        let item = try #require(ShopCatalog.item(id: "fx_rainbow"))
+        context.insert(human)
+        context.insert(cat)
+        try context.save()
+
+        let blocked = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: "Rainbow Trail",
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        #expect(!blocked.didPurchase)
+        #expect(blocked.failure == .applicationUnavailable(.activeDog))
+        #expect(human.coconutBalance == 1_000)
+
+        context.insert(Pet(name: "Kiko", species: "狗"))
+        try context.save()
+        let purchased = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: "Rainbow Trail",
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        #expect(purchased.didPurchase)
+        #expect(purchased.failure == nil)
+        #expect(human.coconutBalance == 1_000 - item.cost)
+        #expect(try ShopPurchaseRecordStore.isOwned(itemID: item.id, context: context))
+    }
+
+    @MainActor
+    @Test func shopPurchaseCommandServiceRejectsDeceasedHumanWalletWithoutWrites() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        human.coconutBalance = 500
+        human.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
+        let item = try #require(ShopCatalog.item(id: "fx_stars"))
+        context.insert(human)
+        try context.save()
+
+        let result = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: "Redeemed Starfall",
             context: context,
             wallet: SwiftDataCoconutWalletManager(),
             careLedger: CareLedgerService()
@@ -10706,11 +10884,11 @@ struct HomeCommandExecutorTests {
             activeHumanSelection: UserDefaultsActiveHumanSelection()
         )
         let beforeRevision = revisionCenter.homeRevision.value
-        let shopItem = try #require(ShopCatalog.item(id: "fx_lime_glow"))
+        let shopItem = try #require(ShopCatalog.item(id: "fx_stars"))
         let purchase = executor.purchase(
             item: shopItem,
             buyer: human,
-            itemName: "Redeemed Lime Glow",
+            itemName: "Redeemed Starfall",
             note: "test.reward.purchase"
         )
         var mutation = try #require(revisionCenter.lastMutation)
@@ -10807,13 +10985,20 @@ struct HomeCommandExecutorTests {
 
         let defaults = UserDefaults.standard
         let oldPassRaw = defaults.object(forKey: Avatar2DAccess.extraPassInventoryKey)
+        let oldDurableInventory = defaults.object(forKey: ShopInventoryDefaultsKeys.durableStateV2)
         defer {
+            if let oldDurableInventory {
+                defaults.set(oldDurableInventory, forKey: ShopInventoryDefaultsKeys.durableStateV2)
+            } else {
+                defaults.removeObject(forKey: ShopInventoryDefaultsKeys.durableStateV2)
+            }
             if let oldPassRaw {
                 defaults.set(oldPassRaw, forKey: Avatar2DAccess.extraPassInventoryKey)
             } else {
                 defaults.removeObject(forKey: Avatar2DAccess.extraPassInventoryKey)
             }
         }
+        defaults.removeObject(forKey: ShopInventoryDefaultsKeys.durableStateV2)
         defaults.set(1, forKey: Avatar2DAccess.extraPassInventoryKey)
 
         let executor = RewardEconomyCommandExecutor(context: context, revisionCenter: revisionCenter)
@@ -11140,6 +11325,12 @@ struct HomeCommandExecutorTests {
         return try ModelContainer(for: schema, configurations: [config])
     }
 
+    private func makeLatestInMemoryContainer() throws -> ModelContainer {
+        let schema = Schema(ArkSchemaV98.models)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return try ModelContainer(for: schema, configurations: [config])
+    }
+
     private func makeSharedCareUndoContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV94.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
@@ -11225,10 +11416,18 @@ struct HomeCommandExecutorTests {
         }
 
         func scheduleHumanMedicationReminders(for _: Human, meds _: [HumanMedication], context _: ModelContext?) {}
+
+        func refreshScheduledMedicationReminders(
+            context _: ModelContext,
+            hidingDetails _: Bool
+        ) async -> MedicationNotificationPrivacyRefreshResult {
+            .unavailable
+        }
     }
 
     private final class RecordingNotificationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
         private(set) var cancelledIds: [String] = []
+        private(set) var cancelledPrefixBatches: [[String]] = []
         private(set) var scheduledIds: [String] = []
 
         func schedule(reminder: Reminder) {
@@ -11258,6 +11457,9 @@ struct HomeCommandExecutorTests {
         func scheduleRollingWindow(reminders _: [Reminder]) {}
         func refillWindowIfNeeded(allReminders _: [Reminder]) {}
         func cancel(notificationId: String) { cancelledIds.append(notificationId) }
+        func cancelPendingNotifications(withPrefixes prefixes: [String]) {
+            cancelledPrefixBatches.append(prefixes)
+        }
         func cancelAll(for _: Pet, reminders _: [Reminder]) {}
         func compensate(reminders _: [Reminder]) {}
     }

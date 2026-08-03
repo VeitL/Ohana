@@ -28,6 +28,8 @@ Purpose:
   - Views do not directly use UserDefaults or construct command executors.
   - Members views do not publish member profile revisions directly; profile
     command executors own the publish boundary.
+  - Production code cannot call the legacy fail-open Human deletion entry point;
+    it must use deleteHumanFailClosed so health-row preflight failures abort.
   - Swift file length is a heuristic: files above the manifest warning target
     are reported, while only files beyond its hard limit or a grandfathered
     baseline's growth allowance fail.
@@ -244,6 +246,10 @@ member_view_direct_profile_revision_publishes() {
   fi
   [[ ${#scoped_files[@]} -eq 0 ]] && return 0
   rg -n --with-filename --pcre2 '\bpublishMemberProfile\s*\(' "${scoped_files[@]}" || true
+}
+
+human_deletion_fail_open_calls() {
+  forbidden_patterns '\bPhysicalDeletionService\.deleteHuman\s*\('
 }
 
 oversized_swift_files() {
@@ -663,6 +669,11 @@ record_matches \
   "member-view-direct-profile-revision" \
   "Members views must not publish profile revisions directly; MemberCommandExecutor.update*Profile owns the single profile revision publish." \
   member_view_direct_profile_revision_publishes
+
+record_matches \
+  "human-deletion-fail-open-entrypoint" \
+  "Production code must use PhysicalDeletionService.deleteHumanFailClosed so every Human-health collection is fetched before the first deletion mutation." \
+  human_deletion_fail_open_calls
 
 record_matches \
   "oversized-swift-file" \

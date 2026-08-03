@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct StarterGiftServiceTests {
-    @Test func freshInstallMarksGiftPendingUntilFirstPetExists() throws {
+    @Test func freshInstallMarksGiftPendingUntilFirstLivingHumanExists() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -19,13 +19,13 @@ struct StarterGiftServiceTests {
             defaults: defaults
         )
 
-        #expect(result == .pendingFirstPet)
+        #expect(result == .waitingForFirstHuman)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.ceremonyRequested))
     }
 
-    @Test func firstActivePetMakesGiftReadyWithoutCareAndConfirmationClaimsIntoIslandReserve() throws {
+    @Test func firstLivingHumanMakesGiftReadyWithoutPetAndClaimsIntoIslandReserve() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -33,29 +33,29 @@ struct StarterGiftServiceTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
-        let pet = Pet(name: "Momo", species: "cat")
-        context.insert(pet)
+        let human = Human(name: "Ava")
+        context.insert(human)
         context.safeSave()
         let ready = StarterGiftService.evaluateEligibility(
-            activeHumanID: nil,
+            activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
         )
 
         #expect(ready == .readyToClaim(recipient: .island, amount: StarterGiftService.giftAmount))
-        #expect(pet.coconutBalance == 0)
+        #expect(human.coconutBalance == 0)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
 
         let result = StarterGiftService.claimStarterGift(
-            activeHumanID: nil,
+            activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
         )
 
         #expect(result == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
-        #expect(pet.coconutBalance == 0)
+        #expect(human.coconutBalance == 0)
         #expect(CoconutWalletService.balance(
             accountKey: CoconutAccountKey.islandReserve,
             context: context
@@ -67,6 +67,7 @@ struct StarterGiftServiceTests {
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonyRequested)
         StarterGiftService.markCeremonySeen(defaults: defaults)
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.ceremonyRequested))
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.oasisTabPromptPending))
 
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledger.count == 1)
@@ -75,6 +76,35 @@ struct StarterGiftServiceTests {
         #expect(ledger.first?.subjectId == nil)
         #expect(ledger.first?.coconutDelta == StarterGiftService.giftAmount)
         #expect(ledger.first?.metadataJSON.contains("\"growthXP\":0") == true)
+    }
+
+    @Test func zenPresentationCompletesCeremonyWithoutQueueingStandardOasisPrompt() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
+        let human = Human(name: "Zen")
+        context.insert(human)
+        context.safeSave()
+
+        #expect(StarterGiftService.claimStarterGift(
+            activeHumanID: human.id.uuidString,
+            context: context,
+            defaults: defaults
+        ) == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
+
+        StarterGiftService.markCeremonySeen(
+            defaults: defaults,
+            requestsOasisTabPrompt: false
+        )
+
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.ceremonyRequested))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.oasisTabPromptPending))
+        #expect(StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults))
     }
 
     @Test func existingHumanDoesNotOwnTheSystemStarterGift() throws {
@@ -86,9 +116,7 @@ struct StarterGiftServiceTests {
 
         #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
         let human = Human(name: "Fresh")
-        let pet = Pet(name: "Momo", species: "cat")
         context.insert(human)
-        context.insert(pet)
         context.safeSave()
 
         let eligibility = StarterGiftService.evaluateEligibility(
@@ -106,7 +134,6 @@ struct StarterGiftServiceTests {
 
         #expect(result == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
         #expect(human.coconutBalance == 0)
-        #expect(pet.coconutBalance == 0)
         #expect(CoconutWalletService.balance(
             accountKey: CoconutAccountKey.islandReserve,
             context: context
@@ -135,12 +162,12 @@ struct StarterGiftServiceTests {
             defaults: defaults
         )
 
-        #expect(result == .pendingFirstPet)
+        #expect(result == .waitingForFirstHuman)
         #expect(defaults.bool(forKey: StarterGiftStorageKey.pending))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.claimed))
     }
 
-    @Test func zenFirstPlantUsesTheSameHouseholdGiftAndCannotDoubleClaimThroughStandard() throws {
+    @Test func zenAndStandardUseTheSameHumanQualifiedGiftAndCannotDoubleClaim() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -148,7 +175,8 @@ struct StarterGiftServiceTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
-        context.insert(Plant(name: "Monstera", species: "Monstera deliciosa"))
+        let human = Human(name: "Ava")
+        context.insert(human)
         context.safeSave()
 
         #expect(StarterGiftService.evaluateZenEligibility(
@@ -160,10 +188,10 @@ struct StarterGiftServiceTests {
             defaults: defaults
         ) == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
 
-        context.insert(Pet(name: "Momo", species: "cat"))
+        context.insert(Plant(name: "Monstera", species: "Monstera deliciosa"))
         context.safeSave()
         #expect(StarterGiftService.claimStarterGift(
-            activeHumanID: nil,
+            activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
         ) == .alreadyHandled)
@@ -182,12 +210,12 @@ struct StarterGiftServiceTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
-        let pet = Pet(name: "Momo", species: "cat")
-        context.insert(pet)
+        let human = Human(name: "Ava")
+        context.insert(human)
         context.safeSave()
 
         let first = StarterGiftService.claimStarterGift(
-            activeHumanID: nil,
+            activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
         )
@@ -196,13 +224,13 @@ struct StarterGiftServiceTests {
         defaults.removeObject(forKey: StarterGiftStorageKey.claimed)
         defaults.set(true, forKey: StarterGiftStorageKey.pending)
         let recovered = StarterGiftService.claimStarterGift(
-            activeHumanID: nil,
+            activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
         )
 
         #expect(recovered == .alreadyHandled)
-        #expect(pet.coconutBalance == 0)
+        #expect(human.coconutBalance == 0)
         #expect(CoconutWalletService.balance(
             accountKey: CoconutAccountKey.islandReserve,
             context: context
@@ -210,9 +238,52 @@ struct StarterGiftServiceTests {
         #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
         #expect(!defaults.bool(forKey: StarterGiftStorageKey.pending))
         #expect(StarterGiftService.shouldShowCeremony(defaults: defaults))
-        #expect(!StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults))
+        #expect(StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults))
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).count == 1)
+    }
+
+    @Test func walletReceiptAloneRecoversLostGiftFlagsWithoutMintingAgain() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
+        let human = Human(name: "Ava")
+        context.insert(human)
+        try CoconutWalletService.apply(
+            deltas: [
+                .island(
+                    delta: StarterGiftService.giftAmount,
+                    entryKind: .reward,
+                    source: .starterGift,
+                    title: "Starter gift",
+                    transactionKey: StarterGiftPolicy.transactionKey
+                )
+            ],
+            context: context,
+            save: true,
+            postsRewardFeedback: false
+        )
+
+        let recovered = StarterGiftService.claimStarterGift(
+            activeHumanID: human.id.uuidString,
+            context: context,
+            defaults: defaults
+        )
+
+        #expect(recovered == .alreadyHandled)
+        #expect(defaults.bool(forKey: StarterGiftStorageKey.claimed))
+        #expect(!defaults.bool(forKey: StarterGiftStorageKey.pending))
+        #expect(StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults))
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>()) == 1)
+        #expect(CoconutWalletService.balance(
+            accountKey: CoconutAccountKey.islandReserve,
+            context: context
+        ) == StarterGiftService.giftAmount)
     }
 
     @Test func legacyMemberStarterGiftMovesAvailableGiftBalanceToIslandOnce() throws {
@@ -330,16 +401,17 @@ struct StarterGiftServiceTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
-        context.insert(Pet(name: "Momo", species: "cat"))
+        let human = Human(name: "Ava")
+        context.insert(human)
         context.safeSave()
 
         let first = StarterGiftService.claimStarterGift(
-            activeHumanID: nil,
+            activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
         )
         let second = StarterGiftService.claimStarterGift(
-            activeHumanID: nil,
+            activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
         )
@@ -350,6 +422,72 @@ struct StarterGiftServiceTests {
         #expect(second.completesClaimRequest)
         #expect(try context.fetchCount(FetchDescriptor<CareLedgerEvent>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>()) == 1)
+    }
+
+    @Test func sharedStarterProjectionKeepsGiftAndHumanProgressModeIndependent() {
+        let humanID = UUID()
+        let profile = HouseholdStarterJourneyTaskState(
+            task: .humanProfile,
+            status: .claimable,
+            rewardCoconuts: HouseholdStarterJourneyTask.humanProfile.rewardCoconuts,
+            completedCheckpointCount: 3,
+            requiredCheckpointCount: 3,
+            completionPercent: 75,
+            requiredCompletionPercent: 75,
+            targetID: humanID,
+            completedCheckpoints: [
+                .humanAppearance,
+                .humanLifeStage,
+                .humanBodyProfile
+            ],
+            checkpointResolutions: [:]
+        )
+        let journey = HouseholdStarterJourneySnapshot(
+            isEnabled: true,
+            activeHumanID: humanID,
+            taskStates: [profile],
+            visibleTaskStates: [profile]
+        )
+
+        let projection = StarterJourneyExperienceProjection.make(
+            giftResult: .readyToClaim(
+                recipient: .island,
+                amount: StarterGiftService.giftAmount
+            ),
+            starterJourney: journey
+        )
+
+        #expect(projection.giftState == .claimable)
+        #expect(projection.humanProfileState == profile)
+        #expect(projection.completedTaskCount == 0)
+        #expect(projection.totalTaskCount == 2)
+        #expect(projection.totalRewardCoconuts == 150)
+        #expect(projection.shouldShowCommonJourney)
+    }
+
+    @Test func firstPetSuggestionIsLocalDismissibleAndNeverARewardFact() throws {
+        let suiteName = makeDefaultsSuiteName()
+        let defaults = try makeDefaults(suiteName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(Date().timeIntervalSince1970, forKey: OnboardingJourneyCoordinator.Key.journeyStartedAt)
+
+        #expect(StarterPetSuggestionPolicy.shouldShow(
+            hasOnboarded: true,
+            hasActivePet: false,
+            defaults: defaults
+        ))
+        #expect(!StarterPetSuggestionPolicy.shouldShow(
+            hasOnboarded: true,
+            hasActivePet: true,
+            defaults: defaults
+        ))
+
+        StarterPetSuggestionPolicy.markResolved(defaults: defaults)
+        #expect(!StarterPetSuggestionPolicy.shouldShow(
+            hasOnboarded: true,
+            hasActivePet: false,
+            defaults: defaults
+        ))
     }
 
     @Test func homeProjectionGateUsesTheVisibleBalanceInsteadOfTheWholeWallet() {
@@ -382,11 +520,12 @@ struct StarterGiftServiceTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         #expect(StarterGiftService.beginFreshJourney(context: context, defaults: defaults))
-        context.insert(Pet(name: "Momo", species: "cat"))
+        let human = Human(name: "Ava")
+        context.insert(human)
         context.safeSave()
 
         let result = StarterGiftService.claimStarterGift(
-            activeHumanID: nil,
+            activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults,
             wallet: FailingCoconutWalletManager()
@@ -401,7 +540,7 @@ struct StarterGiftServiceTests {
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
 
         let retry = StarterGiftService.claimStarterGift(
-            activeHumanID: nil,
+            activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
         )

@@ -1,6 +1,6 @@
 # 首发真机测试清单
 
-更新日期：2026-07-22
+更新日期：2026-08-02
 
 本文件给真机执行使用，目的是让你一眼看清：哪些已经由自动化或模拟器预检覆盖，哪些还必须由你在真实 iPhone 上签收。
 
@@ -20,17 +20,17 @@
 
 ## 本轮结论
 
-当前已知首发仓库代码层 P0 为 0，首发可达的实现 / 证明 P1 为 2。状态总账还剩
-13 个 follow-up：1 个 Free / Personal 与 Storefront 项、1 个 Widget / Dynamic
-Island 能力与真机项、1 个 Family 守护专项、1 个 CloudKit 1.x 延后项、4 个其他
-真机 P1、4 个非阻塞 P2 和 1 个未来 P3。Family 守护在开关关闭时不阻塞本地
-Free / Personal 发布，但任何 Family 发布必须先关闭其专项 P1。
-设备范围已经批准为 iPhone-only / iOS 26.2+；签名
-Archive、App Store Connect 和最小实体 iPhone 证明并入下方 R0。下方 17 项
-是给人执行的合并验收清单，不等于 17 个独立 open follow-up；第 15 项
-CloudKit live apply 在首发继续关闭 CloudKit 时只需确认本轮不测。开始新的真机
-RC 签收前，先关闭 `TFU-20260715-003` 与 `TFU-20260720-001`；旧 Pet-first
-真机结果不能替代当前流程。
+截至 2026-07-29 的活动总账为 P0 = 0、P1 = 8、P2 = 4、P3 = 1，共 13 个 open
+follow-up；其中“首发可达 P1 = 2”只是 2026-07-22 的旧分类，不是当前 RC 结论。
+本轮未签名基线已通过 20 suites / 270 Unit/Integration 和 3 条
+Standard/Zen/自定义资料 UI 路径；受保护的 WMO Release overlay 也已启动正常 Home，
+保留 sealed store identity 和 ready 的 2-Human / 1-Pet 既有数据。签名 Archive、
+App Store Connect、Storefront 和实体设备证明仍未完成。
+
+设备范围已经批准为 iPhone-only / iOS 26.2+。下方 17 项是给人执行的合并验收清单，
+不等于 17 个独立 open follow-up；第 15 项 CloudKit live apply 在首发继续关闭时
+只需确认本轮不测。冻结 RC 后先同步 `testing-progress.md` / `task-follow-ups.md`，
+再开始真机签收。旧 Pet-first 真机结果不能替代当前流程。
 
 建议分两轮完成：
 
@@ -39,7 +39,7 @@ RC 签收前，先关闭 `TFU-20260715-003` 与 `TFU-20260720-001`；旧 Pet-fir
 
 ## 校对状态
 
-本清单已按 2026-07-15 当前源头校对：
+本清单已于 2026-07-29 按当前 D17/D28/D29 源头校对；下列历史证据仅按日期解释：
 
 - 17 项把当前真机/人工债按用户路径合并，状态数量以
   `docs/task-follow-ups.md` 为准。
@@ -68,19 +68,20 @@ RC 签收前，先关闭 `TFU-20260715-003` 与 `TFU-20260720-001`；旧 Pet-fir
   1/1。该结果不替代真机 VoiceOver、Voice Control、Switch Control、触感和
   能耗验收。
 
-## 2026-07-15 当前流程前置条件
+## 2026-07-29 当前流程前置条件
 
-- 当前首启必须是 `Human 名字 -> 现在建宠 / 稍后建宠`，不得再出现无 Human 的
+- 当前首启必须是 `选择 Standard / Zen -> Human 名字`，不得再出现无 Human 的
   新装 Pet-first 主路径，也不得预先请求通知、定位、相机或相册权限。
-- 立即建宠路径必须在 Pet 保存后进入待办的 50 椰子领取事项；只有用户在奖励层
-  明确领取成功后才显示 Oasis。Pet 保存或首次照护都不得自动发这 50 椰子。
-- 稍后建宠路径立即进入包含 Human 卡片的首页；待办保留“建立第一只宠物”，
-  取消创建后仍保留，建宠后再替换为领取事项。
-- 领取启动赠礼后，待办顶部最多显示三项 D28 新手成长计划。六项总额 400，
-  必须分别满足真实资格并明确领取到有效 Human 钱包；选择暂无、不适用、不清楚
-  或不愿透露不能被当作低一等完成。
-- 这组当前流程的本地编译、定向测试和 disposable-Simulator 证据仍由
-  `TFU-20260715-002` 负责。关闭前不要生成新的签名 RC 结论。
+- 第一位在世 Human 建立后，两种模式立即共用同一项可手动领取的 `+50🥥` 资格；
+  只有交易提交成功后才开放 Oasis。Pet 保存、首次照护和模式切换都不得自动发放或
+  重置这 50 椰子。
+- Standard 继续选择现在或稍后建 Pet；Zen 直接进入三页 Shell。稍后建 Pet 后首页
+  立即显示 Human 卡片，另有一项可关闭、零奖励的 Pet 建议；它不计任务、badge、
+  Calendar 或奖励总额。
+- 两种模式还共用 Human 资料 75% 的手动 `+100🥥`。Standard 在此之外保留五项
+  Pet 成长任务；Human 资料与五项 Pet 任务合计 400，必须分别满足真实资格后领取。
+- 当前未签名源码已重跑定向 Unit/UI；冻结 commit 后仍须用同一源码生成并验收唯一
+  signed RC，不能把 Simulator 结果提升为签名或真机结论。
 
 ## 完成打卡板
 
@@ -95,7 +96,7 @@ RC 签收前，先关闭 `TFU-20260715-003` 与 `TFU-20260720-001`；旧 Pet-fir
 
 ### 第一轮：首发硬门和系统能力
 
-- [x] 1. GAP-7 补记喂食
+- [ ] 1. GAP-7 补记喂食
 - [ ] 2. GAP-6 通知交付
 - [ ] 3. GAP-9 离世退场
 - [ ] 9. Medication / Notifications
@@ -130,8 +131,8 @@ Family Yearly Sandbox 商品和隐私标签均已配置。使用两台实体 iPh
   过期、复用、第四位守护人和撤销必须失败或正确停止。
 - 权限与设备：允许 / 拒绝通知、同账号第二设备、退出当前设备、卸载 token 失效、
   全部守护人不可达警告均符合真实状态，不显示“已收到”。
-- 漏签：第 1 个守护日无亲友推送；第 2 日恰好一次首次推送；第 3 日最多一次跟进；
-  第 4 日以后同一事件安静。
+- 漏签：第 1 个有效漏签日恰好一次首次推送；第 2 个有效漏签日最多一次跟进；
+  第 3 个及以后同一事件安静。
 - 结束：守护人“已联系到本人”不生成签到；本人恢复只发一次恢复推送；暂停、切换
   普通模式、更换 / 解绑本人、纪念、撤销、Family 到期和删除账号均停止后续调度。
 - 离线与隐私：离线签到显示等待同步，恢复联网后不误报；锁屏不出现姓名、分数或
@@ -148,21 +149,35 @@ APNs 环境：_____；StoreKit 测试账号：_____；问题：_____。
 包和真实 iPhone 执行；模拟器、Debug、静态审计或 Instruments 截图都只能当
 预检，不能勾选下面任何一项。
 
-- [ ] R0. 首发设备矩阵与签名包
+- [ ] R0. 首发设备矩阵与签名包（仅在 R0a–R0c 均有独立证据后勾选）
+  - [ ] R0a. 当前 Release Archive 的签名、entitlement、内嵌 extension、隐私报告
+  - [ ] R0b. App Store Connect 处理、设备族、storefront 与外部分发边界
+  - [ ] R0c. 最小和当前真实 iPhone 上安装同一 release artifact 并完成核心 smoke
 - [ ] R1. 公开政策与支持入口
 - [ ] R2. 首页十次快速照护
 - [ ] R3. 两分钟 sheet 覆盖首页
 - [ ] R4. 500 图长滚
 - [ ] R5. 30–60 分钟锁屏遛狗
 - [ ] R6. 自动备份与删除失败恢复
+- [ ] R6b. 系统加密备份 / 恢复排除边界（独立硬门；未取得同一 Release
+  构建的真机恢复证据不得发布）
 - [ ] R7. Today Widget 与 Dynamic Island
+
+发布状态：R6b 当前未签收，属于 NO-GO。静态排除标记、模拟器或代码审计只能作为
+预检，不能替代下方可擦除测试 iPhone 上的加密系统备份与恢复证据。
 
 ### R0. 首发设备矩阵与签名包
 
-步骤：生成已签名 Release Archive；在 App Store Connect 核对设备与 storefront；
-分别在 iPhone SE（第二代）或实际首发最小 iPhone，以及一台当前 iPhone 上安装
-同一 build 并完成 Human 名字 → 立即建第一只宠物 → 待办明确领取 50 椰子 →
-Oasis 解锁 → 第一笔真实照护的最短 smoke；再用 disposable 环境覆盖一次“稍后建宠”。
+步骤：生成已签名 Release Archive；在 App Store Connect 核对设备与 storefront。
+最小与当前 iPhone 使用同一签名 build，并在 disposable clean 环境分别完成：
+
+1. Standard → Human → 立即建 Pet → Home，确认不自动切 Tasks、不自动发奖。
+2. Standard → Human → Later → +50 → Oasis → 关闭零奖励建议 → Human 资料
+   75% → +100。
+3. Zen → Human → +50 → Oasis → Human 资料 75% → +100。
+
+随后往返 Standard/Zen，确认余额保持 150 且共享任务不复活；再在既有数据覆盖安装
+环境验证 receipt、升级和重启读回。
 
 通过标准：
 
@@ -179,7 +194,7 @@ Oasis 解锁 → 第一笔真实照护的最短 smoke；再用 disposable 环境
   不被安全区遮挡、没有启动或持久化失败。
 - 记录实际开放的 storefront。原生 iPad、原生 Watch 与更低 iOS 不得写入首发宣传。
 
-记录（2026-07-11，部分完成）：Archive / build：开发签名 Release 1.0 (1)，
+历史记录（2026-07-11，不得用于当前验收）：Archive / build：开发签名 Release 1.0 (1)，
 `/tmp/OhanaArchives-20260711/Ohana-R0-eece7d642-dirty.xcarchive`；
 `xcodebuild archive`、Xcode store validation 和严格 `codesign` 校验通过。
 归档产物为 arm64、`UIDeviceFamily = [1]`、`MinimumOSVersion = 26.2`，不含
@@ -216,7 +231,7 @@ Create Human handoff 曾卡住。该原型及后续 Supabase 账号原型均未�
 匹配当前 target，不能签收 R0 或任何账号能力；未来设计仅见
 `docs/planning/account-backend-extension.md`。
 
-记录（2026-07-12，当前 local-only 包已安装，用户观察待完成）：
+历史记录（2026-07-12，当时最新的 local-only 包；不得用于当前验收）：
 `scripts/archive-release-local.sh` 成功生成并验证
 `/tmp/OhanaArchives/2026-07-12-180306/Ohana-c2aa2af859-dirty.xcarchive`。
 WMO Archive、Xcode store validation、strict `codesign`、designated requirement、
@@ -235,8 +250,8 @@ Exercise/Stand/活动环/Recent Workouts，R0 与 HealthKit P1 均保持未勾�
 
 通过标准：
 
-- 隐私政策打开公开 HTTPS 页面，内容与当前实现一致：无 Ohana 账号、登录、开发者
-  后端、分析、追踪或照护数据远程同步；自动 iCloud Drive 包由用户自己的 iCloud
+- 隐私政策打开公开 HTTPS 页面，内容与最终签名 RC 一致：无 Ohana 账号、登录、
+  开发者后端、分析、追踪或照护数据远程同步；自动 iCloud Drive 包由用户自己的 iCloud
   持有，且不含人类健康/HealthKit/体重/运动/用药/健康报告。
 - 支持入口打开邮件撰写，收件人正确，且不会自动附带任何记录、日志、截图或诊断数据。
 
@@ -312,6 +327,27 @@ Exercise/Stand/活动环/Recent Workouts，R0 与 HealthKit P1 均保持未勾�
 
 记录：设备 / iOS：_____；iCloud 状态：_____；结果：_____；问题：_____.
 
+### R6b. 系统加密备份 / 恢复排除边界
+
+仅使用测试数据和可擦除的测试 iPhone。用本轮最终签名 Release 创建包含 SwiftData
+记录、Human Note 附件、Widget Personal 投影及非敏感偏好值的样本；记录 build、设备、
+iOS、Xcode / Finder（或受控 iCloud 设备备份）版本与备份时间。完成一次加密的系统级
+设备备份，恢复到已擦除的测试设备，再从同一发布构建启动 Ohana。此 gate 不测试或
+替代 app-managed iCloud Drive 恢复包。
+
+通过标准：
+
+- 被排除的 SwiftData Application Support 根、Human Note 附件和 App Group Personal
+  Widget 投影没有随系统备份恢复，也不会从 Widget、深链或旧路由重新暴露。
+- 允许由系统恢复的非敏感 `UserDefaults` 不得让 App 进入“已 onboarding 但主数据不
+  存在”的矛盾状态；启动后必须安全进入 onboarding / 空状态并可正常创建首条数据。
+- 恢复后执行 App Reset，Widget 只能显示 unavailable 或无快照；再次启动仍无旧私人
+  数据。任何无法解释的恢复数据、状态错配或排除标记失效都阻塞发布。
+
+记录：设备 / iOS：_____；build / Archive：_____；备份方式与加密状态：_____；
+备份 / 恢复时间：_____；SwiftData：_____；附件：_____；App Group / Widget：_____；
+defaults / onboarding：_____；问题与证据路径：_____.
+
 ### R7. Today Widget 与 Dynamic Island
 
 步骤：用同一已签名 Release 在支持 Dynamic Island 的真实 iPhone 上添加 Today
@@ -353,11 +389,11 @@ families：_____；Dynamic Island：_____；问题：_____.
 | 10 | Calendar / DashboardRecords / CareLedger | 日历命令、筛选、深链、水计划读回、密集快照、账本 backfill 已测；手动事项详情 / 编辑 / 删除、系统喂食事项跳 Quick Feed、Add Event 键盘保存、水计划日历保存 / 删除、宠物筛选，以及标题像 feed / water / potty / walk / play / weight / health / hygiene 的宠物关联用户事项打开可编辑详情已复测；最新 6 条策略单测还覆盖普通植物事项不会误跳系统页，生成的喂食 / 饮水 / 植物计划会进相关详情页 / 打卡页；batch E/F/G/H/I/J/K/L 复测系统计划、linked pet 用户事项、植物计划行、宠物筛选、Add Event 键盘保存和手动 Calendar CRUD；2026-07-03 已补测普通植物关联 Calendar 事项的通知时间不会被植物护理窗口改写，且普通植物关联事项 / 提醒完成或跳过不写植物护理账本；当前全局日历入口收敛为首页日历 tab，植物页不再提供独立植物日历路由。 | 真机长列表滚动、趋势图 / 账本筛选、已删除 / 已离世 / legacy 样本目检；创建普通植物关联 Calendar 事项并确认详情 / filter / 通知时间都正确；从首页日历 tab 进入，确认“植物”聚合筛选能显示植物事项，且没有从植物详情或 Function Menu 进入日历的替代入口。 | 待真机 |
 | 11 | Expenses / Insurance / Documents | 费用、保单、文档、附件隐私清洗、删除级联、人类费用 UI 已测；2026-07-01 已复测 Human expense 添加 / 回读。2026-07-11 补充：普通费用在 user/shared/Human command、备份 preflight 和 rehydrate 边界拒绝 0、负数、NaN、正负无穷；失败后重试、重复失败、合法恢复和保险报销负向事实兼容测试通过。 | 真实相册 / 文件 picker、附件预览、删除后入口消失和手感。 | 待真机 |
 | 12 | Privacy / Security | 未来 PIN / 隐私字段命令边界、备份排除和不可写保护已测；首发本地 UI 当前隐藏 Human 隐私 / PIN 控制并保持同设备成员资料可见；2026-07-01 已复测 account switcher 不暴露隐私 / PIN 控制、同设备成员资料仍可见，以及 Human 永久删除取消 / 错误名称保护；batch K 再次复测 account switcher 不暴露隐私 / PIN 控制。 | 真机确认当前首发 Settings / 成员切换不会露出误导性隐私 / PIN 入口，锁屏 / 键盘 / 系统权限相关页面不破版。 | 待真机 |
-| 13 | Onboarding / CrewRoster / FunctionMenu | 旧 Pet-first 首启和既有一人一宠 Function Menu 路径有历史证据；CrewRoster 卡片缩回动画已有策略覆盖。当前 Human-first、稍后建宠、Task Center 显式领取与 D28 路径尚待 TFU-20260715-002 本地验收，旧 smoke 不算当前通过。 | 新签名包覆盖立即 / 稍后建宠、Oasis 领取门、D28 前三项、覆盖安装、reset、第二人 / 第二宠、CrewRoster 卡片手感、全功能菜单和危险区视觉。 | 本地前置未关；待真机 |
-| 14 | Phase 9 dogfooding / RC | 当前处于 9A；自动和模拟器证据已大幅收敛。 | 真机完成本表后，再跑一次 RC 级全路径冒烟。 | 待 RC |
+| 13 | Onboarding / CrewRoster / FunctionMenu | 旧 Pet-first 首启和既有一人一宠 Function Menu 路径只有历史证据；CrewRoster 卡片缩回动画已有策略覆盖。当前 Human-first、Standard/Zen 共用 +50/+100、零奖励 Pet 建议与模式往返必须使用本轮定向 artifact，旧 smoke 不算当前通过。 | 新签名包覆盖 Standard 立即 / 稍后建宠、Zen、Oasis 领取门、Human 资料 75%、模式往返、覆盖安装、reset、第二人 / 第二宠、CrewRoster 卡片手感、全功能菜单和危险区视觉。 | 当前本地证据见发布清单；仍待真机 |
+| 14 | Phase 9 dogfooding / RC | 2026-07-29 当前源码的受保护 WMO Release overlay 已构建、覆盖并启动正常 Home；sealed identity 与 ready 的 2-Human / 1-Pet、15 care、47 ledger、0 test-artifact 快照保持不变。Day 7 ready；Day 30 incomplete。 | 冻结 commit 并完成本表真机验收后，再对同一 signed RC 跑一次全路径冒烟；本轮 Simulator 结果不能替代该步骤。 | Simulator 通过；待 signed RC |
 | 15 | CloudKit live apply policy | 已登记为 TFU-20260614-014 和 CloudKit 1.x 延后项。 | 首发如果 CloudKit 保持关闭，本轮不用测；启用 CloudKit 前另起专项真机 / iCloud 验证。 | 本轮不测 |
 | 16 | Today Widget / Live Activity / Dynamic Island | Widget extension、bounded App Group snapshot、Personal gate、typed deep link、walk Activity lifecycle 与能耗节流已由 89 项聚焦测试和 unsigned Simulator app+extension 编译覆盖。 | 注册并签名两个环境对应的 App Group；真机检查 Widget families、锁屏隐私、Free/Personal/降级/过期/reset、冷启动链接，以及完整 walk 的 Lock Screen / Dynamic Island / relaunch / background / end。 | 待签名真机 |
-| 17 | Family App 内亲友守护 | V96/outbox、客户端 fail-closed、Family catalog、AWS SAM、17 个后端规则/隐私/安全合同测试与 353 个 iOS 定向测试已通过；这不能证明 APNs 到达。 | 部署生产栈并按本节用两台真机、两个账号验证邀请、权限、第 2/3 日推送、恢复、确认、暂停、撤销、token 失效、权益到期、隐私和删除。 | Family 本轮不发布 / 开放前必测 |
+| 17 | Family App 内亲友守护 | Solo 编译/runtime gate 关闭，1.0 不发布；历史 V96/outbox、后端和 iOS 证据不能授权本轮能力项或证明 APNs 到达。 | 未来另行批准后，部署生产栈并按本节用两台真机、两个账号验证邀请、权限、第 1/2 个有效漏签日推送、恢复、确认、暂停、撤销、token 失效、权益到期、隐私和删除。 | Family 本轮不发布 / 开放前必测 |
 
 ## 第一轮：首发硬门
 
@@ -408,16 +444,22 @@ families：_____；Dynamic Island：_____；问题：_____.
 真机还要测：
 
 - 覆盖安装或重新 build 后不卸载 App，确认不会白屏或卡在启动图。
-- App reset 后重新首启，只输入 Human 名字；分别完成“立即建宠”和“稍后建宠”。
-- 立即建宠只要求名字、物种和品种；Pet 保存后待办出现 50 椰子领取项，Oasis
-  在明确领取成功前始终隐藏，失败可重试且重复点击不重复入账。
-- 稍后建宠后首页立即显示 Human 卡片，待办保留建宠系统事项；取消建宠不丢事项，
-  保存首宠后同一旅程切换为领取事项。
-- 领取后检查 D28 新手成长计划最多显示三个未领取事项；资料明确选择与填写等价，
-  默认计划不自动冒充完成，真实照护之外的体重/健康记录不冒充首次照护。
+- App reset 后重新首启，分别选择 Standard 和 Zen，并只输入 Human 名字；Standard
+  再分别完成“立即建宠”和“稍后建宠”。
+- 两种模式都在 Human 建立后显示同一 `+50🥥` 领取项；Oasis 在明确领取成功前保持
+  dormant/locked，失败可重试且重复点击不重复入账。Pet 保存不得自动领取。
+- Standard 稍后建宠后首页立即显示 Human 卡片；领取 +50 后关闭零奖励 Pet 建议，
+  确认它不进入任务数、badge、Calendar 或奖励总额，之后仍可从正常新增入口建 Pet。
+- 完成 Human 资料四个 25% 类别中的至少三类，但生日与性别/身份必须同时为真实字段；
+  “不愿透露”是有效身份选择，二者不得由 skip resolution 替代。达到 75% 后手动
+  领取 `+100🥥`，重复点击不重复入账。普通 Human 资料可以保持未设置；只有领取
+  本项 +100 时，生日与性别/身份是资格必需。
+- 在 Standard 与 Zen 间往返，确认余额保持 150、两项共享行动不复活，Standard
+  专属 Pet 成长项只改变可见性，不丢进度。
 - 打开 Settings，页面应立即可用，不停在 opening shell。
 - 确认没有 Ohana 账号、Apple/Google 登录或登录提示，也不会出现系统登录授权页；
-  Human 只来自用户输入的姓名，性别和生日可保持未设置，App 不读取 Apple 账号资料。
+  Human 只来自用户输入的姓名，App 不读取 Apple 账号资料。除非领取 Human 资料
+  +100，生日和性别/身份可以保持未设置。
 - 启用 iCloud Drive 自动备份、退出并重开 App，确认备份状态恢复且从未要求 App 登录；
   断网/iCloud 不可用时本地照护继续可用，备份失败可见并可重试。
 - App Reset 后确认本机数据删除，并按 R6 验证 app-managed iCloud Drive 备份清理的
@@ -602,6 +644,15 @@ families：_____；Dynamic Island：_____；问题：_____.
 真机还要测：
 
 - 添加健康指标、健康报告、笔记、锻炼和人类用药。
+- 在同一 Personal 签名构建中分别使用文档相机和 Photos 选择真实化验单：确认最多
+  6 页、全程本机识别、逐项默认待复核、用户修正单位/数值/参考范围后才可保存，且
+  偏高/偏低印刷标记不会自动变成诊断或整份报告结论。
+- 覆盖相机不可用、相机权限拒绝、Photos 取消、空白/不可读页、超过页数、识别取消、
+  保存失败和重试；离开或重启后不得恢复原图、完整 OCR 文本或未提交草稿，也不得在
+  附件、通知、Widget、Live Activity 或受限外部备份中出现这些内容。
+- 在 Free 状态确认仍可手工建立和维护基础健康报告/指标，但新的文档扫描入口进入
+  Personal 说明且生产命令拒绝旁路写入；Personal 降级后，既有扫描报告与结构化指标
+  继续可见、可编辑和可删除。
 - 删除上述记录，确认普通入口不再显示。
 - 在已签名新构建中授予步数、距离、活动能量、锻炼时间、站立时间、活动摘要和
   运动记录读取权限；确认真实 Exercise / Stand 值、活动能量或 Move Time 目标及每个
@@ -616,6 +667,8 @@ families：_____；Dynamic Island：_____；问题：_____.
 通过标准：
 
 - 添加、回读、删除都稳定。
+- V97/V98 健康状况、观察和化验单结构化结果在覆盖升级与重启后保持；原图/完整 OCR
+  不持久化，扫描 entitlement、失败重试、删除和受限备份排除与 D34 一致。
 - HealthKit 值和每个可用目标圆环与 Apple Health 一致；Recent Workouts 是只读直接展示，
   没有二次导入、不可删除外部事实，且重启、单项拒绝和撤权时状态诚实可恢复。
 - 键盘不遮挡关键按钮，长文案不破版。

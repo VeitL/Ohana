@@ -121,6 +121,7 @@ final class MediaBlobBoundaryTests: XCTestCase {
             "Ohana/Features/Members/Views/EditPetSheet.swift": "edit-state seed",
             "Ohana/Features/Members/Views/HumanAllFeaturesSheet.swift": "post-frame avatar cache preparation",
             "Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift": "detail/edit avatar surface",
+            "Ohana/Features/Members/Views/HumanBasicInfoDetailSupportingViews.swift": "detail hero avatar display",
             "Ohana/Features/Members/Views/HumanDetailView+Hero.swift": "post-frame hero avatar cache preparation",
             "Ohana/Features/Members/Views/MemberCardCreationContentView+MediaAndSave.swift": "creation draft and save handoff",
             "Ohana/Features/Members/Views/MemberCardCreationView.swift": "creation draft media decode",

@@ -1,10 +1,11 @@
 {
   "schema": "ohana.governance.privacy-ownership.v1",
-  "updated": "2026-07-10",
+  "updated": "2026-08-02",
   "policyDocuments": [
     "AGENTS.md",
     "docs/privacy-compliance.md",
     "docs/release-quality-gates.md",
+    "docs/release-true-device-test-plan.md",
     "docs/app-architecture-governance.md"
   ],
   "surfaces": [
@@ -16,22 +17,32 @@
         "UserDefaults runtime preferences",
         "privacy-safe MetricKit diagnostics"
       ],
-      "storage": "Local Application Support storage excluded from OS-managed backup; no App Group. Restricted automatic backup uses the user's iCloud Drive container.",
-      "userControl": "Settings privacy/account flows, backup export, backup import, delete-my-data reset.",
+      "storage": "Local Application Support storage is marked and read-back verified for OS-managed backup exclusion. A bounded, non-authoritative Today Care projection is shared with the Widget extension through the production App Group; the container is marked and verified before private writes and each final snapshot is marked and verified after atomic replacement. Restricted automatic backup uses the user's iCloud Drive container.",
+      "userControl": "Settings privacy/account flows, restricted recovery backup export/import, and delete-my-data reset. The restricted package is not a complete GDPR/CCPA access or portability export.",
       "manifestEvidence": "Ohana/PrivacyInfo.xcprivacy must match actual required-reason API usage and collected data posture.",
       "deletionPaths": [
-        "AppResetService delete-my-data flow"
+        "AppResetService delete-my-data flow pauses and generation-fences Widget refreshes, then sanitizes or removes the projection before persistent deletion; failed persistent deletion releases the fence and schedules projection recovery"
       ],
       "exportPaths": [
-        "DataBackupManager.exportJSON"
+        "DataBackupManager.exportJSON restricted recovery package; complete access/portability export remains a separate release requirement"
       ],
       "paths": [
         "Ohana/PrivacyInfo.xcprivacy",
         "Ohana/Domain/Services/DataBackupManager.swift",
         "Ohana/Domain/Services/DataBackupDTOs.swift",
         "Ohana/App/AppResetService.swift",
+        "Ohana/App/AppRuntimeAdapters.swift",
+        "Ohana/App/AppServices.swift",
         "Ohana/Shared/Utilities/LocalBackupExclusionPolicy.swift",
+        "Ohana/SystemSurfaces/SystemSurfaceContracts.swift",
+        "Ohana/SystemSurfaces/SystemSurfaceSnapshotCoordinator.swift",
+        "OhanaWidgets/TodayCareWidget.swift",
         "OhanaTests/LocalBackupExclusionPolicyTests.swift",
+        "OhanaTests/SystemSurfaceTests.swift",
+        "OhanaTests/AppResetServiceTests.swift",
+        "OhanaTests/AutomaticBackupServiceTests.swift",
+        "scripts/audit-system-surface-contract.sh",
+        "scripts/audit-system-surface-reset-fence.sh",
         "scripts/audit-release-data-safety.sh"
       ]
     },

@@ -88,9 +88,9 @@ enum BackupError: LocalizedError {
             )
         case .pendingShopPurchase:
             l.tr(
-                zh: "商店购买仍在发放或退款中。请稍后重试，避免备份丢失椰子或权益。",
-                en: "A shop purchase is still being fulfilled or refunded. Try again shortly so the backup cannot lose coconuts or an entitlement.",
-                de: "Ein Shop-Kauf wird noch erfüllt oder erstattet. Versuche es gleich erneut, damit im Backup keine Kokosnüsse oder Berechtigungen verloren gehen."
+                zh: "商店最终成交仍在应用中。请稍后重试，避免备份丢失椰子或权益。",
+                en: "A final-sale shop purchase is still being applied. Try again shortly so the backup cannot lose coconuts or an entitlement.",
+                de: "Ein endgültiger Shop-Kauf wird noch angewendet. Versuche es gleich erneut, damit im Backup keine Kokosnüsse oder Berechtigungen verloren gehen."
             )
         case let .invalidRestoreData(category):
             switch category {

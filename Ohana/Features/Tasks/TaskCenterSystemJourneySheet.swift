@@ -658,21 +658,21 @@ struct TaskCenterSystemJourneySheet: View {
             )
         case .humanLifeStage:
             l.tr(
-                zh: "要留下生日或年龄阶段吗？", en: "Would you like to add a birthday or life stage?", de: "Möchtest du Geburtstag oder Lebensphase ergänzen?",
-                es: "¿Quieres añadir cumpleaños o etapa vital?", pt: "Quer adicionar aniversário ou fase da vida?", fr: "Souhaitez-vous ajouter un anniversaire ou une étape de vie ?",
-                ja: "誕生日やライフステージを追加しますか？", ko: "생일이나 생애 단계를 추가할까요?", it: "Vuoi aggiungere compleanno o fase della vita?"
+                zh: "请填写本人的生日", en: "Add your birthday", de: "Geburtstag eintragen",
+                es: "Añade tu cumpleaños", pt: "Adicione seu aniversário", fr: "Ajoutez votre anniversaire",
+                ja: "本人の誕生日を入力", ko: "본인의 생일을 입력해 주세요", it: "Aggiungi il tuo compleanno"
             )
         case .humanBodyProfile:
             l.tr(
-                zh: "哪些身份或身体资料适合留下？", en: "Which identity or body details feel useful?", de: "Welche Identitäts- oder Körperdaten sind hilfreich?",
-                es: "¿Qué datos personales o físicos son útiles?", pt: "Quais dados de identidade ou corpo são úteis?", fr: "Quelles informations d’identité ou physiques sont utiles ?",
-                ja: "どの本人・身体情報を残しますか？", ko: "어떤 신원·신체 정보가 유용할까요?", it: "Quali dati personali o fisici sono utili?"
+                zh: "请选择本人的性别或身份", en: "Choose your gender or identity", de: "Geschlecht oder Identität auswählen",
+                es: "Elige tu género o identidad", pt: "Escolha seu gênero ou identidade", fr: "Choisissez votre genre ou identité",
+                ja: "本人の性別またはアイデンティティを選択", ko: "본인의 성별 또는 정체성을 선택해 주세요", it: "Scegli il tuo genere o la tua identità"
             )
         case .humanPersonalityContext:
             l.tr(
-                zh: "什么最能讲出你的性格与故事？", en: "What best expresses your personality and story?", de: "Was beschreibt Persönlichkeit und Geschichte am besten?",
-                es: "¿Qué expresa mejor tu personalidad e historia?", pt: "O que melhor expressa sua personalidade e história?", fr: "Qu’est-ce qui exprime le mieux votre personnalité et votre histoire ?",
-                ja: "性格や物語を最もよく表すものは？", ko: "성격과 이야기를 가장 잘 보여주는 것은 무엇일까요?", it: "Cosa esprime meglio personalità e storia?"
+                zh: "还想补充哪些其他资料？", en: "Which other details would you like to add?", de: "Welche weiteren Angaben möchtest du ergänzen?",
+                es: "¿Qué otros datos quieres añadir?", pt: "Quais outros detalhes você quer adicionar?", fr: "Quelles autres informations souhaitez-vous ajouter ?",
+                ja: "ほかに追加したい情報は？", ko: "어떤 기타 정보를 추가하고 싶나요?", it: "Quali altri dettagli vuoi aggiungere?"
             )
         case .humanOptionalDetails:
             l.tr(zh: "哪些可选资料会让成员卡更有用？", en: "Which optional details would make your member card useful?", de: "Welche optionalen Angaben machen deine Karte nützlicher?")
@@ -707,24 +707,28 @@ struct TaskCenterSystemJourneySheet: View {
             )
         case .humanLifeStage:
             l.tr(
-                zh: "生日可用于年龄、星座与纪念日展示；不清楚或不想填写也可以明确说明。", en: "A birthday enables age, zodiac, and anniversary details. Unknown or private is a valid answer.", de: "Ein Geburtstag ermöglicht Alter, Sternzeichen und Jahrestage. Unbekannt oder privat ist ebenfalls gültig.",
-                es: "El cumpleaños permite mostrar edad, signo y aniversarios. Desconocido o privado también es válido.", pt: "O aniversário permite mostrar idade, signo e datas especiais. Desconhecido ou privado também vale.", fr: "L’anniversaire permet d’afficher l’âge, le signe et les dates marquantes. Inconnu ou privé est aussi valable.",
-                ja: "誕生日から年齢・星座・記念日を表示できます。不明や非公開でも構いません。", ko: "생일로 나이, 별자리, 기념일을 표시할 수 있어요. 모름이나 비공개도 괜찮아요.", it: "Il compleanno abilita età, segno e ricorrenze. Anche sconosciuto o privato è valido."
+                zh: "生日是本人资料任务的必填项，也用于年龄、星座与纪念日展示。", en: "Birthday is required for this profile task and enables age, zodiac, and anniversary details.", de: "Der Geburtstag ist für diese Profilaufgabe erforderlich und ermöglicht Alters-, Sternzeichen- und Jahrestagsangaben.",
+                es: "El cumpleaños es obligatorio para esta tarea y permite mostrar edad, signo y aniversarios.", pt: "O aniversário é obrigatório nesta tarefa e permite mostrar idade, signo e datas especiais.", fr: "L’anniversaire est requis pour cette tâche et permet d’afficher l’âge, le signe et les dates marquantes.",
+                ja: "誕生日はこのプロフィールタスクの必須項目で、年齢・星座・記念日の表示に使われます。", ko: "생일은 이 프로필 과제의 필수 항목이며 나이, 별자리, 기념일 표시에 사용돼요.", it: "Il compleanno è obbligatorio per questa attività e abilita età, segno e ricorrenze."
             )
         case .humanBodyProfile:
             l.tr(
-                zh: "身份、血型与身高均为可选资料，只留下你愿意保存的内容。", en: "Identity, blood type, and height are optional. Keep only what you want to save.", de: "Identität, Blutgruppe und Größe sind optional. Speichere nur gewünschte Angaben.",
-                es: "Identidad, grupo sanguíneo y altura son opcionales. Guarda solo lo que quieras.", pt: "Identidade, tipo sanguíneo e altura são opcionais. Guarde apenas o que quiser.", fr: "Identité, groupe sanguin et taille sont facultatifs. Gardez seulement ce que vous souhaitez.",
-                ja: "本人情報・血液型・身長は任意です。残したい内容だけ保存してください。", ko: "신원, 혈액형, 키는 선택 사항이에요. 원하는 정보만 저장하세요.", it: "Identità, gruppo sanguigno e altezza sono facoltativi. Salva solo ciò che desideri."
+                zh: "性别或身份必须作出选择；“不愿透露”也是有效选择。血型和身高仍为可选。", en: "A gender or identity choice is required; “Prefer not to say” is valid. Blood type and height remain optional.", de: "Eine Auswahl zu Geschlecht oder Identität ist erforderlich; „Keine Angabe“ ist gültig. Blutgruppe und Größe bleiben optional.",
+                es: "Debes elegir género o identidad; «Prefiero no decirlo» es válido. El grupo sanguíneo y la altura siguen siendo opcionales.", pt: "É necessário escolher gênero ou identidade; “Prefiro não informar” é válido. Tipo sanguíneo e altura continuam opcionais.", fr: "Un choix de genre ou d’identité est requis ; « Je préfère ne pas répondre » est valide. Le groupe sanguin et la taille restent facultatifs.",
+                ja: "性別またはアイデンティティの選択は必須です。「回答しない」も有効です。血液型と身長は任意です。", ko: "성별 또는 정체성을 선택해야 하며 ‘공개하지 않음’도 유효해요. 혈액형과 키는 선택 사항이에요.", it: "È richiesta una scelta di genere o identità; “Preferisco non dirlo” è valida. Gruppo sanguigno e altezza restano facoltativi."
             )
         case .humanPersonalityContext:
             l.tr(
-                zh: "MBTI、地区与个人故事都可选，也可以明确暂不填写。", en: "MBTI, location, and your story are optional, and can be explicitly left blank.", de: "MBTI, Ort und Geschichte sind optional und können bewusst leer bleiben.",
-                es: "MBTI, lugar e historia son opcionales y pueden dejarse explícitamente en blanco.", pt: "MBTI, local e história são opcionais e podem ficar explicitamente em branco.", fr: "MBTI, lieu et histoire sont facultatifs et peuvent être explicitement laissés vides.",
-                ja: "MBTI・地域・ストーリーは任意で、明確に未入力を選べます。", ko: "MBTI, 지역, 이야기는 선택 사항이며 명시적으로 비워둘 수 있어요.", it: "MBTI, luogo e storia sono facoltativi e possono essere lasciati esplicitamente vuoti."
+                zh: "血型、身高、MBTI、地区与个人故事都可选，也可以明确暂不填写。", en: "Blood type, height, MBTI, location, and your story are optional and can be explicitly left blank.", de: "Blutgruppe, Größe, MBTI, Ort und Geschichte sind optional und können bewusst leer bleiben.",
+                es: "El grupo sanguíneo, la altura, el MBTI, el lugar y la historia son opcionales y pueden dejarse explícitamente en blanco.", pt: "Tipo sanguíneo, altura, MBTI, local e história são opcionais e podem ficar explicitamente em branco.", fr: "Le groupe sanguin, la taille, le MBTI, le lieu et l’histoire sont facultatifs et peuvent être explicitement laissés vides.",
+                ja: "血液型・身長・MBTI・地域・ストーリーは任意で、明示的に未入力を選べます。", ko: "혈액형, 키, MBTI, 지역, 이야기는 선택 사항이며 명시적으로 비워둘 수 있어요.", it: "Gruppo sanguigno, altezza, MBTI, luogo e storia sono facoltativi e possono essere lasciati esplicitamente vuoti."
             )
         case .humanOptionalDetails:
-            l.tr(zh: "生日、身份、地区、血型、MBTI 和身高都可选，只填真正想留下的内容。", en: "Birthday, identity, location, blood type, MBTI, and height are optional. Add only what you want to keep.", de: "Geburtstag, Identität, Ort, Blutgruppe, MBTI und Größe sind optional.")
+            l.tr(
+                zh: "这是旧版资料确认，只计入其他资料；生日与性别/身份仍需真实填写。",
+                en: "This legacy answer counts only toward other details; birthday and gender/identity still require real entries.",
+                de: "Diese alte Antwort zählt nur für weitere Angaben; Geburtstag und Geschlecht/Identität müssen weiterhin wirklich eingetragen werden."
+            )
         case .petLifeStage:
             l.tr(zh: "生日和到家日有助于年龄与纪念日提醒，不清楚也可以直接说明。", en: "Dates help with age and anniversary reminders. It is fine if you do not know them.", de: "Daten helfen bei Alters- und Jahrestagserinnerungen. Unbekannt ist in Ordnung.")
         case .petBodyProfile:
@@ -756,8 +760,8 @@ struct TaskCenterSystemJourneySheet: View {
                 ja: "アバターと外観を設定", ko: "아바타와 모습 설정", it: "Imposta avatar e aspetto"
             )
         case .humanLifeStage: l.tr(zh: "去填写生日资料", en: "Add birthday details", de: "Geburtstag ergänzen", es: "Añadir cumpleaños", pt: "Adicionar aniversário", fr: "Ajouter l’anniversaire", ja: "誕生日を追加", ko: "생일 정보 추가", it: "Aggiungi compleanno")
-        case .humanBodyProfile: l.tr(zh: "去填写身份与身体资料", en: "Add identity and body details", de: "Identitäts- und Körperdaten ergänzen", es: "Añadir datos personales y físicos", pt: "Adicionar dados de identidade e corpo", fr: "Ajouter les informations d’identité et physiques", ja: "本人・身体情報を追加", ko: "신원·신체 정보 추가", it: "Aggiungi dati personali e fisici")
-        case .humanPersonalityContext: l.tr(zh: "去完善性格与故事", en: "Add personality and story", de: "Persönlichkeit und Geschichte ergänzen", es: "Añadir personalidad e historia", pt: "Adicionar personalidade e história", fr: "Ajouter personnalité et histoire", ja: "性格とストーリーを追加", ko: "성격과 이야기 추가", it: "Aggiungi personalità e storia")
+        case .humanBodyProfile: l.tr(zh: "去选择性别或身份", en: "Choose gender or identity", de: "Geschlecht oder Identität wählen", es: "Elegir género o identidad", pt: "Escolher gênero ou identidade", fr: "Choisir le genre ou l’identité", ja: "性別または本人情報を選択", ko: "성별 또는 정체성 선택", it: "Scegli genere o identità")
+        case .humanPersonalityContext: l.tr(zh: "去完善其他资料", en: "Add more details", de: "Weitere Angaben ergänzen", es: "Añadir más datos", pt: "Adicionar mais detalhes", fr: "Ajouter d’autres informations", ja: "その他の情報を追加", ko: "기타 정보 추가", it: "Aggiungi altri dettagli")
         case .humanOptionalDetails: l.tr(zh: "去填写可选资料", en: "Add optional details", de: "Optionale Angaben ergänzen")
         case .petLifeStage: l.tr(zh: "去填写日期资料", en: "Add dates", de: "Daten ergänzen")
         case .petBodyProfile: l.tr(zh: "去填写身体资料", en: "Add body profile", de: "Körperprofil ergänzen")

@@ -27,6 +27,7 @@ may override the active sources below.
 | Product constitution | `docs/specs/product-foundation.md` |
 | Engineering rules | `AGENTS.md` |
 | Current release/validation read | `docs/testing-progress.md` |
+| App Store launch execution | `docs/app-store-launch-readiness-checklist.md` and `docs/app-store-connect-submission-package.md` |
 | Open backlog | `docs/task-follow-ups.md` |
 | Status ownership | `docs/status-ledger-map.md` |
 | Deferred CloudKit work | `docs/cloud-sync-todo.md` |

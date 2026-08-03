@@ -28,8 +28,10 @@ struct ZenExperienceContainer: View {
 
     @State private var snapshot = ZenPresenceSnapshot.empty
     @State private var oasisSnapshot = ZenOasisSnapshot.empty
+    @State private var starterJourney = StarterJourneyExperienceProjection.empty
     @State private var presentedRoute: ZenExperienceRoute?
     @State private var refreshTask: Task<Void, Never>?
+    @State private var starterJourneyRefreshTask: Task<Void, Never>?
     @State private var avatarLoadTask: Task<Void, Never>?
     @State private var didLoadStreak = false
     @State private var didLoadOasis = false
@@ -45,6 +47,7 @@ struct ZenExperienceContainer: View {
         ZenShell(
             snapshot: $snapshot,
             oasisSnapshot: $oasisSnapshot,
+            starterJourney: starterJourney,
             actions: actions,
             profileTransitionNamespace: profileTransitionNamespace
         )
@@ -62,6 +65,8 @@ struct ZenExperienceContainer: View {
             refreshTask = nil
             avatarLoadTask?.cancel()
             avatarLoadTask = nil
+            starterJourneyRefreshTask?.cancel()
+            starterJourneyRefreshTask = nil
         }
         .sheet(item: $presentedRoute) { route in
             transitionedRouteDestination(route)
@@ -101,7 +106,9 @@ struct ZenExperienceContainer: View {
             Text(errorMessage ?? "")
         }
     }
+}
 
+private extension ZenExperienceContainer {
     private var commandService: PresenceCheckInCommandService {
         PresenceCheckInCommandService(
             context: modelContext,
@@ -112,9 +119,6 @@ struct ZenExperienceContainer: View {
 
     private var actions: ZenShellActions {
         ZenShellActions(
-            onAutoCheckInOwner: {
-                await runAutoCheckInOwner()
-            },
             onCheckIn: { subjectID, kind, status in
                 guard let subject = presenceSubject(id: subjectID, kind: kind) else { return }
                 await runPresenceCommand {
@@ -149,9 +153,6 @@ struct ZenExperienceContainer: View {
                     try commandService.undoTodayCheckIn(subject: subject)
                 }
             },
-            onCheckInAll: {
-                await runPresenceCommand { try commandService.checkInAll() }
-            },
             onLoadStreak: {
                 didLoadStreak = true
                 refresh(streak: true)
@@ -179,6 +180,9 @@ struct ZenExperienceContainer: View {
                 presentedRoute = .coconutLog
             },
             onOpenSettings: onRequestModeSwitch,
+            onOpenStarterJourney: {
+                presentedRoute = .starterJourney
+            },
             onOpenPersonalAnalytics: {
                 presentedRoute = appServices.commerce.allows(.presenceLongRangeAnalytics)
                     ? .analytics
@@ -218,7 +222,7 @@ struct ZenExperienceContainer: View {
                     projectionManager: appServices.questManager
                 )
                 if case .claimed = result {
-                    StarterGiftService.markCeremonySeen()
+                    StarterGiftService.markCeremonySeen(requestsOasisTabPrompt: false)
                 } else if case .persistenceFailed = result {
                     errorMessage = L10n.current.tr(
                         zh: "起航礼没有保存，请稍后重试。",
@@ -242,6 +246,7 @@ struct ZenExperienceContainer: View {
               UUID(uuidString: experienceController.zenOwnerHumanID) != nil else {
             snapshot = .empty
             oasisSnapshot = .empty
+            starterJourney = .empty
             return
         }
         refresh(streak: didLoadStreak)
@@ -250,26 +255,32 @@ struct ZenExperienceContainer: View {
     private func runPresenceCommand(
         _ operation: () throws -> PresenceCheckInCommandResult
     ) async {
+        var ownerCheckInAt: Date?
         do {
             let result = try operation()
-            if let ownerCheckIn = result.checkIns.first(where: \.isOwner) {
-                await SystemPresenceReminderScheduler().cancelToday(now: ownerCheckIn.checkedInAt)
-            }
+            ownerCheckInAt = result.checkIns.first(where: \.isOwner)?.checkedInAt
         } catch {
             present(error)
         }
         refresh(streak: didLoadStreak)
+        if let ownerCheckInAt {
+            scheduleOwnerCheckInSideEffects(checkedInAt: ownerCheckInAt)
+        }
     }
 
     private func runUndoPresenceCommand(
         _ operation: () throws -> PresenceUndoCheckInResult
     ) async {
+        var didUndoOwner = false
         do {
-            _ = try operation()
+            didUndoOwner = try operation().removedCheckIn.isOwner
         } catch {
             present(error)
         }
         refresh(streak: didLoadStreak)
+        if didUndoOwner {
+            scheduleOwnerUndoSideEffects()
+        }
     }
 
     private func runRetrospectiveStatusCommand(
@@ -283,18 +294,40 @@ struct ZenExperienceContainer: View {
         refresh(streak: didLoadStreak)
     }
 
-    private func runAutoCheckInOwner() async -> Bool {
-        do {
-            let result = try commandService.autoCheckInOwner()
-            if let ownerCheckIn = result.checkIns.first(where: \.isOwner) {
-                await SystemPresenceReminderScheduler().cancelToday(now: ownerCheckIn.checkedInAt)
+    private func scheduleOwnerCheckInSideEffects(checkedInAt: Date) {
+        let guardian = appServices.guardianSafety
+        OhanaFrameScheduler.runAfterNextFrame {
+            Task { @MainActor in
+                await SystemPresenceReminderScheduler().cancelToday(now: checkedInAt)
+                await guardian.flushOutbox()
             }
-            refresh(streak: didLoadStreak)
-            return result.didCreateCheckIn
-        } catch {
-            present(error)
-            refresh(streak: didLoadStreak)
-            return false
+        }
+    }
+
+    private func scheduleOwnerUndoSideEffects() {
+        let guardian = appServices.guardianSafety
+        let notifications = appServices.userNotifications
+        let configuration = PresenceReminderConfigurationStore().load()
+        let content = PresenceReminderNotificationContent.localized(L10n(appLanguage))
+        OhanaFrameScheduler.runAfterNextFrame {
+            Task { @MainActor in
+                await guardian.flushOutbox()
+            }
+            Task { @MainActor in
+                let result = await PresenceReminderRestorationCoordinator.restoreIfAuthorized(
+                    configuration,
+                    title: content.title,
+                    body: content.body,
+                    notifications: notifications,
+                    scheduler: SystemPresenceReminderScheduler()
+                )
+                if result == .schedulingFailed {
+                    OhanaLog.warning(
+                        "Zen owner undo could not restore local Presence reminders.",
+                        category: "Notifications"
+                    )
+                }
+            }
         }
     }
 
@@ -311,8 +344,10 @@ struct ZenExperienceContainer: View {
               let ownerID = UUID(uuidString: experienceController.zenOwnerHumanID) else {
             snapshot = .empty
             oasisSnapshot = .empty
+            starterJourney = .empty
             return
         }
+        refreshStarterJourney(ownerID: ownerID)
         do {
             let home = try PresenceCheckInReadService.homeSnapshot(
                 context: modelContext,
@@ -349,7 +384,8 @@ struct ZenExperienceContainer: View {
                         isOwner: subject.isOwner,
                         sortIndex: index,
                         isActive: subject.isActive,
-                        isAnonymousHistory: subject.isAnonymousHistory
+                        isAnonymousHistory: subject.isAnonymousHistory,
+                        expandedProfile: subject.expandedProfile
                     )
                 }
                 for subject in historicalSubjects {
@@ -419,6 +455,44 @@ struct ZenExperienceContainer: View {
         }
     }
 
+    private func refreshStarterJourney(ownerID: UUID) {
+        let giftResult = StarterGiftService.evaluateEligibility(
+            activeHumanID: ownerID.uuidString,
+            context: modelContext,
+            wallet: appServices.coconutWallet,
+            projectionManager: appServices.questManager
+        )
+        let container = modelContext.container
+        starterJourneyRefreshTask?.cancel()
+        starterJourneyRefreshTask = Task { @MainActor in
+            do {
+                let actor = StarterJourneyExperienceReadModelActor(modelContainer: container)
+                let journey = try await actor.loadHumanJourney(
+                    activeHumanID: ownerID.uuidString
+                )
+                guard !Task.isCancelled,
+                      experienceController.zenOwnerHumanID == ownerID.uuidString else { return }
+                starterJourney = StarterJourneyExperienceProjection.make(
+                    giftResult: giftResult,
+                    starterJourney: journey
+                )
+                if didLoadOasis {
+                    refreshOasis(
+                        balance: appServices.coconutWallet.totalBalance(context: modelContext)
+                    )
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                OhanaLog.warning(
+                    "Zen starter journey projection failed: \(error.localizedDescription)",
+                    category: "Economy"
+                )
+            }
+            starterJourneyRefreshTask = nil
+        }
+    }
+
     private func scheduleAvatarPreload(for subjects: [PresenceSubjectSnapshot]) {
         let requests = subjects.compactMap { subject -> ZenAvatarLoadRequest? in
             guard let modelID = subject.avatarModelID,
@@ -468,7 +542,8 @@ struct ZenExperienceContainer: View {
     private func refreshOasis(balance: Int) {
         _ = appServices.oasisTree.refreshLedgerEnergy(modelContext: modelContext)
         let level = appServices.oasisTree.treeLevel.rawValue
-        let gift = StarterGiftService.evaluateZenEligibility(
+        let gift = StarterGiftService.evaluateEligibility(
+            activeHumanID: experienceController.zenOwnerHumanID,
             context: modelContext,
             wallet: appServices.coconutWallet,
             projectionManager: appServices.questManager
@@ -476,9 +551,9 @@ struct ZenExperienceContainer: View {
         let giftState: ZenStarterGiftState = switch gift {
         case .readyToClaim:
             .claimable
-        case .claimed, .alreadyHandled:
+        case .claimed, .alreadyHandled, .markedExistingUser:
             .claimed
-        case .markedExistingUser, .pendingFirstPet, .persistenceFailed:
+        case .waitingForFirstHuman, .persistenceFailed:
             .hidden
         }
         oasisSnapshot = ZenOasisSnapshot(
@@ -599,6 +674,17 @@ struct ZenExperienceContainer: View {
                 onClose: closeRoute,
                 historyContentDelayMilliseconds: 80
             )
+        case .starterJourney:
+            ZenStarterJourneySheet(
+                projection: starterJourney,
+                onClaimGift: claimZenStarterGift,
+                onClaimHumanProfile: claimZenHumanProfileReward,
+                onRecordHumanResolution: recordZenHumanResolution,
+                onRefresh: {
+                    refresh(streak: didLoadStreak)
+                },
+                onClose: closeRoute
+            )
         }
     }
 
@@ -609,6 +695,99 @@ struct ZenExperienceContainer: View {
     private func closeAndRefreshRoute() {
         presentedRoute = nil
         scheduleRefresh(delayMilliseconds: 80)
+    }
+
+    private func claimZenStarterGift() -> TaskCenterSystemJourneyMutationOutcome {
+        let result = StarterGiftService.claimStarterGift(
+            activeHumanID: experienceController.zenOwnerHumanID,
+            context: modelContext,
+            careLedger: appServices.careLedger,
+            wallet: appServices.coconutWallet,
+            projectionManager: appServices.questManager
+        )
+        switch result {
+        case .claimed, .alreadyHandled:
+            StarterGiftService.markCeremonySeen(requestsOasisTabPrompt: false)
+            refresh(streak: didLoadStreak)
+            return .success
+        case .readyToClaim, .waitingForFirstHuman, .markedExistingUser:
+            refresh(streak: didLoadStreak)
+            return .failure(L10n.current.tr(
+                zh: "请先建立并绑定一位在世本人。",
+                en: "Create and bind a living Human profile first.",
+                de: "Erstelle und verknüpfe zuerst ein lebendes Personenprofil."
+            ))
+        case .persistenceFailed:
+            return .failure(L10n.current.tr(
+                zh: "礼包保存失败，请稍后重试。",
+                en: "The welcome gift could not be saved. Try again.",
+                de: "Das Willkommensgeschenk konnte nicht gespeichert werden."
+            ))
+        }
+    }
+
+    private func claimZenHumanProfileReward() -> TaskCenterSystemJourneyMutationOutcome {
+        let result = HouseholdStarterJourneyService.claim(
+            task: .humanProfile,
+            actingHumanID: experienceController.zenOwnerHumanID,
+            context: modelContext,
+            questManager: appServices.questManager,
+            wallet: appServices.coconutWallet
+        )
+        switch result {
+        case .claimed, .alreadyClaimed:
+            refresh(streak: didLoadStreak)
+            return .success
+        case .notEligible:
+            refresh(streak: didLoadStreak)
+            return .failure(L10n.current.tr(
+                zh: "本人资料还未达到 75%。",
+                en: "Your profile has not reached 75% yet.",
+                de: "Dein Profil hat noch keine 75 % erreicht."
+            ))
+        case .missingHuman, .requiresHumanSelection:
+            return .failure(L10n.current.tr(
+                zh: "请先重新绑定本人。",
+                en: "Bind your Human profile again first.",
+                de: "Verknüpfe zuerst dein Personenprofil erneut."
+            ))
+        case .persistenceFailed:
+            return .failure(L10n.current.tr(
+                zh: "奖励保存失败，请稍后重试。",
+                en: "The reward could not be saved. Try again.",
+                de: "Die Belohnung konnte nicht gespeichert werden."
+            ))
+        }
+    }
+
+    private func recordZenHumanResolution(
+        _ checkpoint: HouseholdStarterJourneyCheckpoint,
+        _ resolution: HouseholdStarterJourneyResolution
+    ) -> TaskCenterSystemJourneyMutationOutcome {
+        guard let targetID = starterJourney.humanProfileState?.targetID else {
+            return .failure(L10n.current.tr(
+                zh: "找不到本人资料，请返回后重试。",
+                en: "Your Human profile could not be found. Go back and try again.",
+                de: "Dein Personenprofil wurde nicht gefunden."
+            ))
+        }
+        let result = HouseholdStarterJourneyService.recordResolution(
+            task: .humanProfile,
+            checkpoint: checkpoint,
+            resolution: resolution,
+            subjectID: targetID,
+            actingHumanID: experienceController.zenOwnerHumanID,
+            context: modelContext
+        )
+        guard result.didSucceed else {
+            return .failure(L10n.current.tr(
+                zh: "当前选择没有保存，请重试。",
+                en: "That choice could not be saved. Try again.",
+                de: "Die Auswahl konnte nicht gespeichert werden."
+            ))
+        }
+        refresh(streak: didLoadStreak)
+        return .success
     }
 
     private func present(_ error: Error) {
@@ -705,6 +884,7 @@ private enum ZenExperienceRoute: Identifiable, Equatable {
     case personalPlan
     case members
     case coconutLog
+    case starterJourney
 
     var id: String {
         switch self {
@@ -721,6 +901,7 @@ private enum ZenExperienceRoute: Identifiable, Equatable {
         case .personalPlan: "personal-plan"
         case .members: "members"
         case .coconutLog: "coconut-log"
+        case .starterJourney: "starter-journey"
         }
     }
 
@@ -730,7 +911,7 @@ private enum ZenExperienceRoute: Identifiable, Equatable {
         case let .pet(id): "profile:pet:\(id.uuidString)"
         case let .plant(id): "profile:plant:\(id.uuidString)"
         case .add, .shop, .achievements, .gacha, .critters, .growthRoadmap,
-             .analytics, .personalPlan, .members, .coconutLog:
+             .analytics, .personalPlan, .members, .coconutLog, .starterJourney:
             nil
         }
     }

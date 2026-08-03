@@ -212,15 +212,16 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.sheet == .settings)
     }
 
-    @Test func guardianInviteDeepLinkNormalizesCodeAndOpensGuardianSheet() throws {
+    @Test func guardianInviteDeepLinkIsRejectedWithoutReplacingCurrentPresentation() throws {
         let coordinator = AppRouteCoordinator()
+        coordinator.presentSettings()
         let url = try #require(URL(string: "\(OhanaExternalRoute.scheme)://guardian?invite=abc123"))
 
-        #expect(coordinator.handleExternalURL(url))
-        #expect(coordinator.sheet == .guardianSafety(invitationCode: "ABC123", incidentID: nil))
+        #expect(!coordinator.handleExternalURL(url))
+        #expect(coordinator.sheet == .settings)
     }
 
-    @Test func guardianNotificationOpensOnlyTheRequestedIncident() {
+    @Test func guardianNotificationIsSuppressedWithoutReplacingCurrentPresentation() {
         let coordinator = AppRouteCoordinator()
         coordinator.presentSettings()
 
@@ -229,7 +230,7 @@ struct AppRouteCoordinatorTests {
         )
 
         #expect(outcome == .none)
-        #expect(coordinator.sheet == .guardianSafety(invitationCode: nil, incidentID: "incident-7"))
+        #expect(coordinator.sheet == .settings)
         #expect(coordinator.path.isEmpty)
     }
 
@@ -450,6 +451,9 @@ struct AppRouteCoordinatorTests {
 
         coordinator.presentSheet(.humanMetrics(humanID))
         #expect(coordinator.sheet == .humanMetrics(humanID))
+
+        coordinator.presentSheet(.humanConditions(humanID))
+        #expect(coordinator.sheet == .humanConditions(humanID))
 
         coordinator.presentSheet(.humanReport(humanID))
         #expect(coordinator.sheet == .humanReport(humanID))

@@ -184,7 +184,7 @@ struct HumanPrivacyTestView: View {
     private func localizedPrivateFieldTitle(_ field: HumanPrivateField) -> String {
         switch field {
         case .weight:
-            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+            l.tr(zh: "身体与健康记录", en: "Body & health records", de: "Körper- und Gesundheitsdaten")
         case .workout:
             l.tr(zh: "运动", en: "Workouts", de: "Training")
         case .medication:

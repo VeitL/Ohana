@@ -20,18 +20,16 @@ nonisolated enum MemberProfileCompletionResolutionMapper {
             if hasResolution(.humanAppearance, subjectID: subjectID, resolutions: resolutions) {
                 result.insert(.humanAppearance)
             }
-            let focusedMappings: [(String, MemberProfileCompletionCategory)] = [
-                ("humanLifeStage", .humanLifeStage),
-                ("humanBodyProfile", .humanBodyProfile),
-                ("humanPersonalityContext", .humanPersonalityContext)
-            ]
-            for (rawCheckpoint, category) in focusedMappings
-                where HouseholdStarterJourneyCheckpoint(rawValue: rawCheckpoint)
-                    .map({ hasResolution($0, subjectID: subjectID, resolutions: resolutions) }) == true {
-                result.insert(category)
-            }
-            if hasResolution(.humanOptionalDetails, subjectID: subjectID, resolutions: resolutions) {
-                result.formUnion([.humanLifeStage, .humanBodyProfile, .humanPersonalityContext])
+            if hasResolution(
+                .humanPersonalityContext,
+                subjectID: subjectID,
+                resolutions: resolutions
+            ) || hasResolution(
+                .humanOptionalDetails,
+                subjectID: subjectID,
+                resolutions: resolutions
+            ) {
+                result.insert(.humanPersonalityContext)
             }
             return result
         case .pet:

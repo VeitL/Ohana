@@ -43,7 +43,9 @@ struct OhanaApp: App {
             }
         #endif
         AppCountry.ensureInitialized()
-        BackgroundTaskCoordinator.registerTasks()
+        BackgroundTaskCoordinator.registerTasks(
+            makeMedicationReminders: BackgroundTaskRuntimeAdapter.makeMedicationReminders
+        )
     }
 
     private var preferredScheme: ColorScheme? {
@@ -98,7 +100,11 @@ private struct OhanaBootstrapRootView: View {
     @State private var launchRevealTask: Task<Void, Never>?
     @State private var launchRevealProgress: CGFloat = 0
     @State private var isLaunchOverlayVisible = true
-    @State private var commerce = CommerceEntitlementService()
+    #if DEBUG
+        @State private var commerce = CommerceEntitlementService.serviceForCurrentAppLaunch()
+    #else
+        @State private var commerce = CommerceEntitlementService()
+    #endif
     @State private var pendingExternalURL: URL?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -343,14 +349,15 @@ private struct OhanaBootstrapRootView: View {
 
     #if DEBUG
         private static let uiTestStoreOpenFaultLock = NSLock()
-        private static var didConsumeUITestStoreOpenFailure = false
+        private static var consumedUITestStoreOpenFailureCount = 0
 
         private static func consumeUITestStoreOpenFailureIfRequested() -> Bool {
-            guard OhanaUITestLaunchOptions.requestsSingleStoreOpenFailure else { return false }
+            let requestedFailureCount = OhanaUITestLaunchOptions.requestedStoreOpenFailureCount
+            guard requestedFailureCount > 0 else { return false }
             uiTestStoreOpenFaultLock.lock()
             defer { uiTestStoreOpenFaultLock.unlock() }
-            guard !didConsumeUITestStoreOpenFailure else { return false }
-            didConsumeUITestStoreOpenFailure = true
+            guard consumedUITestStoreOpenFailureCount < requestedFailureCount else { return false }
+            consumedUITestStoreOpenFailureCount += 1
             return true
         }
     #endif
@@ -361,7 +368,8 @@ private struct OhanaBootstrapRootView: View {
             do {
                 try StaticAppResetter(
                     questManager: QuestManager(),
-                    automaticBackups: AutomaticBackupService()
+                    automaticBackups: AutomaticBackupService(),
+                    systemSurfaceSnapshotSanitizer: UITestSystemSurfaceSnapshotRuntimeAdapter.sanitizeIfAvailable
                 ).resetForUITests(context: modelContainer.mainContext)
                 SharedModelContainer.invalidateCachedContainer(modelContainer)
                 OhanaStartupProbe.mark("ui-test-reset.complete")
@@ -376,15 +384,15 @@ private struct OhanaBootstrapRootView: View {
         #endif
     }
 
-#if DEBUG
-    private func seedHumanBaselineForUITestsIfNeeded(modelContainer: ModelContainer, services: AppServices) {
-        UITestHumanBaselineSeeder.seedIfRequested(modelContainer: modelContainer, services: services)
-    }
+    #if DEBUG
+        private func seedHumanBaselineForUITestsIfNeeded(modelContainer: ModelContainer, services: AppServices) {
+            UITestHumanBaselineSeeder.seedIfRequested(modelContainer: modelContainer, services: services)
+        }
 
-    private func seedPlantBaselineForUITestsIfNeeded(modelContainer: ModelContainer, services: AppServices) {
-        UITestPlantBaselineSeeder.seedIfRequested(modelContainer: modelContainer, services: services)
-    }
-#endif
+        private func seedPlantBaselineForUITestsIfNeeded(modelContainer: ModelContainer, services: AppServices) {
+            UITestPlantBaselineSeeder.seedIfRequested(modelContainer: modelContainer, services: services)
+        }
+    #endif
 }
 
 private enum OhanaBootstrapStatus: Equatable {
@@ -718,7 +726,7 @@ private struct OhanaLaunchCircularDismissMask: Shape {
     }
 }
 
-private enum OhanaStartupProbe {
+enum OhanaStartupProbe {
     nonisolated static func mark(_ event: String) {
         #if DEBUG
             let filename = "ohana-startup-probe.log"

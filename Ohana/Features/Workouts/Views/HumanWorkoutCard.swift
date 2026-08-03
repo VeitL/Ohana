@@ -82,8 +82,10 @@ struct HumanWorkoutCard: View {
             AddWorkoutSheet(human: human)
         }
         .sheet(isPresented: $showWorkoutHistory) {
-            HumanWorkoutSummaryView(human: human)
-                .ohanaSheetPagePresentation() // ui-v4: keep legacy workout-card detail entry on the same long sheet page host.
+            NavigationStack {
+                HumanWorkoutSummaryView(human: human)
+            }
+            .ohanaSheetPagePresentation() // ui-v4: keep legacy workout-card detail entry on the same long sheet page host.
         }
     }
 
@@ -489,6 +491,7 @@ struct HumanWorkoutHistoryView: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     @State private var showAddSheet = false
+    @State private var pendingDeletionLog: HumanWorkoutLog?
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -586,6 +589,27 @@ struct HumanWorkoutHistoryView: View {
                 AddWorkoutSheet(human: human)
                     .ohanaSheetPagePresentation() // ui-v4: allow complex workout editor uses full-height system sheet
             }
+            .confirmationDialog(
+                l.tr(zh: "删除这条手动运动记录？", en: "Delete this manual workout?", de: "Dieses manuelle Training löschen?"),
+                isPresented: deletionConfirmationIsPresented,
+                titleVisibility: .visible
+            ) {
+                Button(l.tr(zh: "删除记录", en: "Delete Record", de: "Eintrag löschen"), role: .destructive) {
+                    guard let log = pendingDeletionLog else { return }
+                    pendingDeletionLog = nil
+                    deleteLog(log)
+                }
+                .accessibilityIdentifier("human-workout-confirm-delete-action")
+                Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {
+                    pendingDeletionLog = nil
+                }
+            } message: {
+                Text(l.tr(
+                    zh: "删除后无法撤销。",
+                    en: "This cannot be undone.",
+                    de: "Dies kann nicht rückgängig gemacht werden."
+                ))
+            }
         }
     }
 
@@ -664,16 +688,7 @@ struct HumanWorkoutHistoryView: View {
                             }
                         }
                         Button {
-                            let command = DomainCommand.humanWorkoutDelete(humanID: human.id, recordID: log.id)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            commandQueue.enqueue(command) {
-                                HumanCareCommandExecutor(context: modelContext, services: appServices).deleteWorkout(
-                                    log,
-                                    human: human,
-                                    command: command,
-                                    note: "human.workout.delete"
-                                )
-                            }
+                            pendingDeletionLog = log
                         } label: {
                             Image(systemName: "trash").accessibilityHidden(true)
                                 .font(OhanaFont.caption())
@@ -689,6 +704,30 @@ struct HumanWorkoutHistoryView: View {
             }
             .goIslandModuleCard(cornerRadius: OhanaRadius.input)
             .padding(.horizontal, 16)
+        }
+    }
+
+    private var deletionConfirmationIsPresented: Binding<Bool> {
+        Binding(
+            get: { pendingDeletionLog != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingDeletionLog = nil
+                }
+            }
+        )
+    }
+
+    private func deleteLog(_ log: HumanWorkoutLog) {
+        let command = DomainCommand.humanWorkoutDelete(humanID: human.id, recordID: log.id)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            HumanCareCommandExecutor(context: modelContext, services: appServices).deleteWorkout(
+                log,
+                human: human,
+                command: command,
+                note: "human.workout.delete"
+            )
         }
     }
 }

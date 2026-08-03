@@ -875,7 +875,7 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(snapshot.todayCompletedCount == 1)
     }
 
-    @Test func createFirstPetSystemJourneyIsStableUnscheduledAndIndependentOfMemberQueues() throws {
+    @Test func firstPetSuggestionIsStableDismissibleAndExcludedFromTaskCounts() throws {
         let calendar = utcCalendar()
         let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
         let current = Human(name: "Ava")
@@ -896,7 +896,7 @@ struct TaskCenterSnapshotBuilderTests {
         let item = try #require(snapshot.unscheduled.first)
         #expect(snapshot.allItems.count == 1)
         #expect(item.id == "system-journey-create-first-pet")
-        #expect(item.source == .systemJourney)
+        #expect(item.source == .suggestion)
         #expect(item.systemDestination == .createFirstPet)
         #expect(item.subject == .household)
         #expect(item.eventID == nil)
@@ -904,19 +904,99 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(item.familyTaskID == nil)
         #expect(item.dueAt == nil)
         #expect(item.availableActions.isEmpty)
-        #expect(item.rewardCoconuts == 50)
-        #expect(snapshot.filtered(for: .actionRequired).systemJourneyItems.map(\.id) == [item.id])
-        #expect(snapshot.filtered(for: .waitingForFamily).systemJourneyItems.map(\.id) == [item.id])
+        #expect(item.rewardCoconuts == 0)
+        #expect(snapshot.filtered(for: .actionRequired).suggestionItems.map(\.id) == [item.id])
+        #expect(snapshot.filtered(for: .waitingForFamily).suggestionItems.map(\.id) == [item.id])
         #expect(snapshot.memberFilterContext.actionRequiredItemIDs.isEmpty)
         #expect(snapshot.memberFilterContext.waitingForFamilyItemIDs.isEmpty)
         #expect(snapshot.filtered(for: TaskCenterMemberFilter.all).allItems.map(\.id) == [item.id])
         #expect(snapshot.memberFilterSummary == TaskCenterMemberFilterSummary(
             actionRequiredCount: 0,
             waitingForFamilyCount: 0,
-            allCount: 1,
-            systemJourneyCount: 1
+            allCount: 0,
+            systemJourneyCount: 0
         ))
-        #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == 1)
+        #expect(snapshot.pendingCount == 0)
+        #expect(snapshot.hasDisplayableItems)
+        #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == 0)
+    }
+
+    @Test func firstPetSuggestionDoesNotEnterCalendarOrChangeTaskBadgeAndRewardAggregates() throws {
+        let calendar = utcCalendar()
+        let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
+        let current = Human(name: "Ava")
+        let other = Human(name: "Kai")
+        let profileState = HouseholdStarterJourneyTaskState(
+            task: .humanProfile,
+            status: .actionRequired,
+            rewardCoconuts: HouseholdStarterJourneyTask.humanProfile.rewardCoconuts,
+            completedCheckpointCount: 0,
+            requiredCheckpointCount: HouseholdStarterJourneyPolicy.requiredCheckpointCount(for: .humanProfile),
+            targetID: current.id,
+            completedCheckpoints: [],
+            checkpointResolutions: [:]
+        )
+        let journey = HouseholdStarterJourneySnapshot(
+            isEnabled: true,
+            activeHumanID: current.id,
+            taskStates: [profileState],
+            visibleTaskStates: [profileState]
+        )
+
+        func makeSnapshot(
+            destinations: Set<TaskCenterSystemDestination>
+        ) -> TaskCenterSnapshot {
+            TaskCenterSnapshotBuilder.make(
+                events: [],
+                allEvents: [],
+                pets: [],
+                humans: [current, other],
+                plants: [],
+                systemDestinations: destinations,
+                starterJourney: journey,
+                activeHumanId: current.id.uuidString,
+                now: now,
+                calendar: calendar
+            )
+        }
+
+        let baseline = makeSnapshot(destinations: [.claimStarterGift])
+        let withSuggestion = makeSnapshot(
+            destinations: [.claimStarterGift, .createFirstPet]
+        )
+        let suggestion = try #require(withSuggestion.suggestionItems.first)
+
+        #expect(baseline.allItems.count == 2)
+        #expect(withSuggestion.allItems.count == 3)
+        #expect(suggestion.eventID == nil)
+        #expect(suggestion.dueAt == nil)
+        #expect(suggestion.rewardCoconuts == 0)
+        #expect(withSuggestion.pendingCount == baseline.pendingCount)
+        #expect(withSuggestion.todayTotalCount == baseline.todayTotalCount)
+        #expect(withSuggestion.memberFilterSummary == baseline.memberFilterSummary)
+        #expect(
+            TaskCenterBadgeSnapshot(snapshot: withSuggestion)
+                == TaskCenterBadgeSnapshot(snapshot: baseline)
+        )
+        #expect(
+            withSuggestion.allItems.reduce(0) { $0 + $1.rewardCoconuts }
+                == baseline.allItems.reduce(0) { $0 + $1.rewardCoconuts }
+        )
+        #expect(withSuggestion.allItems.reduce(0) { $0 + $1.rewardCoconuts } == 150)
+
+        let calendarSnapshot = CalendarSnapshotBuilder.preparedSnapshot(
+            filteredEvents: [],
+            allEvents: [],
+            pets: [],
+            weekDays: [now],
+            monthDays: [now],
+            now: now,
+            calendar: calendar
+        )
+        #expect(calendarSnapshot.filteredEvents.isEmpty)
+        #expect(calendarSnapshot.timeline.expandedOccurrences.isEmpty)
+        #expect(calendarSnapshot.events(for: now).isEmpty)
+        #expect(calendarSnapshot.monthEventDayIDs.isEmpty)
     }
 
     @Test func routeDataKeepsMemorialSchedulesStoredButExcludesTheirActiveTaskProjection() async throws {
@@ -992,7 +1072,7 @@ struct TaskCenterSnapshotBuilderTests {
 
         #expect(snapshot(humans: [], pets: []).allItems.isEmpty)
         #expect(snapshot(humans: [human], pets: [activePet]).allItems.isEmpty)
-        #expect(snapshot(humans: [human], pets: [memorialPet]).allItems.map(\.source) == [.systemJourney])
+        #expect(snapshot(humans: [human], pets: [memorialPet]).allItems.map(\.source) == [.suggestion])
     }
 
     @Test func firstPetReplacesCreationJourneyWithUnscheduledGiftClaim() throws {
@@ -1064,9 +1144,9 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(snapshot.overdueCount == 1)
         #expect(snapshot.today.count == 1)
         #expect(snapshot.today.first?.workflowStatus == .pendingReview)
-        #expect(snapshot.unscheduled.first?.source == .systemJourney)
+        #expect(snapshot.unscheduled.first?.source == .suggestion)
         #expect(badge.overdueCount == 1)
-        #expect(badge.attentionCount == 3)
+        #expect(badge.attentionCount == 2)
     }
 
     @Test func starterJourneyProjectsAtMostThreeStableTypedItemsWithSummary() throws {
@@ -1166,11 +1246,17 @@ struct TaskCenterSnapshotBuilderTests {
             calendar: calendar
         )
 
-        #expect(snapshot.systemJourneyItems.count == 1)
-        let item = try #require(snapshot.systemJourneyItems.first)
-        #expect(item.id == "system-journey-claim-starter-gift")
-        #expect(item.systemDestination == .claimStarterGift)
-        #expect(item.systemJourneyPresentationState == .rewardReady)
+        #expect(snapshot.systemJourneyItems.count == 2)
+        let gift = try #require(snapshot.systemJourneyItems.first {
+            $0.systemDestination == .claimStarterGift
+        })
+        #expect(gift.id == "system-journey-claim-starter-gift")
+        #expect(gift.systemJourneyPresentationState == .rewardReady)
+        let humanProfile = try #require(snapshot.systemJourneyItems.first {
+            $0.systemDestination == .completeHumanProfile
+        })
+        #expect(humanProfile.id == HouseholdStarterJourneyTask.humanProfile.id)
+        #expect(humanProfile.systemJourneyPresentationState == .actionRequired)
     }
 
     @Test func recurringBirthdayReminderDoesNotQualifyAsCarePlan() {

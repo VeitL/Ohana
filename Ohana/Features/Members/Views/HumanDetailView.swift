@@ -57,6 +57,8 @@ struct HumanDetailView: View {
     @State var showingMedication = false
     @State var showingHealthReport = false
     @State var showingHealthMetrics = false
+    @State var showingHealthConditions = false
+    @State var showingHealthSummary = false
     @State var isDeleting = false
     @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var avatarSignature = ""
@@ -122,75 +124,50 @@ struct HumanDetailView: View {
                     if isAllPrivateForViewer {
                         fullPrivacyPlaceholder
                     } else {
-                        badgesCard
-                        statsBento
+                        if !human.hasPassedAway {
+                            humanHealthSummaryCard
+                            badgesCard
 
-                        sectionHeader(l.tr(zh: "健康 & 身体", en: "Health & Body", de: "Gesundheit & Körper"))
+                            sectionHeader(l.tr(zh: "活动 & 记录", en: "Activity & Records", de: "Aktivität & Einträge"))
 
-                        if human.isPrivate(.weight, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: l.tr(zh: "体重记录", en: "Weight Records", de: "Gewichtsverlauf"))
-                        } else {
-                            HumanPrivateDataNotice(human: human, field: .weight)
-                                .padding(.horizontal, 16)
-                            weightCard
-                        }
-                        if human.isPrivate(.weight, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: l.tr(zh: "体检指标", en: "Checkup Metrics", de: "Check-up-Werte"))
-                        } else {
-                            healthMetricCard
-                        }
-                        if human.isPrivate(.medication, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: l.tr(zh: "吃药提醒", en: "Medication Reminders", de: "Medikamentenerinnerungen"))
-                        } else {
-                            HumanPrivateDataNotice(human: human, field: .medication)
-                                .padding(.horizontal, 16)
-                            medicationCard
-                        }
-                        if human.isPrivate(.weight, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: l.tr(zh: "身体检测报告", en: "Health Reports", de: "Gesundheitsberichte"))
-                        } else {
-                            healthReportCard
-                        }
+                            if human.isPrivate(.workout, viewedBy: activeHumanId) {
+                                privacyPlaceholderCard(label: l.tr(zh: "运动记录", en: "Workout Records", de: "Trainingseinträge"))
+                            } else {
+                                HumanPrivateDataNotice(human: human, field: .workout)
+                                    .padding(.horizontal, 16)
+                                HumanWorkoutCard(human: human, pets: allPets)
+                                    .padding(.horizontal, 16)
+                            }
+                            if human.isPrivate(.weight, viewedBy: activeHumanId) ||
+                                human.isPrivate(.workout, viewedBy: activeHumanId) {
+                                privacyPlaceholderCard(label: l.tr(zh: "共健数据", en: "Shared Health Data", de: "Gemeinsame Gesundheitsdaten"))
+                            } else {
+                                coHealthCard
+                            }
 
-                        sectionHeader(l.tr(zh: "活动 & 记录", en: "Activity & Records", de: "Aktivität & Einträge"))
+                            sectionHeader(l.tr(zh: "财务", en: "Finance", de: "Finanzen"))
 
-                        if human.isPrivate(.workout, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: l.tr(zh: "运动记录", en: "Workout Records", de: "Trainingseinträge"))
-                        } else {
-                            HumanPrivateDataNotice(human: human, field: .workout)
-                                .padding(.horizontal, 16)
-                            HumanWorkoutCard(human: human, pets: allPets)
-                                .padding(.horizontal, 16)
-                        }
-                        if human.isPrivate(.weight, viewedBy: activeHumanId) ||
-                            human.isPrivate(.workout, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: l.tr(zh: "共健数据", en: "Shared Health Data", de: "Gemeinsame Gesundheitsdaten"))
-                        } else {
-                            coHealthCard
-                        }
+                            if human.isPrivate(.expense, viewedBy: activeHumanId) {
+                                privacyPlaceholderCard(label: l.tr(zh: "花费记录", en: "Expense Records", de: "Ausgabeneinträge"))
+                            } else {
+                                HumanPrivateDataNotice(human: human, field: .expense)
+                                    .padding(.horizontal, 16)
+                                humanExpenseCard
+                            }
+                            if human.isPrivate(.wishlist, viewedBy: activeHumanId) {
+                                privacyPlaceholderCard(label: l.tr(zh: "椰子资产", en: "Coconut Assets", de: "Kokosnussvermögen"))
+                            } else {
+                                HumanPrivateDataNotice(human: human, field: .wishlist)
+                                    .padding(.horizontal, 16)
+                                humanAssetCard
+                            }
 
-                        sectionHeader(l.tr(zh: "财务", en: "Finance", de: "Finanzen"))
-
-                        if human.isPrivate(.expense, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: l.tr(zh: "花费记录", en: "Expense Records", de: "Ausgabeneinträge"))
-                        } else {
-                            HumanPrivateDataNotice(human: human, field: .expense)
-                                .padding(.horizontal, 16)
-                            humanExpenseCard
-                        }
-                        if human.isPrivate(.wishlist, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: l.tr(zh: "椰子资产", en: "Coconut Assets", de: "Kokosnussvermögen"))
-                        } else {
-                            HumanPrivateDataNotice(human: human, field: .wishlist)
-                                .padding(.horizontal, 16)
-                            humanAssetCard
-                        }
-
-                        sectionHeader(l.tr(zh: "提醒 & 备注", en: "Reminders & Notes", de: "Erinnerungen & Notizen"))
-                        if human.isPrivate(.medication, viewedBy: activeHumanId) {
-                            privacyPlaceholderCard(label: l.tr(zh: "待办提醒", en: "Pending Reminders", de: "Ausstehende Erinnerungen"))
-                        } else {
-                            remindersSection
+                            sectionHeader(l.tr(zh: "提醒 & 备注", en: "Reminders & Notes", de: "Erinnerungen & Notizen"))
+                            if human.isPrivate(.medication, viewedBy: activeHumanId) {
+                                privacyPlaceholderCard(label: l.tr(zh: "待办提醒", en: "Pending Reminders", de: "Ausstehende Erinnerungen"))
+                            } else {
+                                remindersSection
+                            }
                         }
                         notesSection
                     }
@@ -204,7 +181,8 @@ struct HumanDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 12) {
-                    if !human.isPrivate(.wishlist, viewedBy: activeHumanId) {
+                    if !human.hasPassedAway,
+                       !human.isPrivate(.wishlist, viewedBy: activeHumanId) {
                         CoconutBalanceCapsule(balance: human.coconutBalance) {
                             presentCoconutLog()
                         }
@@ -220,7 +198,16 @@ struct HumanDetailView: View {
             }
         }
         .accessibilityIdentifier("human-detail-screen")
-        .sheet(isPresented: $showingEditSheet) { EditHumanSheet(human: human) }
+        .sheet(isPresented: $showingEditSheet) {
+            NavigationStack {
+                HumanBasicInfoDetailView(
+                    human: human,
+                    startsEditing: true,
+                    onClose: { showingEditSheet = false }
+                )
+            }
+            .ohanaSheetPagePresentation()
+        }
         .sheet(item: $personalUpgradePrompt) { prompt in
             PersonalPlanView(prompt: prompt)
                 .ohanaSheetPagePresentation()
@@ -238,6 +225,8 @@ struct HumanDetailView: View {
         }
         .navigationDestination(isPresented: $showingHealthReport) { HumanHealthReportView(human: human) }
         .navigationDestination(isPresented: $showingHealthMetrics) { HumanHealthCheckupView(human: human) }
+        .navigationDestination(isPresented: $showingHealthConditions) { HumanHealthConditionsView(human: human) }
+        .navigationDestination(isPresented: $showingHealthSummary) { HumanHealthSummaryView(human: human) }
         .task(id: avatarSourceKey) {
             await prepareAvatar()
         }

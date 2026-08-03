@@ -33,7 +33,7 @@ struct SystemSurfaceTests {
         #expect(!inbox.submit(URL(string: "https://example.com")!))
     }
 
-    @Test func snapshotStoreRoundTripsVersionedValueData() throws {
+    @Test func snapshotStoreRoundTripsVersionedValueDataAndReappliesBackupExclusion() throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "ohana-system-surface-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -45,8 +45,97 @@ struct SystemSurfaceTests {
         try store.write(snapshot)
 
         #expect(try store.read() == snapshot)
-        try store.removeSnapshotIfPresent()
+        let snapshotURL = try #require(store.snapshotURL)
+        #expect(try directory.resourceValues(
+            forKeys: [.isExcludedFromBackupKey]
+        ).isExcludedFromBackup == true)
+        #expect(try snapshotURL.resourceValues(
+            forKeys: [.isExcludedFromBackupKey]
+        ).isExcludedFromBackup == true)
+
+        var includedValues = URLResourceValues()
+        includedValues.isExcludedFromBackup = false
+        var mutableDirectory = directory
+        var mutableSnapshotURL = snapshotURL
+        try mutableDirectory.setResourceValues(includedValues)
+        try mutableSnapshotURL.setResourceValues(includedValues)
+        #expect(try directory.resourceValues(
+            forKeys: [.isExcludedFromBackupKey]
+        ).isExcludedFromBackup == false)
+        #expect(try snapshotURL.resourceValues(
+            forKeys: [.isExcludedFromBackupKey]
+        ).isExcludedFromBackup == false)
+
+        try store.write(snapshot)
+        #expect(try directory.resourceValues(
+            forKeys: [.isExcludedFromBackupKey]
+        ).isExcludedFromBackup == true)
+        var rewrittenSnapshotURL = try #require(store.snapshotURL)
+        rewrittenSnapshotURL.removeCachedResourceValue(forKey: .isExcludedFromBackupKey)
+        #expect(try rewrittenSnapshotURL.resourceValues(
+            forKeys: [.isExcludedFromBackupKey]
+        ).isExcludedFromBackup == true)
+
+        try store.sanitizeForAppReset(.unavailable(languageCode: "en"))
         #expect(try store.read() == nil)
+    }
+
+    @Test func snapshotResetSanitizationRequiresWriteOrRemovalToSucceed() throws {
+        try SystemSurfaceSnapshotStore.requireSuccessfulResetSanitization(
+            writeSucceeded: true,
+            removalSucceeded: false
+        )
+        try SystemSurfaceSnapshotStore.requireSuccessfulResetSanitization(
+            writeSucceeded: false,
+            removalSucceeded: true
+        )
+        try SystemSurfaceSnapshotStore.requireSuccessfulResetSanitization(
+            writeSucceeded: true,
+            removalSucceeded: true
+        )
+
+        #expect(throws: SystemSurfaceSnapshotStore.StoreError.resetSanitizationFailed) {
+            try SystemSurfaceSnapshotStore.requireSuccessfulResetSanitization(
+                writeSucceeded: false,
+                removalSucceeded: false
+            )
+        }
+    }
+
+    @Test @MainActor func resetFencePreventsDelayedRefreshFromRewritingPersonalSnapshot() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "ohana-system-surface-reset-fence-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = SystemSurfaceSnapshotStore(containerURL: directory)
+        try store.write(.placeholder())
+        let loader = DelayedSystemSurfaceSnapshotLoader()
+        var reloadCount = 0
+        let coordinator = SystemSurfaceSnapshotCoordinator(
+            revisions: SharedDomainRevisionPublisher(center: ReadModelRevisionCenter()),
+            store: store,
+            debounceMilliseconds: { 0 },
+            allowsSystemWidgets: { true },
+            loadSnapshot: { await loader.load() },
+            reloadWidget: { reloadCount += 1 }
+        )
+
+        coordinator.scheduleRefresh(reason: "beforeReset")
+        await loader.waitUntilStarted()
+        #expect(loader.callCount == 1)
+
+        coordinator.prepareForAppReset()
+        coordinator.scheduleRefresh(reason: "duringReset")
+        try store.sanitizeForAppReset(.unavailable(languageCode: "en"))
+
+        loader.resume(with: emptyTaskCenterSnapshot())
+        await coordinator.waitForRefreshQuiescenceForTesting()
+
+        #expect(loader.callCount == 1)
+        #expect(try store.read() == nil)
+        #expect(reloadCount == 0)
+        coordinator.finishAppReset()
     }
 
     @Test func widgetProjectionIsBoundedAndDoesNotExposeFreeFormHouseholdTitles() {
@@ -231,5 +320,48 @@ struct SystemSurfaceTests {
             availableActions: [.complete],
             participantHumanIDs: []
         )
+    }
+
+    private func emptyTaskCenterSnapshot() -> TaskCenterSnapshot {
+        TaskCenterSnapshot(
+            overdue: [],
+            today: [],
+            upcoming: [],
+            unscheduled: [],
+            todayCompletedCount: 0,
+            todayTotalCount: 0,
+            memberFilterContext: .hidden,
+            starterJourney: nil
+        )
+    }
+}
+
+@MainActor
+private final class DelayedSystemSurfaceSnapshotLoader {
+    private var continuation: CheckedContinuation<TaskCenterSnapshot, Never>?
+    private var startWaiter: CheckedContinuation<Void, Never>?
+    private var didStart = false
+    private(set) var callCount = 0
+
+    func load() async -> TaskCenterSnapshot {
+        callCount += 1
+        didStart = true
+        startWaiter?.resume()
+        startWaiter = nil
+        return await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func waitUntilStarted() async {
+        guard !didStart else { return }
+        await withCheckedContinuation { continuation in
+            startWaiter = continuation
+        }
+    }
+
+    func resume(with snapshot: TaskCenterSnapshot) {
+        continuation?.resume(returning: snapshot)
+        continuation = nil
     }
 }

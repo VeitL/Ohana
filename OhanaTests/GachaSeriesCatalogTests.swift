@@ -20,11 +20,62 @@ struct GachaSeriesCatalogTests {
     }
 
     @Test func shopCatalogPricesMatchEconomyPolicy() throws {
-        #expect(try #require(ShopCatalog.item(id: "boost_double")).cost == 80)
+        #expect(try #require(ShopCatalog.item(id: "boost_double")).cost == 20)
         #expect(try #require(ShopCatalog.item(id: "boost_streak")).cost == 180)
         #expect(try #require(ShopCatalog.item(id: "boost_backdate_single")).cost == 240)
         #expect(try #require(ShopCatalog.item(id: "boost_backdate_pack")).cost == 580)
         #expect(try #require(ShopCatalog.item(id: Avatar2DAccess.shopItemId)).cost == 1200)
+    }
+
+    @Test func everyCatalogItemHasAnApplicationAndLegacyItemsStayRecoverable() throws {
+        #expect(ShopCatalog.allCatalogIDsHaveApplications)
+        #expect(!ShopCatalog.allItems().contains { $0.id == "boost_tree" })
+        #expect(!ShopCatalog.allItems().contains { $0.id == "boost_tree_large" })
+        #expect(!ShopCatalog.allItems().contains { $0.id == "boost_backdate_single" })
+        #expect(!ShopCatalog.allItems().contains { $0.id == "boost_backdate_pack" })
+        #expect(!ShopCatalog.isSellable(itemID: "boost_tree"))
+        #expect(!ShopCatalog.isSellable(itemID: "boost_backdate_pack"))
+        #expect(ShopCatalog.isSellable(itemID: "boost_double"))
+        #expect(
+            try #require(ShopCatalog.item(id: "boost_tree")).application ==
+                .treeEnergy(OasisTreeEnergyInjectionPolicy.starterPackageXP)
+        )
+        #expect(
+            try #require(ShopCatalog.item(id: "boost_tree_large")).application ==
+                .treeEnergy(OasisTreeEnergyInjectionPolicy.largePackageXP)
+        )
+        #expect(try #require(ShopCatalog.item(id: "boost_backdate_single")).application == .backdatePasses(1))
+        #expect(try #require(ShopCatalog.item(id: "boost_backdate_pack")).application == .backdatePasses(3))
+    }
+
+    @Test func petSpecificEffectsDeclareTheirApplicationRequirements() throws {
+        #expect(try #require(ShopCatalog.item(id: "fx_popout_card")).applicationRequirement == .activePet)
+        #expect(try #require(ShopCatalog.item(id: "fx_lime_glow")).applicationRequirement == .activePet)
+        #expect(try #require(ShopCatalog.item(id: "fx_rainbow")).applicationRequirement == .activeDog)
+        #expect(try #require(ShopCatalog.item(id: "fx_rainbow_poop")).applicationRequirement == .activeDog)
+        #expect(try #require(ShopCatalog.item(id: "fx_stars")).applicationRequirement == .none)
+    }
+
+    @Test func shopFundingPreviewUsesBuyerFirstThenOldestActiveMembers() throws {
+        let buyerID = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000003"))
+        let olderID = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000001"))
+        let newerID = try #require(UUID(uuidString: "00000000-0000-0000-0000-000000000002"))
+        let start = Date(timeIntervalSinceReferenceDate: 100)
+        let lines = ShopFundingPreviewPolicy.lines(
+            cost: 100,
+            primaryID: buyerID,
+            members: [
+                .init(id: newerID, name: "Newer", createdAt: start.addingTimeInterval(20), balance: 80),
+                .init(id: buyerID, name: "Buyer", createdAt: start.addingTimeInterval(10), balance: 30),
+                .init(id: olderID, name: "Older", createdAt: start, balance: 50)
+            ]
+        )
+
+        #expect(lines == [
+            .init(id: buyerID, name: "Buyer", amount: 30, isPrimary: true),
+            .init(id: olderID, name: "Older", amount: 50, isPrimary: false),
+            .init(id: newerID, name: "Newer", amount: 20, isPrimary: false)
+        ])
     }
 
     @Test func hiddenExchangeOptionsKeepLinearRates() throws {

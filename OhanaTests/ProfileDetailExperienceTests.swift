@@ -6,6 +6,7 @@ final class ProfileDetailExperienceTests: XCTestCase {
     func testHumanPetAndPlantUseTheSharedReadFirstProfileScaffold() throws {
         let shared = try source("Ohana/Shared/Components/ProfileDetailComponents.swift")
         let human = try source("Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift")
+        let humanSupporting = try source("Ohana/Features/Members/Views/HumanBasicInfoDetailSupportingViews.swift")
         let humanLifecycle = try source("Ohana/Features/Members/Views/HumanBasicInfoLifecycleViews.swift")
         let humanCreation = try source("Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift")
         let pet = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView.swift")
@@ -24,7 +25,7 @@ final class ProfileDetailExperienceTests: XCTestCase {
             XCTAssertTrue(shared.contains("struct \(component)"))
         }
 
-        for profile in [human, pet + petEditor, plant] {
+        for profile in [human + humanSupporting, pet + petEditor, plant] {
             XCTAssertTrue(profile.contains("ProfileDetailScaffold("))
             XCTAssertTrue(profile.contains(".sheet(item: $presentedSheet)"))
             XCTAssertTrue(profile.contains("ProfileIdentityHero("))
@@ -46,6 +47,10 @@ final class ProfileDetailExperienceTests: XCTestCase {
         XCTAssertTrue(pet.contains("pet-basic-info-discard-changes-action"))
         XCTAssertTrue(plant.contains("plant-profile-delete-action"))
         XCTAssertTrue(human.contains("ProfileCompletionCard("))
+        XCTAssertTrue(human.contains("draftProfileCompletion"))
+        XCTAssertTrue(human.contains("human-basic-info-live-profile-progress"))
+        XCTAssertTrue(human.contains("human-basic-info-required-fields-status"))
+        XCTAssertTrue(human.contains("requiresStarterProfileFields"))
         XCTAssertTrue(petRead.contains("ProfileCompletionCard("))
         XCTAssertTrue(plant.contains("ProfileCompletionCard("))
         XCTAssertTrue(shared.contains("profile-completion-continue-action"))
@@ -88,22 +93,90 @@ final class ProfileDetailExperienceTests: XCTestCase {
         XCTAssertTrue(human.contains("VStack(alignment: .leading, spacing: 14)"))
         XCTAssertTrue(pet.contains("VStack(alignment: .leading, spacing: 14)"))
         XCTAssertTrue(avatar.contains("width * MemberAvatarImageProcessor.portraitAspect"))
-        XCTAssertTrue(avatar.contains("if experienceStyle == .zen"))
+        XCTAssertFalse(avatar.contains("circularAvatarPreview"))
+        XCTAssertFalse(avatar.contains("experienceStyle == .zen"))
         XCTAssertTrue(zenContainer.contains(".environment(\\.memberProfileExperienceStyle, .zen)"))
         XCTAssertTrue(zenMembers.contains("FocusWalletAvatarCache.cachedEntry("))
         XCTAssertTrue(zenMembers.contains("if let avatarImage"))
     }
 
-    func testZenHumanProfileUsesThemeSemanticTextAndNativeOtherInputs() throws {
+    func testStandardAndZenProfileEditorsShareThemeAndNativeOtherInputLogic() throws {
         let human = try source("Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift")
+        let pet = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView.swift")
+        let petEditor = try source("Ohana/Features/Members/Views/PetBasicInfoDetailView+Edit.swift")
         let creation = try source("Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift")
 
-        XCTAssertTrue(human.contains("profileExperienceStyle == .zen ? profileEditAccent"))
+        XCTAssertFalse(human.contains("profileExperienceStyle"))
+        XCTAssertFalse((pet + petEditor).contains("profileExperienceStyle"))
+        XCTAssertTrue(human.contains(".foregroundStyle(profileEditAccent)"))
+        XCTAssertTrue(petEditor.contains(".foregroundStyle(profileEditAccent)"))
         XCTAssertTrue(human.contains("human-basic-info-custom-nationality-input"))
         XCTAssertTrue(human.contains("human-basic-info-custom-residence-input"))
+        XCTAssertTrue(human.contains("if eUsesCustomNationality"))
+        XCTAssertTrue(human.contains("if eUsesCustomResidence"))
         XCTAssertTrue(creation.contains("member-human-custom-nationality-input"))
         XCTAssertTrue(creation.contains("member-human-custom-residence-country-input"))
         XCTAssertTrue(human.contains("TextField("))
+    }
+
+    func testStandardProfileEditEntrypointsOpenTheSharedProfileEditors() throws {
+        let humanDetail = try source("Ohana/Features/Members/Views/HumanDetailView.swift")
+        let petSettings = try source("Ohana/Features/Members/Views/PetCardBackSettingsSheet.swift")
+
+        XCTAssertTrue(humanDetail.contains("HumanBasicInfoDetailView("))
+        XCTAssertTrue(humanDetail.contains("startsEditing: true"))
+        XCTAssertFalse(humanDetail.contains("EditHumanSheet(human: human)"))
+
+        XCTAssertTrue(petSettings.contains("PetBasicInfoDetailView("))
+        XCTAssertTrue(petSettings.contains("startsEditing: true"))
+        XCTAssertTrue(petSettings.contains("if !pet.hasPassedAway"))
+        XCTAssertFalse(petSettings.contains("EditPetSheet(pet: pet)"))
+    }
+
+    func testStarterProfileEntrypointsEnforceTheSharedRequiredFields() throws {
+        let taskRoute = try source(
+            "Ohana/Features/Tasks/TaskCenterRouteContainer.swift"
+        )
+        let zenJourney = try source(
+            "Ohana/Features/Zen/ZenStarterJourneySheet.swift"
+        )
+        let zenJourneyDataContainer = try source(
+            "Ohana/Features/Zen/ZenStarterJourneyDataContainer.swift"
+        )
+
+        for source in [taskRoute, zenJourneyDataContainer] {
+            XCTAssertTrue(source.contains("requiresStarterProfileFields: true"))
+        }
+        XCTAssertTrue(zenJourney.contains("ZenStarterHumanProfileEditorDataContainer("))
+    }
+
+    func testProfileAvatarCropUsesCanonicalPortraitGeometry() throws {
+        let cropView = try source("Ohana/Features/Members/Views/PetImageCropView.swift")
+        let containers = [
+            CGSize(width: 390, height: 700),
+            CGSize(width: 844, height: 390)
+        ]
+
+        for container in containers {
+            let size = MemberAvatarImageProcessor.portraitCropSize(
+                in: container,
+                horizontalMargin: 7,
+                reservedVerticalSpace: 170
+            )
+            XCTAssertGreaterThan(size.width, 0)
+            XCTAssertEqual(
+                size.height / size.width,
+                MemberAvatarImageProcessor.portraitAspect,
+                accuracy: 0.0001
+            )
+            XCTAssertLessThanOrEqual(size.width, container.width - 14)
+            XCTAssertLessThanOrEqual(size.height, container.height - 170)
+        }
+
+        XCTAssertTrue(cropView.contains("MemberAvatarImageProcessor.portraitCropSize("))
+        XCTAssertTrue(cropView.contains("return max(fw, fh)"))
+        XCTAssertFalse(cropView.contains("cardAspectRatio"))
+        XCTAssertFalse(cropView.contains("targetW / cardAspectRatio"))
     }
 
     func testMBTISelectionUsesFourValidatedBinaryDimensions() throws {

@@ -2,6 +2,10 @@
 
 > 目标：让 Ohana 像长期维护的主流 iOS app 一样，合规、低功耗、性能稳定、可扩展。本文是工程治理边界；UI 视觉仍以根目录 `ui规范.selection.json` 为准。
 
+## 适用范围
+
+本文记录的是由 Ohana 当前产品风险、SwiftData 架构和发布流程推导出的项目约束，不是对所有 iOS app 的通用要求。下文的 `@Query` 放置、Ark schema 追加迁移、`AppWorkloadPolicy`、持久 Dogfood 用户和构建缓存分 lane 等规则，只有在新项目采用相同架构或风险边界时才应复用；否则应先保留其目标，再按项目证据选择更轻的实现。
+
 ## 分层边界
 
 - `App/` owns the app shell, route containers, lifecycle coordinators, startup bootstrap, and `AppServices` dependency container. App startup must stay skinny and must not eagerly initialize feature dashboards.
@@ -167,7 +171,9 @@ Never protect prefetch, decoration, or dashboard freshness at the cost of curren
 
 - UI token 唯一来源是 `ui规范.selection.json`。
 - 新页面从 `docs/ui-v4-new-page-template.md` 开始。
-- 短记录/确认/管理弹窗使用 inline overlay，不用系统 sheet 冒充小弹窗。
+- 短记录或轻量管理使用原生 `Sheet`，短确认或破坏性决策使用
+  `Alert` / `confirmationDialog`，紧凑命令使用 `Menu`；有语义化系统
+  presentation 可用时，不要用页面内 inline overlay 替代。
 - 新增用户文案在编写时必须同时提供中文和英文；其他已注册语言按
   `LocalizationSettings` 的 fallback 链运行。动态字符串走 `L10n` /
   `AppLocalizedText`。

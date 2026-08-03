@@ -13,6 +13,7 @@ enum HumanAllFeatureDestination: Hashable {
     case weight
     case workout
     case metrics
+    case conditions
     case medication
     case report
     case expense
@@ -28,6 +29,7 @@ extension HumanAllFeatureDestination: Identifiable {
         case .weight: "weight"
         case .workout: "workout"
         case .metrics: "metrics"
+        case .conditions: "conditions"
         case .medication: "medication"
         case .report: "report"
         case .expense: "expense"
@@ -41,7 +43,7 @@ extension HumanAllFeatureDestination: Identifiable {
         switch self {
         case .basicInfo, .achievements:
             nil
-        case .weight, .metrics, .report:
+        case .weight, .metrics, .conditions, .report:
             .weight
         case .workout:
             .workout
@@ -60,7 +62,7 @@ extension HumanAllFeatureDestination: Identifiable {
         switch self {
         case .basicInfo, .notes, .achievements:
             true
-        case .weight, .workout, .metrics, .medication, .report, .expense, .wishlist:
+        case .weight, .workout, .metrics, .conditions, .medication, .report, .expense, .wishlist:
             false
         }
     }
@@ -75,11 +77,14 @@ struct HumanAllFeaturesActivitySummary: Equatable {
     var latestHealthMetricKey: String?
     var latestHealthMetricUnitCode: String?
     var latestHealthMetricValue: Double?
+    var activeHealthConditionCount: Int = 0
+    var recentHealthObservationCount: Int = 0
     var weightChartPoints: [OhanaMinimalChartPoint] = []
     var workoutChartPoints: [OhanaMinimalChartPoint] = []
     var metricsChartPoints: [OhanaMinimalChartPoint] = []
     var reportChartPoints: [OhanaMinimalChartPoint] = []
     var medicationChartPoints: [OhanaMinimalChartPoint] = []
+    var conditionChartPoints: [OhanaMinimalChartPoint] = []
     var expenseChartPoints: [OhanaMinimalChartPoint] = []
     var coconutChartPoints: [OhanaMinimalChartPoint] = []
     var noteChartPoints: [OhanaMinimalChartPoint] = []
@@ -96,6 +101,8 @@ struct HumanAllFeaturesActivitySummary: Equatable {
         weightLogs: [HumanWeightLog] = [],
         workoutLogs: [HumanWorkoutLog] = [],
         healthMetricLogs: [HumanHealthMetricLog] = [],
+        healthConditions: [HumanHealthCondition] = [],
+        healthObservations: [HumanHealthObservation] = [],
         explicitlyResolvedProfileCategories: Set<MemberProfileCompletionCategory> = [],
         now: Date = Date(),
         calendar: Calendar = .current
@@ -105,8 +112,12 @@ struct HumanAllFeaturesActivitySummary: Equatable {
             calendar.date(byAdding: .day, value: $0 - 6, to: todayStart)
         }
         let humanID = human.id.uuidString
-        let myMeds = allMeds.filter { $0.humanId == humanID }
-        let myReports = allReports.filter { $0.humanId == humanID }
+        let myMeds = allMeds.filter {
+            UUID(uuidString: $0.humanId.trimmingCharacters(in: .whitespacesAndNewlines)) == human.id
+        }
+        let myReports = allReports.filter {
+            UUID(uuidString: $0.humanId.trimmingCharacters(in: .whitespacesAndNewlines)) == human.id
+        }
         let myExpenses = allExpenses.filter { $0.executorId == humanID }
         let latestWeight = weightLogs.max(by: { $0.date < $1.date })
         let latestWorkout = workoutLogs.max(by: { $0.date < $1.date })
@@ -127,6 +138,8 @@ struct HumanAllFeaturesActivitySummary: Equatable {
             latestHealthMetricKey: latestHealthMetric?.metricKey,
             latestHealthMetricUnitCode: latestHealthMetric?.unitCode,
             latestHealthMetricValue: latestHealthMetric?.value,
+            activeHealthConditionCount: healthConditions.count { $0.trackingStatus != .resolved },
+            recentHealthObservationCount: healthObservations.count { $0.recordedAt >= (recentDays.first ?? todayStart) },
             weightChartPoints: weightLogs
                 .sorted { $0.date < $1.date }
                 .suffix(7)
@@ -161,6 +174,14 @@ struct HumanAllFeaturesActivitySummary: Equatable {
                     Double(myMeds.count { !$0.isActive || !$0.isActiveToday })
                 ],
                 idPrefix: "human-all-medication"
+            ),
+            conditionChartPoints: dailyPoints(
+                days: recentDays,
+                idPrefix: "human-all-conditions",
+                values: healthObservations,
+                date: \.recordedAt,
+                value: { _ in 1 },
+                calendar: calendar
             ),
             expenseChartPoints: dailyPoints(
                 days: recentDays,
@@ -562,6 +583,23 @@ struct HumanAllFeaturesSheet: View {
 
     private var careItems: [FeatureHubDestinationItem<HumanAllFeatureDestination>] {
         [
+            item(
+                id: "conditions",
+                title: l.tr(zh: "健康状况", en: "Conditions", de: "Gesundheitszustände"),
+                value: lockedValue(.weight, visible: "\(summary.activeHealthConditionCount)"),
+                subtitle: lockedSubtitle(
+                    .weight,
+                    visible: l.tr(
+                        zh: "近 7 天 \(summary.recentHealthObservationCount) 条状态记录",
+                        en: "\(summary.recentHealthObservationCount) state logs in 7 days",
+                        de: "\(summary.recentHealthObservationCount) Status-Einträge in 7 Tagen"
+                    )
+                ),
+                icon: "cross.case.fill",
+                tint: Color.goTeal,
+                chart: privacyChart(.weight, points: summary.conditionChartPoints),
+                destination: .conditions
+            ),
             item(
                 id: "medication",
                 title: l.tr(zh: "用药", en: "Medication", de: "Medikation"),

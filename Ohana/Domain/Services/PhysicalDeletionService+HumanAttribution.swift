@@ -13,7 +13,8 @@ extension PhysicalDeletionService {
         for human: Human,
         in context: ModelContext,
         at deletedAt: Date,
-        by deletedByHumanId: String?
+        by deletedByHumanId: String?,
+        requiredHealthRows: HumanDeletionRequiredHealthRows? = nil
     ) -> Int {
         let humanId = human.id.uuidString
         let allNotes = fetchAll(HumanNoteRecord.self, context: context)
@@ -45,7 +46,9 @@ extension PhysicalDeletionService {
             CloudSyncMutationRecorder.markModified(retainedExpens, context: context, modifiedAt: deletedAt)
         }
 
-        let retainedHealthMetrics = fetchAll(HumanHealthMetricLog.self, context: context).filter {
+        let allHealthMetrics = requiredHealthRows?.metrics
+            ?? fetchAll(HumanHealthMetricLog.self, context: context)
+        let retainedHealthMetrics = allHealthMetrics.filter {
             $0.human?.id != human.id && idsMatch($0.recordedByHumanId, humanId)
         }
         retainedHealthMetrics.forEach { $0.recordedByHumanId = nil }
@@ -53,12 +56,40 @@ extension PhysicalDeletionService {
             CloudSyncMutationRecorder.markModified(retainedHealthMetric, context: context, modifiedAt: deletedAt)
         }
 
-        let retainedHealthReports = fetchAll(HumanHealthReport.self, context: context).filter {
+        let allHealthReports = requiredHealthRows?.reports
+            ?? fetchAll(HumanHealthReport.self, context: context)
+        let retainedHealthReports = allHealthReports.filter {
             !idsMatch($0.humanId, humanId) && idsMatch($0.recordedByHumanId, humanId)
         }
         retainedHealthReports.forEach { $0.recordedByHumanId = nil }
         for retainedHealthReport in retainedHealthReports {
             CloudSyncMutationRecorder.markModified(retainedHealthReport, context: context, modifiedAt: deletedAt)
+        }
+
+        let allHealthConditions = requiredHealthRows?.conditions
+            ?? fetchAll(HumanHealthCondition.self, context: context)
+        let retainedHealthConditions = allHealthConditions.filter {
+            !idsMatch($0.humanId, humanId) && idsMatch($0.recordedByHumanId, humanId)
+        }
+        retainedHealthConditions.forEach {
+            $0.recordedByHumanId = nil
+            $0.updatedAt = deletedAt
+        }
+        for retainedHealthCondition in retainedHealthConditions {
+            CloudSyncMutationRecorder.markModified(retainedHealthCondition, context: context, modifiedAt: deletedAt)
+        }
+
+        let allHealthObservations = requiredHealthRows?.observations
+            ?? fetchAll(HumanHealthObservation.self, context: context)
+        let retainedHealthObservations = allHealthObservations.filter {
+            !idsMatch($0.humanId, humanId) && idsMatch($0.recordedByHumanId, humanId)
+        }
+        retainedHealthObservations.forEach {
+            $0.recordedByHumanId = nil
+            $0.updatedAt = deletedAt
+        }
+        for retainedHealthObservation in retainedHealthObservations {
+            CloudSyncMutationRecorder.markModified(retainedHealthObservation, context: context, modifiedAt: deletedAt)
         }
 
         let retainedSymptoms = fetchAll(SymptomLog.self, context: context).filter {
@@ -79,6 +110,7 @@ extension PhysicalDeletionService {
 
         return subjectNotes.count + retainedNotes.count + deletedExpenseCount + retainedExpenses.count
             + retainedHealthMetrics.count + retainedHealthReports.count
+            + retainedHealthConditions.count + retainedHealthObservations.count
             + retainedSymptoms.count + retainedHeatCycles.count
     }
 }

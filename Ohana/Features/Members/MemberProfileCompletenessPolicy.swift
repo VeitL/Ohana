@@ -55,15 +55,15 @@ nonisolated enum MemberProfileCompletionCategory: String, CaseIterable, Hashable
             )
         case .humanBodyProfile:
             l.tr(
-                zh: "身份与身体", en: "Identity & body", de: "Identität & Körper",
-                es: "Identidad y cuerpo", pt: "Identidade e corpo", fr: "Identité et corps",
-                ja: "本人情報と身体", ko: "신원 및 신체", it: "Identità e corpo"
+                zh: "性别与身份", en: "Gender & identity", de: "Geschlecht & Identität",
+                es: "Género e identidad", pt: "Gênero e identidade", fr: "Genre et identité",
+                ja: "性別と本人情報", ko: "성별 및 정체성", it: "Genere e identità"
             )
         case .humanPersonalityContext:
             l.tr(
-                zh: "性格与故事", en: "Personality & story", de: "Persönlichkeit & Geschichte",
-                es: "Personalidad e historia", pt: "Personalidade e história", fr: "Personnalité et histoire",
-                ja: "性格とストーリー", ko: "성격과 이야기", it: "Personalità e storia"
+                zh: "其他资料", en: "More details", de: "Weitere Angaben",
+                es: "Más datos", pt: "Mais detalhes", fr: "Autres informations",
+                ja: "その他の情報", ko: "기타 정보", it: "Altri dettagli"
             )
         case .petLifeStage:
             l.tr(
@@ -119,29 +119,55 @@ nonisolated enum MemberProfileCompletionCategory: String, CaseIterable, Hashable
 
 nonisolated struct MemberProfileCompletionSnapshot: Equatable, Sendable {
     let kind: MemberProfileCompletionKind
-    let completedCategories: Set<MemberProfileCompletionCategory>
+    let actualCategories: Set<MemberProfileCompletionCategory>
     let explicitlyResolvedCategories: Set<MemberProfileCompletionCategory>
+    let requiredActualCategories: Set<MemberProfileCompletionCategory>
 
     var allCategories: [MemberProfileCompletionCategory] {
         MemberProfileCompletenessPolicy.categories(for: kind)
     }
 
+    var completedCategories: Set<MemberProfileCompletionCategory> {
+        actualCategories.union(explicitlyResolvedCategories)
+    }
     var completedCategoryCount: Int { completedCategories.count }
     var totalCategoryCount: Int { allCategories.count }
     var completionPercent: Int {
         guard totalCategoryCount > 0 else { return 0 }
         return Int((Double(completedCategoryCount) / Double(totalCategoryCount) * 100).rounded())
     }
+    var missingRequiredCategories: [MemberProfileCompletionCategory] {
+        allCategories.filter {
+            requiredActualCategories.contains($0) && !actualCategories.contains($0)
+        }
+    }
     var reachesProfileThreshold: Bool {
         completionPercent >= MemberProfileCompletenessPolicy.starterRewardThresholdPercent
+            && missingRequiredCategories.isEmpty
     }
     var missingCategories: [MemberProfileCompletionCategory] {
         allCategories.filter { !completedCategories.contains($0) }
     }
 }
 
+nonisolated struct HumanProfileCompletionDraft: Equatable, Sendable {
+    let hasMeaningfulAppearance: Bool
+    let birthday: Date?
+    let genderIdentityRaw: String
+    let bloodType: String
+    let heightCm: Double
+    let mbti: String
+    let nationality: String
+    let city: String
+    let notes: String
+}
+
 nonisolated enum MemberProfileCompletenessPolicy {
     static let starterRewardThresholdPercent = 75
+    static let humanRequiredActualCategories: Set<MemberProfileCompletionCategory> = [
+        .humanLifeStage,
+        .humanBodyProfile
+    ]
 
     static func categories(for kind: MemberProfileCompletionKind) -> [MemberProfileCompletionCategory] {
         MemberProfileCompletionCategory.allCases.filter { $0.kind == kind }
@@ -150,24 +176,51 @@ nonisolated enum MemberProfileCompletenessPolicy {
     static func evaluate(
         kind: MemberProfileCompletionKind,
         actualCategories: Set<MemberProfileCompletionCategory>,
-        explicitlyResolvedCategories: Set<MemberProfileCompletionCategory> = []
+        explicitlyResolvedCategories: Set<MemberProfileCompletionCategory> = [],
+        requiredActualCategories: Set<MemberProfileCompletionCategory> = []
     ) -> MemberProfileCompletionSnapshot {
         let allowed = Set(categories(for: kind))
         let actual = actualCategories.intersection(allowed)
-        let resolved = explicitlyResolvedCategories.intersection(allowed)
+        let required = requiredActualCategories.intersection(allowed)
+        let resolved = explicitlyResolvedCategories
+            .intersection(allowed)
+            .subtracting(required)
         return MemberProfileCompletionSnapshot(
             kind: kind,
-            completedCategories: actual.union(resolved),
-            explicitlyResolvedCategories: resolved.subtracting(actual)
+            actualCategories: actual,
+            explicitlyResolvedCategories: resolved.subtracting(actual),
+            requiredActualCategories: required
         )
     }
 
     static func humanActualCategories(_ human: Human) -> Set<MemberProfileCompletionCategory> {
+        humanActualCategories(
+            HumanProfileCompletionDraft(
+                hasMeaningfulAppearance: hasMeaningfulHumanAppearance(human),
+                birthday: human.birthday,
+                genderIdentityRaw: human.genderIdentityRaw ?? "",
+                bloodType: human.bloodType,
+                heightCm: human.heightCm,
+                mbti: human.mbti,
+                nationality: human.nationality,
+                city: human.city,
+                notes: HumanProfileOptions.visibleNoteParts(from: human.notes).joined(separator: "｜")
+            )
+        )
+    }
+
+    static func humanActualCategories(
+        _ draft: HumanProfileCompletionDraft
+    ) -> Set<MemberProfileCompletionCategory> {
         var completed: Set<MemberProfileCompletionCategory> = []
-        if hasMeaningfulHumanAppearance(human) { completed.insert(.humanAppearance) }
-        if human.birthday != nil { completed.insert(.humanLifeStage) }
-        if hasMeaningfulHumanBodyProfile(human) { completed.insert(.humanBodyProfile) }
-        if hasMeaningfulHumanPersonalityContext(human) { completed.insert(.humanPersonalityContext) }
+        if draft.hasMeaningfulAppearance { completed.insert(.humanAppearance) }
+        if draft.birthday != nil { completed.insert(.humanLifeStage) }
+        if hasMeaningfulHumanGender(draft.genderIdentityRaw) {
+            completed.insert(.humanBodyProfile)
+        }
+        if hasMeaningfulHumanOptionalDetails(draft) {
+            completed.insert(.humanPersonalityContext)
+        }
         return completed
     }
 
@@ -199,10 +252,31 @@ nonisolated enum MemberProfileCompletenessPolicy {
         _ human: Human,
         explicitlyResolvedCategories: Set<MemberProfileCompletionCategory> = []
     ) -> MemberProfileCompletionSnapshot {
+        Self.human(
+            HumanProfileCompletionDraft(
+                hasMeaningfulAppearance: hasMeaningfulHumanAppearance(human),
+                birthday: human.birthday,
+                genderIdentityRaw: human.genderIdentityRaw ?? "",
+                bloodType: human.bloodType,
+                heightCm: human.heightCm,
+                mbti: human.mbti,
+                nationality: human.nationality,
+                city: human.city,
+                notes: HumanProfileOptions.visibleNoteParts(from: human.notes).joined(separator: "｜")
+            ),
+            explicitlyResolvedCategories: explicitlyResolvedCategories
+        )
+    }
+
+    static func human(
+        _ draft: HumanProfileCompletionDraft,
+        explicitlyResolvedCategories: Set<MemberProfileCompletionCategory> = []
+    ) -> MemberProfileCompletionSnapshot {
         evaluate(
             kind: .human,
-            actualCategories: humanActualCategories(human),
-            explicitlyResolvedCategories: explicitlyResolvedCategories
+            actualCategories: humanActualCategories(draft),
+            explicitlyResolvedCategories: explicitlyResolvedCategories,
+            requiredActualCategories: humanRequiredActualCategories
         )
     }
 
@@ -227,18 +301,19 @@ nonisolated enum MemberProfileCompletenessPolicy {
         return !emoji.isEmpty && emoji != "👤"
     }
 
-    private static func hasMeaningfulHumanBodyProfile(_ human: Human) -> Bool {
-        !normalized(human.genderIdentityRaw ?? "").isEmpty
-            || !normalized(human.bloodType).isEmpty
-            || (human.heightCm.isFinite && human.heightCm > 0)
+    private static func hasMeaningfulHumanGender(_ raw: String) -> Bool {
+        HumanProfileOptions.storedGenderIdentity(raw) != nil
     }
 
-    private static func hasMeaningfulHumanPersonalityContext(_ human: Human) -> Bool {
-        !normalized(human.mbti).isEmpty
-            || !normalized(human.nationality).isEmpty
-            || !normalized(human.city).isEmpty
-            || HumanProfileOptions.visibleNoteParts(from: human.notes)
-                .contains { !normalized($0).isEmpty }
+    private static func hasMeaningfulHumanOptionalDetails(
+        _ draft: HumanProfileCompletionDraft
+    ) -> Bool {
+        !normalized(draft.bloodType).isEmpty
+            || (draft.heightCm.isFinite && draft.heightCm > 0)
+            || !normalized(draft.mbti).isEmpty
+            || !normalized(draft.nationality).isEmpty
+            || !normalized(draft.city).isEmpty
+            || !normalized(draft.notes).isEmpty
     }
 
     private static func hasMeaningfulPetBodyProfile(_ pet: Pet) -> Bool {

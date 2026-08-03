@@ -43,6 +43,8 @@ struct VerticalSolidHomeView: View {
     @AppStorage("goFocusHomeCardOrder.v1") var homeCardOrderRaw = ""
     @AppStorage("debugShowDummyCards") var showDummyCards = false
     @AppStorage("ohana_has_onboarded") var hasOnboarded = false
+    @AppStorage(StarterGiftStorageKey.claimed) var starterGiftClaimed = false
+    @AppStorage(StarterGiftStorageKey.pending) var starterGiftPending = false
     @AppStorage(StarterGiftStorageKey.ceremonySeen) var starterGiftCeremonySeen = false
     @AppStorage(StarterGiftStorageKey.oasisTabPromptPending) var starterOasisTabPromptPending = false
     @AppStorage("ohanaGrowthOnboardingCompletedV1") var growthOnboardingCompleted = false
@@ -260,7 +262,7 @@ struct VerticalSolidHomeView: View {
                     outgoingTab: controller.outgoingTab,
                     preparingTab: controller.preparingTab,
                     preparedTabs: controller.preparedTabs,
-                    visibleTabs: AppFeatureRouteGuard.visibleHomeTabs(currentLevel: treeManager.treeLevel.rawValue),
+                    visibleTabs: currentVisibleHomeTabs,
                     taskCenterBadge: taskCenterBadge,
                     localization: l,
                     backgroundViewportSize: backgroundViewportSize,
@@ -468,6 +470,14 @@ struct VerticalSolidHomeView: View {
             !isHomeCardExpandedOrTransitioning &&
             !isHomeCardHeroAnimating &&
             AppFeatureRouteGuard.allowsHomeTab(.oasis, currentLevel: treeManager.treeLevel.rawValue)
+    }
+
+    private var currentVisibleHomeTabs: [VerticalSolidHomeTab] {
+        // Reading both AppStorage facts makes the tab rail react to the durable
+        // gift transaction immediately; the ceremony is presentation-only.
+        _ = starterGiftClaimed
+        _ = starterGiftPending
+        return AppFeatureRouteGuard.visibleHomeTabs(currentLevel: treeManager.treeLevel.rawValue)
     }
 }
 

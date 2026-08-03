@@ -349,6 +349,7 @@ actor HomeReadModelActor {
         let walkLedgerEntries = fetches.walkQuickActionEntries()
         let pottyLedgerEntries = fetches.pottyQuickActionEntries()
         let petExpenseLedgerEntries = fetches.petExpenseQuickActionEntries()
+        let humanExpenseEntries = fetches.humanExpenseQuickActionEntries()
         let petWeightLedgerEntries = fetches.petWeightQuickActionEntries()
         let petMomentEntries = fetches.petMomentQuickActionEntries()
         try Task.checkCancellation()
@@ -371,6 +372,7 @@ actor HomeReadModelActor {
             walkLedgerEntries: walkLedgerEntries,
             pottyLedgerEntries: pottyLedgerEntries,
             petExpenseLedgerEntries: petExpenseLedgerEntries,
+            humanExpenseEntries: humanExpenseEntries,
             petWeightLedgerEntries: petWeightLedgerEntries,
             petMomentEntries: petMomentEntries,
             humanWeightLogs: [],
@@ -721,6 +723,41 @@ private nonisolated struct HomeReadModelFetches {
         } catch {
             OhanaLog.warning(
                 "Home read model pet expense ledger fetch failed: \(error.localizedDescription)",
+                category: "Home"
+            )
+            return []
+        }
+    }
+
+    func humanExpenseQuickActionEntries() -> [HomeExpensePreviewEntry] {
+        let monthInterval = calendar.dateInterval(of: .month, for: now)
+        let monthStart = monthInterval?.start ?? calendar.startOfDay(for: now)
+        let monthEnd = monthInterval?.end ?? now
+        let humanSubject = CareLedgerSubjectKind.human.rawValue
+        let expenseKind = CareLedgerEventKind.expense.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.occurredAt >= monthStart &&
+                    event.occurredAt < monthEnd &&
+                    event.subjectKind == humanSubject &&
+                    event.eventKind == expenseKind
+            },
+            sortBy: [SortDescriptor(\CareLedgerEvent.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 240
+        do {
+            return try context.fetch(descriptor).compactMap { event in
+                guard let humanID = event.subjectId else { return nil }
+                return HomeExpensePreviewEntry(
+                    id: event.id,
+                    date: event.occurredAt,
+                    actorId: humanID,
+                    amount: event.amountValue
+                )
+            }
+        } catch {
+            OhanaLog.warning(
+                "Home read model human expense ledger fetch failed: \(error.localizedDescription)",
                 category: "Home"
             )
             return []

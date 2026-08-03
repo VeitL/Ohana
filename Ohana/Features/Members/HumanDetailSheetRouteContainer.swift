@@ -18,6 +18,7 @@ enum AppHumanDetailSheetDestination: Hashable {
     case workout
     case workoutDashboard
     case metrics
+    case conditions
     case report
     case expenseQuick
     case expense
@@ -32,7 +33,7 @@ extension AppHumanDetailSheetDestination {
         case .basicInfo, .noteQuick, .note:
             true
         case .medicationQuick, .medication, .weightQuick, .weight, .workoutQuick, .workout,
-             .workoutDashboard, .metrics, .report, .expenseQuick, .expense, .wishlist:
+             .workoutDashboard, .metrics, .conditions, .report, .expenseQuick, .expense, .wishlist:
             false
         }
     }
@@ -204,13 +205,21 @@ struct AppHumanDetailSheetRouteContainer: View {
                     onDismiss: onDismiss
                 )
             case .workout:
-                HumanWorkoutSummaryView(human: human)
+                NavigationStack { HumanWorkoutSummaryView(human: human) }
             case .workoutDashboard:
-                HumanWorkoutSummaryView(human: human)
+                NavigationStack { HumanWorkoutSummaryView(human: human) }
             case .metrics:
                 NavigationStack { HumanHealthCheckupView(human: human) }
+            case .conditions:
+                NavigationStack {
+                    HumanHealthConditionsView(
+                        human: human,
+                        showsCloseButton: true,
+                        onClose: onDismiss
+                    )
+                }
             case .report:
-                HumanHealthReportView(human: human)
+                NavigationStack { HumanHealthReportView(human: human) }
             case .expenseQuick:
                 QuickHumanExpenseSheet(
                     human: human,
@@ -252,6 +261,12 @@ private struct HumanAllFeaturesRouteData {
     @MainActor
     static func load(id: UUID, from context: ModelContext) -> HumanAllFeaturesRouteData {
         let humanKey = id.uuidString
+        let humanKeyLower = humanKey.lowercased()
+        let recentObservationStart = Calendar.current.date(
+            byAdding: .day,
+            value: -6,
+            to: Calendar.current.startOfDay(for: Date())
+        ) ?? Date()
         let human = fetchOne(
             FetchDescriptor<Human>(
                 predicate: #Predicate<Human> { $0.id == id }
@@ -261,7 +276,9 @@ private struct HumanAllFeaturesRouteData {
         )
         let allMeds = fetch(
             FetchDescriptor<HumanMedication>(
-                predicate: #Predicate<HumanMedication> { $0.humanId == humanKey },
+                predicate: #Predicate<HumanMedication> {
+                    $0.humanId == humanKey || $0.humanId == humanKeyLower
+                },
                 sortBy: [SortDescriptor(\.createdAt)]
             ),
             context: context,
@@ -269,7 +286,9 @@ private struct HumanAllFeaturesRouteData {
         )
         let allReports = fetch(
             FetchDescriptor<HumanHealthReport>(
-                predicate: #Predicate<HumanHealthReport> { $0.humanId == humanKey },
+                predicate: #Predicate<HumanHealthReport> {
+                    $0.humanId == humanKey || $0.humanId == humanKeyLower
+                },
                 sortBy: [SortDescriptor(\.reportDate, order: .reverse)]
             ),
             context: context,
@@ -313,6 +332,12 @@ private struct HumanAllFeaturesRouteData {
             context: context,
             name: "HumanHealthMetricLog"
         )
+        let healthRows = loadRecentHealthRows(
+            humanKey: humanKey,
+            humanKeyLower: humanKeyLower,
+            recentObservationStart: recentObservationStart,
+            context: context
+        )
         return HumanAllFeaturesRouteData(
             human: human,
             allMeds: allMeds,
@@ -333,10 +358,50 @@ private struct HumanAllFeaturesRouteData {
                     weightLogs: weightLogs,
                     workoutLogs: workoutLogs,
                     healthMetricLogs: healthMetricLogs,
+                    healthConditions: healthRows.conditions,
+                    healthObservations: healthRows.observations,
                     explicitlyResolvedProfileCategories: explicitlyResolvedProfileCategories
                 )
             } ?? .empty,
             hasLoaded: true
+        )
+    }
+
+    @MainActor
+    private static func loadRecentHealthRows(
+        humanKey: String,
+        humanKeyLower: String,
+        recentObservationStart: Date,
+        context: ModelContext
+    ) -> (conditions: [HumanHealthCondition], observations: [HumanHealthObservation]) {
+        var conditionDescriptor = FetchDescriptor<HumanHealthCondition>(
+            predicate: #Predicate<HumanHealthCondition> {
+                $0.humanId == humanKey || $0.humanId == humanKeyLower
+            },
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        conditionDescriptor.fetchLimit = 64
+
+        var observationDescriptor = FetchDescriptor<HumanHealthObservation>(
+            predicate: #Predicate<HumanHealthObservation> {
+                ($0.humanId == humanKey || $0.humanId == humanKeyLower) &&
+                    $0.recordedAt >= recentObservationStart
+            },
+            sortBy: [SortDescriptor(\.recordedAt, order: .reverse)]
+        )
+        observationDescriptor.fetchLimit = 256
+
+        return (
+            conditions: fetch(
+                conditionDescriptor,
+                context: context,
+                name: "HumanHealthCondition"
+            ),
+            observations: fetch(
+                observationDescriptor,
+                context: context,
+                name: "HumanHealthObservation"
+            )
         )
     }
 }

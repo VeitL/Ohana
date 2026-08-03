@@ -216,6 +216,56 @@ struct HomeReadModelStoreTests {
         #expect(store.payload.signature.contains(event.id.uuidString))
     }
 
+    @Test func humanExpenseProjectsToSubjectWhenRecordedByAnotherHuman() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let store = HomeReadModelStore()
+        let subject = Human(name: "Subject")
+        let recorder = Human(name: "Recorder")
+        let expense = CareLedgerEvent(
+            occurredAt: Date(),
+            actorKind: .human,
+            actorId: recorder.id.uuidString,
+            subjectKind: .human,
+            subjectId: subject.id.uuidString,
+            eventKind: .expense,
+            actionType: ExpenseCategory.other.rawValue,
+            amountValue: 20,
+            amountUnit: "currency",
+            source: .quickAction
+        )
+        context.insert(subject)
+        context.insert(recorder)
+        context.insert(expense)
+        try context.save()
+
+        await store.refreshImmediately(
+            context: context,
+            activeHumanIdRaw: subject.id.uuidString,
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            quickActionItemsRaw: "",
+            language: "zh",
+            externalRevision: HomeRevision(),
+            force: true
+        )
+
+        let action = QuickActionItem(
+            label: "花费",
+            icon: "creditcard.fill",
+            colorHex: "FF9F43",
+            actionType: "humanExpense",
+            entityId: subject.id,
+            entityKind: .human
+        )
+        let state = store.payload.interaction.expandedActions(for: subject.id).state(for: action)
+
+        #expect(state.status == "本月 \(AppCurrency.format(20, fractionDigits: 0))")
+        #expect(state.isCompleted)
+        #expect(store.payload.signature.contains(expense.id.uuidString))
+    }
+
     @Test func orphanPetWeightFactRemainsVisibleBeforeLedgerBackfillRuns() async throws {
         let container = try makeContainer()
         let context = container.mainContext

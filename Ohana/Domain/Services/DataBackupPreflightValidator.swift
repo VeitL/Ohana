@@ -23,6 +23,7 @@ nonisolated struct DataBackupRestoreExistingIdentities: Sendable {
     let plants: Set<UUID>
     let documents: Set<UUID>
     let humanMedications: Set<UUID>
+    let humanHealthReportOwners: [UUID: UUID]
 
     @MainActor
     init(context: ModelContext) throws {
@@ -31,10 +32,17 @@ nonisolated struct DataBackupRestoreExistingIdentities: Sendable {
         plants = try Set(context.fetch(FetchDescriptor<Plant>()).map(\.id))
         documents = try Set(context.fetch(FetchDescriptor<PetDocument>()).map(\.id))
         humanMedications = try Set(context.fetch(FetchDescriptor<HumanMedication>()).map(\.id))
+        var reportOwners: [UUID: UUID] = [:]
+        for report in try context.fetch(FetchDescriptor<HumanHealthReport>()) {
+            guard let humanID = UUID(uuidString: report.humanId) else { continue }
+            reportOwners[report.id] = humanID
+        }
+        humanHealthReportOwners = reportOwners
     }
 }
 
 nonisolated enum DataBackupPreflightValidator {
+    @MainActor
     static func validate(
         _ backup: OhanaBackup,
         existing: DataBackupRestoreExistingIdentities
@@ -217,6 +225,7 @@ nonisolated enum DataBackupPreflightValidator {
 
     // MARK: - Business value validation
 
+    @MainActor
     private static func validateBusinessValues(_ backup: OhanaBackup) throws {
         for expense in backup.petExpenseLogs {
             guard ExpenseAmountPolicy.isValidPersistedExpense(
@@ -235,6 +244,27 @@ nonisolated enum DataBackupPreflightValidator {
                 throw BackupError.invalidRestoreData(.businessValue)
             }
         }
+
+        for metric in backup.humanHealthMetricLogs ?? [] {
+            guard HumanHealthMetricImportValidationPolicy.isValid(
+                metricKey: metric.metricKey,
+                unitCode: metric.unitCode,
+                value: metric.value,
+                referenceLow: metric.referenceLow,
+                referenceHigh: metric.referenceHigh,
+                sourceLabel: metric.sourceLabel ?? "",
+                referenceRangeText: metric.referenceRangeText ?? ""
+            ),
+                  metric.reportedFlagRaw.map({ ["low", "normal", "high", "unknown"].contains($0) }) != false else {
+                throw BackupError.invalidRestoreData(.businessValue)
+            }
+        }
+
+        for report in backup.humanHealthReports ?? [] {
+            guard report.captureSourceRaw.map({ ["manual", "documentScan"].contains($0) }) != false else {
+                throw BackupError.invalidRestoreData(.businessValue)
+            }
+        }
     }
 
     // MARK: - Required relationship validation
@@ -250,6 +280,7 @@ nonisolated enum DataBackupPreflightValidator {
         let medicationIDs = existing.humanMedications.union(
             (backup.humanMedications ?? []).compactMap { UUID(uuidString: $0.id) }
         )
+        var healthReportOwners = existing.humanHealthReportOwners
 
         for relationship in backup.petRelationships ?? [] {
             try requireReference(relationship.fromPetId, in: petIDs)
@@ -267,6 +298,12 @@ nonisolated enum DataBackupPreflightValidator {
         }
         for report in backup.humanHealthReports ?? [] {
             try requireReference(report.humanId, in: humanIDs)
+            guard let reportID = UUID(uuidString: report.id),
+                  let humanID = UUID(uuidString: report.humanId),
+                  healthReportOwners[reportID] == nil || healthReportOwners[reportID] == humanID else {
+                throw BackupError.invalidRestoreData(.relationship)
+            }
+            healthReportOwners[reportID] = humanID
             if let recorder = report.recordedByHumanId {
                 try requireReference(recorder, in: humanIDs)
             }
@@ -277,6 +314,13 @@ nonisolated enum DataBackupPreflightValidator {
             }
             if let recorder = metric.recordedByHumanId {
                 try requireReference(recorder, in: humanIDs)
+            }
+            if let sourceReportID = metric.sourceReportID {
+                guard let reportID = UUID(uuidString: sourceReportID),
+                      let humanID = metric.humanId.flatMap(UUID.init(uuidString:)),
+                      healthReportOwners[reportID] == humanID else {
+                    throw BackupError.invalidRestoreData(.relationship)
+                }
             }
         }
         for record in backup.humanNoteRecords ?? [] {

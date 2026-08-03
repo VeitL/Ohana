@@ -73,15 +73,15 @@ extension SettingsView {
                         ))
                         .font(OhanaFont.body(.semibold))
                         Text(l.tr(
-                            zh: "打开 App 时自动为此人打卡",
-                            en: "Checked in automatically when Ohana opens",
-                            de: "Wird beim Öffnen von Ohana automatisch eingecheckt",
-                            es: "Se registra automáticamente al abrir Ohana",
-                            pt: "Check-in automático ao abrir o Ohana",
-                            fr: "Pointage automatique à l’ouverture d’Ohana",
-                            ja: "Ohanaを開くと自動でチェックイン",
-                            ko: "Ohana를 열면 자동으로 체크인",
-                            it: "Check-in automatico all’apertura di Ohana"
+                            zh: "轻点本人卡片或通知动作才会确认",
+                            en: "Confirmed only by your card tap or notification action",
+                            de: "Nur per Kartentipp oder Mitteilungsaktion bestätigt",
+                            es: "Solo se confirma al tocar tu tarjeta o actuar desde la notificación",
+                            pt: "Só confirma ao tocar no cartão ou agir pela notificação",
+                            fr: "Confirmé uniquement par votre carte ou l’action de notification",
+                            ja: "本人カードまたは通知操作でのみ確認",
+                            ko: "본인 카드나 알림 동작으로만 확인",
+                            it: "Conferma solo dalla tua scheda o dalla notifica"
                         ))
                         .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(tertiaryText)

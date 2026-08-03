@@ -78,17 +78,17 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         let presenceOkayAction = UNNotificationAction(
             identifier: PresenceReminderRequestFactory.okayActionIdentifier,
             title: l.tr(
-                zh: "我没事",
-                en: "I'm okay",
-                de: "Mir geht's gut",
-                es: "Estoy bien",
-                pt: "Estou bem",
-                fr: "Je vais bien",
-                ja: "大丈夫です",
-                ko: "괜찮아요",
-                it: "Sto bene"
+                zh: "我今天平安",
+                en: "I'm safe today",
+                de: "Mir geht es heute gut",
+                es: "Estoy bien hoy",
+                pt: "Estou bem hoje",
+                fr: "Tout va bien aujourd’hui",
+                ja: "今日は無事です",
+                ko: "오늘은 무사해요",
+                it: "Oggi sto bene"
             ),
-            options: []
+            options: [.authenticationRequired]
         )
         let guardianContactedAction = UNNotificationAction(
             identifier: GuardianRemoteNotificationContract.contactedActionIdentifier,

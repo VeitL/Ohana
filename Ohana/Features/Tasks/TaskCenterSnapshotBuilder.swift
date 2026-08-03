@@ -659,7 +659,8 @@ nonisolated extension TaskCenterSnapshotBuilder {
         humans: [Human],
         activeHumanId: String?
     ) -> TaskCenterMemberFilterContext {
-        let allItemIDs = Set(items.map(\.id))
+        let countedItems = items.filter { $0.source != .suggestion }
+        let allItemIDs = Set(countedItems.map(\.id))
         let systemJourneyItemIDs = Set(items.lazy.filter { $0.source == .systemJourney }.map(\.id))
         let activeHumans = humans.filter { !$0.hasPassedAway }
         guard activeHumans.count > 1 else {
@@ -693,7 +694,7 @@ nonisolated extension TaskCenterSnapshotBuilder {
         var actionRequiredItemIDs: Set<String> = []
         var waitingForFamilyItemIDs: Set<String> = []
 
-        for item in items where item.source != .systemJourney {
+        for item in countedItems where item.source != .systemJourney {
             switch memberQueue(
                 for: item,
                 familyTasksByID: familyTasksByID,

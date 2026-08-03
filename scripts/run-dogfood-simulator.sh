@@ -27,8 +27,8 @@ INITIALIZE_USER=0
 REPAIR_DETACHED_ASSOCIATION=0
 INITIALIZATION_RESUME=0
 INITIALIZATION_LAUNCH_ONLY=0
-SESSION_LOCK_DIR="${OHANA_LOCAL_BUILD_REPO_ROOT}/.build/locks/dogfood-session.lock"
-OVERLAY_RECEIPT_PATH="${OHANA_LOCAL_BUILD_REPO_ROOT}/.build/dogfood-evidence/last-overlay.json"
+SESSION_LOCK_DIR="${OHANA_LOCAL_BUILD_COMMON_REPO_ROOT}/.build/locks/dogfood-session.lock"
+OVERLAY_RECEIPT_PATH="${OHANA_LOCAL_BUILD_COMMON_REPO_ROOT}/.build/dogfood-evidence/last-overlay.json"
 SESSION_LOCK_ACQUIRED=0
 PIN_NEEDS_CREATION=0
 
@@ -71,7 +71,7 @@ Options:
 Environment:
   OHANA_DOGFOOD_SIMULATOR_UDID       Explicit simulator UDID to pin
   OHANA_DOGFOOD_SIMULATOR_NAME       Simulator name to resolve on first run
-  OHANA_DOGFOOD_DERIVED_DATA_PATH    Must equal .build/DerivedData/dogfood
+  OHANA_DOGFOOD_DERIVED_DATA_PATH    Must equal the shared external dogfood lane
 USAGE
 }
 

@@ -1,7 +1,7 @@
 # Entitlement Logic
 
 > 状态：Free / Personal 与 fail-closed Family 年度 catalog、StoreKit 测试配置和统一权益服务已在工作树实现；Family 商品默认不加载、不展示、不可购买，直到在线守护上线门禁完成。这不等于 App Store Connect、Sandbox、服务端或真机已验收。
-> 最近核对：2026-07-22，依据 `product-foundation.md` D4、D6、D9、D22、D25、D29–D32 与 G12。
+> 最近核对：2026-07-23，依据 `product-foundation.md` D4、D6、D9、D22、D25、D29–D32 与 G12。
 > 所有者：统一 Entitlement 服务与领域额度策略；任何 View、主题、图标或分享卡不得自行读取产品 ID、交易或本地布尔值决定所有权。
 
 ## Purpose
@@ -85,10 +85,17 @@ Personal 解锁以下语义能力；只有已实现、已验收的条目才能�
 - 多版本自动 iCloud Drive 备份与恢复点；
 - Founding 徽章、3 个 Supporter 背景、`AppIconNeonSmile` 立即使用权和 Founding 周报海报。
 
+1.0 的 Human 化验单扫描映射到语义能力 `PersonalFeature.documentScanning`：
+
+- Free 可继续手工新增、查看、编辑与删除基础 Human 健康报告和指标；
+- Personal 才能启动相机/照片端侧识别并提交新的扫描导入；生产命令边界必须再次校验 entitlement，不能只隐藏入口；
+- 降级后既有扫描报告和结构化指标继续可见、可编辑、可删除，不删除、不隐藏，也不要求重新订阅；
+- 原始图片和完整 OCR 文本不作为 Personal 资产持久化，导入结束、取消、失败或页面离开时释放。
+
 原始记录、已有历史、手动导出、健康关键提醒、纪念、椰子、基础 Oasis 与 Free 最新一份自动备份不读 Personal entitlement。
 
-佛系基础模式、卡片打卡、固定状态、一键全部、全部原始月份、当前/最长连续、基础
-Oasis、商店、扭蛋和电子宠物也不读 Personal entitlement。Personal 只增加佛系的
+佛系基础模式、单对象显式记录、1–10 分状态、全部原始月份、本人当前/最长连续、Plant
+陪伴天数、基础 Oasis、商店、扭蛋和电子宠物也不读 Personal entitlement。Personal 只增加佛系的
 90 天/1 年/全部时间趋势、状态分布、完成率、跨对象比较、导出、按星期提醒、
 15–180 分钟宽限和第二次本机提醒。Free 保留一个每日本机提醒时间。Free / Personal
 都不发送跨设备亲友通知；任何套餐都不增加佛系奖励、椰子倍率或扭蛋概率。

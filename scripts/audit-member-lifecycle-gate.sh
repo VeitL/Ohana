@@ -343,32 +343,23 @@ SCHEDULE_DELETE_RAW_ALLOWLIST = {
     "Ohana/Domain/Services/DomainScheduleWriteKernel.swift",
     "Ohana/Domain/Services/PhysicalDeletionService.swift",
 }
-DIRECT_SCHEDULE_DELETE_RE = re.compile(
-    r"\b(?:context|modelContext)\.delete\s*\(\s*(?:event|reminder)\s*\)"
-    r"|CloudSyncMutationRecorder\.markDeleted\(\s*(?:event|reminder)\b"
+SCHEDULE_DELETE_CALL_RE = re.compile(
+    r"\bDomainScheduleWriter\.(?P<method>delete(?:Event|Reminder))\s*\("
 )
-AUTHORIZED_SCHEDULE_DELETE_RE = re.compile(
-    r"DomainScheduleWriteAuthorizer\.authorizeExistingEventMutation"
-    r"|DomainScheduleWriteAuthorizer\.authorizeExistingReminderMutation"
-    r"|DomainScheduleWriter\.deleteEvent"
-    r"|DomainScheduleWriter\.deleteReminder"
+SCHEDULE_DELETE_RESULT_BINDING_PREFIX_RE = re.compile(
+    r"\b(?:let|var)\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
+    r"(?:\s*:\s*DomainScheduleDeleteResult)?\s*=\s*"
+    r"(?:(?:try[!?]?|await)\s+)*$",
+    re.DOTALL,
 )
-SCHEDULE_DELETE_CONTEXT_RE = re.compile(
-    r"\bEvent\b"
-    r"|FetchDescriptor<Event>"
-    r"|fetchAll\(Event\.self"
-    r"|\bevent\.reminders\b"
-    r"|\breminder\.event\b"
-    r"|MemberLifecycleActiveScheduleResolver\."
-    r"|DomainSchedule"
+SCHEDULE_DELETE_INLINE_SINK_PREFIX_RE = re.compile(
+    r"(?:DomainScheduleEffectsDispatcher\.dispatch"
+    r"|[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.stage)"
+    r"\s*\(\s*delete\s*:\s*$",
+    re.DOTALL,
 )
-AUTHORIZED_SCHEDULE_DELETE_CALL_RE = re.compile(
-    r"DomainScheduleWriter\.delete(?:Event|Reminder)\s*\("
-)
-AUTHORIZED_SCHEDULE_DELETE_EFFECTS_RE = re.compile(
-    r"DomainScheduleEffectsDispatcher\.dispatch\s*\(\s*delete:"
-    r"|notificationIdsToCancel"
-    r"|notificationIDsToCancel"
+EXPLICIT_SCHEDULE_MODEL_BINDING_RE = re.compile(
+    r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?:Event|Reminder)\??\b"
 )
 REHYDRATE_ENTRY_PATHS = {
     "Ohana/Domain/Services/DataBackupManager.swift",
@@ -488,6 +479,172 @@ def function_blocks(lines: list[str]) -> list[tuple[str, int, str, bool]]:
         ))
         idx = max(end + 1, idx + 1)
     return blocks
+
+
+def mask_swift_noncode(source: str) -> str:
+    """Mask comments and string literals while preserving offsets and lines."""
+    masked = list(source)
+    length = len(source)
+
+    def mask_range(start: int, end: int) -> None:
+        for position in range(start, min(end, length)):
+            if source[position] not in "\r\n":
+                masked[position] = " "
+
+    index = 0
+    while index < length:
+        if source.startswith("//", index):
+            end = source.find("\n", index + 2)
+            if end == -1:
+                end = length
+            mask_range(index, end)
+            index = end
+            continue
+
+        if source.startswith("/*", index):
+            start = index
+            depth = 1
+            index += 2
+            while index < length and depth > 0:
+                if source.startswith("/*", index):
+                    depth += 1
+                    index += 2
+                elif source.startswith("*/", index):
+                    depth -= 1
+                    index += 2
+                else:
+                    index += 1
+            mask_range(start, index)
+            continue
+
+        hash_count = 0
+        quote_index = index
+        if source[index] == "#":
+            while quote_index < length and source[quote_index] == "#":
+                hash_count += 1
+                quote_index += 1
+            if quote_index >= length or source[quote_index] != '"':
+                index += 1
+                continue
+        elif source[index] != '"':
+            index += 1
+            continue
+
+        quote_count = 3 if source.startswith('"""', quote_index) else 1
+        opening_end = quote_index + quote_count
+        closing = ('"' * quote_count) + ("#" * hash_count)
+        start = index
+        index = opening_end
+        while index < length:
+            if source.startswith(closing, index):
+                index += len(closing)
+                break
+            if hash_count == 0 and source[index] == "\\":
+                index = min(index + 2, length)
+            else:
+                index += 1
+        mask_range(start, index)
+
+    return "".join(masked)
+
+
+def schedule_function_blocks(
+    lines: list[str],
+) -> list[tuple[str, int, str, bool, str]]:
+    source = "\n".join(lines)
+    code_lines = mask_swift_noncode(source).splitlines()
+    blocks: list[tuple[str, int, str, bool, str]] = []
+    for func_name, start_line, code_body, is_private in function_blocks(code_lines):
+        end_line = start_line + code_body.count("\n")
+        raw_body = "\n".join(lines[start_line - 1 : end_line])
+        blocks.append((func_name, start_line, code_body, is_private, raw_body))
+    return blocks
+
+
+def schedule_delete_binding(body: str, call_start: int) -> str | None:
+    match = SCHEDULE_DELETE_RESULT_BINDING_PREFIX_RE.search(body, 0, call_start)
+    return match.group("name") if match else None
+
+
+def schedule_delete_result_is_consumed(body: str, call_end: int, result_name: str) -> bool:
+    escaped_name = re.escape(result_name)
+    next_binding = re.compile(
+        rf"\b(?:let|var)\s+{escaped_name}\b(?:\s*:[^=]+)?\s*="
+    ).search(body, call_end)
+    segment_end = next_binding.start() if next_binding else len(body)
+    segment = body[call_end:segment_end]
+    notification_ids = (
+        rf"\b{escaped_name}\s*\.\s*notification(?:Ids|IDs)ToCancel\b"
+    )
+    sinks = (
+        re.compile(
+            rf"DomainScheduleEffectsDispatcher\.dispatch\s*\(\s*delete\s*:\s*{escaped_name}\b",
+            re.DOTALL,
+        ),
+        re.compile(
+            rf"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*"
+            rf"\.stage\s*\(\s*delete\s*:\s*{escaped_name}\b",
+            re.DOTALL,
+        ),
+        re.compile(rf"\breturn\s+{notification_ids}", re.DOTALL),
+        re.compile(rf"\.append\s*\(\s*contentsOf\s*:\s*{notification_ids}", re.DOTALL),
+        re.compile(rf"\.formUnion\s*\(\s*{notification_ids}", re.DOTALL),
+        re.compile(
+            rf"\bnotification(?:Ids|IDs)ToCancel\s*:\s*{notification_ids}",
+            re.DOTALL,
+        ),
+        re.compile(rf"\bcancelNotifications\s*\(\s*{notification_ids}", re.DOTALL),
+    )
+    return any(pattern.search(segment) for pattern in sinks)
+
+
+def unconsumed_schedule_delete_calls(body: str) -> list[tuple[int, str]]:
+    findings: list[tuple[int, str]] = []
+    for call in SCHEDULE_DELETE_CALL_RE.finditer(body):
+        relative_line = body[: call.start()].count("\n")
+        if SCHEDULE_DELETE_INLINE_SINK_PREFIX_RE.search(body, 0, call.start()):
+            continue
+        result_name = schedule_delete_binding(body, call.start())
+        if result_name is None:
+            findings.append((
+                relative_line,
+                f"{call.group('method')} result is not bound to a named value",
+            ))
+            continue
+        if not schedule_delete_result_is_consumed(body, call.end(), result_name):
+            findings.append((
+                relative_line,
+                f"{call.group('method')} result '{result_name}' has no matching effect sink",
+            ))
+    return findings
+
+
+def direct_raw_schedule_delete_calls(body: str) -> list[tuple[int, str]]:
+    schedule_names = {
+        match.group("name") for match in EXPLICIT_SCHEDULE_MODEL_BINDING_RE.finditer(body)
+    }
+    findings: list[tuple[int, str]] = []
+    seen_positions: set[int] = set()
+    for name in sorted(schedule_names):
+        escaped_name = re.escape(name)
+        patterns = (
+            re.compile(
+                rf"\b(?:context|modelContext)\.delete\s*\(\s*{escaped_name}\s*\)"
+            ),
+            re.compile(
+                rf"\bCloudSyncMutationRecorder\.markDeleted\s*\(\s*{escaped_name}\b"
+            ),
+        )
+        for pattern in patterns:
+            for match in pattern.finditer(body):
+                if match.start() in seen_positions:
+                    continue
+                seen_positions.add(match.start())
+                findings.append((
+                    body[: match.start()].count("\n"),
+                    f"raw delete of explicitly typed schedule value '{name}'",
+                ))
+    return sorted(findings)
 
 
 def requires_lifecycle_gate(path: str, func_name: str, body: str, is_private: bool) -> bool:
@@ -758,31 +915,23 @@ for path in files:
         or (targets and path_str.startswith("scripts/tests/fixtures/"))
     ) and path_str not in SCHEDULE_DELETE_RAW_ALLOWLIST
     if checks_schedule_delete:
-        for func_name, start_line, body, _ in function_blocks(lines):
-            if "member-lifecycle-gate: allow" in body:
+        for func_name, start_line, body, _, raw_body in schedule_function_blocks(lines):
+            if "member-lifecycle-gate: allow" in raw_body:
                 continue
-            direct_schedule_delete = (
-                DIRECT_SCHEDULE_DELETE_RE.search(body)
-                and SCHEDULE_DELETE_CONTEXT_RE.search(body)
-                and not AUTHORIZED_SCHEDULE_DELETE_RE.search(body)
-            )
-            if direct_schedule_delete:
+            for relative_line, detail in direct_raw_schedule_delete_calls(body):
                 schedule_delete_warnings.append(
                     WarningItem(
                         path_str,
-                        start_line,
-                        f"func {func_name} deletes Event/Reminder rows without consuming an authorized schedule mutation writer",
+                        start_line + relative_line,
+                        f"func {func_name} deletes Event/Reminder rows without consuming an authorized schedule mutation writer: {detail}",
                     )
                 )
-            if (
-                AUTHORIZED_SCHEDULE_DELETE_CALL_RE.search(body)
-                and not AUTHORIZED_SCHEDULE_DELETE_EFFECTS_RE.search(body)
-            ):
+            for relative_line, detail in unconsumed_schedule_delete_calls(body):
                 schedule_delete_warnings.append(
                     WarningItem(
                         path_str,
-                        start_line,
-                        f"func {func_name} deletes Event/Reminder rows without dispatching schedule delete effects",
+                        start_line + relative_line,
+                        f"func {func_name} deletes Event/Reminder rows without dispatching or staging its schedule delete effects: {detail}",
                     )
                 )
 

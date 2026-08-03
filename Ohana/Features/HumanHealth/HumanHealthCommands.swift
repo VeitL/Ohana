@@ -8,11 +8,41 @@
 import Foundation
 import SwiftData
 
+@MainActor
+enum HumanHealthCommandOwnership {
+    static func owns(_ log: HumanHealthMetricLog, human: Human) -> Bool {
+        log.human?.id == human.id
+    }
+
+    static func owns(_ report: HumanHealthReport, human: Human) -> Bool {
+        UUID(
+            uuidString: report.humanId.trimmingCharacters(in: .whitespacesAndNewlines)
+        ) == human.id
+    }
+}
+
 struct HumanHealthMetricCommandResult {
     let log: HumanHealthMetricLog
     let logID: UUID
     let subjectID: UUID
     let metricKey: String
+    let didPersist: Bool
+    let persistenceErrorDescription: String?
+}
+
+nonisolated struct HumanHealthMetricUpdateInput: Equatable, Sendable {
+    let unitCode: String
+    let value: Double
+    let date: Date
+    let notes: String
+}
+
+nonisolated struct HumanHealthMetricUpdateCommandResult: Equatable, Sendable {
+    let humanID: UUID
+    let logID: UUID
+    let metricKey: String
+    let unitCode: String
+    let didChange: Bool
     let didPersist: Bool
     let persistenceErrorDescription: String?
 }
@@ -38,7 +68,7 @@ enum HumanHealthMetricCommandService {
         recordedByHumanId: String? = nil,
         context: ModelContext
     ) -> HumanHealthMetricCommandResult? {
-        guard value > 0, value.isFinite else { return nil }
+        guard value > 0, value.isFinite, !context.hasChanges else { return nil }
         guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
             human: human,
             occurredAt: date,
@@ -75,12 +105,114 @@ enum HumanHealthMetricCommandService {
 
     @discardableResult
     @MainActor
+    static func updateMetricLog(
+        _ log: HumanHealthMetricLog,
+        human: Human,
+        input: HumanHealthMetricUpdateInput,
+        context: ModelContext
+    ) -> HumanHealthMetricUpdateCommandResult {
+        let unitCode = input.unitCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !context.hasChanges else {
+            return updateFailure(
+                log: log,
+                human: human,
+                unitCode: unitCode,
+                error: "Human health metric command requires a clean ModelContext"
+            )
+        }
+        guard input.value > 0,
+              input.value.isFinite,
+              HealthMetricCatalog.metric(forKey: log.metricKey)?.unit(for: unitCode) != nil else {
+            return updateFailure(
+                log: log,
+                human: human,
+                unitCode: unitCode,
+                error: "humanHealthMetric.invalidInput"
+            )
+        }
+        guard log.sourceReportID == nil || log.unitCode == unitCode else {
+            return updateFailure(
+                log: log,
+                human: human,
+                unitCode: unitCode,
+                error: "humanHealthMetric.importedUnitLocked"
+            )
+        }
+        guard log.sourceReportID == nil || log.date == input.date else {
+            return updateFailure(
+                log: log,
+                human: human,
+                unitCode: unitCode,
+                error: "humanHealthMetric.importedDateLocked"
+            )
+        }
+        guard HumanHealthCommandOwnership.owns(log, human: human),
+              MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+            return updateFailure(log: log, human: human, unitCode: unitCode)
+        }
+
+        let notes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let didChangeValue = log.value != input.value
+        let didChange = log.unitCode != unitCode
+            || didChangeValue
+            || log.date != input.date
+            || log.notes != notes
+        guard didChange else {
+            return HumanHealthMetricUpdateCommandResult(
+                humanID: human.id,
+                logID: log.id,
+                metricKey: log.metricKey,
+                unitCode: log.unitCode,
+                didChange: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
+            )
+        }
+
+        log.unitCode = unitCode
+        log.value = input.value
+        log.date = input.date
+        log.notes = notes
+        if log.sourceReportID != nil, didChangeValue {
+            log.reportedFlag = .unknown
+        }
+        CloudSyncMutationRecorder.markModified(log, context: context)
+        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        guard saveResult.didSave else {
+            let logID = log.id
+            let metricKey = log.metricKey
+            context.rollback()
+            return HumanHealthMetricUpdateCommandResult(
+                humanID: human.id,
+                logID: logID,
+                metricKey: metricKey,
+                unitCode: unitCode,
+                didChange: false,
+                didPersist: false,
+                persistenceErrorDescription: saveResult.errorDescription
+            )
+        }
+        return HumanHealthMetricUpdateCommandResult(
+            humanID: human.id,
+            logID: log.id,
+            metricKey: log.metricKey,
+            unitCode: log.unitCode,
+            didChange: true,
+            didPersist: true,
+            persistenceErrorDescription: nil
+        )
+    }
+
+    @discardableResult
+    @MainActor
     static func deleteMetricLog(
         _ log: HumanHealthMetricLog,
         human: Human,
         context: ModelContext
     ) -> HumanHealthMetricDeleteCommandResult {
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+        guard !context.hasChanges,
+              HumanHealthCommandOwnership.owns(log, human: human),
+              MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
             return HumanHealthMetricDeleteCommandResult(
                 humanID: human.id,
                 metricKey: log.metricKey,
@@ -113,9 +245,27 @@ enum HumanHealthMetricCommandService {
             persistenceErrorDescription: nil
         )
     }
+
+    @MainActor
+    private static func updateFailure(
+        log: HumanHealthMetricLog,
+        human: Human,
+        unitCode: String,
+        error: String? = nil
+    ) -> HumanHealthMetricUpdateCommandResult {
+        HumanHealthMetricUpdateCommandResult(
+            humanID: human.id,
+            logID: log.id,
+            metricKey: log.metricKey,
+            unitCode: unitCode,
+            didChange: false,
+            didPersist: false,
+            persistenceErrorDescription: error
+        )
+    }
 }
 
-struct HumanHealthReportCommandInput: Equatable {
+nonisolated struct HumanHealthReportCommandInput: Equatable, Sendable {
     let reportType: HealthReportType
     let conclusion: ReportConclusion
     let hospitalName: String
@@ -133,6 +283,24 @@ struct HumanHealthReportCommandResult: Equatable {
     let reportType: String
     let didChange: Bool
     let persistenceErrorDescription: String?
+    var affectedMetricLogIDs: Set<UUID> = []
+}
+
+nonisolated enum HumanHealthReportInputValidation {
+    static func error(
+        for input: HumanHealthReportCommandInput,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String? {
+        let reportDay = calendar.startOfDay(for: input.reportDate)
+        let today = calendar.startOfDay(for: now)
+        guard reportDay <= today else { return "reportDate.future" }
+        if let nextCheckDate = input.nextCheckDate,
+           calendar.startOfDay(for: nextCheckDate) < reportDay {
+            return "nextCheckDate.beforeReportDate"
+        }
+        return nil
+    }
 }
 
 enum HumanHealthReportCommandService {
@@ -143,6 +311,22 @@ enum HumanHealthReportCommandService {
         input: HumanHealthReportCommandInput,
         context: ModelContext
     ) -> HumanHealthReportCommandResult {
+        guard !context.hasChanges else {
+            return failure(
+                humanID: human.id,
+                reportID: UUID(),
+                reportType: input.reportType.rawValue,
+                error: "Human health report command requires a clean ModelContext"
+            )
+        }
+        if let validationError = HumanHealthReportInputValidation.error(for: input) {
+            return failure(
+                humanID: human.id,
+                reportID: UUID(),
+                reportType: input.reportType.rawValue,
+                error: validationError
+            )
+        }
         guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
             human: human,
             occurredAt: input.reportDate,
@@ -208,7 +392,32 @@ enum HumanHealthReportCommandService {
         input: HumanHealthReportCommandInput,
         context: ModelContext
     ) -> HumanHealthReportCommandResult {
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+        guard !context.hasChanges else {
+            return failure(
+                humanID: human.id,
+                reportID: report.id,
+                reportType: report.reportTypeRaw,
+                error: "Human health report command requires a clean ModelContext"
+            )
+        }
+        if let validationError = HumanHealthReportInputValidation.error(for: input) {
+            return failure(
+                humanID: human.id,
+                reportID: report.id,
+                reportType: report.reportTypeRaw,
+                error: validationError
+            )
+        }
+        guard report.captureSource != .documentScan || input.reportType == .bloodTest else {
+            return failure(
+                humanID: human.id,
+                reportID: report.id,
+                reportType: report.reportTypeRaw,
+                error: "documentScan.reportTypeLocked"
+            )
+        }
+        guard HumanHealthCommandOwnership.owns(report, human: human),
+              MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
             return HumanHealthReportCommandResult(
                 humanID: human.id,
                 reportID: report.id,
@@ -217,6 +426,35 @@ enum HumanHealthReportCommandService {
                 persistenceErrorDescription: nil
             )
         }
+        let linkedLogs: [HumanHealthMetricLog]
+        if report.captureSource == .documentScan, report.reportDate != input.reportDate {
+            do {
+                linkedLogs = try linkedMetricLogs(reportID: report.id, context: context)
+            } catch {
+                return HumanHealthReportCommandResult(
+                    humanID: human.id,
+                    reportID: report.id,
+                    reportType: report.reportTypeRaw,
+                    didChange: false,
+                    persistenceErrorDescription: error.localizedDescription
+                )
+            }
+            guard linkedLogs.allSatisfy({ HumanHealthCommandOwnership.owns($0, human: human) }) else {
+                return HumanHealthReportCommandResult(
+                    humanID: human.id,
+                    reportID: report.id,
+                    reportType: report.reportTypeRaw,
+                    didChange: false,
+                    persistenceErrorDescription: nil
+                )
+            }
+        } else {
+            linkedLogs = []
+        }
+        let previousReportDate = report.reportDate
+        let logsToRedate = linkedLogs.allSatisfy { $0.date == previousReportDate }
+            ? linkedLogs
+            : []
         report.humanId = human.id.uuidString
         report.reportType = input.reportType
         report.conclusion = input.conclusion
@@ -231,6 +469,10 @@ enum HumanHealthReportCommandService {
                 requestedRecorderID,
                 context: context
             )
+        }
+        for log in logsToRedate {
+            log.date = input.reportDate
+            CloudSyncMutationRecorder.markModified(log, context: context)
         }
         CloudSyncMutationRecorder.markModified(report, context: context, modifiedAt: input.reportDate)
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
@@ -251,7 +493,8 @@ enum HumanHealthReportCommandService {
             reportID: report.id,
             reportType: report.reportTypeRaw,
             didChange: true,
-            persistenceErrorDescription: nil
+            persistenceErrorDescription: nil,
+            affectedMetricLogIDs: Set(logsToRedate.map(\.id))
         )
     }
 
@@ -262,7 +505,16 @@ enum HumanHealthReportCommandService {
         human: Human,
         context: ModelContext
     ) -> HumanHealthReportCommandResult {
-        guard MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
+        guard !context.hasChanges else {
+            return failure(
+                humanID: human.id,
+                reportID: report.id,
+                reportType: report.reportTypeRaw,
+                error: "Human health report command requires a clean ModelContext"
+            )
+        }
+        guard HumanHealthCommandOwnership.owns(report, human: human),
+              MemberWritePolicy.disposition(human: human, intent: .activeOnly).allowsDerivedEffects else {
             return HumanHealthReportCommandResult(
                 humanID: human.id,
                 reportID: report.id,
@@ -273,6 +525,31 @@ enum HumanHealthReportCommandService {
         }
         let reportID = report.id
         let reportType = report.reportTypeRaw
+        let linkedLogs: [HumanHealthMetricLog]
+        do {
+            linkedLogs = try linkedMetricLogs(reportID: reportID, context: context)
+        } catch {
+            return HumanHealthReportCommandResult(
+                humanID: human.id,
+                reportID: reportID,
+                reportType: reportType,
+                didChange: false,
+                persistenceErrorDescription: error.localizedDescription
+            )
+        }
+        guard linkedLogs.allSatisfy({ HumanHealthCommandOwnership.owns($0, human: human) }) else {
+            return HumanHealthReportCommandResult(
+                humanID: human.id,
+                reportID: reportID,
+                reportType: reportType,
+                didChange: false,
+                persistenceErrorDescription: nil
+            )
+        }
+        for log in linkedLogs {
+            log.sourceReportID = nil
+            CloudSyncMutationRecorder.markModified(log, context: context)
+        }
         CloudSyncMutationRecorder.markDeleted(report, context: context)
         context.delete(report)
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
@@ -291,7 +568,36 @@ enum HumanHealthReportCommandService {
             reportID: reportID,
             reportType: reportType,
             didChange: true,
-            persistenceErrorDescription: nil
+            persistenceErrorDescription: nil,
+            affectedMetricLogIDs: Set(linkedLogs.map(\.id))
+        )
+    }
+
+    private static func linkedMetricLogs(
+        reportID: UUID,
+        context: ModelContext
+    ) throws -> [HumanHealthMetricLog] {
+        try context.fetch(
+            FetchDescriptor<HumanHealthMetricLog>(
+                predicate: #Predicate<HumanHealthMetricLog> { log in
+                    log.sourceReportID == reportID
+                }
+            )
+        )
+    }
+
+    private static func failure(
+        humanID: UUID,
+        reportID: UUID,
+        reportType: String,
+        error: String
+    ) -> HumanHealthReportCommandResult {
+        HumanHealthReportCommandResult(
+            humanID: humanID,
+            reportID: reportID,
+            reportType: reportType,
+            didChange: false,
+            persistenceErrorDescription: error
         )
     }
 }

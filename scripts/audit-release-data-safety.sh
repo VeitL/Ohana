@@ -59,6 +59,7 @@ data_backup_files=(
 shared_container="Ohana/Models/SharedModelContainer.swift"
 local_backup_exclusion="Ohana/Shared/Utilities/LocalBackupExclusionPolicy.swift"
 human_note_attachments="Ohana/Features/HumanNotes/HumanNoteAttachmentStore.swift"
+system_surface_contracts="Ohana/SystemSurfaces/SystemSurfaceContracts.swift"
 human_note_commands="Ohana/Features/HumanNotes/HumanNoteCommands.swift"
 member_deletion_commands="Ohana/Features/Members/MemberDeletionCommands.swift"
 human_note_attachment_tests="OhanaTests/HumanNoteAttachmentLifecycleTests.swift"
@@ -134,6 +135,19 @@ reject_backup_pattern() {
   fi
 }
 
+require_ordered_patterns() {
+  local file="$1"
+  local first="$2"
+  local second="$3"
+  local message="$4"
+  local first_line second_line
+  first_line="$(rg -n -m 1 --pcre2 "$first" "$file" | cut -d: -f1 || true)"
+  second_line="$(rg -n -m 1 --pcre2 "$second" "$file" | cut -d: -f1 || true)"
+  if [[ -z "$first_line" || -z "$second_line" || "$first_line" -ge "$second_line" ]]; then
+    failures+=("$message")
+  fi
+}
+
 # Every persisted SwiftData model must either have a backup DTO contract or a
 # deliberate exemption. This prevents new @Model types from silently falling out
 # of user-owned export/restore coverage.
@@ -157,7 +171,9 @@ backup_contract_entries=(
   "HeatCycleLog|struct HeatCycleLogBackup"
   "Household|struct HouseholdBackup"
   "Human|struct HumanBackup"
+  "HumanHealthCondition|EXEMPT:Human condition details are excluded from externally shareable backups"
   "HumanHealthMetricLog|struct HumanHealthMetricLogBackup"
+  "HumanHealthObservation|EXEMPT:Human health observations are excluded from externally shareable backups"
   "HumanHealthReport|struct HumanHealthReportBackup"
   "HumanNoteRecord|struct HumanNoteRecordBackup"
   "HumanMedication|struct HumanMedicationBackup"
@@ -231,11 +247,21 @@ for entry in "${backup_contract_entries[@]}"; do
     "SwiftData model $model should have a matching backup DTO, or a documented exemption if intentionally excluded."
 done
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV96\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV96 model set."
+latest_schema_version="$(
+  rg -o '^enum ArkSchemaV[0-9]+: VersionedSchema' "$shared_container" |
+    rg -o '[0-9]+' |
+    sort -n |
+    tail -n 1 || true
+)"
+if [[ -z "$latest_schema_version" ]]; then
+  failures+=("SharedModelContainer should declare at least one versioned ArkSchema.")
+else
+  require_pattern "$shared_container" "Schema\\(ArkSchemaV${latest_schema_version}\\.models\\)" \
+    "SharedModelContainer should open the latest declared ArkSchemaV${latest_schema_version} model set."
+fi
 
 require_pattern "$local_backup_exclusion" 'values\.isExcludedFromBackup = true' \
-  "Local persistence must set URLResourceValues.isExcludedFromBackup before storing private data."
+  "Local persistence must apply URLResourceValues.isExcludedFromBackup at protected path creation or open."
 
 require_pattern "$local_backup_exclusion" 'forKeys: \[\.isExcludedFromBackupKey\]' \
   "Local backup exclusion must be read back and verified after it is applied."
@@ -248,6 +274,25 @@ require_pattern "$human_note_attachments" 'LocalBackupExclusionPolicy\.excludeFr
 
 require_pattern "$human_note_attachments" 'LocalBackupExclusionPolicy\.excludeFromDeviceBackup\(url\)' \
   "Human Note attachment files must be excluded after atomic writes."
+
+if ! scripts/audit-system-surface-contract.sh "$system_surface_contracts"; then
+  failures+=("The bounded App Group snapshot must protect and verify its container before writing and its final file after every atomic replacement.")
+fi
+
+if ! scripts/audit-system-surface-reset-fence.sh; then
+  failures+=("The App Reset runtime must fence delayed Widget refreshes, recover after failed persistent deletion, and keep executable regression proof.")
+fi
+
+require_pattern "$app_reset" 'sanitizeForAppReset\(' \
+  "Delete-all Reset must use the observable Widget snapshot sanitization boundary."
+
+require_ordered_patterns "$app_reset" 'try systemSurfaceSnapshotSanitizer\(\)' \
+  'try deletePersistentModels\(' \
+  "Delete-all Reset must sanitize the private Widget projection before deleting the primary store."
+
+require_section_pattern "OhanaWidgets/TodayCareWidget.swift" 'case \.personal:' \
+  'case \.upgradeRequired:' '\.privacySensitive\(\)' \
+  "The Today Care Widget must redact the entire Personal branch on privacy-sensitive system surfaces."
 
 require_pattern "$human_note_commands" 'let attachmentCleanup = cleanDeletedAttachments\(' \
   "Human Note deletion must run attachment cleanup only after its SwiftData commit succeeds."
@@ -282,6 +327,18 @@ require_pattern "$human_note_attachment_tests" 'appResetStoreDeletionFailureLeav
 
 require_pattern "OhanaTests/LocalBackupExclusionPolicyTests.swift" 'marksDirectoriesAndFilesAsExcludedFromDeviceBackup' \
   "Release data safety must test directory and file backup-exclusion resource values."
+
+require_pattern "OhanaTests/SystemSurfaceTests.swift" 'snapshotStoreRoundTripsVersionedValueDataAndReappliesBackupExclusion' \
+  "Release data safety must test backup exclusion on bounded App Group snapshot rewrites."
+
+require_pattern "OhanaTests/SystemSurfaceTests.swift" 'includedValues\.isExcludedFromBackup = false' \
+  "The snapshot rewrite test must clear the prior marker before proving exclusion is reapplied."
+
+require_pattern "OhanaTests/SystemSurfaceTests.swift" 'snapshotResetSanitizationRequiresWriteOrRemovalToSucceed' \
+  "Release data safety must prove Widget Reset sanitization rejects a double failure."
+
+require_pattern "OhanaTests/AppResetServiceTests.swift" 'testResetStopsBeforePersistentDeletionWhenSystemSurfaceSanitizationFails' \
+  "Release data safety must prove a failed Widget sanitization aborts Reset before primary deletion."
 
 require_pattern "$app_reset" 'deletePersistentData: \{ \$0\.deleteAllData\(\) \}' \
   "Delete-all reset must use the full-store deletion boundary so every current and future persisted model is removed."

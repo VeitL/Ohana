@@ -51,6 +51,78 @@ struct ZenStreakView: View {
         subjects.first(where: { $0.id == selectedSubjectID }) ?? subjects.first
     }
 
+    private var selectedPresentationSubject: ZenPresenceSubjectDTO? {
+        guard let selectedSubject else { return nil }
+        if selectedSubject.kind == .plant,
+           let activeSubject = snapshot.subjects.first(where: { $0.id == selectedSubject.id }) {
+            // Active Home snapshots carry the Plant expanded-profile projection,
+            // whose care-day metric already prefers acquiredDate over createdAt.
+            return activeSubject
+        }
+        return selectedSubject
+    }
+
+    private var isPlantSelected: Bool {
+        selectedSubject?.kind == .plant
+    }
+
+    private var selectedSemantic: ZenPresenceRecordSemantic {
+        selectedSubject?.recordSemantic ?? .ownerSafety
+    }
+
+    private var screenTitle: String {
+        switch selectedSemantic {
+        case .ownerSafety:
+            return l.tr(
+                zh: "平安日历",
+                en: "Safety calendar",
+                de: "Bestätigungskalender",
+                es: "Calendario de bienestar",
+                pt: "Calendário de segurança",
+                fr: "Calendrier de confirmation",
+                ja: "無事確認カレンダー",
+                ko: "무사 확인 달력",
+                it: "Calendario di conferma"
+            )
+        case .humanContact:
+            return l.tr(
+                zh: "联系日历",
+                en: "Contact calendar",
+                de: "Kontaktkalender",
+                es: "Calendario de contacto",
+                pt: "Calendário de contato",
+                fr: "Calendrier de contact",
+                ja: "連絡カレンダー",
+                ko: "연락 달력",
+                it: "Calendario dei contatti"
+            )
+        case .petObservation:
+            return l.tr(
+                zh: "观察日历",
+                en: "Observation calendar",
+                de: "Beobachtungskalender",
+                es: "Calendario de observación",
+                pt: "Calendário de observação",
+                fr: "Calendrier d’observation",
+                ja: "観察カレンダー",
+                ko: "관찰 달력",
+                it: "Calendario delle osservazioni"
+            )
+        case .plantObservation:
+            return l.tr(
+                zh: "陪伴日历",
+                en: "Companion calendar",
+                de: "Begleitkalender",
+                es: "Calendario de compañía",
+                pt: "Calendário de companhia",
+                fr: "Calendrier de compagnie",
+                ja: "一緒のカレンダー",
+                ko: "함께한 달력",
+                it: "Calendario insieme"
+            )
+        }
+    }
+
     private var selectedDays: [ZenPresenceDayDTO] {
         guard let subjectID = selectedSubject?.id else { return [] }
         return snapshot.days.filter { $0.subjectID == subjectID }
@@ -65,6 +137,9 @@ struct ZenStreakView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     subjectPicker
                     metrics
+                    if selectedSubject?.isOwner == true {
+                        ownerStreakReassurance
+                    }
                     calendarCard
                     personalAnalyticsAction
                 }
@@ -73,17 +148,7 @@ struct ZenStreakView: View {
                 .padding(.bottom, 28)
             }
         }
-        .navigationTitle(l.tr(
-            zh: "打卡日历",
-            en: "Check-in calendar",
-            de: "Check-in-Kalender",
-            es: "Calendario de check-in",
-            pt: "Calendário de check-in",
-            fr: "Calendrier de check-in",
-            ja: "チェックインカレンダー",
-            ko: "체크인 캘린더",
-            it: "Calendario check-in"
-        ))
+        .navigationTitle(screenTitle)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await actions.onLoadStreak()
@@ -193,7 +258,7 @@ struct ZenStreakView: View {
             metric(
                 value: primaryMetricValue,
                 title: primaryMetricTitle,
-                icon: "flame.fill"
+                icon: isPlantSelected ? "heart.fill" : "flame.fill"
             )
 
             Divider()
@@ -202,7 +267,7 @@ struct ZenStreakView: View {
             metric(
                 value: secondaryMetricValue,
                 title: secondaryMetricTitle,
-                icon: "trophy.fill"
+                icon: isPlantSelected ? "sparkles" : "trophy.fill"
             )
         }
         .padding(.vertical, 4)
@@ -233,19 +298,67 @@ struct ZenStreakView: View {
         .accessibilityElement(children: .combine)
     }
 
+    private var ownerStreakReassurance: some View {
+        Label {
+            Text(l.tr(
+                zh: "连续是节奏，不是惩罚；中断只会开启新一轮，最好记录会保留。",
+                en: "A streak is a rhythm, not a penalty. A missed day simply starts a new round; your best stays.",
+                de: "Eine Serie ist ein Rhythmus, keine Strafe. Eine Pause startet nur eine neue Runde; dein Bestwert bleibt.",
+                es: "La racha es un ritmo, no un castigo. Una pausa solo inicia otra ronda; tu mejor marca permanece.",
+                pt: "A sequência é um ritmo, não uma punição. Uma pausa só inicia outra rodada; seu melhor fica.",
+                fr: "Une série est un rythme, pas une punition. Une pause ouvre simplement un nouveau cycle ; votre record reste.",
+                ja: "連続はリズムであって罰ではありません。途切れても新しい一周が始まり、最高記録は残ります。",
+                ko: "연속 기록은 리듬이지 벌이 아니에요. 쉬어도 새 라운드가 시작될 뿐, 최고 기록은 남아요.",
+                it: "La serie è un ritmo, non una punizione. Una pausa apre solo un nuovo giro; il record resta."
+            ))
+            .font(OhanaFont.caption(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90") // a11y: allow decorative icon; adjacent reassurance text carries the meaning
+                .accessibilityHidden(true)
+                .foregroundStyle(Color.goPrimary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("zen-streak-reassurance")
+    }
+
     private var primaryMetricValue: Int {
-        selectedSubject?.isOwner == true ? snapshot.currentStreak : checkedCount(in: displayedMonth)
+        if isPlantSelected {
+            return selectedPresentationSubject?.plantCompanionDays(calendar: calendar) ?? 1
+        }
+        return selectedSubject?.isOwner == true
+            ? snapshot.currentStreak
+            : checkedCount(in: displayedMonth)
     }
 
     private var secondaryMetricValue: Int {
-        selectedSubject?.isOwner == true ? snapshot.longestStreak : selectedDays.count(where: \.checkedIn)
+        if isPlantSelected {
+            return selectedDays.count(where: \.checkedIn)
+        }
+        return selectedSubject?.isOwner == true
+            ? snapshot.longestStreak
+            : selectedDays.count(where: \.checkedIn)
     }
 
     private var primaryMetricTitle: String {
-        selectedSubject?.isOwner == true
-            ? l.tr(
-                zh: "当前连续",
-                en: "Current streak",
+        switch selectedSemantic {
+        case .plantObservation:
+            return l.tr(
+                zh: "已陪伴天数",
+                en: "Days together",
+                de: "Tage zusammen",
+                es: "Días juntos",
+                pt: "Dias juntos",
+                fr: "Jours ensemble",
+                ja: "一緒にいる日数",
+                ko: "함께한 날",
+                it: "Giorni insieme"
+            )
+        case .ownerSafety:
+            return l.tr(
+                zh: "当前连续确认",
+                en: "Current confirmations",
                 de: "Aktuelle Serie",
                 es: "Racha actual",
                 pt: "Sequência atual",
@@ -254,24 +367,51 @@ struct ZenStreakView: View {
                 ko: "현재 연속 기록",
                 it: "Serie attuale"
             )
-            : l.tr(
-                zh: "本月打卡",
-                en: "This month",
+        case .humanContact:
+            return l.tr(
+                zh: "本月联系",
+                en: "Contacts this month",
+                de: "Kontakte diesen Monat",
+                es: "Contactos este mes",
+                pt: "Contatos neste mês",
+                fr: "Contacts ce mois-ci",
+                ja: "今月の連絡",
+                ko: "이번 달 연락",
+                it: "Contatti del mese"
+            )
+        case .petObservation:
+            return l.tr(
+                zh: "本月观察",
+                en: "Observations this month",
                 de: "Diesen Monat",
                 es: "Este mes",
                 pt: "Este mês",
                 fr: "Ce mois-ci",
-                ja: "今月のチェックイン",
-                ko: "이번 달",
+                ja: "今月の観察",
+                ko: "이번 달 관찰",
                 it: "Questo mese"
             )
+        }
     }
 
     private var secondaryMetricTitle: String {
-        selectedSubject?.isOwner == true
-            ? l.tr(
-                zh: "最长连续",
-                en: "Longest streak",
+        switch selectedSemantic {
+        case .plantObservation, .petObservation:
+            return l.tr(
+                zh: "观察记录",
+                en: "Observations",
+                de: "Beobachtungen",
+                es: "Observaciones",
+                pt: "Observações",
+                fr: "Observations",
+                ja: "観察記録",
+                ko: "관찰 기록",
+                it: "Osservazioni"
+            )
+        case .ownerSafety:
+            return l.tr(
+                zh: "最长连续确认",
+                en: "Longest confirmations",
                 de: "Längste Serie",
                 es: "Racha más larga",
                 pt: "Maior sequência",
@@ -280,17 +420,19 @@ struct ZenStreakView: View {
                 ko: "최장 연속 기록",
                 it: "Serie più lunga"
             )
-            : l.tr(
-                zh: "累计打卡",
-                en: "All check-ins",
-                de: "Alle Check-ins",
-                es: "Todos los check-ins",
-                pt: "Todos os check-ins",
-                fr: "Tous les check-ins",
-                ja: "チェックイン総数",
-                ko: "전체 체크인",
-                it: "Tutti i check-in"
+        case .humanContact:
+            return l.tr(
+                zh: "累计联系",
+                en: "All contacts",
+                de: "Alle Kontakte",
+                es: "Todos los contactos",
+                pt: "Todos os contatos",
+                fr: "Tous les contacts",
+                ja: "連絡の合計",
+                ko: "전체 연락",
+                it: "Tutti i contatti"
             )
+        }
     }
 
     private var calendarCard: some View {
@@ -423,6 +565,7 @@ struct ZenStreakView: View {
                         date: date,
                         day: day,
                         isFuture: calendar.startOfDay(for: date) > calendar.startOfDay(for: Date()),
+                        recordSemantic: selectedSemantic,
                         localization: l,
                         languageCode: appLanguage,
                         cellHeight: calendarCellHeight,
@@ -446,21 +589,52 @@ struct ZenStreakView: View {
     }
 
     private var compactCalendarKey: some View {
-        Text(l.tr(
-            zh: "数字为状态分数 · ◌ 补记不计打卡 · ✓ 仅打卡 · — 未参与",
-            en: "Number = score · ◌ remembered, not checked in · ✓ check-in only · — not participating",
-            de: "Zahl = Wert · ◌ nachgetragen, kein Check-in · ✓ nur Check-in · — nicht teilgenommen",
-            es: "Número = puntuación · ◌ recordado, sin check-in · ✓ solo check-in · — sin participación",
-            pt: "Número = pontuação · ◌ lembrado, sem check-in · ✓ só check-in · — sem participação",
-            fr: "Nombre = score · ◌ ajouté, sans check-in · ✓ check-in seul · — hors participation",
-            ja: "数字＝状態スコア · ◌ 補記（チェックイン外）· ✓ チェックインのみ · — 未参加",
-            ko: "숫자 = 상태 점수 · ◌ 보충 기록(체크인 아님) · ✓ 체크인만 · — 미참여",
-            it: "Numero = punteggio · ◌ annotato, senza check-in · ✓ solo check-in · — non partecipante"
-        ))
+        Text(compactCalendarKeyText)
         .font(OhanaFont.caption2(.semibold))
         .foregroundStyle(Color.ohanaSecondaryText)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("zen-streak-calendar-key")
+    }
+
+    private var compactCalendarKeyText: String {
+        switch selectedSemantic {
+        case .plantObservation, .petObservation:
+            return l.tr(
+                zh: "数字为观察分数 · ◌ 补记观察 · ✓ 当天记录 · — 无观察记录",
+                en: "Number = observation score · ◌ remembered · ✓ recorded that day · — no observation",
+                de: "Zahl = Beobachtungswert · ◌ nachgetragen · ✓ an diesem Tag erfasst · — keine Beobachtung",
+                es: "Número = puntuación observada · ◌ recordado · ✓ registrado ese día · — sin observación",
+                pt: "Número = pontuação observada · ◌ lembrado · ✓ registrado no dia · — sem observação",
+                fr: "Nombre = score observé · ◌ ajouté · ✓ noté ce jour-là · — sans observation",
+                ja: "数字＝観察スコア · ◌ あとから記録 · ✓ 当日の記録 · — 観察記録なし",
+                ko: "숫자 = 관찰 점수 · ◌ 나중에 기록 · ✓ 당일 기록 · — 관찰 기록 없음",
+                it: "Numero = punteggio osservato · ◌ annotato · ✓ registrato quel giorno · — nessuna osservazione"
+            )
+        case .humanContact:
+            return l.tr(
+                zh: "数字为状态分数 · ◌ 补记状态 · ✓ 当天联系 · — 无联系记录",
+                en: "Number = score · ◌ remembered status · ✓ contact that day · — no contact",
+                de: "Zahl = Wert · ◌ Status nachgetragen · ✓ Kontakt an diesem Tag · — kein Kontakt",
+                es: "Número = puntuación · ◌ estado recordado · ✓ contacto ese día · — sin contacto",
+                pt: "Número = pontuação · ◌ status lembrado · ✓ contato no dia · — sem contato",
+                fr: "Nombre = score · ◌ état ajouté · ✓ contact ce jour-là · — sans contact",
+                ja: "数字＝状態スコア · ◌ 状態を補記 · ✓ 当日の連絡 · — 連絡記録なし",
+                ko: "숫자 = 상태 점수 · ◌ 상태 보충 기록 · ✓ 당일 연락 · — 연락 기록 없음",
+                it: "Numero = punteggio · ◌ stato annotato · ✓ contatto del giorno · — nessun contatto"
+            )
+        case .ownerSafety:
+            return l.tr(
+                zh: "数字为状态分数 · ◌ 仅补记状态 · ✓ 当天平安确认 · — 未参与",
+                en: "Number = score · ◌ status note only · ✓ safety confirmed · — not participating",
+                de: "Zahl = Wert · ◌ nur Statusnotiz · ✓ bestätigt · — nicht teilgenommen",
+                es: "Número = puntuación · ◌ solo nota de estado · ✓ confirmado · — sin participación",
+                pt: "Número = pontuação · ◌ só nota de status · ✓ confirmado · — sem participação",
+                fr: "Nombre = score · ◌ simple note d’état · ✓ confirmation · — hors participation",
+                ja: "数字＝状態スコア · ◌ 状態の補記のみ · ✓ 無事確認 · — 未参加",
+                ko: "숫자 = 상태 점수 · ◌ 상태 메모만 · ✓ 무사 확인 · — 미참여",
+                it: "Numero = punteggio · ◌ sola nota di stato · ✓ conferma · — non partecipante"
+            )
+        }
     }
 
     private var personalAnalyticsAction: some View {
@@ -610,6 +784,7 @@ struct ZenStreakView: View {
         let draft = ZenRetrospectiveStatusDraft(
             subjectID: subject.id,
             subjectKind: subject.kind,
+            recordSemantic: subject.recordSemantic,
             subjectName: subject.name,
             dayKey: dayKey,
             date: date,
@@ -640,10 +815,19 @@ private struct ZenCalendarDayCell: View {
     let date: Date
     let day: ZenPresenceDayDTO?
     let isFuture: Bool
+    let recordSemantic: ZenPresenceRecordSemantic
     let localization: L10n
     let languageCode: String
     let cellHeight: CGFloat
     let onSelectRetrospectiveStatus: (() -> Void)?
+
+    private var isPlant: Bool {
+        recordSemantic == .plantObservation
+    }
+
+    private var usesObservationCopy: Bool {
+        recordSemantic == .petObservation || recordSemantic == .plantObservation
+    }
 
     private var fill: Color {
         guard !isFuture else { return Color.clear }
@@ -657,7 +841,7 @@ private struct ZenCalendarDayCell: View {
             return Color.ohanaControlFill
         }
         if effectiveParticipation == .participating {
-            return Color.goRed.opacity(0.16)
+            return isPlant ? Color.ohanaControlFill : Color.goRed.opacity(0.16)
         }
         return Color.ohanaCardSurfaceElevated
     }
@@ -773,72 +957,170 @@ private struct ZenCalendarDayCell: View {
         }
         if day?.checkedIn == true {
             let status = day?.status?.title(localization)
-                ?? localization.tr(
-                    zh: "已打卡",
-                    en: "Checked in",
-                    de: "Eingecheckt",
-                    es: "Check-in hecho",
-                    pt: "Check-in feito",
-                    fr: "Check-in effectué",
-                    ja: "チェックイン済み",
-                    ko: "체크인 완료",
-                    it: "Check-in fatto"
-                )
+                ?? recordedThatDayText
             return "\(dateText), \(status)"
         }
         if day?.isRetrospectiveStatus == true, let status = day?.status {
-            let retrospectiveText = localization.tr(
-                zh: "补记状态，未打卡",
-                en: "Remembered status, not checked in",
-                de: "Status nachgetragen, nicht eingecheckt",
-                es: "Estado recordado, sin check-in",
-                pt: "Estado lembrado, sem check-in",
-                fr: "État ajouté, sans check-in",
-                ja: "状態を補記、チェックインなし",
-                ko: "상태 보충 기록, 체크인 안 함",
-                it: "Stato annotato, senza check-in"
-            )
-            return "\(dateText), \(status.title(localization)), \(retrospectiveText)"
+            return "\(dateText), \(status.title(localization)), \(retrospectiveRecordText)"
         }
         if effectiveParticipation == .notParticipating {
-            let participationText = localization.tr(
-                zh: "未参与",
-                en: "Not participating",
-                de: "Nicht teilgenommen",
-                es: "Sin participación",
-                pt: "Sem participação",
-                fr: "Hors participation",
-                ja: "未参加",
-                ko: "미참여",
-                it: "Non partecipante"
-            )
-            return "\(dateText), \(participationText)"
+            return "\(dateText), \(notParticipatingText)"
         }
-        let missedText = localization.tr(
-            zh: "未打卡",
-            en: "No check-in",
-            de: "Kein Check-in",
-            es: "Sin check-in",
-            pt: "Sem check-in",
-            fr: "Aucun check-in",
-            ja: "チェックインなし",
-            ko: "체크인 없음",
-            it: "Nessun check-in"
+        return "\(dateText), \(missingRecordText)"
+    }
+
+    private var recordedThatDayText: String {
+        switch recordSemantic {
+        case .ownerSafety:
+            return localization.tr(
+                zh: "当天已平安确认", en: "Safety confirmed that day",
+                de: "An diesem Tag bestätigt", es: "Bienestar confirmado ese día",
+                pt: "Segurança confirmada no dia", fr: "Confirmation effectuée ce jour-là",
+                ja: "当日に無事確認済み", ko: "당일 무사 확인됨", it: "Conferma effettuata quel giorno"
+            )
+        case .humanContact:
+            return localization.tr(
+                zh: "当天已联系", en: "Contact recorded that day",
+                de: "Kontakt an diesem Tag", es: "Contacto registrado ese día",
+                pt: "Contato registrado no dia", fr: "Contact noté ce jour-là",
+                ja: "当日に連絡済み", ko: "당일 연락 기록됨", it: "Contatto registrato quel giorno"
+            )
+        case .petObservation, .plantObservation:
+            return localization.tr(
+                zh: "当天已观察", en: "Observed that day",
+                de: "An diesem Tag beobachtet", es: "Observado ese día",
+                pt: "Observado no dia", fr: "Observé ce jour-là",
+                ja: "当日に観察済み", ko: "당일 관찰됨", it: "Osservato quel giorno"
+            )
+        }
+    }
+
+    private var retrospectiveRecordText: String {
+        if usesObservationCopy {
+            return localization.tr(
+                zh: "补记观察，未形成当天记录",
+                en: "Remembered observation, not a same-day record",
+                de: "Beobachtung nachgetragen, kein Eintrag vom selben Tag",
+                es: "Observación recordada, no es un registro del mismo día",
+                pt: "Observação lembrada, não é um registro do mesmo dia",
+                fr: "Observation ajoutée, pas une note du jour même",
+                ja: "あとから観察を記録、当日の記録ではありません",
+                ko: "나중에 관찰을 기록함, 당일 기록은 아님",
+                it: "Osservazione annotata, non registrata lo stesso giorno"
+            )
+        }
+        if recordSemantic == .humanContact {
+            return localization.tr(
+                zh: "补记状态，不代表当天联系", en: "Remembered status, not same-day contact",
+                de: "Status nachgetragen, kein Kontakt am selben Tag",
+                es: "Estado recordado, no es contacto del mismo día",
+                pt: "Status lembrado, não é contato no mesmo dia",
+                fr: "État ajouté, pas un contact du jour même",
+                ja: "状態を補記、当日の連絡ではありません",
+                ko: "상태 보충 기록, 당일 연락은 아님",
+                it: "Stato annotato, non è un contatto dello stesso giorno"
+            )
+        }
+        return localization.tr(
+            zh: "补记状态，不代表当天平安确认", en: "Remembered status, not a safety confirmation",
+            de: "Status nachgetragen, keine Bestätigung", es: "Estado recordado, no es una confirmación",
+            pt: "Status lembrado, não é uma confirmação", fr: "État ajouté, pas une confirmation",
+            ja: "状態を補記、当日の無事確認ではありません",
+            ko: "상태 보충 기록, 당일 무사 확인은 아님",
+            it: "Stato annotato, non è una conferma"
         )
-        return "\(dateText), \(missedText)"
+    }
+
+    private var notParticipatingText: String {
+        if usesObservationCopy {
+            return localization.tr(
+                zh: "未参与观察", en: "Not participating in observations",
+                de: "Keine Beobachtungsteilnahme", es: "Sin participación en observaciones",
+                pt: "Sem participação em observações", fr: "Hors période d’observation",
+                ja: "観察に未参加", ko: "관찰 미참여", it: "Fuori dal periodo di osservazione"
+            )
+        }
+        return localization.tr(
+            zh: "未参与",
+            en: "Not participating",
+            de: "Nicht teilgenommen",
+            es: "Sin participación",
+            pt: "Sem participação",
+            fr: "Hors participation",
+            ja: "未参加",
+            ko: "미참여",
+            it: "Non partecipante"
+        )
+    }
+
+    private var missingRecordText: String {
+        switch recordSemantic {
+        case .ownerSafety:
+            return localization.tr(
+                zh: "未确认平安", en: "Safety not confirmed",
+                de: "Nicht bestätigt", es: "Bienestar sin confirmar",
+                pt: "Segurança não confirmada", fr: "Confirmation absente",
+                ja: "無事未確認", ko: "무사 미확인", it: "Conferma assente"
+            )
+        case .humanContact:
+            return localization.tr(
+                zh: "无联系记录", en: "No contact recorded",
+                de: "Kein Kontakt erfasst", es: "Sin contacto registrado",
+                pt: "Nenhum contato registrado", fr: "Aucun contact noté",
+                ja: "連絡記録なし", ko: "연락 기록 없음", it: "Nessun contatto registrato"
+            )
+        case .petObservation, .plantObservation:
+            return localization.tr(
+                zh: "未记录观察",
+                en: "No observation recorded",
+                de: "Keine Beobachtung erfasst",
+                es: "Sin observación registrada",
+                pt: "Nenhuma observação registrada",
+                fr: "Aucune observation notée",
+                ja: "観察記録なし",
+                ko: "관찰 기록 없음",
+                it: "Nessuna osservazione registrata"
+            )
+        }
     }
 
     private var retrospectiveAccessibilityHint: String {
-        localization.tr(
-            zh: "轻点补记或修改状态分数；不会恢复打卡或连续天数",
-            en: "Tap to remember or edit a score; this will not restore the check-in or streak",
-            de: "Tippen, um einen Wert nachzutragen; Check-in und Serie werden nicht wiederhergestellt",
-            es: "Toca para recordar o editar una puntuación; no restaurará el check-in ni la racha",
-            pt: "Toque para lembrar ou editar uma pontuação; isso não restaura o check-in nem a sequência",
-            fr: "Touchez pour ajouter ou modifier un score ; le check-in et la série ne seront pas restaurés",
-            ja: "タップして状態を補記・変更します。チェックインや連続記録は戻りません",
-            ko: "탭하여 점수를 보충 기록하거나 수정하세요. 체크인이나 연속 기록은 복원되지 않아요",
-            it: "Tocca per annotare o modificare un punteggio; check-in e serie non verranno ripristinati"
+        if usesObservationCopy {
+            return localization.tr(
+                zh: "轻点补记或修改观察分数；不会变成当天记录或产生椰子奖励",
+                en: "Tap to remember or edit an observation score; it will not become a same-day record or earn coconut rewards",
+                de: "Tippen, um einen Beobachtungswert nachzutragen; daraus wird kein Tageseintrag und es gibt keine Kokosnuss-Belohnung",
+                es: "Toca para recordar o editar una observación; no será un registro del mismo día ni dará cocos",
+                pt: "Toque para lembrar ou editar uma observação; ela não vira registro do mesmo dia nem gera cocos",
+                fr: "Touchez pour ajouter ou modifier une observation ; elle ne deviendra pas une note du jour et ne donnera pas de noix de coco",
+                ja: "タップして観察スコアを補記・変更します。当日の記録やココナッツ報酬にはなりません",
+                ko: "탭하여 관찰 점수를 나중에 기록하거나 수정하세요. 당일 기록이나 코코넛 보상이 되지는 않아요",
+                it: "Tocca per annotare o modificare un’osservazione; non diventa una registrazione del giorno e non dà ricompense in cocco"
+            )
+        }
+        if recordSemantic == .humanContact {
+            return localization.tr(
+                zh: "轻点补记或修改状态分数；不会变成当天联系记录或产生椰子奖励",
+                en: "Tap to remember or edit a score; it will not become same-day contact or earn coconut rewards",
+                de: "Tippen, um einen Wert nachzutragen; daraus wird kein Kontakt und es gibt keine Belohnung",
+                es: "Toca para recordar una puntuación; no será contacto del mismo día ni dará cocos",
+                pt: "Toque para lembrar uma pontuação; ela não vira contato do dia nem gera cocos",
+                fr: "Touchez pour ajouter un score ; il ne deviendra pas un contact du jour et ne donnera pas de récompense",
+                ja: "状態を補記・変更します。当日の連絡や報酬にはなりません",
+                ko: "상태 점수를 보충 기록해도 당일 연락이나 보상이 되지 않아요",
+                it: "Tocca per annotare un punteggio; non diventa un contatto del giorno e non dà ricompense"
+            )
+        }
+        return localization.tr(
+            zh: "轻点补记或修改状态分数；不会恢复平安确认、连续天数或椰子奖励",
+            en: "Tap to remember or edit a score; this will not restore the safety confirmation, streak, or rewards",
+            de: "Tippen, um einen Wert nachzutragen; Bestätigung, Serie und Belohnung werden nicht wiederhergestellt",
+            es: "Toca para recordar una puntuación; no restaurará la confirmación, la racha ni las recompensas",
+            pt: "Toque para lembrar uma pontuação; isso não restaura a confirmação, a sequência nem recompensas",
+            fr: "Touchez pour ajouter un score ; confirmation, série et récompenses ne seront pas restaurées",
+            ja: "状態を補記しても、無事確認・連続記録・報酬は戻りません",
+            ko: "상태 점수를 보충 기록해도 무사 확인, 연속 기록, 보상은 복원되지 않아요",
+            it: "Tocca per annotare un punteggio; conferma, serie e ricompense non verranno ripristinate"
         )
     }
 }
@@ -846,18 +1128,16 @@ private struct ZenCalendarDayCell: View {
 private struct ZenRetrospectiveStatusDraft: Identifiable, Equatable {
     let subjectID: String
     let subjectKind: ZenPresenceSubjectKind
+    let recordSemantic: ZenPresenceRecordSemantic
     let subjectName: String
     let dayKey: String
     let date: Date
     let initialScore: Int
-
     var id: String { "\(subjectKind.rawValue):\(subjectID):\(dayKey)" }
 }
-
 private struct ZenRetrospectiveStatusSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     let draft: ZenRetrospectiveStatusDraft
     let localization: L10n
     let languageCode: String
@@ -881,6 +1161,130 @@ private struct ZenRetrospectiveStatusSheet: View {
 
     private var selectedScore: Int { Int(score.rounded()) }
     private var selectedStatus: ZenPresenceStatus { ZenPresenceStatus(score: selectedScore) }
+    private var usesObservationCopy: Bool {
+        draft.recordSemantic == .petObservation || draft.recordSemantic == .plantObservation
+    }
+
+    private var scoreAccessibilityLabel: String {
+        if usesObservationCopy {
+            return localization.tr(
+                zh: "观察分数",
+                en: "Observation score",
+                de: "Beobachtungswert",
+                es: "Puntuación de observación",
+                pt: "Pontuação da observação",
+                fr: "Score d’observation",
+                ja: "観察スコア",
+                ko: "관찰 점수",
+                it: "Punteggio di osservazione"
+            )
+        }
+        return localization.tr(
+            zh: "状态分数",
+            en: "Status score",
+            de: "Statuswert",
+            es: "Puntuación de estado",
+            pt: "Pontuação de estado",
+            fr: "Score d’état",
+            ja: "状態スコア",
+            ko: "상태 점수",
+            it: "Punteggio di stato"
+        )
+    }
+
+    private var retrospectiveExplanation: String {
+        if usesObservationCopy {
+            return localization.tr(
+                zh: "这是补记观察，不会变成当天记录，也不会产生椰子奖励。",
+                en: "This is a remembered observation. It will not become a same-day record or earn coconut rewards.",
+                de: "Dies ist eine nachgetragene Beobachtung. Sie wird kein Tageseintrag und bringt keine Kokosnuss-Belohnung.",
+                es: "Es una observación recordada. No será un registro del mismo día ni dará recompensas de cocos.",
+                pt: "Esta é uma observação lembrada. Ela não vira um registro do mesmo dia nem gera recompensas de cocos.",
+                fr: "C’est une observation ajoutée. Elle ne deviendra pas une note du jour et ne donnera pas de noix de coco.",
+                ja: "これはあとから追加する観察です。当日の記録やココナッツ報酬にはなりません。",
+                ko: "나중에 추가하는 관찰 기록입니다. 당일 기록이나 코코넛 보상이 되지는 않아요.",
+                it: "È un’osservazione annotata in seguito. Non diventa una registrazione del giorno e non dà ricompense in cocco."
+            )
+        }
+        if draft.recordSemantic == .humanContact {
+            return localization.tr(
+                zh: "这是补记状态，不会变成当天联系记录，也不会产生椰子奖励。",
+                en: "This remembers a status. It will not become same-day contact or earn coconut rewards.",
+                de: "Dies ist ein nachgetragener Status. Er wird kein Kontakt und bringt keine Belohnung.",
+                es: "Es un estado recordado. No será contacto del mismo día ni dará cocos.",
+                pt: "Este é um status lembrado. Ele não vira contato do dia nem gera cocos.",
+                fr: "C’est un état ajouté. Il ne deviendra pas un contact du jour et ne donnera pas de récompense.",
+                ja: "状態の補記です。当日の連絡やココナッツ報酬にはなりません。",
+                ko: "상태 보충 기록입니다. 당일 연락이나 코코넛 보상이 되지는 않아요.",
+                it: "È uno stato annotato. Non diventa un contatto del giorno e non dà ricompense."
+            )
+        }
+        return localization.tr(
+            zh: "这是补记状态，不会恢复当天平安确认、连续天数或椰子奖励。",
+            en: "This remembers a status. It will not restore that day’s safety confirmation, streak, or coconut rewards.",
+            de: "Dies ist ein nachgetragener Status. Bestätigung, Serie und Belohnung werden nicht wiederhergestellt.",
+            es: "Es un estado recordado. No restaurará la confirmación, la racha ni las recompensas.",
+            pt: "Este é um status lembrado. Ele não restaura a confirmação, a sequência nem recompensas.",
+            fr: "C’est un état ajouté. Il ne restaure ni la confirmation, ni la série, ni les récompenses.",
+            ja: "状態の補記です。その日の無事確認、連続記録、報酬は戻りません。",
+            ko: "상태 보충 기록입니다. 당일 무사 확인, 연속 기록, 보상은 복원되지 않아요.",
+            it: "È uno stato annotato. Non ripristina conferma, serie o ricompense."
+        )
+    }
+
+    private var saveLabel: String {
+        if usesObservationCopy {
+            return localization.tr(
+                zh: "保存观察",
+                en: "Save observation",
+                de: "Beobachtung speichern",
+                es: "Guardar observación",
+                pt: "Salvar observação",
+                fr: "Enregistrer l’observation",
+                ja: "観察を保存",
+                ko: "관찰 저장",
+                it: "Salva osservazione"
+            )
+        }
+        return localization.tr(
+            zh: "保存补记",
+            en: "Save remembered status",
+            de: "Nachtrag speichern",
+            es: "Guardar estado recordado",
+            pt: "Salvar estado lembrado",
+            fr: "Enregistrer l’état ajouté",
+            ja: "補記を保存",
+            ko: "보충 기록 저장",
+            it: "Salva stato annotato"
+        )
+    }
+
+    private var navigationTitle: String {
+        if usesObservationCopy {
+            return localization.tr(
+                zh: "补记观察",
+                en: "Remember an observation",
+                de: "Beobachtung nachtragen",
+                es: "Recordar una observación",
+                pt: "Lembrar uma observação",
+                fr: "Ajouter une observation",
+                ja: "観察を補記",
+                ko: "관찰 보충 기록",
+                it: "Annota un’osservazione"
+            )
+        }
+        return localization.tr(
+            zh: "补记状态",
+            en: "Remember a status",
+            de: "Status nachtragen",
+            es: "Recordar un estado",
+            pt: "Lembrar um estado",
+            fr: "Ajouter un état",
+            ja: "状態を補記",
+            ko: "상태 보충 기록",
+            it: "Annota uno stato"
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -911,33 +1315,13 @@ private struct ZenRetrospectiveStatusSheet: View {
 
                     Slider(value: $score, in: 1 ... 10, step: 1)
                         .tint(selectedStatus.zenColor)
-                        .accessibilityLabel(localization.tr(
-                            zh: "状态分数",
-                            en: "Status score",
-                            de: "Statuswert",
-                            es: "Puntuación de estado",
-                            pt: "Pontuação de estado",
-                            fr: "Score d’état",
-                            ja: "状態スコア",
-                            ko: "상태 점수",
-                            it: "Punteggio di stato"
-                        ))
+                        .accessibilityLabel(scoreAccessibilityLabel)
                         .accessibilityValue("\(selectedScore)/10")
                 }
                 .animation(reduceMotion ? GoMotion.reduced : GoMotion.quick, value: selectedScore)
 
                 Label {
-                    Text(localization.tr(
-                        zh: "这是补记，不会恢复当天打卡、连续天数或椰子奖励。",
-                        en: "This is a remembered note. It will not restore that day’s check-in, streak, or coconut rewards.",
-                        de: "Dies ist ein Nachtrag. Check-in, Serie und Kokosnuss-Belohnungen werden nicht wiederhergestellt.",
-                        es: "Es una nota recordada. No restaurará el check-in, la racha ni las recompensas de cocos.",
-                        pt: "Esta é uma anotação lembrada. Ela não restaura o check-in, a sequência nem recompensas de cocos.",
-                        fr: "C’est un ajout rétrospectif. Il ne restaure ni le check-in, ni la série, ni les récompenses en noix de coco.",
-                        ja: "これは補記です。その日のチェックイン、連続記録、ココナッツ報酬は戻りません。",
-                        ko: "이 기록은 보충 메모입니다. 해당 날짜의 체크인, 연속 기록, 코코넛 보상은 복원되지 않아요.",
-                        it: "È un’annotazione retrospettiva. Non ripristina check-in, serie o ricompense in cocco."
-                    ))
+                    Text(retrospectiveExplanation)
                     .font(OhanaFont.footnote(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -961,17 +1345,7 @@ private struct ZenRetrospectiveStatusSheet: View {
                                 .controlSize(.small)
                                 .tint(Color.ohanaPrimaryActionText)
                         }
-                        Text(localization.tr(
-                            zh: "保存补记",
-                            en: "Save remembered status",
-                            de: "Nachtrag speichern",
-                            es: "Guardar estado recordado",
-                            pt: "Salvar estado lembrado",
-                            fr: "Enregistrer l’état ajouté",
-                            ja: "補記を保存",
-                            ko: "보충 기록 저장",
-                            it: "Salva stato annotato"
-                        ))
+                        Text(saveLabel)
                             .font(OhanaFont.callout(.bold))
                     }
                     .frame(maxWidth: .infinity, minHeight: 50)
@@ -985,17 +1359,7 @@ private struct ZenRetrospectiveStatusSheet: View {
             .padding(.horizontal, 18)
             .padding(.top, 10)
             .padding(.bottom, 18)
-            .navigationTitle(localization.tr(
-                zh: "补记状态",
-                en: "Remember a status",
-                de: "Status nachtragen",
-                es: "Recordar un estado",
-                pt: "Lembrar um estado",
-                fr: "Ajouter un état",
-                ja: "状態を補記",
-                ko: "상태 보충 기록",
-                it: "Annota uno stato"
-            ))
+            .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

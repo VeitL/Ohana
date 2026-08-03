@@ -68,7 +68,6 @@ struct CrewRosterProfilePanel: View {
     @State private var humanAvatarCacheKey = "crew-roster-profile-human-avatar-empty"
     @State private var avatarImageRevision = 0
 
-    private let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
     private let bloodTypeOptions = ["未填写", "A", "B", "AB", "O"]
     private let mbtiOptions = ["未填写", "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]
 
@@ -82,6 +81,15 @@ struct CrewRosterProfilePanel: View {
     }
 
     private var l: L10n { L10n(appLanguage) }
+    private var speciesOptions: [String] {
+        var options = Pet.canonicalSpeciesOptions
+        if !species.isEmpty, !options.contains(species) {
+            options.append(species)
+        }
+        return l.sortedCatalogKeys(options, otherKey: "other") {
+            Pet.localizedSpeciesName($0, l: l)
+        }
+    }
     private var detailReveal: CGFloat { min(max(detailProgress, 0), 1) }
     private var controlReveal: CGFloat { WalletHeroTimeline.smooth(detailProgress, 0.12, 0.34) }
     private var summarySnapshot: CrewRosterProfileSummarySnapshot {
@@ -299,7 +307,10 @@ extension CrewRosterProfilePanel {
         VStack(spacing: 12) {
             profileSection(l.tr(zh: "身份", en: "Identity", de: "Identitaet"), icon: "pawprint.fill") {
                 infoRow(l.tr(zh: "物种", en: "Species", de: "Art"), emptyText(pet.localizedSpeciesName(l: l)))
-                infoRow(l.tr(zh: "品种", en: "Breed", de: "Rasse"), emptyText(pet.breed))
+                infoRow(
+                    l.tr(zh: "品种", en: "Breed", de: "Rasse"),
+                    pet.breed.isEmpty ? localizedEmptyValue : l.resourceName(pet.breed)
+                )
                 infoRow(l.tr(zh: "年龄", en: "Age", de: "Alter"), pet.hasPassedAway ? pet.ageAtPassingText : pet.ageText)
                 infoRow(l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), petGenderSummary(pet))
                 infoRow(l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"), "#\(pet.safeThemeColorHex.uppercased())")
@@ -341,8 +352,18 @@ extension CrewRosterProfilePanel {
                 infoRow("MBTI", human.mbti.isEmpty ? localizedEmptyValue : human.mbti.uppercased())
             }
             profileSection(l.tr(zh: "家庭", en: "Family", de: "Familie"), icon: "house.fill") {
-                infoRow(l.tr(zh: "国籍", en: "Nationality", de: "Nationalitaet"), emptyText(human.nationality))
-                infoRow(l.tr(zh: "现居地", en: "Current city", de: "Aktueller Ort"), emptyText(human.city))
+                infoRow(
+                    l.tr(zh: "国籍", en: "Nationality", de: "Nationalitaet"),
+                    human.nationality.isEmpty
+                        ? localizedEmptyValue
+                        : PetBreedDatabase.localizedRegionName(human.nationality, l: l)
+                )
+                infoRow(
+                    l.tr(zh: "现居地", en: "Residence", de: "Wohnort"),
+                    human.city.isEmpty
+                        ? localizedEmptyValue
+                        : MemberResidenceValue(storedValue: human.city).localized(l: l)
+                )
                 if HumanLocalPrivacyPolicy.isEnabled {
                     infoRow(l.tr(zh: "隐私项目", en: "Private fields", de: "Private Felder"), privacySummary(for: human))
                 }
@@ -392,7 +413,13 @@ extension CrewRosterProfilePanel {
     private var petEditContent: some View {
         VStack(spacing: 10) {
             CrewRosterEditorTextField(title: l.tr(zh: "名字", en: "Name", de: "Name"), text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterEditorMenuRow(title: l.tr(zh: "物种", en: "Species", de: "Art"), icon: "pawprint.fill", selection: $species, options: speciesOptions)
+            CrewRosterEditorMenuRow(
+                title: l.tr(zh: "物种", en: "Species", de: "Art"),
+                icon: "pawprint.fill",
+                selection: $species,
+                options: speciesOptions,
+                optionTitle: { Pet.localizedSpeciesName($0, l: l) }
+            )
             CrewRosterEditorTextField(title: l.tr(zh: "品种", en: "Breed", de: "Rasse"), text: $breed, icon: "tag.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             CrewRosterEditorSegmentedRow(title: l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), selection: $gender, options: [
                 ("male", l.tr(zh: "男孩", en: "Boy", de: "Junge")),
@@ -724,7 +751,7 @@ extension CrewRosterProfilePanel {
             avatarImageData = includeAvatarData ? pet.avatarImageData : nil
             avatarImageRevision &+= 1
             avatarEmoji = pet.avatarEmoji
-            species = pet.species.isEmpty ? "其他" : pet.species
+            species = Pet.normalizedSpeciesStorageValue(pet.species)
             breed = pet.breed
             gender = pet.gender.isEmpty ? "unknown" : pet.gender
             isNeutered = pet.isNeutered

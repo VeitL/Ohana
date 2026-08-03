@@ -18,8 +18,8 @@ Do not copy or casually fork them into another persona.
 
 - Simulator: exactly `iPhone 17 Dogfood`, pinned by UDID in the ignored local
   file `.build/dogfood-simulator.udid`.
-- Build: unsigned Simulator `Release`, overlaid from the fixed
-  `.build/DerivedData/dogfood` lane.
+- Build: unsigned Simulator `Release`, overlaid from the fixed `dogfood` cache
+  lane outside the source tree printed by `scripts/run-dogfood-simulator.sh`.
 - App identity: `com.guanchen.li.Ohana`.
 - Data: one long-lived logical app data set and SwiftData store. CoreSimulator
   may remount it under a new data-container UUID during an overlay; the launcher

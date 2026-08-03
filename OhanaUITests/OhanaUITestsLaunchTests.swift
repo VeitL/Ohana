@@ -45,7 +45,7 @@ final class OhanaUITestsLaunchTests: XCTestCase {
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Cold launch - first meaningful onboarding screen"
-        attachment.lifetime = .keepAlways
+        attachment.lifetime = .deleteOnSuccess
         add(attachment)
     }
 }

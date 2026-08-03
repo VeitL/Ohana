@@ -6,9 +6,11 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct ShopManualRecoveryTests {
-    @Test func manualRefundWaitsForOriginalPayerThenRefundsExactlyOnce() throws {
+    @Test func legacyRefundReasonFulfillsWithoutPayerOrRefund() throws {
         let container = try makeContainer()
         let context = container.mainContext
+        let (name, defaults) = try isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
         let item = try #require(ShopCatalog.item(id: "boost_backdate_pack"))
         let payer = Human(name: "Original payer")
         payer.coconutBalance = 0
@@ -26,34 +28,23 @@ struct ShopManualRecoveryTests {
         context.insert(attempt)
         try context.save()
 
-        let services = AppServices(modelContainer: container)
+        let inventory = UserDefaultsShopInventoryManager(defaults: defaults)
+        let base = AppServices(modelContainer: container)
+        let services = appServices(base: base, replacingInventoryWith: inventory)
         services.questManager.coconutCount = 0
         services.questManager.coconutLogs = []
 
-        let blocked = ShopPurchaseRecoveryService.retryManualReview(
-            itemID: item.id,
-            context: context,
-            services: services
-        )
-
-        #expect(blocked.disposition == .stillNeedsAttention)
-        #expect(blocked.reasonCode == "missingOrFrozenRefundRecipient")
-        #expect(attempt.state == .manualReview)
-        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
-
-        context.insert(payer)
-        try context.save()
         let recovered = ShopPurchaseRecoveryService.retryManualReview(
             itemID: item.id,
             context: context,
             services: services
         )
 
-        #expect(recovered.disposition == .refunded)
-        #expect(attempt.state == .refunded)
-        #expect(payer.coconutBalance == item.cost)
-        var walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
-        #expect(walletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 1)
+        #expect(recovered.disposition == .fulfilled)
+        #expect(attempt.state == .fulfilled)
+        #expect(inventory.consumableSnapshot().backdatePassCount == 3)
+        #expect(payer.coconutBalance == 0)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
 
         let repeated = ShopPurchaseRecoveryService.retryManualReview(
             itemID: item.id,
@@ -63,9 +54,9 @@ struct ShopManualRecoveryTests {
 
         #expect(repeated.disposition == .stillNeedsAttention)
         #expect(repeated.reasonCode == "manualReviewAttemptUnavailable")
-        #expect(payer.coconutBalance == item.cost)
-        walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
-        #expect(walletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 1)
+        #expect(payer.coconutBalance == 0)
+        #expect(inventory.consumableSnapshot().backdatePassCount == 3)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 
     @Test func manualFulfillmentReusesOutboxWithoutAnotherDebit() throws {
@@ -112,20 +103,24 @@ struct ShopManualRecoveryTests {
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 
-    @Test func invalidFundingSnapshotIsRebuiltOnlyFromTheOriginalDebitLedger() throws {
+    @Test func invalidLegacyFundingSnapshotCannotReverseACompletedPurchase() throws {
         let container = try makeContainer()
         let context = container.mainContext
-        let item = try #require(ShopCatalog.item(id: "boost_backdate_pack"))
+        let (name, defaults) = try isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        let item = try #require(ShopCatalog.item(id: "boost_streak"))
         let buyer = Human(name: "Buyer")
         buyer.coconutBalance = item.cost
         context.insert(buyer)
         try context.save()
 
-        let services = AppServices(modelContainer: container)
+        let inventory = UserDefaultsShopInventoryManager(defaults: defaults)
+        let base = AppServices(modelContainer: container)
+        let services = appServices(base: base, replacingInventoryWith: inventory)
         let purchase = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: buyer,
-            itemName: "Backdate Pack",
+            itemName: "Streak Shield",
             context: context,
             questManager: services.questManager,
             wallet: services.coconutWallet,
@@ -150,19 +145,20 @@ struct ShopManualRecoveryTests {
             services: services
         )
 
-        #expect(result.disposition == .refunded)
-        #expect(attempt.state == .refunded)
-        #expect(buyer.coconutBalance == item.cost)
-        let rebuilt = try JSONDecoder().decode(
+        #expect(result.disposition == .fulfilled)
+        #expect(attempt.state == .fulfilled)
+        #expect(buyer.coconutBalance == 0)
+        #expect(inventory.consumableSnapshot().streakShieldExpiry != nil)
+        let retainedSnapshot = try JSONDecoder().decode(
             [ShopPurchaseFundingContribution].self,
             from: Data(attempt.fundingContributionsJSON.utf8)
         )
-        #expect(rebuilt == [
-            ShopPurchaseFundingContribution(humanID: buyer.id, amount: item.cost)
+        #expect(retainedSnapshot == [
+            ShopPurchaseFundingContribution(humanID: buyer.id, amount: item.cost + 1)
         ])
         let entries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         #expect(entries.count(where: { $0.source == .shop && $0.delta < 0 }) == 1)
-        #expect(entries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 1)
+        #expect(entries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 0)
     }
 
     @Test func legacyFulfillingInventoryAttemptStopsWithoutDuplicateGrantOrRefund() throws {
@@ -232,6 +228,37 @@ struct ShopManualRecoveryTests {
         #expect(attempt.state == .manualReview)
         #expect(attempt.lastError == "legacyUnknownFailure")
         #expect(try context.fetchCount(FetchDescriptor<ShopPurchaseAttempt>()) == 1)
+    }
+
+    @Test func legacyNonconsumableOutboxCompletesOwnershipWithoutAnotherDebit() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let item = try #require(ShopCatalog.item(id: "fx_stars"))
+        let buyer = Human(name: "Buyer")
+        buyer.coconutBalance = 0
+        let attempt = ShopPurchaseAttempt(
+            transactionKey: "shop:\(item.id):\(buyer.id.uuidString):legacy-owned",
+            itemId: item.id,
+            buyerHumanId: buyer.id.uuidString,
+            price: item.cost,
+            state: .manualReview,
+            lastError: "unsupportedFulfillmentKind"
+        )
+        context.insert(buyer)
+        context.insert(attempt)
+        try context.save()
+
+        let result = ShopPurchaseRecoveryService.retryManualReview(
+            itemID: item.id,
+            context: context,
+            services: AppServices(modelContainer: container)
+        )
+
+        #expect(result.disposition == .fulfilled)
+        #expect(attempt.state == .fulfilled)
+        #expect(try ShopPurchaseRecordStore.isOwned(itemID: item.id, context: context))
+        #expect(buyer.coconutBalance == 0)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 
     @Test func activeAttemptQuerySkipsNewerSettledAttemptWithoutChargingAgain() throws {

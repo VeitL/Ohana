@@ -11,6 +11,8 @@ nonisolated enum ShopPurchaseReadiness: Equatable {
     case loading
     case missingBuyer
     case walletFrozen
+    case requiresActivePet
+    case requiresActiveDog
     case insufficient(missing: Int)
     case ready
 
@@ -29,9 +31,70 @@ nonisolated enum ShopPurchaseReadiness: Equatable {
     }
 }
 
+nonisolated struct ShopFundingMemberSnapshot: Equatable, Sendable {
+    let id: UUID
+    let name: String
+    let createdAt: Date
+    let balance: Int
+}
+
+nonisolated struct ShopFundingPreviewLine: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let name: String
+    let amount: Int
+    let isPrimary: Bool
+}
+
+nonisolated enum ShopFundingPreviewPolicy {
+    static func lines(
+        cost: Int,
+        primaryID: UUID?,
+        members: [ShopFundingMemberSnapshot]
+    ) -> [ShopFundingPreviewLine] {
+        guard cost > 0,
+              let primaryID,
+              let primary = members.first(where: { $0.id == primaryID }) else {
+            return []
+        }
+        var remaining = cost
+        var result: [ShopFundingPreviewLine] = []
+
+        let primaryAmount = min(remaining, max(0, primary.balance))
+        if primaryAmount > 0 {
+            result.append(.init(
+                id: primary.id,
+                name: primary.name,
+                amount: primaryAmount,
+                isPrimary: true
+            ))
+            remaining -= primaryAmount
+        }
+
+        let supporters = members
+            .filter { $0.id != primaryID }
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt < rhs.createdAt
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+        for member in supporters where remaining > 0 {
+            let amount = min(remaining, max(0, member.balance))
+            guard amount > 0 else { continue }
+            result.append(.init(
+                id: member.id,
+                name: member.name,
+                amount: amount,
+                isPrimary: false
+            ))
+            remaining -= amount
+        }
+        return result
+    }
+}
+
 nonisolated enum ShopPurchaseSettlementState: Equatable, Sendable {
     case pending
-    case refunding
     case needsAttention
 }
 
@@ -39,9 +102,17 @@ nonisolated enum ShopManualRecoveryActionPolicy {
     static func canRetry(reasonCode: String?) -> Bool {
         switch reasonCode {
         case "catalogItemMissing",
+             "catalogPriceChanged",
+             "unsupportedFulfillmentKind",
              "missingFundingSnapshot",
              "invalidFundingSnapshot",
              "missingOrFrozenRefundRecipient",
+             "invalidPurchaseSnapshot",
+             "fulfillmentRejected",
+             "streakFulfillmentExpired",
+             "appIconApplyFailed",
+             "appIconRecoveryMismatch",
+             "legacyRefundConvertedToFulfillment",
              "manualRecoveryPersistenceFailed":
             true
         default:
@@ -101,7 +172,7 @@ struct CoconutShopView: View {
     @State var exchangeNote = ""
 
     init(
-        initialCategory: ShopItem.ShopCategory = .appIcon,
+        initialCategory: ShopItem.ShopCategory = .effect,
         humans: [Human] = [],
         pets: [Pet] = [],
         purchaseRecords: [ShopPurchaseRecord] = [],
@@ -131,7 +202,7 @@ struct CoconutShopView: View {
         self.retryDataLoad = retryDataLoad
         self.refreshData = refreshData
         self.retryPurchaseRecovery = retryPurchaseRecovery
-        _selectedCategory = State(initialValue: initialCategory.isVisibleInFirstRelease ? initialCategory : .appIcon)
+        _selectedCategory = State(initialValue: initialCategory.isVisibleInFirstRelease ? initialCategory : .effect)
     }
 
     enum ShopPicker: Identifiable {
@@ -179,7 +250,7 @@ struct CoconutShopView: View {
     }
 
     var effectiveSelectedCategory: ShopItem.ShopCategory {
-        selectedCategory.isVisibleInFirstRelease ? selectedCategory : .appIcon
+        selectedCategory.isVisibleInFirstRelease ? selectedCategory : .effect
     }
 
     var selectedActiveHuman: Human? {
@@ -218,6 +289,21 @@ struct CoconutShopView: View {
         activeHumans.reduce(0) { partial, human in
             partial + max(0, humanBalances[human.id] ?? human.coconutBalance)
         }
+    }
+
+    func fundingPreview(for item: ShopItem) -> [ShopFundingPreviewLine] {
+        ShopFundingPreviewPolicy.lines(
+            cost: item.cost,
+            primaryID: currentHuman?.id,
+            members: activeHumans.map {
+                ShopFundingMemberSnapshot(
+                    id: $0.id,
+                    name: $0.name,
+                    createdAt: $0.createdAt,
+                    balance: max(0, humanBalances[$0.id] ?? $0.coconutBalance)
+                )
+            }
+        )
     }
 
     var exchangeOptions: [CoconutExchangeOption] {
@@ -367,7 +453,7 @@ struct CoconutShopView: View {
         }
         .onAppear {
             if !selectedCategory.isVisibleInFirstRelease {
-                selectedCategory = .appIcon
+                selectedCategory = .effect
             }
             selectedAppIcon = appServices.appIcons.currentDescriptor.itemId
         }

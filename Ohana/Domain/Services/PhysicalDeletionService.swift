@@ -46,6 +46,8 @@ nonisolated enum PhysicalDeletionService {
         String(describing: HumanMedication.self),
         String(describing: HumanMedicationLog.self),
         String(describing: HumanHealthReport.self),
+        String(describing: HumanHealthCondition.self),
+        String(describing: HumanHealthObservation.self),
         String(describing: HumanNoteRecord.self),
         String(describing: WishlistItem.self),
         String(describing: GachaOwnedItem.self),
@@ -197,6 +199,48 @@ nonisolated enum PhysicalDeletionService {
         deletedByHumanId: String? = nil,
         notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
     ) -> Int {
+        deleteHuman(
+            human,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications,
+            requiredHealthRows: nil
+        )
+    }
+
+    /// Production deletion paths use this entry point so every sensitive
+    /// Human-health collection is fetched before the first staged mutation.
+    /// Any fetch failure aborts the deletion instead of treating the missing
+    /// collection as empty and orphaning rows.
+    @discardableResult
+    static func deleteHumanFailClosed(
+        _ human: Human,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
+        requiredHealthRowsLoader: HumanDeletionRequiredHealthRowsLoader = loadRequiredHumanHealthRows
+    ) throws -> Int {
+        let requiredHealthRows = try requiredHealthRowsLoader(context)
+        return deleteHuman(
+            human,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId,
+            notifications: notifications,
+            requiredHealthRows: requiredHealthRows
+        )
+    }
+
+    private static func deleteHuman(
+        _ human: Human,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?,
+        notifications: ReminderNotificationScheduling,
+        requiredHealthRows: HumanDeletionRequiredHealthRows?
+    ) -> Int {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let humanId = human.id.uuidString
         guard !hasUnsettledShopPurchaseReference(
@@ -217,7 +261,9 @@ nonisolated enum PhysicalDeletionService {
             occurredAt: deletedAt,
             context: context
         )
-        let humanMedications = fetchAll(HumanMedication.self, context: context).filter { $0.humanId == humanId }
+        let humanMedications = fetchAll(HumanMedication.self, context: context).filter {
+            idsMatch($0.humanId, humanId)
+        }
         let relatedEventCount = deleteHumanRelatedEvents(
             humanId: humanId,
             humanMedications: humanMedications,
@@ -231,7 +277,8 @@ nonisolated enum PhysicalDeletionService {
             context: context,
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId,
-            notifications: notifications
+            notifications: notifications,
+            requiredHealthRows: requiredHealthRows
         )
         CloudSyncMutationRecorder.markDeleted(
             human,
@@ -517,116 +564,7 @@ nonisolated enum PhysicalDeletionService {
         }
     }
 
-    private static func deleteHumanScopedRows(
-        for human: Human,
-        context: ModelContext,
-        deletedAt: Date,
-        deletedByHumanId: String?,
-        notifications: ReminderNotificationScheduling
-    ) -> Int {
-        let humanId = human.id.uuidString
-        var deletedCount = 0
-
-        deletedCount += deleteRows(fetchAll(HumanMedication.self, context: context).filter { $0.humanId == humanId }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteRows(fetchAll(HumanMedicationLog.self, context: context).filter { $0.humanId == humanId }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteRows(fetchAll(HumanHealthReport.self, context: context).filter { $0.humanId == humanId }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteRows(fetchAll(WishlistItem.self, context: context).filter {
-            idsMatch($0.creatorId, humanId) || idsMatch($0.redeemedById, humanId)
-        }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteRows(fetchAll(GachaOwnedItem.self, context: context).filter { idsMatch($0.ownerHumanId, humanId) }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteRows(fetchAll(GachaDrawLog.self, context: context).filter { idsMatch($0.ownerHumanId, humanId) }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteRows(fetchAll(ShopPurchaseRecord.self, context: context).filter { idsMatch($0.buyerHumanId, humanId) }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteAchievementFacts(
-            scopeKind: .human,
-            scopeID: humanId,
-            context: context
-        )
-        for receipt in fetchAll(AchievementRewardReceipt.self, context: context)
-            where receipt.scopeKindRaw == AchievementScopeKind.island.rawValue
-                && idsMatch(receipt.recipientHumanIDRaw, humanId) {
-            receipt.recipientHumanIDRaw = ""
-        }
-        deletedCount += scrubHumanAttribution(for: human, in: context, at: deletedAt, by: deletedByHumanId)
-        deletedCount += deleteRows(fetchAll(HumanWeightLog.self, context: context).filter { $0.human?.id == human.id }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteRows(fetchAll(HumanWorkoutLog.self, context: context).filter { $0.human?.id == human.id }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteRows(fetchAll(HumanHealthMetricLog.self, context: context).filter { $0.human?.id == human.id }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteSharedCareUndoReceiptsReferencingHuman(humanId: humanId, context: context)
-        deletedCount += scrubSharedCareSessionsReferencingHuman(
-            humanId: humanId,
-            context: context,
-            deletedAt: deletedAt,
-            deletedByHumanId: deletedByHumanId
-        )
-        deletedCount += deleteOrphanedSharedCareUndoReceipts(context: context)
-        deletedCount += scrubRetainedPetFactsReferencingHuman(humanId: humanId, context: context, modifiedAt: deletedAt)
-        deletedCount += retireWalletAccounts(ownerKind: .human, ownerId: humanId, context: context, deletedAt: deletedAt)
-        deletedCount += scrubCoconutLedgerEntriesReferencingDeletedOwner(
-            ownerKind: .human,
-            ownerId: humanId,
-            subjectKind: .human,
-            reason: "humanPhysicalDeletion",
-            context: context,
-            modifiedAt: deletedAt
-        )
-        deletedCount += deleteOrRetainCareLedgerEvents(fetchAll(CareLedgerEvent.self, context: context).filter { event in
-            referencesHuman(event, humanId: humanId)
-        }, context: context) { _ in
-            CareLedgerDeletionContext(
-                deletedOwnerKind: .human,
-                deletedOwnerId: humanId,
-                deletedLegacyModelName: nil,
-                deletedLegacyModelId: nil,
-                reason: "humanPhysicalDeletion",
-                deletedAt: deletedAt,
-                deletedByHumanId: deletedByHumanId
-            )
-        }
-        deletedCount += deleteRows(fetchAll(EconomyBudgetUsageEvent.self, context: context).filter { event in
-            referencesHuman(event, humanId: humanId)
-        }, context: context) {
-            CloudSyncMutationRecorder.markDeleted($0, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteRows(fetchAll(CoconutExchangeRequest.self, context: context).filter { request in
-            idsMatch(request.senderId, humanId) || idsMatch(request.receiverId, humanId)
-        }, context: context) {
-            markGenericDeleted(entityName: String(describing: CoconutExchangeRequest.self), localRecordId: $0.id, parentId: humanId, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
-        }
-        deletedCount += deleteFamilyTaskPlansAndActivitiesReferencingHuman(
-            humanId: humanId,
-            context: context,
-            deletedAt: deletedAt,
-            deletedByHumanId: deletedByHumanId,
-            notifications: notifications
-        )
-        deletedCount += deleteGuardianSafetyProjections(
-            ownerHumanID: human.id,
-            context: context
-        )
-
-        return deletedCount
-    }
-
-    private static func deleteAchievementFacts(
+    nonisolated static func deleteAchievementFacts(
         scopeKind: AchievementScopeKind,
         scopeID: String,
         context: ModelContext

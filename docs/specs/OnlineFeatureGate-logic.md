@@ -1,7 +1,7 @@
 # OnlineFeatureGate Logic
 
 > 状态：CloudKit 协作关闭；Family 守护使用独立 fail-closed 子门。
-> 最近核对：2026-07-22，依据 `OnlineFeatureGate`、`GuardianSafetyConfiguration`、`AppCapabilityProfile`、`AppFeatureRouteGuard`、`TaskCenterRouteContainer` 与 `FamilyTaskService`。
+> 最近核对：2026-07-29，依据 `OnlineFeatureGate`、`GuardianSafetyConfiguration`、`AppCapabilityProfile`、`AppFeatureRouteGuard`、`TaskCenterRouteContainer` 与 `FamilyTaskService`。
 > 所有者：`OnlineFeatureGate` 与 `AppCapabilityProfile`；具体远端入口由 `AppFeatureRouteGuard` 和 CKShare / Settings 写入边界共同执行。
 
 ## Purpose
@@ -23,8 +23,8 @@ Family App 内亲友守护不是 CloudKit 家庭共享。它使用
 
 - 首发 `AppCapabilityProfile.shipsCloudFamilyCapabilities` 为 false，
   `OnlineFeatureGate.allows(.onlineCollaboration)` 也为 false。
-- `OHANAGuardianSafetyEnabled` 默认 false，服务 URL 默认为空，因此
-  `OnlineFeatureGate.allows(.guardianSafety)` 默认 false。该门与 CloudKit 门彼此独立。
+- 首发 `Info.plist` 不携带 `OHANAGuardian*` 配置；配置读取在键缺失时安全关闭，因此
+  `OnlineFeatureGate.allows(.guardianSafety)` 为 false。该门与 CloudKit 门彼此独立。
 - 关闭门控必须阻止 CloudKit share 接受、云同步设置、远端家庭邀请、共享
   database scope 切换，以及明确标为未来联机面的入口。
 - 关闭门控不得隐藏本机 Task Center、`FamilyCollaborationTask`、家庭分工创建与
@@ -77,12 +77,13 @@ Family App 内亲友守护不是 CloudKit 家庭共享。它使用
 - `OhanaCloudSharingAppDelegate` 必须在调用 `CloudSyncHouseholdShareService`、
   写 accepted-share state、启用 cloud sync 或启动远端收发前拒绝 CKShare。
 - `CloudSyncShareRuntime` 可以保留为未来实现细节，但当前没有可达的接受路径。
-- App target 已声明 Sign in with Apple、APNs development 与 `remote-notification`
-  background mode，供通过上线门禁后的 Family 守护使用；当前开关关闭时不启动登录、
-  不注册可用服务端点、不加载 Family 商品。Associated Domains 尚未加入真实 host，
-  因而仍是 Family 发布阻断项。
-- CloudKit service entitlement 仍未声明，`shipsCloudFamilyCapabilities` 恒 false；存在
-  dormant CloudKit 代码或 APNs 能力不构成 CloudKit 协作已启用。
+- 首发 App target 不声明 Sign in with Apple、APNs 或 `remote-notification`
+  background mode；源码 `Info.plist` 也不携带 Guardian 配置键。当前开关关闭时不启动
+  登录、不注册可用服务端点、不加载 Family 商品。未来 Family 发布必须独立恢复并验证
+  所需能力；Associated Domains 尚未加入真实 host，仍是其发布阻断项。
+- CloudKit service entitlement 仍未声明，`shipsCloudFamilyCapabilities` 恒 false；
+  存在 dormant CloudKit 代码或未来 Family 所需的 APNs 能力也不构成 CloudKit
+  协作已启用。
 
 ## Blocked UX
 

@@ -676,6 +676,25 @@ struct HumanCareCommandExecutor {
     }
 
     @discardableResult
+    func updateHealthMetric(
+        _ log: HumanHealthMetricLog,
+        human: Human,
+        input: HumanHealthMetricUpdateInput,
+        note: String
+    ) -> HumanHealthMetricUpdateCommandResult {
+        let result = HumanHealthMetricCommandService.updateMetricLog(
+            log,
+            human: human,
+            input: input,
+            context: context
+        )
+        if result.didPersist, result.didChange {
+            revisions.publishHumanHealthMetricUpdate(result, note: note)
+        }
+        return result
+    }
+
+    @discardableResult
     func deleteHealthMetric(
         _ log: HumanHealthMetricLog,
         human: Human,

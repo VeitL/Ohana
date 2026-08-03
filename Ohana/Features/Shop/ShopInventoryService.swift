@@ -111,18 +111,16 @@ nonisolated enum ShopInventoryStateStore {
         mutate(defaults: defaults) { state in
             let key = attemptID.uuidString
             guard !state.appliedPurchaseIDs.contains(key) else { return true }
-            switch itemID {
-            case "boost_double":
+            switch ShopProductApplicationCatalog.application(for: itemID) {
+            case .goldenLuck:
                 state.doubleRewardBoostActive = true
-            case "boost_streak":
-                let target = purchasedAt.addingTimeInterval(172_800)
-                guard target > now else { return false }
+            case .streakShield:
+                let target = max(purchasedAt, now).addingTimeInterval(172_800)
                 state.streakShieldExpiry = max(state.streakShieldExpiry ?? .distantPast, target)
-            case "boost_backdate_single":
-                state.backdatePassCount += 1
-            case "boost_backdate_pack":
-                state.backdatePassCount += 3
-            case Avatar2DAccess.shopItemId:
+            case let .backdatePasses(count):
+                guard count > 0 else { return false }
+                state.backdatePassCount += count
+            case .avatarPass:
                 state.avatar2DExtraPassCount += 1
             default:
                 return false

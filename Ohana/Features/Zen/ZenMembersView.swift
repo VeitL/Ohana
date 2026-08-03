@@ -302,7 +302,7 @@ private struct ZenMemberRow: View {
                     }
                 }
 
-                Text("\(subject.kind.title(localization)) · \(streakText)")
+                Text("\(subject.kind.title(localization)) · \(primaryDayMetricText)")
                     .font(OhanaFont.caption())
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
@@ -346,8 +346,11 @@ private struct ZenMemberRow: View {
         )?.image
     }
 
-    private var streakText: String {
-        localization.tr(
+    private var primaryDayMetricText: String {
+        if let companionText = subject.plantCompanionText(localization) {
+            return companionText
+        }
+        return localization.tr(
             zh: "连续 \(subject.currentDisplayStreak) 天",
             en: "\(subject.currentDisplayStreak)-day streak",
             de: "\(subject.currentDisplayStreak)-Tage-Serie",
@@ -364,29 +367,7 @@ private struct ZenMemberRow: View {
         if let status = subject.status {
             return "\(status.score)/10"
         }
-        return subject.checkedToday
-            ? localization.tr(
-                zh: "已打卡",
-                en: "Checked in",
-                de: "Eingecheckt",
-                es: "Registrado",
-                pt: "Registrado",
-                fr: "Enregistré",
-                ja: "チェック済み",
-                ko: "체크인 완료",
-                it: "Registrato"
-            )
-            : localization.tr(
-                zh: "未打卡",
-                en: "Pending",
-                de: "Offen",
-                es: "Pendiente",
-                pt: "Pendente",
-                fr: "En attente",
-                ja: "未チェック",
-                ko: "미체크인",
-                it: "In attesa"
-            )
+        return subject.zenCompactStatusText(localization)
     }
 
     private var statusIcon: String {

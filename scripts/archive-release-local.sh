@@ -6,6 +6,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # shellcheck source=scripts/lib/local-build-environment.sh
 source "${REPO_ROOT}/scripts/lib/local-build-environment.sh"
+# shellcheck source=scripts/lib/xcode-storage-lifecycle.sh
+source "${REPO_ROOT}/scripts/lib/xcode-storage-lifecycle.sh"
 
 cd "${REPO_ROOT}"
 
@@ -45,7 +47,6 @@ fi
 STAMP="$(date +%Y-%m-%d-%H%M%S)"
 DEFAULT_ARCHIVE_PATH="${ARCHIVE_ROOT}/${STAMP}/Ohana-${COMMIT}${DIRTY_SUFFIX}.xcarchive"
 ARCHIVE_PATH="${OHANA_ARCHIVE_PATH:-${DEFAULT_ARCHIVE_PATH}}"
-LOCK_DIR="${REPO_ROOT}/.build/locks/lane-release.lock"
 
 absolute_path() {
   python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$1"
@@ -82,16 +83,10 @@ else
 
   ohana_require_build_disk_space
 
-  mkdir -p "${DERIVED_DATA_PATH}" "$(dirname "${ARCHIVE_PATH}")" "$(dirname "${LOCK_DIR}")"
-  if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
-    echo "Another signed Archive is already running for this worktree." >&2
-    echo "Lock: ${LOCK_DIR}" >&2
-    exit 75
-  fi
-  printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+  ohana_acquire_xcode_project_lock "archive:release"
+  mkdir -p "${DERIVED_DATA_PATH}" "$(dirname "${ARCHIVE_PATH}")"
   cleanup() {
-    rm -f "${LOCK_DIR}/pid"
-    rmdir "${LOCK_DIR}" 2>/dev/null || true
+    ohana_release_xcode_project_lock
   }
   trap cleanup EXIT
 

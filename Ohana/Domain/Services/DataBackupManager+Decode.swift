@@ -87,7 +87,7 @@ nonisolated extension DataBackupManager {
             id: UUID(uuidString: dto.id) ?? UUID(),
             name: dto.name,
             birthday: parseDate(dto.birthday),
-            bloodType: dto.bloodType,
+            bloodType: dto.bloodType.isEmpty ? nil : dto.bloodType,
             avatarEmoji: dto.avatarEmoji,
             avatarImageData: try mediaData(
                 reference: dto.avatarImageRef,
@@ -96,16 +96,18 @@ nonisolated extension DataBackupManager {
             ),
             role: dto.role,
             genderIdentityRaw: dto.genderIdentityRaw ?? HumanProfileOptions.genderMetadata(from: dto.notes),
-            notes: HumanProfileOptions.visibleNoteParts(from: dto.notes).joined(separator: "｜"),
+            notes: dto.notes.isEmpty
+                ? nil
+                : HumanProfileOptions.visibleNoteParts(from: dto.notes).joined(separator: "｜"),
             createdAt: parseDate(dto.createdAt) ?? Date(),
             nationality: dto.nationality,
             city: dto.city,
             coconutBalance: dto.coconutBalance,
             shouldShowOnHome: dto.shouldShowOnHome,
             mbti: dto.mbti ?? "",
-            privateFieldsRaw: dto.privateFieldsRaw ?? "",
+            privateFieldsRaw: dto.privateFieldsRaw,
             themeColorHex: dto.themeColorHex ?? "",
-            heightCm: dto.heightCm ?? 0,
+            heightCm: dto.heightCm,
             passedAwayDate: parseDate(dto.passedAwayDate)
         )
     }
@@ -628,6 +630,12 @@ nonisolated extension DataBackupManager {
             notes: dto.notes,
             humanId: dto.humanId.flatMap(UUID.init(uuidString:)),
             recordedByHumanId: dto.recordedByHumanId,
+            sourceReportID: dto.sourceReportID.flatMap(UUID.init(uuidString:)),
+            sourceLabel: dto.sourceLabel ?? "",
+            referenceLow: dto.referenceLow,
+            referenceHigh: dto.referenceHigh,
+            referenceRangeText: dto.referenceRangeText ?? "",
+            reportedFlagRaw: dto.reportedFlagRaw ?? "unknown",
             createdAt: parseDate(dto.createdAt) ?? Date()
         )
     }
@@ -645,6 +653,7 @@ nonisolated extension DataBackupManager {
             summary: dto.summary,
             notes: dto.notes,
             recordedByHumanId: dto.recordedByHumanId,
+            captureSourceRaw: dto.captureSourceRaw ?? "manual",
             colorHex: dto.colorHex,
             createdAt: parseDate(dto.createdAt) ?? Date()
         )

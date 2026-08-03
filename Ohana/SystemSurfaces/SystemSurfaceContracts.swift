@@ -171,6 +171,8 @@ nonisolated struct SystemSurfaceSnapshotStore: Sendable {
     enum StoreError: Error, Equatable {
         case containerUnavailable
         case unsupportedSchema(Int)
+        case backupExclusionVerificationFailed
+        case resetSanitizationFailed
     }
 
     let containerURL: URL?
@@ -203,14 +205,12 @@ nonisolated struct SystemSurfaceSnapshotStore: Sendable {
     }
 
     func write(_ snapshot: TodayCareWidgetSnapshot) throws {
-        guard let snapshotURL else { throw StoreError.containerUnavailable }
+        guard let containerURL, let snapshotURL else { throw StoreError.containerUnavailable }
+        try verifyBackupExclusion(at: containerURL)
         let data = try JSONEncoder().encode(snapshot)
         try data.write(to: snapshotURL, options: [.atomic])
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        var mutableURL = snapshotURL
         do {
-            try mutableURL.setResourceValues(values)
+            try verifyBackupExclusion(at: snapshotURL)
         } catch {
             try? FileManager.default.removeItem(at: snapshotURL)
             throw error
@@ -218,9 +218,57 @@ nonisolated struct SystemSurfaceSnapshotStore: Sendable {
     }
 
     func removeSnapshotIfPresent() throws {
-        guard let snapshotURL else { return }
+        guard let snapshotURL else { throw StoreError.containerUnavailable }
         guard FileManager.default.fileExists(atPath: snapshotURL.path) else { return }
         try FileManager.default.removeItem(at: snapshotURL)
+    }
+
+    /// Reset is privacy-safe once either the old payload has been atomically
+    /// replaced by an unavailable value or the file has been removed. Only a
+    /// double failure can leave the previous Personal projection readable.
+    func sanitizeForAppReset(_ unavailableSnapshot: TodayCareWidgetSnapshot) throws {
+        var writeSucceeded = false
+        do {
+            try write(unavailableSnapshot)
+            writeSucceeded = true
+        } catch {
+            writeSucceeded = false
+        }
+
+        var removalSucceeded = false
+        do {
+            try removeSnapshotIfPresent()
+            removalSucceeded = true
+        } catch {
+            removalSucceeded = false
+        }
+
+        try Self.requireSuccessfulResetSanitization(
+            writeSucceeded: writeSucceeded,
+            removalSucceeded: removalSucceeded
+        )
+    }
+
+    static func requireSuccessfulResetSanitization(
+        writeSucceeded: Bool,
+        removalSucceeded: Bool
+    ) throws {
+        guard writeSucceeded || removalSucceeded else {
+            throw StoreError.resetSanitizationFailed
+        }
+    }
+
+    private func verifyBackupExclusion(at url: URL) throws {
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var mutableURL = url
+        try mutableURL.setResourceValues(values)
+        let persisted = try mutableURL.resourceValues(
+            forKeys: [.isExcludedFromBackupKey]
+        ).isExcludedFromBackup
+        guard persisted == true else {
+            throw StoreError.backupExclusionVerificationFailed
+        }
     }
 }
 

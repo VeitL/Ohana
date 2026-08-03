@@ -53,6 +53,7 @@ enum AppResetService {
             options: options,
             questManager: questManager,
             attachmentStorage: .live,
+            systemSurfaceSnapshotSanitizer: sanitizeLiveSystemSurfaceSnapshot,
             deletePersistentData: { $0.deleteAllData() }
         )
     }
@@ -64,12 +65,13 @@ enum AppResetService {
         options: Options,
         questManager: QuestManager
     ) throws -> HumanNoteAttachmentCleanupResult {
-        try reset(
+        try resetInternal(
             context: context,
             defaults: defaults,
             options: options,
             questManager: questManager,
             attachmentStorage: .live,
+            systemSurfaceSnapshotSanitizer: sanitizeLiveSystemSurfaceSnapshot,
             deletePersistentData: { $0.deleteAllData() }
         )
     }
@@ -83,12 +85,34 @@ enum AppResetService {
         attachmentStorage: HumanNoteAttachmentStorage,
         deletePersistentData: (ModelContainer) throws -> Void
     ) throws -> HumanNoteAttachmentCleanupResult {
+        try reset(
+            context: context,
+            defaults: defaults,
+            options: options,
+            questManager: questManager,
+            attachmentStorage: attachmentStorage,
+            systemSurfaceSnapshotSanitizer: sanitizeLiveSystemSurfaceSnapshot,
+            deletePersistentData: deletePersistentData
+        )
+    }
+
+    @discardableResult
+    static func reset(
+        context: ModelContext,
+        defaults: UserDefaults,
+        options: Options,
+        questManager: QuestManager,
+        attachmentStorage: HumanNoteAttachmentStorage,
+        systemSurfaceSnapshotSanitizer: @MainActor () throws -> Void,
+        deletePersistentData: (ModelContainer) throws -> Void
+    ) throws -> HumanNoteAttachmentCleanupResult {
         try resetInternal(
             context: context,
             defaults: defaults,
             options: options,
             questManager: questManager,
             attachmentStorage: attachmentStorage,
+            systemSurfaceSnapshotSanitizer: systemSurfaceSnapshotSanitizer,
             deletePersistentData: deletePersistentData
         )
     }
@@ -101,23 +125,33 @@ enum AppResetService {
         attachmentStorage: HumanNoteAttachmentStorage,
         deletePersistentData: (ModelContainer) throws -> Void
     ) throws -> HumanNoteAttachmentCleanupResult {
+        try reset(
+            context: context,
+            defaults: defaults,
+            options: options,
+            attachmentStorage: attachmentStorage,
+            systemSurfaceSnapshotSanitizer: sanitizeLiveSystemSurfaceSnapshot,
+            deletePersistentData: deletePersistentData
+        )
+    }
+
+    @discardableResult
+    static func reset(
+        context: ModelContext,
+        defaults: UserDefaults,
+        options: Options,
+        attachmentStorage: HumanNoteAttachmentStorage,
+        systemSurfaceSnapshotSanitizer: @MainActor () throws -> Void,
+        deletePersistentData: (ModelContainer) throws -> Void
+    ) throws -> HumanNoteAttachmentCleanupResult {
         let questManager = options.resetSharedRuntimeState ? QuestManager() : nil
-        if let questManager {
-            return try reset(
-                context: context,
-                defaults: defaults,
-                options: options,
-                questManager: questManager,
-                attachmentStorage: attachmentStorage,
-                deletePersistentData: deletePersistentData
-            )
-        }
         return try resetInternal(
             context: context,
             defaults: defaults,
             options: options,
-            questManager: nil,
+            questManager: questManager,
             attachmentStorage: attachmentStorage,
+            systemSurfaceSnapshotSanitizer: systemSurfaceSnapshotSanitizer,
             deletePersistentData: deletePersistentData
         )
     }
@@ -128,20 +162,19 @@ enum AppResetService {
         options: Options,
         questManager: QuestManager?,
         attachmentStorage: HumanNoteAttachmentStorage,
+        systemSurfaceSnapshotSanitizer: @MainActor () throws -> Void,
         deletePersistentData: (ModelContainer) throws -> Void
     ) throws -> HumanNoteAttachmentCleanupResult {
+        do {
+            try systemSurfaceSnapshotSanitizer()
+        } catch {
+            throw AppResetPersistenceError.systemSurfaceCleanupFailed(nil)
+        }
         let preservedDefaults = preservedDefaultValues(in: defaults, options: options)
         try deletePersistentModels(context: context, deletePersistentData: deletePersistentData)
         let humanNoteAttachmentCleanup = options.deleteHumanNoteAttachments
             ? HumanNoteAttachmentStore.deleteAll(storage: attachmentStorage)
             : .notRequired
-        let systemSurfaceStore = SystemSurfaceSnapshotStore.live
-        try? systemSurfaceStore.write(
-            TodayCareWidgetSnapshot.unavailable(languageCode: AppLanguage.code)
-        )
-        try? systemSurfaceStore.removeSnapshotIfPresent()
-        WidgetCenter.shared.reloadTimelines(ofKind: OhanaSystemSurfaceConstants.todayCareWidgetKind)
-
         resetLocalDefaults(defaults, preservedValues: preservedDefaults)
         // AutomaticBackupStatusStore exclusively owns its prefix so reset does
         // not enumerate and remove the same CFPreferences keys twice. The
@@ -164,6 +197,13 @@ enum AppResetService {
         defaults.set(false, forKey: "ohana_show_first_success_card")
         defaults.set(false, forKey: "ohana_first_quick_checkin_completed")
         return humanNoteAttachmentCleanup
+    }
+
+    static func sanitizeLiveSystemSurfaceSnapshot() throws {
+        try SystemSurfaceSnapshotStore.live.sanitizeForAppReset(
+            TodayCareWidgetSnapshot.unavailable(languageCode: AppLanguage.code)
+        )
+        WidgetCenter.shared.reloadTimelines(ofKind: OhanaSystemSurfaceConstants.todayCareWidgetKind)
     }
 
     private static func deletePersistentModels(
@@ -251,6 +291,7 @@ enum AppResetService {
         StarterGiftStorageKey.claimed,
         StarterGiftStorageKey.oasisTabPromptPending,
         StarterGiftStorageKey.pending,
+        StarterPetSuggestionStorageKey.resolved,
         "ohanaGrowthLastSeenTreeLevelV1",
         "ohanaGrowthOnboardingCompletedV1",
         "petBondVaultRevision",
@@ -307,6 +348,7 @@ enum AppResetService {
 
 enum AppResetPersistenceError: LocalizedError, Equatable {
     case persistenceFailed(String?)
+    case systemSurfaceCleanupFailed(String?)
 
     var errorDescription: String? {
         switch self {
@@ -315,6 +357,12 @@ enum AppResetPersistenceError: LocalizedError, Equatable {
                 localized: "app.reset.persistence.failed",
                 defaultValue: "Unable to reset local data.",
                 comment: "Shown when app reset cannot delete the local store."
+            )
+        case let .systemSurfaceCleanupFailed(message):
+            message ?? String(
+                localized: "app.reset.persistence.failed",
+                defaultValue: "Unable to clear private system-surface data.",
+                comment: "Shown when app reset cannot sanitize private Widget data."
             )
         }
     }

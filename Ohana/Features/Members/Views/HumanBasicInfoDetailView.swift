@@ -7,70 +7,18 @@ import SwiftData
 import SwiftUI
 import UIKit
 
-enum HumanDeletionPresentationOutcome: Equatable {
-    case deleted
-    case failed(message: String)
-}
-
-enum HumanDeletionPresentationCopy {
-    static func failureMessage(
-        for result: MemberDeletionCommandResult? = nil,
-        l: L10n
-    ) -> String {
-        if result?.persistenceErrorDescription?.localizedCaseInsensitiveContains("pending shop purchase") == true {
-            return l.tr(
-                zh: "请先结算或退款待处理的商店购买，再删除这位成员。",
-                en: "Settle or refund the pending shop purchase before deleting this member.",
-                de: "Schließe den ausstehenden Shop-Kauf ab oder erstatte ihn, bevor du dieses Mitglied löschst.",
-                es: "Completa o reembolsa la compra pendiente antes de eliminar a este miembro.",
-                pt: "Conclua ou reembolse a compra pendente antes de excluir este membro.",
-                fr: "Finalisez ou remboursez l’achat en attente avant de supprimer ce membre.",
-                ja: "保留中のショップ購入を完了または返金してから、このメンバーを削除してください。",
-                ko: "대기 중인 상점 구매를 완료하거나 환불한 후 이 구성원을 삭제해 주세요.",
-                it: "Completa o rimborsa l’acquisto in sospeso prima di eliminare questo membro."
-            )
-        }
-        return l.tr(
-            zh: "成员没有被删除。数据仍然保留，请稍后重试。",
-            en: "The member was not deleted. Their data is still intact. Try again.",
-            de: "Das Mitglied wurde nicht gelöscht. Die Daten sind weiterhin vorhanden. Bitte erneut versuchen.",
-            es: "El miembro no se eliminó. Sus datos siguen intactos. Inténtalo de nuevo.",
-            pt: "O membro não foi excluído. Os dados continuam intactos. Tente novamente.",
-            fr: "Le membre n’a pas été supprimé. Ses données sont intactes. Réessayez.",
-            ja: "メンバーは削除されませんでした。データは保持されています。もう一度お試しください。",
-            ko: "구성원이 삭제되지 않았습니다. 데이터는 그대로 유지됩니다. 다시 시도해 주세요.",
-            it: "Il membro non è stato eliminato. I dati sono ancora intatti. Riprova."
-        )
-    }
-}
-
-func localizedHumanAgeYears(_ years: Int, l: L10n) -> String {
-    l.tr(
-        zh: "\(years)岁", en: "\(years) yrs", de: "\(years) J.",
-        es: "\(years) años", pt: "\(years) anos", fr: "\(years) ans",
-        ja: "\(years)歳", ko: "\(years)세", it: "\(years) anni"
-    )
-}
-
 struct HumanBasicInfoDetailContentView: View {
     let human: Human
     var startsEditing = false
+    var requiresStarterProfileFields = false
     var onSave: (() -> Void)? = nil
     var onClose: (() -> Void)? = nil
-
-    private enum PresentedSheet: String, Identifiable {
-        case editor
-        case avatarPreview
-
-        var id: String { rawValue }
-    }
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
-    @Environment(\.memberProfileExperienceStyle) private var profileExperienceStyle
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -82,7 +30,7 @@ struct HumanBasicInfoDetailContentView: View {
     @State private var didApplyInitialEditing = false
     @State private var isDeleting = false
     @State private var personalUpgradePrompt: PersonalUpgradePrompt?
-    @State private var presentedSheet: PresentedSheet?
+    @State private var presentedSheet: HumanBasicInfoPresentedSheet?
     @State private var showingDiscardConfirmation = false
     @State private var isSaving = false
     @State private var saveErrorMessage: String?
@@ -104,9 +52,12 @@ struct HumanBasicInfoDetailContentView: View {
     @State private var eMBTIDecision = ""
     @State private var eMBTILifestyle = ""
     @State private var eNationality = ""
+    @State private var eResidenceCountry = ""
     @State private var eCity = ""
     @State private var eUsesCustomNationality = false
     @State private var eCustomNationality = ""
+    @State private var eUsesCustomResidenceCountry = false
+    @State private var eCustomResidenceCountry = ""
     @State private var eUsesCustomResidence = false
     @State private var eCustomResidence = ""
     @State private var eThemeColorHex = ""
@@ -135,9 +86,22 @@ struct HumanBasicInfoDetailContentView: View {
             onClose: onClose,
             onEdit: presentEditor
         ) {
-            avatarSection
+            HumanBasicInfoIdentityHero(
+                human: human,
+                onAvatarTap: human.avatarImageData == nil
+                    ? nil
+                    : { presentedSheet = .avatarPreview }
+            )
         } content: {
-            readContent
+            HumanBasicInfoReadContentView(
+                human: human,
+                profileCompletionResolutions: profileCompletionResolutions,
+                canEditProfile: canEditProfile,
+                onEdit: presentEditor,
+                onMarkPassedAway: markHumanPassedAway,
+                onUndoPassedAway: undoHumanPassedAway,
+                onDelete: deleteHumanAndReturnHome
+            )
         }
         .onChange(of: human.hasPassedAway) { _, hasPassedAway in
             if hasPassedAway, presentedSheet == .editor {
@@ -207,6 +171,11 @@ private extension HumanBasicInfoDetailContentView {
                             }
                         }
                         .disabled(!canSaveHumanDraft)
+                        .accessibilityHint(
+                            requiresStarterProfileFields && !hasRequiredStarterProfileFields
+                                ? requiredStarterProfileStatusTitle
+                                : ""
+                        )
                         .accessibilityIdentifier("human-basic-info-save-action")
                     }
                 }
@@ -252,7 +221,71 @@ private extension HumanBasicInfoDetailContentView {
     }
 
     private var canSaveHumanDraft: Bool {
-        !isSaving && !eName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && hasHumanDraftChanges
+        !isSaving
+            && !eName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (!requiresStarterProfileFields || hasRequiredStarterProfileFields)
+            && hasHumanDraftChanges
+    }
+
+    private var draftProfileCompletion: MemberProfileCompletionSnapshot {
+        MemberProfileCompletenessPolicy.human(
+            HumanProfileCompletionDraft(
+                hasMeaningfulAppearance: draftHasMeaningfulAppearance,
+                birthday: eHasBirthday ? eBirthday : nil,
+                genderIdentityRaw: eGender,
+                bloodType: eBloodType,
+                heightCm: heightValue,
+                mbti: editedMBTI,
+                nationality: resolvedNationality,
+                city: resolvedResidence,
+                notes: eNotes
+            ),
+            explicitlyResolvedCategories: profileCompletionResolutions
+        )
+    }
+
+    private var draftHasMeaningfulAppearance: Bool {
+        if eAvatarImageData != nil { return true }
+        if human.avatarImageData == nil,
+           human.avatarAttachmentState == .present || !human.avatarImageSignature.isEmpty {
+            return true
+        }
+        let emoji = eAvatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !emoji.isEmpty && emoji != "👤"
+    }
+
+    private var hasRequiredStarterProfileFields: Bool {
+        draftProfileCompletion.missingRequiredCategories.isEmpty
+    }
+
+    private var requiredStarterProfileStatusTitle: String {
+        if hasRequiredStarterProfileFields {
+            return l.tr(
+                zh: "生日与性别/身份已完成",
+                en: "Birthday and gender/identity are complete",
+                de: "Geburtstag und Geschlecht/Identität sind vollständig",
+                es: "Cumpleaños y género/identidad completados",
+                pt: "Aniversário e gênero/identidade concluídos",
+                fr: "Anniversaire et genre/identité complétés",
+                ja: "誕生日と性別／本人情報を入力済み",
+                ko: "생일 및 성별/정체성 입력 완료",
+                it: "Compleanno e genere/identità completati"
+            )
+        }
+        let missing = draftProfileCompletion.missingRequiredCategories
+            .map { $0.localizedTitle(l) }
+            .joined(separator: l.tr(zh: "、", en: ", ", de: ", "))
+        return l.tr(
+            zh: "保存前请完成：\(missing)",
+            en: "Complete before saving: \(missing)",
+            de: "Vor dem Speichern ausfüllen: \(missing)",
+            es: "Completa antes de guardar: \(missing)",
+            pt: "Conclua antes de salvar: \(missing)",
+            fr: "À compléter avant d’enregistrer : \(missing)",
+            ja: "保存前に入力：\(missing)",
+            ko: "저장 전 입력: \(missing)",
+            it: "Completa prima di salvare: \(missing)"
+        )
     }
 
     private var hasHumanDraftChanges: Bool {
@@ -267,7 +300,8 @@ private extension HumanBasicInfoDetailContentView {
             eHeightText != originalHeightText ||
             editedMBTI != human.mbti.uppercased() ||
             resolvedNationality != human.nationality ||
-            resolvedResidence != human.city ||
+            MemberResidenceValue(storedValue: resolvedResidence)
+                != MemberResidenceValue(storedValue: human.city) ||
             eThemeColorHex.uppercased() != human.safeThemeColorHex.uppercased() ||
             eNotes != displayNotes ||
             editedPrivateFieldsRaw != human.privateFields
@@ -299,229 +333,18 @@ private extension HumanBasicInfoDetailContentView {
         }
     }
 
-    private var avatarSection: some View {
-        ProfileIdentityHero(
-            name: human.name,
-            subtitle: l.tr(
-                zh: "家庭成员资料", en: "Household profile", de: "Haushaltsprofil",
-                es: "Perfil del hogar", pt: "Perfil da família", fr: "Profil du foyer",
-                ja: "家族プロフィール", ko: "가족 프로필", it: "Profilo familiare"
-            ),
-            themeColorHex: human.safeThemeColorHex,
-            fallbackColor: Color.goPrimary,
-            statusTitle: human.hasPassedAway
-                ? l.tr(zh: "纪念模式", en: "Memorial", de: "Gedenken")
-                : nil,
-            avatarAccessibilityLabel: l.tr(
-                zh: "\(human.name) 的头像", en: "Avatar for \(human.name)", de: "Avatar von \(human.name)",
-                es: "Avatar de \(human.name)", pt: "Avatar de \(human.name)", fr: "Avatar de \(human.name)",
-                ja: "\(human.name)のアバター", ko: "\(human.name)님의 아바타", it: "Avatar di \(human.name)"
-            ),
-            nameAccessibilityIdentifier: "human-basic-info-name-readback",
-            onAvatarTap: human.avatarImageData == nil ? nil : { presentedSheet = .avatarPreview }
-        ) {
-            humanAvatarImage(
-                data: human.avatarImageData,
-                fallbackEmoji: human.avatarEmoji,
-                accent: Color(hex: human.safeThemeColorHex),
-                size: 88
-            )
-        } badges: {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { humanProfileBadges }
-                VStack(spacing: 8) { humanProfileBadges }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var humanProfileBadges: some View {
-        ProfileBadge(title: localizedRoleText(for: human.role), systemImage: "person.badge.key.fill")
-        if let birthday = human.birthday {
-            ProfileBadge(title: humanAgeText(for: birthday), systemImage: "birthday.cake.fill")
-        }
-        if !human.mbti.isEmpty {
-            ProfileBadge(title: human.mbti.uppercased(), systemImage: nil)
-        }
-    }
-
-    private func humanAvatarImage(data: Data?, fallbackEmoji: String, accent: Color, size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .fill(accent.opacity(0.16))
-                .frame(width: size, height: size)
-                .overlay(Circle().strokeBorder(accent.opacity(0.35), lineWidth: 2))
-            AsyncDecodedImageView(data: data) { image in
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: max(0, size - 8), height: max(0, size - 8), alignment: .center)
-                    .clipShape(Circle())
-            } placeholder: {
-                Text(fallbackEmoji.isEmpty ? "👤" : fallbackEmoji)
-                    .font(OhanaFont.metric(size: size * 0.48))
-            }
-        }
-        .frame(width: size, height: size, alignment: .center)
-    }
-
-    private func humanAgeText(for birthday: Date) -> String {
-        let years = Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0
-        return years > 0
-            ? localizedHumanAgeYears(years, l: l)
-            : l.tr(zh: "未满1岁", en: "Under 1", de: "Unter 1")
-    }
-
-    private var readContent: some View {
-        VStack(spacing: 24) {
-            humanMemorialStatus
-            humanProfileCompletionCard
-            humanCoreProfileSection
-            humanBodySection
-            humanHouseholdSection
-            humanPrivacySection
-            humanThemeSection
-            humanNotesSection
-            humanLifecycleDangerZone
-        }
-    }
-
-    private var humanProfileCompletionCard: some View {
-        ProfileCompletionCard(
-            snapshot: MemberProfileCompletenessPolicy.human(
-                human,
-                explicitlyResolvedCategories: profileCompletionResolutions
-            ),
-            onContinue: canEditProfile
-                ? { presentEditor() }
-                : nil
-        )
-    }
-
-    @ViewBuilder
-    private var humanMemorialStatus: some View {
-        if human.hasPassedAway {
-            ProfileStatusBanner(
-                title: l.tr(zh: "已进入纪念状态", en: "Memorial profile", de: "Gedenkprofil"),
-                detail: human.passedAwayDate.map {
-                    l.tr(
-                        zh: "纪念日期：\($0.formatted(.dateTime.year().month().day()))",
-                        en: "Memorial date: \($0.formatted(.dateTime.year().month().day()))",
-                        de: "Gedenkdatum: \($0.formatted(.dateTime.year().month().day()))",
-                        es: "Fecha conmemorativa: \($0.formatted(.dateTime.year().month().day()))",
-                        pt: "Data memorial: \($0.formatted(.dateTime.year().month().day()))",
-                        fr: "Date commémorative : \($0.formatted(.dateTime.year().month().day()))",
-                        ja: "メモリアル日：\($0.formatted(.dateTime.year().month().day()))",
-                        ko: "추모일: \($0.formatted(.dateTime.year().month().day()))",
-                        it: "Data commemorativa: \($0.formatted(.dateTime.year().month().day()))"
-                    )
-                },
-                systemImage: "heart.fill",
-                tint: Color.purple
-            )
-        }
-    }
-
-    private var humanCoreProfileSection: some View {
-        infoSection(title: l.tr(zh: "基本信息", en: "Basic Info", de: "Basisinfos"), icon: "person.fill", iconColor: Color.goPrimary) {
-            infoRow(label: l.tr(zh: "名字", en: "Name", de: "Name"), value: human.name)
-            infoRow(
-                label: l.tr(
-                    zh: "家庭角色", en: "Household role", de: "Rolle im Haushalt",
-                    es: "Rol en el hogar", pt: "Papel na família", fr: "Rôle dans le foyer",
-                    ja: "家族での役割", ko: "가족 역할", it: "Ruolo familiare"
-                ),
-                value: localizedRoleText(for: human.role)
-            )
-            infoRow(label: l.tr(zh: "性别/身份", en: "Gender / Identity", de: "Geschlecht / Identität"), value: localizedGenderTitle(for: human.genderRaw))
-            if let birthday = human.birthday {
-                infoRow(label: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), value: birthday.formatted(.dateTime.year().month().day()))
-                infoRow(label: l.tr(zh: "星座", en: "Zodiac", de: "Sternzeichen"), value: Human.westernZodiacDisplay(for: birthday, l: l))
-            } else {
-                infoRow(label: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), value: localizedEmptyValue)
-            }
-        }
-    }
-
-    private var humanBodySection: some View {
-        infoSection(title: l.tr(zh: "身体资料", en: "Body Info", de: "Körperdaten"), icon: "heart.text.square.fill", iconColor: Color.goRed) {
-            if hasHumanBodyDetails {
-                if !human.bloodType.isEmpty {
-                    infoRow(label: l.tr(zh: "血型", en: "Blood Type", de: "Blutgruppe"), value: human.bloodType)
-                }
-                if human.heightCm > 0, human.heightCm.isFinite {
-                    infoRow(label: l.tr(zh: "身高", en: "Height", de: "Größe"), value: String(format: "%.0f cm", human.heightCm))
-                }
-                if !human.mbti.isEmpty {
-                    infoRow(label: "MBTI", value: human.mbti.uppercased())
-                }
-            } else {
-                humanEmptySectionRow
-            }
-        }
-    }
-
-    private var humanHouseholdSection: some View {
-        infoSection(title: l.tr(zh: "家庭与位置", en: "Family & Location", de: "Familie & Standort"), icon: "house.fill", iconColor: Color.goTeal) {
-            infoRow(label: l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), value: human.nationality.isEmpty ? localizedEmptyValue : human.nationality)
-            infoRow(label: l.tr(zh: "现居地", en: "Residence", de: "Wohnort"), value: human.city.isEmpty ? localizedEmptyValue : human.city)
-            infoRow(label: l.tr(zh: "加入时间", en: "Joined", de: "Beigetreten"), value: human.createdAt.formatted(.dateTime.year().month().day()))
-            infoRow(
-                label: l.tr(zh: "相处天数", en: "Days Together", de: "Gemeinsame Tage"),
-                value: l.tr(
-                    zh: "\(daysTogether) 天", en: "\(daysTogether) days", de: "\(daysTogether) Tage",
-                    es: "\(daysTogether) días", pt: "\(daysTogether) dias", fr: "\(daysTogether) jours",
-                    ja: "\(daysTogether)日", ko: "\(daysTogether)일", it: "\(daysTogether) giorni"
-                )
-            )
-        }
-    }
-
-    @ViewBuilder
-    private var humanPrivacySection: some View {
-        if HumanLocalPrivacyPolicy.isEnabled {
-            infoSection(title: l.tr(zh: "隐私", en: "Privacy", de: "Datenschutz"), icon: "lock.shield.fill", iconColor: Color.goYellow) {
-                infoRow(label: l.tr(zh: "隐私项目", en: "Private Fields", de: "Private Felder"), value: privacySummary)
-            }
-        }
-    }
-
-    private var humanThemeSection: some View {
-        infoSection(title: l.tr(zh: "主题色", en: "Theme Color", de: "Designfarbe"), icon: "paintpalette.fill", iconColor: Color(hex: human.safeThemeColorHex)) {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: OhanaRadius.icon)
-                    .fill(Color(hex: human.safeThemeColorHex))
-                    .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                Text("#\(human.safeThemeColorHex.uppercased())")
-                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .monospaced)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
-            }
-        }
-    }
-
-    private var humanNotesSection: some View {
-        infoSection(title: l.tr(zh: "备注", en: "Notes", de: "Notizen"), icon: "note.text", iconColor: Color.goOrange) {
-            if !displayNotes.isEmpty {
-                Text(displayNotes)
-                    .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                humanEmptySectionRow
-            }
-        }
-    }
-
-    private var humanEmptySectionRow: some View {
-        ProfileEmptySectionRow(
-            title: l.tr(zh: "尚未填写", en: "Not added yet", de: "Noch nicht ausgefüllt"),
-            editTitle: l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"),
-            onEdit: canEditProfile ? { presentEditor() } : nil
-        )
-    }
-
     private var editContent: some View {
         Form {
+            Section {
+                ProfileCompletionCard(
+                    snapshot: draftProfileCompletion,
+                    onContinue: nil
+                )
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .accessibilityIdentifier("human-basic-info-live-profile-progress")
+            }
+
             Section {
                 EditableProfileAvatarPicker(
                     avatarImageData: $eAvatarImageData,
@@ -557,22 +380,80 @@ private extension HumanBasicInfoDetailContentView {
                 }
                 Divider().opacity(0.1)
                 HStack {
-                    editLabel(l.tr(zh: "性别/身份", en: "Gender / Identity", de: "Geschlecht / Identität"))
+                    requiredEditLabel(
+                        l.tr(
+                            zh: "性别/身份",
+                            en: "Gender / Identity",
+                            de: "Geschlecht / Identität"
+                        ),
+                        isRequired: requiresStarterProfileFields
+                    )
                     Spacer()
-                    Picker("", selection: $eGender) {
+                    Menu {
                         ForEach(genderOptions, id: \.key) { option in
-                            Text(localizedGenderTitle(for: option.key)).tag(option.key)
+                            Button {
+                                eGender = option.key
+                            } label: {
+                                if eGender == option.key {
+                                    Label(
+                                        localizedGenderTitle(for: option.key),
+                                        systemImage: "checkmark"
+                                    )
+                                } else {
+                                    Text(localizedGenderTitle(for: option.key))
+                                }
+                            }
+                            .disabled(requiresStarterProfileFields && option.key.isEmpty)
+                            .accessibilityIdentifier(
+                                "human-basic-info-gender-option-\(option.key.isEmpty ? "unset" : option.key)"
+                            )
+                            .accessibilityAddTraits(eGender == option.key ? .isSelected : [])
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(localizedGenderTitle(for: eGender))
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down") // a11y: allow decorative menu disclosure glyph hidden below
+                                .font(.caption2.weight(.semibold))
+                                .accessibilityHidden(true)
                         }
                     }
-                    .pickerStyle(.menu)
                     .frame(maxWidth: 180, alignment: .trailing)
+                    .accessibilityLabel(l.tr(
+                        zh: "性别/身份",
+                        en: "Gender / Identity",
+                        de: "Geschlecht / Identität"
+                    ))
+                    .accessibilityValue(localizedGenderTitle(for: eGender))
+                    .accessibilityIdentifier("human-basic-info-gender-picker")
                 }
                 Divider().opacity(0.1)
-                Toggle(isOn: $eHasBirthday) {
-                    editLabel(l.tr(zh: "设置生日", en: "Set Birthday", de: "Geburtstag festlegen"))
+                HStack {
+                    requiredEditLabel(
+                        l.tr(
+                            zh: "设置生日",
+                            en: "Set Birthday",
+                            de: "Geburtstag festlegen"
+                        ),
+                        isRequired: requiresStarterProfileFields
+                    )
+                    Spacer()
+                    Toggle("", isOn: $eHasBirthday)
+                        .labelsHidden()
+                        .tint(profileEditAccent)
+                        .accessibilityLabel(l.tr(
+                            zh: "设置生日",
+                            en: "Set Birthday",
+                            de: "Geburtstag festlegen",
+                            es: "Establecer cumpleaños",
+                            pt: "Definir aniversário",
+                            fr: "Définir l’anniversaire",
+                            ja: "誕生日を設定",
+                            ko: "생일 설정",
+                            it: "Imposta compleanno"
+                        ))
+                        .accessibilityIdentifier("human-basic-info-birthday-toggle")
                 }
-                .tint(profileEditAccent)
-                .accessibilityIdentifier("human-basic-info-birthday-toggle")
                 if eHasBirthday {
                     DatePicker("", selection: $eBirthday, in: ...Date(), displayedComponents: .date)
                         .datePickerStyle(.compact)
@@ -584,6 +465,22 @@ private extension HumanBasicInfoDetailContentView {
                             ja: "誕生日", ko: "생일", it: "Compleanno"
                         ))
                         .accessibilityIdentifier("human-basic-info-birthday-picker")
+                }
+                if requiresStarterProfileFields {
+                    Label(
+                        requiredStarterProfileStatusTitle,
+                        systemImage: hasRequiredStarterProfileFields
+                            ? "checkmark.circle.fill"
+                            : "exclamationmark.circle.fill"
+                    )
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(
+                        hasRequiredStarterProfileFields
+                            ? Color.goTeal
+                            : Color.ohanaSecondaryText
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("human-basic-info-required-fields-status")
                 }
             }
 
@@ -608,7 +505,7 @@ private extension HumanBasicInfoDetailContentView {
                     selection: nationalityPickerSelection,
                     options: countryOptions
                 )
-                if profileExperienceStyle == .zen, eUsesCustomNationality {
+                if eUsesCustomNationality {
                     TextField(
                         l.tr(zh: "输入国籍", en: "Enter nationality", de: "Nationalität eingeben"),
                         text: $eCustomNationality
@@ -619,11 +516,26 @@ private extension HumanBasicInfoDetailContentView {
                 }
                 Divider().opacity(0.1)
                 optionPickerRow(
-                    l.tr(zh: "现居地", en: "Residence", de: "Wohnort"),
+                    l.tr(zh: "现居国家", en: "Residence country", de: "Wohnland"),
+                    selection: residenceCountryPickerSelection,
+                    options: countryOptions
+                )
+                if eUsesCustomResidenceCountry {
+                    TextField(
+                        l.tr(zh: "输入现居国家", en: "Enter residence country", de: "Wohnland eingeben"),
+                        text: $eCustomResidenceCountry
+                    )
+                    .textInputAutocapitalization(.words)
+                    .accessibilityIdentifier("human-basic-info-custom-residence-country-input")
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+                Divider().opacity(0.1)
+                optionPickerRow(
+                    l.tr(zh: "现居城市", en: "Residence city", de: "Wohnort"),
                     selection: residencePickerSelection,
                     options: residenceCityOptions
                 )
-                if profileExperienceStyle == .zen, eUsesCustomResidence {
+                if eUsesCustomResidence {
                     TextField(
                         l.tr(zh: "输入现居地", en: "Enter residence", de: "Wohnort eingeben"),
                         text: $eCustomResidence
@@ -714,19 +626,6 @@ private extension HumanBasicInfoDetailContentView {
 }
 
 private extension HumanBasicInfoDetailContentView {
-    private var humanLifecycleDangerZone: some View {
-        HumanLifecycleDangerZone(
-            human: human,
-            onMarkPassedAway: markHumanPassedAway,
-            onUndoPassedAway: undoHumanPassedAway,
-            onDelete: deleteHumanAndReturnHome
-        )
-    }
-
-    private func infoSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
-        ProfileInfoSection(title: title, systemImage: icon, tint: iconColor, content: content)
-    }
-
     private func editSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
         Section {
             VStack(alignment: .leading, spacing: 14) {
@@ -735,18 +634,38 @@ private extension HumanBasicInfoDetailContentView {
             .frame(maxWidth: .infinity, alignment: .leading)
         } header: {
             Label(title, systemImage: icon)
-                .foregroundStyle(profileExperienceStyle == .zen ? profileEditAccent : iconColor)
+                .foregroundStyle(profileEditAccent)
         }
-    }
-
-    private func infoRow(label: String, value: String) -> some View {
-        ProfileInfoRow(label: label, value: value)
     }
 
     private func editLabel(_ text: String) -> some View {
         Text(text)
             .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaSecondaryText)
+    }
+
+    private func requiredEditLabel(
+        _ text: String,
+        isRequired: Bool
+    ) -> some View {
+        HStack(spacing: 6) {
+            editLabel(text)
+            if isRequired {
+                Text(l.tr(
+                    zh: "必填",
+                    en: "Required",
+                    de: "Erforderlich",
+                    es: "Obligatorio",
+                    pt: "Obrigatório",
+                    fr: "Requis",
+                    ja: "必須",
+                    ko: "필수",
+                    it: "Obbligatorio"
+                ))
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+            }
+        }
     }
 
     private func editField(
@@ -772,27 +691,16 @@ private extension HumanBasicInfoDetailContentView {
     }
 
     private var countryOptions: [String] {
-        var options = [""] + PetBreedDatabase.countries
-        if profileExperienceStyle != .zen,
-           !eNationality.isEmpty,
-           !options.contains(eNationality) {
-            options.insert(eNationality, at: 1)
-        }
-        return options
+        [""] + PetBreedDatabase.sortedCountries(l: l)
     }
 
     private var residenceCityOptions: [String] {
-        let base = eNationality.isEmpty
+        let base = eResidenceCountry.isEmpty
             ? [""]
-            : [""] + PetBreedDatabase.cities(for: eNationality)
+            : [""] + PetBreedDatabase.sortedCities(for: eResidenceCountry, l: l)
         var options = base
-        if profileExperienceStyle == .zen, !options.contains("其他") {
+        if !options.contains("其他") {
             options.append("其他")
-        }
-        if profileExperienceStyle != .zen,
-           !eCity.isEmpty,
-           !options.contains(eCity) {
-            options.insert(eCity, at: 1)
         }
         return options
     }
@@ -802,7 +710,7 @@ private extension HumanBasicInfoDetailContentView {
             get: { eUsesCustomNationality ? "其他" : eNationality },
             set: { selection in
                 withAnimation(GoMotion.selection) {
-                    if profileExperienceStyle == .zen, selection == "其他" {
+                    if selection == "其他" {
                         eUsesCustomNationality = true
                         eNationality = ""
                     } else {
@@ -815,12 +723,37 @@ private extension HumanBasicInfoDetailContentView {
         )
     }
 
+    private var residenceCountryPickerSelection: Binding<String> {
+        Binding(
+            get: { eUsesCustomResidenceCountry ? "其他" : eResidenceCountry },
+            set: { selection in
+                withAnimation(GoMotion.selection) {
+                    let changedCountry = selection != eResidenceCountry
+                    if selection == "其他" {
+                        eUsesCustomResidenceCountry = true
+                        eResidenceCountry = ""
+                        eUsesCustomResidence = true
+                    } else {
+                        eUsesCustomResidenceCountry = false
+                        eCustomResidenceCountry = ""
+                        eResidenceCountry = selection
+                    }
+                    if changedCountry {
+                        eCity = ""
+                        eCustomResidence = ""
+                        eUsesCustomResidence = selection == "其他"
+                    }
+                }
+            }
+        )
+    }
+
     private var residencePickerSelection: Binding<String> {
         Binding(
             get: { eUsesCustomResidence ? "其他" : eCity },
             set: { selection in
                 withAnimation(GoMotion.selection) {
-                    if profileExperienceStyle == .zen, selection == "其他" {
+                    if selection == "其他" {
                         eUsesCustomResidence = true
                         eCity = ""
                     } else {
@@ -838,9 +771,21 @@ private extension HumanBasicInfoDetailContentView {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var resolvedResidence: String {
+    private var resolvedResidenceCountry: String {
+        (eUsesCustomResidenceCountry ? eCustomResidenceCountry : eResidenceCountry)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var resolvedResidenceCity: String {
         (eUsesCustomResidence ? eCustomResidence : eCity)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var resolvedResidence: String {
+        MemberResidenceValue(
+            country: resolvedResidenceCountry,
+            city: resolvedResidenceCity
+        ).storedValue
     }
 
     private var heightValue: Double {
@@ -942,7 +887,7 @@ private extension HumanBasicInfoDetailContentView {
             editLabel(title)
             Spacer()
             Toggle("", isOn: isOn)
-                .tint(profileExperienceStyle == .zen ? profileEditAccent : Color.goYellow)
+                .tint(profileEditAccent)
                 .labelsHidden()
                 .accessibilityLabel(title)
         }
@@ -958,35 +903,16 @@ private extension HumanBasicInfoDetailContentView {
     }
 
     private var profileEditAccent: Color {
-        guard profileExperienceStyle == .zen else { return Color.goPrimary }
         let value = eThemeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? Color.goPrimary : Color(hex: value)
     }
 
     private var profileEditAccentForeground: Color {
-        guard profileExperienceStyle == .zen else { return Color.arkInk }
         let value = eThemeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
         let hex = value.isEmpty ? "C8F34A" : value
         return WalletPetCardTheme.prefersDarkForeground(for: hex)
             ? Color.arkInk
             : Color.goCardWhite
-    }
-
-    private var daysTogether: Int {
-        max(0, Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0)
-    }
-
-    private var hasHumanBodyDetails: Bool {
-        !human.bloodType.isEmpty ||
-            (human.heightCm > 0 && human.heightCm.isFinite) ||
-            !human.mbti.isEmpty
-    }
-
-    private var privacySummary: String {
-        let titles = HumanPrivateField.allCases
-            .filter { human.privateFields.contains($0.rawValue) }
-            .map(localizedPrivateFieldTitle)
-        return titles.isEmpty ? l.tr(zh: "全部公开", en: "All visible", de: "Alles sichtbar") : titles.joined(separator: l.tr(zh: "、", en: ", ", de: ", "))
     }
 
     private var displayNotes: String {
@@ -1019,19 +945,22 @@ private extension HumanBasicInfoDetailContentView {
         eMBTIInformation = mbti[1]
         eMBTIDecision = mbti[2]
         eMBTILifestyle = mbti[3]
-        eUsesCustomNationality = profileExperienceStyle == .zen &&
-            !human.nationality.isEmpty &&
+        eUsesCustomNationality = !human.nationality.isEmpty &&
             !PetBreedDatabase.countries.contains(human.nationality)
         eCustomNationality = eUsesCustomNationality ? human.nationality : ""
         eNationality = eUsesCustomNationality ? "" : human.nationality
-        let recognizedResidenceOptions = eNationality.isEmpty
+        let residence = MemberResidenceValue(storedValue: human.city)
+        eUsesCustomResidenceCountry = !residence.country.isEmpty &&
+            !PetBreedDatabase.countries.contains(residence.country)
+        eCustomResidenceCountry = eUsesCustomResidenceCountry ? residence.country : ""
+        eResidenceCountry = eUsesCustomResidenceCountry ? "" : residence.country
+        let recognizedResidenceOptions = eResidenceCountry.isEmpty
             ? []
-            : PetBreedDatabase.cities(for: eNationality)
-        eUsesCustomResidence = profileExperienceStyle == .zen &&
-            !human.city.isEmpty &&
-            !recognizedResidenceOptions.contains(human.city)
-        eCustomResidence = eUsesCustomResidence ? human.city : ""
-        eCity = eUsesCustomResidence ? "" : human.city
+            : PetBreedDatabase.cities(for: eResidenceCountry)
+        eUsesCustomResidence = !residence.city.isEmpty &&
+            !recognizedResidenceOptions.contains(residence.city)
+        eCustomResidence = eUsesCustomResidence ? residence.city : ""
+        eCity = eUsesCustomResidence ? "" : residence.city
         eThemeColorHex = human.safeThemeColorHex
         eNotes = displayNotes
         ePrivateWeight = human.privateFields.contains(HumanPrivateField.weight.rawValue)
@@ -1112,7 +1041,9 @@ private extension HumanBasicInfoDetailContentView {
     }
 
     private func localizedOptionTitle(_ option: String) -> String {
-        option.isEmpty ? localizedEmptyValue : option
+        option.isEmpty
+            ? localizedEmptyValue
+            : PetBreedDatabase.localizedRegionName(option, l: l)
     }
 
     private func localizedRoleText(for raw: String) -> String {
@@ -1122,23 +1053,6 @@ private extension HumanBasicInfoDetailContentView {
     private func localizedGenderTitle(for raw: String) -> String {
         let title = HumanProfileOptions.localizedGenderTitle(raw, l: l)
         return title.isEmpty ? localizedEmptyValue : title
-    }
-
-    private func localizedPrivateFieldTitle(_ field: HumanPrivateField) -> String {
-        switch field {
-        case .weight:
-            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
-        case .workout:
-            l.tr(zh: "运动", en: "Workouts", de: "Training")
-        case .medication:
-            l.tr(zh: "吃药提醒", en: "Medication", de: "Medikamente")
-        case .wishlist:
-            l.tr(zh: "椰子资产与心愿", en: "Coconut Assets & Wishes", de: "Kokosnussvermögen & Wünsche")
-        case .expense:
-            l.tr(zh: "花费", en: "Expenses", de: "Ausgaben")
-        case .note:
-            l.tr(zh: "备注", en: "Notes", de: "Notizen")
-        }
     }
 
     private func deleteHumanAndReturnHome(
