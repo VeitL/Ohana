@@ -1,6 +1,6 @@
 # Privacy & Store Compliance
 
-Last reviewed: 2026-08-02
+Last reviewed: 2026-08-04
 
 Ohana stores sensitive local data (health, medication, insurance, documents,
 photos, location traces, family member info). Because the app ships with German
@@ -15,6 +15,10 @@ in-app member-privacy/PIN rules in `docs/app-architecture-governance.md`.
   `NSPrivacyAccessedAPICategorySystemBootTime` (`35F9.1`),
   `NSPrivacyTracking=false`, empty tracking domains, and an empty
   `NSPrivacyCollectedDataTypes` array for the local Free / Personal release.
+  `OhanaWidgets/PrivacyInfo.xcprivacy` separately declares no tracking, no
+  collection, and an empty required-reason list because its Release executable
+  uses none of Apple's currently listed APIs; the resource audit and privacy
+  contract test cover both manifests.
   Re-audit it whenever another required-reason API (disk space, system boot time,
   active keyboards, etc.) or any data collection/network call is added. At every
   release, also compare the final dependency set against Apple's then-current

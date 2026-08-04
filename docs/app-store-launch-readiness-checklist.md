@@ -19,12 +19,12 @@
 
 | Gate | 当前判断 | 关闭条件 |
 | --- | --- | --- |
-| G0：冻结 RC 与重建状态基线 | 本地源码冻结；替代 development-signed Archive 待生成 | 当前完整 Unit 2,310/2,310 和发行静态门通过；132-selector UI campaign 的 2 个失败已精确复验 2/2，受保护 Dogfood 通过；commit `64e3d6ba0` 的本地 Release Archive 已用于预检，但 Widget manifest 精度修复后须从新的干净 commit 生成替代 Archive |
-| G1：首发裁剪与隐私清单 | Required Reason 扫描完成；替代 Archive/Privacy Report 待生成 | Guardian UI/runtime/deep link、源码 entitlement/Info.plist 与隐私清单已按 Solo 收敛；development-signed 预检发现并移除 Widget 多报的 File Timestamp 类别，仍须从修复后的 Archive 重复核验，并继续关闭 Developer Portal、distribution profile 与最终 distribution-signed Archive 门禁 |
+| G0：冻结 RC 与重建状态基线 | 本地源码冻结与 development-signed Archive 完成 | 当前完整 Unit 2,310/2,310 和发行静态门通过；132-selector UI campaign 的 2 个失败已精确复验 2/2，受保护 Dogfood 通过；commit `3ee93cf718` 的替代 WMO Release Archive 已生成并记录，最终 distribution artifact 身份仍须另行记录 |
+| G1：首发裁剪与隐私清单 | 当前 RC Archive/Privacy Report 预检完成，distribution 签名仍阻塞 | Guardian UI/runtime/deep link、源码 entitlement/Info.plist 与隐私清单已按 Solo 收敛；Widget 多报的 File Timestamp 类别已移除，替代 development-signed Archive 与 Xcode Privacy Report 已核验；仍须关闭 Developer Portal、distribution profile 与最终 distribution-signed Archive 门禁 |
 | G2：Free / Personal 真实商店闭环 | 阻塞 | App Store Connect 商品、协议、税务、银行、九语言元数据、Sandbox、退款/撤销、第二设备恢复全部通过 |
 | G3：Widget / Live Activity 签名能力 | 阻塞 | 注册 App Group；App 与 Widget distribution profile 匹配；当前签名包在真机完成 Widget、锁屏和 Dynamic Island 验收 |
 | G4：商店资料与合规 | 仓库草案完成，外部状态未知 | 九语言元数据与审核填写包已准备；截图、年龄分级、DSA、隐私、出口合规、账户字段仍须在 App Store Connect 完成 |
-| G5：当前签名包 RC 验收 | 旧 development-signed 包已完成预检；替代包待生成 | 当前 Unit/静态、失败已清零的 UI campaign、受保护 Dogfood 和 commit `64e3d6ba0` 的本地 Release Archive 已记录；Widget manifest 精度修复使该包成为历史证据，仍须生成替代 development-signed Archive、最终 distribution-signed artifact，并完成 TestFlight/Sandbox 和真机 R0–R7 |
+| G5：当前签名包 RC 验收 | 本地 development-signed RC 验收完成，外部门禁阻塞 | 当前 Unit/静态、失败已清零的 UI campaign、受保护 Dogfood 和 commit `3ee93cf718` 的替代 Release Archive 已记录；仍须生成最终 distribution-signed artifact，并完成 TestFlight/Sandbox 和真机 R0–R7 |
 
 活动总账已于 2026-08-03 区分 7 月 29 日历史证据与当前本地证据。当前结构审计记录 13 个 open follow-up：
 P0 = 0、P1 = 8、P2 = 4、P3 = 1；“首发可达实现/证明缺口的 P1 = 2”是
@@ -44,21 +44,25 @@ failures，发行静态门通过。当前 132-selector / 9-shard UI campaign 记
 2 fail；修复后两个原失败 selector 精确复验 2/2。按产品负责人要求，没有为合并数字而
 重跑未变化的完整 campaign，因此不得写成单次 132/132。受保护 Dogfood WMO Release
 overlay 与正常 UI Human detail/gender menu open-cancel 通过，sealed store 保持完整。
-commit `64e3d6ba0` 冻结当前本地 RC 源码身份。Xcode 26.6 已从该 commit 生成
-`Ohana 1.0 (1)` arm64 Release Archive；`codesign`、主 App/Widget test-surface
-artifact scan 与 Archive 元数据检查通过。该包使用 Apple Development profile 且
-`get-task-allow=true`，因此只关闭本地 development-signed 预检，不替代最终
-App Store distribution artifact。Xcode Organizer 从该 Archive 生成的 Privacy Report
-是有效的一页空白 PDF：归档内主 App 与 Widget 都声明不跟踪且
-`NSPrivacyCollectedDataTypes` 为空，因此没有 Nutrition Label 条目；required-reason
-API 仍由两份 `PrivacyInfo.xcprivacy` 单独核对。报告 SHA-256 为
-`bc5523c13c40ed0811d4794d722050c150d3985d2f689afb23830b8f9d74b5b0`。随后按 Apple
-当前五类 API 清单复核源码与归档可执行文件，确认主 App 使用且完整声明
-User Defaults、File Timestamp、System Boot Time，没有 Disk Space 或 Active Keyboards；
-项目没有第三方 package/framework。Widget 不使用任何列出的 required-reason API，
-因此其原 `FileTimestamp/C617.1` 属于多报，源码 manifest 已改为空类别，并新增契约测试
-与资源审计。该修复使 `64e3d6ba0` Archive 成为历史预检证据，须由修复后的干净
-commit 重建替代 Archive 与 Privacy Report。
+commit `3ee93cf718` 冻结当前本地 RC 源码身份。Xcode 26.6 / iOS 26.5 SDK 已从该
+commit 生成 `Ohana 1.0 (1)` arm64 WMO Release Archive；`codesign`、主 App/Widget
+test-surface artifact scan 与 Archive 元数据检查通过。该包使用 Apple Development
+profile 且 `get-task-allow=true`，因此只关闭本地 development-signed 预检，不替代
+最终 App Store distribution artifact。Archive 创建于 2026-08-04 09:43:51 CEST；
+按“排序相对路径 + entry type + 文件内容/符号链接目标”计算的 canonical tree SHA-256
+为 `c52bc0b3dd5511e99593af4fafd61c387b52f7e2abc88274e21854d87f1f3e30`
+（838 entries / 798 regular files），Archive `Info.plist` SHA-256 为
+`a239fe3772f13c68aaccca4c13ff3d266a335cc3259fb0c0b27a1ff498bdb46e`。
+
+按 Apple 2026-08-04 当前五类 API 清单复核源码与替代 Archive 可执行文件：主 App
+使用且完整声明 User Defaults、File Timestamp、System Boot Time，没有 Disk Space
+或 Active Keyboards；项目没有第三方 package/framework。Widget 不使用任何列出的
+required-reason API，其 manifest 已为空 `NSPrivacyAccessedAPITypes`；两份嵌入清单
+都声明不跟踪且不收集数据。Xcode Organizer 从替代 Archive 生成 805-byte、可解析但
+无内容的单页 PDF（`MediaBox=[0,0,0,0]`、content `q Q`、无文本/annotation；Poppler
+按 Letter fallback 渲染纯白页）。结合两份 manifest，可推断没有可展示的 Nutrition
+Label 条目；required-reason API 仍由 manifest/源码/二进制扫描单独证明。报告
+SHA-256 为 `c8c5c6f8553b5542971d20093788716da1393926eee5975c203abcb0e3f778d9`。
 
 ## G0：先冻结一个真正的 RC
 
@@ -66,14 +70,17 @@ commit 重建替代 Archive 与 Privacy Report。
 
 - [ ] 确认 1.0 只包含 Free + Personal；Family SKU、入口、账号、APNs 守护和后端
   均不发布。
-- [ ] 确认 iPhone-only、最低 iOS 26.2、版本 `1.0` 是最终产品选择。
+- [x] 确认 iPhone-only、最低 iOS 26.2、版本 `1.0` 是最终产品选择；替代 Archive
+  的 `UIDeviceFamily=[1]`、`MinimumOSVersion=26.2`、版本 `1.0 (1)` 与之相符。
 - [x] 确认 V97/V98 的 Human 健康状况、观察、手动指标与 Personal 本机化验单
   扫描进入 1.0；原始图片/OCR 不持久化，结构化结果须经用户复核后原子保存。
 - [x] 本清单所在 commit 是可追溯的本地 RC 源码身份；不得从后续 dirty worktree
   归档或提交。
 - [ ] 固定 `MARKETING_VERSION = 1.0` 和唯一递增的 build number。当前工程是
   `1.0 (1)`；如果 build 1 已上传过，必须递增。
-- [ ] 记录 RC 所用 Xcode、SDK、commit、build、Archive SHA-256 和构建时间。
+- [x] 记录本地 RC 预检身份：Xcode 26.6、iOS 26.5 SDK、commit `3ee93cf718`、
+  build `1`、2026-08-04 09:43:51 CEST，以及上述 Archive canonical tree / Info.plist
+  SHA-256；最终 distribution-signed artifact 仍须获得自己的独立身份。
 
 本机已有 Xcode 26.6 / iOS 26.5 SDK，满足 Apple 自 2026-04-28 起要求使用
 Xcode 26+ 与 iOS 26+ SDK 上传的门槛。最低部署版本 iOS 26.2 是 Ohana 自己的产品
@@ -182,6 +189,10 @@ distribution profile、最终 signed Archive 或 Privacy Report 证据。
   `remote-notification`。
 - [ ] 检查 Developer Portal 与 Solo 1.0 App Store distribution profiles 只授予上述
   发行能力。
+- [x] 当前 development-signed Archive 的生成 `Info.plist` 和签名 entitlement 已检查：
+  主 App 只有 HealthKit、CloudDocuments、生产 App Group，Widget 只有同一 App Group；
+  没有 Sign in with Apple、APNs、`remote-notification`、Guardian keys、CloudKit 或
+  Associated Domains。
 - [ ] 检查最终 Archive 内生成的 `Info.plist` 和签名 entitlement；不得重新引入
   Sign in with Apple、APNs、`remote-notification`、Guardian keys、CloudKit 或
   Associated Domains。
@@ -196,16 +207,17 @@ distribution profile、最终 signed Archive 或 Privacy Report 证据。
 
 - [x] App privacy manifest 已增加
   `NSPrivacyAccessedAPICategorySystemBootTime` / `35F9.1`。
-- [x] 优化版 unsigned Release 已分别嵌入主 App 与 Widget privacy manifest；
-  两者都声明不跟踪、无 collected-data 条目，Widget 保留
-  `FileTimestamp` / `C617.1`。
+- [x] commit `3ee93cf718` 的替代 development-signed Archive 已分别嵌入主 App 与
+  Widget privacy manifest；两者都声明不跟踪、无 collected-data 条目，Widget 的
+  `NSPrivacyAccessedAPITypes` 为空。
 - [x] 依据 Xcode 26.6 / iOS 26.5 SDK 与 Apple 2026-08-04 当前清单，重新扫描源码、
   主 App/Widget Archive 可执行文件及依赖：主 App 只使用已声明的 User Defaults、
   File Timestamp、System Boot Time；未发现 Disk Space、Active Keyboards 或第三方
   package/framework。
-- [x] 从 commit `64e3d6ba0` 的本地 development-signed Release Archive 生成并人工
-  核对 Xcode Privacy Report；报告是有效的一页空白 PDF，与主 App/Widget 的
-  `NSPrivacyTracking=false`、空 `NSPrivacyCollectedDataTypes` 一致。
+- [x] 从 commit `3ee93cf718` 的替代 development-signed Release Archive 生成并人工
+  核对 Xcode Privacy Report；Xcode 输出上述零面积、无内容 PDF，Poppler 渲染纯白，
+  与主 App/Widget 的 `NSPrivacyTracking=false`、空 `NSPrivacyCollectedDataTypes`
+  一致。
 - [ ] 从最终 App Store distribution-signed Archive 再生成一次 Privacy Report，确认
   内容与上述 RC 预检一致；不能以 development profile 代替最终分发证据。
 - [x] Widget 自己的 `PrivacyInfo.xcprivacy` 已移除未使用的
@@ -317,13 +329,19 @@ App Store Connect 的 Support URL 必须是公开 HTTPS 页面；App 内保留 `
 
 ### 3.2 最终 Archive 检查
 
-- [ ] 用冻结的 RC 源码生成 WMO signed Archive。
-- [ ] App 与 Widget 的版本/build、deployment target、bundle ID 和 App Group 一致。
-- [ ] `UIDeviceFamily = [1]`；不包含 iPad app、watchOS app 或 complication。
-- [ ] 主 App 只内嵌预期的 `OhanaWidgets.appex`。
-- [ ] 对主 App 和 extension 分别执行 strict codesign / entitlement 检查。
-- [ ] Archive 不含 FinderInfo、ResourceFork、quarantine、测试 fixture、Debug
-  菜单、seed/reset 参数入口或测试 StoreKit 配置。
+- [x] 从冻结的 commit `3ee93cf718` 生成本地 development-signed WMO Archive。
+- [x] 当前 Archive 的 App 与 Widget 版本/build、deployment target、bundle ID 和
+  App Group 一致。
+- [x] 当前 Archive `UIDeviceFamily = [1]`，不包含 iPad app、watchOS app 或
+  complication。
+- [x] 当前 Archive 主 App 只内嵌预期的 `OhanaWidgets.appex`。
+- [x] 当前 Archive 对主 App 和 extension 分别通过 strict codesign / entitlement
+  检查。
+- [x] 当前 Archive 不含 FinderInfo、ResourceFork、quarantine、测试 fixture、Debug
+  菜单、seed/reset 参数入口或测试 StoreKit 配置；源码 1,187 文件、产物 2 个
+  executable 的 test-surface 扫描均为 0 违规。
+- [ ] 从最终 App Store distribution-signed Archive 重复上述全部检查；当前 Apple
+  Development profile 与 `get-task-allow=true` 不能关闭分发门禁。
 - [ ] 检查最终 `Assets.car`、IPA 下载/安装体积和启动时间。当前图标已是
   1024×1024、无 alpha；xcassets 源体积接近仓库 review threshold，仍需看最终产物。
 
