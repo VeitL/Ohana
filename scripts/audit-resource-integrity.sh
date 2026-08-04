@@ -51,7 +51,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-for path in Resources Ohana/Assets.xcassets Ohana/PrivacyInfo.xcprivacy; do
+for path in Resources Ohana/Assets.xcassets Ohana/PrivacyInfo.xcprivacy OhanaWidgets/PrivacyInfo.xcprivacy; do
   [[ -e "$path" ]] && scan_roots+=("$path")
 done
 while IFS= read -r lproj; do
@@ -343,13 +343,15 @@ fi
 
 echo
 echo "== Privacy manifest packaging =="
-if [[ ! -f "Ohana/PrivacyInfo.xcprivacy" ]]; then
-  fail "Ohana/PrivacyInfo.xcprivacy is missing."
-elif ! plutil -lint "Ohana/PrivacyInfo.xcprivacy" >/dev/null; then
-  fail "Ohana/PrivacyInfo.xcprivacy is not valid plist syntax."
-else
-  echo "ok  Ohana/PrivacyInfo.xcprivacy"
-fi
+for manifest in Ohana/PrivacyInfo.xcprivacy OhanaWidgets/PrivacyInfo.xcprivacy; do
+  if [[ ! -f "$manifest" ]]; then
+    fail "$manifest is missing."
+  elif ! plutil -lint "$manifest" >/dev/null; then
+    fail "$manifest is not valid plist syntax."
+  else
+    echo "ok  $manifest"
+  fi
+done
 
 if [[ ${#failures[@]} -eq 0 ]]; then
   echo

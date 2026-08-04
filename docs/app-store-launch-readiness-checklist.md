@@ -2,7 +2,7 @@
 
 > 文档性质：Release owner 的执行清单；不替代状态总账。
 >
-> 核对日期：2026-08-03。
+> 核对日期：2026-08-04。
 >
 > 当前结论：**NO-GO，暂不可提交 App Review。**
 >
@@ -19,12 +19,12 @@
 
 | Gate | 当前判断 | 关闭条件 |
 | --- | --- | --- |
-| G0：冻结 RC 与重建状态基线 | 本地源码冻结完成 | 当前完整 Unit 2,310/2,310 和发行静态门通过；132-selector UI campaign 的 2 个失败已精确复验 2/2，受保护 Dogfood 通过；本清单所在 commit 是可追溯源码身份，签名 artifact 身份仍须另行记录 |
-| G1：首发裁剪与隐私清单 | 源码清理完成，签名验收仍阻塞 | Guardian UI/runtime/deep link、源码 entitlement/Info.plist 与隐私清单已按 Solo 收敛；仍须核对 Developer Portal、distribution profile、最终 signed Archive 与 Privacy Report |
+| G0：冻结 RC 与重建状态基线 | 本地源码冻结；替代 development-signed Archive 待生成 | 当前完整 Unit 2,310/2,310 和发行静态门通过；132-selector UI campaign 的 2 个失败已精确复验 2/2，受保护 Dogfood 通过；commit `64e3d6ba0` 的本地 Release Archive 已用于预检，但 Widget manifest 精度修复后须从新的干净 commit 生成替代 Archive |
+| G1：首发裁剪与隐私清单 | Required Reason 扫描完成；替代 Archive/Privacy Report 待生成 | Guardian UI/runtime/deep link、源码 entitlement/Info.plist 与隐私清单已按 Solo 收敛；development-signed 预检发现并移除 Widget 多报的 File Timestamp 类别，仍须从修复后的 Archive 重复核验，并继续关闭 Developer Portal、distribution profile 与最终 distribution-signed Archive 门禁 |
 | G2：Free / Personal 真实商店闭环 | 阻塞 | App Store Connect 商品、协议、税务、银行、九语言元数据、Sandbox、退款/撤销、第二设备恢复全部通过 |
 | G3：Widget / Live Activity 签名能力 | 阻塞 | 注册 App Group；App 与 Widget distribution profile 匹配；当前签名包在真机完成 Widget、锁屏和 Dynamic Island 验收 |
 | G4：商店资料与合规 | 仓库草案完成，外部状态未知 | 九语言元数据与审核填写包已准备；截图、年龄分级、DSA、隐私、出口合规、账户字段仍须在 App Store Connect 完成 |
-| G5：当前签名包 RC 验收 | 本地源码冻结完成，签名验收阻塞 | 当前 Unit/静态、失败已清零的 UI campaign 和受保护 Dogfood 已记录；仍须从本清单所在 commit 生成 signed Archive，并完成 TestFlight/Sandbox 和真机 R0–R7 |
+| G5：当前签名包 RC 验收 | 旧 development-signed 包已完成预检；替代包待生成 | 当前 Unit/静态、失败已清零的 UI campaign、受保护 Dogfood 和 commit `64e3d6ba0` 的本地 Release Archive 已记录；Widget manifest 精度修复使该包成为历史证据，仍须生成替代 development-signed Archive、最终 distribution-signed artifact，并完成 TestFlight/Sandbox 和真机 R0–R7 |
 
 活动总账已于 2026-08-03 区分 7 月 29 日历史证据与当前本地证据。当前结构审计记录 13 个 open follow-up：
 P0 = 0、P1 = 8、P2 = 4、P3 = 1；“首发可达实现/证明缺口的 P1 = 2”是
@@ -44,8 +44,21 @@ failures，发行静态门通过。当前 132-selector / 9-shard UI campaign 记
 2 fail；修复后两个原失败 selector 精确复验 2/2。按产品负责人要求，没有为合并数字而
 重跑未变化的完整 campaign，因此不得写成单次 132/132。受保护 Dogfood WMO Release
 overlay 与正常 UI Human detail/gender menu open-cancel 通过，sealed store 保持完整。
-本清单所在 commit 冻结唯一的本地 RC 源码身份；下一步不是上传，而是从该 commit 生成
-并核验唯一 signed Archive，再关闭签名能力与外部门禁。
+commit `64e3d6ba0` 冻结当前本地 RC 源码身份。Xcode 26.6 已从该 commit 生成
+`Ohana 1.0 (1)` arm64 Release Archive；`codesign`、主 App/Widget test-surface
+artifact scan 与 Archive 元数据检查通过。该包使用 Apple Development profile 且
+`get-task-allow=true`，因此只关闭本地 development-signed 预检，不替代最终
+App Store distribution artifact。Xcode Organizer 从该 Archive 生成的 Privacy Report
+是有效的一页空白 PDF：归档内主 App 与 Widget 都声明不跟踪且
+`NSPrivacyCollectedDataTypes` 为空，因此没有 Nutrition Label 条目；required-reason
+API 仍由两份 `PrivacyInfo.xcprivacy` 单独核对。报告 SHA-256 为
+`bc5523c13c40ed0811d4794d722050c150d3985d2f689afb23830b8f9d74b5b0`。随后按 Apple
+当前五类 API 清单复核源码与归档可执行文件，确认主 App 使用且完整声明
+User Defaults、File Timestamp、System Boot Time，没有 Disk Space 或 Active Keyboards；
+项目没有第三方 package/framework。Widget 不使用任何列出的 required-reason API，
+因此其原 `FileTimestamp/C617.1` 属于多报，源码 manifest 已改为空类别，并新增契约测试
+与资源审计。该修复使 `64e3d6ba0` Archive 成为历史预检证据，须由修复后的干净
+commit 重建替代 Archive 与 Privacy Report。
 
 ## G0：先冻结一个真正的 RC
 
@@ -186,9 +199,18 @@ distribution profile、最终 signed Archive 或 Privacy Report 证据。
 - [x] 优化版 unsigned Release 已分别嵌入主 App 与 Widget privacy manifest；
   两者都声明不跟踪、无 collected-data 条目，Widget 保留
   `FileTimestamp` / `C617.1`。
-- [ ] 重新扫描 App、Widget 和任何依赖的全部 required-reason API。
-- [ ] 从最终 Archive 生成并人工核对 Xcode Privacy Report；不能只 lint 源 plist。
-- [ ] 保持 Widget 自己的 `PrivacyInfo.xcprivacy` 与其可执行代码一致。
+- [x] 依据 Xcode 26.6 / iOS 26.5 SDK 与 Apple 2026-08-04 当前清单，重新扫描源码、
+  主 App/Widget Archive 可执行文件及依赖：主 App 只使用已声明的 User Defaults、
+  File Timestamp、System Boot Time；未发现 Disk Space、Active Keyboards 或第三方
+  package/framework。
+- [x] 从 commit `64e3d6ba0` 的本地 development-signed Release Archive 生成并人工
+  核对 Xcode Privacy Report；报告是有效的一页空白 PDF，与主 App/Widget 的
+  `NSPrivacyTracking=false`、空 `NSPrivacyCollectedDataTypes` 一致。
+- [ ] 从最终 App Store distribution-signed Archive 再生成一次 Privacy Report，确认
+  内容与上述 RC 预检一致；不能以 development profile 代替最终分发证据。
+- [x] Widget 自己的 `PrivacyInfo.xcprivacy` 已移除未使用的
+  `FileTimestamp/C617.1`，当前声明无 tracking、无 collection、无 required-reason API；
+  `OnlineFeatureGateTests` 13/13 与资源完整性审计通过。
 
 Apple 自 2024-05-01 起要求上传包为 required-reason API 提供获批理由；漏报会阻止
 App Store Connect 接受提交。

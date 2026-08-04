@@ -9,7 +9,7 @@
 
 ## Current Read
 
-- Last compacted: 2026-08-03.
+- Last compacted: 2026-08-04.
 - Open follow-ups: 13 total: P1 = 8, P2 = 4, P3 = 1.
 - Open P0: 0.
 - Current local evidence: the complete Unit suite executes 2,310 tests with 0
@@ -19,8 +19,12 @@
   Per the product owner's instruction the unchanged full campaign was not rerun,
   so no single-pass 132/132 claim is made. One guarded WMO Release overlay and
   normal-UI Human detail/gender-menu open-cancel journey pass with the sealed
-  existing-user store intact. Signed Archive and physical-device lanes remain
-  separate.
+  existing-user store intact. Commit `64e3d6ba0` also has a verified local
+  Apple Development-signed Release Archive and an Archive-generated Xcode
+  Privacy Report. Its follow-up Required Reason audit found Widget overdeclared
+  File Timestamp despite using none of Apple's listed APIs; source manifest,
+  test and resource gate are fixed, so a replacement local Archive remains due.
+  The distribution-signed Archive and physical-device lanes remain separate.
 - First-release product/configuration gap: 1.0 remains iPhone-only,
   iOS 26.2+, Free plus Personal. The repository now contains nine-locale
   App metadata, 36 IAP localization drafts for Monthly/Yearly/Lifetime plus
@@ -37,9 +41,14 @@
   the Solo privacy manifest declares no developer collection. The authorized
   source cleanup has removed Sign in with Apple, APNs, Guardian keys and
   `remote-notification`, while preserving HealthKit, CloudDocuments, the
-  production App Group, `fetch` and active-walk `location`. Developer Portal,
-  distribution profile, final signed Archive and Privacy Report verification
-  remain open.
+  production App Group, `fetch` and active-walk `location`. The current local
+  Archive's App/Widget entitlements and embedded privacy manifests pass
+  inspection; its one-page blank Privacy Report is consistent with both
+  manifests declaring no tracking and no collected data. The post-Archive scan
+  confirms the App's three declared required-reason categories and no third-party
+  package/framework, and removes Widget's unused File Timestamp declaration.
+  A replacement development-signed Archive, Developer Portal, distribution
+  profiles, and repetition from the final distribution-signed Archive remain open.
 - Current decision: close TFU-20260715-003 and TFU-20260720-001 before final
   signed-device RC acceptance. The remaining CloudKit P1 is explicitly
   deferred and unreachable in the local-only first release. The future

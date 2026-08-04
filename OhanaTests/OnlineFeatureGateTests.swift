@@ -111,6 +111,21 @@ struct OnlineFeatureGateTests {
         #expect(reasonsByType["NSPrivacyAccessedAPICategorySystemBootTime"] == ["35F9.1"])
     }
 
+    @Test func widgetPrivacyManifestDeclaresOnlyItsActualPrivacySurface() throws {
+        let manifest = try propertyListDictionary(
+            repositoryRootURL().appendingPathComponent("OhanaWidgets/PrivacyInfo.xcprivacy")
+        )
+        let tracking = try #require(manifest["NSPrivacyTracking"] as? Bool)
+        let trackingDomains = try #require(manifest["NSPrivacyTrackingDomains"] as? [Any])
+        let collected = try #require(manifest["NSPrivacyCollectedDataTypes"] as? [Any])
+        let accessed = try #require(manifest["NSPrivacyAccessedAPITypes"] as? [Any])
+
+        #expect(!tracking)
+        #expect(trackingDomains.isEmpty)
+        #expect(collected.isEmpty)
+        #expect(accessed.isEmpty)
+    }
+
     @Test func blockedShareNoticeHasVisibleLaunchCopy() {
         let reason = OnlineFeatureGateNoticeReason.cloudShareInviteBlocked
 
