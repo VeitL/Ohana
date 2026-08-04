@@ -20,8 +20,8 @@ extension SettingsView {
             .accessibilityIdentifier("settings-close-action")
         }
 
-        ToolbarItem(placement: .primaryAction) {
-            if SettingsDebugTools.isVisible {
+        #if DEBUG
+            ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button {
                         openCoconutBalanceDebugTool()
@@ -43,54 +43,56 @@ extension SettingsView {
                     Label(l.tr(zh: "调试工具", en: "Debug Tools", de: "Debug-Werkzeuge"), systemImage: "ellipsis.circle")
                 }
             }
-        }
+        #endif
     }
 
-    var settingsUITestShortcutSection: some View {
-        Section(l.tr(zh: "UI 测试快捷方式", en: "UI Test Shortcuts", de: "UI-Test-Kurzbefehle")) {
-            Button {
-                openCoconutBalanceDebugTool()
-            } label: {
-                Label(l.tr(zh: "Debug 椰子", en: "Debug Coconuts", de: "Debug-Kokosnüsse"), systemImage: "hammer.fill")
-            }
-            .accessibilityIdentifier("settings-debug-coconuts-shortcut")
+    #if DEBUG
+        var settingsUITestShortcutSection: some View {
+            Section(l.tr(zh: "UI 测试快捷方式", en: "UI Test Shortcuts", de: "UI-Test-Kurzbefehle")) {
+                Button {
+                    openCoconutBalanceDebugTool()
+                } label: {
+                    Label(l.tr(zh: "Debug 椰子", en: "Debug Coconuts", de: "Debug-Kokosnüsse"), systemImage: "hammer.fill")
+                }
+                .accessibilityIdentifier("settings-debug-coconuts-shortcut")
 
-            Button {
-                showingReminderObservability = true
-            } label: {
-                Label(l.tr(zh: "提醒可观测面板", en: "Reminder Observability", de: "Erinnerungsbeobachtung"), systemImage: "list.clipboard.fill")
-            }
-            .accessibilityIdentifier("settings-debug-reminder-observability-shortcut")
+                Button {
+                    showingReminderObservability = true
+                } label: {
+                    Label(l.tr(zh: "提醒可观测面板", en: "Reminder Observability", de: "Erinnerungsbeobachtung"), systemImage: "list.clipboard.fill")
+                }
+                .accessibilityIdentifier("settings-debug-reminder-observability-shortcut")
 
-            Button {
-                showingFamilyWeeklyReportDebug = true
-            } label: {
-                Label(l.tr(zh: "Debug 家庭周报", en: "Debug Weekly Report", de: "Debug-Wochenbericht"), systemImage: "chart.bar.doc.horizontal")
-            }
-            .accessibilityIdentifier("settings-debug-family-weekly-report-shortcut")
+                Button {
+                    showingFamilyWeeklyReportDebug = true
+                } label: {
+                    Label(l.tr(zh: "Debug 家庭周报", en: "Debug Weekly Report", de: "Debug-Wochenbericht"), systemImage: "chart.bar.doc.horizontal")
+                }
+                .accessibilityIdentifier("settings-debug-family-weekly-report-shortcut")
 
-            Button {
-                applyUITestRewardTierShortcut()
-            } label: {
-                Label(l.tr(zh: "Debug 奖励层", en: "Debug Reward Tier", de: "Debug-Belohnungsstufe"), systemImage: "bag.fill")
-            }
-            .accessibilityIdentifier("settings-debug-reward-tier-shortcut")
+                Button {
+                    applyUITestRewardTierShortcut()
+                } label: {
+                    Label(l.tr(zh: "Debug 奖励层", en: "Debug Reward Tier", de: "Debug-Belohnungsstufe"), systemImage: "bag.fill")
+                }
+                .accessibilityIdentifier("settings-debug-reward-tier-shortcut")
 
-            Button {
-                applyUITestEconomyBudgetResetShortcut()
-            } label: {
-                Label(l.tr(zh: "Debug 重置奖励预算", en: "Debug Reset Reward Budget", de: "Debug-Belohnungsbudget zurücksetzen"), systemImage: "arrow.counterclockwise.circle.fill")
-            }
-            .accessibilityIdentifier("settings-debug-economy-budget-reset-shortcut")
+                Button {
+                    applyUITestEconomyBudgetResetShortcut()
+                } label: {
+                    Label(l.tr(zh: "Debug 重置奖励预算", en: "Debug Reset Reward Budget", de: "Debug-Belohnungsbudget zurücksetzen"), systemImage: "arrow.counterclockwise.circle.fill")
+                }
+                .accessibilityIdentifier("settings-debug-economy-budget-reset-shortcut")
 
-            Button {
-                applyUITestPlantBaselineShortcut()
-            } label: {
-                Label(l.tr(zh: "Debug 植物基线", en: "Debug Plant Baseline", de: "Debug-Pflanzenbasis"), systemImage: "leaf.fill")
+                Button {
+                    applyUITestPlantBaselineShortcut()
+                } label: {
+                    Label(l.tr(zh: "Debug 植物基线", en: "Debug Plant Baseline", de: "Debug-Pflanzenbasis"), systemImage: "leaf.fill")
+                }
+                .accessibilityIdentifier("settings-debug-plant-baseline-shortcut")
             }
-            .accessibilityIdentifier("settings-debug-plant-baseline-shortcut")
         }
-    }
+    #endif
 
     func closeSettings() {
         if let onClose {

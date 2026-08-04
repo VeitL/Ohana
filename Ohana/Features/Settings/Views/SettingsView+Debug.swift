@@ -8,6 +8,7 @@
 import SwiftData
 import SwiftUI
 
+#if DEBUG
 enum SettingsDebugTools {
     static var isRunningUITests: Bool {
         #if DEBUG
@@ -231,3 +232,4 @@ extension SettingsView {
         return trimmed.isEmpty ? l.tr(zh: "宠物", en: "Pet", de: "Haustier") : trimmed
     }
 }
+#endif

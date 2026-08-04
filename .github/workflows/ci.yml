@@ -63,6 +63,8 @@ jobs:
         run: scripts/tests/run-ci-policy-tests.sh
       - name: UI test shard completeness
         run: scripts/audit-ui-test-shards.sh
+      - name: Release test-surface audit (whole repo, strict)
+        run: scripts/audit-release-test-surface.sh --all
       # Full-scope strict gates for UI V4 + accessibility + smoothness +
       # route first-frame safety. The
       # ratchet baseline is now zero; keep these direct `--all` scans required.

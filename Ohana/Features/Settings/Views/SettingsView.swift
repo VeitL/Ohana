@@ -43,10 +43,12 @@ struct SettingsView: View {
     @State var isRetryingCloudSyncNow = false
     @State var householdSyncStatusMessage: String? = nil
     @State var householdSyncErrorMessage: String? = nil
-    @State var showingCoconutBalanceTest = false
-    @State var showingReminderObservability = false
-    @State var showingUISpecShowcase = false
-    @State var showingFamilyWeeklyReportDebug = false
+    #if DEBUG
+        @State var showingCoconutBalanceTest = false
+        @State var showingReminderObservability = false
+        @State var showingUISpecShowcase = false
+        @State var showingFamilyWeeklyReportDebug = false
+    #endif
 
     init(
         homeHouseholds: [SettingsHouseholdSnapshot]? = nil,
@@ -187,77 +189,83 @@ struct SettingsView: View {
         )
     }
 
-    private var settingsDeveloperPresentationContent: AnyView {
-        AnyView(
-            settingsPrimaryPresentationContent
-        .sheet(isPresented: $showingCoconutBalanceTest) {
-            NavigationStack {
-                CoconutBalanceTestView()
-            }
-            .ohanaSheetPagePresentation() // ui-v4: allow developer balance console as long sheet
-        }
-        .sheet(isPresented: $showingReminderObservability) {
-            NavigationStack {
-                ReminderObservabilityView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button {
-                                showingReminderObservability = false
-                            } label: {
-                                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
-                            }
-                            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                            .accessibilityIdentifier("reminder-observability-close-action")
-                        }
+    #if DEBUG
+        private var settingsDeveloperPresentationContent: AnyView {
+            AnyView(
+                settingsPrimaryPresentationContent
+                .sheet(isPresented: $showingCoconutBalanceTest) {
+                    NavigationStack {
+                        CoconutBalanceTestView()
                     }
-            }
-            .ohanaSheetPagePresentation() // ui-v4: allow developer reminder observability console as long sheet
+                    .ohanaSheetPagePresentation() // ui-v4: allow developer balance console as long sheet
+                }
+                .sheet(isPresented: $showingReminderObservability) {
+                    NavigationStack {
+                        ReminderObservabilityView()
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button {
+                                        showingReminderObservability = false
+                                    } label: {
+                                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
+                                    }
+                                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                                    .accessibilityIdentifier("reminder-observability-close-action")
+                                }
+                            }
+                    }
+                    .ohanaSheetPagePresentation() // ui-v4: allow developer reminder observability console as long sheet
+                }
+            )
         }
-        )
-    }
 
-    private var settingsUISpecPresentationContent: AnyView {
-        #if DEBUG
+        private var settingsUISpecPresentationContent: AnyView {
             AnyView(
                 settingsDeveloperPresentationContent
                 .sheet(isPresented: $showingUISpecShowcase) {
-                NavigationStack {
-                    OhanaUISpecShowcaseView()
-                }
-                .ohanaSheetPagePresentation() // ui-v4: allow developer UI specification console as long sheet
-            }
-            )
-        #else
-            settingsDeveloperPresentationContent
-        #endif
-    }
-
-    private var settingsReportingPresentationContent: AnyView {
-        AnyView(
-            settingsUISpecPresentationContent
-        .sheet(isPresented: $showingFamilyWeeklyReportDebug) {
-            NavigationStack {
-                FamilyWeeklyReportDashboardView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button {
-                                showingFamilyWeeklyReportDebug = false
-                            } label: {
-                                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
-                            }
-                            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                            .accessibilityIdentifier("family-weekly-report-debug-close-action")
-                        }
+                    NavigationStack {
+                        OhanaUISpecShowcaseView()
                     }
-            }
-            .ohanaSheetPagePresentation() // ui-v4: allow developer weekly report console as long sheet
+                    .ohanaSheetPagePresentation() // ui-v4: allow developer UI specification console as long sheet
+                }
+            )
         }
-        )
+
+        private var settingsReportingPresentationContent: AnyView {
+            AnyView(
+                settingsUISpecPresentationContent
+                .sheet(isPresented: $showingFamilyWeeklyReportDebug) {
+                    NavigationStack {
+                        FamilyWeeklyReportDashboardView()
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button {
+                                        showingFamilyWeeklyReportDebug = false
+                                    } label: {
+                                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
+                                    }
+                                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                                    .accessibilityIdentifier("family-weekly-report-debug-close-action")
+                                }
+                            }
+                    }
+                    .ohanaSheetPagePresentation() // ui-v4: allow developer weekly report console as long sheet
+                }
+            )
+        }
+    #endif
+
+    private var settingsPreSharingPresentationContent: AnyView {
+        #if DEBUG
+            settingsReportingPresentationContent
+        #else
+            settingsPrimaryPresentationContent
+        #endif
     }
 
     private var settingsSharingPresentationContent: AnyView {
         AnyView(
-            settingsReportingPresentationContent
+            settingsPreSharingPresentationContent
         .sheet(item: $quickSwitchHuman) { human in
             HumanQuickSwitchPasscodeSheet(human: human) {
                 switchActiveHuman(to: human, emitSuccessFeedback: false)

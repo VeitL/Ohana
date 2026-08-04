@@ -103,6 +103,7 @@ fi
 
 release_ci_audits=(
   audit-ui-test-shards.sh
+  audit-release-test-surface.sh
   audit-runtime-guardrails.sh
   audit-architecture-boundaries.sh
   audit-economy-boundaries.sh

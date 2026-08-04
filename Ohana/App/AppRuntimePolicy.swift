@@ -20,8 +20,13 @@ enum AppPerformanceMode {
     }
 
     static var userPrefersReducedVisualEffects: Bool {
-        UserDefaults.standard.bool(forKey: reducedVisualEffectsKey)
-            || ProcessInfo.processInfo.arguments.contains("-OHANA_REDUCED_VISUAL_EFFECTS")
+        let storedPreference = UserDefaults.standard.bool(forKey: reducedVisualEffectsKey)
+        #if DEBUG
+            return storedPreference
+                || ProcessInfo.processInfo.arguments.contains("-OHANA_REDUCED_VISUAL_EFFECTS")
+        #else
+            return storedPreference
+        #endif
     }
 
     static var uiTestsDisableAnimations: Bool {

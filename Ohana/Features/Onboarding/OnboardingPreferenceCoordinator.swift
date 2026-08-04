@@ -689,7 +689,11 @@ final class OnboardingPreferenceCoordinator {
 
 private extension OnboardingPreferenceCoordinator {
     static var usesUITestDefaultsFromLaunchArguments: Bool {
-        ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TESTS")
+        #if DEBUG
+            ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TESTS")
+        #else
+            false
+        #endif
     }
 }
 

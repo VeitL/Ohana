@@ -18,8 +18,9 @@ Usage:
   scripts/archive-release-local.sh --verify /path/to/Ohana.xcarchive
 
 Creates and verifies a signed Release WMO Archive outside the repository. It
-can also verify an existing Archive without rebuilding. It does not export or
-upload the archive.
+can also verify an existing Archive without rebuilding. Source and archived
+executables must not contain shipping UI-test or developer mutation surfaces.
+It does not export or upload the archive.
 USAGE
 }
 
@@ -81,6 +82,7 @@ else
     exit 2
   fi
 
+  "${REPO_ROOT}/scripts/audit-release-test-surface.sh" --all
   ohana_require_build_disk_space
 
   ohana_acquire_xcode_project_lock "archive:release"
@@ -120,8 +122,9 @@ if [[ ! -d "${APP_PATH}" ]]; then
 fi
 
 codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
+"${REPO_ROOT}/scripts/audit-release-test-surface.sh" --app "${APP_PATH}"
 
-if xattr -lr "${APP_PATH}" 2>/dev/null | grep -Eq 'com\.apple\.(FinderInfo|ResourceFork)'; then
+if xattr -lr "${APP_PATH}" 2>/dev/null | grep -Eq 'com\.apple\.(FinderInfo|ResourceFork|quarantine)'; then
   echo "Signing-risk extended attributes remain in the archived app." >&2
   exit 1
 fi

@@ -1,6 +1,7 @@
 import SwiftData
 import SwiftUI
 
+#if DEBUG
 struct CoconutBalanceTestView: View {
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query(sort: \CoconutAccount.updatedAt, order: .reverse) private var walletAccounts: [CoconutAccount]
@@ -12,3 +13,4 @@ struct CoconutBalanceTestView: View {
         )
     }
 }
+#endif

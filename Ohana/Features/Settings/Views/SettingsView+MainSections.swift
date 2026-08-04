@@ -9,9 +9,11 @@ extension SettingsView {
     @ViewBuilder
     var settingsBodySections: some View {
         settingsExperienceSection
-        if SettingsDebugTools.isRunningUITests {
-            settingsUITestShortcutSection
-        }
+        #if DEBUG
+            if SettingsDebugTools.isRunningUITests {
+                settingsUITestShortcutSection
+            }
+        #endif
         settingsDataSections
         settingsDeferredHeavySections
         settingsPersonalSection
@@ -229,9 +231,9 @@ extension SettingsView {
 
     @ViewBuilder
     var settingsDeferredHeavySections: some View {
-        if SettingsDebugTools.isVisible {
+        #if DEBUG
             settingsDebugSection
-        }
+        #endif
         if OnlineFeatureGate.allows(.onlineCollaboration) {
             householdSyncSection
         }

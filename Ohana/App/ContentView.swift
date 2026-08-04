@@ -25,13 +25,17 @@ struct ContentView: View {
     @State private var onboardingJourneyEvaluationTask: Task<Void, Never>?
     @State private var activeHumanReactionTask: Task<Void, Never>?
     @State private var onboardingCreatedEntitySignalTask: Task<Void, Never>?
-    @State private var uiTestRouteTask: Task<Void, Never>?
-    @State private var uiTestEconomyStateSeedTask: Task<Void, Never>?
+    #if DEBUG
+        @State private var uiTestRouteTask: Task<Void, Never>?
+        @State private var uiTestEconomyStateSeedTask: Task<Void, Never>?
+    #endif
     @State private var onboardingJourneyPhase: OnboardingJourneyPhase = .preOnboarding
     @State private var embeddedOnboardingFirstPetID: String?
     @State private var handledOnboardingFirstPetID: String?
     @State private var signaledOnboardingFirstPetID: String?
-    @State private var handledUITestHumanProfileRouteName: String?
+    #if DEBUG
+        @State private var handledUITestHumanProfileRouteName: String?
+    #endif
     @State private var homeCardStateResetToken = UUID()
     @State private var homeSurfaceLanguage = AppLanguage.code
     @State private var homeSurfaceLanguageThawTask: Task<Void, Never>?
@@ -158,7 +162,9 @@ struct ContentView: View {
             appServices.systemSurfaces.scheduleRefresh(reason: "contentAppear")
             scheduleRootAppearHandoff()
             applyOnboardingFirstPetIDIfNeeded()
-            scheduleUITestHumanProfileRouteIfNeeded()
+            #if DEBUG
+                scheduleUITestHumanProfileRouteIfNeeded()
+            #endif
             resumeStarterGiftHomePreparationRecoveryIfNeeded()
         }
         .onDisappear {
@@ -170,10 +176,12 @@ struct ContentView: View {
             activeHumanReactionTask = nil
             onboardingCreatedEntitySignalTask?.cancel()
             onboardingCreatedEntitySignalTask = nil
-            uiTestRouteTask?.cancel()
-            uiTestRouteTask = nil
-            uiTestEconomyStateSeedTask?.cancel()
-            uiTestEconomyStateSeedTask = nil
+            #if DEBUG
+                uiTestRouteTask?.cancel()
+                uiTestRouteTask = nil
+                uiTestEconomyStateSeedTask?.cancel()
+                uiTestEconomyStateSeedTask = nil
+            #endif
             homeSurfaceLanguageThawTask?.cancel()
             homeSurfaceLanguageThawTask = nil
             routeSurfaceLanguageThawTask?.cancel()
@@ -210,8 +218,10 @@ struct ContentView: View {
             guard hasOnboarded else { return }
             scheduleRootAppearHandoff()
             applyOnboardingFirstPetIDIfNeeded()
-            scheduleUITestHumanProfileRouteIfNeeded()
-            scheduleUITestEconomyStateSeedIfNeeded()
+            #if DEBUG
+                scheduleUITestHumanProfileRouteIfNeeded()
+                scheduleUITestEconomyStateSeedIfNeeded()
+            #endif
         }
         .onChange(of: onboardingFirstPetID) { _, _ in
             applyOnboardingFirstPetIDIfNeeded()
@@ -256,7 +266,9 @@ struct ContentView: View {
                     pet.id,
                     destinationTab: .home
                 )
-                scheduleUITestEconomyStateSeedIfNeeded()
+                #if DEBUG
+                    scheduleUITestEconomyStateSeedIfNeeded()
+                #endif
                 scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
             },
             onHumanSavedFromAddEntity: { human in
@@ -265,7 +277,9 @@ struct ContentView: View {
                     createdHumanId: human.id
                 )
                 scheduleCreatedEntitySignalAfterHomeHandoff(human.id)
-                scheduleUITestEconomyStateSeedIfNeeded()
+                #if DEBUG
+                    scheduleUITestEconomyStateSeedIfNeeded()
+                #endif
                 scheduleOnboardingJourneyEvaluationAfterHomeHandoff(activeHumanIDOverride: human.id.uuidString)
             },
             onRequestStarterGiftClaim: requestStarterGiftClaimFromTaskCenter,
@@ -467,7 +481,9 @@ struct ContentView: View {
         }
         let bootstrapDelay = OnboardingHomeJoinHandoffGate.remainingRootBootstrapDelayMilliseconds()
         rootAppearHandoffTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: bootstrapDelay) {
-            scheduleUITestEconomyStateSeedIfNeeded(delayMilliseconds: 120)
+            #if DEBUG
+                scheduleUITestEconomyStateSeedIfNeeded(delayMilliseconds: 120)
+            #endif
             reconcileHumanProfileRequirement()
             scheduleOnboardingJourneyEvaluationAfterHomeHandoff()
             OnboardingHomeJoinHandoffGate.consume()
@@ -501,7 +517,9 @@ struct ContentView: View {
     private func activateRequiredHuman(_ human: Human) {
         currentActiveHumanId = human.id.uuidString
         scheduleCreatedEntitySignalAfterHomeHandoff(human.id)
-        scheduleUITestEconomyStateSeedIfNeeded()
+        #if DEBUG
+            scheduleUITestEconomyStateSeedIfNeeded()
+        #endif
         scheduleOnboardingJourneyEvaluationAfterHomeHandoff(activeHumanIDOverride: human.id.uuidString)
     }
 
@@ -570,7 +588,9 @@ struct ContentView: View {
             appRoutes.dismissSheet(.requiredAccountSwitch)
             reconcileHumanProfileRequirement()
             scheduleOnboardingJourneyEvaluationForActiveHumanChange(humanID)
-            scheduleUITestEconomyStateSeedIfNeeded()
+            #if DEBUG
+                scheduleUITestEconomyStateSeedIfNeeded()
+            #endif
             activeHumanReactionTask = nil
         }
     }
@@ -647,8 +667,8 @@ struct ContentView: View {
         )
     }
 
-    private func scheduleUITestEconomyStateSeedIfNeeded(delayMilliseconds: UInt64 = 180) {
-        #if DEBUG
+    #if DEBUG
+        private func scheduleUITestEconomyStateSeedIfNeeded(delayMilliseconds: UInt64 = 180) {
             guard OhanaUITestLaunchOptions.requestedCoconutBalanceSeedAmount != nil
                 || OhanaUITestLaunchOptions.requestsRewardTierUnlock
                 || OhanaUITestLaunchOptions.requestsGrowthLoopUnlock
@@ -670,8 +690,8 @@ struct ContentView: View {
                 }
                 uiTestEconomyStateSeedTask = nil
             }
-        #endif
-    }
+        }
+    #endif
 }
 
 private extension ContentView {
@@ -922,25 +942,28 @@ private extension ContentView {
         }
     }
 
-    private func scheduleUITestHumanProfileRouteIfNeeded() {
-        guard hasOnboarded,
-              let humanName = Self.uiTestHumanProfileRouteName,
-              handledUITestHumanProfileRouteName != humanName else { return }
-        uiTestRouteTask?.cancel()
-        uiTestRouteTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 520) {
-            defer { uiTestRouteTask = nil }
-            guard Self.uiTestHumanProfileRouteName == humanName,
-                  let human = fetchModelsOrLog(
-                    FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
-                    operation: "fetch humans for UI-test human profile route"
-                  )
-                  .first(where: { $0.name == humanName }) else { return }
-            handledUITestHumanProfileRouteName = humanName
-            appRoutes.openHuman(human.id)
+    #if DEBUG
+        private func scheduleUITestHumanProfileRouteIfNeeded() {
+            guard hasOnboarded,
+                  let humanName = Self.uiTestHumanProfileRouteName,
+                  handledUITestHumanProfileRouteName != humanName else { return }
+            uiTestRouteTask?.cancel()
+            uiTestRouteTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 520) {
+                defer { uiTestRouteTask = nil }
+                guard Self.uiTestHumanProfileRouteName == humanName,
+                      let human = fetchModelsOrLog(
+                        FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
+                        operation: "fetch humans for UI-test human profile route"
+                      )
+                      .first(where: { $0.name == humanName }) else { return }
+                handledUITestHumanProfileRouteName = humanName
+                appRoutes.openHuman(human.id)
+            }
         }
-    }
+    #endif
 }
 
+#if DEBUG
 private extension ContentView {
     static var uiTestHumanProfileRouteName: String? {
         let arguments = ProcessInfo.processInfo.arguments
@@ -963,6 +986,7 @@ private extension ContentView {
             || arguments.contains("-OHANA_UI_TESTS")
     }
 }
+#endif
 
 private extension View {
     func homeSurfaceLanguage(_ rawLanguage: String) -> some View {

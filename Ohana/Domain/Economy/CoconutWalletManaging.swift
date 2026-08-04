@@ -33,7 +33,9 @@ protocol CoconutWalletManaging {
     func balance(for human: Human, context: ModelContext) -> Int
     func balance(for pet: Pet, context: ModelContext) -> Int
     func legacySystemBalance(context: ModelContext, fallback: Int) -> Int
-    func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext)
+    #if DEBUG
+        func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext)
+    #endif
     func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?)
     func bootstrapIfNeeded(context: ModelContext, projectionManager: CoconutProjectionManaging?) throws
     func stageLegacyBootstrapIfNeeded(context: ModelContext) throws
@@ -169,14 +171,16 @@ final class SwiftDataCoconutWalletManager: CoconutWalletManaging {
         CoconutWalletService.legacySystemBalance(context: context, fallback: fallback)
     }
 
-    func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) {
-        CoconutWalletService.setDeveloperOverrideBalance(
-            amount: amount,
-            for: human,
-            displayName: displayName,
-            context: context
-        )
-    }
+    #if DEBUG
+        func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) {
+            CoconutWalletService.setDeveloperOverrideBalance(
+                amount: amount,
+                for: human,
+                displayName: displayName,
+                context: context
+            )
+        }
+    #endif
 
     func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?) {
         CoconutWalletService.refreshQuestProjection(context: context, manager: manager)

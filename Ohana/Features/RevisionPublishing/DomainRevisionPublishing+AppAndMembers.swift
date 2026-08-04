@@ -88,16 +88,18 @@ extension DomainRevisionPublishing {
         )
     }
 
-    func publishSettingsCoconutBalance(_ result: SettingsCoconutBalanceCommandResult, note: String) {
-        publish(
-            DomainMutationResult(
-                command: .settingsCoconutBalance(humanID: result.humanID, amount: result.amount),
-                affectedEntityIDs: Set(result.humanID.map { [$0] } ?? []),
-                wroteBusinessFact: false,
-                note: note
+    #if DEBUG
+        func publishSettingsCoconutBalance(_ result: SettingsCoconutBalanceCommandResult, note: String) {
+            publish(
+                DomainMutationResult(
+                    command: .settingsCoconutBalance(humanID: result.humanID, amount: result.amount),
+                    affectedEntityIDs: Set(result.humanID.map { [$0] } ?? []),
+                    wroteBusinessFact: false,
+                    note: note
+                )
             )
-        )
-    }
+        }
+    #endif
 
     func publishHumanPrivacy(_ result: HumanPrivacyCommandResult, note: String) {
         publish(

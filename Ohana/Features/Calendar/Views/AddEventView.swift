@@ -152,11 +152,14 @@ struct AddEventContentView: View {
         _recurrenceDays = State(initialValue: initial.recurrenceDays)
         _recurrenceEndDate = State(initialValue: initial.recurrenceEndDate)
         _reminderLeadOption = State(initialValue: initial.reminderLeadOption)
-        _hasReminder = State(
-            initialValue: ProcessInfo.processInfo.environment[
+        #if DEBUG
+            let hasReminder = ProcessInfo.processInfo.environment[
                 "OHANA_UI_TEST_ADD_EVENT_REMINDER_DEFAULT_OFF"
             ] == "1" ? false : initial.hasReminder
-        )
+        #else
+            let hasReminder = initial.hasReminder
+        #endif
+        _hasReminder = State(initialValue: hasReminder)
         _assigneeId = State(initialValue: initial.assigneeId)
     }
 
