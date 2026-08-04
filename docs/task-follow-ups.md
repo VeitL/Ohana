@@ -124,7 +124,10 @@
   132/132 claim is made. One guarded WMO Release overlay plus a normal-UI Human
   detail/gender-menu open-cancel journey passes with the sealed ready store
   preserved at 2 Humans / 1 Pet / 16 care facts / 8 plans / 52 ledger facts /
-  0 test artifacts.
+  0 test artifacts. Commit `3ee93cf718` now also has a verified local Apple
+  Development-signed WMO Archive; App/Widget manifests, binary Required Reason
+  usage, entitlements, strict codesign and the Archive-generated empty Xcode
+  Privacy Report pass local preflight.
   The repository now includes nine App locales and 36 IAP localization drafts
   for Monthly/Yearly/Lifetime plus conditional restore-only legacy Supporter,
   review notes, screenshots and compliance checklists. New D34 validation evidence
@@ -135,9 +138,7 @@
   professional language review remain absent. D34 additionally requires a signed
   Camera/Photos journey, a real existing-install upgrade/readback, and confirmation
   that cancelled/failed scans leave no source page or OCR persistence.
-- Next action: build and inspect the signed WMO Archive from the containing
-  source-freeze commit without rerunning the unchanged full UI campaign, then
-  validate StoreKit product
+- Next action: without rerunning the unchanged full UI campaign, validate StoreKit product
   loading, verified/unverified purchase, pending, cancel, failure,
   `currentEntitlements`, `Transaction.updates`, `AppStore.sync()`, offline,
   trial conversion, subscription expiration, Lifetime, refund/revocation, and
@@ -176,12 +177,17 @@
   Seven focused suites execute 89/89 tests, and the unsigned Simulator and
   LocalDevice lanes compile and embed both app and extension. A clean-cache
   dual-architecture optimized Release build and the final incremental recheck also pass
-  `ValidateEmbeddedBinary` for the extension.
+  `ValidateEmbeddedBinary` for the extension. Commit `3ee93cf718` now has a
+  development-signed WMO Archive that embeds only `OhanaWidgets.appex`; App and
+  Widget strict codesign pass, and both signed entitlements contain the exact
+  same production App Group. This proves package consistency for the local
+  development profile, not Developer Portal distribution configuration or
+  runtime access on a physical device.
 - Blocker: production `group.com.guanchen.li.Ohana` has not been registered and
   approved in Developer Portal provisioning for both app and extension. The
   `group.com.guanchen.li.Ohana.LocalDevice` group is only needed if the separate
   local-development target remains in use; it is not an App Store 1.0 gate. No
-  signed current Archive or physical-device run has therefore proved shared
+  App Store distribution-signed Archive or physical-device run has therefore proved shared
   snapshot access, Home/Lock Screen Widget rendering, Dynamic Island behavior,
   foreground/background location handoff, or locked-device privacy.
 - Next action: register the production App Group on the App Store app and Widget
@@ -300,6 +306,12 @@
   It overlaid and launched on iPhone 17 Pro Max / iOS 26.5.2 without uninstalling
   or clearing data; the process remained present. User-observed data preservation
   and repaired HealthKit behavior still await confirmation.
+  On 2026-08-04, frozen commit `3ee93cf718` produced the current local
+  development-signed WMO Archive. It is Ohana 1.0 (1), arm64, iPhone-only,
+  iOS 26.2+, embeds the Widget, passes strict App/Widget codesign and test-surface
+  scans, and contains only HealthKit, CloudDocuments and the shared production
+  App Group capabilities. Its App/Widget privacy manifests and Required Reason
+  scan pass, and Xcode Organizer generated the recorded empty Privacy Report.
 - Blocker: the current machine has only an Apple Development identity, so this
   does not establish App Store distribution, the final App Store Connect Apple
   ID/storefront, or Store validation of screenshots. The smallest physical
@@ -309,11 +321,12 @@
   broader APNs/iCloud capabilities than the signed Solo App claims; verify the
   distribution profile and Developer Portal capability state before release.
   The app hides Rate App until the Store identity is verified.
-- Next action: on the already overlaid current local-only build, confirm preserved
-  data and run the repaired HealthKit matrix; then finish R1-R6 and run the same
-  core smoke on the smallest supported
-  physical iPhone; obtain App Store distribution/App Store Connect evidence and
-  inspect an encrypted device backup for the Application Support exclusion policy.
+- Next action: install the current frozen build on the physical acceptance devices
+  without clearing preserved data, confirm upgrade/readback, and run the repaired
+  HealthKit matrix; then finish R1-R6 and run the same core smoke on the smallest
+  supported physical iPhone. Obtain App Store distribution/App Store Connect
+  evidence and inspect an encrypted device backup for the Application Support
+  and App Group exclusion policies.
 - Close when: all R0-R7 results identify the signed Release build and device;
   any defect is fixed or split into a scoped follow-up.
 
