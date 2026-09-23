@@ -218,7 +218,10 @@ struct ZenPresentationTests {
         #expect(hint.contains("轻点 \\(owner.name) 的卡片确认今天平安；长按后上下滑动选择 1–10 分，松手保存"))
         #expect(hint.contains("zen-home-card-score-hint"))
         for languageArgument in ["zh:", "en:", "de:", "es:", "pt:", "fr:", "ja:", "ko:", "it:"] {
-            #expect(hint.components(separatedBy: languageArgument).count == 3)
+            let localizedArgumentCount = hint.split(separator: "\n").count {
+                String($0).trimmingCharacters(in: .whitespaces).hasPrefix(languageArgument)
+            }
+            #expect(localizedArgumentCount == 2)
         }
     }
 

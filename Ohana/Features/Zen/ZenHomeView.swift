@@ -103,21 +103,28 @@ struct ZenHomeView: View {
         }
         .confirmationDialog(
             undoConfirmationTitle,
-            item: $undoConfirmationSubject
-        ) { subject in
-            Button(undoConfirmationActionTitle, role: .destructive) {
-                undoConfirmationSubject = nil
-                undoCheckIn(subject)
+            isPresented: Binding(
+                get: { undoConfirmationSubject != nil },
+                set: { if !$0 { undoConfirmationSubject = nil } }
+            )
+        ) {
+            if let subject = undoConfirmationSubject {
+                Button(undoConfirmationActionTitle, role: .destructive) {
+                    undoConfirmationSubject = nil
+                    undoCheckIn(subject)
+                }
+                .accessibilityIdentifier("zen-confirm-undo-check-in")
             }
-            .accessibilityIdentifier("zen-confirm-undo-check-in")
             Button(l.tr(
                 zh: "取消", en: "Cancel", de: "Abbrechen", es: "Cancelar",
                 pt: "Cancelar", fr: "Annuler", ja: "キャンセル", ko: "취소", it: "Annulla"
             ), role: .cancel) {
                 undoConfirmationSubject = nil
             }
-        } message: { subject in
-            Text(undoConfirmationMessage(for: subject))
+        } message: {
+            if let subject = undoConfirmationSubject {
+                Text(undoConfirmationMessage(for: subject))
+            }
         }
         .onDisappear {
             expandedSubjectID = nil
