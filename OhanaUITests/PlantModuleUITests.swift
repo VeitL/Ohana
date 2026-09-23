@@ -257,7 +257,7 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(waterAction.waitForExistence(timeout: 8), "Expanded plant card did not expose the default Water quick action.")
         XCTAssertTrue(tapWhenFrameReady(waterAction, timeout: 8), "Plant Water quick action did not accept a tap.")
 
-        let quickRecordAction = app.buttons
+        let quickRecordActions = app.buttons
             .matching(
                 NSPredicate(
                     format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
@@ -265,8 +265,7 @@ final class PlantModuleUITests: XCTestCase {
                     "-plantWater-quick"
                 )
             )
-            .firstMatch
-        let detailAction = app.buttons
+        let detailActions = app.buttons
             .matching(
                 NSPredicate(
                     format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
@@ -274,13 +273,30 @@ final class PlantModuleUITests: XCTestCase {
                     "-plantWater-detail"
                 )
             )
-            .firstMatch
-        XCTAssertTrue(quickRecordAction.waitForExistence(timeout: 8), "Plant Water quick action did not expose the Quick Record submenu action.")
-        XCTAssertTrue(detailAction.waitForExistence(timeout: 8), "Plant Water quick action did not expose the Detail submenu action.")
-        XCTAssertTrue(tapWhenFrameReady(detailAction, timeout: 8), "Plant Water detail submenu action did not accept a tap.")
+        guard let quickRecordAction = firstVisibleEnabledHittableButton(
+            matching: quickRecordActions,
+            in: app,
+            timeout: 8
+        ) else {
+            XCTFail("Plant Water quick action did not expose a visible, enabled Quick Record submenu button.")
+            return
+        }
+        guard let detailAction = firstVisibleEnabledHittableButton(
+            matching: detailActions,
+            in: app,
+            timeout: 8
+        ) else {
+            XCTFail("Plant Water quick action did not expose a visible, enabled Detail submenu button.")
+            return
+        }
+        XCTAssertTrue(quickRecordAction.exists, "Plant Water quick action did not expose the Quick Record submenu action.")
+        detailAction.tap()
+
+        let careRouteRoot = app.descendants(matching: .any)["plant-care-feature-header"]
+        let waterGuidedHome = app.descendants(matching: .any)["plant-care-feature-water-guided-home"]
         XCTAssertTrue(
-            app.descendants(matching: .any)["plant-care-feature-water-guided-home"].waitForExistence(timeout: 12),
-            "Plant Water detail submenu action did not open the watering care detail."
+            waitUntil(timeout: 12) { careRouteRoot.exists && waterGuidedHome.exists },
+            "Plant Water detail submenu action did not open the watering care route root and guided-home marker."
         )
     }
 
@@ -1444,12 +1460,25 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func tapPlantDetailDeleteAction(in app: XCUIApplication) {
-        let deleteAction = app.buttons["plant-detail-delete-action"]
-        XCTAssertTrue(
-            waitForTapFrame(deleteAction, in: app, timeout: 8),
-            "Plant detail delete action did not become visible."
+        let detailScreen = app.descendants(matching: .any)["plant-detail-screen"]
+        XCTAssertTrue(detailScreen.waitForExistence(timeout: 8), "Plant detail screen did not exist before deletion.")
+        guard detailScreen.exists else { return }
+
+        let deleteActions = detailScreen.buttons.matching(
+            NSPredicate(format: "identifier == %@", "plant-detail-delete-action")
         )
-        deleteAction.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        guard let deleteAction = firstVisibleEnabledHittableButton(
+            matching: deleteActions,
+            in: app,
+            timeout: 8
+        ) else {
+            XCTFail(
+                "Plant detail did not expose a visible, enabled delete action inside plant-detail-screen; runtime matches=\(deleteActions.count)."
+            )
+            return
+        }
+
+        deleteAction.tap()
     }
 
     @MainActor
@@ -1727,7 +1756,10 @@ final class PlantModuleUITests: XCTestCase {
     private func dismissKeyboardIfPresent(in app: XCUIApplication) {
         guard app.keyboards.firstMatch.exists else { return }
 
-        let returnKeyTitles = ["Done", "Return", "Search", "Go", "OK"]
+        let returnKeyTitles = [
+            "Done", "Return", "Search", "Go", "OK",
+            "Hide keyboard", "隐藏键盘", "Tastatur ausblenden"
+        ]
         if let key = returnKeyTitles
             .map({ app.keyboards.buttons[$0] })
             .first(where: { $0.exists && $0.isHittable }) {
@@ -1736,14 +1768,8 @@ final class PlantModuleUITests: XCTestCase {
         }
 
         if app.keyboards.firstMatch.exists {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.16)).tap()
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-        }
-
-        if app.keyboards.firstMatch.exists {
             let keyboard = app.keyboards.firstMatch
-            keyboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08))
-                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92)))
+            keyboard.swipeDown()
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         }
     }
@@ -1791,18 +1817,40 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func dragTowardEarlierContent(in app: XCUIApplication) {
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.24))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.78))
-        start.press(forDuration: 0.04, thenDragTo: end)
+        let scrollView = plantDetailScrollView(in: app)
+        XCTAssertTrue(
+            scrollView.waitForExistence(timeout: 2),
+            "Plant detail did not expose a runtime ScrollView for an earlier-content search."
+        )
+        guard scrollView.exists else { return }
+        scrollView.swipeDown()
         RunLoop.current.run(until: Date().addingTimeInterval(0.35))
     }
 
     @MainActor
     private func dragTowardLaterContent(in app: XCUIApplication) {
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.78))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.24))
-        start.press(forDuration: 0.04, thenDragTo: end)
+        let scrollView = plantDetailScrollView(in: app)
+        XCTAssertTrue(
+            scrollView.waitForExistence(timeout: 2),
+            "Plant detail did not expose a runtime ScrollView for a later-content search."
+        )
+        guard scrollView.exists else { return }
+        scrollView.swipeUp()
         RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+    }
+
+    private func plantDetailScrollView(in app: XCUIApplication) -> XCUIElement {
+        let identifiedScrollView = app.scrollViews["plant-detail-screen"]
+        if identifiedScrollView.exists {
+            return identifiedScrollView
+        }
+
+        let detailScreen = app.descendants(matching: .any)["plant-detail-screen"]
+        let nestedScrollView = detailScreen.descendants(matching: .scrollView).firstMatch
+        if nestedScrollView.exists {
+            return nestedScrollView
+        }
+        return app.scrollViews.firstMatch
     }
 
     @MainActor
@@ -1868,9 +1916,13 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func dismissCurrentSheetByDrag(in app: XCUIApplication) {
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.86))
-        start.press(forDuration: 0.12, thenDragTo: end)
+        let sheet = app.descendants(matching: .any)["plant-edit-sheet"]
+        XCTAssertTrue(
+            sheet.waitForExistence(timeout: 2),
+            "Plant edit did not expose its semantic sheet element for interactive dismissal."
+        )
+        guard sheet.exists else { return }
+        sheet.swipeDown()
         RunLoop.current.run(until: Date().addingTimeInterval(0.6))
     }
 
@@ -1882,13 +1934,14 @@ final class PlantModuleUITests: XCTestCase {
 
         let later = app.buttons["growth-unlock-later-action"]
         let close = app.buttons["growth-unlock-close-action"]
-        if tapWhenFrameReady(later, timeout: 4) || tapWhenFrameReady(close, timeout: 4) {
-            _ = waitUntil(timeout: 5) { !popup.exists }
-            return
-        }
-
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
-        _ = waitUntil(timeout: 5) { !popup.exists }
+        XCTAssertTrue(
+            tapWhenFrameReady(later, timeout: 4) || tapWhenFrameReady(close, timeout: 4),
+            "Growth unlock popup did not expose a semantic Later or Close action."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 5) { !popup.exists },
+            "Growth unlock popup did not close after tapping its semantic dismissal action."
+        )
     }
 
     @MainActor
@@ -1944,6 +1997,25 @@ final class PlantModuleUITests: XCTestCase {
         waitUntil(timeout: timeout) {
             isTapFrameHittable(element, in: app)
         }
+    }
+
+    @MainActor
+    private func firstVisibleEnabledHittableButton(
+        matching query: XCUIElementQuery,
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> XCUIElement? {
+        var matchedButton: XCUIElement?
+        let didFindMatch = waitUntil(timeout: timeout) {
+            guard let button = query.allElementsBoundByIndex.first(where: {
+                isTapFrameHittable($0, in: app)
+            }) else {
+                return false
+            }
+            matchedButton = button
+            return true
+        }
+        return didFindMatch ? matchedButton : nil
     }
 
     private func isTapFrameHittable(_ element: XCUIElement, in app: XCUIApplication) -> Bool {

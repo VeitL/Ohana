@@ -20,40 +20,17 @@ struct PlantLockedPreviewCard: View {
         VStack(alignment: .leading, spacing: 13) {
             header
 
-            Text(PlantUnlockCopy.lockedDetail(language: appLanguage))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
             HStack(spacing: 8) {
                 previewMetric(icon: "arrow.up.forward.circle.fill", text: levelText)
                 previewMetric(icon: "bolt.fill", text: energyText)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                expectationRow(
-                    icon: "bookmark.fill",
-                    text: l.tr(
-                        zh: "现在可以先收藏植物资料；Lv.4 后再一键建档。",
-                        en: "Save catalog plants now; create profiles after Lv.4.",
-                        de: "Pflanzen jetzt merken; Profile nach Lv.4 anlegen."
-                    )
-                )
-                expectationRow(
-                    icon: "bell.slash.fill",
-                    text: l.tr(
-                        zh: "锁定期间不会生成浇水、施肥或复查提醒。",
-                        en: "No watering, fertilizing, or follow-up reminders are created while locked.",
-                        de: "Solange gesperrt, entstehen keine Giess-, Duenge- oder Nachfass-Erinnerungen."
-                    )
-                )
-            }
-
-            Divider()
-                .overlay(Color.ohanaDivider.opacity(0.7))
-
             VStack(alignment: .leading, spacing: 9) {
-                Text(l.tr(zh: "可先收藏的资料", en: "Catalog to save now", de: "Katalog zum Merken"))
+                Text(l.tr(
+                    zh: "可先收藏", en: "Save for later", de: "Für später merken",
+                    es: "Guardar para después", pt: "Salvar para depois", fr: "Enregistrer pour plus tard",
+                    ja: "あとで使うため保存", ko: "나중을 위해 저장", it: "Salva per dopo"
+                ))
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
 
@@ -90,14 +67,6 @@ struct PlantLockedPreviewCard: View {
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(l.tr(
-                    zh: "植物会进入 Ohana，但要等宠物核心照护习惯稳定后再开始。",
-                    en: "Plants are part of Ohana, but they start after core pet care is steady.",
-                    de: "Pflanzen gehoeren zu Ohana, starten aber nach stabiler Haustierpflege."
-                ))
-                .font(OhanaFont.caption2(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 8)
@@ -108,7 +77,13 @@ struct PlantLockedPreviewCard: View {
         l.tr(
             zh: "还差 \(levelsRemaining) 级",
             en: "\(levelsRemaining) levels left",
-            de: "Noch \(levelsRemaining) Level"
+            de: "Noch \(levelsRemaining) Level",
+            es: "Faltan \(levelsRemaining) niveles",
+            pt: "Faltam \(levelsRemaining) níveis",
+            fr: "Encore \(levelsRemaining) niveaux",
+            ja: "あと\(levelsRemaining)レベル",
+            ko: "\(levelsRemaining)레벨 남음",
+            it: "Mancano \(levelsRemaining) livelli"
         )
     }
 
@@ -116,7 +91,13 @@ struct PlantLockedPreviewCard: View {
         l.tr(
             zh: "预计还差 \(energyRemaining) XP",
             en: "\(energyRemaining) XP to go",
-            de: "Noch \(energyRemaining) XP"
+            de: "Noch \(energyRemaining) XP",
+            es: "Faltan \(energyRemaining) XP",
+            pt: "Faltam \(energyRemaining) XP",
+            fr: "Encore \(energyRemaining) XP",
+            ja: "あと\(energyRemaining) XP",
+            ko: "\(energyRemaining) XP 남음",
+            it: "Mancano \(energyRemaining) XP"
         )
     }
 
@@ -130,20 +111,6 @@ struct PlantLockedPreviewCard: View {
             .padding(.vertical, 7)
             .frame(maxWidth: .infinity)
             .background(Color.ohanaControlFill, in: Capsule())
-    }
-
-    private func expectationRow(icon: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: icon)
-                .accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
-                .foregroundStyle(Color.goPrimary)
-                .frame(width: 20, height: 20) // a11y: allow decorative non-interactive checklist glyph; row text carries meaning.
-            Text(text)
-                .font(OhanaFont.caption2(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 
     private func toggleFavorite(_ id: String) {
@@ -209,24 +176,16 @@ private struct PlantLockedPreviewCatalogRow: View {
 
 enum PlantUnlockCopy {
     static func lockedTitle(language: String) -> String {
-        switch language {
-        case "en":
-            "Plant care unlocks at Life Canopy Lv.4"
-        case "de":
-            "Pflanzenpflege ab Lebenskrone Lv.4"
-        default:
-            PlantUnlockPolicy.lockedTitleZh
-        }
-    }
-
-    static func lockedDetail(language: String) -> String {
-        switch language {
-        case "en":
-            "Build core pet-care habits first; once the island is steady, plants can move into Ohana too."
-        case "de":
-            "Baue zuerst die Kernroutine fuer Haustiere auf; wenn die Insel stabil ist, ziehen Pflanzen auch in Ohana ein."
-        default:
-            PlantUnlockPolicy.lockedDetailZh
-        }
+        L10n(language).tr(
+            zh: PlantUnlockPolicy.lockedTitleZh,
+            en: "Plant care unlocks at Life Canopy Lv.4",
+            de: "Pflanzenpflege ab Lebenskrone Lv.4",
+            es: "El cuidado de plantas se desbloquea en Vida Lv.4",
+            pt: "O cuidado de plantas desbloqueia no nível 4",
+            fr: "Le soin des plantes se débloque au niveau 4",
+            ja: "植物ケアは生命樹Lv.4で解放",
+            ko: "식물 돌봄은 생명의 나무 Lv.4에서 잠금 해제",
+            it: "La cura delle piante si sblocca al livello 4"
+        )
     }
 }

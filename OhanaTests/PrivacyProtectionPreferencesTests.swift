@@ -12,6 +12,27 @@ struct PrivacyProtectionPreferencesTests {
         #expect(!AppPrivacySnapshotProtectionStore.shouldShowProtection(isEnabled: false, scenePhase: .background))
     }
 
+    @Test func appSwitcherSnapshotCoverUsesTheConfiguredLaunchScreenAssets() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let cover = try String(
+            contentsOf: root.appending(path: "Ohana/App/AppPrivacySnapshotProtection.swift"),
+            encoding: .utf8
+        )
+        let info = try String(
+            contentsOf: root.appending(path: "Ohana/Info.plist"),
+            encoding: .utf8
+        )
+
+        #expect(cover.contains("Color(\"LaunchBackground\")"))
+        #expect(cover.contains("Image(\"LaunchMark\")"))
+        #expect(!cover.contains("lock.shield.fill"))
+        #expect(!cover.contains("Text(\"Ohana\")"))
+        #expect(info.contains("<string>LaunchBackground</string>"))
+        #expect(info.contains("<string>LaunchMark</string>"))
+    }
+
     @Test func memberGateBiometricPreferenceDefaultsOffAndCanBeEnabled() throws {
         let suiteName = "MemberGateBiometricAuthStoreTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))

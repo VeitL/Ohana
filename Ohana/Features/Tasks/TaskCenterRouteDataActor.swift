@@ -139,6 +139,9 @@ actor TaskCenterRouteDataActor {
             humans: humans
         )
         let events = allEvents.filter { event in
+            if CarePlanCalendarSync.isDefaultGeneratedCalendarPlan(event, pets: pets) {
+                return false
+            }
             if !loadPlants, DomainEntityLinkRegistry.plantId(for: event) != nil {
                 return false
             }
@@ -226,10 +229,7 @@ actor TaskCenterRouteDataActor {
         let careLedgerEvents = enabled
             ? fetchStarterJourneyCareLedgerEvents(
                 targetPetID: targetPet?.id,
-                humanTargetIDs: starterJourneyHumanTargetIDs(
-                    activeHumanID: activeHumanID,
-                    humans: humans
-                )
+                humanTargetIDs: starterJourneyHumanTargetIDs(humans: humans)
             )
             : []
         let coconutLedgerEntries = enabled
@@ -358,18 +358,14 @@ actor TaskCenterRouteDataActor {
     }
 
     private func starterJourneyHumanTargetIDs(
-        activeHumanID: String?,
         humans: [Human]
     ) -> [UUID] {
-        let livingHumans = humans
+        // Human-profile progress is household-wide, so the bounded latest-marker
+        // lookup must consider every living member rather than only the active one.
+        humans
             .filter { $0.passedAwayDate == nil }
             .sorted(by: starterJourneyHumanWasCreatedEarlier)
-        if let activeHumanID,
-           let requestedID = UUID(uuidString: activeHumanID),
-           livingHumans.contains(where: { $0.id == requestedID }) {
-            return [requestedID]
-        }
-        return livingHumans.map(\.id)
+            .map(\.id)
     }
 
     private func fetchStarterJourneyCoconutLedgerEntries() -> [CoconutLedgerEntry] {

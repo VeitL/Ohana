@@ -99,7 +99,7 @@ struct PlantDashboardPhotoDetailSheet: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 48)
             .background(Color.goPrimary, in: Capsule())

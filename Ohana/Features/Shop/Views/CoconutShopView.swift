@@ -501,7 +501,7 @@ struct CoconutShopView: View {
             Text(l.tr(zh: "你的余额和已购内容没有被当作空数据处理。请重试。", en: "Your balance and purchases were not treated as empty. Please try again.", de: "Guthaben und Käufe wurden nicht als leer behandelt. Bitte versuche es erneut."))
         } actions: {
             Button(l.tr(zh: "重新加载", en: "Reload", de: "Neu laden"), action: retryDataLoad)
-                .buttonStyle(.borderedProminent)
+                .ohanaPrimaryProminentButton()
         }
         .accessibilityIdentifier("coconut-shop-load-failed")
     }

@@ -271,7 +271,7 @@ private struct HumanHealthConditionsRouteStatusView: View {
                 HumanModulePageHeader(
                     human: human,
                     title: l.tr(zh: "健康状况", en: "Health Conditions", de: "Gesundheitszustände"),
-                    subtitle: l.tr(zh: "症状、状态与趋势追踪", en: "Symptoms, state, and trend tracking", de: "Symptome, Status und Trends"),
+                    subtitle: human.name,
                     showsCloseButton: false,
                     onClose: {}
                 )
@@ -284,13 +284,13 @@ private struct HumanHealthConditionsRouteStatusView: View {
                         )
                     } description: {
                         Text(l.tr(
-                            zh: "记录仍保存在本机，请重试读取。",
-                            en: "Your records remain on this device. Try loading them again.",
-                            de: "Deine Einträge bleiben auf diesem Gerät. Versuche das Laden erneut."
+                            zh: "记录仍保存在本机。",
+                            en: "Records remain on this device.",
+                            de: "Einträge bleiben auf diesem Gerät."
                         ))
                     } actions: {
                         Button(l.tr(zh: "重试", en: "Try Again", de: "Erneut versuchen"), action: onRetry)
-                            .buttonStyle(.borderedProminent)
+                            .ohanaPrimaryProminentButton()
                     }
                 } else {
                     VStack(spacing: 12) {
@@ -477,7 +477,7 @@ private struct HumanHealthConditionsContentView: View {
         HumanModulePageHeader(
             human: human,
             title: l.tr(zh: "健康状况", en: "Health Conditions", de: "Gesundheitszustände"),
-            subtitle: l.tr(zh: "症状、状态与趋势追踪", en: "Symptoms, state, and trend tracking", de: "Symptome, Status und Trends"),
+            subtitle: human.name,
             showsCloseButton: false,
             onClose: {}
         ) {
@@ -515,13 +515,13 @@ private struct HumanHealthConditionsContentView: View {
                 .frame(width: 34, height: 34) // a11y: allow decorative summary glyph; card text carries meaning.
                 .background(Color.goBlue.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "趋势来自你的记录", en: "Trends come from your logs", de: "Trends stammen aus deinen Einträgen"))
+                Text(l.tr(zh: "描述性记录", en: "Descriptive records", de: "Beschreibende Einträge"))
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(
-                    zh: "只做描述性汇总，不用于诊断，也不推断药物与状态之间的因果关系。",
-                    en: "Descriptive summaries only—not diagnosis or proof that medication caused a change.",
-                    de: "Nur beschreibende Zusammenfassungen—keine Diagnose oder Aussage zur Ursache durch Medikamente."
+                    zh: "不作诊断或因果判断。",
+                    en: "Not a diagnosis or causal conclusion.",
+                    de: "Keine Diagnose oder Kausalitätsaussage."
                 ))
                 .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -536,9 +536,9 @@ private struct HumanHealthConditionsContentView: View {
     private var memorialReadOnlyNotice: some View {
         Label(
             l.tr(
-                zh: "纪念模式仅保留历史查看，不能新增或修改健康记录。",
-                en: "Memorial mode keeps history view-only; health records cannot be added or changed.",
-                de: "Im Gedenkmodus bleibt der Verlauf schreibgeschützt; Gesundheitsdaten können nicht ergänzt oder geändert werden."
+                zh: "纪念模式只读，不能新增或修改记录。",
+                en: "Memorial mode is read-only; records cannot be added or changed.",
+                de: "Der Gedenkmodus ist schreibgeschützt; Einträge können nicht ergänzt oder geändert werden."
             ),
             systemImage: "lock.fill"
         )
@@ -552,9 +552,9 @@ private struct HumanHealthConditionsContentView: View {
     private var medicationPrivacyNotice: some View {
         Label(
             l.tr(
-                zh: "关联用药、服药完成率和用药观察已按隐私设置隐藏。",
-                en: "Linked medications, completion, and medication observations are hidden by privacy settings.",
-                de: "Verknüpfte Medikamente, Erfüllung und Medikamentenbeobachtungen sind durch die Datenschutzeinstellung ausgeblendet."
+                zh: "关联用药数据已按隐私设置隐藏。",
+                en: "Linked medication data is hidden by privacy settings.",
+                de: "Verknüpfte Medikamentendaten sind durch die Datenschutzeinstellung ausgeblendet."
             ),
             systemImage: "pills.fill"
         )
@@ -859,21 +859,6 @@ private struct HumanHealthConditionsContentView: View {
                 : l.tr(zh: "建立第一份健康状况档案", en: "Create the first health condition", de: "Ersten Gesundheitszustand anlegen"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(isReadOnly
-                ? l.tr(
-                    zh: "此前没有保存相关记录。",
-                    en: "No related records were saved previously.",
-                    de: "Zuvor wurden keine entsprechenden Einträge gespeichert."
-                )
-                : l.tr(
-                    zh: "可追踪心理与情绪、甲状腺、过敏、毛发与头皮等长期或反复变化。",
-                    en: "Track recurring or long-term changes in mental health, thyroid, allergy, hair and scalp, and more.",
-                    de: "Verfolge wiederkehrende oder langfristige Veränderungen bei Psyche, Schilddrüse, Allergien, Haar und Kopfhaut."
-                ))
-            .font(OhanaFont.callout(.semibold))
-            .foregroundStyle(Color.ohanaSecondaryText)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
         .padding(24)

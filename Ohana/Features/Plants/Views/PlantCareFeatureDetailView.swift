@@ -22,6 +22,7 @@ struct PlantCareFeatureDetailView: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     @State var logDraft: PlantCareFeatureLogDraft?
+    @State private var historyRoute: PlantCareHistoryRoute?
     @State private var quickCareActorDraft: PlantQuickCareActorDraft?
     @State private var waterPlanCalendarEnabled = true
     @State private var waterSystemReminderEnabled = true
@@ -31,6 +32,7 @@ struct PlantCareFeatureDetailView: View {
     @State private var waterScheduleEndDate = Date()
     @State private var waterSchedulePersistenceError: String?
     @State private var selectedWaterMode: PlantWaterGuidedMode = .overview
+    @State private var historyLimit = 80
     @State var routeSnapshot = PlantCareFeatureRouteSnapshot.empty
     @State var routeSnapshotRefreshTask: Task<Void, Never>?
     @State var routeSnapshotRefreshGeneration = 0
@@ -56,6 +58,7 @@ struct PlantCareFeatureDetailView: View {
             plantIDs: scopedPlants.map(\.id),
             feature: feature,
             focusedCareType: focusedCareType,
+            historyLimit: historyLimit,
             now: Date()
         )
     }
@@ -149,6 +152,11 @@ struct PlantCareFeatureDetailView: View {
                 )
             }
         }
+        .sheet(item: $historyRoute) { route in
+            PlantCareHistoryEditSheet(route: route) { _ in
+                scheduleRouteSnapshotRefresh(force: true, delayMilliseconds: 0)
+            }
+        }
         .sheet(item: $quickCareActorDraft) { draft in
             PlantQuickCareActorConfirmationSheet(draft: draft) { executorID in
                 confirmQuickCare(draft, executorID: executorID)
@@ -160,6 +168,7 @@ struct PlantCareFeatureDetailView: View {
         }
         .onChange(of: focusedPlantID) {
             selectedWaterMode = .overview
+            historyLimit = 80
             refreshWaterScheduleControls()
             scheduleRouteSnapshotRefresh(force: true)
         }
@@ -202,7 +211,7 @@ struct PlantCareFeatureDetailView: View {
                 id: "records",
                 icon: "clock.arrow.circlepath",
                 title: l.tr(zh: "记录", en: "Logs", de: "Einträge"),
-                value: isRouteSnapshotLoading ? "…" : "\(records.count)",
+                value: isRouteSnapshotLoading ? "…" : "\(routeSnapshot.totalRecordCount)",
                 tint: feature.tint
             )
             metricTile(
@@ -739,8 +748,30 @@ struct PlantCareFeatureDetailView: View {
                 emptyRecordState
             } else {
                 VStack(spacing: 10) {
-                    ForEach(records.prefix(80)) { record in
+                    ForEach(records) { record in
                         recordRow(record)
+                    }
+
+                    if routeSnapshot.hasMore {
+                        Button {
+                            historyLimit += 80
+                        } label: {
+                            Label(
+                                l.tr(zh: "加载更多", en: "Load more", de: "Mehr laden"),
+                                systemImage: "chevron.down.circle"
+                            )
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(feature.tint)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel(l.tr(
+                            zh: "加载更多历史记录，当前已显示 \(records.count) 条，共 \(routeSnapshot.totalRecordCount) 条",
+                            en: "Load more history. Showing \(records.count) of \(routeSnapshot.totalRecordCount) logs",
+                            de: "Mehr Verlauf laden. \(records.count) von \(routeSnapshot.totalRecordCount) Einträgen werden angezeigt"
+                        ))
+                        .accessibilityIdentifier("plant-care-feature-history-load-more")
                     }
                 }
             }
@@ -795,12 +826,44 @@ struct PlantCareFeatureDetailView: View {
                         .lineLimit(1)
                 }
             }
+            .accessibilityElement(children: .combine)
 
             Spacer(minLength: 0)
+
+            Menu {
+                Button {
+                    historyRoute = PlantCareHistoryRoute(
+                        recordID: PlantCareHistoryRecordID(plantID: record.plantID, logID: record.id),
+                        action: .edit
+                    )
+                } label: {
+                    Label(l.tr(zh: "编辑记录", en: "Edit log", de: "Eintrag bearbeiten"), systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    historyRoute = PlantCareHistoryRoute(
+                        recordID: PlantCareHistoryRecordID(plantID: record.plantID, logID: record.id),
+                        action: .delete
+                    )
+                } label: {
+                    Label(l.tr(zh: "删除记录", en: "Delete log", de: "Eintrag löschen"), systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(l.tr(
+                zh: "编辑或删除\(record.careType.displayName(l: l))记录",
+                en: "Edit or delete \(record.careType.displayName(l: l)) log",
+                de: "Eintrag \(record.careType.displayName(l: l)) bearbeiten oder löschen"
+            ))
+            .accessibilityIdentifier("plant-care-feature-record-menu-\(record.id.uuidString)")
         }
         .padding(12)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("plant-care-feature-record-\(record.id.uuidString)")
     }
 

@@ -1049,6 +1049,47 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(try context.fetch(FetchDescriptor<Reminder>()).contains { $0.id == reminder.id })
     }
 
+    @Test func routeDataHidesLegacyDefaultPetPlansButKeepsExplicitEvents() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "cat")
+        let defaultTitle = try #require(
+            CarePlanCalendarSync.defaultGeneratedCalendarPlanTitles(for: pet).sorted().first
+        )
+        let defaultEvent = Event(
+            title: defaultTitle,
+            startDate: now.addingTimeInterval(3600),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        defaultEvent.recurrenceDays = 1
+        let explicitEvent = Event(
+            title: "Vet visit",
+            startDate: now.addingTimeInterval(7200),
+            eventType: EventType.vetVisit.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(defaultEvent)
+        context.insert(explicitEvent)
+        try context.save()
+
+        let reference = try await TaskCenterRouteDataActor(modelContainer: container).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            now: now
+        )
+
+        #expect(!reference.eventModelIDs.contains(defaultEvent.persistentModelID))
+        #expect(reference.eventModelIDs.contains(explicitEvent.persistentModelID))
+        #expect(try context.fetch(FetchDescriptor<Event>()).contains { $0.id == defaultEvent.id })
+    }
+
     @Test func createFirstPetSystemJourneyRequiresAnActiveHumanAndNoActivePet() {
         let calendar = utcCalendar()
         let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
@@ -1320,7 +1361,7 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(!qualification.hasDefaultRecommendedCarePlan)
     }
 
-    @Test func carePlanResolutionIsOfferedOnlyForAnExistingDefaultPlan() throws {
+    @Test func defaultCarePlanNeverOffersACompletionResolution() throws {
         let human = Human(name: "Ava")
         let pet = Pet(name: "Momo", species: "cat", breed: "Ragdoll")
         let noPlan = HouseholdStarterJourneyService.buildSnapshot(
@@ -1360,7 +1401,8 @@ struct TaskCenterSnapshotBuilderTests {
             coconutLedgerEntries: []
         )
         let recommendedState = try #require(recommendedPlan.state(for: .carePlan))
-        #expect(recommendedState.availableResolutionCheckpoints == [.acceptedRecommendedCarePlan])
+        #expect(recommendedState.availableResolutionCheckpoints.isEmpty)
+        #expect(recommendedState.completedCheckpoints.isEmpty)
         #expect(recommendedState.status == .actionRequired)
     }
 

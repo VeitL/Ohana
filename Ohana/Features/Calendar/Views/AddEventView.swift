@@ -754,6 +754,7 @@ extension AddEventContentView {
                 }
 
                 ForEach(activePlants) { plant in
+                    let themeHex = plantChipHex(for: plant)
                     relatedPersonChip(
                         title: plant.name,
                         imageSignature: plant.avatarThumbnailSignature,
@@ -761,7 +762,8 @@ extension AddEventContentView {
                             plant.hasAvatarImageAttachment ? plant.avatarImageData : nil
                         },
                         fallback: plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji,
-                        tint: plantChipTint(for: plant),
+                        tint: Color(hex: themeHex),
+                        selectedForeground: OhanaResolvedPrimaryAccent(customHex: themeHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                         identifier: "add-event-related-plant-\(plant.name)",
                         isSelected: relatedEntityType == EntityKind.plant.rawValue && relatedEntityId == plant.id.uuidString
                     ) {
@@ -779,6 +781,7 @@ extension AddEventContentView {
                         },
                         fallback: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
                         tint: Color(hex: pet.safeThemeColorHex),
+                        selectedForeground: OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                         identifier: "add-event-related-pet-\(pet.name)",
                         isSelected: relatedEntityType == EntityKind.pet.rawValue && relatedEntityId == pet.id.uuidString
                     ) {
@@ -796,6 +799,7 @@ extension AddEventContentView {
                         },
                         fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
                         tint: Color(hex: human.safeThemeColorHex),
+                        selectedForeground: OhanaResolvedPrimaryAccent(customHex: human.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                         identifier: "add-event-related-human-\(human.name)",
                         isSelected: relatedEntityType == EntityKind.human.rawValue && relatedEntityId == human.id.uuidString
                     ) {
@@ -852,7 +856,7 @@ extension AddEventContentView {
                     } label: {
                         Text(option.title(l))
                             .font(OhanaFont.caption(.black))
-                            .foregroundStyle(selected ? Color.arkInk : Color.ohanaPrimaryText)
+                            .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
                             .background(selected ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -890,6 +894,7 @@ extension AddEventContentView {
                             },
                             fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
                             tint: Color(hex: human.safeThemeColorHex),
+                            selectedForeground: OhanaResolvedPrimaryAccent(customHex: human.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                             identifier: "add-event-assignee-human-\(human.name)",
                             isSelected: assigneeId == human.id.uuidString
                         ) {
@@ -920,7 +925,7 @@ extension AddEventContentView {
                     Text(didSave ? savedActionTitle : primaryActionTitle)
                 }
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(canSave ? Color.arkInk : Color.ohanaSecondaryText)
+                .foregroundStyle(canSave ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -1086,7 +1091,7 @@ extension AddEventContentView {
         } label: {
             Text(option.title(l))
                 .font(OhanaFont.caption(.black))
-                .foregroundStyle(selected ? Color.arkInk : Color.ohanaPrimaryText)
+                .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(selected ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -1123,7 +1128,7 @@ extension AddEventContentView {
                     .lineLimit(1)
             }
             .font(OhanaFont.caption(.black))
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.leading, 12)
             .padding(.trailing, 14)
@@ -1139,6 +1144,7 @@ extension AddEventContentView {
         imageDataProvider: @escaping @MainActor () -> Data?,
         fallback: String,
         tint: Color,
+        selectedForeground: Color,
         identifier: String,
         isSelected: Bool,
         action: @escaping () -> Void
@@ -1163,7 +1169,7 @@ extension AddEventContentView {
                     .minimumScaleFactor(0.72)
             }
             .font(OhanaFont.caption(.black))
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? selectedForeground : Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.leading, 8)
             .padding(.trailing, 13)
@@ -1180,9 +1186,9 @@ extension AddEventContentView {
             : L10n.current.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt")
     }
 
-    private func plantChipTint(for plant: Plant) -> Color {
+    private func plantChipHex(for plant: Plant) -> String {
         let trimmed = plant.themeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
-        return Color(hex: trimmed.isEmpty ? "2ED3B7" : trimmed)
+        return trimmed.isEmpty ? "2ED3B7" : trimmed
     }
 
     private func eventTypeTitle(_ type: EventType) -> String {

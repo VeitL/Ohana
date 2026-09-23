@@ -141,8 +141,7 @@ struct AddEntityDestinationView: View {
                     Label(l.tr(zh: "重试", en: "Try again", de: "Erneut versuchen"), systemImage: "arrow.clockwise")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.goPrimary)
+                .ohanaPrimaryProminentButton()
                 .accessibilityIdentifier("member-pet-entry-retry")
 
                 Button(l.cancel) {

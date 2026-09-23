@@ -155,13 +155,6 @@ struct AchievementUnifiedWallView: View {
                     Text(l.tr(zh: "成长总览", en: "Growth overview", de: "Wachstumsübersicht"))
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(
-                        zh: "已解锁 \(selectedItems.count(where: \.isUnlocked)) / \(selectedItems.count)",
-                        en: "Unlocked \(selectedItems.count(where: \.isUnlocked)) of \(selectedItems.count)",
-                        de: "\(selectedItems.count(where: \.isUnlocked)) von \(selectedItems.count) freigeschaltet"
-                    ))
-                    .font(OhanaFont.subheadline(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text("\(selectedItems.count(where: \.isUnlocked))/\(selectedItems.count)")
@@ -192,10 +185,6 @@ struct AchievementUnifiedWallView: View {
 
     private var scopeControls: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(l.tr(zh: "成就范围", en: "Achievement scope", de: "Erfolgsbereich"))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-
             Picker(
                 l.tr(zh: "成就范围", en: "Achievement scope", de: "Erfolgsbereich"),
                 selection: $selectedScopeKey
@@ -314,9 +303,7 @@ struct AchievementUnifiedWallView: View {
                 .frame(maxWidth: .infinity)
                 .padding(14)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.goPrimary)
-            .foregroundStyle(Color.arkInk)
+            .ohanaPrimaryProminentButton()
             .disabled(selectedRecipient == nil || isClaiming)
             .accessibilityHint(recipientAccessibilityHint)
         }
@@ -869,9 +856,7 @@ private struct AchievementSnapshotDetailSheet: View {
                                 )
                                 .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(Color.goPrimary)
-                            .foregroundStyle(Color.arkInk)
+                            .ohanaPrimaryProminentButton()
                             .disabled(!canClaim)
                         } else {
                             Label(

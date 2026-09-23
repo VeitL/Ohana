@@ -104,11 +104,7 @@ extension AchievementWallContentView {
                 id: "human_first_record",
                 emoji: "📝",
                 title: l.tr(zh: "第一条记录", en: "First record", de: "Erster Eintrag"),
-                description: l.tr(
-                    zh: "完成任意一条体重、花费、运动或用药记录",
-                    en: "Log any weight, expense, workout, or medication record.",
-                    de: "Erfasse einen Gewichts-, Ausgaben-, Sport- oder Medikamenteneintrag."
-                ),
+                description: humanFirstRecordDescription,
                 color: Color.goCardCyan,
                 isUnlocked: hasAnyHumanRecord(human)
             ),
@@ -139,12 +135,8 @@ extension AchievementWallContentView {
             Achievement(
                 id: "human_expense_tracker",
                 emoji: "💳",
-                title: l.tr(zh: "记账上手", en: "Expense starter", de: "Ausgabenstart"),
-                description: l.tr(
-                    zh: "记录 5 笔家庭或宠物相关花费",
-                    en: "Log 5 family or pet-related expenses.",
-                    de: "Erfasse 5 Familien- oder Haustierausgaben."
-                ),
+                title: humanExpenseTrackerTitle,
+                description: humanExpenseTrackerDescription,
                 color: Color.goOrange,
                 isUnlocked: expenseCount >= 5
             ),
@@ -257,6 +249,42 @@ extension AchievementWallContentView {
                 isUnlocked: accountDays >= 365
             )
         ]
+    }
+
+    private var humanFirstRecordDescription: String {
+        l.tr(
+            zh: "完成任意一条体重、运动或用药记录",
+            en: "Log any weight, workout, or medication record.",
+            de: "Erfasse einen Gewichts-, Sport- oder Medikamenteneintrag.",
+            es: "Registra un peso, entrenamiento o medicamento.",
+            pt: "Registe um peso, treino ou medicamento.",
+            fr: "Enregistrez un poids, un entraînement ou un médicament.",
+            ja: "体重、運動、服薬のいずれかを記録します。",
+            ko: "체중, 운동 또는 복약 기록을 남겨 보세요.",
+            it: "Registra peso, allenamento o farmaco."
+        )
+    }
+
+    private var humanExpenseTrackerTitle: String {
+        l.tr(
+            zh: "宠物开销帮手", en: "Pet cost helper", de: "Hilfe bei Tierkosten",
+            es: "Ayuda con gastos", pt: "Ajuda com despesas", fr: "Aide aux dépenses",
+            ja: "ペット費用の協力者", ko: "반려동물 비용 도우미", it: "Aiuto spese animali"
+        )
+    }
+
+    private var humanExpenseTrackerDescription: String {
+        l.tr(
+            zh: "参与支付 5 笔宠物花费",
+            en: "Contribute to 5 pet expenses.",
+            de: "Beteilige dich an 5 Haustierausgaben.",
+            es: "Participa en 5 gastos de mascotas.",
+            pt: "Participe em 5 despesas com pets.",
+            fr: "Participez à 5 dépenses pour animaux.",
+            ja: "ペットの費用を5件負担します。",
+            ko: "반려동물 지출 5건을 함께 부담해 보세요.",
+            it: "Contribuisci a 5 spese per animali."
+        )
     }
 
     func progress(for badge: Achievement) -> ProgressInfo {
@@ -524,7 +552,12 @@ extension AchievementWallContentView {
         case .humanWeightHistory:
             l.tr(zh: "累计体重记录", en: "Build weight history", de: "Gewichtsverlauf aufbauen")
         case .humanExpenses:
-            l.tr(zh: "记录花费", en: "Log expenses", de: "Ausgaben erfassen")
+            l.tr(
+                zh: "记录宠物花费", en: "Log pet spending", de: "Haustierausgaben erfassen",
+                es: "Registrar gastos de mascotas", pt: "Registar despesas com pets",
+                fr: "Saisir une dépense animale", ja: "ペットの支出を記録",
+                ko: "반려동물 지출 기록", it: "Registra spese per animali"
+            )
         case .humanMedicationPlan:
             l.tr(zh: "添加用药计划", en: "Add a medication plan", de: "Medikamentenplan hinzufügen")
         case .humanMedicationCheckIns:
@@ -648,6 +681,5 @@ extension AchievementWallContentView {
             || !human.workoutLogs.isEmpty
             || !medications(for: human).isEmpty
             || !medicationLogs(for: human).isEmpty
-            || !expenses(for: human).isEmpty
     }
 }

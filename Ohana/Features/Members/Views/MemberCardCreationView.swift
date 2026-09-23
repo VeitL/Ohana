@@ -59,7 +59,6 @@ struct MemberCardCreationContentView: View {
     @State var didConfigureInitialAvatar = false
     @State var didConfigureAvatarStep = false
     @State var shouldApply2DAfterPurchase = false
-    @State var didShowSuccess = false
     @State var isPreparingCamera = false
     @State var currentStep: MemberCreationStep
     @State var lastCustomAvatarImageData: Data?
@@ -158,7 +157,7 @@ struct MemberCardCreationContentView: View {
     }
 
     var canRunHomeJoinHandoff: Bool {
-        true
+        presentationStyle == .onboarding
     }
 
     var mbtiSignature: String {
@@ -275,15 +274,6 @@ struct MemberCardCreationContentView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 10)
                 .frame(width: proxy.size.width, height: proxy.size.height)
-            }
-            if didShowSuccess {
-                AddWizardJoinCelebrationOverlay(
-                    title: l.tr(zh: "\(draft.trimmedName) 已加入 Ohana", en: "\(draft.trimmedName) joined Ohana", de: "\(draft.trimmedName) ist bei Ohana"),
-                    subtitle: l.tr(zh: "成员竖卡已准备好", en: "The portrait card is ready", de: "Die Hochformatkarte ist bereit"),
-                    systemImage: kind == .pet ? "pawprint.fill" : "person.crop.circle.badge.checkmark",
-                    accent: Color(hex: draft.normalizedThemeHex)
-                )
-                .zIndex(50)
             }
         }
         .toolbar(.hidden, for: .navigationBar)

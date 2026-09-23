@@ -408,6 +408,7 @@ ALLOWED_CARE_DISCIPLINE_CONTEXTS: dict[str, set[str]] = {
     "Ohana/Features/Economy/CareEventEconomyAwarder.swift": {
         "awardCareAction",
         "awardSharedCareAction",
+        "awardIdempotentCareAction",
     },
     "Ohana/Domain/Services/CalendarTaskCompletionSyncService.swift": {
         "awardGeneratedCare",

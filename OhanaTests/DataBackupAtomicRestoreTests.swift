@@ -361,6 +361,60 @@ struct DataBackupAtomicRestoreTests {
         #expect(restoredExpenses.first?.amount == -80)
     }
 
+    @Test func restoreAppliesMultiPayerPetExpenseAndReadsExactShares() throws {
+        let source = try makeBackup()
+        let primaryPayerRaw = try #require(source.backup.humans.first?.id)
+        let primaryPayerID = try #require(UUID(uuidString: primaryPayerRaw))
+        let coPayerID = UUID()
+        let expenseID = UUID()
+        let timestamp = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: 1_700_000_450))
+        let contributions = [
+            ExpensePayerContribution(humanID: primaryPayerID, minorUnits: 6000),
+            ExpensePayerContribution(humanID: coPayerID, minorUnits: 4000)
+        ]
+        var backup = source.backup
+        var coPayer = try #require(backup.humans.first)
+        coPayer.id = coPayerID.uuidString
+        coPayer.name = "Co-payer"
+        backup.humans.append(coPayer)
+        backup.petExpenseLogs = [
+            PetExpenseLogBackup(
+                id: expenseID.uuidString,
+                date: timestamp,
+                amount: 100,
+                category: ExpenseCategory.medical.rawValue,
+                note: "Shared clinic bill",
+                petId: source.petID.uuidString,
+                executorId: primaryPayerID.uuidString,
+                recordedByHumanId: coPayerID.uuidString,
+                sharedSessionId: nil,
+                payerContributionsJSON: ExpensePayerContributionPolicy.encode(contributions)
+            )
+        ]
+        let fixture = try makeTarget(petID: source.petID)
+        defer { fixture.removeDefaults() }
+
+        try fixture.manager.applyBackup(
+            backup,
+            context: fixture.container.mainContext,
+            projectionManager: nil,
+            schedulePlantNotifications: false,
+            plantNotifications: fixture.notifications
+        )
+
+        let expense = try #require(
+            try fixture.container.mainContext.fetch(FetchDescriptor<PetExpenseLog>()).first {
+                $0.id == expenseID
+            }
+        )
+        #expect(expense.pet?.id == source.petID)
+        #expect(expense.executorId == primaryPayerID.uuidString)
+        #expect(expense.recordedByHumanId == coPayerID.uuidString)
+        #expect(expense.payerContributions == contributions)
+        #expect(ExpenseSummaryBuilder.amountPaid(by: primaryPayerID, for: expense) == 60)
+        #expect(ExpenseSummaryBuilder.amountPaid(by: coPayerID, for: expense) == 40)
+    }
+
     @Test func restoreLimitsAndMediaReaderRejectOversizeOrTampering() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("DataBackupAtomicRestoreTests.\(UUID().uuidString)", isDirectory: true)
@@ -370,7 +424,7 @@ struct DataBackupAtomicRestoreTests {
         let oversizedManifest = root.appendingPathComponent("oversized.json")
         #expect(FileManager.default.createFile(atPath: oversizedManifest.path, contents: nil))
         let handle = try FileHandle(forWritingTo: oversizedManifest)
-        try handle.truncate(atOffset: UInt64(DataBackupRestoreLimits.maximumManifestBytes + 1))
+        try handle.truncate(atOffset: UInt64(DataBackupRestoreLimits.maximumEncryptedManifestBytes + 1))
         try handle.close()
         do {
             try DataBackupPreflightValidator.validateManifestSize(at: oversizedManifest)
@@ -390,6 +444,23 @@ struct DataBackupAtomicRestoreTests {
         } catch let BackupError.invalidRestoreData(category) {
             #expect(category == .media)
         }
+    }
+
+    @Test func encryptedFiftyMiBMediaPackageRoundTripsWithinPlaintextLimit() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DataBackupEncryptedMedia.\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let password = "Strong backup password"
+        let writer = DataBackupMediaPackageWriter(packageURL: root, encryptMedia: true, password: password)
+        try writer.preparePackageDirectory()
+        let original = Data(repeating: 0xA5, count: 50 * 1024 * 1024)
+        let reference = try #require(try writer.write(original, purpose: .petDocumentAttachmentFile, id: UUID().uuidString))
+        let reader = DataBackupMediaPackageReader(packageURL: root, password: password)
+        let restored = try #require(try reader.data(for: reference))
+
+        #expect(reference.byteCount == original.count)
+        #expect(restored == original)
+        #expect(writer.mediaBytes == original.count)
     }
 
     @Test func successfulRepeatedRestoreIsIdempotentAndCommitsDefaults() throws {

@@ -165,53 +165,27 @@ private struct ZenMembersView: View {
                 ContentUnavailableView {
                     Label(emptyTitle, systemImage: "person.2.slash")
                 } description: {
-                    Text(emptyDescription)
+                    EmptyView()
                 } actions: {
                     ZenMemberAddMenu(onAdd: onAdd)
-                        .buttonStyle(.borderedProminent)
+                        .ohanaPrimaryProminentButton()
                 }
             } else {
                 List {
-                    Section {
-                        ForEach(orderedSubjects) { subject in
-                            Button {
-                                onOpenProfile(subject)
-                            } label: {
-                                ZenMemberRow(
-                                    subject: subject,
-                                    avatarCacheRevision: avatarCacheRevision,
-                                    localization: l
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier(
-                                "zen-members-row-\(subject.kind.rawValue)-\(subject.id)"
+                    ForEach(orderedSubjects) { subject in
+                        Button {
+                            onOpenProfile(subject)
+                        } label: {
+                            ZenMemberRow(
+                                subject: subject,
+                                avatarCacheRevision: avatarCacheRevision,
+                                localization: l
                             )
                         }
-                    } header: {
-                        Text(l.tr(
-                            zh: "所有成员",
-                            en: "Everyone",
-                            de: "Alle",
-                            es: "Todos",
-                            pt: "Todos",
-                            fr: "Tout le monde",
-                            ja: "すべてのメンバー",
-                            ko: "모든 구성원",
-                            it: "Tutti"
-                        ))
-                    } footer: {
-                        Text(l.tr(
-                            zh: "家人、宠物和植物都在这里管理。",
-                            en: "Manage people, pets, and plants here.",
-                            de: "Verwalte hier Menschen, Tiere und Pflanzen.",
-                            es: "Gestiona aquí personas, mascotas y plantas.",
-                            pt: "Gerencie pessoas, pets e plantas aqui.",
-                            fr: "Gérez ici les personnes, animaux et plantes.",
-                            ja: "家族、ペット、植物をここで管理します。",
-                            ko: "가족, 반려동물과 식물을 여기서 관리해요.",
-                            it: "Gestisci qui persone, animali e piante."
-                        ))
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier(
+                            "zen-members-row-\(subject.kind.rawValue)-\(subject.id)"
+                        )
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -244,20 +218,6 @@ private struct ZenMembersView: View {
             ja: "まだメンバーがいません",
             ko: "아직 구성원이 없어요",
             it: "Nessun membro"
-        )
-    }
-
-    private var emptyDescription: String {
-        l.tr(
-            zh: "添加家人、宠物或植物。",
-            en: "Add a person, pet, or plant.",
-            de: "Füge eine Person, ein Tier oder eine Pflanze hinzu.",
-            es: "Añade una persona, mascota o planta.",
-            pt: "Adicione uma pessoa, um pet ou uma planta.",
-            fr: "Ajoutez une personne, un animal ou une plante.",
-            ja: "家族、ペット、植物を追加できます。",
-            ko: "가족, 반려동물 또는 식물을 추가하세요.",
-            it: "Aggiungi una persona, un animale o una pianta."
         )
     }
 }
@@ -350,16 +310,17 @@ private struct ZenMemberRow: View {
         if let companionText = subject.plantCompanionText(localization) {
             return companionText
         }
+        let days = subject.currentDisplayStreak
         return localization.tr(
-            zh: "连续 \(subject.currentDisplayStreak) 天",
-            en: "\(subject.currentDisplayStreak)-day streak",
-            de: "\(subject.currentDisplayStreak)-Tage-Serie",
-            es: "Racha de \(subject.currentDisplayStreak) días",
-            pt: "Sequência de \(subject.currentDisplayStreak) dias",
-            fr: "Série de \(subject.currentDisplayStreak) jours",
-            ja: "\(subject.currentDisplayStreak)日連続",
-            ko: "\(subject.currentDisplayStreak)일 연속",
-            it: "Serie di \(subject.currentDisplayStreak) giorni"
+            zh: "连续 \(days) 天",
+            en: "\(days)-day streak",
+            de: days == 1 ? "Serie: 1 Tag" : "Serie: \(days) Tage",
+            es: days == 1 ? "Racha de 1 día" : "Racha de \(days) días",
+            pt: days == 1 ? "Sequência de 1 dia" : "Sequência de \(days) dias",
+            fr: days == 1 ? "Série de 1 jour" : "Série de \(days) jours",
+            ja: "\(days)日連続",
+            ko: "\(days)일 연속",
+            it: days == 1 ? "Serie di 1 giorno" : "Serie di \(days) giorni"
         )
     }
 

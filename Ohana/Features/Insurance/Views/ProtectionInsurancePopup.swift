@@ -212,7 +212,7 @@ struct ProtectionInsurancePopup: View {
                     } label: {
                         Text(frequency.localizedLabel(l))
                             .font(OhanaFont.caption(.black))
-                            .foregroundStyle(paymentFrequency == frequency ? Color.arkInk : Color.ohanaPrimaryText)
+                            .foregroundStyle(paymentFrequency == frequency ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 42)
                             .background(paymentFrequency == frequency ? Color.goPrimary : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
@@ -272,7 +272,7 @@ struct ProtectionInsurancePopup: View {
         } label: {
             Text(title)
                 .font(OhanaFont.caption(.black))
-                .foregroundStyle(premiumMode == mode ? Color.arkInk : Color.ohanaSecondaryText)
+                .foregroundStyle(premiumMode == mode ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 36)
                 .background(premiumMode == mode ? Color.goPrimary : Color.clear, in: Capsule())

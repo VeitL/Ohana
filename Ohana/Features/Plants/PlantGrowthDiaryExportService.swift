@@ -69,6 +69,7 @@ enum PlantGrowthDiaryExportService {
     ) -> PlantGrowthDiaryExportPayload {
         let l = L10n.current
         let entries = plant.careLogs
+            .filter { !PlantCareHistoryPolicy.isInternalFeedback($0) }
             .sorted { $0.date < $1.date }
             .map { log in
                 let embeddedPhotoData = includePhotos ? log.photoData : nil

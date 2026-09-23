@@ -363,7 +363,8 @@ nonisolated extension DataBackupManager {
             petId: dto.petId.flatMap(UUID.init(uuidString:)),
             executorId: dto.executorId,
             recordedByHumanId: dto.recordedByHumanId,
-            sharedSessionId: dto.sharedSessionId ?? ""
+            sharedSessionId: dto.sharedSessionId ?? "",
+            payerContributionsJSON: dto.payerContributionsJSON ?? ""
         )
     }
 

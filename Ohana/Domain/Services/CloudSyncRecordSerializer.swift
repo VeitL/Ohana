@@ -662,6 +662,7 @@ nonisolated enum CloudSyncRecordSerializer {
             "sharedSessionId": .string(log.sharedSessionId),
             "executorId": optionalString(log.executorId),
             "recordedByHumanId": optionalString(log.recordedByHumanId),
+            "payerContributionsJSON": .string(log.payerContributionsJSON),
             "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
         ]
     }

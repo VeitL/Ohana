@@ -8,7 +8,14 @@
 import SwiftData
 import SwiftUI
 
+struct HomeAvatarPreloadTaskKey: Hashable {
+    let signature: String
+    let canRun: Bool
+}
+
 struct VerticalSolidHomeView: View {
+    private static let readModelLoadingPresentationDelayMilliseconds: UInt64 = 500
+
     let onOpenPet: (UUID, PetDetailTab) -> Void
     let onOpenHuman: (UUID) -> Void
     let onOpenPlant: (UUID) -> Void
@@ -33,7 +40,6 @@ struct VerticalSolidHomeView: View {
     let payload: HomeReadModelPayload
 
     @StateObject var controller: VerticalSolidHomeController
-    @StateObject var safeAreaController = FocusHomeSafeAreaController()
     @StateObject var routeCoordinator = HomeRouteCoordinator()
     @StateObject var commandQueue = DeferredDomainCommandQueue()
 
@@ -51,6 +57,7 @@ struct VerticalSolidHomeView: View {
     @AppStorage("ohanaGrowthLastSeenTreeLevelV1") var growthLastSeenTreeLevel = 0
     @AppStorage("quickActionItems_v2") var quickActionItemsRaw = ""
     @AppStorage("plantQuickActionItems_v1") var plantQuickActionItemsRaw = ""
+    @AppStorage(OasisTreePreferenceStore.renderRevisionKey) var oasisTreeRenderRevision = 0
     @AppStorage("home_cards_enable_ambient_float") var enablesHomeCardAmbientFloat = false
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
@@ -98,6 +105,7 @@ struct VerticalSolidHomeView: View {
     @State var memberMediaAttachmentIndexRepairTask: Task<Void, Never>?
     @State var handledCreatedEntityToken: UUID?
     @State var walkCardPresentationRevision = 0
+    @State private var showsHomeReadModelLoadingOverlay = false
 
     init(
         onOpenPet: @escaping (UUID, PetDetailTab) -> Void,
@@ -185,6 +193,20 @@ struct VerticalSolidHomeView: View {
         ].joined(separator: "||popout:")
     }
 
+    var canRunAvatarPreload: Bool {
+        workloadPolicy.backgroundWorkBudget(
+            operation: "home_first_screen_avatars",
+            requestedItemCount: 1
+        ).hasWorkCapacity
+    }
+
+    var avatarPreloadTaskKey: HomeAvatarPreloadTaskKey {
+        HomeAvatarPreloadTaskKey(
+            signature: avatarPreloadSignature,
+            canRun: canRunAvatarPreload
+        )
+    }
+
     var activeHumanDisplayName: String {
         interaction.activeHuman?.name ?? controller.snapshot.activeName
     }
@@ -237,7 +259,7 @@ struct VerticalSolidHomeView: View {
             let backgroundViewportTopOffset = max(0, globalFrame.minY)
             let backgroundViewportSize = ScreenCompat.bounds.size
             let safeTop: CGFloat = 0
-            let safeBottom = safeAreaController.resolvedBottom(in: proxy)
+            let safeBottom = proxy.safeAreaInsets.bottom
             let headerTopGap: CGFloat = 0
             let headerContentHeight: CGFloat = 0
             let compactContentGap: CGFloat = 8
@@ -257,54 +279,80 @@ struct VerticalSolidHomeView: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
 
-                VerticalSolidHomePageDeck(
-                    selectedTab: controller.selectedTab,
-                    outgoingTab: controller.outgoingTab,
-                    preparingTab: controller.preparingTab,
-                    preparedTabs: controller.preparedTabs,
-                    visibleTabs: currentVisibleHomeTabs,
-                    taskCenterBadge: taskCenterBadge,
-                    localization: l,
-                    backgroundViewportSize: backgroundViewportSize,
-                    backgroundViewportTopOffset: backgroundViewportTopOffset,
-                    onSelect: { tab in selectTab(tab) }
-                ) { lifecycle in
-                    VerticalSolidHomeDashboardPage(
-                        snapshot: controller.snapshot,
-                        interaction: interaction,
-                        avatarCacheRevision: avatarCacheRevision,
-                        isLive: lifecycle.isLive,
-                        walkPresentationRevision: walkCardPresentationRevision,
-                        collapsedTopInset: homeCollapsedTopInset,
+                VStack(spacing: 0) {
+                    VerticalSolidHomePageDeck(
+                        selectedTab: controller.selectedTab,
+                        outgoingTab: controller.outgoingTab,
+                        preparingTab: controller.preparingTab,
+                        preparedTabs: controller.preparedTabs,
+                        visibleTabs: currentVisibleHomeTabs,
+                        taskCenterBadge: taskCenterBadge,
                         localization: l,
-                        activeHumanID: activeHumanID,
-                        allowsAmbientFloat: enablesHomeCardAmbientFloat,
-                        quickActionItemsRaw: $quickActionItemsRaw,
-                        headerContextCardId: $headerContextCardId,
-                        isCardExpandedOrTransitioning: $isHomeCardExpandedOrTransitioning,
-                        isCardHeroAnimating: $isHomeCardHeroAnimating,
-                        cardHeroProgress: $homeCardHeroProgress,
-                        arrivingCardId: arrivingHomeCardId,
-                        cardStateResetToken: cardStateResetToken,
-                        onOpenCardDetails: openCard,
-                        onQuickActionForCard: openQuickActionItem,
-                        onQuickActionOptionForCard: openQuickActionOption,
-                        onQuickActionLimitReached: { routeCoordinator.showQuickActionLimit() },
-                        onExpandedCardCollapseIntent: { false },
-                        onWalkCardMinimizeToFloatingControl: minimizeWalkCardToFloatingControl,
-                        onAddFirstPet: { routeCoordinator.openAddEntity(.pet) }
-                    )
-                } calendar: { lifecycle in
-                    embeddedTaskCenterPage(lifecycle: lifecycle)
-                } oasis: { lifecycle in
-                    embeddedOasisPage(lifecycle: lifecycle)
-                } plants: { _ in
-                    embeddedPlantsPage(topChromeHeight: topChromeHeight)
-                }
-                .frame(width: proxy.size.width, height: contentHeight)
-                .position(x: proxy.size.width / 2, y: topChromeHeight + contentHeight / 2)
+                        backgroundViewportSize: backgroundViewportSize,
+                        backgroundViewportTopOffset: backgroundViewportTopOffset,
+                        onSelect: { tab in selectTab(tab) }
+                    ) { lifecycle in
+                        VerticalSolidHomeDashboardPage(
+                            snapshot: controller.snapshot,
+                            interaction: interaction,
+                            avatarCacheRevision: avatarCacheRevision,
+                            isLive: lifecycle.isLive,
+                            walkPresentationRevision: walkCardPresentationRevision,
+                            collapsedTopInset: homeCollapsedTopInset,
+                            localization: l,
+                            activeHumanID: activeHumanID,
+                            allowsAmbientFloat: enablesHomeCardAmbientFloat,
+                            quickActionItemsRaw: $quickActionItemsRaw,
+                            headerContextCardId: $headerContextCardId,
+                            isCardExpandedOrTransitioning: $isHomeCardExpandedOrTransitioning,
+                            isCardHeroAnimating: $isHomeCardHeroAnimating,
+                            cardHeroProgress: $homeCardHeroProgress,
+                            arrivingCardId: arrivingHomeCardId,
+                            cardStateResetToken: cardStateResetToken,
+                            onOpenCardDetails: openCard,
+                            onQuickActionForCard: openQuickActionItem,
+                            onQuickActionOptionForCard: openQuickActionOption,
+                            onQuickActionLimitReached: { routeCoordinator.showQuickActionLimit() },
+                            onExpandedCardCollapseIntent: { false },
+                            onWalkCardMinimizeToFloatingControl: minimizeWalkCardToFloatingControl,
+                            onAddFirstPet: { routeCoordinator.openAddEntity(.pet) },
+                            onOpenAllMembers: { routeCoordinator.openCrewRoster() }
+                        )
+                    } calendar: { lifecycle in
+                        embeddedTaskCenterPage(lifecycle: lifecycle)
+                    } oasis: { lifecycle in
+                        embeddedOasisPage(lifecycle: lifecycle)
+                    } plants: { _ in
+                        embeddedPlantsPage(topChromeHeight: topChromeHeight)
+                    }
+                    .frame(width: proxy.size.width, height: contentHeight)
 
-                if !controller.snapshot.isReady {
+                    VerticalSolidHomeBottomBar(
+                        selectedTab: controller.selectedTab,
+                        visibleTabs: currentVisibleHomeTabs,
+                        taskCenterBadge: taskCenterBadge,
+                        quickRecordTargets: homeToolbarQuickRecordTargets,
+                        safeBottom: safeBottom,
+                        allowsSelectionMotion: canAnimate,
+                        contextActionDisabledReason: homeBottomContextActionDisabledReason,
+                        localization: l,
+                        onSelect: { tab in selectTab(tab) },
+                        onQuickRecord: openHomeToolbarQuickRecord,
+                        onContextAction: performHomeBottomContextAction
+                    )
+                    .frame(width: proxy.size.width, height: bottomHeight, alignment: .bottom)
+                }
+                .frame(
+                    width: proxy.size.width,
+                    height: contentHeight + bottomHeight,
+                    alignment: .top
+                )
+                .position(
+                    x: proxy.size.width / 2,
+                    y: topChromeHeight + (contentHeight + bottomHeight) / 2
+                )
+
+                if showsHomeReadModelLoadingOverlay {
                     HomeReadModelLoadingOverlay(localization: l)
                         .frame(width: proxy.size.width, height: contentHeight)
                         .position(x: proxy.size.width / 2, y: topChromeHeight + contentHeight / 2)
@@ -357,9 +405,6 @@ struct VerticalSolidHomeView: View {
                     .zIndex(70)
                 }
             }
-            .onAppear {
-                safeAreaController.stabilize(from: proxy)
-            }
         }
     }
 
@@ -377,6 +422,7 @@ struct VerticalSolidHomeView: View {
                 activeHumanDisplayName: activeHumanDisplayName,
                 primaryActionIcon: homeToolbarPrimaryActionIcon,
                 primaryActionAccessibilityLabel: homeToolbarPrimaryActionAccessibilityLabel,
+                showsHomePrimaryAction: showsHomeToolbarPrimaryAction,
                 localization: l,
                 onCoconut: openHeaderCoconutDestination,
                 onPrimaryAction: performHomeToolbarPrimaryAction,
@@ -401,8 +447,21 @@ struct VerticalSolidHomeView: View {
         .onChange(of: isHomeCardHeroAnimating) { _, isAnimating in
             flushDeferredHomeSnapshotRefreshIfNeeded(isAnimating: isAnimating)
         }
-        .task(id: avatarPreloadSignature) {
+        .task(id: avatarPreloadTaskKey) {
+            guard canRunAvatarPreload else { return }
             await preloadFirstScreenAvatars()
+        }
+        .task(id: controller.snapshot.isReady) {
+            guard !controller.snapshot.isReady else {
+                showsHomeReadModelLoadingOverlay = false
+                return
+            }
+            showsHomeReadModelLoadingOverlay = false
+            await OhanaFrameScheduler.waitAfterNextFrame(
+                milliseconds: Self.readModelLoadingPresentationDelayMilliseconds
+            )
+            guard !Task.isCancelled, !controller.snapshot.isReady else { return }
+            showsHomeReadModelLoadingOverlay = true
         }
         .onDisappear {
             homeAppearHandoffTask?.cancel()
@@ -485,22 +544,17 @@ private struct HomeReadModelLoadingOverlay: View {
     let localization: L10n
 
     var body: some View {
-        VStack(spacing: 10) {
-            ProgressView()
-                .tint(Color.goPrimary)
-            Text(localization.tr(
-                zh: "正在恢复家庭数据",
-                en: "Loading household data",
-                de: "Haushaltsdaten werden geladen"
-            ))
-            .font(OhanaFont.caption(.semibold))
-            .foregroundStyle(Color.ohanaSecondaryText)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(Color.ohanaCardSurface.opacity(0.88), in: Capsule())
+        ProgressView()
+            .tint(Color.goPrimary)
+            .padding(16)
+            .background(Color.ohanaCardSurface.opacity(0.88), in: Circle())
         .allowsHitTesting(false)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(localization.tr(
+            zh: "正在恢复家庭数据",
+            en: "Loading household data",
+            de: "Haushaltsdaten werden geladen"
+        ))
         .accessibilityIdentifier("home-read-model-loading")
     }
 }

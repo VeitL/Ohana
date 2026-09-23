@@ -603,7 +603,7 @@ extension IslandWeightDashboardContentView {
                 Text(selectedWeightEntryRoute == nil ? l.tr(zh: "选成员", en: "Choose", de: "Wählen") : l.tr(zh: "记录", en: "Record", de: "Eintragen"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 14)
             .padding(.vertical, 11)
             .background(Color.goPrimary, in: Capsule())
@@ -699,7 +699,7 @@ extension IslandWeightDashboardContentView {
                             }
                         }
                         .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(weightTimeRange == range ? Color.arkInk : primaryText)
+                        .foregroundStyle(weightTimeRange == range ? Color.ohanaPrimaryActionText : primaryText)
                         .frame(minWidth: range == .all ? 42 : 30)
                         .padding(.vertical, 7)
                         .background(weightTimeRange == range ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

@@ -203,7 +203,7 @@ nonisolated struct AuthorizedDomainHumanExpenseWrite {
     let actor: EconomyRewardOwnerResolution
     let disposition: CareFactWriteDisposition
 
-    fileprivate init(
+    private init(
         mutationPlan: AuthorizedMutationPlan,
         intent: DomainCareFactCreateIntent,
         human: Human,
@@ -316,43 +316,14 @@ enum DomainCareFactWriteAuthorizer {
     }
 
     static func authorizeHumanExpense(
-        human: Human,
-        intent: DomainCareFactCreateIntent,
-        context: ModelContext,
+        human _: Human,
+        intent _: DomainCareFactCreateIntent,
+        context _: ModelContext,
         logPrefix _: String
     ) -> AuthorizedDomainHumanExpenseWrite? {
-        guard case .expense = intent.kind,
-              ExpenseAmountPolicy.isValid(intent: intent),
-              let mutationPlan = DomainPolicyAuthorizer.authorize(
-                  DomainMutationAuthorizationRequest(
-                      scope: .careFact,
-                      source: intent.source,
-                      subjectRequest: DomainSubjectResolutionRequest(
-                          relatedEntityType: EntityKind.human.rawValue,
-                          relatedEntityId: human.id.uuidString
-                      ),
-                      writeKind: intent.writeKind
-                  ),
-                  context: context
-              ),
-              mutationPlan.allowsCareFactWrite
-        else {
-            return nil
-        }
-
-        let humanId = human.id.uuidString
-        return AuthorizedDomainHumanExpenseWrite(
-            mutationPlan: mutationPlan,
-            intent: intent,
-            human: human,
-            actor: EconomyRewardOwnerResolution(
-                requestedExecutorId: humanId,
-                effectiveExecutorId: humanId,
-                rewardExecutorId: humanId,
-                usedFallback: false
-            ),
-            disposition: .active
-        )
+        // Legacy nil-pet facts may still be restored and viewed, but every new
+        // expense fact must be authorized through a Pet subject.
+        nil
     }
 }
 
@@ -509,11 +480,13 @@ nonisolated enum DomainCareFactWriter {
     static func createExpenseLog(
         plan: AuthorizedDomainCareFactWrite,
         recordedByHumanId: String? = nil,
+        payerContributions: [ExpensePayerContribution]? = nil,
         context: ModelContext
     ) -> PetExpenseLog {
         upsertExpenseLog(
             plan: plan,
             recordedByHumanId: recordedByHumanId,
+            payerContributions: payerContributions,
             existing: nil,
             context: context
         )
@@ -523,6 +496,7 @@ nonisolated enum DomainCareFactWriter {
     static func upsertExpenseLog(
         plan: AuthorizedDomainCareFactWrite,
         recordedByHumanId: String? = nil,
+        payerContributions: [ExpensePayerContribution]? = nil,
         existing log: PetExpenseLog?,
         context: ModelContext
     ) -> PetExpenseLog {
@@ -546,13 +520,23 @@ nonisolated enum DomainCareFactWriter {
         if didCreate {
             context.insert(expenseLog)
         }
+        // A caller that does not supply allocation intent may edit legacy
+        // derived expenses, but must not make an existing split non-conserving.
+        let preservesExistingSplit = !didCreate && payerContributions == nil && !expenseLog.payerContributionsJSON.isEmpty
         expenseLog.date = plan.intent.occurredAt
-        expenseLog.amount = amount
+        if !preservesExistingSplit {
+            expenseLog.amount = amount
+        }
         expenseLog.category = category.rawValue
         expenseLog.note = note
         expenseLog.pet = plan.pet
-        expenseLog.executorId = plan.actor.effectiveExecutorId
         expenseLog.recordedByHumanId = recordedByHumanId
+        if didCreate || payerContributions != nil {
+            expenseLog.executorId = plan.actor.effectiveExecutorId
+            expenseLog.setPayerContributions(payerContributions ?? [])
+        } else if expenseLog.payerContributionsJSON.isEmpty {
+            expenseLog.executorId = plan.actor.effectiveExecutorId
+        }
         expenseLog.sharedSessionId = sharedSessionId
         CloudSyncMutationRecorder.markModified(expenseLog, context: context, modifiedAt: plan.intent.modifiedAt)
         return expenseLog

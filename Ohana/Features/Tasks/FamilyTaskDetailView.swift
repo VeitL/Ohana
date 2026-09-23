@@ -547,6 +547,7 @@ extension FamilyTaskDetailView {
                     .font(OhanaFont.callout(.bold))
                 Spacer(minLength: 0)
             }
+            .foregroundStyle(actionForeground(action))
             .frame(maxWidth: .infinity, minHeight: 44)
             .contentShape(Rectangle())
         }
@@ -750,6 +751,17 @@ extension FamilyTaskDetailView {
         case .complete, .approve: .goTeal
         case .claim, .submitForReview: .goPrimary
         case .reject: .goRed
+        }
+    }
+
+    private func actionForeground(_ action: TaskCenterAvailableAction) -> Color {
+        switch action {
+        case .complete, .approve:
+            Color.arkInk
+        case .claim, .submitForReview:
+            Color.ohanaPrimaryActionText
+        case .reject:
+            Color.goCardWhite
         }
     }
 

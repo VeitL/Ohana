@@ -25,6 +25,14 @@ extension DomainCommand {
         command("expenses", "entry", ["entityID": entityID.uuidString, "entityKind": entityKind])
     }
 
+    static func expenseUpdate(entityID: UUID, entityKind: String, recordID: UUID) -> DomainCommand {
+        command("expenses", "update", [
+            "entityID": entityID.uuidString,
+            "entityKind": entityKind,
+            "recordID": recordID.uuidString
+        ])
+    }
+
     static func expenseDelete(entityID: UUID, entityKind: String, recordID: UUID) -> DomainCommand {
         command("expenses", "delete", [
             "entityID": entityID.uuidString,

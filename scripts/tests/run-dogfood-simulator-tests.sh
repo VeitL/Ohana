@@ -220,6 +220,9 @@ chmod +x "${fake_bin}/xcrun"
 
 cat > "${fake_bin}/open" <<'SH'
 #!/usr/bin/env bash
+if [[ "${FAKE_OPEN_FAILURE:-0}" == "1" ]]; then
+  exit 1
+fi
 exit 0
 SH
 chmod +x "${fake_bin}/open"
@@ -306,7 +309,7 @@ set -e
   fail "Shutdown metadata seal did not create the store identity"
 
 set +e
-offline_overlay_output="$(FAKE_SHUTDOWN_CONTAINER_LOOKUP_FAIL=1 \
+offline_overlay_output="$(FAKE_SHUTDOWN_CONTAINER_LOOKUP_FAIL=1 FAKE_OPEN_FAILURE=1 \
   "${repo_root}/scripts/run-dogfood-simulator.sh" --no-build 2>&1)"
 offline_overlay_code=$?
 set -e
@@ -314,6 +317,8 @@ set -e
   fail "Shutdown preflight did not recover through booted simctl validation: ${offline_overlay_output}"
 grep -qF "CoreSimulator remounted the logical data container" <<< "${offline_overlay_output}" || \
   fail "Shutdown-to-Booted overlay did not report logical data continuity"
+grep -qF "Simulator GUI is not registered; continuing with the booted CoreSimulator device." <<< "${offline_overlay_output}" || \
+  fail "Headless overlay did not explain the optional Simulator GUI failure"
 [[ -f "${fake_boot_state}" ]] || \
   fail "Shutdown-to-Booted overlay never booted the Simulator"
 rm -f "${fake_boot_state}" "${fake_install_state}"

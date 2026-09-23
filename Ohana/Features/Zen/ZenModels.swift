@@ -660,6 +660,7 @@ struct ZenShellActions {
     var onOpenGacha: () -> Void
     var onOpenCritters: () -> Void
     var onOpenGrowthRoadmap: () -> Void
+    var onOpenOasisReward: () -> Void
     var onInjectEnergy: () async -> Void
     var onClaimStarterGift: () async -> Void
 
@@ -682,6 +683,7 @@ struct ZenShellActions {
         onOpenGacha: {},
         onOpenCritters: {},
         onOpenGrowthRoadmap: {},
+        onOpenOasisReward: {},
         onInjectEnergy: {},
         onClaimStarterGift: {}
     )

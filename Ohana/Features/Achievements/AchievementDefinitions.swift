@@ -564,13 +564,13 @@ nonisolated enum AchievementDefinitionCatalog {
             it: ("Osservatore delle tendenze", "Registra il peso 7 volte.")
         ),
         "human_expense_tracker": .init(
-            de: ("Ausgabenstart", "5 Ausgaben erfassen."),
-            es: ("Primeros gastos", "Registra 5 gastos."),
-            pt: ("Primeiras despesas", "Registre 5 despesas."),
-            fr: ("Premières dépenses", "Enregistrer 5 dépenses."),
-            ja: ("支出記録デビュー", "支出を5件記録する"),
-            ko: ("지출 기록 시작", "지출을 5건 기록하세요."),
-            it: ("Prime spese", "Registra 5 spese.")
+            de: ("Hilfe bei Tierkosten", "Beteilige dich an 5 Haustierausgaben."),
+            es: ("Ayuda con gastos", "Participa en 5 gastos de mascotas."),
+            pt: ("Ajuda com despesas", "Participe em 5 despesas com pets."),
+            fr: ("Aide aux dépenses", "Participez à 5 dépenses pour animaux."),
+            ja: ("ペット費用の協力者", "ペットの費用を5件負担する"),
+            ko: ("반려동물 비용 도우미", "반려동물 지출 5건을 함께 부담하세요."),
+            it: ("Aiuto spese animali", "Contribuisci a 5 spese per animali.")
         ),
         "human_medication_setup": .init(
             de: ("Medikamentenplan", "Einen Medikamentenplan erstellen."),
@@ -757,7 +757,7 @@ nonisolated enum AchievementDefinitionCatalog {
         make("human_first_record", .human, .health, "📝", "AchievementBgHumanFirstRecord", "第一条记录", "First Record", "完成任意个人记录", "Complete any personal record."),
         make("human_weight_starter", .human, .health, "⚖️", "AchievementBgHumanWeightStarter", "体重起点", "Weight Baseline", "记录第一条体重", "Log the first weight entry."),
         make("human_weight_keeper", .human, .health, "📈", "AchievementBgHumanWeightKeeper", "趋势观察员", "Trend Watcher", "记录 7 次体重", "Log weight 7 times."),
-        make("human_expense_tracker", .human, .economy, "💳", "AchievementBgHumanExpenseTracker", "记账上手", "Expense Starter", "记录 5 笔花费", "Log 5 expenses."),
+        make("human_expense_tracker", .human, .economy, "💳", "AchievementBgHumanExpenseTracker", "宠物开销帮手", "Pet Cost Helper", "参与支付 5 笔宠物花费", "Contribute to 5 pet expenses."),
         make("human_medication_setup", .human, .health, "💊", "AchievementBgHumanMedicationSetup", "用药计划", "Medication Plan", "建立一个用药计划", "Create a medication plan."),
         make("human_medication_keeper", .human, .health, "✅", "AchievementBgHumanMedicationKeeper", "按时吃药", "Medication Rhythm", "完成 7 次用药打卡", "Complete 7 medication check-ins."),
         make("human_workout_starter", .human, .movement, "🏃", "AchievementBgHumanWorkoutStarter", "开始活动", "First Workout", "记录第一条运动", "Log the first workout."),

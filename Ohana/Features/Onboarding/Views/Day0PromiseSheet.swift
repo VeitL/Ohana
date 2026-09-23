@@ -23,22 +23,8 @@ nonisolated struct Day0PromiseCopy {
         self.l = l
     }
 
-    var footnote: String {
-        l.tr(
-            zh: "勾选的承诺会自动进入「家庭悬赏榜」——任何家人都可以帮你完成并领取椰子。",
-            en: "Selected promises automatically go to the Family Bounty Board, so any family member can help complete them and earn coconuts."
-        )
-    }
-
     var skipTitle: String {
         l.tr(zh: "跳过", en: "Skip")
-    }
-
-    var headerSubtitle: String {
-        l.tr(
-            zh: "勾选几条你今晚或明天愿意完成的小承诺——它们会自动成为家庭任务，让家人一起参与。",
-            en: "Pick a few small promises you can finish tonight or tomorrow. They become family tasks automatically so everyone can join in."
-        )
     }
 
     var skipForNowTitle: String {
@@ -180,11 +166,6 @@ struct Day0PromiseContentSheet: View {
                                 promiseRow(promise)
                             }
                         }
-                        Text(copy.footnote)
-                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 6)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
@@ -208,15 +189,9 @@ struct Day0PromiseContentSheet: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(copy.welcomeTitle(petName: petName))
-                .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text(copy.headerSubtitle)
-                .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        Text(copy.welcomeTitle(petName: petName))
+            .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
+            .foregroundStyle(Color.ohanaPrimaryText)
     }
 
     private func promiseRow(_ p: Day0PromiseChoice) -> some View {
@@ -233,7 +208,7 @@ struct Day0PromiseContentSheet: View {
                     if isOn {
                         Image(systemName: "checkmark").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 13, weight: .black))
-                            .foregroundStyle(.black) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
                     }
                 }
                 Text(p.emoji).font(OhanaFont.adaptive(size: 22))
@@ -275,7 +250,7 @@ struct Day0PromiseContentSheet: View {
                 Text(selected.isEmpty ? copy.skipForNowTitle : copy.sendPromisesTitle(count: selected.count))
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(.black) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(Color.goPrimary, in: Capsule())
         }

@@ -36,7 +36,7 @@ extension WalkTrackingCard {
                 } label: {
                     Label(L10n(appLanguage).tr(zh: "出发", en: "Start", de: "Starten"), systemImage: "figure.walk")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 16).padding(.vertical, 8)
                         .background(Color.goPrimary, in: Capsule())
                 }
@@ -65,7 +65,7 @@ extension WalkTrackingCard {
                 } label: {
                     Label(L10n(appLanguage).tr(zh: "再来", en: "Again", de: "Nochmal"), systemImage: "arrow.clockwise")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 16).padding(.vertical, 8)
                         .background(Color.goPrimary, in: Capsule())
                 }
@@ -204,7 +204,7 @@ extension WalkTrackingCard {
             if mgr.poopCount > 0 {
                 Text("\(mgr.poopCount)")
                     .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.goCardWhite)
+                    .foregroundStyle(Color.arkInk)
                     .frame(width: 15, height: 15) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goOrange, in: Circle())
                     .offset(x: 3, y: -3)

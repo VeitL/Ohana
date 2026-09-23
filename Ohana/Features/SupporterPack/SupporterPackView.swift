@@ -63,9 +63,10 @@ struct PersonalPlanView: View {
                             }
                             purchaseFootnote
                         } else {
-                            hero
                             if commerce.hasPersonalEntitlement {
                                 activePlanCard
+                            } else {
+                                hero
                             }
                             comparisonSection
                             purchaseSection
@@ -160,22 +161,6 @@ struct PersonalPlanView: View {
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .multilineTextAlignment(.center)
-
-            Text(l.tr(
-                zh: "Free 没有广告，也不会锁住你的记录。Personal 为更多活跃成员与进阶本地工具而生。",
-                en: "Free has no ads and never locks your records. Personal adds room to grow and advanced local tools.",
-                de: "Free ist werbefrei und sperrt keine Einträge. Personal bietet mehr Platz und fortgeschrittene lokale Werkzeuge.",
-                es: "Free no tiene anuncios y nunca bloquea tus registros. Ohana Personal ofrece más espacio para crecer y herramientas locales avanzadas.",
-                pt: "Free não tem anúncios e nunca bloqueia seus registros. Ohana Personal oferece mais espaço para crescer e ferramentas locais avançadas.",
-                fr: "Free est sans publicité et ne bloque jamais vos données. Ohana Personal offre plus de capacité et des outils locaux avancés.",
-                ja: "Freeには広告がなく、記録がロックされることもありません。Ohana Personalでは利用枠が広がり、高度なローカルツールを使えます。",
-                ko: "Free에는 광고가 없으며 기록을 잠그지 않습니다. Ohana Personal은 더 넉넉한 이용 한도와 고급 로컬 도구를 제공합니다.",
-                it: "Free è senza pubblicità e non blocca mai i tuoi dati. Ohana Personal offre più spazio per crescere e strumenti locali avanzati."
-            ))
-            .font(OhanaFont.body(.medium))
-            .foregroundStyle(Color.ohanaSecondaryText)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
@@ -305,17 +290,6 @@ struct PersonalPlanView: View {
         VStack(alignment: .leading, spacing: 13) {
             planHeader(
                 title: "Free",
-                subtitle: l.tr(
-                    zh: "每天轻松记录 · 永久免费",
-                    en: "Easy everyday records · Free forever",
-                    de: "Täglich leicht festhalten · Dauerhaft kostenlos",
-                    es: "Registros diarios sencillos · Gratis para siempre",
-                    pt: "Registros diários simples · Grátis para sempre",
-                    fr: "Noter le quotidien simplement · Gratuit pour toujours",
-                    ja: "毎日を気軽に記録 · ずっと無料",
-                    ko: "매일 가볍게 기록 · 평생 무료",
-                    it: "Registri quotidiani semplici · Gratis per sempre"
-                ),
                 symbol: "checkmark.shield.fill",
                 tint: Color.goTeal
             )
@@ -375,17 +349,6 @@ struct PersonalPlanView: View {
         VStack(alignment: .leading, spacing: 13) {
             planHeader(
                 title: "Ohana Personal",
-                subtitle: l.tr(
-                    zh: "看懂长期变化 · 更多本地工具",
-                    en: "Understand long-term change · More local tools",
-                    de: "Langfristige Veränderungen verstehen · Mehr lokale Werkzeuge",
-                    es: "Entiende los cambios a largo plazo · Más herramientas locales",
-                    pt: "Entenda mudanças de longo prazo · Mais ferramentas locais",
-                    fr: "Comprendre les évolutions · Plus d’outils locaux",
-                    ja: "長期の変化を理解 · 充実したローカル機能",
-                    ko: "장기 변화를 이해 · 더 많은 로컬 도구",
-                    it: "Comprendi i cambiamenti nel tempo · Più strumenti locali"
-                ),
                 symbol: "sparkles",
                 tint: Color.goPrimary
             )
@@ -467,21 +430,16 @@ struct PersonalPlanView: View {
         .accessibilityIdentifier("personal-plan-personal-card")
     }
 
-    private func planHeader(title: String, subtitle: String, symbol: String, tint: Color) -> some View {
+    private func planHeader(title: String, symbol: String, tint: Color) -> some View {
         HStack(spacing: 12) {
             Image(systemName: symbol)
                 .font(OhanaFont.title3(.bold))
                 .foregroundStyle(tint)
                 .frame(width: 30)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(OhanaFont.body(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(subtitle)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
+            Text(title)
+                .font(OhanaFont.body(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
@@ -689,8 +647,7 @@ private extension PersonalPlanView {
             }
             .frame(maxWidth: .infinity, minHeight: 50)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(Color.goPrimary)
+        .ohanaPrimaryProminentButton()
         .disabled(
             commerce.isPurchasing ||
                 commerce.isPurchasePending ||
@@ -726,7 +683,7 @@ private extension PersonalPlanView {
                                 ko: "추천",
                                 it: "Consigliato"))
                                 .font(OhanaFont.caption2(.bold))
-                                .foregroundStyle(Color.arkInk)
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
                                 .background(Color.goPrimary, in: Capsule())
@@ -1129,8 +1086,7 @@ private extension PersonalPlanView {
                                 it: "Usa"))
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.goPrimary)
+                .ohanaPrimaryProminentButton()
                 .disabled(
                     !canUseNeonSmileIcon ||
                         !appServices.appIcons.supportsAlternateIcons ||

@@ -178,7 +178,7 @@ struct EditPetContentSheet: View {
                 } label: {
                     Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                         .font(OhanaFont.headline(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(Color.goPrimary, in: Capsule())

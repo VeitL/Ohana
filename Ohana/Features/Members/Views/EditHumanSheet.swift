@@ -46,6 +46,23 @@ struct EditHumanSheet: View {
 
                 if hasBirthday {
                     DatePicker(l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), selection: $birthday, displayedComponents: .date)
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles") // a11y: allow decorative zodiac glyph hidden below
+                            .foregroundStyle(Color.goPrimary)
+                            .accessibilityHidden(true)
+                        Text(l.tr(
+                            zh: "星座", en: "Zodiac", de: "Sternzeichen",
+                            es: "Signo", pt: "Signo", fr: "Signe",
+                            ja: "星座", ko: "별자리", it: "Segno"
+                        ))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        Spacer(minLength: 8)
+                        Text(Human.westernZodiacDisplay(for: birthday, l: l))
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("edit-human-zodiac")
                 }
 
                 formField(l.tr(zh: "血型", en: "Blood Type", de: "Blutgruppe"), text: $bloodType)
@@ -131,7 +148,7 @@ struct EditHumanSheet: View {
                 .font(OhanaFont.subheadline())
                 .foregroundStyle(Color.ohanaSecondaryText)
             TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                .textFieldStyle(.roundedBorder)
+                .ohanaRoundedTextFieldStyle()
         }
     }
 

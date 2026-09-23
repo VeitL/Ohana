@@ -24,9 +24,11 @@ nonisolated struct HumanLabResultParser: Sendable {
     }
 
     func parse(pages: [HumanLabOCRPage]) -> HumanLabResultParseOutcome {
-        let patterns = PatternBundle()
+        guard let patterns = try? PatternBundle() else {
+            return HumanLabResultParseOutcome(candidates: [], wasTruncated: false)
+        }
         let rowLimit = max(256, maximumCandidateCount * 8)
-        let rowBatch = makeRows(from: pages, limit: rowLimit)
+        let rowBatch = makeRows(from: pages, limit: rowLimit, patterns: patterns)
         var candidates: [HumanLabResultCandidate] = []
         candidates.reserveCapacity(min(rowBatch.rows.count, maximumCandidateCount))
         var deduplicationKeys = Set<String>()
@@ -122,8 +124,7 @@ nonisolated struct HumanLabResultParser: Sendable {
         )
     }
 
-    private func makeRows(from pages: [HumanLabOCRPage], limit: Int) -> SourceRowBatch {
-        let patterns = PatternBundle()
+    private func makeRows(from pages: [HumanLabOCRPage], limit: Int, patterns: PatternBundle) -> SourceRowBatch {
         var rows: [SourceRow] = []
         var wasTruncated = false
         rows.reserveCapacity(min(limit, pages.count * 32))

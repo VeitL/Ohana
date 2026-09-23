@@ -254,7 +254,7 @@ struct GachaCollectibleRevealCardView: View {
         } label: {
             Label(l.tr(zh: "收下", en: "Collect", de: "Nehmen"), systemImage: "tray.and.arrow.down.fill")
                 .font(OhanaFont.caption2(.black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .lineLimit(1)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 6)

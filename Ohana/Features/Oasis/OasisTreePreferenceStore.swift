@@ -17,6 +17,7 @@ enum OasisTreePreferenceStore {
     static let passiveIncomeKey = "lastTreeHarvestDate"
     static let dailyInjectionDayKey = "oasis_v2DailyTreeInjectionDay"
     static let weeklyInjectionWeekKey = "oasis_v2WeeklyTreeInjectionWeek"
+    nonisolated static let renderRevisionKey = "oasis_treeRenderRevisionV1"
 
     private nonisolated static let injectedEnergyKey = "oasis_injectedEnergy"
     nonisolated static let shopEnergyPurchaseStateKey = "oasis_shopEnergyPurchaseStateV1"
@@ -37,6 +38,14 @@ enum OasisTreePreferenceStore {
     private static let legacyBaselineXPScaleVersion = 2
     private static let ledgerEnergyCacheVersion = 1
     private static let defaults = UserDefaults.standard
+
+    @discardableResult
+    nonisolated static func advanceRenderRevision(defaults: UserDefaults = .standard) -> Int {
+        let current = defaults.integer(forKey: renderRevisionKey)
+        let next = current == Int.max ? 0 : current + 1
+        defaults.set(next, forKey: renderRevisionKey)
+        return next
+    }
 
     nonisolated static var injectedEnergy: Int {
         get {

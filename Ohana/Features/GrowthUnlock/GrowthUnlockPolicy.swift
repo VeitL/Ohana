@@ -225,6 +225,91 @@ enum GrowthUnlockCatalog {
     ]
 }
 
+enum GrowthUnlockExperiencePolicy {
+    private static let standardOnlyZenStages: Set<GrowthUnlockStageID> = [
+        .dailyCare,
+        .bodyHealth,
+        .household,
+        .advancedInsights,
+        .memoryReview
+    ]
+
+    static func isStandardOnlyInZen(_ stageID: GrowthUnlockStageID) -> Bool {
+        standardOnlyZenStages.contains(stageID)
+    }
+
+    static func detail(
+        for step: GrowthUnlockStep,
+        experienceMode: AppExperienceMode,
+        language: String
+    ) -> String {
+        guard experienceMode == .zen else { return step.detail(language: language) }
+        let text: AppLocalizedText = switch step.id {
+        case .dailyCare:
+            AppLocalizedText(
+                zh: "普通模式在此开放日常照护、健康与用药记录和基础家庭洞察；Zen 打卡与 Oasis 不受此等级限制。",
+                en: "Standard opens daily care, health and medication records, and basic household insights here; Zen check-ins and Oasis are not gated by this level.",
+                de: "Im Standardmodus öffnen sich hier tägliche Pflege, Gesundheits- und Medikamenteneinträge sowie grundlegende Haushaltseinblicke; Zen-Check-ins und Oasis sind nicht daran gebunden."
+            )
+        case .bodyHealth:
+            AppLocalizedText(
+                zh: "普通模式在此开放家庭健康与用药聚合趋势；Zen 仍保持轻量打卡体验。",
+                en: "Standard opens household health and medication trends here; Zen keeps its lightweight check-in experience.",
+                de: "Im Standardmodus öffnen sich hier Gesundheits- und Medikamententrends des Haushalts; Zen bleibt bei leichten Check-ins."
+            )
+        case .memory:
+            AppLocalizedText(
+                zh: "Zen 在此开放成就；时光记录、照片与成长时间线可切换到普通模式使用。",
+                en: "Zen opens achievements here; switch to Standard for moments, photos, and growth timelines.",
+                de: "Zen öffnet hier Erfolge; Momente, Fotos und Wachstumszeitleisten sind im Standardmodus verfügbar."
+            )
+        case .household:
+            AppLocalizedText(
+                zh: "Zen 从第一天就显示植物卡片；Lv.4 开放的是普通模式中的植物护理计划、日志、资料库和本地提醒。",
+                en: "Zen shows plant cards from day one; Lv.4 opens Standard-mode plant care plans, logs, the catalog, and local reminders.",
+                de: "Zen zeigt Pflanzenkarten ab dem ersten Tag; Lv.4 öffnet Pflegepläne, Protokolle, Katalog und lokale Erinnerungen im Standardmodus."
+            )
+        case .oasisPlants:
+            AppLocalizedText(
+                zh: "开放共享 Oasis 的氛围、装饰与每日被动收益循环。",
+                en: "Open the shared Oasis mood, decoration, and daily passive-income loop.",
+                de: "Öffnet Stimmung, Dekoration und tägliche passive Erträge der gemeinsamen Oasis."
+            )
+        case .rewards:
+            AppLocalizedText(
+                zh: "开放共享椰子商店与装饰；家庭周报属于普通模式。",
+                en: "Open the shared coconut shop and cosmetics; household weekly reports belong to Standard.",
+                de: "Öffnet den gemeinsamen Kokos-Shop und Kosmetik; Haushalts-Wochenberichte gehören zum Standardmodus."
+            )
+        case .advancedPlay:
+            AppLocalizedText(
+                zh: "开放共享扭蛋与高级收集玩法，不打断每日打卡。",
+                en: "Open shared gacha and advanced collection without interrupting daily check-ins.",
+                de: "Öffnet gemeinsame Gacha- und Sammelfunktionen, ohne tägliche Check-ins zu unterbrechen."
+            )
+        case .advancedInsights:
+            AppLocalizedText(
+                zh: "普通模式在此开放深度照护分析与完整提醒诊断；Zen 的安全告警始终可见。",
+                en: "Standard opens deep care analysis and full reminder diagnostics here; Zen safety alerts always remain visible.",
+                de: "Im Standardmodus öffnen sich hier tiefe Pflegeanalysen und vollständige Erinnerungsdiagnosen; Sicherheitswarnungen bleiben in Zen immer sichtbar."
+            )
+        case .memoryReview:
+            AppLocalizedText(
+                zh: "普通模式在此开放按月整理照护与回忆的长期家庭回顾。",
+                en: "Standard opens the monthly long-term household care and memory review here.",
+                de: "Im Standardmodus öffnet sich hier der monatliche Langzeitrückblick auf Pflege und Erinnerungen."
+            )
+        case .mastery:
+            AppLocalizedText(
+                zh: "开放共享电子宠物、大师树外观、顶级被动收益和长期荣誉。",
+                en: "Open the shared e-critter, master tree styling, top passive income, and long-term honors.",
+                de: "Öffnet den gemeinsamen E-Critter, Meisterbaum, höchste passive Erträge und Langzeit-Ehren."
+            )
+        }
+        return text.resolve(language)
+    }
+}
+
 enum GrowthUnlockPolicy {
     static let stages: [GrowthUnlockStep] = GrowthUnlockCatalog.stages
 

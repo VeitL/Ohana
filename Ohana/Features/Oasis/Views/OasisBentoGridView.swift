@@ -411,13 +411,6 @@ struct OasisBentoFeatureInfoOverlay: View {
                 .lineLimit(3)
                 .minimumScaleFactor(0.82)
 
-            Text(helperText)
-                .font(OhanaFont.caption(.bold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
-
             Button {
                 onDismiss()
             } label: {
@@ -438,27 +431,5 @@ struct OasisBentoFeatureInfoOverlay: View {
             shape.strokeBorder(Color.ohanaPopupSurfaceStroke, lineWidth: 1)
         }
         .shadow(color: Color.black.opacity(0.26), radius: 26, x: 0, y: 16) // ui-v4: allow centered glass popup lift
-    }
-
-    private var helperText: String {
-        if info.requiredLevel != nil {
-            return localization.tr(
-                zh: "继续完成真实照护，椰子树升级后会自动开放。",
-                en: "Keep completing real care. It opens automatically as the tree levels up.",
-                de: "Bleib bei echter Pflege. Es öffnet sich automatisch mit Baum-Leveln."
-            )
-        }
-        if info.feature == .achievements, info.unavailableLabel != nil {
-            return localization.tr(
-                zh: "添加宠物后，这里会显示它们的成就进度。",
-                en: "Add a pet and this will show their badge progress.",
-                de: "Füge ein Tier hinzu, dann erscheint hier der Abzeichen-Fortschritt."
-            )
-        }
-        return localization.tr(
-            zh: "满足条件后会自动开放。",
-            en: "It opens automatically once the requirements are met.",
-            de: "Es öffnet sich automatisch, sobald die Bedingungen erfüllt sind."
-        )
     }
 }

@@ -187,9 +187,6 @@ struct DailyStreakDetailView: View {
                     Text(l.tr(zh: "椰子账本", en: "Coconut ledger", de: "Kokosnuss-Buch"))
                         .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "查看连击和奖励记录", en: "View streak and reward history", de: "Serien- und Belohnungsverlauf ansehen"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
 
                 Spacer(minLength: 10)
@@ -240,9 +237,6 @@ struct DailyStreakDetailView: View {
                     Text(activeHuman?.name ?? l.tr(zh: "我", en: "Me", de: "Ich"))
                         .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "历史连续记录会保留", en: "Your streak history stays", de: "Dein Serienverlauf bleibt erhalten"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
@@ -272,9 +266,6 @@ struct DailyStreakDetailView: View {
                             .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         Spacer()
-                        Text(l.tr(zh: "还差 \(next - currentStreak) 天", en: "\(next - currentStreak) days left", de: "Noch \(next - currentStreak) Tage"))
-                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.goOrange.opacity(0.8))
                     }
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
@@ -306,9 +297,6 @@ struct DailyStreakDetailView: View {
                     Text(l.tr(zh: "家庭连击", en: "Family streak", de: "Familienserie"))
                         .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "本周照护贡献，谁最稳一眼就知道", en: "This week's care contributions at a glance", de: "Pflegebeitraege dieser Woche auf einen Blick"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Image(systemName: "flame.fill") // a11y: allow decorative icon covered by surrounding text or control
@@ -365,15 +353,6 @@ struct DailyStreakDetailView: View {
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
-                HStack(spacing: 4) {
-                    Text("🔥")
-                    Text(l.tr(zh: "\(currentStreak) 天连胜", en: "\(currentStreak)-day streak", de: "\(currentStreak)-Tage-Serie"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.goOrange)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.goOrange.opacity(0.12), in: Capsule())
             }
 
             checkInStatsRow

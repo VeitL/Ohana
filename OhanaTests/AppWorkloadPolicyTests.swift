@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import Ohana
 
@@ -176,6 +177,37 @@ struct AppWorkloadPolicyTests {
         )
         #expect(!criticalBudget.hasWorkCapacity)
         #expect(criticalBudget.isDeferred)
+    }
+
+    @Test func foregroundResumeMakesDeferredHomeAvatarPreloadEligibleAgain() {
+        let policy = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        let signature = "same-home-media"
+
+        policy.updateScenePhase(.background)
+        let deferred = HomeAvatarPreloadTaskKey(
+            signature: signature,
+            canRun: policy.backgroundWorkBudget(
+                operation: "home_first_screen_avatars",
+                requestedItemCount: 1
+            ).hasWorkCapacity
+        )
+        #expect(!deferred.canRun)
+
+        policy.updateScenePhase(.active)
+        let resumed = HomeAvatarPreloadTaskKey(
+            signature: signature,
+            canRun: policy.backgroundWorkBudget(
+                operation: "home_first_screen_avatars",
+                requestedItemCount: 1
+            ).hasWorkCapacity
+        )
+        #expect(resumed.canRun)
+        #expect(resumed != deferred)
     }
 
     @Test func systemSurfaceBudgetsFollowCentralRuntimePolicy() {

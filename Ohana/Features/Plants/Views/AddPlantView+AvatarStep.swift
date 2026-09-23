@@ -104,7 +104,7 @@ extension AddPlantView {
                 Image(systemName: icon)
                     .font(OhanaFont.adaptive(size: 17, weight: .black))
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(isSelected ? Color.arkInk : Color.goTeal)
+                    .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.goTeal)
                     .frame(width: 34, height: 34) // a11y: allow decorative source glyph; parent button provides the 44pt target and label.
                     .background(isSelected ? Color.goPrimary.opacity(0.96) : Color.goTeal.opacity(0.13), in: Circle())
                     .accessibilityHidden(true)

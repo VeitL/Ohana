@@ -327,19 +327,20 @@ nonisolated enum AchievementProgressionEngine {
         )
         medicationLogDescriptor.fetchLimit = activityFetchLimit
         var expenseDescriptor = FetchDescriptor<PetExpenseLog>(
-            predicate: #Predicate { $0.executorId == humanID }
+            predicate: #Predicate { $0.amount > 0 }
         )
         expenseDescriptor.fetchLimit = activityFetchLimit
         let medications = try context.fetch(medicationDescriptor)
         let medicationLogs = try context.fetch(medicationLogDescriptor)
-        let expenses = try context.fetch(expenseDescriptor)
+        let expenses = try context.fetch(expenseDescriptor).filter { expense in
+            expense.pet != nil && expense.payerIDs.contains(humanID)
+        }
         let taken = medicationLogs.count(where: { $0.status == .taken })
         let days = Calendar.current.dateComponents([.day], from: human.createdAt, to: now).day ?? 0
         let hasAnyRecord = !human.weightLogs.isEmpty
             || !human.workoutLogs.isEmpty
             || !medications.isEmpty
             || !medicationLogs.isEmpty
-            || !expenses.isEmpty
 
         let conditions: [String: Bool] = [
             "human_profile_ready": HumanBasicProfileAchievementPolicy.isReady(human),

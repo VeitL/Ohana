@@ -90,13 +90,6 @@ struct CareLedgerAnalysisContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "统一照护事件账本", en: "Unified care event ledger", de: "Einheitliches Pflegeereignis-Buch"))
                         .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
-                    Text(l.tr(
-                        zh: "用同一事件层查看谁、给谁、做了什么",
-                        en: "See who did what for whom from one event layer",
-                        de: "Sieh in einer Ereignisebene, wer was fuer wen getan hat"
-                    ))
-                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
             }
@@ -105,14 +98,6 @@ struct CareLedgerAnalysisContentView: View {
                 metric(l.tr(zh: "对象覆盖", en: "Coverage", de: "Abdeckung"), "\(screenModel.objectCoverageCount)", .goTeal)
                 metric(l.tr(zh: "奖励", en: "Rewards", de: "Belohnungen"), "\(screenModel.positiveRewardTotal)🥥", .goYellow)
             }
-            Text(l.tr(
-                zh: "同一批量或共享照护只计一次现实操作；每个被照护对象各计一次覆盖。",
-                en: "A batch or shared-care session counts as one action; each cared-for subject counts once toward coverage.",
-                de: "Eine Sammel- oder gemeinsame Pflege zaehlt als eine Aktion; jedes versorgte Objekt als eine Abdeckung."
-            ))
-                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-
             if appServices.commerce.allows(.extendedTrends) {
                 ShareLink(item: preparedCSV) {
                     Label(
@@ -201,7 +186,7 @@ struct CareLedgerAnalysisContentView: View {
                 }
             }
             .font(OhanaFont.caption(.black))
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaSecondaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .padding(.horizontal, 12)
             .frame(minHeight: 36)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -334,11 +319,7 @@ struct CareLedgerAnalysisContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(l.tr(zh: "最近账本流水", en: "Recent ledger activity", de: "Aktuelle Buchaktivitaet"), icon: "list.bullet.rectangle")
             if screenModel.filteredEvents.isEmpty {
-                emptyText(l.tr(
-                    zh: "完成一次照护、提醒或椰子操作后，这里会出现流水",
-                    en: "Care, reminder, or coconut activity will appear here after it is completed",
-                    de: "Pflege-, Erinnerungs- oder Kokosnuss-Aktivitaet erscheint hier nach Abschluss"
-                ))
+                emptyText(l.noRecords)
             } else {
                 ForEach(screenModel.filteredEvents.prefix(20)) { event in
                     HStack(spacing: 10) {
@@ -371,14 +352,12 @@ struct CareLedgerAnalysisContentView: View {
     private func kindChip(title: String, kind: CareLedgerEventKind?) -> some View {
         let isSelected = screenModel.selectedKind == kind
         return Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) { // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-                screenModel.selectedKind = kind
-            }
+            screenModel.selectedKind = kind
             prepareExport()
         } label: {
             Text(title)
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(isSelected ? Color.arkInk : Color.primary)
+                .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.primary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
                 .background(isSelected ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())

@@ -29,6 +29,7 @@ struct CrewRosterProfilePanel: View {
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var isEditing = false
+    @State private var showsSavedFeedback = false
     @State private var showingPetPassedAlert = false
     @State private var showingPetUndoPassedAlert = false
     @State private var showingPetClearAlert = false
@@ -72,6 +73,10 @@ struct CrewRosterProfilePanel: View {
     private let mbtiOptions = ["未填写", "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]
 
     private var tint: Color { Color(hex: resolvedThemeHex) }
+    private var tintActionText: Color {
+        OhanaResolvedPrimaryAccent(customHex: resolvedThemeHex)?.actionTextColor
+            ?? Color.ohanaPrimaryText
+    }
     private var resolvedThemeHex: String {
         if !themeHex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return themeHex }
         if let pet { return pet.safeThemeColorHex }
@@ -132,7 +137,11 @@ struct CrewRosterProfilePanel: View {
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text(l.tr(zh: "将进入纪念模式，并让未来照护安排退出活跃提醒。原有数据会保留，此操作可撤销。", en: "This pet will enter memorial mode and future care plans will leave active reminders. Existing data stays, and this can be undone.", de: "Dieses Haustier wechselt in den Gedenkmodus und kuenftige Pflegeplaene verlassen aktive Erinnerungen. Bestehende Daten bleiben erhalten und die Aktion kann rueckgaengig gemacht werden."))
+            Text(l.tr(
+                zh: "进入纪念模式并停止未来照护提醒；数据保留，可撤销。",
+                en: "Enters memorial mode and stops future care reminders. Data stays, and this can be undone.",
+                de: "Wechselt in den Gedenkmodus und stoppt künftige Pflegehinweise. Daten bleiben erhalten; dies ist widerrufbar."
+            ))
         }
         .alert(l.tr(zh: "撤销离世标记", en: "Undo passed-away mark?", de: "Verstorben-Markierung rueckgaengig machen?"), isPresented: $showingPetUndoPassedAlert) {
             Button(l.tr(zh: "撤销", en: "Undo", de: "Rueckgaengig"), role: .destructive) {
@@ -140,7 +149,7 @@ struct CrewRosterProfilePanel: View {
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text(l.tr(zh: "将清除离世日期，恢复为在世状态。", en: "This clears the passed-away date and restores active status.", de: "Das Sterbedatum wird geloescht und der aktive Status wiederhergestellt."))
+            Text(l.tr(zh: "清除离世日期并恢复活跃状态。", en: "Clears the passed-away date and restores active status.", de: "Löscht das Sterbedatum und stellt den aktiven Status wieder her."))
         }
         .alert(l.tr(zh: "仅清空所有记录", en: "Clear records only?", de: "Nur Eintraege loeschen?"), isPresented: $showingPetClearAlert) {
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
@@ -156,7 +165,7 @@ struct CrewRosterProfilePanel: View {
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text(l.tr(zh: "将把该成员设为纪念模式。", en: "This member will be moved into memorial mode.", de: "Dieses Mitglied wird in den Gedenkmodus versetzt."))
+            Text(l.tr(zh: "资料保留，可撤销。", en: "Profile data stays, and this can be undone.", de: "Profildaten bleiben erhalten; dies ist widerrufbar."))
         }
         .alert(l.tr(zh: "撤销纪念模式", en: "Undo memorial mode?", de: "Gedenkmodus zuruecknehmen?"), isPresented: $showingHumanUndoPassedAlert) {
             Button(l.tr(zh: "撤销", en: "Undo", de: "Zuruecknehmen"), role: .destructive) {
@@ -164,7 +173,7 @@ struct CrewRosterProfilePanel: View {
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text(l.tr(zh: "将清除该成员的纪念模式日期。", en: "This will clear the member's memorial-mode date.", de: "Das Datum fuer den Gedenkmodus dieses Mitglieds wird geloescht."))
+            Text(l.tr(zh: "清除纪念日期并恢复活跃状态。", en: "Clears the memorial date and restores active status.", de: "Löscht das Gedenkdatum und stellt den aktiven Status wieder her."))
         }
         .alert(l.tr(zh: "确认删除植物", en: "Delete plant?", de: "Pflanze loeschen?"), isPresented: $showingPlantDeleteAlert) {
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
@@ -181,7 +190,11 @@ struct CrewRosterProfilePanel: View {
             }
         } message: {
             let plantName = plant?.name ?? l.tr(zh: "这株植物", en: "this plant", de: "diese Pflanze")
-            Text(l.tr(zh: "确定要删除 \(plantName) 吗？", en: "Delete \(plantName)?", de: "\(plantName) loeschen?"))
+            Text(l.tr(
+                zh: "将删除 \(plantName) 的档案和全部记录，无法撤销。",
+                en: "Deletes \(plantName)'s profile and all records. This cannot be undone.",
+                de: "Löscht das Profil und alle Einträge von \(plantName). Dies kann nicht rückgängig gemacht werden."
+            ))
         }
         .sheet(isPresented: $showingPetDeleteSheet) {
             let petName = pet?.name ?? l.tr(zh: "宠物", en: "pet", de: "Haustier")
@@ -239,12 +252,13 @@ extension CrewRosterProfilePanel {
                     saveChanges()
                 } else {
                     loadEditState(includeAvatarData: true)
+                    showsSavedFeedback = false
                     withAnimation(GoMotion.feedback) { isEditing = true }
                 }
             } label: {
                 Image(systemName: isEditing ? "checkmark" : "pencil")
                     .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(tintActionText)
                     .frame(width: 44, height: 44)
                     .background(tint, in: Circle())
                     .contentShape(Circle())
@@ -252,15 +266,24 @@ extension CrewRosterProfilePanel {
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(isEditing ? l.save : l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(displayName)
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.goCardWhite)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.70)
-                Text(isEditing ? l.tr(zh: "编辑基本信息", en: "Editing basic info", de: "Basisdaten bearbeiten") : l.tr(zh: "基本信息", en: "Basic info", de: "Basisdaten"))
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.64))
+            Text(displayName)
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.goCardWhite)
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+            if showsSavedFeedback {
+                Label(
+                    l.tr(
+                        zh: "已保存", en: "Saved", de: "Gespeichert",
+                        es: "Guardado", pt: "Salvo", fr: "Enregistré",
+                        ja: "保存済み", ko: "저장됨", it: "Salvato"
+                    ),
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(Color.goTeal)
+                .transition(.opacity)
+                .accessibilityIdentifier("crew-roster-profile-saved-feedback")
             }
             Spacer(minLength: 8)
             Button(action: onClose) {
@@ -442,14 +465,14 @@ extension CrewRosterProfilePanel {
                 ("owner", localizedRoleText(for: "owner")),
                 ("member", localizedRoleText(for: "member"))
             ])
-            CrewRosterEditorMenuRow(
-                title: l.tr(zh: "性别/身份", en: "Gender / identity", de: "Geschlecht / Identitaet"),
-                icon: "person.fill",
+            CrewRosterHumanGenderGrid(
                 selection: $gender,
-                options: HumanProfileOptions.genderOptions.map(\.key),
-                optionTitle: { l.humanGenderDisplay($0) }
+                l: l
             )
             CrewRosterEditorDateToggleRow(title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), icon: "gift.fill", isOn: $hasBirthday, date: $birthday, upperBound: Date())
+            if hasBirthday {
+                CrewRosterZodiacRow(date: birthday, l: l)
+            }
             CrewRosterEditorMenuRow(
                 title: l.tr(zh: "血型", en: "Blood type", de: "Blutgruppe"),
                 icon: "drop.fill",
@@ -856,7 +879,7 @@ extension CrewRosterProfilePanel {
                 }
                 warmAvatarCache(id: result.entityID, data: result.persistedAvatarImageData)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
-                withAnimation(GoMotion.feedback) { isEditing = false }
+                withAnimation(GoMotion.feedback) { showsSavedFeedback = true }
                 onSaved(result.entityID, result.kind)
             }
         } else if let plant {
@@ -1074,5 +1097,111 @@ extension CrewRosterProfilePanel {
                 )
             )
         }
+    }
+}
+
+private struct CrewRosterHumanGenderGrid: View {
+    @Binding var selection: String
+    let l: L10n
+
+    private var options: [(key: String, icon: String)] {
+        HumanProfileOptions.genderOptions.filter { !$0.key.isEmpty }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            CrewRosterEditorLabel(
+                title: l.tr(
+                    zh: "性别/身份", en: "Gender / identity", de: "Geschlecht / Identität",
+                    es: "Género o identidad", pt: "Gênero ou identidade", fr: "Genre ou identité",
+                    ja: "性別・アイデンティティ", ko: "성별 또는 정체성", it: "Genere o identità"
+                ),
+                icon: "person.fill"
+            )
+
+            LazyVGrid(
+                columns: [GridItem(.flexible()), GridItem(.flexible())],
+                spacing: 8
+            ) {
+                ForEach(options, id: \.key) { option in
+                    let isSelected = HumanProfileOptions.storedGenderIdentity(selection) == option.key
+                    Button {
+                        selection = option.key
+                        OhanaFeedback.selection()
+                    } label: {
+                        HStack(spacing: 7) {
+                            Text(option.icon)
+                                .accessibilityHidden(true)
+                            Text(HumanProfileOptions.localizedGenderTitle(option.key, l: l))
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
+                            if isSelected {
+                                Image(systemName: "checkmark") // a11y: allow decorative selected-state glyph hidden below
+                                    .font(OhanaFont.caption(.black))
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.goCardWhite)
+                        .padding(.horizontal, 10)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(
+                            isSelected ? Color.goPrimary.opacity(0.28) : Color.goCardWhite.opacity(0.10),
+                            in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                                .strokeBorder(
+                                    isSelected ? Color.goPrimary.opacity(0.78) : Color.goCardWhite.opacity(0.14),
+                                    lineWidth: 1
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(HumanProfileOptions.localizedGenderTitle(option.key, l: l))
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    .accessibilityIdentifier("crew-roster-human-gender-\(option.key)")
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            Color.goCardWhite.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+        )
+        .accessibilityIdentifier("crew-roster-human-gender-grid")
+    }
+}
+
+private struct CrewRosterZodiacRow: View {
+    let date: Date
+    let l: L10n
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles") // a11y: allow decorative zodiac glyph hidden below
+                .foregroundStyle(Color.goPrimary)
+                .accessibilityHidden(true)
+            Text(l.tr(
+                zh: "星座", en: "Zodiac", de: "Sternzeichen",
+                es: "Signo", pt: "Signo", fr: "Signe",
+                ja: "星座", ko: "별자리", it: "Segno"
+            ))
+            .foregroundStyle(Color.goCardWhite.opacity(0.82))
+            Spacer(minLength: 8)
+            Text(Human.westernZodiacDisplay(for: date, l: l))
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.goCardWhite)
+        }
+        .font(OhanaFont.caption(.bold))
+        .padding(12)
+        .frame(minHeight: 56)
+        .background(
+            Color.goCardWhite.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("crew-roster-human-zodiac")
     }
 }

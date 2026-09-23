@@ -220,7 +220,10 @@ nonisolated struct OhanaResolvedPrimaryAccent: Equatable, Sendable {
         let whiteContrast = 1.05 / (backgroundLuminance + 0.05)
         let inkLuminance = relativeLuminance(of: "1A1A2E")
         let inkContrast = (backgroundLuminance + 0.05) / (inkLuminance + 0.05)
-        return inkContrast >= whiteContrast ? "1A1A2E" : "FFFFFF"
+        if whiteContrast >= 4.5 || inkContrast >= 4.5 {
+            return inkContrast >= whiteContrast ? "1A1A2E" : "FFFFFF"
+        }
+        return "000000"
     }
 
     private static func relativeLuminance(of hex: String) -> Double {

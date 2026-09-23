@@ -302,7 +302,7 @@ nonisolated enum FocusHomeReminderDeepLinkRouter {
             return .humanQuick("humanWorkout", human)
         }
         if matchesAny(text, ["花费", "支出", "expense", "ausgabe"]) {
-            return .humanQuick("humanExpense", human)
+            return .humanDetail(human)
         }
         if matchesAny(text, ["备注", "记录", "note", "notiz"]) {
             return .humanQuick("humanNote", human)

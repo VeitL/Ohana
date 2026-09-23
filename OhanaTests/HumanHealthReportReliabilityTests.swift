@@ -192,7 +192,7 @@ struct HumanHealthReportReliabilityTests {
 
     @Test func linkedMetricReadIsOwnerScopedBoundedAndReturnsStableModelIDs() async throws {
         let container = try ModelContainer(
-            for: Schema(ArkSchemaV98.models),
+            for: Schema(ArkSchemaV99.models),
             configurations: [ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)]
         )
         let context = container.mainContext

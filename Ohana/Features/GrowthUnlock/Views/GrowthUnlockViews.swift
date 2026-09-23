@@ -46,35 +46,19 @@ struct GrowthUnlockRulesSheet: View {
                 .frame(width: 44, height: 44)
                 .background(accent.opacity(0.12), in: Circle())
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(
-                    zh: "椰子树成长图鉴",
-                    en: "Coconut Tree Atlas",
-                    de: "Kokosbaum-Atlas",
-                    es: "Atlas del cocotero",
-                    pt: "Atlas do coqueiro",
-                    fr: "Atlas du cocotier",
-                    ja: "ココナッツツリー図鑑",
-                    ko: "코코넛 나무 도감",
-                    it: "Atlante dell’albero di cocco"
-                ))
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(
-                    zh: "点一级，看看会长出什么",
-                    en: "Tap a level to see what grows",
-                    de: "Tippe eine Stufe an und entdecke mehr",
-                    es: "Toca un nivel para ver qué crece",
-                    pt: "Toque em um nível para ver o que cresce",
-                    fr: "Touchez un niveau pour voir ce qui pousse",
-                    ja: "レベルをタップして成長を確認",
-                    ko: "레벨을 탭해 무엇이 자라는지 확인하세요",
-                    it: "Tocca un livello e scopri cosa cresce"
-                ))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(2)
-            }
+            Text(l.tr(
+                zh: "椰子树成长图鉴",
+                en: "Coconut Tree Atlas",
+                de: "Kokosbaum-Atlas",
+                es: "Atlas del cocotero",
+                pt: "Atlas do coqueiro",
+                fr: "Atlas du cocotier",
+                ja: "ココナッツツリー図鑑",
+                ko: "코코넛 나무 도감",
+                it: "Atlante dell’albero di cocco"
+            ))
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
 
             Spacer(minLength: 8)
 
@@ -142,6 +126,7 @@ struct GrowthUnlockProgressCard: View {
     let progressToNextLevel: Double
     let appLanguage: String
     var isCompact = false
+    @AppStorage(AppExperienceMode.storageKey) private var experienceModeRaw = AppExperienceMode.standard.rawValue
 
     private var currentStep: GrowthUnlockStep {
         GrowthUnlockPolicy.currentStep(currentLevel: currentLevel)
@@ -149,6 +134,10 @@ struct GrowthUnlockProgressCard: View {
 
     private var nextStep: GrowthUnlockStep? {
         GrowthUnlockPolicy.nextLockedStep(currentLevel: currentLevel)
+    }
+
+    private var experienceMode: AppExperienceMode {
+        AppExperienceMode(rawValue: experienceModeRaw) ?? .standard
     }
 
     var body: some View {
@@ -211,6 +200,14 @@ struct GrowthUnlockProgressCard: View {
                 de: "Alle Wachstumsfunktionen sind offen; weiteres Wachstum bleibt Belohnung und Langzeitziel."
             )
         }
+        if experienceMode == .zen,
+           GrowthUnlockExperiencePolicy.isStandardOnlyInZen(nextStep.id) {
+            return localized(
+                zh: "下一阶段：\(nextStep.title(language: appLanguage))，Lv.\(nextStep.requiredLevel) 解锁；该入口在普通模式中使用。",
+                en: "Next: \(nextStep.title(language: appLanguage)), unlocks at Lv.\(nextStep.requiredLevel); use this entry in Standard.",
+                de: "Weiter: \(nextStep.title(language: appLanguage)), ab Lv.\(nextStep.requiredLevel); dieser Einstieg wird im Standardmodus verwendet."
+            )
+        }
         return localized(
             zh: "下一阶段：\(nextStep.title(language: appLanguage))，Lv.\(nextStep.requiredLevel) 解锁。",
             en: "Next: \(nextStep.title(language: appLanguage)), unlocks at Lv.\(nextStep.requiredLevel).",
@@ -235,15 +232,13 @@ struct GrowthUnlockRoadmapView: View {
 
     @Environment(AppServices.self) private var appServices
     @AppStorage(PlantLockedPreviewPolicy.onboardingHasPlantsKey) private var onboardingHasPlants = false
+    @AppStorage(AppExperienceMode.storageKey) private var experienceModeRaw = AppExperienceMode.standard.rawValue
     @State private var appearHandoffTask: Task<Void, Never>?
 
     private var l: L10n { L10n(appLanguage) }
-    private var currentStep: GrowthUnlockStep {
-        GrowthUnlockPolicy.currentStep(currentLevel: currentLevel)
-    }
-
     private var showsPlantLockedPreview: Bool {
         _ = onboardingHasPlants
+        guard experienceModeRaw != AppExperienceMode.zen.rawValue else { return false }
         return PlantLockedPreviewPolicy.shouldShowLockedPreview(currentLevel: currentLevel)
     }
 
@@ -306,27 +301,21 @@ struct GrowthUnlockRoadmapView: View {
                 .frame(width: 44, height: 44)
                 .background(Color.ohanaControlFill, in: Circle())
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(
-                    zh: "椰子树成长路线",
-                    en: "Coconut Tree Roadmap",
-                    de: "Kokosbaum-Roadmap",
-                    es: "Ruta del cocotero",
-                    pt: "Rota do coqueiro",
-                    fr: "Parcours du cocotier",
-                    ja: "ココナッツツリーの成長ルート",
-                    ko: "코코넛 나무 성장 경로",
-                    it: "Percorso dell’albero di cocco"
-                ))
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Text("Lv.\(currentLevel) · \(currentStep.title(language: appLanguage))")
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.goPrimary)
+            Text(l.tr(
+                zh: "椰子树成长路线",
+                en: "Coconut Tree Roadmap",
+                de: "Kokosbaum-Roadmap",
+                es: "Ruta del cocotero",
+                pt: "Rota do coqueiro",
+                fr: "Parcours du cocotier",
+                ja: "ココナッツツリーの成長ルート",
+                ko: "코코넛 나무 성장 경로",
+                it: "Percorso dell’albero di cocco"
+            ))
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
-            }
+                .minimumScaleFactor(0.78)
 
             Spacer(minLength: 8)
 

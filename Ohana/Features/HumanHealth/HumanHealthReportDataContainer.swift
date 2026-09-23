@@ -498,6 +498,7 @@ private struct HumanHealthReportRouteStatusView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color.goTeal)
+                    .foregroundStyle(Color.arkInk)
                     .accessibilityIdentifier("human-health-report-load-retry-action")
                 }
                 .accessibilityIdentifier("human-health-report-load-failed-state")

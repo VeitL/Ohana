@@ -15,7 +15,7 @@ struct AchievementProgressionTests {
             String(describing: AchievementRewardReceipt.self)
         ])
         #expect(v93.subtracting(v94).isEmpty)
-        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV98.self))
+        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV99.self))
         #expect(ArkMigrationPlan.stages.isEmpty)
     }
 
@@ -112,6 +112,45 @@ struct AchievementProgressionTests {
         let unlocks = try context.fetch(FetchDescriptor<AchievementUnlock>())
         #expect(unlocks.count(where: { $0.achievementID == "global_island_crew" }) == 1)
         #expect(unlocks.first(where: { $0.achievementID == "global_island_crew" })?.scopeKindRaw == AchievementScopeKind.island.rawValue)
+    }
+
+    @Test func coPayerPetExpensesUnlockExpenseHelperButNotFirstPersonalRecord() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let primary = Human(name: "Primary")
+        let coPayer = Human(name: "Co-payer")
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(primary)
+        context.insert(coPayer)
+        context.insert(pet)
+
+        for index in 0 ..< 5 {
+            let contributions = [
+                ExpensePayerContribution(humanID: primary.id, minorUnits: 500),
+                ExpensePayerContribution(humanID: coPayer.id, minorUnits: 500)
+            ]
+            let expense = PetExpenseLog(
+                date: Date(timeIntervalSince1970: 1_900_000_000 + Double(index)),
+                amount: 10,
+                category: .other,
+                pet: pet,
+                executorId: primary.id.uuidString,
+                payerContributionsJSON: ExpensePayerContributionPolicy.encode(contributions)
+            )
+            context.insert(expense)
+        }
+        try context.save()
+
+        let scope = AchievementScopeReference.human(coPayer.id)
+        _ = try AchievementProgressionEngine.reconcile(
+            AchievementProgressionRequest(affectedScopes: [scope], reason: .explicit),
+            context: context
+        )
+
+        let unlocks = try context.fetch(FetchDescriptor<AchievementUnlock>())
+            .filter { $0.scopeIDRaw == coPayer.id.uuidString }
+        #expect(unlocks.contains(where: { $0.achievementID == "human_expense_tracker" }))
+        #expect(!unlocks.contains(where: { $0.achievementID == "human_first_record" }))
     }
 
     @Test func commandCommitsCoconutsStardustLedgerAndReceiptTogether() throws {
@@ -326,7 +365,7 @@ struct AchievementProgressionTests {
 
         let manager = DataBackupManager(defaults: defaults)
         let backup = try manager.buildBackup(context: context)
-        #expect(backup.schemaVersion == 33)
+        #expect(backup.schemaVersion == 34)
         #expect(Set(backup.achievementUnlocks?.map(\.achievementKey) ?? []) == [islandKey, safeHumanKey])
         #expect(Set(backup.achievementRewardReceipts?.map(\.achievementKey) ?? []) == [islandKey, safeHumanKey])
         #expect(backup.achievementUnlocks?.contains { $0.achievementKey == humanKey } == false)

@@ -277,7 +277,7 @@ struct PetRetentionHubView: View {
             HStack(spacing: 12) {
                 Image(systemName: archiveSnapshot.nextStep.icon)
                     .font(OhanaFont.adaptive(size: 18, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 

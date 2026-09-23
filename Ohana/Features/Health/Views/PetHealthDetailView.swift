@@ -464,12 +464,26 @@ struct PetHealthDetailContentView: View {
         urgentPreventiveCount > 0 ? Color.goRed : chromeAccent
     }
 
+    var preventionActionForeground: Color {
+        urgentPreventiveCount > 0
+            ? (OhanaResolvedPrimaryAccent(customHex: "FF4757")?.actionTextColor ?? Color.arkInk)
+            : Color.ohanaPrimaryActionText
+    }
+
     var medicationTint: Color {
         isDark ? Color.goPrimary : Color.goBlue
     }
 
+    var medicationActionForeground: Color { Color.ohanaPrimaryActionText }
+
     var symptomVisitTint: Color {
         latestSymptomLog == nil ? chromeAccent : Color.goOrange
+    }
+
+    var symptomVisitActionForeground: Color {
+        latestSymptomLog == nil
+            ? Color.ohanaPrimaryActionText
+            : (OhanaResolvedPrimaryAccent(customHex: "FF8C42")?.actionTextColor ?? Color.arkInk)
     }
 
     var preventiveDashboardDetail: String {

@@ -287,7 +287,7 @@ extension SettingsBackupPage {
                     }
                     .font(OhanaFont.adaptive(size: 13, weight: .medium))
                     .foregroundStyle(primaryText)
-                    .textFieldStyle(.roundedBorder)
+                    .ohanaRoundedTextFieldStyle()
                     .onChange(of: backupPassword) { _, _ in exportedJSONURL = nil }
                     .onChange(of: backupPasswordConfirmation) { _, _ in exportedJSONURL = nil }
                 }

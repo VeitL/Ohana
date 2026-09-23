@@ -25,27 +25,21 @@ private struct ActionHumanConfirmationDialogModifier: ViewModifier {
     func body(content: Content) -> some View {
         content.confirmationDialog(
             dialogTitle,
-            isPresented: Binding(
-                get: { draft != nil },
-                set: { if !$0 { draft = nil } }
-            ),
+            item: $draft,
             titleVisibility: .visible
-        ) {
-            if let draft {
-                ForEach(orderedHumans(draft)) { human in
-                    Button(buttonTitle(human, draft: draft)) {
-                        let perform = draft.perform
-                        self.draft = nil
-                        perform(human.id.uuidString)
-                    }
+        ) { draft in
+            ForEach(orderedHumans(draft)) { human in
+                Button(buttonTitle(human, draft: draft)) {
+                    let perform = draft.perform
+                    self.draft = nil
+                    perform(human.id.uuidString)
                 }
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {
-                draft = nil
+                self.draft = nil
             }
-        } message: {
-            if let draft,
-               let preferred = draft.humans.first(where: { $0.id == draft.preferredHumanID }) {
+        } message: { draft in
+            if let preferred = draft.humans.first(where: { $0.id == draft.preferredHumanID }) {
                 Text(l.tr(
                     zh: "默认记为 \(displayName(preferred)) 完成，也可以临时选择其他成员。",
                     en: "Defaults to \(displayName(preferred)). You can choose someone else for this action.",

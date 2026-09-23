@@ -190,7 +190,7 @@ struct HumanAccountSwitcherSheet: View {
         if human.id.uuidString == activeHumanId {
             Text(l.tr(zh: "当前", en: "Current", de: "Aktuell"))
                 .font(OhanaFont.caption2(.black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(Color.goPrimary, in: Capsule())

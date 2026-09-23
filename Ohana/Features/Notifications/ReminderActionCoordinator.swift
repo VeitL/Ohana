@@ -58,7 +58,8 @@ enum ReminderActionCoordinator {
         careLedger providedCareLedger: CareLedgerRecording? = nil,
         questManager providedQuestManager: QuestManager? = nil,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil,
-        domainRevisions providedDomainRevisions: DomainRevisionPublishing? = nil
+        domainRevisions providedDomainRevisions: DomainRevisionPublishing? = nil,
+        economy providedEconomy: CareEventEconomyAwarding? = nil
     ) -> ReminderActionDispatchResult {
         guard let action = userInfo?["action"] as? String else {
             return .ignoredAction
@@ -84,7 +85,14 @@ enum ReminderActionCoordinator {
         let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
         switch action {
         case "COMPLETE":
-            return complete(reminder, executorId: executorId, context: context, careEvents: careEvents, reminderCompletion: reminderCompletion)
+            return complete(
+                reminder,
+                executorId: executorId,
+                context: context,
+                careEvents: careEvents,
+                reminderCompletion: reminderCompletion,
+                economy: providedEconomy
+            )
         case "SKIP":
             reminderCompletion.skip(reminder, by: executorId, context: context)
             return .skipped
@@ -196,6 +204,15 @@ enum ReminderActionCoordinator {
         guard let pet = medication.pet ?? petContainingMedication(medicationId, context: context) else {
             return .missingPet
         }
+        guard let scheduledAt = scheduledDate(from: userInfo),
+              scheduledAt.timeIntervalSince1970.isFinite else {
+            return .missingMedicationSchedule
+        }
+        let doseIndex = (userInfo?["doseIndex"] as? NSNumber)?.intValue ?? 0
+        guard doseIndex >= 0,
+              doseIndex < PetMedicationDoseLogging.requiredDoses(on: scheduledAt, for: medication) else {
+            return .missingMedicationSchedule
+        }
 
         let result = PetMedicationCommandExecutor(
             context: context,
@@ -207,7 +224,8 @@ enum ReminderActionCoordinator {
             pet: pet,
             awardCoconut: true,
             executorId: executorId,
-            note: "notification.pet.medication.complete"
+            note: "notification.pet.medication.complete",
+            scheduledOccurrence: .init(scheduledAt: scheduledAt, doseIndex: doseIndex)
         )
         guard result.didRecord, result.allowsDerivedEffects else { return .skipped }
         medicationReminders.scheduleMedicationReminders(for: pet, context: context)
@@ -220,7 +238,8 @@ enum ReminderActionCoordinator {
         executorId: String?,
         context: ModelContext,
         careEvents: CareEventRecording,
-        reminderCompletion: ReminderCompleting
+        reminderCompletion: ReminderCompleting,
+        economy: CareEventEconomyAwarding?
     ) -> ReminderActionDispatchResult {
         if let event = reminder.event,
            event.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue {
@@ -256,7 +275,8 @@ enum ReminderActionCoordinator {
                     context: context,
                     executorId: executorId,
                     operationDate: Date(),
-                    sourceReminderId: reminder.id.uuidString
+                    sourceReminderId: reminder.id.uuidString,
+                    economy: economy
                 )
                 guard syncResult.shouldCompleteOccurrence else { return .skipped }
             } else if !CalendarTaskCompletionSyncService.canCompletePetTask(

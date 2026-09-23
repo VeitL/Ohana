@@ -44,10 +44,96 @@ struct GrowthUnlockLoopCard: View {
     let appLanguage: String
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AppStorage(AppExperienceMode.storageKey) private var experienceModeRaw = AppExperienceMode.standard.rawValue
 
     private var l: L10n { L10n(appLanguage) }
+    private var experienceMode: AppExperienceMode {
+        AppExperienceMode(rawValue: experienceModeRaw) ?? .standard
+    }
     private var steps: [LoopStep] {
-        [
+        if experienceMode == .zen {
+            return [
+                LoopStep(
+                    id: 0,
+                    icon: "checkmark.circle.fill",
+                    title: l.tr(
+                        zh: "确认",
+                        en: "Check in",
+                        de: "Bestätigen",
+                        es: "Confirmar",
+                        pt: "Confirmar",
+                        fr: "Confirmer",
+                        ja: "確認",
+                        ko: "확인",
+                        it: "Conferma"
+                    ),
+                    subtitle: l.tr(
+                        zh: "获得养分",
+                        en: "Gain nutrients",
+                        de: "Nährstoffe erhalten",
+                        es: "Gana nutrientes",
+                        pt: "Ganhe nutrientes",
+                        fr: "Gagner des nutriments",
+                        ja: "栄養を獲得",
+                        ko: "영양분 획득",
+                        it: "Ottieni nutrienti"
+                    )
+                ),
+                LoopStep(
+                    id: 1,
+                    icon: "bolt.fill",
+                    title: l.tr(
+                        zh: "注入",
+                        en: "Feed",
+                        de: "Speisen",
+                        es: "Inyectar",
+                        pt: "Injetar",
+                        fr: "Nourrir",
+                        ja: "注入",
+                        ko: "주입",
+                        it: "Inietta"
+                    ),
+                    subtitle: l.tr(
+                        zh: "轻度加速",
+                        en: "Light boost",
+                        de: "Leicht beschleunigen",
+                        es: "Impulso suave",
+                        pt: "Impulso leve",
+                        fr: "Petit coup de pouce",
+                        ja: "少し加速",
+                        ko: "가볍게 가속",
+                        it: "Spinta leggera"
+                    )
+                ),
+                LoopStep(
+                    id: 2,
+                    icon: "sparkles",
+                    title: l.tr(
+                        zh: "点亮",
+                        en: "Unlock",
+                        de: "Freischalten",
+                        es: "Desbloquear",
+                        pt: "Desbloquear",
+                        fr: "Débloquer",
+                        ja: "解放",
+                        ko: "해금",
+                        it: "Sblocca"
+                    ),
+                    subtitle: l.tr(
+                        zh: "共享 Oasis",
+                        en: "Shared Oasis",
+                        de: "Gemeinsame Oasis",
+                        es: "Oasis compartido",
+                        pt: "Oasis compartilhado",
+                        fr: "Oasis partagé",
+                        ja: "共有Oasis",
+                        ko: "공유 Oasis",
+                        it: "Oasis condivisa"
+                    )
+                )
+            ]
+        }
+        return [
             LoopStep(
                 id: 0,
                 icon: "checkmark.circle.fill",
@@ -132,28 +218,9 @@ struct GrowthUnlockLoopCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(l.tr(
-                    zh: "照护，让树长大",
-                    en: "Care. Grow. Unlock.",
-                    de: "Pflegen. Wachsen. Öffnen.",
-                    es: "Cuida. Crece. Desbloquea.",
-                    pt: "Cuide. Cresça. Desbloqueie.",
-                    fr: "Soignez. Grandissez. Débloquez.",
-                    ja: "お世話して、育てて、解放。",
-                    ko: "돌보고, 키우고, 열어 보세요.",
-                    it: "Cura. Cresci. Sblocca."
-                ))
+                Text(loopTitle)
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-
-                Spacer(minLength: 8)
-
-                Text("Lv.\(currentLevel)")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.goPrimary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Color.ohanaControlFill, in: Capsule())
             }
 
             if dynamicTypeSize.isAccessibilitySize {
@@ -266,6 +333,32 @@ struct GrowthUnlockLoopCard: View {
     }
 
     private var footerText: String {
+        if experienceMode == .zen {
+            if currentLevel == 0 {
+                return l.tr(
+                    zh: "每日本人首次确认 +6、首次状态 +2 养分；起步礼仍可用于注入。",
+                    en: "First owner check-in +6 and first status +2 nutrients daily; the starter gift can still be injected.",
+                    de: "Erster Besitzer-Check-in +6 und erster Status +2 Nährstoffe pro Tag; das Startgeschenk kann weiter eingespeist werden.",
+                    es: "Primer check-in +6 y primer estado +2 nutrientes al día; el regalo inicial aún puede inyectarse.",
+                    pt: "Primeiro check-in +6 e primeiro estado +2 nutrientes por dia; o presente inicial ainda pode ser injetado.",
+                    fr: "Premier check-in +6 et premier état +2 nutriments par jour ; le cadeau de départ peut toujours être injecté.",
+                    ja: "本人の最初の確認で+6、最初の状態で+2栄養/日。スタートギフトも注入できます。",
+                    ko: "본인 첫 확인 +6, 첫 상태 +2 영양분/일. 시작 선물도 주입할 수 있어요.",
+                    it: "Primo check-in +6 e primo stato +2 nutrienti al giorno; il regalo iniziale resta utilizzabile."
+                )
+            }
+            return l.tr(
+                zh: "每日自然养分最多 8；每次 \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 → \(OasisTreeEnergyInjectionPolicy.starterPackageXP) 能量。",
+                en: "Natural nutrients cap at 8 daily; each feed is \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 → \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energy.",
+                de: "Natürliche Nährstoffe sind auf 8 pro Tag begrenzt; je Einspeisung \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 → \(OasisTreeEnergyInjectionPolicy.starterPackageXP) Energie.",
+                es: "Los nutrientes naturales tienen un máximo diario de 8; cada inyección: \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 → \(OasisTreeEnergyInjectionPolicy.starterPackageXP) de energía.",
+                pt: "Os nutrientes naturais têm limite diário de 8; cada injeção: \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 → \(OasisTreeEnergyInjectionPolicy.starterPackageXP) de energia.",
+                fr: "Les nutriments naturels sont plafonnés à 8 par jour ; chaque apport : \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 → \(OasisTreeEnergyInjectionPolicy.starterPackageXP) d’énergie.",
+                ja: "自然栄養は1日最大8。1回の注入：\(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 → \(OasisTreeEnergyInjectionPolicy.starterPackageXP)エネルギー。",
+                ko: "자연 영양분은 하루 최대 8. 1회 주입: \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 → 에너지 \(OasisTreeEnergyInjectionPolicy.starterPackageXP).",
+                it: "I nutrienti naturali hanno un limite di 8 al giorno; ogni iniezione: \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 → \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energia."
+            )
+        }
         if currentLevel == 0 {
             return l.tr(
                 zh: "起步礼正好够 5 次注入：\(StarterGiftPolicy.giftAmount)🥥 → Lv.1",
@@ -292,6 +385,33 @@ struct GrowthUnlockLoopCard: View {
             it: "Ogni iniezione: \(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥 → \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energia. Apertura automatica."
         )
     }
+
+    private var loopTitle: String {
+        if experienceMode == .zen {
+            return l.tr(
+                zh: "确认当下，让树长大",
+                en: "Check in. Grow. Unlock.",
+                de: "Bestätigen. Wachsen. Öffnen.",
+                es: "Confirma. Crece. Desbloquea.",
+                pt: "Confirme. Cresça. Desbloqueie.",
+                fr: "Confirmez. Grandissez. Débloquez.",
+                ja: "今を確認して、育てて、解放。",
+                ko: "오늘을 확인하고, 키우고, 열어 보세요.",
+                it: "Conferma. Cresci. Sblocca."
+            )
+        }
+        return l.tr(
+            zh: "照护，让树长大",
+            en: "Care. Grow. Unlock.",
+            de: "Pflegen. Wachsen. Öffnen.",
+            es: "Cuida. Crece. Desbloquea.",
+            pt: "Cuide. Cresça. Desbloqueie.",
+            fr: "Soignez. Grandissez. Débloquez.",
+            ja: "お世話して、育てて、解放。",
+            ko: "돌보고, 키우고, 열어 보세요.",
+            it: "Cura. Cresci. Sblocca."
+        )
+    }
 }
 
 struct GrowthUnlockStageExplorer: View {
@@ -301,9 +421,13 @@ struct GrowthUnlockStageExplorer: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @AppStorage(AppExperienceMode.storageKey) private var experienceModeRaw = AppExperienceMode.standard.rawValue
     @State private var selectedStageID: GrowthUnlockStageID
 
     private var l: L10n { L10n(appLanguage) }
+    private var experienceMode: AppExperienceMode {
+        AppExperienceMode(rawValue: experienceModeRaw) ?? .standard
+    }
     private var stages: [GrowthUnlockStep] { GrowthUnlockPolicy.roadmapStages() }
     private var selectedStep: GrowthUnlockStep {
         stages.first(where: { $0.id == selectedStageID }) ?? stages[0]
@@ -344,35 +468,19 @@ struct GrowthUnlockStageExplorer: View {
 
     private var explorerHeader: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(
-                    zh: "点亮成长路线",
-                    en: "Light up the path",
-                    de: "Wachstumsweg erhellen",
-                    es: "Ilumina el camino",
-                    pt: "Ilumine o caminho",
-                    fr: "Éclairez le parcours",
-                    ja: "成長ルートを灯す",
-                    ko: "성장 경로 밝히기",
-                    it: "Illumina il percorso"
-                ))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-
-                Text(l.tr(
-                    zh: "左右滑动，点一级看看",
-                    en: "Swipe, then tap a level",
-                    de: "Wischen und Stufe antippen",
-                    es: "Desliza y toca un nivel",
-                    pt: "Deslize e toque em um nível",
-                    fr: "Balayez puis touchez un niveau",
-                    ja: "スワイプしてレベルをタップ",
-                    ko: "밀어서 레벨을 탭하세요",
-                    it: "Scorri e tocca un livello"
-                ))
-                .font(OhanaFont.caption2(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            }
+            Text(l.tr(
+                zh: "点亮成长路线",
+                en: "Light up the path",
+                de: "Wachstumsweg erhellen",
+                es: "Ilumina el camino",
+                pt: "Ilumine o caminho",
+                fr: "Éclairez le parcours",
+                ja: "成長ルートを灯す",
+                ko: "성장 경로 밝히기",
+                it: "Illumina il percorso"
+            ))
+            .font(OhanaFont.callout(.black))
+            .foregroundStyle(Color.ohanaPrimaryText)
 
             Spacer(minLength: 8)
 
@@ -431,6 +539,7 @@ struct GrowthUnlockStageExplorer: View {
     private func levelButton(_ step: GrowthUnlockStep) -> some View {
         let isSelected = selectedStageID == step.id
         let accent = Color(hex: step.tintHex)
+        let accentForeground = OhanaResolvedPrimaryAccent(customHex: step.tintHex)?.actionTextColor ?? Color.ohanaPrimaryText
         let state = GrowthUnlockStageExplorerPolicy.displayState(for: step, currentLevel: currentLevel)
 
         return Button {
@@ -447,7 +556,7 @@ struct GrowthUnlockStageExplorer: View {
             VStack(spacing: 6) {
                 Image(systemName: levelIcon(for: state))
                     .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(isSelected ? Color.arkInk : accent)
+                    .foregroundStyle(isSelected ? accentForeground : accent)
                     .frame(width: 34, height: 34) // a11y: allow glyph sits inside a 58x68 button target
                     .background(isSelected ? accent : Color.ohanaControlFill, in: Circle())
                     .ohanaPhasePop(trigger: selectedStageID, enabled: isSelected && canAnimate)
@@ -543,10 +652,22 @@ struct GrowthUnlockStageExplorer: View {
                         .labelStyle(.titleAndIcon)
                 }
 
-                Text(step.detail(language: appLanguage))
+                Text(GrowthUnlockExperiencePolicy.detail(
+                    for: step,
+                    experienceMode: experienceMode,
+                    language: appLanguage
+                ))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if experienceMode == .zen,
+                   GrowthUnlockExperiencePolicy.isStandardOnlyInZen(step.id) {
+                    Label(standardModeNote(for: state), systemImage: "arrow.left.arrow.right")
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(accent)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 Label(
                     l.tr(
@@ -634,6 +755,33 @@ struct GrowthUnlockStageExplorer: View {
         state: GrowthUnlockStageDisplayState
     ) -> String {
         "Lv.\(step.requiredLevel), \(step.title(language: appLanguage)), \(stateLabel(for: state))"
+    }
+
+    private func standardModeNote(for state: GrowthUnlockStageDisplayState) -> String {
+        if state == .unlocked {
+            return l.tr(
+                zh: "等级已解锁；切换到普通模式使用此入口",
+                en: "Level unlocked; switch to Standard to use this entry",
+                de: "Stufe freigeschaltet; zum Verwenden in den Standardmodus wechseln",
+                es: "Nivel desbloqueado; cambia a Estándar para usar esta entrada",
+                pt: "Nível desbloqueado; mude para Padrão para usar esta entrada",
+                fr: "Niveau débloqué ; passez en mode Standard pour utiliser cette entrée",
+                ja: "レベル解放済み。通常モードに切り替えて利用できます",
+                ko: "레벨 해금됨. 일반 모드로 전환해 이용하세요",
+                it: "Livello sbloccato; passa a Standard per usare questa voce"
+            )
+        }
+        return l.tr(
+            zh: "此入口属于普通模式；达到等级后可切换使用",
+            en: "This entry belongs to Standard; switch after reaching its level",
+            de: "Dieser Einstieg gehört zum Standardmodus; nach Erreichen der Stufe wechseln",
+            es: "Esta entrada pertenece a Estándar; cambia al alcanzar el nivel",
+            pt: "Esta entrada pertence ao Padrão; mude ao atingir o nível",
+            fr: "Cette entrée appartient au mode Standard ; passez-y après avoir atteint le niveau",
+            ja: "この入口は通常モード用です。レベル到達後に切り替えて利用できます",
+            ko: "이 진입점은 일반 모드용입니다. 레벨 도달 후 전환해 이용하세요",
+            it: "Questa voce appartiene a Standard; passa dopo aver raggiunto il livello"
+        )
     }
 }
 

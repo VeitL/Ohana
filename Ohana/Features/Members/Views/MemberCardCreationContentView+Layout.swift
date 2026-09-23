@@ -103,7 +103,6 @@ extension MemberCardCreationContentView {
                 currentStep: currentStep,
                 kind: kind,
                 l: l,
-                foreground: cardForeground,
                 secondaryForeground: cardSecondaryForeground,
                 inactiveFill: cardControlFill
             )

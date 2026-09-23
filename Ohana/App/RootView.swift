@@ -46,6 +46,44 @@ nonisolated struct OnboardingPetSnapshotHandoffState: Equatable {
     }
 }
 
+nonisolated struct OnboardingZenSnapshotHandoffState: Equatable {
+    private(set) var isShellMounted = false
+    private(set) var completionRequested = false
+    private(set) var homeSnapshotReady = false
+    private(set) var fallbackElapsed = false
+
+    var isReadyToComplete: Bool {
+        completionRequested && (homeSnapshotReady || fallbackElapsed)
+    }
+
+    mutating func stageShell() {
+        isShellMounted = true
+    }
+
+    mutating func requestCompletion() {
+        isShellMounted = true
+        completionRequested = true
+    }
+
+    mutating func markHomeSnapshotReady() {
+        isShellMounted = true
+        homeSnapshotReady = true
+    }
+
+    mutating func markFallbackElapsed() {
+        guard completionRequested else { return }
+        fallbackElapsed = true
+    }
+
+    mutating func resetAfterCompletion() {
+        self = OnboardingZenSnapshotHandoffState()
+    }
+}
+
+nonisolated enum OnboardingZenSnapshotHandoffGate {
+    static let fallbackDelayMilliseconds: UInt64 = 1200
+}
+
 private enum SupporterIconAccessNotice: Equatable {
     case requiresDefault
     case applyFailed(String)
@@ -55,6 +93,7 @@ struct RootView: View {
     var appLanguage: String = AppLanguage.code
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("ohana_has_onboarded") private var hasOnboarded = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @AppStorage(AppPrivacySnapshotProtectionStore.hideSnapshotKey) private var hideAppSwitcherSnapshot = AppPrivacySnapshotProtectionStore.defaultHideSnapshot
@@ -65,6 +104,8 @@ struct RootView: View {
     @State private var onboardingHomeSnapshotRefreshGeneration = 0
     @State private var onboardingHomeSnapshotRecoveryTask: Task<Void, Never>?
     @State private var onboardingHomePreparationFailedPetID: UUID?
+    @State private var onboardingZenSnapshotHandoff = OnboardingZenSnapshotHandoffState()
+    @State private var onboardingZenSnapshotFallbackTask: Task<Void, Never>?
     @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
     @State private var supporterIconAccessNotice: SupporterIconAccessNotice?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
@@ -109,14 +150,17 @@ struct RootView: View {
             .onChange(of: hasOnboarded) { _, isComplete in
                 guard isComplete else { return }
                 cancelOnboardingHomeSnapshotRecovery()
-                guard isOnboardingHomePreflightMounted else { return }
+                cancelOnboardingZenSnapshotFallback()
                 var handoff = onboardingPetSnapshotHandoff
                 handoff.resetAfterCompletion()
+                var zenHandoff = onboardingZenSnapshotHandoff
+                zenHandoff.resetAfterCompletion()
                 var transaction = Transaction(animation: nil)
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
                     onboardingPetSnapshotHandoff = handoff
                     isOnboardingHomePreflightMounted = false
+                    onboardingZenSnapshotHandoff = zenHandoff
                 }
             }
             .onChange(of: experienceController.mode) { previousMode, currentMode in
@@ -130,6 +174,7 @@ struct RootView: View {
                 automaticBackupReminderTask?.cancel()
                 automaticBackupReminderTask = nil
                 cancelOnboardingHomeSnapshotRecovery()
+                cancelOnboardingZenSnapshotFallback()
             }
             .onReceive(appServices.notificationRoutes.reminderActionEvents) { event in
                 appServices.notificationRoutes.acknowledgeReminderActionEvent(id: event.id)
@@ -192,9 +237,12 @@ struct RootView: View {
     private func rootStack(_ experienceController: AppExperienceController) -> some View {
         ZStack {
             if !experienceController.requiresInitialSelection,
-               hasOnboarded || (experienceController.mode == .standard && isOnboardingHomePreflightMounted) {
+               hasOnboarded || (experienceController.mode == .standard && isOnboardingHomePreflightMounted)
+                || (experienceController.mode == .zen && onboardingZenSnapshotHandoff.isShellMounted) {
                 experienceShell(experienceController)
                     .id(experienceController.shellIdentity)
+                    .allowsHitTesting(hasOnboarded)
+                    .accessibilityHidden(!hasOnboarded)
             }
 
             if !experienceController.requiresInitialSelection, !hasOnboarded {
@@ -204,10 +252,12 @@ struct RootView: View {
                         currentActiveHumanId = humanID.uuidString
                         if experienceController.mode == .zen {
                             experienceController.bindZenOwner(humanID)
+                            beginOnboardingZenPreflight()
                         } else {
                             appServices.onboardingJourney.markFirstHumanCreated(humanID)
                         }
                     },
+                    onZenCompletionRequested: requestOnboardingZenCompletion,
                     onPetDeferred: {
                         appServices.onboardingJourney.markPetDeferred()
                         showDeferredPetTaskToastAfterHomeHandoff()
@@ -227,6 +277,7 @@ struct RootView: View {
                         && onboardingHomePreparationFailedPetID == onboardingPetSnapshotHandoff.requiredPetID,
                     onRetryHomePreparation: retryOnboardingHomePreparation
                 )
+                .transition(.opacity)
                 .zIndex(100)
             }
 
@@ -300,8 +351,6 @@ struct RootView: View {
                 requiredPetHomeSnapshotRefreshRequest: onboardingHomeSnapshotRefreshGeneration,
                 onRequiredPetHomeSnapshotReady: markOnboardingPetHomeSnapshotReady
             )
-            .allowsHitTesting(hasOnboarded)
-            .accessibilityHidden(!hasOnboarded)
         case .zen:
             zenExperienceShell(experienceController)
         }
@@ -313,7 +362,9 @@ struct RootView: View {
         case .unresolved:
             ZenOwnerResolutionView(appLanguage: appLanguage)
         case .ready:
-            ZenExperienceContainer {
+            ZenExperienceContainer(
+                onInitialHomeSnapshotReady: markOnboardingZenHomeSnapshotReady
+            ) {
                 showingZenSettings = true
             }
         case let .requiresSelection(humans):
@@ -336,8 +387,10 @@ struct RootView: View {
         guard previousMode != currentMode else { return }
         showingZenSettings = false
         cancelOnboardingHomeSnapshotRecovery()
+        cancelOnboardingZenSnapshotFallback()
         onboardingFirstPetID = nil
         isOnboardingHomePreflightMounted = false
+        onboardingZenSnapshotHandoff = OnboardingZenSnapshotHandoffState()
     }
 
     @discardableResult
@@ -358,6 +411,7 @@ struct RootView: View {
             let service = PresenceCheckInCommandService(
                 context: modelContext,
                 wallet: appServices.coconutWallet,
+                careLedger: appServices.careLedger,
                 projectionManager: appServices.questManager
             )
             let result = try service.checkInOwner(source: .notificationAction)
@@ -393,6 +447,70 @@ struct RootView: View {
         withTransaction(transaction) {
             isOnboardingHomePreflightMounted = true
         }
+    }
+
+    private func beginOnboardingZenPreflight() {
+        guard !hasOnboarded else { return }
+        var handoff = onboardingZenSnapshotHandoff
+        handoff.stageShell()
+        guard handoff != onboardingZenSnapshotHandoff else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            onboardingZenSnapshotHandoff = handoff
+        }
+    }
+
+    private func requestOnboardingZenCompletion() {
+        guard !hasOnboarded else { return }
+        var handoff = onboardingZenSnapshotHandoff
+        handoff.requestCompletion()
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            onboardingZenSnapshotHandoff = handoff
+        }
+        scheduleOnboardingZenSnapshotFallback()
+        completeOnboardingZenHandoffIfReady()
+    }
+
+    private func markOnboardingZenHomeSnapshotReady() {
+        guard !hasOnboarded else { return }
+        var handoff = onboardingZenSnapshotHandoff
+        handoff.markHomeSnapshotReady()
+        guard handoff != onboardingZenSnapshotHandoff else { return }
+        onboardingZenSnapshotHandoff = handoff
+        completeOnboardingZenHandoffIfReady()
+    }
+
+    private func scheduleOnboardingZenSnapshotFallback() {
+        cancelOnboardingZenSnapshotFallback()
+        onboardingZenSnapshotFallbackTask = OhanaFrameScheduler.runAfterNextFrame(
+            milliseconds: OnboardingZenSnapshotHandoffGate.fallbackDelayMilliseconds
+        ) {
+            guard !hasOnboarded else {
+                onboardingZenSnapshotFallbackTask = nil
+                return
+            }
+            var handoff = onboardingZenSnapshotHandoff
+            handoff.markFallbackElapsed()
+            onboardingZenSnapshotHandoff = handoff
+            onboardingZenSnapshotFallbackTask = nil
+            completeOnboardingZenHandoffIfReady()
+        }
+    }
+
+    private func completeOnboardingZenHandoffIfReady() {
+        guard !hasOnboarded, onboardingZenSnapshotHandoff.isReadyToComplete else { return }
+        cancelOnboardingZenSnapshotFallback()
+        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.page) {
+            hasOnboarded = true
+        }
+    }
+
+    private func cancelOnboardingZenSnapshotFallback() {
+        onboardingZenSnapshotFallbackTask?.cancel()
+        onboardingZenSnapshotFallbackTask = nil
     }
 
     private func stageOnboardingPetHomeHandoff(_ petID: UUID) {

@@ -119,6 +119,10 @@ nonisolated struct PlantDetailLogSnapshot: Identifiable, Equatable, Sendable {
     let hasPhoto: Bool
     let photoImageSignature: String
 
+    func historyRecordID(plantID: UUID) -> PlantCareHistoryRecordID {
+        PlantCareHistoryRecordID(plantID: plantID, logID: id)
+    }
+
     init(log: PlantCareLog) {
         id = log.id
         modelID = log.persistentModelID
@@ -165,7 +169,6 @@ nonisolated struct PlantDetailRenderData: Sendable {
     let logSummary: PlantDetailLogSummary
     let galleryPhotoItems: [PlantDetailPhotoItem]
     let growthDiaryPhotoCount: Int
-    let growthDiaryMarkdown: String
 }
 
 nonisolated struct PlantDetailRenderDataRequest: Sendable {

@@ -40,8 +40,8 @@ private struct TaskCenterFamilyTaskInboxRoute: Identifiable, Equatable {
 }
 
 struct TaskCenterRouteContainer: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AppServices.self) private var appServices
+    @Environment(\.modelContext) var modelContext
+    @Environment(AppServices.self) var appServices
     @AppStorage(StarterGiftStorageKey.ceremonySeen) private var starterGiftCeremonySeen = false
 
     @State private var selectedSurface: TaskCenterSurface
@@ -56,7 +56,7 @@ struct TaskCenterRouteContainer: View {
     @State private var familyTaskActivities: [FamilyTaskActivitySnapshot] = []
     @State private var familyTaskUnreadActivityCount = 0
     @State private var familyTaskInboxRoute: TaskCenterFamilyTaskInboxRoute?
-    @State private var familyTaskDetailRoute: TaskCenterFamilyTaskDetailRoute?
+    @State var familyTaskDetailRoute: TaskCenterFamilyTaskDetailRoute?
     @State var familyTaskEditorRoute: FamilyCollaborationEditorRoute?
     @State private var selectedMemberFilter: TaskCenterMemberFilter?
     @State private var pendingActionHumanConfirmation: ActionHumanConfirmationDraft?
@@ -289,8 +289,16 @@ struct TaskCenterRouteContainer: View {
             TaskCenterSystemJourneySheet(
                 item: item,
                 taskState: starterJourneyState(for: item),
+                humanProfileTarget: humanProfileTarget(for: item),
+                petProfileTarget: petProfileTarget(for: item),
                 onOpenDestination: { checkpoint in
                     presentSystemJourneyEditor(item, checkpoint: checkpoint)
+                },
+                onUpdateHumanProfile: { update in
+                    updateStarterHumanProfile(for: item, applying: update)
+                },
+                onUpdatePetProfile: { update in
+                    updateStarterPetProfile(for: item, applying: update)
                 },
                 onClaim: { claimStarterJourneyReward(for: item) },
                 onRecordResolution: { checkpoint, resolution in
@@ -806,6 +814,7 @@ private extension TaskCenterRouteContainer {
         _ item: TaskCenterItemSnapshot,
         checkpoint: HouseholdStarterJourneyCheckpoint?
     ) {
+        guard item.systemDestination != .completeHumanProfile else { return }
         let routedItem = systemJourneyDestinationItem(item, checkpoint: checkpoint)
         guard let task = starterJourneyTask(for: item),
               let targetID = routedItem.subject.id,
@@ -1028,261 +1037,116 @@ private extension TaskCenterRouteContainer {
         scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
         return .success
     }
-}
 
-// MARK: - Family task detail
+    private func humanProfileTarget(for item: TaskCenterItemSnapshot) -> Human? {
+        guard item.systemDestination == .completeHumanProfile,
+              let targetID = item.subject.id else { return nil }
+        return routeData.humans.first { $0.id == targetID && !$0.hasPassedAway }
+    }
 
-extension TaskCenterRouteContainer {
-    func familyTaskDetail(_ route: TaskCenterFamilyTaskDetailRoute) -> some View {
-        FamilyTaskDetailView(
-            snapshot: route.snapshot,
-            onEdit: route.snapshot.capabilities.canEdit ? {
-                presentFamilyTaskEditorAfterDetail(taskID: route.snapshot.taskID)
-            } : nil,
-            onTaskAction: { action in
-                performFamilyTaskDetailAction(taskID: route.snapshot.taskID, action: action)
-            },
-            onDecline: { reason in
-                declineFamilyTask(taskID: route.snapshot.taskID, reason: reason)
-            },
-            onPostpone: { dueAt in
-                postponeFamilyTask(taskID: route.snapshot.taskID, to: dueAt)
-            },
-            onComment: { body in
-                commentOnFamilyTask(taskID: route.snapshot.taskID, body: body)
-            },
-            onCancel: { scope in
-                await cancelFamilyTask(taskID: route.snapshot.taskID, scope: scope)
-            }
+    private func petProfileTarget(for item: TaskCenterItemSnapshot) -> Pet? {
+        guard item.systemDestination == .completeFirstPetProfile,
+              let targetID = item.subject.id else { return nil }
+        return routeData.pets.first { $0.id == targetID && !$0.hasPassedAway }
+    }
+
+    private func updateStarterHumanProfile(
+        for item: TaskCenterItemSnapshot,
+        applying update: TaskCenterHumanProfileInlineUpdate
+    ) -> TaskCenterSystemJourneyMutationOutcome {
+        guard let human = humanProfileTarget(for: item),
+              HumanProfileEditPolicy.canEdit(hasPassedAway: human.hasPassedAway) else {
+            return .failure(L10n.current.tr(
+                zh: "未找到这位成员。",
+                en: "This member is unavailable.",
+                de: "Dieses Mitglied ist nicht verfügbar.",
+                es: "Este miembro no está disponible.",
+                pt: "Este membro não está disponível.",
+                fr: "Ce membre n’est pas disponible.",
+                ja: "このメンバーは利用できません。",
+                ko: "이 구성원을 사용할 수 없습니다.",
+                it: "Questo membro non è disponibile."
+            ))
+        }
+        let input = TaskCenterHumanProfileInlineInputBuilder.input(
+            for: human,
+            applying: update
         )
-    }
-
-    func presentFamilyTaskDetail(
-        taskID: UUID,
-        preferredItem: TaskCenterItemSnapshot? = nil
-    ) {
-        guard let task = familyTaskModel(id: taskID) else { return }
-        familyTaskDetailRoute = makeFamilyTaskDetailRoute(task: task, preferredItem: preferredItem)
-    }
-
-    func makeFamilyTaskDetailRoute(
-        task: FamilyCollaborationTask,
-        preferredItem: TaskCenterItemSnapshot?
-    ) -> TaskCenterFamilyTaskDetailRoute {
-        let latestItem = preferredItem.flatMap { preferred in
-            routeData.snapshot.allItems.first(where: { $0.id == preferred.id }) ?? preferred
-        } ?? routeData.snapshot.allItems.first(where: { $0.familyTaskID == task.id })
-        let capabilities = FamilyTaskCapabilities.resolve(
-            task: task,
-            currentHumanID: selectedActiveHumanID
+        let result = MemberCommandExecutor(
+            context: modelContext,
+            services: appServices
+        ).updateHumanProfile(
+            human,
+            input: input,
+            note: "taskCenter.starterJourney.inlineHumanProfile"
         )
-        var actions: Set<TaskCenterAvailableAction> = []
-        if capabilities.canComplete {
-            actions.insert(task.hasReward ? .submitForReview : .complete)
+        guard result.didPersist else {
+            return .failure(L10n.current.tr(
+                zh: "资料没有保存，请重试。",
+                en: "The profile was not saved. Try again.",
+                de: "Das Profil wurde nicht gespeichert. Bitte erneut versuchen.",
+                es: "El perfil no se guardó. Inténtalo de nuevo.",
+                pt: "O perfil não foi salvo. Tente novamente.",
+                fr: "Le profil n’a pas été enregistré. Réessayez.",
+                ja: "プロフィールを保存できませんでした。もう一度お試しください。",
+                ko: "프로필이 저장되지 않았어요. 다시 시도해 주세요.",
+                it: "Il profilo non è stato salvato. Riprova."
+            ))
         }
-        if capabilities.canApprove { actions.insert(.approve) }
-        if capabilities.canReturnForRedo { actions.insert(.reject) }
-        if task.status == .active,
-           task.isOpen,
-           selectedActiveHumanID != nil,
-           latestItem?.availableActions.contains(.claim) == true {
-            actions.insert(.claim)
-        }
+        scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
+        return .success
+    }
 
-        return TaskCenterFamilyTaskDetailRoute(
-            snapshot: TaskCenterFamilyTaskDetailSnapshot(
-                taskID: task.id,
-                title: task.title,
-                note: task.note,
-                emoji: task.emoji,
-                creatorName: task.createdByName,
-                assigneeName: task.claimedByName ?? task.assignedToName,
-                viewerRole: familyTaskViewerRole(for: task),
-                capabilities: capabilities,
-                status: task.status,
-                dueAt: task.dueAt ?? latestItem?.dueAt,
-                isAllDay: latestItem?.isAllDay ?? false,
-                isRecurring: latestItem?.isRecurring == true || task.planId != nil,
-                allowsThisAndFutureCancellation: task.planId != nil && task.nominalAt != nil,
-                rewardCoconuts: task.rewardCoconuts,
-                availableActions: actions,
-                isLinkedToCalendar: latestItem?.eventID != nil || task.relatedEventId != nil,
-                activities: FamilyTaskActivityService.occurrenceTimeline(
-                    taskID: task.id,
-                    context: modelContext
-                )
-            )
+    private func updateStarterPetProfile(
+        for item: TaskCenterItemSnapshot,
+        applying update: TaskCenterPetProfileInlineUpdate
+    ) -> TaskCenterSystemJourneyMutationOutcome {
+        guard let pet = petProfileTarget(for: item) else {
+            return .failure(L10n.current.tr(
+                zh: "未找到这只宠物。",
+                en: "This pet is unavailable.",
+                de: "Dieses Tier ist nicht verfügbar.",
+                es: "Esta mascota no está disponible.",
+                pt: "Este pet está indisponível.",
+                fr: "Cet animal n’est pas disponible.",
+                ja: "このペットは利用できません。",
+                ko: "이 반려동물을 사용할 수 없습니다.",
+                it: "Questo animale non è disponibile."
+            ))
+        }
+        let input = TaskCenterPetProfileInlineInputBuilder.input(
+            for: pet,
+            applying: update
         )
-    }
-
-    func familyTaskViewerRole(
-        for task: FamilyCollaborationTask
-    ) -> TaskCenterFamilyTaskViewerRole {
-        guard let selectedHumanID = selectedActiveHumanID else {
-            return .familyMember
-        }
-        if UUID(uuidString: task.createdById) == selectedHumanID {
-            return .creator
-        }
-        if task.claimedById.flatMap(UUID.init(uuidString:)) == selectedHumanID ||
-            task.assignedToId.flatMap(UUID.init(uuidString:)) == selectedHumanID {
-            return .assignee
-        }
-        return .familyMember
-    }
-
-    func canSelectedHumanEdit(_ task: FamilyCollaborationTask) -> Bool {
-        FamilyTaskCapabilities.resolve(
-            task: task,
-            currentHumanID: selectedActiveHumanID
-        ).canEdit
-    }
-
-    func presentFamilyTaskEditorAfterDetail(taskID: UUID) {
-        familyTaskDetailRoute = nil
-        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 160) {
-            guard let task = familyTaskModel(id: taskID),
-                  canSelectedHumanEdit(task) else { return }
-            if !routeData.familyTasks.contains(where: { $0.id == taskID }) {
-                routeData.familyTasks.append(task)
-            }
-            familyTaskEditorRoute = .editTask(taskID)
-        }
-    }
-
-    func performFamilyTaskDetailAction(
-        taskID: UUID,
-        action: TaskCenterAvailableAction
-    ) -> Bool {
-        guard let task = familyTaskModel(id: taskID),
-              let human = selectedHumanForFamilyTaskCommand() else { return false }
-        let capabilities = FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id)
-        let didSucceed: Bool
-        switch action {
-        case .complete, .submitForReview:
-            guard capabilities.canComplete else { return false }
-            didSucceed = familyTaskCommandExecutor.complete(task, by: human)
-        case .claim:
-            didSucceed = familyTaskCommandExecutor.claim(task, by: human)
-        case .approve:
-            guard capabilities.canApprove else { return false }
-            didSucceed = familyTaskCommandExecutor.confirmCompletion(task, by: human)
-        case .reject:
-            guard capabilities.canReturnForRedo else { return false }
-            didSucceed = familyTaskCommandExecutor.rejectCompletion(task, by: human)
-        }
-        return finishFamilyTaskMutation(didSucceed, taskID: taskID)
-    }
-
-    func declineFamilyTask(taskID: UUID, reason: String) -> Bool {
-        guard let task = familyTaskModel(id: taskID),
-              let human = selectedHumanForFamilyTaskCommand(),
-              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canDecline else {
-            return false
-        }
-        return finishFamilyTaskMutation(
-            familyTaskCommandExecutor.declineAssignment(task, by: human, reason: reason),
-            taskID: taskID
+        let result = MemberCommandExecutor(
+            context: modelContext,
+            services: appServices
+        ).updatePetProfile(
+            pet,
+            input: input,
+            note: "taskCenter.starterJourney.inlinePetProfile"
         )
-    }
-
-    func postponeFamilyTask(taskID: UUID, to dueAt: Date) -> Bool {
-        guard let task = familyTaskModel(id: taskID),
-              let human = selectedHumanForFamilyTaskCommand(),
-              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canPostpone else {
-            return false
+        guard result.didPersist else {
+            return .failure(L10n.current.tr(
+                zh: "资料没有保存，请重试。",
+                en: "The profile was not saved. Try again.",
+                de: "Das Profil wurde nicht gespeichert. Bitte erneut versuchen.",
+                es: "El perfil no se guardó. Inténtalo de nuevo.",
+                pt: "O perfil não foi salvo. Tente novamente.",
+                fr: "Le profil n’a pas été enregistré. Réessayez.",
+                ja: "プロフィールを保存できませんでした。もう一度お試しください。",
+                ko: "프로필이 저장되지 않았어요. 다시 시도해 주세요.",
+                it: "Il profilo non è stato salvato. Riprova."
+            ))
         }
-        return finishFamilyTaskMutation(
-            familyTaskCommandExecutor.postponeOccurrence(task, to: dueAt, by: human),
-            taskID: taskID
-        )
-    }
-
-    func commentOnFamilyTask(taskID: UUID, body: String) -> Bool {
-        guard let task = familyTaskModel(id: taskID),
-              let human = selectedHumanForFamilyTaskCommand(),
-              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canComment else {
-            return false
-        }
-        let idempotencyKey = "family-task:\(taskID.uuidString):comment:\(human.id.uuidString):\(UUID().uuidString)"
-        return finishFamilyTaskMutation(
-            familyTaskCommandExecutor.addComment(
-                task,
-                body: body,
-                by: human,
-                idempotencyKey: idempotencyKey
-            ),
-            taskID: taskID
-        )
-    }
-
-    func cancelFamilyTask(
-        taskID: UUID,
-        scope: FamilyTaskEditScope
-    ) async -> Bool {
-        guard let task = familyTaskModel(id: taskID),
-              let human = selectedHumanForFamilyTaskCommand(),
-              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canCancel else {
-            return false
-        }
-        switch scope {
-        case .onlyThis:
-            return finishFamilyTaskMutation(
-                familyTaskCommandExecutor.cancelTask(task, by: human),
-                taskID: taskID
-            )
-        case .thisAndFuture:
-            guard let rawPlanID = task.planId,
-                  let planID = UUID(uuidString: rawPlanID),
-                  let nominalAt = task.nominalAt else { return false }
-            let didSucceed = await familyTaskCommandExecutor.cancelThisAndFuture(
-                planID: planID,
-                from: nominalAt,
-                by: human
-            )
-            guard didSucceed else { return false }
-            refreshFamilyTaskActivities()
-            scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
-            return true
-        }
-    }
-
-    func finishFamilyTaskMutation(_ didSucceed: Bool, taskID: UUID) -> Bool {
-        guard didSucceed else { return false }
-        if familyTaskDetailRoute?.snapshot.taskID == taskID,
-           let task = familyTaskModel(id: taskID) {
-            familyTaskDetailRoute = makeFamilyTaskDetailRoute(task: task, preferredItem: nil)
-        }
-        refreshFamilyTaskActivities()
-        scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
-        return true
-    }
-
-    var familyTaskCommandExecutor: FamilyCollaborationCommandExecutor {
-        FamilyCollaborationCommandExecutor(
-            modelContext: modelContext,
-            familyTasks: appServices.familyTasks,
-            revisions: appServices.domainRevisions
-        )
-    }
-
-    var selectedActiveHumanID: UUID? {
-        appServices.activeHumanSelection.currentHumanId.flatMap(UUID.init(uuidString:))
-    }
-
-    func selectedHumanForFamilyTaskCommand() -> Human? {
-        guard let selectedActiveHumanID else { return nil }
-        return routeData.humans.first { $0.id == selectedActiveHumanID && !$0.hasPassedAway }
-    }
-
-    func familyTaskModel(id: UUID) -> FamilyCollaborationTask? {
-        routeData.familyTasks.first { $0.id == id }
+        scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
+        return .success
     }
 }
 
 // MARK: - Family task inbox
 
-private extension TaskCenterRouteContainer {
+extension TaskCenterRouteContainer {
     func refreshFamilyTaskActivities() {
         guard let humanID = selectedActiveHumanID else {
             familyTaskActivities = []

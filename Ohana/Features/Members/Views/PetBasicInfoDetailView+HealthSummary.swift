@@ -303,7 +303,7 @@ extension PetBasicInfoDetailView {
             Text(l.tr(zh: "给兽医", en: "For vet", de: "Fuer Tierarzt"))
         }
         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-        .foregroundStyle(Color.arkInk)
+        .foregroundStyle(Color.ohanaPrimaryActionText)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background(Color.goPrimary, in: Capsule())

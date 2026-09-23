@@ -593,6 +593,10 @@ final class AppRouteCoordinator: ObservableObject {
             rootIdentity = UUID()
         }
     }
+
+    func completeMemberCreation() {
+        resetToHome()
+    }
 }
 
 private extension AppRouteCoordinator {

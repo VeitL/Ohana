@@ -238,35 +238,35 @@ nonisolated extension HumanLabResultParser {
         let lowFlag: NSRegularExpression
         let normalFlag: NSRegularExpression
 
-        init() {
+        init() throws {
             let numberCore = #"[-+]?(?:\d+(?:[.,]\d+)?|[.,]\d+)"#
-            number = try! NSRegularExpression(
+            number = try NSRegularExpression(
                 pattern: #"(?<![\p{L}\d])([<>≤≥]?\s*"# + numberCore
                     + #")(?![\p{L}\d]|\s*[-–—]?\s*\(?OH)"#,
                 options: [.caseInsensitive]
             )
-            doubleRange = try! NSRegularExpression(
+            doubleRange = try NSRegularExpression(
                 pattern: "(" + numberCore + #")\s*(?:-|–|—|~|～|至|到)\s*("#
                     + numberCore + ")",
                 options: []
             )
-            comparatorRange = try! NSRegularExpression(
+            comparatorRange = try NSRegularExpression(
                 pattern: #"([<>≤≥])\s*("# + numberCore + ")",
                 options: []
             )
-            dateHeader = try! NSRegularExpression(
+            dateHeader = try NSRegularExpression(
                 pattern: #"(?<!\d)(\d{1,2})[./-](\d{1,2})[./-](\d{4})(?!\d)"#,
                 options: []
             )
-            highFlag = try! NSRegularExpression(
+            highFlag = try NSRegularExpression(
                 pattern: #"(?:\[\s*\+\s*\]|［\s*\+\s*］|\(\s*\+\s*\)|(?:^|\s)[\[［(]?\s*\+\s*[\]］)]?(?=\s*\d))|(?:^|[\s\t*])(?:H|HIGH|HOCH)(?=$|[\s\t*])|[↑⬆]|(?:偏高|升高)"#,
                 options: [.caseInsensitive]
             )
-            lowFlag = try! NSRegularExpression(
+            lowFlag = try NSRegularExpression(
                 pattern: #"(?:\[\s*-\s*\]|［\s*-\s*］|\(\s*-\s*\)|(?:^|\s)[\[［(]?\s*-\s*[\]］)]?(?=\s*\d)|(?:^|\s)L\s*-\s*[\]］](?=\s*\d))|(?:^|[\s\t*])(?:L|LOW|NIEDRIG)(?=$|[\s\t*])|[↓⬇]|(?:偏低|降低)"#,
                 options: [.caseInsensitive]
             )
-            normalFlag = try! NSRegularExpression(
+            normalFlag = try NSRegularExpression(
                 pattern: #"(?:^|[\s\t*])(?:N|NORMAL)(?=$|[\s\t*])|正常"#,
                 options: [.caseInsensitive]
             )

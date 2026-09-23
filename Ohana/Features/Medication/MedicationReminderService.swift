@@ -130,7 +130,7 @@ private enum MedicationNotificationMutationCoordinator {
     }
 }
 
-private struct MedicationNotificationRequestPlan {
+struct MedicationNotificationRequestPlan {
     let request: UNNotificationRequest
     let scheduledAt: Date
     let subjectKind: CareLedgerSubjectKind
@@ -211,14 +211,19 @@ extension MedicationReminderService {
         }
     }
 
-    private func petNotificationPlans(
+    func petNotificationPlans(
         for pet: Pet,
         hidesDetails: Bool,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [MedicationNotificationRequestPlan] {
         pet.medications
-            .filter { $0.isActive(on: now) }
+            .filter { medication in
+                guard medication.isActive else { return false }
+                return medication.endDate.map {
+                    calendar.startOfDay(for: $0) >= calendar.startOfDay(for: now)
+                } ?? true
+            }
             .flatMap { medication in
                 petNotificationPlans(
                     for: medication,
@@ -257,16 +262,23 @@ extension MedicationReminderService {
 
         outerLoop: for day in 0 ..< 14 {
             guard let dayDate = calendar.date(byAdding: .day, value: day, to: baseTime) else { continue }
-            if medication.frequency == .everyOtherDay {
-                let daysSinceStart = calendar.dateComponents([.day], from: medication.startDate, to: dayDate).day ?? 0
-                if daysSinceStart % 2 != 0 { continue }
-            }
+            guard PetMedicationDoseLogging.requiredDoses(on: dayDate, for: medication, calendar: calendar) > 0 else { continue }
 
             for doseIndex in 0 ..< dosesPerDay {
                 let minute = doseMinutes.indices.contains(doseIndex) ? doseMinutes[doseIndex] : 8 * 60
-                let fireDate = dayDate.addingTimeInterval(Double(minute) * 60)
+                guard let fireDate = calendar.date(
+                    bySettingHour: minute / 60,
+                    minute: minute % 60,
+                    second: 0,
+                    of: dayDate,
+                    matchingPolicy: .nextTime
+                ) else { continue }
                 guard fireDate > now else { continue }
-                if let endDate = medication.endDate, fireDate > endDate { break outerLoop }
+                guard fireDate >= medication.startDate else { continue }
+                if let endDate = medication.endDate,
+                   calendar.startOfDay(for: fireDate) > calendar.startOfDay(for: endDate) {
+                    break outerLoop
+                }
 
                 let content = UNMutableNotificationContent()
                 content.title = l.tr(zh: "宠物用药提醒", en: "Pet medication reminder", de: "Medikamentenerinnerung")

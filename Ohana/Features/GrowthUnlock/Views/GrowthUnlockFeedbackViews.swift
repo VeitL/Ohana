@@ -34,7 +34,7 @@ struct StarterGiftHomePreparationRecoveryOverlay: View {
                         Button(action: onRetry) {
                             Text(localized(zh: "重试", en: "Try again", de: "Erneut versuchen"))
                                 .font(OhanaFont.callout(.black))
-                                .foregroundStyle(Color.arkInk)
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
                                 .frame(maxWidth: .infinity, minHeight: 44)
                                 .background(Color.goPrimary, in: Capsule())
                         }
@@ -101,19 +101,10 @@ struct StarterGiftCeremonyOverlay: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    HStack(spacing: 9) {
-                        levelBadge("Lv0", isActive: true)
-                        Image(systemName: "plus").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                        levelBadge("+\(amount)🥥", isActive: false)
-                    }
-                    .frame(maxWidth: .infinity)
-
                     Text(localized(
-                        zh: "首宠奖励已经准备好。领取后会解锁底部的 Oasis；每次注入 \(OasisTreeEnergyInjectionPolicy.starterPackageXP) 能量，注入 5 次会升到 Lv1。",
-                        en: "Your first-pet reward is ready. Claim it to unlock Oasis; each injection adds \(OasisTreeEnergyInjectionPolicy.starterPackageXP) energy, and 5 injections reach Lv1.",
-                        de: "Deine Belohnung für das erste Haustier ist bereit. Hole sie ab, um Oasis freizuschalten; jede Einspeisung gibt \(OasisTreeEnergyInjectionPolicy.starterPackageXP) Energie, 5 Einspeisungen erreichen Lv1."
+                        zh: "领取后解锁 Oasis；注入 5 次升到 Lv1。",
+                        en: "Claim to unlock Oasis; 5 injections reach Lv1.",
+                        de: "Abholen, um Oasis freizuschalten; 5 Einspeisungen erreichen Lv1."
                     ))
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -130,7 +121,7 @@ struct StarterGiftCeremonyOverlay: View {
                             Text(actionTitle)
                                 .font(OhanaFont.callout(.black))
                         }
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(Color.goPrimary, in: Capsule())
                     }
@@ -160,14 +151,6 @@ struct StarterGiftCeremonyOverlay: View {
         .accessibilityAddTraits(.isModal)
     }
 
-    private func levelBadge(_ text: String, isActive: Bool) -> some View {
-        Text(text)
-            .font(OhanaFont.callout(.black))
-            .foregroundStyle(isActive ? Color.arkInk : Color.ohanaSecondaryText)
-            .frame(minWidth: 72, minHeight: 44)
-            .background(isActive ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-    }
-
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
         case "en": en
@@ -184,7 +167,7 @@ struct StarterGiftCeremonyOverlay: View {
         }
         return isClaimCommitted
             ? localized(zh: "刷新并继续", en: "Refresh and continue", de: "Aktualisieren und fortfahren")
-            : localized(zh: "领取 \(amount) 椰子", en: "Claim \(amount) coconuts", de: "\(amount) Kokosnüsse abholen")
+            : localized(zh: "领取并继续", en: "Claim and continue", de: "Abholen und fortfahren")
     }
 
     private var actionAccessibilityLabel: String {
@@ -255,7 +238,7 @@ struct GrowthDailyLoopStrip: View {
                         Image(systemName: "arrow.right").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 10, weight: .black))
                     }
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(minWidth: 76, minHeight: 44)
                     .padding(.horizontal, 2)
                     .background(Color.goPrimary, in: Capsule())
@@ -389,10 +372,6 @@ struct GrowthLoopPulseToastView: View {
                 .background(Color.ohanaControlFill, in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(localized(zh: "成长能量已同步", en: "Growth synced", de: "Wachstum synchronisiert"))
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.goPrimary)
-                    .lineLimit(1)
                 Text(localized(
                     zh: "生命之树 Lv.\(status.currentLevel) · +\(status.energyDelta) 能量",
                     en: "Life Tree Lv.\(status.currentLevel) · +\(status.energyDelta) energy",
@@ -402,18 +381,13 @@ struct GrowthLoopPulseToastView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
-                Text(detailText)
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
             }
 
             Spacer(minLength: 4)
 
             Text("\(status.progressPercent)%")
                 .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(minWidth: 48, minHeight: 44)
                 .background(Color.goPrimary, in: Capsule())
         }
@@ -423,21 +397,6 @@ struct GrowthLoopPulseToastView: View {
         .padding(.vertical, 10)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .accessibilityElement(children: .combine)
-    }
-
-    private var detailText: String {
-        guard let nextStep else {
-            return localized(
-                zh: "全部功能已开放，继续积累长期记录。",
-                en: "All features are open; keep building long-term records.",
-                de: "Alle Funktionen sind offen; baue weiter Verlauf auf."
-            )
-        }
-        return localized(
-            zh: "下一步 \(nextStep.title(language: appLanguage)) Lv.\(nextStep.requiredLevel)",
-            en: "Next: \(nextStep.title(language: appLanguage)) Lv.\(nextStep.requiredLevel)",
-            de: "Weiter: \(nextStep.title(language: appLanguage)) Lv.\(nextStep.requiredLevel)"
-        )
     }
 
     private func localized(zh: String, en: String, de: String) -> String {
@@ -472,10 +431,6 @@ struct GrowthUnlockToastView: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
-                Text(status.step.detail(language: appLanguage))
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
             }
 
             Spacer(minLength: 6)
@@ -484,7 +439,7 @@ struct GrowthUnlockToastView: View {
                 Button(action: onOpen) {
                     Text(localized(zh: "去看看", en: "Open", de: "Öffnen"))
                         .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .lineLimit(1)
                         .frame(minWidth: 64, minHeight: 44)
                         .padding(.horizontal, 4)
@@ -568,11 +523,6 @@ struct GrowthUnlockPopupView: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(localized(zh: "新功能已解锁", en: "New feature unlocked", de: "Neue Funktion frei"))
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.goPrimary)
-                        .lineLimit(1)
-
                     Text(unlockedTitle)
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
@@ -600,26 +550,12 @@ struct GrowthUnlockPopupView: View {
                 .accessibilityIdentifier("growth-unlock-close-action")
             }
 
-            Text(featureSummary)
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
-
             VStack(alignment: .leading, spacing: 7) {
                 ForEach(featureBullets, id: \.self) { text in
                     featureBullet(text)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text(entryHint)
-                .font(OhanaFont.caption(.bold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
 
             HStack(spacing: 10) {
                 Button(action: onDismiss) {
@@ -694,71 +630,6 @@ struct GrowthUnlockPopupView: View {
         )
     }
 
-    private var featureSummary: String {
-        switch status.step.id {
-        case .dailyCare:
-            localized(
-                zh: "基础管理入口已经就绪，先把每天必须记录的照护放在手边。",
-                en: "Core care tools are ready, keeping must-log daily care close at hand.",
-                de: "Die wichtigsten Pflegewerkzeuge sind bereit und bleiben griffbereit."
-            )
-        case .bodyHealth:
-            localized(
-                zh: "健康与身体记录升级成可浏览的管理面板。",
-                en: "Health and body records now become a scannable management panel.",
-                de: "Gesundheits- und Körperdaten werden zu einer übersichtlichen Ansicht."
-            )
-        case .memory:
-            localized(
-                zh: "成长档案开放，可以把运动、互动和重要瞬间沉淀下来。",
-                en: "Growth archive is open, so walks, play, and moments can become a lasting record.",
-                de: "Das Wachstumsarchiv ist offen und sammelt Spaziergänge, Spiel und Momente."
-            )
-        case .household:
-            localized(
-                zh: PlantUnlockPolicy.unlockedToastZh,
-                en: "Your life canopy has opened. You can now care for the plants at home.",
-                de: "Deine Lebenskrone hat sich geöffnet. Du kannst jetzt Pflanzen zu Hause pflegen."
-            )
-        case .oasisPlants:
-            localized(
-                zh: "绿洲收益开放，生命树开始把成长反馈成可领取的椰子。",
-                en: "Oasis yield is open, turning tree growth into collectable coconuts.",
-                de: "Oasis-Erträge sind offen und wandeln Wachstum in Kokosnüsse um."
-            )
-        case .rewards:
-            localized(
-                zh: "椰子商店和标准家庭周报开放，照护成果开始变得可消费、可回看。",
-                en: "The coconut shop and standard weekly report are open, making care progress spendable and easy to review.",
-                de: "Kokos-Shop und Standard-Wochenbericht sind offen: Pflegefortschritt wird nutzbar und gut rückblickbar."
-            )
-        case .advancedPlay:
-            localized(
-                zh: "扭蛋玩法开放，奖励层收集内容现在可以开始抽取。",
-                en: "Gacha play is open, adding a collectible reward layer.",
-                de: "Gacha ist offen und ergänzt eine sammelbare Belohnungsebene."
-            )
-        case .advancedInsights:
-            localized(
-                zh: "深度照护分析和完整提醒诊断开放；安全告警始终可见。",
-                en: "Deep care analysis and full reminder diagnostics are open; safety alerts always remain visible.",
-                de: "Tiefe Pflegeanalyse und vollständige Erinnerungsdiagnose sind offen; Sicherheitswarnungen bleiben sichtbar."
-            )
-        case .memoryReview:
-            localized(
-                zh: "长期家庭回顾开放，按月份整理重要照护和回忆，不重复周报。",
-                en: "Long-term household review is open, organizing meaningful care and memories by month without repeating the weekly report.",
-                de: "Der Langzeitrückblick ordnet wichtige Pflege und Erinnerungen monatlich, ohne den Wochenbericht zu wiederholen."
-            )
-        case .mastery:
-            localized(
-                zh: "大师树冠开放，长期荣誉、外观和顶级收益已经到位。",
-                en: "Master canopy is open with long-term honors, styling, and top yield.",
-                de: "Die Meister-Krone ist offen mit Ehren, Stil und höchsten Erträgen."
-            )
-        }
-    }
-
     private var featureBullets: [String] {
         switch status.step.id {
         case .dailyCare:
@@ -812,14 +683,6 @@ struct GrowthUnlockPopupView: View {
                 localized(zh: "获得当前成长线的顶级被动收益", en: "Receive the top passive yield for the growth path", de: "Höchste passive Erträge dieser Wachstumslinie erhalten")
             ]
         }
-    }
-
-    private var entryHint: String {
-        localized(
-            zh: "相关入口会显示红点，直到你第一次打开\(featureTitle)。",
-            en: "Related entries show a red dot until you open \(featureTitle) once.",
-            de: "Zugehörige Einstiege zeigen einen Punkt, bis du \(featureTitle) einmal öffnest."
-        )
     }
 
     private var openTitle: String {
@@ -879,7 +742,7 @@ struct GrowthUnlockStageRow: View {
 
             Text("Lv.\(step.requiredLevel)")
                 .font(OhanaFont.caption2(.black))
-                .foregroundStyle(isUnlocked ? Color.arkInk : Color(hex: step.tintHex))
+                .foregroundStyle(isUnlocked ? Color.ohanaPrimaryActionText : Color(hex: step.tintHex))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
                 .background(isUnlocked ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

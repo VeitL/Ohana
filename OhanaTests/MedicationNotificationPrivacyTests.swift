@@ -7,6 +7,77 @@ import UserNotifications
 @MainActor
 @Suite(.serialized)
 struct MedicationNotificationPrivacyTests {
+    @Test func petPlansFollowCalendarFrequencyAndBoundaries() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let start = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 21, hour: 0)))
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 21, hour: 7)))
+        let service = MedicationReminderService(notificationCenter: FakeMedicationNotificationCenter(requests: []))
+
+        for (frequency, expectedCount) in [
+            (PetMedicationFrequency.daily, 14),
+            (.weekly, 2),
+            (.everyOtherDay, 7),
+            (.asNeeded, 0)
+        ] {
+            let container = try makeContainer()
+            let context = container.mainContext
+            let pet = Pet(name: "Momo", species: "dog")
+            let medication = PetMedication(name: "Apoquel", frequency: frequency, startDate: start, pet: pet)
+            context.insert(pet)
+            context.insert(medication)
+            try context.save()
+
+            let plans = service.petNotificationPlans(for: pet, hidesDetails: true, now: now, calendar: calendar)
+                .filter { $0.medicationID == medication.id.uuidString }
+            #expect(plans.count == expectedCount)
+            #expect(plans.allSatisfy {
+                PetMedicationDoseLogging.requiredDoses(on: $0.scheduledAt, for: medication, calendar: calendar) > 0
+            })
+            #expect(plans.allSatisfy { $0.scheduledAt >= medication.startDate })
+        }
+
+        let boundedContainer = try makeContainer()
+        let boundedContext = boundedContainer.mainContext
+        let boundedPet = Pet(name: "Momo", species: "dog")
+        let endDay = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 23, hour: 0)))
+        let boundedMedication = PetMedication(
+            name: "Apoquel",
+            frequency: .daily,
+            startDate: start,
+            endDate: endDay,
+            pet: boundedPet
+        )
+        boundedContext.insert(boundedPet)
+        boundedContext.insert(boundedMedication)
+        try boundedContext.save()
+        let boundedPlans = service.petNotificationPlans(for: boundedPet, hidesDetails: true, now: now, calendar: calendar)
+            .filter { $0.medicationID == boundedMedication.id.uuidString }
+        #expect(boundedPlans.count == 3)
+        #expect(boundedPlans.allSatisfy { calendar.startOfDay(for: $0.scheduledAt) <= endDay })
+    }
+
+    @Test func medicationDashboardReadsPersistedDoseEvents() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "dog")
+        let medication = PetMedication(name: "Apoquel", frequency: .daily, pet: pet)
+        let event = Event(
+            title: "Dose",
+            startDate: Date(),
+            eventType: EventType.petMedicationDose.rawValue,
+            relatedEntityType: DomainEntityLinkRegistry.petMedicationDose,
+            relatedEntityId: medication.id.uuidString
+        )
+        context.insert(pet)
+        context.insert(medication)
+        context.insert(event)
+        try context.save()
+
+        let routeData = IslandMedicationRouteData.load(from: context)
+        #expect(routeData.todayDoseCounts[medication.id] == 1)
+    }
+
     @Test func legacyPreferenceKeyDrivesGlobalMedicationPrivacyPolicy() throws {
         let suiteName = "MedicationNotificationPrivacyTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))

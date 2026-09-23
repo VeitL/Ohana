@@ -64,25 +64,15 @@ struct PlantPhotoGallerySheet: View {
                 .background(Color.goTeal.opacity(0.16), in: Circle())
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "成长照片", en: "Growth photos", de: "Wachstumsfotos"))
-                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(
-                    zh: "集中查看档案照和带照片的护理记录。",
-                    en: "Review profile images and care logs with photos in one place.",
-                    de: "Profilbilder und Pflegeprotokolle mit Fotos an einem Ort ansehen."
-                ))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(l.tr(zh: "成长照片", en: "Growth photos", de: "Wachstumsfotos"))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
 
             Spacer(minLength: 8)
 
             Text("\(photos.count)")
                 .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 11)
                 .frame(minHeight: 30)
                 .background(Color.goPrimary, in: Capsule())
@@ -105,9 +95,9 @@ struct PlantPhotoGallerySheet: View {
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(
-                    zh: "当档案照或带照片的护理记录出现后，这里会自动组成成长图库。",
-                    en: "Profile images and photo care logs will automatically form a growth gallery here.",
-                    de: "Profilbilder und Pflegeprotokolle mit Fotos bilden hier automatisch eine Wachstumsgalerie."
+                    zh: "添加档案照或带照片的护理记录。",
+                    en: "Add a profile photo or a care log with a photo.",
+                    de: "Füge ein Profilfoto oder einen Pflegeeintrag mit Foto hinzu."
                 ))
                 .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -215,7 +205,7 @@ private struct PlantPhotoDetailSheet: View {
                 } label: {
                     Text(l.tr(zh: "完成", en: "Done", de: "Fertig"))
                         .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 44)
                         .background(Color.goPrimary, in: Capsule())

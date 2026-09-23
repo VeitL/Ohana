@@ -155,9 +155,15 @@ struct VerticalSolidHomePlantRoomStack: View {
             )
         }
         return l.tr(
-            zh: "\(summary.plantCount) 株 · 状态良好",
-            en: "\(summary.plantCount) plants · Good",
-            de: "\(summary.plantCount) Pflanzen · Gut"
+            zh: "\(summary.plantCount) 株",
+            en: "\(summary.plantCount) plants",
+            de: "\(summary.plantCount) Pflanzen",
+            es: "\(summary.plantCount) plantas",
+            pt: "\(summary.plantCount) plantas",
+            fr: "\(summary.plantCount) plantes",
+            ja: "\(summary.plantCount)株",
+            ko: "식물 \(summary.plantCount)개",
+            it: "\(summary.plantCount) piante"
         )
     }
 

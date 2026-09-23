@@ -53,8 +53,9 @@ enum VerticalHomeTabMountPolicy {
 }
 
 enum VerticalHomeTabTransitionPolicy {
-    static let fullMotionOutgoingCleanupDelayMilliseconds: UInt64 = 700
-    static let reducedMotionOutgoingCleanupDelayMilliseconds: UInt64 = 90
+    static let selectionAnimation: Animation = GoMotion.selection
+    static let fullMotionOutgoingCleanupDelayMilliseconds: UInt64 = 220
+    static let reducedMotionOutgoingCleanupDelayMilliseconds: UInt64 = 60
 
     static func outgoingCleanupDelayMilliseconds(for motionBudget: OhanaMotionBudget) -> UInt64 {
         motionBudget == .full
@@ -71,10 +72,7 @@ enum VerticalSolidHomePageContentHeightPolicy {
         bottomChromeHeight: CGFloat
     ) -> CGFloat {
         _ = selectedTab
-        _ = bottomChromeHeight
-        // The native TabView owns bottom-bar and safe-area layout. Reserving a
-        // second custom chrome inset would leave the selected page visibly short.
-        return max(300, containerHeight - topChromeHeight)
+        return max(0, containerHeight - topChromeHeight - bottomChromeHeight)
     }
 }
 
@@ -102,18 +100,18 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
                         .background {
                             viewportAlignedPageBackground(for: tab)
                         }
+                        .toolbarVisibility(.hidden, for: .tabBar)
                 } label: {
                     Label(tab.title(localization), systemImage: tab.icon)
                 }
-                .accessibilityIdentifier("home-tab-\(tab.rawValue)")
+                .accessibilityIdentifier("home-content-tab-\(tab.rawValue)")
                 .accessibilityLabel(tabAccessibilityLabel(for: tab))
                 .badge(tab == .calendar ? taskCenterBadge.attentionCount : 0)
             }
         }
-        .id(visibleTabs)
         .tint(Color.goPrimary)
-        .tabBarMinimizeBehavior(.onScrollDown)
-        .accessibilityIdentifier("home-native-tab-view")
+        .toolbarVisibility(.hidden, for: .tabBar)
+        .accessibilityIdentifier("home-content-tab-view")
     }
 
     private var selection: Binding<VerticalSolidHomeTab> {
@@ -129,9 +127,15 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     private func tabAccessibilityLabel(for tab: VerticalSolidHomeTab) -> String {
         if tab == .calendar, taskCenterBadge.attentionCount > 0 {
             return localization.tr(
-                zh: "\(tab.title(localization))，\(taskCenterBadge.attentionCount) 项待处理",
-                en: "\(tab.title(localization)), \(taskCenterBadge.attentionCount) need attention",
-                de: "\(tab.title(localization)), \(taskCenterBadge.attentionCount) offen"
+                zh: "\(tab.title(localization))，待处理：\(taskCenterBadge.attentionCount)",
+                en: "\(tab.title(localization)), needs attention: \(taskCenterBadge.attentionCount)",
+                de: "\(tab.title(localization)), offen: \(taskCenterBadge.attentionCount)",
+                es: "\(tab.title(localization)), pendientes: \(taskCenterBadge.attentionCount)",
+                pt: "\(tab.title(localization)), pendentes: \(taskCenterBadge.attentionCount)",
+                fr: "\(tab.title(localization)), à traiter : \(taskCenterBadge.attentionCount)",
+                ja: "\(tab.title(localization))、未対応：\(taskCenterBadge.attentionCount)件",
+                ko: "\(tab.title(localization)), 처리할 항목: \(taskCenterBadge.attentionCount)개",
+                it: "\(tab.title(localization)), da gestire: \(taskCenterBadge.attentionCount)"
             )
         }
         return tab.title(localization)
@@ -169,8 +173,10 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
                 calendar(lifecycle)
             case .oasis:
                 oasis(lifecycle)
-            case .home, .plants:
-                VerticalSolidHomePreparedPlaceholder()
+            case .home:
+                home(lifecycle)
+            case .plants:
+                plants(lifecycle)
             }
         } else if lifecycle.isVisible {
             switch tab {

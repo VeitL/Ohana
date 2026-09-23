@@ -119,23 +119,13 @@ private struct OhanaBootstrapRootView: View {
             }
 
             if isLaunchOverlayVisible {
-                GeometryReader { proxy in
-                    OhanaBootstrapShell(
-                        status: bootstrapStatus,
-                        onRetry: retryBootstrap
-                    )
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .mask {
-                        OhanaLaunchCircularDismissMask(
-                            progress: reduceMotion ? 0 : launchRevealProgress
-                        )
-                        .fill(.white, style: FillStyle(eoFill: true)) // ui-v4: allow alpha-only launch transition mask ink.
-                        .blur(radius: reduceMotion ? 0 : 1.5)
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                    }
-                }
+                OhanaBootstrapShell(
+                    status: bootstrapStatus,
+                    onRetry: retryBootstrap
+                )
                 .ignoresSafeArea()
-                .opacity(reduceMotion ? 1 - launchRevealProgress : 1)
+                .opacity(1 - launchRevealProgress)
+                .scaleEffect(reduceMotion ? 1 : 1 + (launchRevealProgress * 0.006))
                 .allowsHitTesting(payload == nil)
                 .zIndex(1)
             }
@@ -197,20 +187,22 @@ private struct OhanaBootstrapRootView: View {
 
     private func beginLaunchRevealIfReady() {
         guard payload != nil, isLaunchOverlayVisible, launchRevealTask == nil else { return }
-        let duration = reduceMotion ? 0.14 : 0.48
-        let animation: Animation = reduceMotion
-            ? .easeOut(duration: duration)
-            : .timingCurve(0.2, 0.78, 0.2, 1, duration: duration)
+        let durationNanoseconds: UInt64 = reduceMotion ? 120_000_000 : 180_000_000
+        let animation = reduceMotion ? GoMotion.reduced : GoMotion.quick
 
         launchRevealTask = Task { @MainActor in
-            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 16)
+            await OhanaFrameScheduler.waitAfterNextFrame()
             guard !Task.isCancelled else { return }
             withAnimation(animation) {
                 launchRevealProgress = 1
             }
-            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: durationNanoseconds)
             guard !Task.isCancelled else { return }
-            isLaunchOverlayVisible = false
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                isLaunchOverlayVisible = false
+            }
             launchRevealTask = nil
             OhanaStartupProbe.mark("bootstrap.reveal-complete")
         }
@@ -697,32 +689,6 @@ private struct OhanaLaunchMark: View {
             .renderingMode(.original)
             .interpolation(.high)
             .frame(width: 180, height: 180)
-    }
-}
-
-private struct OhanaLaunchCircularDismissMask: Shape {
-    var progress: CGFloat
-
-    var animatableData: CGFloat {
-        get { progress }
-        set { progress = newValue }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        let clampedProgress = min(max(progress, 0), 1)
-        let maximumRadius = hypot(rect.width, rect.height) * 0.52
-        let radius = maximumRadius * clampedProgress
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-
-        var path = Path()
-        path.addRect(rect)
-        path.addEllipse(in: CGRect(
-            x: center.x - radius,
-            y: center.y - radius,
-            width: radius * 2,
-            height: radius * 2
-        ))
-        return path
     }
 }
 

@@ -136,6 +136,9 @@ final class HomeReadModelStore: ObservableObject {
         refreshGeneration &+= 1
         let generation = refreshGeneration
         let container = context.container
+        if !payload.snapshot.isReady {
+            OhanaLog.info("Home initial read requested, generation=\(generation), force=\(force)", category: "Home", privacy: .publicText)
+        }
         let refreshDelay = OnboardingHomeJoinHandoffGate.remainingHomeReadModelDelayMilliseconds(
             defaultDelayMilliseconds: force ? 0 : 48
         )
@@ -246,8 +249,12 @@ final class HomeReadModelStore: ObservableObject {
                 force: force
             )
         } catch is CancellationError {
+            if !payload.snapshot.isReady {
+                OhanaLog.info("Home initial read cancelled, generation=\(generation)", category: "Home", privacy: .publicText)
+            }
             return
         } catch {
+            OhanaLog.error("Home read model refresh failed: \(error.localizedDescription)", category: "Home")
             AppPerformanceMonitor.shared.record(
                 "home_read_model_refresh_failed",
                 startedAt: startedAt,
@@ -256,12 +263,18 @@ final class HomeReadModelStore: ObservableObject {
             return
         }
 
-        guard let actorResult else { return }
+        guard let actorResult else {
+            if !payload.snapshot.isReady {
+                OhanaLog.warning("Home initial read produced no payload", category: "Home", privacy: .publicText)
+            }
+            return
+        }
         guard await checkpoint(generation: generation, stage: "actorPayload", startedAt: startedAt) else { return }
 
         var nextRevision = externalRevision
         nextRevision.advance(for: externalRevision.lastCommand ?? .unknown(action: "homeReadModelRefresh"))
 
+        let wasInitialRead = !payload.snapshot.isReady
         snapshot = actorResult.snapshot
         revision = nextRevision
         payload = HomeReadModelPayload(
@@ -283,6 +296,9 @@ final class HomeReadModelStore: ObservableObject {
             title: "home"
         )
         lastSignature = actorResult.signature
+        if wasInitialRead {
+            OhanaLog.info("Home initial read completed", category: "Home", privacy: .publicText)
+        }
 
         AppPerformanceMonitor.shared.record(
             "home_read_model_refresh",
@@ -325,15 +341,32 @@ actor HomeReadModelActor {
     ) throws -> HomeReadModelActorResult? {
         let now = Date()
         let fetches = HomeReadModelFetches(context: modelContext, now: now)
-        let pets = fetches.pets()
-        let humans = fetches.humans()
+        let petPreview = fetches.pets()
+        let humanPreview = fetches.humans(activeHumanID: UUID(uuidString: input.activeHumanIdRaw))
+        let pets = petPreview.items
+        let humans = humanPreview.items
         let islandCoconutReserveBalance = fetches.islandCoconutReserveBalance()
+        let familyCoconutTotal = try fetches.familyCoconutTotal(previewPets: pets, previewHumans: humans)
         try Task.checkCancellation()
 
-        let plants = input.loadPlants ? fetches.plants() : []
+        let plantPreview: (items: [Plant], hasMore: Bool) = input.loadPlants
+            ? fetches.plants()
+            : ([], false)
+        let plants = plantPreview.items
         if !plants.isEmpty {
             PlantUnlockPolicy.noteExistingPlantData()
         }
+        let plantPlanningHistoryBatch = try PlantCarePlanningHistoryQuery.buildMany(
+            plantIDs: plants.map(\.id),
+            context: modelContext
+        )
+        if !plantPlanningHistoryBatch.failedPlantIDs.isEmpty {
+            OhanaLog.warning(
+                "Home plant planning history degraded for \(plantPlanningHistoryBatch.failedPlantIDs.count) plant(s)",
+                category: "Home"
+            )
+        }
+        let plantPlanningHistories = plantPlanningHistoryBatch.historiesByPlantID
         let electronicPets = fetches.electronicPets()
         try Task.checkCancellation()
 
@@ -358,7 +391,9 @@ actor HomeReadModelActor {
             pets: pets,
             humans: humans,
             islandCoconutReserveBalance: islandCoconutReserveBalance,
+            familyCoconutTotalOverride: familyCoconutTotal,
             plants: plants,
+            plantPlanningHistories: plantPlanningHistories,
             electronicPets: electronicPets,
             events: events,
             pendingReminders: pendingReminders,
@@ -386,10 +421,17 @@ actor HomeReadModelActor {
             equippedTitleRaw: input.equippedTitleRaw,
             language: input.language
         )
-        let signature = VerticalSolidHomeSnapshotBuilder.signature(for: source, now: now)
+        let hasMoreMembers = petPreview.hasMore || humanPreview.hasMore
+        let hasMorePlants = plantPreview.hasMore
+        let baseSignature = VerticalSolidHomeSnapshotBuilder.signature(for: source, now: now)
+        let signature = hasMoreMembers || hasMorePlants
+            ? "\(baseSignature)|preview:\(hasMoreMembers):\(hasMorePlants)"
+            : baseSignature
         guard force || signature != previousSignature || externalRevision != currentRevision else { return nil }
 
-        let snapshot = VerticalSolidHomeSnapshotBuilder.buildForReadModelActor(from: source, now: now)
+        var snapshot = VerticalSolidHomeSnapshotBuilder.buildForReadModelActor(from: source, now: now)
+        snapshot.hasMoreMembers = hasMoreMembers
+        snapshot.hasMorePlants = hasMorePlants
         let interaction = HomeInteractionSnapshotBuilder.build(
             from: source,
             quickActionItemsRaw: input.quickActionItemsRaw,
@@ -428,20 +470,79 @@ private nonisolated struct HomeReadModelFetches {
     let now: Date
     private let calendar = Calendar.current
 
-    func pets() -> [Pet] {
+    func pets() -> (items: [Pet], hasMore: Bool) {
         var descriptor = FetchDescriptor<Pet>(
-            sortBy: [SortDescriptor(\Pet.createdAt, order: .reverse)]
+            predicate: #Predicate<Pet> { $0.passedAwayDate == nil },
+            sortBy: [
+                SortDescriptor(\Pet.createdAt, order: .reverse),
+                SortDescriptor(\Pet.id)
+            ]
         )
-        descriptor.fetchLimit = 80
-        return fetchOrLog(descriptor, operation: "fetch home pets")
+        descriptor.fetchLimit = 81
+        let page = fetchOrLog(descriptor, operation: "fetch home pets")
+        return (Array(page.prefix(80)), page.count > 80)
     }
 
-    func humans() -> [Human] {
+    func humans(activeHumanID: UUID?) -> (items: [Human], hasMore: Bool) {
         var descriptor = FetchDescriptor<Human>(
-            sortBy: [SortDescriptor(\Human.createdAt, order: .reverse)]
+            predicate: #Predicate<Human> { $0.passedAwayDate == nil },
+            sortBy: [
+                SortDescriptor(\Human.createdAt, order: .reverse),
+                SortDescriptor(\Human.id)
+            ]
         )
-        descriptor.fetchLimit = 40
-        return fetchOrLog(descriptor, operation: "fetch home humans")
+        descriptor.fetchLimit = 41
+        let page = fetchOrLog(descriptor, operation: "fetch home humans")
+        var humans = Array(page.prefix(40))
+        if let activeHumanID, !humans.contains(where: { $0.id == activeHumanID }) {
+            var selected = FetchDescriptor<Human>(predicate: #Predicate<Human> {
+                $0.id == activeHumanID && $0.passedAwayDate == nil
+            })
+            selected.fetchLimit = 1
+            humans.append(contentsOf: fetchOrLog(selected, operation: "fetch selected home human"))
+        }
+        return (humans, page.count > 40)
+    }
+
+    func familyCoconutTotal(previewPets: [Pet], previewHumans: [Human]) throws -> Int {
+        let petTotal: Int
+        if previewPets.count < 80 {
+            petTotal = previewPets.filter(EconomyWalletWritePolicy.canWrite).reduce(0) { $0 + $1.coconutBalance }
+        } else {
+            var total = 0
+            var offset = 0
+            while true {
+                try Task.checkCancellation()
+                var descriptor = FetchDescriptor<Pet>(sortBy: [SortDescriptor(\Pet.id)])
+                descriptor.fetchOffset = offset
+                descriptor.fetchLimit = 128
+                let page = try context.fetch(descriptor)
+                total += page.filter(EconomyWalletWritePolicy.canWrite).reduce(0) { $0 + $1.coconutBalance }
+                guard page.count == 128 else { break }
+                offset += page.count
+            }
+            petTotal = total
+        }
+
+        let humanTotal: Int
+        if previewHumans.count < 40 {
+            humanTotal = previewHumans.filter(EconomyWalletWritePolicy.canWrite).reduce(0) { $0 + $1.coconutBalance }
+        } else {
+            var total = 0
+            var offset = 0
+            while true {
+                try Task.checkCancellation()
+                var descriptor = FetchDescriptor<Human>(sortBy: [SortDescriptor(\Human.id)])
+                descriptor.fetchOffset = offset
+                descriptor.fetchLimit = 128
+                let page = try context.fetch(descriptor)
+                total += page.filter(EconomyWalletWritePolicy.canWrite).reduce(0) { $0 + $1.coconutBalance }
+                guard page.count == 128 else { break }
+                offset += page.count
+            }
+            humanTotal = total
+        }
+        return petTotal + humanTotal
     }
 
     func islandCoconutReserveBalance() -> Int {
@@ -453,12 +554,19 @@ private nonisolated struct HomeReadModelFetches {
         return max(0, fetchOrLog(descriptor, operation: "fetch home island coconut reserve").first?.balance ?? 0)
     }
 
-    func plants() -> [Plant] {
+    func plants() -> (items: [Plant], hasMore: Bool) {
         var descriptor = FetchDescriptor<Plant>(
-            sortBy: [SortDescriptor(\Plant.createdAt, order: .reverse)]
+            predicate: #Predicate<Plant> { plant in
+                plant.archivedAt == nil
+            },
+            sortBy: [
+                SortDescriptor(\Plant.createdAt, order: .reverse),
+                SortDescriptor(\Plant.id)
+            ]
         )
-        descriptor.fetchLimit = 60
-        return fetchOrLog(descriptor, operation: "fetch home plants")
+        descriptor.fetchLimit = 61
+        let page = fetchOrLog(descriptor, operation: "fetch home plants")
+        return (Array(page.prefix(60)), page.count > 60)
     }
 
     func electronicPets() -> [OasisElectronicPet] {

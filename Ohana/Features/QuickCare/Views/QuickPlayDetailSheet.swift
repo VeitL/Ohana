@@ -502,7 +502,7 @@ struct QuickPlayDetailSheet: View {
             Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(playTint)
-            Text(l.tr(zh: "第一次逗玩后会出现在这里", en: "Your first play session appears here", de: "Das erste Spiel erscheint hier"))
+            Text(l.tr(zh: "暂无记录", en: "No records yet", de: "Noch keine Einträge"))
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
@@ -648,9 +648,6 @@ struct QuickPlayDetailSheet: View {
                     Text(playPlanEvent == nil ? l.tr(zh: "添加陪玩计划", en: "Add play plan", de: "Spielplan hinzufügen") : l.tr(zh: "陪玩计划", en: "Play plan", de: "Spielplan"))
                         .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "轻提醒，不制造压力。", en: "A light reminder, no pressure.", de: "Sanfte Erinnerung, kein Druck."))
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             .padding(.top, 26)

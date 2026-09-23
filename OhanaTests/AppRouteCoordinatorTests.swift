@@ -654,6 +654,26 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.overlay == nil)
     }
 
+    @Test func successfulMemberCreationReturnsHomeWhileCancellationPreservesContext() {
+        let coordinator = AppRouteCoordinator()
+        let existingHumanID = UUID()
+
+        coordinator.openHuman(existingHumanID)
+        coordinator.presentAddEntity(.pet)
+        coordinator.dismissSheet(.addEntity(.pet))
+
+        #expect(coordinator.path == [.humanProfile(id: existingHumanID)])
+        #expect(coordinator.sheet == nil)
+
+        coordinator.presentAddEntity(.human)
+        coordinator.completeMemberCreation()
+
+        #expect(coordinator.path.isEmpty)
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.overlay == nil)
+    }
+
     @Test func rootIdentityRebuildsOnlyWhenRequested() {
         let coordinator = AppRouteCoordinator()
         let initialRoot = coordinator.rootIdentity

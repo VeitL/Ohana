@@ -106,7 +106,7 @@ struct HumanQuickSwitchPasscodeSheet: View {
                 systemImage: biometricAvailability.symbolName
             )
             .font(OhanaFont.callout(.black))
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))

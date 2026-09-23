@@ -48,29 +48,6 @@ enum CoconutGachaRevealPhase: String, CaseIterable, Identifiable {
             l.tr(zh: "已收下", en: "Collected", de: "Eingesammelt")
         }
     }
-
-    func subtitle(_ l: L10n, isCollectible: Bool = false) -> String {
-        switch self {
-        case .idle:
-            l.tr(zh: "可能是款式，也可能是一句小话", en: "A collectible, a tiny reward, or a little note", de: "Eine Figur, eine kleine Belohnung oder eine Notiz")
-        case .charging:
-            isCollectible
-                ? l.tr(zh: "盲盒里有一张小卡醒来了", en: "A little card wakes inside the box", de: "Eine kleine Karte erwacht in der Box")
-                : l.tr(zh: "轻轻摇一摇，听见里面的惊喜", en: "A gentle shake wakes the surprise inside", de: "Ein sanftes Schütteln weckt die Überraschung")
-        case .crack:
-            isCollectible
-                ? l.tr(zh: "盒子打开了", en: "The box opens", de: "Die Box öffnet sich")
-                : l.tr(zh: "椰壳裂开了", en: "The shell is opening", de: "Die Schale öffnet sich")
-        case .reveal:
-            isCollectible
-                ? l.tr(zh: "剪影卡翻到了眼前", en: "The silhouette card lands up close", de: "Die Silhouettenkarte landet ganz nah")
-                : l.tr(zh: "小结果跳出来啦", en: "A little result pops out", de: "Ein kleines Ergebnis springt heraus")
-        case .settled:
-            isCollectible
-                ? l.tr(zh: "已经放进收藏夹", en: "Added to the collection", de: "Zur Sammlung hinzugefügt")
-                : l.tr(zh: "这次结果已经收下", en: "This opening is settled", de: "Dieses Öffnen ist abgeschlossen")
-        }
-    }
 }
 
 enum GachaCollectibleRevealPhase: String, CaseIterable, Identifiable {
@@ -300,55 +277,6 @@ struct CoconutGachaRevealView: View {
             .offset(y: phase == .settled ? -18 : -24)
             .transition(.ohanaPop)
         }
-    }
-
-    private var statusText: some View {
-        VStack(spacing: 3) {
-            Text(phase.title(l))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .contentTransition(.opacity)
-            Text(subtitleText)
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
-                .contentTransition(.opacity)
-        }
-        .frame(minHeight: 42)
-    }
-
-    private var subtitleText: String {
-        if isCollectibleReveal, revealCardPhase == .revealed {
-            return l.tr(
-                zh: "轻点剪影卡，看看真身",
-                en: "Tap the silhouette card to reveal the plush",
-                de: "Tippe die Silhouettenkarte an, um die Figur zu zeigen"
-            )
-        }
-        if isCollectibleReveal, revealCardPhase == .secretBurst {
-            return l.tr(
-                zh: "隐藏款的光正在展开",
-                en: "The secret glow is unfolding",
-                de: "Der geheime Glanz entfaltet sich"
-            )
-        }
-        if isCollectibleReveal, revealCardPhase == .toyAppearing {
-            return l.tr(
-                zh: "玩偶正在从卡片里出现",
-                en: "The plush is appearing from the card",
-                de: "Die Figur erscheint aus der Karte"
-            )
-        }
-        if isCollectibleReveal, revealCardPhase == .toyReady {
-            return l.tr(
-                zh: "点击收下，放进收藏夹",
-                en: "Tap collect to add it to your collection",
-                de: "Tippe auf Sammeln, um sie abzulegen"
-            )
-        }
-        return phase.subtitle(l, isCollectible: isCollectibleReveal)
     }
 
     private var accessibilityLabel: String {

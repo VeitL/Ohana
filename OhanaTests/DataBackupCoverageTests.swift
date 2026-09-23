@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct DataBackupCoverageTests {
     @Test func latestSwiftDataModelsHaveExternalBackupCoverageOrExplicitHealthExemption() {
-        let schemaModels = Set(ArkSchemaV98.models.map { String(describing: $0) })
+        let schemaModels = Set(ArkSchemaV99.models.map { String(describing: $0) })
         let externallyCoveredModels: Set<String> = [
             String(describing: Pet.self),
             String(describing: Human.self),
@@ -100,7 +100,7 @@ struct DataBackupCoverageTests {
             Issue.record("SwiftData models missing external backup coverage or explicit classification: \(missingModels.sorted())")
         }
         if !staleCoverageModels.isEmpty {
-            Issue.record("External backup coverage lists models no longer in ArkSchemaV98: \(staleCoverageModels.sorted())")
+            Issue.record("External backup coverage lists models no longer in ArkSchemaV99: \(staleCoverageModels.sorted())")
         }
         if !staleExemptModels.isEmpty {
             Issue.record("External backup exclusion list contains stale models: \(staleExemptModels.sorted())")
@@ -112,27 +112,45 @@ struct DataBackupCoverageTests {
         #expect(schemaModels == classifiedModels)
     }
 
-    @Test func expenseRecorderAttributionRoundTripsAndLegacyBackupDefaultsToNil() throws {
+    @Test func expensePayersAndRecorderRoundTripWhileLegacyBackupDefaultsFields() throws {
         let manager = TestDataBackupManagerProjection.manager
+        let payerID = UUID()
+        let coPayerID = UUID()
+        let payerContributions = [
+            ExpensePayerContribution(humanID: payerID, minorUnits: 2520),
+            ExpensePayerContribution(humanID: coPayerID, minorUnits: 1680)
+        ]
+        let payerContributionsJSON = ExpensePayerContributionPolicy.encode(payerContributions)
         let log = PetExpenseLog(
             amount: 42,
             category: .food,
             note: "shared bag",
-            executorId: "payer-id",
-            recordedByHumanId: "recorder-id"
+            executorId: payerID.uuidString,
+            recordedByHumanId: "recorder-id",
+            payerContributionsJSON: payerContributionsJSON
         )
 
         let dto = manager.encodeExpenseLog(log)
-        #expect(dto.executorId == "payer-id")
+        #expect(dto.executorId == payerID.uuidString)
         #expect(dto.recordedByHumanId == "recorder-id")
-        #expect(manager.decodeExpenseLogSnapshot(dto).recordedByHumanId == "recorder-id")
+        #expect(dto.payerContributionsJSON == payerContributionsJSON)
+        let snapshot = manager.decodeExpenseLogSnapshot(dto)
+        #expect(snapshot.recordedByHumanId == "recorder-id")
+        #expect(snapshot.payerContributionsJSON == payerContributionsJSON)
 
         let encodedDTO = try JSONEncoder().encode(dto)
+        let decodedDTO = try JSONDecoder().decode(PetExpenseLogBackup.self, from: encodedDTO)
+        #expect(decodedDTO.payerContributionsJSON == payerContributionsJSON)
+        #expect(manager.decodeExpenseLogSnapshot(decodedDTO).payerContributionsJSON == payerContributionsJSON)
+
         var legacyObject = try #require(JSONSerialization.jsonObject(with: encodedDTO) as? [String: Any])
         legacyObject.removeValue(forKey: "recordedByHumanId")
+        legacyObject.removeValue(forKey: "payerContributionsJSON")
         let legacyData = try JSONSerialization.data(withJSONObject: legacyObject)
         let legacyDTO = try JSONDecoder().decode(PetExpenseLogBackup.self, from: legacyData)
-        #expect(manager.decodeExpenseLogSnapshot(legacyDTO).recordedByHumanId == nil)
+        let legacySnapshot = manager.decodeExpenseLogSnapshot(legacyDTO)
+        #expect(legacySnapshot.recordedByHumanId == nil)
+        #expect(legacySnapshot.payerContributionsJSON.isEmpty)
     }
 
     @Test func humanHealthRecorderAttributionRoundTripsAndLegacyBackupDefaultsToNil() throws {
@@ -670,7 +688,7 @@ struct DataBackupCoverageTests {
 
         let manager = DataBackupManager(defaults: sourceDefaults)
         let backup = try manager.buildBackup(context: context)
-        #expect(backup.schemaVersion == 33)
+        #expect(backup.schemaVersion == 34)
         #expect(backup.presenceCheckIns?.count == 1)
         #expect(backup.presenceParticipationPeriods?.count == 1)
         #expect(backup.presenceRewardReceipts?.count == 1)
@@ -682,7 +700,7 @@ struct DataBackupCoverageTests {
         #expect(!manifestText.contains(PresenceReminderConfigurationStore.storageKey))
 
         let decoded = try JSONDecoder().decode(OhanaBackup.self, from: manifest)
-        #expect(decoded.schemaVersion == 33)
+        #expect(decoded.schemaVersion == 34)
         #expect(decoded.presenceCheckIns == backup.presenceCheckIns)
         #expect(decoded.presenceParticipationPeriods == backup.presenceParticipationPeriods)
         #expect(decoded.presenceRewardReceipts == backup.presenceRewardReceipts)

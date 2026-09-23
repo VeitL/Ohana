@@ -20,19 +20,13 @@ nonisolated enum AppPrivacySnapshotProtectionStore {
 struct AppPrivacySnapshotCover: View {
     var body: some View {
         ZStack {
-            OhanaStaticAppBackground()
+            Color("LaunchBackground")
 
-            VStack(spacing: 14) {
-                Image(systemName: "lock.shield.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 44, weight: .black))
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 86, height: 86)
-                    .background(Color.ohanaCardSurface.opacity(0.88), in: Circle())
-
-                Text("Ohana")
-                    .font(OhanaFont.title(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-            }
+            Image("LaunchMark")
+                .resizable()
+                .renderingMode(.original)
+                .interpolation(.high)
+                .frame(width: 180, height: 180)
         }
         .ignoresSafeArea()
         .accessibilityHidden(true)

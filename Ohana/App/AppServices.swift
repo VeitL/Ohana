@@ -41,6 +41,7 @@ private struct AppServicesLiveGraph {
     let guardianSafety: any GuardianSafetyManaging
     let reminderCompletion: ReminderCompletionService
     let careEventDependencies: CareEventServiceDependencies
+    let careEventEconomy: CareEventEconomyAwarding
     let walkingManager: PetWalkingManager
     let systemSurfaces: SystemSurfaceSnapshotRefreshing
 }
@@ -194,6 +195,15 @@ final class AppServices {
             systemSurfaces: graph.systemSurfaces,
             systemSurfaceRoutes: SystemSurfaceRouteInbox()
         )
+        AppServices.registerDomainDependencies(
+            owner: self,
+            graph.careEventDependencies,
+            graph.careEventEconomy,
+            graph.familyTasks,
+            graph.reminderScheduling,
+            graph.medicationReminders,
+            graph.reminderCompletion
+        )
         configureLiveRuntime(
             backupAdapter: graph.backupAdapter,
             automaticBackups: graph.automaticBackups,
@@ -261,10 +271,6 @@ final class AppServices {
             careEventEconomy, careLedger, reminderCompletion, familyTasks,
             domainRevisions, notificationManager
         )
-        registerDomainDependencies(
-            careEventDependencies, careEventEconomy, familyTasks,
-            reminderScheduling, medicationReminders, reminderCompletion
-        )
         let walkingManager = makeWalker(
             locationManager,
             questManager,
@@ -309,12 +315,14 @@ final class AppServices {
             guardianSafety: guardianSafety,
             reminderCompletion: reminderCompletion,
             careEventDependencies: careEventDependencies,
+            careEventEconomy: careEventEconomy,
             walkingManager: walkingManager,
             systemSurfaces: systemSurfaces
         )
     }
 
     private static func registerDomainDependencies(
+        owner: AnyObject,
         _ careEventDependencies: CareEventServiceDependencies,
         _ careEventEconomy: CareEventEconomyAwarding,
         _ familyTasks: FamilyTaskManaging,
@@ -323,6 +331,7 @@ final class AppServices {
         _ reminderCompletion: ReminderCompleting
     ) {
         DomainServiceDependencyRegistry.register(
+            owner: owner,
             careEventDependencies: { careEventDependencies },
             careEventEconomy: { careEventEconomy },
             familyTasks: { familyTasks },

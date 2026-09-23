@@ -100,7 +100,8 @@ struct SupporterPackAccessPolicyTests {
         let source = try source("Ohana/Features/SupporterPack/SupporterPackView.swift")
 
         #expect(source.contains("personal-plan-free-card"))
-        #expect(source.contains("Free has no ads and never locks your records"))
+        #expect(source.contains("All history, existing data, core care records, and exports stay available"))
+        #expect(source.contains("personal-plan-personal-card"))
         #expect(source.contains("@State private var selectedChoice: PersonalPurchaseChoice?"))
         #expect(source.contains("commerce.displayPrice(for: selectedChoice) == nil"))
         #expect(source.contains("commerce.isPurchasePending"))
@@ -185,7 +186,7 @@ struct SupporterPackAccessPolicyTests {
 
         while let opening = source.range(
             of: "l.tr(",
-            range: searchStart..<source.endIndex
+            range: searchStart ..< source.endIndex
         ) {
             var cursor = opening.upperBound
             var depth = 1
@@ -213,7 +214,7 @@ struct SupporterPackAccessPolicyTests {
             }
 
             guard depth == 0 else { break }
-            calls.append(String(source[opening.lowerBound..<cursor]))
+            calls.append(String(source[opening.lowerBound ..< cursor]))
             searchStart = cursor
         }
         return calls

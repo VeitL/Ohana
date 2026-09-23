@@ -258,6 +258,44 @@ struct LocalizationTests {
         #expect(PetAgeConverter.humanAge(birthday: date, species: "狗", l: de).contains("Menschenalter"))
     }
 
+    @Test func humanZodiacNamesCoverEveryRegisteredLanguage() throws {
+        let dateComponents = [
+            (1, 1), (1, 25), (3, 1), (3, 25),
+            (4, 25), (5, 25), (6, 25), (7, 25),
+            (8, 25), (9, 25), (10, 25), (11, 25)
+        ]
+        let expected: [String: [String]] = [
+            "zh": ["摩羯座", "水瓶座", "双鱼座", "白羊座", "金牛座", "双子座", "巨蟹座", "狮子座", "处女座", "天秤座", "天蝎座", "射手座"],
+            "en": ["Capricorn", "Aquarius", "Pisces", "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius"],
+            "de": ["Steinbock", "Wassermann", "Fische", "Widder", "Stier", "Zwillinge", "Krebs", "Löwe", "Jungfrau", "Waage", "Skorpion", "Schütze"],
+            "es": ["Capricornio", "Acuario", "Piscis", "Aries", "Tauro", "Géminis", "Cáncer", "Leo", "Virgo", "Libra", "Escorpio", "Sagitario"],
+            "pt": ["Capricórnio", "Aquário", "Peixes", "Áries", "Touro", "Gêmeos", "Câncer", "Leão", "Virgem", "Libra", "Escorpião", "Sagitário"],
+            "fr": ["Capricorne", "Verseau", "Poissons", "Bélier", "Taureau", "Gémeaux", "Cancer", "Lion", "Vierge", "Balance", "Scorpion", "Sagittaire"],
+            "ja": ["山羊座", "水瓶座", "魚座", "牡羊座", "牡牛座", "双子座", "蟹座", "獅子座", "乙女座", "天秤座", "蠍座", "射手座"],
+            "ko": ["염소자리", "물병자리", "물고기자리", "양자리", "황소자리", "쌍둥이자리", "게자리", "사자자리", "처녀자리", "천칭자리", "전갈자리", "사수자리"],
+            "it": ["Capricorno", "Acquario", "Pesci", "Ariete", "Toro", "Gemelli", "Cancro", "Leone", "Vergine", "Bilancia", "Scorpione", "Sagittario"]
+        ]
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        for option in AppLanguage.supported {
+            let names = try #require(expected[option.code])
+            for (dateParts, expectedName) in zip(dateComponents, names) {
+                let date = try #require(calendar.date(from: DateComponents(
+                    timeZone: calendar.timeZone,
+                    year: 2026,
+                    month: dateParts.0,
+                    day: dateParts.1,
+                    hour: 12
+                )))
+                #expect(
+                    Human.westernZodiacDisplay(for: date, l: L10n(option.code)) == expectedName,
+                    "Unexpected zodiac for \(option.code), \(dateParts.0)/\(dateParts.1)"
+                )
+            }
+        }
+    }
+
     @Test func petTagGreetingDoesNotFallbackToChineseForEnglishOrGerman() {
         let pet = Pet(name: "Momo", species: "狗")
         pet.personalityTagsRaw = "curious"
@@ -305,6 +343,27 @@ struct LocalizationTests {
 
         for name in breedNames.union(databaseCoats).union(avatarCoats) {
             #expect(!containsCJK(en.resourceName(name)), "English catalog name leaked Chinese: \(name)")
+        }
+    }
+
+    @Test func devonRexUsesItsCanonicalPickerNameInEverySupportedLanguage() {
+        let expectedNames = [
+            "zh": "德文卷毛猫",
+            "en": "Devon Rex",
+            "de": "Devon Rex",
+            "es": "Devon Rex",
+            "pt": "Devon Rex",
+            "fr": "Devon Rex",
+            "ja": "デボンレックス",
+            "ko": "데본 렉스",
+            "it": "Devon Rex"
+        ]
+
+        for option in AppLanguage.supported {
+            #expect(
+                L10n(option.code).resourceName("德文卷毛猫") == expectedNames[option.code],
+                "Unexpected Devon Rex picker name for \(option.code)"
+            )
         }
     }
 

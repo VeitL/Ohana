@@ -44,6 +44,7 @@ struct OasisHomeTabHost: View {
     var onOpenCritters: () -> Void = {}
     var onOpenGacha: () -> Void = {}
     var onOpenGrowthRoadmap: () -> Void = {}
+    var onOpenFullOasis: () -> Void = {}
 
     @State private var showsTreeContent = false
     @State private var forwardedInjectEnergyTrigger = 0
@@ -78,12 +79,14 @@ struct OasisHomeTabHost: View {
                     allowsInteractionMotion: allowsInteractionMotion,
                     usesFullVisualEffects: usesFullVisualEffects,
                     layoutStyle: treeLayoutStyle,
+                    showsInjectEnergyButton: false,
                     onInjectEnergy: onInjectEnergy,
                     onOpenShop: onOpenShop,
                     onOpenAchievements: onOpenAchievements,
                     onOpenCritters: onOpenCritters,
                     onOpenGacha: onOpenGacha,
-                    onOpenGrowthRoadmap: onOpenGrowthRoadmap
+                    onOpenGrowthRoadmap: onOpenGrowthRoadmap,
+                    onOpenFullOasis: onOpenFullOasis
                 )
             } else {
                 Color.clear

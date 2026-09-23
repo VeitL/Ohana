@@ -51,10 +51,22 @@ extension HumanDetailView {
                         .foregroundStyle(Color.goCardCyan)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(l.tr(zh: "账单花费", en: "Bill Expenses", de: "Rechnungsausgaben"))
+                    Text(l.tr(
+                        zh: "宠物花费",
+                        en: "Pet spending",
+                        de: "Haustierausgaben",
+                        es: "Gastos de mascotas", pt: "Despesas com pets", fr: "Dépenses des animaux",
+                        ja: "ペットの支出", ko: "반려동물 지출", it: "Spese per animali"
+                    ))
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(Color(hex: "1E3A8A"))
-                    Text(l.tr(zh: "查看经手支出明细", en: "Review handled expense details", de: "Bearbeitete Ausgaben ansehen"))
+                    Text(l.tr(
+                        zh: "查看此人支付的份额",
+                        en: "View this person's share",
+                        de: "Bezahlten Anteil ansehen",
+                        es: "Ver la parte pagada", pt: "Ver a parte paga", fr: "Voir la part payée",
+                        ja: "この人の負担分を見る", ko: "이 사람이 낸 금액 보기", it: "Vedi la quota pagata"
+                    ))
                         .font(OhanaFont.caption())
                         .foregroundStyle(Color(hex: "6B82C4"))
                 }

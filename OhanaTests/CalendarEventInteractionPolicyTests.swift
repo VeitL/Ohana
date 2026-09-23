@@ -86,13 +86,15 @@ struct CalendarEventInteractionPolicyTests {
         )
         let plantID = UUID()
         let plant = Event(
-            title: "Pothos · Watering植物计划",
+            title: "Pothos · Watering",
             startDate: Date(timeIntervalSince1970: 1_800_000_000),
             isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plantID.uuidString
+            relatedEntityId: plantID.uuidString,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
         )
+        plant.id = PlantCarePlanIdentity.expectedEventID(plantID: plantID, careType: .watering)
         plant.recurrenceDays = 7
 
         #expect(CalendarEventInteractionPolicy.tapInteraction(for: water, pets: [pet]) == .relatedDestination)

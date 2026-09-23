@@ -21,7 +21,7 @@ extension QuickFeedDetailContent {
             if pet.dailyPortionGrams > 0 {
                 return l.tr(zh: "默认 \(formattedFoodWeight(pet.dailyPortionGrams)) · 当前 \(pet.mainFoodKind.title(l))", en: "Default \(formattedFoodWeight(pet.dailyPortionGrams)) · \(pet.mainFoodKind.title(l))", de: "Standard \(formattedFoodWeight(pet.dailyPortionGrams))")
             }
-            return l.tr(zh: "还没有默认克数，设置后即可一键打卡。", en: "Set a default amount for one-tap logging.", de: "Standardmenge festlegen.")
+            return l.tr(zh: "未设置默认克数", en: "No default amount", de: "Keine Standardmenge")
         case .manualReminder:
             return nextFeedDetailText(events: feedScheduleEvents, fallback: l.tr(zh: "今日计划 \(feedTaskState.todayManualPlanCompletionText) 已完成", en: "Today \(feedTaskState.todayManualPlanCompletionText) complete", de: "Heute \(feedTaskState.todayManualPlanCompletionText)"))
         case .autoFeeder:
@@ -31,9 +31,9 @@ extension QuickFeedDetailContent {
 
     var overviewChartSubtitle: String {
         l.tr(
-            zh: "聚合手动、计划和自动记录。",
-            en: "Manual, plan, and auto logs combined.",
-            de: "Manuelle, Plan- und Auto-Einträge kombiniert."
+            zh: "全部喂食记录",
+            en: "All feeding logs",
+            de: "Alle Fütterungseinträge"
         )
     }
 
@@ -80,11 +80,11 @@ extension QuickFeedDetailContent {
     var feedModeHistoryChartSubtitle: String {
         switch activeFeedingMode {
         case .manual:
-            l.tr(zh: "只显示手动主粮记录。", en: "Manual main-food logs only.", de: "Nur manuelle Hauptfutter-Einträge.")
+            l.tr(zh: "手动记录", en: "Manual logs", de: "Manuelle Einträge")
         case .manualReminder:
-            l.tr(zh: "只显示喂食计划完成记录。", en: "Completed plan check-ins only.", de: "Nur erledigte Plan-Check-ins.")
+            l.tr(zh: "计划记录", en: "Plan logs", de: "Plan-Einträge")
         case .autoFeeder:
-            l.tr(zh: "只显示自动猫粮机补记。", en: "Auto feeder logs only.", de: "Nur Futterautomat-Einträge.")
+            l.tr(zh: "自动记录", en: "Automatic logs", de: "Automatische Einträge")
         }
     }
 

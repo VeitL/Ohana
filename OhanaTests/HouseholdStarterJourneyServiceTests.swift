@@ -6,7 +6,7 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct HouseholdStarterJourneyServiceTests {
-    @Test func catalogAndSnapshotStaySmallAndAnchorCurrentHumanAndFirstPet() throws {
+    @Test func catalogAndSnapshotStaySmallAndPreferHouseholdProgressAndFirstPet() throws {
         #expect(HouseholdStarterJourneyPolicy.totalRewardCoconuts == 400)
         #expect(HouseholdStarterJourneyTask.humanProfile.rewardCoconuts == 100)
         #expect(HouseholdStarterJourneyTask.petProfile.rewardCoconuts == 100)
@@ -49,7 +49,7 @@ struct HouseholdStarterJourneyServiceTests {
         )
 
         #expect(snapshot.activeHumanID == activeHuman.id)
-        #expect(snapshot.state(for: .humanProfile)?.targetID == activeHuman.id)
+        #expect(snapshot.state(for: .humanProfile)?.targetID == firstHuman.id)
         #expect(snapshot.state(for: .petProfile)?.targetID == firstPet.id)
         #expect(snapshot.state(for: .identityProtection)?.targetID == firstPet.id)
         #expect(snapshot.state(for: .healthProtection)?.targetID == firstPet.id)
@@ -58,6 +58,55 @@ struct HouseholdStarterJourneyServiceTests {
         #expect(snapshot.state(for: .petProfile)?.completedCheckpointCount == 0)
         #expect(snapshot.state(for: .firstCare)?.status == .actionRequired)
         #expect(snapshot.visibleTaskStates.count == 3)
+    }
+
+    @Test func addingAndSwitchingSecondHumanKeepsHouseholdProfileCompletion() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let completedHuman = Human(name: "First")
+        completedHuman.createdAt = Date(timeIntervalSince1970: 1)
+        let secondHuman = Human(name: "Second")
+        secondHuman.createdAt = Date(timeIntervalSince1970: 2)
+        context.insert(completedHuman)
+        context.insert(secondHuman)
+        try context.save()
+
+        let firstSelection = FixedActiveHumanSelection(
+            currentHumanId: completedHuman.id.uuidString
+        )
+        qualifyHumanProfile(
+            human: completedHuman,
+            context: context,
+            selection: firstSelection
+        )
+
+        let actor = TaskCenterRouteDataActor(modelContainer: container)
+        let firstReference = try await actor.load(
+            loadPlants: false,
+            activeHumanID: completedHuman.id.uuidString,
+            starterJourneyEnabled: true
+        )
+        let secondReference = try await actor.load(
+            loadPlants: false,
+            activeHumanID: secondHuman.id.uuidString,
+            starterJourneyEnabled: true
+        )
+
+        let firstState = try #require(
+            firstReference.snapshot.starterJourney?.state(for: .humanProfile)
+        )
+        let secondState = try #require(
+            secondReference.snapshot.starterJourney?.state(for: .humanProfile)
+        )
+        #expect(firstReference.snapshot.starterJourney?.activeHumanID == completedHuman.id)
+        #expect(secondReference.snapshot.starterJourney?.activeHumanID == secondHuman.id)
+        #expect(firstState.targetID == completedHuman.id)
+        #expect(secondState.targetID == completedHuman.id)
+        #expect(firstState.completedCheckpointCount == 3)
+        #expect(secondState.completedCheckpointCount == 3)
+        #expect(secondState.checkpointResolutions[.humanAppearance] == .reviewed)
+        #expect(firstState.status == .claimable)
+        #expect(secondState.status == .claimable)
     }
 
     @Test func resolutionsAreWhitelistedIdempotentAndDoNotPersistProfileValues() throws {
@@ -596,7 +645,7 @@ struct HouseholdStarterJourneyServiceTests {
         #expect(pet.cardPopoutAttachmentState == .absent)
     }
 
-    @Test func carePlanResolutionNeedsARealRecommendedPlanAndFirstCareNeedsARealCareFact() throws {
+    @Test func carePlanNeedsAnExplicitPlanAndFirstCareNeedsARealCareFact() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Ava")
@@ -631,7 +680,10 @@ struct HouseholdStarterJourneyServiceTests {
             careLedgerEvents: [],
             coconutLedgerEntries: []
         )
-        #expect(base.state(for: .carePlan)?.availableResolutionCheckpoints == [.acceptedRecommendedCarePlan])
+        let baseCarePlan = try #require(base.state(for: .carePlan))
+        #expect(baseCarePlan.availableResolutionCheckpoints.isEmpty)
+        #expect(baseCarePlan.completedCheckpoints.isEmpty)
+        #expect(baseCarePlan.status == .actionRequired)
         #expect(base.state(for: .firstCare)?.status == .actionRequired)
 
         let unrelated = CareLedgerEvent(
@@ -719,6 +771,85 @@ struct HouseholdStarterJourneyServiceTests {
             $0.actionType == HouseholdStarterJourneyService.rewardActionType
         }
         #expect(rewardEvents.count == 1)
+    }
+
+    @Test func memberSwitchCannotRepeatHouseholdProfileReward() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let completedHuman = Human(name: "First")
+        completedHuman.createdAt = Date(timeIntervalSince1970: 1)
+        let secondHuman = Human(name: "Second")
+        secondHuman.createdAt = Date(timeIntervalSince1970: 2)
+        context.insert(completedHuman)
+        context.insert(secondHuman)
+        try context.save()
+
+        qualifyHumanProfile(
+            human: completedHuman,
+            context: context,
+            selection: FixedActiveHumanSelection(
+                currentHumanId: completedHuman.id.uuidString
+            )
+        )
+
+        let defaults = try makeDefaults()
+        defaults.set(true, forKey: "ohana_has_onboarded")
+        defaults.set(true, forKey: StarterGiftStorageKey.pending)
+        let observingWallet = ObservingWallet()
+        let secondHumanClaim = HouseholdStarterJourneyService.claim(
+            task: .humanProfile,
+            actingHumanID: secondHuman.id.uuidString,
+            context: context,
+            wallet: observingWallet,
+            activeHumanSelection: FixedActiveHumanSelection(
+                currentHumanId: secondHuman.id.uuidString
+            ),
+            defaults: defaults
+        )
+        let firstHumanRetry = HouseholdStarterJourneyService.claim(
+            task: .humanProfile,
+            actingHumanID: completedHuman.id.uuidString,
+            context: context,
+            wallet: observingWallet,
+            activeHumanSelection: FixedActiveHumanSelection(
+                currentHumanId: completedHuman.id.uuidString
+            ),
+            defaults: defaults
+        )
+
+        #expect(secondHumanClaim == .claimed(
+            task: .humanProfile,
+            humanID: secondHuman.id,
+            amount: 100
+        ))
+        #expect(firstHumanRetry == .alreadyClaimed(task: .humanProfile, amount: 100))
+        #expect(observingWallet.calls.count == 1)
+
+        let entries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let events = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let rewardEvents = events.filter {
+            $0.actionType == HouseholdStarterJourneyService.rewardActionType
+        }
+        #expect(entries.count == 1)
+        #expect(entries.first?.accountKey == CoconutAccountKey.human(secondHuman.id))
+        #expect(entries.first?.transactionKey == HouseholdStarterJourneyService.rewardTransactionKey(
+            for: .humanProfile
+        ))
+        #expect(rewardEvents.count == 1)
+
+        for activeHuman in [completedHuman, secondHuman] {
+            let snapshot = HouseholdStarterJourneyService.buildSnapshot(
+                enabled: true,
+                activeHumanID: activeHuman.id.uuidString,
+                humans: [completedHuman, secondHuman],
+                pets: [],
+                qualificationFacts: .empty,
+                careLedgerEvents: events,
+                coconutLedgerEntries: entries
+            )
+            #expect(snapshot.state(for: .humanProfile)?.status == .claimed)
+            #expect(!snapshot.visibleTaskStates.contains { $0.task == .humanProfile })
+        }
     }
 
     @Test func humanProfileWalletReceiptRecoversWithoutCareLedgerProjectionOrDuplicateMint() throws {
@@ -1045,7 +1176,7 @@ struct HouseholdStarterJourneyServiceTests {
         #expect(state.status == .claimable)
     }
 
-    @Test func oldStoredDefaultCarePlanStaysAcceptableAndResolutionGateAgrees() async throws {
+    @Test func oldStoredDefaultCarePlanAndLegacyResolutionStayIncomplete() async throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Default plan owner")
@@ -1084,7 +1215,7 @@ struct HouseholdStarterJourneyServiceTests {
         let journey = try #require(reference.snapshot.starterJourney)
         let state = try #require(journey.state(for: .carePlan))
         #expect(state.completedCheckpoints.isEmpty)
-        #expect(state.availableResolutionCheckpoints == [.acceptedRecommendedCarePlan])
+        #expect(state.availableResolutionCheckpoints.isEmpty)
         #expect(state.status == .actionRequired)
 
         let resolution = HouseholdStarterJourneyService.recordResolution(
@@ -1095,14 +1226,40 @@ struct HouseholdStarterJourneyServiceTests {
             context: context,
             activeHumanSelection: FixedActiveHumanSelection(currentHumanId: human.id.uuidString)
         )
-        #expect(resolution == .recorded(
+        #expect(resolution == .invalidCheckpoint)
+
+        let checkpoint = HouseholdStarterJourneyCheckpoint.acceptedRecommendedCarePlan
+        let recordKey = HouseholdStarterJourneyService.checkpointRecordKey(
             task: .carePlan,
-            checkpoint: .acceptedRecommendedCarePlan,
-            resolution: .reviewed
+            checkpoint: checkpoint,
+            subjectID: pet.id
+        )
+        let targetID = pet.id.uuidString.lowercased()
+        context.insert(CareLedgerEvent(
+            actorKind: .human,
+            actorId: human.id.uuidString.lowercased(),
+            subjectKind: .household,
+            eventKind: .milestone,
+            actionType: HouseholdStarterJourneyService.checkpointActionType,
+            legacyModelName: HouseholdStarterJourneyService.checkpointSourceModelName,
+            legacyModelId: recordKey,
+            metadataJSON: "{\"journeyKey\":\"household-starter-v1\",\"taskRaw\":\"carePlan\",\"checkpointRaw\":\"acceptedRecommendedCarePlan\",\"resolutionRaw\":\"reviewed\",\"targetKindRaw\":\"pet\",\"targetID\":\"\(targetID)\"}"
         ))
+        try context.save()
+
+        let legacyReference = try await TaskCenterRouteDataActor(modelContainer: container).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            starterJourneyEnabled: true
+        )
+        let legacyState = try #require(legacyReference.snapshot.starterJourney?.state(for: .carePlan))
+        #expect(legacyState.completedCheckpoints.isEmpty)
+        #expect(legacyState.checkpointResolutions.isEmpty)
+        #expect(legacyState.availableResolutionCheckpoints.isEmpty)
+        #expect(legacyState.status == .actionRequired)
     }
 
-    @Test func laterExplicitCarePlanSupersedesEarlierResolutionWithoutDoubleCounting() async throws {
+    @Test func laterExplicitCarePlanCompletesDespiteEarlierLegacyResolution() async throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Care plan owner")
@@ -1133,11 +1290,25 @@ struct HouseholdStarterJourneyServiceTests {
             subjectID: pet.id,
             context: context,
             activeHumanSelection: selection
-        ) == .recorded(
+        ) == .invalidCheckpoint)
+
+        let recordKey = HouseholdStarterJourneyService.checkpointRecordKey(
             task: .carePlan,
             checkpoint: checkpoint,
-            resolution: .reviewed
+            subjectID: pet.id
+        )
+        let targetID = pet.id.uuidString.lowercased()
+        context.insert(CareLedgerEvent(
+            actorKind: .human,
+            actorId: human.id.uuidString.lowercased(),
+            subjectKind: .household,
+            eventKind: .milestone,
+            actionType: HouseholdStarterJourneyService.checkpointActionType,
+            legacyModelName: HouseholdStarterJourneyService.checkpointSourceModelName,
+            legacyModelId: recordKey,
+            metadataJSON: "{\"journeyKey\":\"household-starter-v1\",\"taskRaw\":\"carePlan\",\"checkpointRaw\":\"acceptedRecommendedCarePlan\",\"resolutionRaw\":\"reviewed\",\"targetKindRaw\":\"pet\",\"targetID\":\"\(targetID)\"}"
         ))
+        try context.save()
 
         let resolutionReference = try await TaskCenterRouteDataActor(
             modelContainer: container
@@ -1149,10 +1320,11 @@ struct HouseholdStarterJourneyServiceTests {
         let resolutionState = try #require(
             resolutionReference.snapshot.starterJourney?.state(for: .carePlan)
         )
-        #expect(resolutionState.completedCheckpointCount == 1)
-        #expect(resolutionState.completedCheckpoints == [checkpoint])
-        #expect(resolutionState.checkpointResolutions == [checkpoint: .reviewed])
-        #expect(resolutionState.status == .claimable)
+        #expect(resolutionState.completedCheckpointCount == 0)
+        #expect(resolutionState.completedCheckpoints.isEmpty)
+        #expect(resolutionState.checkpointResolutions.isEmpty)
+        #expect(resolutionState.availableResolutionCheckpoints.isEmpty)
+        #expect(resolutionState.status == .actionRequired)
 
         let explicitPlan = Event(
             title: "Explicit feeding plan",

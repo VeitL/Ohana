@@ -188,8 +188,7 @@ struct InventoryContentView: View {
                     Section {
                         ContentUnavailableView(
                             l.tr(zh: "还没有兑换内容", en: "No redeemed items yet", de: "Noch keine eingelösten Artikel"),
-                            systemImage: "shippingbox",
-                            description: Text(l.tr(zh: "在椰子商店兑换的外观和道具会出现在这里。", en: "Looks and items redeemed in the Coconut Shop appear here.", de: "Im Kokosnuss-Shop eingelöste Looks und Artikel erscheinen hier."))
+                            systemImage: "shippingbox"
                         )
                     }
                 }

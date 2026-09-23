@@ -73,7 +73,7 @@ struct HouseholdInsightLockedCard: View {
                 systemImage: "sparkles"
             )
             .font(OhanaFont.callout(.black))
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 14)
             .frame(minHeight: 44)
             .background(Color.goPrimary, in: Capsule())

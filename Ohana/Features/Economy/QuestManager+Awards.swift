@@ -30,6 +30,12 @@ private func saveQuestAwardChanges(context: ModelContext) throws {
 }
 
 extension QuestManager {
+    private struct WalletRewardPreparation {
+        let title: String
+        let metadata: String
+        let deltas: [CoconutWalletDelta]
+    }
+
     // MARK: - 核心分发方法（新版，接受 OhanaActionType）
     /// - Parameters:
     ///   - type: OhanaActionType，携带奖励规则
@@ -43,11 +49,23 @@ extension QuestManager {
         quality: QualityBonus = .none,
         date: Date = Date(),
         executorId: String? = nil,
-        careObjectKey: UUID? = nil
+        careObjectKey: UUID? = nil,
+        idempotencyKey: String? = nil
     ) -> (humanGot: Int, petGot: Int) {
         if let pet, !EconomyWalletWritePolicy.canWrite(pet) {
             lastEconomyRewardResult = .empty
             return (0, 0)
+        }
+
+        if let replay = replayCareActionReward(
+            idempotencyKey: idempotencyKey,
+            type: type,
+            pet: pet,
+            careObjectKey: careObjectKey,
+            fallbackOperationDate: date,
+            context: context
+        ) {
+            return replay
         }
 
         // ── 1. 人类账户（从 context fetch，安全降级）
@@ -63,7 +81,11 @@ extension QuestManager {
         }
         let consumesBoost = isDoubleRewardBoostActive()
         let cooldownSubjectId = careObjectKey ?? pet?.id
-        let isCoolingDown = isOnCooldown(petId: cooldownSubjectId, type: type)
+        let isCoolingDown = isOnCooldown(
+            petId: cooldownSubjectId,
+            type: type,
+            at: date
+        )
         let budgetKeys = economyBudgetKeys(for: human, context: context)
         let objectKeys = pet != nil ? careObjectKeys(for: pet) : careObjectKeys(forPlantId: careObjectKey)
         let result = CoconutEconomyPolicyV2.reward(
@@ -84,53 +106,21 @@ extension QuestManager {
 
         let finalHuman = result.humanCoconuts
         let finalPet = result.petCoconuts
-        // ── 2. 钱包流水（拆分：宠物和人类各生成独立条目）
-        let l = L10n.current
-        let logEmoji = result.luck == .golden ? "🎁" : type.emoji
-        var baseTitle = type.title(pet: pet, l: l)
-        if let badge = quality.badgeLabel(l: l) {
-            baseTitle += " · \(badge)"
-        }
-        if let luckTitle = Self.economyLuckTitle(result.luck, l: l) {
-            baseTitle += " · \(luckTitle)"
-        }
+        let walletPreparation = Self.prepareWalletReward(
+            result: result,
+            type: type,
+            pet: pet,
+            human: human,
+            quality: quality,
+            date: date,
+            idempotencyKey: idempotencyKey,
+            consumesBoost: consumesBoost
+        )
 
-        var walletDeltas: [CoconutWalletDelta] = []
-        if let p = pet, finalPet > 0 {
-            walletDeltas.append(.pet(
-                p,
-                delta: finalPet,
-                entryKind: .reward,
-                source: .careEvent,
-                title: baseTitle,
-                emoji: logEmoji,
-                actorId: p.id.uuidString,
-                actorName: p.name,
-                subjectKind: .pet,
-                subjectId: p.id.uuidString,
-                metadataJSON: result.metadataJSON
-            ))
-        }
-        if let h = human, finalHuman > 0 {
-            walletDeltas.append(.human(
-                h,
-                delta: finalHuman,
-                entryKind: .reward,
-                source: .careEvent,
-                title: baseTitle,
-                emoji: "🥥",
-                actorId: h.id.uuidString,
-                actorName: h.name,
-                subjectKind: .human,
-                subjectId: h.id.uuidString,
-                metadataJSON: result.metadataJSON
-            ))
-        }
-
-        // ── 3. 持久化（同一个 ModelContext 事务）
+        // ── 2. 持久化（同一个 ModelContext 事务）
         do {
             try wallet.apply(
-                deltas: walletDeltas,
+                deltas: walletPreparation.deltas,
                 context: context,
                 save: false,
                 postsRewardFeedback: false,
@@ -145,7 +135,8 @@ extension QuestManager {
                 date: date,
                 context: context,
                 save: false,
-                writeDefaults: false
+                writeDefaults: false,
+                metadataJSONOverride: walletPreparation.metadata
             )
             try saveQuestAwardChanges(context: context)
             EconomyDailyBudgetStore.commit(
@@ -160,13 +151,13 @@ extension QuestManager {
             if consumesBoost {
                 clearDoubleRewardBoost()
             }
-            postEconomyFeedback(result, type: type, title: baseTitle, actorId: pet?.id.uuidString ?? human?.id.uuidString, actorName: pet?.name ?? human?.name)
+            postEconomyFeedback(result, type: type, title: walletPreparation.title, actorId: pet?.id.uuidString ?? human?.id.uuidString, actorName: pet?.name ?? human?.name)
             if case .walk = type, let humanId = human?.id.uuidString {
                 recordWalkRewardToday(finalHuman, humanId: humanId)
             }
             // 记录冷却时间戳（持久化成功后才记录；冷却内补记不延长窗口）
             if !isCoolingDown {
-                recordCooldown(petId: cooldownSubjectId, type: type)
+                recordCooldown(petId: cooldownSubjectId, type: type, occurredAt: date)
             }
             // TASK C: 检查 Streak 里程碑奖励
             if let pet { streakRewards.checkAndAward(pet: pet, questManager: self, context: context) }
@@ -180,6 +171,177 @@ extension QuestManager {
             return (0, 0)
         }
         return (finalHuman, finalPet)
+    }
+
+    private static func prepareWalletReward(
+        result: EconomyRewardResult,
+        type: OhanaActionType,
+        pet: Pet?,
+        human: Human?,
+        quality: QualityBonus,
+        date: Date,
+        idempotencyKey: String?,
+        consumesBoost: Bool
+    ) -> WalletRewardPreparation {
+        let l = L10n.current
+        let logEmoji = result.luck == .golden ? "🎁" : type.emoji
+        var baseTitle = type.title(pet: pet, l: l)
+        if let badge = quality.badgeLabel(l: l) {
+            baseTitle += " · \(badge)"
+        }
+        if let luckTitle = Self.economyLuckTitle(result.luck, l: l) {
+            baseTitle += " · \(luckTitle)"
+        }
+
+        let walletMetadata = Self.careActionRewardMetadata(
+            result.metadataJSON,
+            idempotencyKey: idempotencyKey,
+            consumesBoost: consumesBoost
+        )
+        let sourceModelName = idempotencyKey == nil ? "" : Self.careActionFinalizationSourceModelName
+        let sourceModelId = idempotencyKey ?? ""
+
+        var walletDeltas: [CoconutWalletDelta] = []
+        if let p = pet, result.petCoconuts > 0 {
+            walletDeltas.append(.pet(
+                p,
+                delta: result.petCoconuts,
+                entryKind: .reward,
+                source: .careEvent,
+                title: baseTitle,
+                emoji: logEmoji,
+                actorId: p.id.uuidString,
+                actorName: p.name,
+                subjectKind: .pet,
+                subjectId: p.id.uuidString,
+                sourceModelName: sourceModelName,
+                sourceModelId: sourceModelId,
+                metadataJSON: walletMetadata,
+                occurredAt: date,
+                transactionKey: idempotencyKey.map { "\($0):pet:\(p.id.uuidString)" }
+            ))
+        }
+        if let h = human, result.humanCoconuts > 0 {
+            walletDeltas.append(.human(
+                h,
+                delta: result.humanCoconuts,
+                entryKind: .reward,
+                source: .careEvent,
+                title: baseTitle,
+                emoji: "🥥",
+                actorId: h.id.uuidString,
+                actorName: h.name,
+                subjectKind: .human,
+                subjectId: h.id.uuidString,
+                sourceModelName: sourceModelName,
+                sourceModelId: sourceModelId,
+                metadataJSON: walletMetadata,
+                occurredAt: date,
+                transactionKey: idempotencyKey.map { "\($0):human:\(h.id.uuidString)" }
+            ))
+        }
+        if let idempotencyKey, walletDeltas.isEmpty {
+            walletDeltas.append(.island(
+                delta: 0,
+                entryKind: .legacyHistory,
+                source: .careEvent,
+                title: baseTitle,
+                emoji: "🧾",
+                subjectKind: .household,
+                sourceModelName: sourceModelName,
+                sourceModelId: sourceModelId,
+                metadataJSON: walletMetadata,
+                occurredAt: date,
+                transactionKey: "\(idempotencyKey):marker",
+                affectsBalance: false
+            ))
+        }
+
+        return WalletRewardPreparation(title: baseTitle, metadata: walletMetadata, deltas: walletDeltas)
+    }
+
+    func hasPersistedCareActionReward(idempotencyKey: String, context: ModelContext) -> Bool {
+        existingCareActionReward(idempotencyKey: idempotencyKey, context: context) != nil
+    }
+
+    private func replayCareActionReward(
+        idempotencyKey: String?,
+        type: OhanaActionType,
+        pet: Pet?,
+        careObjectKey: UUID?,
+        fallbackOperationDate: Date,
+        context: ModelContext
+    ) -> (humanGot: Int, petGot: Int)? {
+        guard let idempotencyKey,
+              let existing = existingCareActionReward(
+                  idempotencyKey: idempotencyKey,
+                  context: context
+              ) else { return nil }
+        let restoredResult = Self.rewardResult(from: existing.metadataJSON)
+        lastEconomyRewardResult = restoredResult
+        wallet.refreshQuestProjection(context: context, manager: self)
+        if Self.boolValue(named: "consumesBoost", metadataJSON: existing.metadataJSON) {
+            clearDoubleRewardBoost()
+        }
+        if restoredResult?.isOnCooldown != true {
+            let operationDate = existing.entries.map(\.occurredAt).min() ?? fallbackOperationDate
+            recordCooldown(
+                petId: careObjectKey ?? pet?.id,
+                type: type,
+                occurredAt: operationDate
+            )
+        }
+        return (
+            existing.entries
+                .filter { $0.ownerKind == .human }
+                .reduce(0) { $0 + max(0, $1.delta) },
+            existing.entries
+                .filter { $0.ownerKind == .pet }
+                .reduce(0) { $0 + max(0, $1.delta) }
+        )
+    }
+
+    private func existingCareActionReward(
+        idempotencyKey: String,
+        context: ModelContext
+    ) -> ExistingCareActionReward? {
+        let sourceModelName = Self.careActionFinalizationSourceModelName
+        var descriptor = FetchDescriptor<CoconutLedgerEntry>(
+            predicate: #Predicate<CoconutLedgerEntry> {
+                $0.sourceModelName == sourceModelName && $0.sourceModelId == idempotencyKey
+            },
+            sortBy: [SortDescriptor(\CoconutLedgerEntry.occurredAt)]
+        )
+        descriptor.fetchLimit = 4
+        guard let entries = try? context.fetch(descriptor), !entries.isEmpty else { return nil }
+        return ExistingCareActionReward(
+            entries: entries,
+            metadataJSON: entries.first?.metadataJSON ?? ""
+        )
+    }
+
+    private struct ExistingCareActionReward {
+        let entries: [CoconutLedgerEntry]
+        let metadataJSON: String
+    }
+
+    static let careActionFinalizationSourceModelName = "CareActionFinalization"
+
+    private static func careActionRewardMetadata(
+        _ metadataJSON: String,
+        idempotencyKey: String?,
+        consumesBoost: Bool
+    ) -> String {
+        guard let idempotencyKey else { return metadataJSON }
+        let objectFromMetadata: [String: Any]? = metadataJSON.data(using: .utf8).flatMap { data in
+            try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        }
+        var object = objectFromMetadata ?? [:]
+        object["careActionIdempotencyKey"] = idempotencyKey
+        object["consumesBoost"] = consumesBoost
+        guard let encoded = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let json = String(data: encoded, encoding: .utf8) else { return metadataJSON }
+        return json
     }
 
     func human(withId humanId: String?, context: ModelContext) -> Human? {

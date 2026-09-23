@@ -118,6 +118,77 @@ struct OnboardingHandoffResponsivenessTests {
         #expect(mismatched.completedPetID == nil)
     }
 
+    @Test func zenSnapshotHandoffWaitsForRequestAndUsesReadyOrFallback() {
+        var snapshotFirst = OnboardingZenSnapshotHandoffState()
+        snapshotFirst.stageShell()
+        snapshotFirst.markHomeSnapshotReady()
+        #expect(snapshotFirst.isShellMounted)
+        #expect(!snapshotFirst.isReadyToComplete)
+        snapshotFirst.requestCompletion()
+        #expect(snapshotFirst.isReadyToComplete)
+
+        var requestFirst = OnboardingZenSnapshotHandoffState()
+        requestFirst.requestCompletion()
+        #expect(requestFirst.isShellMounted)
+        #expect(!requestFirst.isReadyToComplete)
+        requestFirst.markHomeSnapshotReady()
+        #expect(requestFirst.isReadyToComplete)
+
+        var fallback = OnboardingZenSnapshotHandoffState()
+        fallback.markFallbackElapsed()
+        #expect(!fallback.isReadyToComplete)
+        fallback.requestCompletion()
+        fallback.markFallbackElapsed()
+        #expect(fallback.isReadyToComplete)
+        #expect(OnboardingZenSnapshotHandoffGate.fallbackDelayMilliseconds == 1200)
+    }
+
+    @Test func zenOnboardingPremountsAnInertShellUntilItsFirstSnapshotIsReady() throws {
+        let rootSource = try source(
+            "Ohana/App/RootView.swift",
+            rootURL: repositoryRootURL()
+        )
+        let onboardingSource = try source(
+            "Ohana/Features/Onboarding/Views/OnboardingView.swift",
+            rootURL: repositoryRootURL()
+        )
+        let zenContainerSource = try source(
+            "Ohana/Features/Zen/ZenExperienceContainer.swift",
+            rootURL: repositoryRootURL()
+        )
+        let zenPreparationSource = zenContainerSource
+            .components(separatedBy: "private func prepareExperience").last?
+            .components(separatedBy: "private func runPresenceCommand").first ?? ""
+
+        #expect(rootSource.contains(
+            "experienceController.mode == .zen && onboardingZenSnapshotHandoff.isShellMounted"
+        ))
+        #expect(rootSource.contains(".allowsHitTesting(hasOnboarded)"))
+        #expect(rootSource.contains(".accessibilityHidden(!hasOnboarded)"))
+        #expect(rootSource.contains("onZenCompletionRequested: requestOnboardingZenCompletion"))
+        #expect(rootSource.contains("beginOnboardingZenPreflight()"))
+        #expect(rootSource.contains(
+            "onInitialHomeSnapshotReady: markOnboardingZenHomeSnapshotReady"
+        ))
+        #expect(rootSource.contains(
+            "milliseconds: OnboardingZenSnapshotHandoffGate.fallbackDelayMilliseconds"
+        ))
+        #expect(rootSource.contains(
+            "withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.page)"
+        ))
+        #expect(rootSource.contains(".transition(.opacity)"))
+        #expect(onboardingSource.contains("var onZenCompletionRequested: (() -> Void)?"))
+        #expect(onboardingSource.contains("requestZenOnboardingCompletion()"))
+        #expect(zenPreparationSource.contains("allowsBootstrapPendingHomeRead: true"))
+        #expect(!zenPreparationSource.contains("guard persistentBootstrapReady"))
+        #expect(zenContainerSource.contains(
+            "guard persistentBootstrapReady || allowsBootstrapPendingHomeRead else { return }"
+        ))
+        #expect(zenContainerSource.contains("let loadsPersistentProjections = persistentBootstrapReady"))
+        #expect(zenContainerSource.contains("reportInitialHomeSnapshotReadyIfNeeded()"))
+        #expect(zenContainerSource.contains("onInitialHomeSnapshotReady()"))
+    }
+
     @Test func onboardingCompletionFallsBackOnlyWhenNoExternalGateExists() throws {
         let onboardingSource = try source(
             "Ohana/Features/Onboarding/Views/OnboardingView.swift",
@@ -176,16 +247,67 @@ struct OnboardingHandoffResponsivenessTests {
         #expect(!source.contains("private let modelContainer: ModelContainer"))
     }
 
-    @Test func memberCreationSaveHandoffDoesNotWaitForFullAnimationTail() throws {
+    @Test func appBootstrapUsesOneShortInterruptibleOverlayHandoff() throws {
         let source = try source(
-            "Ohana/Features/Members/Views/MemberCardCreationContentView+MediaAndSave.swift",
+            "Ohana/App/OhanaApp.swift",
             rootURL: repositoryRootURL()
         )
 
-        #expect(source.contains("var standardSaveSuccessDelayMilliseconds"))
-        #expect(source.contains("reduceMotion ? 70 : 140"))
-        #expect(!source.contains("reduceMotion ? 140 : 820"))
-        #expect(!source.contains("milliseconds: 780"))
+        #expect(source.contains(".opacity(1 - launchRevealProgress)"))
+        #expect(source.contains(".scaleEffect(reduceMotion ? 1 : 1 + (launchRevealProgress * 0.006))"))
+        #expect(source.contains("let animation = reduceMotion ? GoMotion.reduced : GoMotion.quick"))
+        #expect(source.contains("reduceMotion ? 120_000_000 : 180_000_000"))
+        #expect(source.contains("await OhanaFrameScheduler.waitAfterNextFrame()"))
+        #expect(!source.contains("OhanaLaunchCircularDismissMask"))
+        #expect(!source.contains("waitAfterNextFrame(milliseconds: 16)"))
+        #expect(!source.contains("duration: 0.48"))
+    }
+
+    @Test func memberCreationUsesNativeDismissOutsideOnboardingAndOneCompletionTurn() throws {
+        let saveSource = try source(
+            "Ohana/Features/Members/Views/MemberCardCreationContentView+MediaAndSave.swift",
+            rootURL: repositoryRootURL()
+        )
+        let viewSource = try source(
+            "Ohana/Features/Members/Views/MemberCardCreationView.swift",
+            rootURL: repositoryRootURL()
+        )
+        let completionSource = saveSource
+            .components(separatedBy: "func completeSuccessfulMemberCreation").last?
+            .components(separatedBy: "func notifySavedMembers").first ?? ""
+
+        #expect(viewSource.contains("presentationStyle == .onboarding"))
+        #expect(!viewSource.contains("didShowSuccess"))
+        #expect(saveSource.contains("joinSaveTask = OhanaFrameScheduler.runAfterNextFrame"))
+        #expect(saveSource.contains("completeSuccessfulMemberCreation(pet: result.pet, human: result.human)"))
+        #expect(saveSource.contains("notifySavedMembers(pet: pet, human: human)\n        onComplete()"))
+        #expect(!completionSource.contains("runAfterNextFrame"))
+        #expect(saveSource.contains("reduceMotion ? GoMotion.reduced : GoMotion.quick"))
+        #expect(!saveSource.contains("standardSaveSuccessDelayMilliseconds"))
+        #expect(!saveSource.contains("GoMotion.zStackHero"))
+    }
+
+    @Test func memberJoinHandoffIsRestrainedAndReduceMotionRemovesSpatialTransforms() throws {
+        let motionSource = try source(
+            "Ohana/Shared/Design/GoMotion.swift",
+            rootURL: repositoryRootURL()
+        )
+        let componentSource = try source(
+            "Ohana/Features/Members/Views/MemberCardCreationComponents.swift",
+            rootURL: repositoryRootURL()
+        )
+        let modifierSource = componentSource
+            .components(separatedBy: "struct MemberCreationJoinHandoffModifier").last?
+            .components(separatedBy: "struct MemberCreationJoinHandoffCard").first ?? ""
+
+        #expect(motionSource.contains("static let scale: CGFloat = 0.985"))
+        #expect(motionSource.contains("static let rotation: CGFloat = 0"))
+        #expect(motionSource.contains("static let flip: CGFloat = 0"))
+        #expect(motionSource.contains("static let y: CGFloat = 6"))
+        #expect(modifierSource.contains("let scale = reduceMotion ? 1"))
+        #expect(modifierSource.contains("let y = reduceMotion ? 0"))
+        #expect(!modifierSource.contains("rotationEffect"))
+        #expect(!modifierSource.contains("rotation3DEffect"))
     }
 
     private func repositoryRootURL() -> URL {

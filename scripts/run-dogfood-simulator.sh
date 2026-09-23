@@ -1011,7 +1011,9 @@ fi
 if [[ "${INITIALIZATION_LAUNCH_ONLY}" == "1" ]]; then
   xcrun simctl boot "${SIMULATOR_UDID}" 2>/dev/null || true
   xcrun simctl bootstatus "${SIMULATOR_UDID}" -b
-  open -a Simulator
+  if ! open -a Simulator 2>/dev/null; then
+    echo "Simulator GUI is not registered; continuing with the booted CoreSimulator device." >&2
+  fi
   echo "Resuming the installed Dogfood App without reinstalling over its new store."
   xcrun simctl launch "${SIMULATOR_UDID}" "${BUNDLE_ID}" "$@"
   if [[ "${PIN_NEEDS_CREATION}" == "1" ]]; then
@@ -1049,7 +1051,9 @@ ARTIFACT_APP_BUILD="$(app_plist_value "${APP_PATH}" CFBundleVersion)"
 
 xcrun simctl boot "${SIMULATOR_UDID}" 2>/dev/null || true
 xcrun simctl bootstatus "${SIMULATOR_UDID}" -b
-open -a Simulator
+if ! open -a Simulator 2>/dev/null; then
+  echo "Simulator GUI is not registered; continuing with the booted CoreSimulator device." >&2
+fi
 
 PERSISTENT_DATA_FINGERPRINT_BEFORE=""
 if [[ "${INITIALIZE_USER}" != "1" ]]; then

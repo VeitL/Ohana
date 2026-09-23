@@ -361,18 +361,12 @@ final class MemberCreationService: MemberCreating {
             countryCode: countryCode
         )
         insertPetRelatedRecords(pet: pet, draft: draft, context: context)
-        let defaultPlanSideEffects = CarePlanCalendarSync.ensureDefaultPlans(
-            for: pet,
-            context: context,
-            saveChanges: false
-        )
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             context.rollback()
             throw ServiceError.saveFailed(saveResult.errorDescription ?? "Member creation was not saved.")
         }
 
-        defaultPlanSideEffects.commit()
         if shouldUse2D {
             Avatar2DAccess.consumeIfNeeded(kind: .pet, existingCount: existingCount)
         }

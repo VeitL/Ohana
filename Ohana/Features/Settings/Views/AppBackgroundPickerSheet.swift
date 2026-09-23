@@ -61,18 +61,13 @@ struct AppBackgroundPickerSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(l.tr(zh: "背景", en: "Background", de: "Hintergrund"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(
-                    zh: "选择一组背景，同时决定浅色和深色模式。",
-                    en: "Choose one background pair for both light and dark mode.",
-                    de: "Wähle ein Hintergrundpaar für Hell- und Dunkelmodus."
-                ))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            }
+            Text(l.tr(
+                zh: "背景", en: "Background", de: "Hintergrund",
+                es: "Fondo", pt: "Plano de fundo", fr: "Arrière-plan",
+                ja: "背景", ko: "배경", it: "Sfondo"
+            ))
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
@@ -205,23 +200,17 @@ struct AppBackgroundPickerSheet: View {
                         } else if isLocked {
                             Image(systemName: "lock.fill").accessibilityHidden(true)
                                 .font(OhanaFont.adaptive(size: 13, weight: .black))
-                                .foregroundStyle(Color.arkInk)
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
                                 .padding(8)
                                 .background(Color.goPrimary, in: Circle())
                                 .padding(7)
                         }
                     }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(style.localizedName(appLanguage))
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                    Text(style.localizedSubtitle(appLanguage))
-                        .font(OhanaFont.caption2(.semibold))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                        .lineLimit(2)
-                }
+                Text(style.localizedName(appLanguage))
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -234,6 +223,7 @@ struct AppBackgroundPickerSheet: View {
         .buttonStyle(ScaleButtonStyle())
         .animation(GoMotion.feedback, value: selected)
         .accessibilityLabel(style.localizedName(appLanguage))
+        .accessibilityHint(style.localizedSubtitle(appLanguage))
         .accessibilityValue(isLocked
             ? l.tr(zh: "需要 Ohana Personal", en: "Requires Ohana Personal", de: "Benötigt Ohana Personal")
             : (selected

@@ -255,16 +255,9 @@ struct EditableProfileAvatarPicker: View {
             Text(title)
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
-        .foregroundStyle(avatarActionForeground)
+        .foregroundStyle(Color.ohanaPrimaryActionText)
         .frame(maxWidth: .infinity, minHeight: 44)
-        .background(accentColor, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
-    }
-
-    private var avatarActionForeground: Color {
-        guard let hex = accentColor.toHex() else { return Color.arkInk }
-        return WalletPetCardTheme.prefersDarkForeground(for: hex)
-            ? Color.arkInk
-            : Color.goCardWhite
+        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
     }
 
     private func handlePhotosPickerItemChanged(_ item: PhotosPickerItem?) {

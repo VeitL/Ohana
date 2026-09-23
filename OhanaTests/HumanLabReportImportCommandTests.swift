@@ -6,7 +6,7 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct HumanLabReportImportCommandTests {
-    @Test func v98KeepsTheV97ModelSetAndMakesLabProvenanceTheLatestLightweightSchema() {
+    @Test func v98KeepsTheV97ModelSetAndV99IsTheLatestLightweightSchema() {
         let v97 = Set(ArkSchemaV97.models.map { String(describing: $0) })
         let v98 = Set(ArkSchemaV98.models.map { String(describing: $0) })
         let manualReport = HumanHealthReport(humanId: UUID().uuidString)
@@ -17,7 +17,7 @@ struct HumanLabReportImportCommandTests {
         )
 
         #expect(v98 == v97)
-        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV98.self))
+        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV99.self))
         #expect(ArkMigrationPlan.stages.isEmpty)
         #expect(manualReport.captureSource == .manual)
         #expect(manualMetric.sourceReportID == nil)
@@ -498,7 +498,7 @@ struct HumanLabReportImportCommandTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV98.models)
+        let schema = Schema(ArkSchemaV99.models)
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [configuration])
     }

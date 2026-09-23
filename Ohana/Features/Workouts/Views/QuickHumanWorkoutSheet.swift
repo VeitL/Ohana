@@ -41,6 +41,9 @@ struct QuickHumanWorkoutSheet: View {
     private var duration: Int { Int(durationText) ?? 0 }
     private var canSave: Bool { duration > 0 }
     private var accent: Color { Color(hex: selectedType.colorHex) }
+    private var accentForeground: Color {
+        OhanaResolvedPrimaryAccent(customHex: selectedType.colorHex)?.actionTextColor ?? Color.ohanaPrimaryText
+    }
     private var popupAnimation: Animation {
         .interactiveSpring(response: 0.30, dampingFraction: 0.88, blendDuration: 0.12)
     }
@@ -173,7 +176,11 @@ struct QuickHumanWorkoutSheet: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
                     }
-                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                    .foregroundStyle(
+                        isSelected
+                            ? (OhanaResolvedPrimaryAccent(customHex: type.colorHex)?.actionTextColor ?? Color.ohanaPrimaryText)
+                            : Color.ohanaPrimaryText
+                    )
                     .frame(maxWidth: .infinity)
                     .frame(height: 58)
                     .background(isSelected ? Color(hex: type.colorHex) : Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
@@ -215,7 +222,7 @@ struct QuickHumanWorkoutSheet: View {
                 } label: {
                     Text("\(value)")
                         .font(OhanaFont.caption(.black))
-                        .foregroundStyle(duration == value ? Color.arkInk : Color.ohanaPrimaryText)
+                        .foregroundStyle(duration == value ? accentForeground : Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 34)
                         .background(duration == value ? accent : Color.ohanaCardSurface, in: Capsule())
@@ -237,7 +244,7 @@ struct QuickHumanWorkoutSheet: View {
                 )
                 .font(OhanaFont.callout(.black))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(canSave && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(canSave && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

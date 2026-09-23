@@ -43,6 +43,42 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
         return reward
     }
 
+    func awardIdempotentCareAction(
+        type: DomainCareRewardAction,
+        pet: Pet?,
+        context: ModelContext,
+        quality: DomainCareRewardQuality,
+        date: Date,
+        executorId: String?,
+        careObjectKey: UUID?,
+        idempotencyKey: String,
+        idempotencyID: UUID
+    ) -> (humanGot: Int, petGot: Int, didPersist: Bool) {
+        let reward = EconomyRewardDiscipline.awardCareAction(
+            type: type,
+            pet: pet,
+            context: context,
+            quality: quality,
+            date: date,
+            executorId: executorId,
+            careObjectKey: careObjectKey,
+            idempotencyKey: idempotencyKey,
+            questManager: questManager
+        )
+        guard questManager.hasPersistedCareActionReward(
+            idempotencyKey: idempotencyKey,
+            context: context
+        ) else {
+            return (0, 0, false)
+        }
+        let didPersistOasisReward = oasisRewards.rewardFeaturedCritterFromCare(
+            type: type,
+            context: context,
+            idempotencyID: idempotencyID
+        )
+        return (reward.humanGot, reward.petGot, didPersistOasisReward)
+    }
+
     func awardSharedCareAction(
         type: DomainCareRewardAction,
         pets: [Pet],

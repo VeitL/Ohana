@@ -21,6 +21,22 @@ protocol CareEventEconomyAwarding {
         careObjectKey: UUID?
     ) -> (humanGot: Int, petGot: Int)
 
+    /// Finalizes a care reward after the owning business fact has committed.
+    /// The idempotency key must identify that fact, not the UI attempt, so a
+    /// crash/retry cannot mint a second wallet or Oasis entry.
+    @discardableResult
+    func awardIdempotentCareAction(
+        type: DomainCareRewardAction,
+        pet: Pet?,
+        context: ModelContext,
+        quality: DomainCareRewardQuality,
+        date: Date,
+        executorId: String?,
+        careObjectKey: UUID?,
+        idempotencyKey: String,
+        idempotencyID: UUID
+    ) -> (humanGot: Int, petGot: Int, didPersist: Bool)
+
     @discardableResult
     func awardSharedCareAction(
         type: DomainCareRewardAction,
@@ -68,6 +84,25 @@ extension CareEventEconomyAwarding {
             executorId: executorId,
             careObjectKey: nil
         )
+    }
+
+    @discardableResult
+    func awardIdempotentCareAction(
+        type: DomainCareRewardAction,
+        pet: Pet?,
+        context: ModelContext,
+        quality: DomainCareRewardQuality,
+        date: Date,
+        executorId: String?,
+        careObjectKey: UUID?,
+        idempotencyKey _: String,
+        idempotencyID _: UUID
+    ) -> (humanGot: Int, petGot: Int, didPersist: Bool) {
+        // A conformer that cannot prove a durable idempotency receipt must
+        // fail closed. Calling the legacy award API here could mint twice and
+        // would let the owning ledger incorrectly transition to "settled".
+        _ = (type, pet, context, quality, date, executorId, careObjectKey)
+        return (0, 0, false)
     }
 
     @discardableResult

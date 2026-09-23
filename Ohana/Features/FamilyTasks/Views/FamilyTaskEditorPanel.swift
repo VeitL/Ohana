@@ -321,9 +321,9 @@ struct FamilyTaskEditorPanel: View {
         } footer: {
             if includesReward {
                 Text(l.tr(
-                    zh: "奖励任务完成后会请你确认一次，再转出椰子。当前可用 \(availableBalance)🥥。",
-                    en: "When this rewarded task is done, you will confirm it once before the coconuts transfer. \(availableBalance)🥥 available.",
-                    de: "Nach Abschluss bestätigst du die Prämienaufgabe einmal, bevor die Kokosnüsse übertragen werden. \(availableBalance)🥥 verfügbar."
+                    zh: "确认完成后转账 · 可用 \(availableBalance)🥥",
+                    en: "Transfer after approval · \(availableBalance)🥥 available",
+                    de: "Übertragung nach Bestätigung · \(availableBalance)🥥 verfügbar"
                 ))
             }
         }
@@ -523,8 +523,7 @@ struct FamilyTaskEditorPanel: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.goPrimary)
+            .ohanaPrimaryProminentButton()
             .disabled(!canSave || isSaving)
             .accessibilityIdentifier("family-task-save-action")
         }

@@ -151,7 +151,7 @@ struct AddSymptomSheet: View {
                         } label: {
                             Text(severityTitle(level))
                                 .font(OhanaFont.caption(.black))
-                                .foregroundStyle(severity == level ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
+                                .foregroundStyle(severity == level ? severityForeground(level) : Color.ohanaPrimaryText)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 36)
                                 .background(severity == level ? severityColor(level) : Color.ohanaControlFill, in: Capsule())
@@ -273,6 +273,15 @@ struct AddSymptomSheet: View {
         case .moderate: Color.goYellow
         case .severe: Color.goOrange
         case .critical: Color.goRed
+        }
+    }
+
+    private func severityForeground(_ severity: SymptomSeverity) -> Color {
+        switch severity {
+        case .mild, .moderate, .severe:
+            Color.arkInk
+        case .critical:
+            Color.goCardWhite
         }
     }
 

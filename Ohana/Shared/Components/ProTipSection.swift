@@ -59,7 +59,7 @@ struct ProTipSection: View {
                 // 新功能标签
                 Text("NEW")
                     .font(OhanaFont.adaptive(size: 10, weight: .bold))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Color.goPrimary, in: Capsule())

@@ -39,7 +39,6 @@ enum HouseholdStarterJourneyService {
         let firstCareCompleted: Bool
         let hasLivingHuman: Bool
         let hasLivingPet: Bool
-        let carePlanResolutionAvailable: Bool
     }
 
     private enum ActingHumanResolution {
@@ -183,7 +182,8 @@ enum HouseholdStarterJourneyService {
     ) -> HouseholdStarterJourneyResolutionResult {
         guard checkpoint.task == task,
               task.checkpoints.contains(checkpoint),
-              checkpoint.allowedResolutions.contains(resolution) else {
+              checkpoint.allowedResolutions.contains(resolution),
+              checkpoint != .acceptedRecommendedCarePlan else {
             return .invalidCheckpoint
         }
 
@@ -200,15 +200,6 @@ enum HouseholdStarterJourneyService {
             ) else {
                 return .missingSubject
             }
-            if checkpoint == .acceptedRecommendedCarePlan,
-               try !hasDefaultRecommendedCarePlan(
-                   petID: subjectID,
-                   livingPets: livingPets,
-                   context: context
-               ) {
-                return .invalidCheckpoint
-            }
-
             let actorResolution = resolveActingHuman(
                 requestedID: actingHumanID,
                 activeHumanID: activeHumanSelection.currentHumanId,
@@ -493,7 +484,10 @@ private extension HouseholdStarterJourneyService {
                 )
             },
             preferredID: activeHumanID,
-            requiredCount: HouseholdStarterJourneyPolicy.requiredCheckpointCount(for: .humanProfile)
+            requiredCount: HouseholdStarterJourneyPolicy.requiredCheckpointCount(for: .humanProfile),
+            requiredActualCheckpoints: HouseholdStarterJourneyTask
+                .humanProfile
+                .requiredActualCheckpoints
         )
         let petProfile = firstLivingPet.map { pet in
             candidateProgress(
@@ -528,7 +522,7 @@ private extension HouseholdStarterJourneyService {
             )
         }
         let carePlan = firstLivingPet.map { pet in
-            carePlanProgress(for: pet, facts: petFacts, resolutions: resolutions)
+            carePlanProgress(for: pet, facts: petFacts)
         }
         let firstCareCompleted = firstLivingPet.map { pet in
             hasFirstCare(targetPetID: pet.id, careLedgerEvents: careLedgerEvents)
@@ -544,8 +538,7 @@ private extension HouseholdStarterJourneyService {
             },
             firstCareCompleted: firstCareCompleted,
             hasLivingHuman: !livingHumans.isEmpty,
-            hasLivingPet: firstLivingPet != nil,
-            carePlanResolutionAvailable: petFacts.hasDefaultRecommendedCarePlan
+            hasLivingPet: firstLivingPet != nil
         )
     }
 
@@ -618,8 +611,6 @@ private extension HouseholdStarterJourneyService {
             .actionRequired
         }
         let availableResolutions: Set<HouseholdStarterJourneyCheckpoint> = switch task {
-        case .carePlan where progress.carePlanResolutionAvailable:
-            [.acceptedRecommendedCarePlan]
         case .carePlan, .firstCare:
             []
         case .humanProfile, .petProfile, .identityProtection, .healthProtection:
@@ -670,26 +661,32 @@ private extension HouseholdStarterJourneyService {
     private nonisolated static func selectCandidate(
         _ candidates: [CandidateProgress],
         preferredID: UUID?,
-        requiredCount: Int
+        requiredCount: Int,
+        requiredActualCheckpoints: Set<HouseholdStarterJourneyCheckpoint>
     ) -> CandidateProgress? {
         guard !candidates.isEmpty else { return nil }
+
+        // This is one household task. An active-member switch may choose among
+        // equal candidates, but it must never replace stronger existing progress.
+        let eligible = candidates.filter { candidate in
+            candidate.completed.count >= requiredCount
+                && requiredActualCheckpoints.isSubset(of: candidate.completed)
+        }
         if let preferredID,
-           let preferred = candidates.first(where: { $0.id == preferredID }) {
+           let preferred = eligible.first(where: { $0.id == preferredID }) {
             return preferred
         }
-        if let eligible = candidates.first(where: { $0.completed.count >= requiredCount }) {
-            return eligible
+        if let firstEligible = eligible.first {
+            return firstEligible
         }
+
+        let highestCompletedCount = candidates.lazy.map(\.completed.count).max() ?? 0
+        let leaders = candidates.filter { $0.completed.count == highestCompletedCount }
         if let preferredID,
-           let preferred = candidates.first(where: { $0.id == preferredID }) {
+           let preferred = leaders.first(where: { $0.id == preferredID }) {
             return preferred
         }
-        return candidates.max { lhs, rhs in
-            if lhs.completed.count != rhs.completed.count {
-                return lhs.completed.count < rhs.completed.count
-            }
-            return lhs.id.uuidString > rhs.id.uuidString
-        }
+        return leaders.first
     }
 
     nonisolated static func latestCheckpointResolutions(
@@ -944,29 +941,13 @@ private extension HouseholdStarterJourneyService {
 
     private nonisolated static func carePlanProgress(
         for pet: Pet,
-        facts: HouseholdStarterJourneyQualificationFacts,
-        resolutions: [String: HouseholdStarterJourneyResolution]
+        facts: HouseholdStarterJourneyQualificationFacts
     ) -> CandidateProgress {
         let checkpoint = HouseholdStarterJourneyCheckpoint.acceptedRecommendedCarePlan
-        let key = checkpointRecordKey(
-            task: .carePlan,
-            checkpoint: checkpoint,
-            subjectID: pet.id
-        )
-        let hasExplicitPlan = facts.hasExplicitCarePlan
-        let hasAnyPlan = hasExplicitPlan || facts.hasDefaultRecommendedCarePlan
-        var completed: Set<HouseholdStarterJourneyCheckpoint> = []
-        var recordedResolutions: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution] = [:]
-        if hasExplicitPlan {
-            completed.insert(checkpoint)
-        } else if hasAnyPlan, let resolution = resolutions[key] {
-            completed.insert(checkpoint)
-            recordedResolutions[checkpoint] = resolution
-        }
         return CandidateProgress(
             id: pet.id,
-            completed: completed,
-            resolutions: recordedResolutions
+            completed: facts.hasExplicitCarePlan ? [checkpoint] : [],
+            resolutions: [:]
         )
     }
 

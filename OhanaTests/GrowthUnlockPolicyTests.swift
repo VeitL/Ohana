@@ -28,13 +28,12 @@ struct GrowthUnlockPolicyTests {
         #expect(GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 7).isUnlocked)
     }
 
-    @Test func homeToolbarMatchesItsIconToTheAvailableDestination() {
-        #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 0) == .growthRoadmap)
-        #expect(HomeToolbarPrimaryActionPolicy.homeIcon(currentLevel: 0) == "tree.fill")
+    @Test func homeToolbarOnlyShowsHouseholdInsightsWhenTheyAreAvailable() {
+        #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 0) == nil)
+        #expect(HomeToolbarPrimaryActionPolicy.homeIcon == "chart.bar.xaxis")
         #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 1) == .featureGroup(.householdHub))
-        #expect(HomeToolbarPrimaryActionPolicy.homeIcon(currentLevel: 1) == "chart.bar.xaxis")
         #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 0, plan: .personal) == .featureGroup(.householdHub))
-        #expect(HomeToolbarPrimaryActionPolicy.homeIcon(currentLevel: 0, plan: .family) == "chart.bar.xaxis")
+        #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 0, plan: .family) == .featureGroup(.householdHub))
     }
 
     @Test func weeklyAndLongTermReviewHaveDistinctMilestones() {
@@ -138,6 +137,28 @@ struct GrowthUnlockPolicyTests {
         }
     }
 
+    @Test func plantLockedPreviewTitleIsLocalizedForEveryRegisteredLanguage() throws {
+        let expected = [
+            "zh": PlantUnlockPolicy.lockedTitleZh,
+            "en": "Plant care unlocks at Life Canopy Lv.4",
+            "de": "Pflanzenpflege ab Lebenskrone Lv.4",
+            "es": "El cuidado de plantas se desbloquea en Vida Lv.4",
+            "pt": "O cuidado de plantas desbloqueia no nível 4",
+            "fr": "Le soin des plantes se débloque au niveau 4",
+            "ja": "植物ケアは生命樹Lv.4で解放",
+            "ko": "식물 돌봄은 생명의 나무 Lv.4에서 잠금 해제",
+            "it": "La cura delle piante si sblocca al livello 4"
+        ]
+        #expect(Set(expected.keys) == Set(AppLanguage.supported.map(\.code)))
+        for language in AppLanguage.supported {
+            let expectedTitle = try #require(expected[language.code])
+            #expect(
+                PlantUnlockCopy.lockedTitle(language: language.code)
+                    == expectedTitle
+            )
+        }
+    }
+
     @Test func existingPlantDataSuppressesLockedPreviewBeforeLevelFour() {
         let suiteName = "GrowthUnlockPolicyTests.existingPlantDataSuppressesLockedPreviewBeforeLevelFour.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
@@ -156,6 +177,37 @@ struct GrowthUnlockPolicyTests {
     @Test func growthRoadmapIsAlwaysVisible() {
         #expect(GrowthUnlockPolicy.availability(for: FMDest.growthRoadmap, currentLevel: 0).isVisibleInApp)
         #expect(GrowthUnlockPolicy.availability(for: FMDest.growthRoadmap, currentLevel: 10).isVisibleInApp)
+    }
+
+    @Test func zenRoadmapKeepsSharedLevelsWhileLabelingStandardOnlyStages() throws {
+        let standardOnlyStages = GrowthUnlockStageID.allCases.filter {
+            GrowthUnlockExperiencePolicy.isStandardOnlyInZen($0)
+        }
+        #expect(standardOnlyStages == [
+            .dailyCare,
+            .bodyHealth,
+            .household,
+            .advancedInsights,
+            .memoryReview
+        ])
+
+        let household = try #require(
+            GrowthUnlockPolicy.roadmapStages().first(where: { $0.id == .household })
+        )
+        #expect(
+            GrowthUnlockExperiencePolicy.detail(
+                for: household,
+                experienceMode: .standard,
+                language: "zh-Hans"
+            ) == household.detail(language: "zh-Hans")
+        )
+        #expect(
+            GrowthUnlockExperiencePolicy.detail(
+                for: household,
+                experienceMode: .zen,
+                language: "zh-Hans"
+            ).contains("第一天就显示植物卡片")
+        )
     }
 
     @Test func featureRouteGuardRedirectsLockedAndSuppressesGatedDestinations() {

@@ -15,7 +15,7 @@ struct AppExperienceIntroductionBanner: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "leaf.fill") // a11y: allow decorative mode glyph is hidden below
                 .font(OhanaFont.adaptive(size: 17, weight: .black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 38, height: 38) // a11y: allow non-interactive decorative glyph
                 .background(Color.goPrimary, in: Circle())
                 .accessibilityHidden(true)
@@ -92,7 +92,7 @@ struct AppExperienceSelectionView: View {
                         VStack(spacing: 9) {
                             Image(systemName: "leaf.fill") // a11y: allow decorative mode glyph is hidden below
                                 .font(OhanaFont.adaptive(size: 34, weight: .black))
-                                .foregroundStyle(Color.arkInk)
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
                                 .frame(width: 82, height: 82)
                                 .background(Color.goPrimary, in: Circle())
                                 .accessibilityHidden(true)
@@ -162,7 +162,11 @@ struct AppExperienceSelectionView: View {
             HStack(spacing: 14) {
                 Image(systemName: mode == .zen ? "leaf.fill" : "square.grid.2x2.fill")
                     .font(OhanaFont.adaptive(size: 20, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(
+                        mode == .zen
+                            ? Color.ohanaPrimaryActionText
+                            : (OhanaResolvedPrimaryAccent(customHex: "2563EB")?.actionTextColor ?? Color.ohanaPrimaryText)
+                    )
                     .frame(width: 46, height: 46)
                     .background(mode == .zen ? Color.goPrimary : Color.goBlue, in: Circle())
                     .accessibilityHidden(true)
@@ -347,7 +351,7 @@ struct ZenOwnerUnavailableView: View {
                     it: "Apri Impostazioni"
                 ), systemImage: "gearshape.fill")
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .background(Color.goPrimary, in: Capsule())
             }

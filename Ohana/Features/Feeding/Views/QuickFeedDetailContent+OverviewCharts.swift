@@ -14,10 +14,6 @@ extension QuickFeedDetailContent {
                     Text(l.tr(zh: "全部喂食", en: "All feeding", de: "Alle Fütterungen"))
                         .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "手动、计划、自动都会计入总览。", en: "Manual, plan, and auto logs are all included.", de: "Manuell, Plan und Auto sind enthalten."))
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 Text(feedTaskState.todayMainFoodGrams > 0 ? formattedFoodWeight(feedTaskState.todayMainFoodGrams) : "--")
@@ -250,9 +246,9 @@ extension QuickFeedDetailContent {
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(
-                        zh: "按次数看节奏，没填克数也算",
-                        en: "Frequency rhythm; no-gram logs count",
-                        de: "Rhythmus nach Anzahl; ohne Gramm zählt"
+                        zh: "按记录次数",
+                        en: "By log count",
+                        de: "Nach Eintragszahl"
                     ))
                     .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)

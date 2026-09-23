@@ -320,7 +320,7 @@ struct HumanHealthMetricDetailView: View {
         HStack(spacing: 12) {
             Image(systemName: metric.category.systemImage)
                 .font(OhanaFont.adaptive(size: 18, weight: .black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(metric.category.colorToken.actionTextColor)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
 
@@ -627,7 +627,7 @@ struct HumanHealthMetricDetailView: View {
                 Text(l.tr(zh: "记录", en: "Record", de: "Erfassen"))
                     .font(OhanaFont.callout(.black))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 26)
             .frame(height: 54)
             .background(Color.goPrimary, in: Capsule())

@@ -7,6 +7,7 @@ import Foundation
 import PhotosUI
 import SwiftData
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 extension AddExpenseSheetContent {
@@ -76,22 +77,31 @@ extension AddExpenseSheetContent {
             sectionLabel(icon: "\(AppCurrency.systemIconName).fill", title: l.quickExpenseAmount)
                 .padding(.horizontal, 20)
 
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(AppCurrency.symbol)
-                    .font(OhanaFont.metric(size: 28, .black))
-                    .foregroundStyle(sheetTint)
-                Text(amountInput.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: appCountry) : amountInput)
-                    .font(OhanaFont.metric(size: 52, .black))
-                    .foregroundStyle(amountInput.isEmpty ? tertiaryText : primaryText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .minimumScaleFactor(0.45)
+            Button {
+                withAnimation(GoMotion.feedback) {
+                    activePayerAmountID = nil
+                }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(AppCurrency.symbol)
+                        .font(OhanaFont.metric(size: 28, .black))
+                        .foregroundStyle(sheetTint)
+                    Text(amountInput.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: appCountry) : amountInput)
+                        .font(OhanaFont.metric(size: 52, .black))
+                        .foregroundStyle(amountInput.isEmpty ? tertiaryText : primaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .minimumScaleFactor(0.45)
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+            .buttonStyle(.plain)
             .padding(.horizontal, 20)
+            .accessibilityLabel(l.quickExpenseAmount)
+            .accessibilityValue(amountInput.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: appCountry) : amountInput)
 
-            if !hasSavedMedicalExpense {
+            if !hasSavedMedicalExpense, activePayerAmountID == nil {
                 EmbeddedDecimalKeypad(
                     text: $amountInput,
                     countryCode: appCountry,
@@ -122,7 +132,7 @@ extension AddExpenseSheetContent {
                         } label: {
                             Text("\(AppCurrency.symbol)\(displayAmount(amount))")
                                 .font(OhanaFont.subheadline(.black))
-                                .foregroundStyle(isQuickAmountSelected(amount) ? Color.arkInk : primaryText)
+                                .foregroundStyle(isQuickAmountSelected(amount) ? Color.ohanaPrimaryActionText : primaryText)
                                 .padding(.horizontal, 15)
                                 .padding(.vertical, 10)
                                 .quickExpenseSolidSelectionSurface(
@@ -206,16 +216,43 @@ extension AddExpenseSheetContent {
 
     @ViewBuilder
     var payerSection: some View {
-        if activeExpenseHumans.count > 1 {
+        if !activeExpenseHumans.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                sectionLabel(icon: "person.fill", title: l.quickExpensePayer)
+                HStack {
+                    sectionLabel(icon: "person.fill", title: l.quickExpensePayer)
+                    Spacer()
+                    if selectedPayerIDs.count > 1 {
+                        Button {
+                            resetPayerAmountsToEqual()
+                        } label: {
+                            Text(l.tr(
+                                zh: "平分",
+                                en: "Split equally",
+                                de: "Gleich teilen",
+                                es: "Dividir por igual",
+                                pt: "Dividir igualmente",
+                                fr: "Partager également",
+                                ja: "均等割り",
+                                ko: "균등 분할",
+                                it: "Dividi in parti uguali"
+                            ))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(sheetTint)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        .disabled(!isAmountValid || hasSavedMedicalExpense)
+                        .accessibilityIdentifier("expense-payer-equal-split-action")
+                    }
+                }
                     .padding(.horizontal, 20)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         payerChip(id: nil, name: l.quickExpenseUnspecified, color: sheetTint) {
                             Image(systemName: "questionmark") // a11y: allow decorative icon covered by surrounding text or control
                                 .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(selectedPayerId == nil ? Color.arkInk : secondaryText)
+                                .foregroundStyle(selectedPayerId == nil ? Color.ohanaPrimaryActionText : secondaryText)
                         }
                         ForEach(activeExpenseHumans) { human in
                             payerChip(
@@ -228,6 +265,51 @@ extension AddExpenseSheetContent {
                         }
                     }
                     .padding(.horizontal, 20)
+                }
+
+                if selectedExpensePayerHumans.count > 1 {
+                    VStack(spacing: 7) {
+                        ForEach(selectedExpensePayerHumans) { human in
+                            payerContributionRow(human)
+                        }
+
+                        if let activePayerAmountID,
+                           selectedPayerIDs.contains(activePayerAmountID) {
+                            EmbeddedDecimalKeypad(
+                                text: payerAmountBinding(for: activePayerAmountID),
+                                countryCode: appCountry,
+                                maxFractionDigits: 2,
+                                accent: sheetTint,
+                                isEnabled: !isSaving,
+                                isMini: true,
+                                showsSubmitButton: true,
+                                onSubmit: {
+                                    if let payerSplitValidationText {
+                                        UIAccessibility.post(
+                                            notification: .announcement,
+                                            argument: payerSplitValidationText
+                                        )
+                                        return
+                                    }
+                                    withAnimation(GoMotion.feedback) {
+                                        self.activePayerAmountID = nil
+                                    }
+                                }
+                            )
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                    .padding(10)
+                    .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+                    .padding(.horizontal, 20)
+
+                    if let payerSplitValidationText {
+                        Text(payerSplitValidationText)
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(Color.goRed)
+                            .padding(.horizontal, 20)
+                            .accessibilityIdentifier("expense-payer-split-validation")
+                    }
                 }
             }
         }
@@ -381,6 +463,7 @@ extension AddExpenseSheetContent {
                 }
                 .disabled(!canSave)
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityHint(payerSplitValidationText ?? "")
             }
         }
         .padding(.horizontal, 20)

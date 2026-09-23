@@ -111,14 +111,13 @@ struct HumanAllFeaturesActivitySummary: Equatable {
         let recentDays = (0 ..< 7).compactMap {
             calendar.date(byAdding: .day, value: $0 - 6, to: todayStart)
         }
-        let humanID = human.id.uuidString
         let myMeds = allMeds.filter {
             UUID(uuidString: $0.humanId.trimmingCharacters(in: .whitespacesAndNewlines)) == human.id
         }
         let myReports = allReports.filter {
             UUID(uuidString: $0.humanId.trimmingCharacters(in: .whitespacesAndNewlines)) == human.id
         }
-        let myExpenses = allExpenses.filter { $0.executorId == humanID }
+        let myExpenses = ExpenseSummaryBuilder.paidBy(human.id, from: allExpenses)
         let latestWeight = weightLogs.max(by: { $0.date < $1.date })
         let latestWorkout = workoutLogs.max(by: { $0.date < $1.date })
         let latestHealthMetric = healthMetricLogs.max(by: { $0.date < $1.date })
@@ -188,7 +187,7 @@ struct HumanAllFeaturesActivitySummary: Equatable {
                 idPrefix: "human-all-expense",
                 values: myExpenses,
                 date: \.date,
-                value: { max(0, $0.amount) },
+                value: { max(0, ExpenseSummaryBuilder.amountPaid(by: human.id, for: $0)) },
                 calendar: calendar
             ),
             coconutChartPoints: FeatureHubChartPointFactory.quietPlaceholder(
@@ -302,14 +301,6 @@ struct HumanAllFeaturesSheet: View {
                     HumanOwnerPrivacyHint(appLanguage: appLanguage)
                 }
 
-                FeatureHubSummaryPanel(
-                    title: l.tr(zh: "成员摘要", en: "Member Summary", de: "Mitgliederübersicht"),
-                    statusText: summaryStatusText,
-                    statusTint: summaryStatusTint,
-                    metrics: metrics
-                )
-                .accessibilityIdentifier("human-all-features-summary-panel")
-
                 ForEach(visibleSections) { section in
                     FeatureHubSectionActionView(section: section) { destination in
                         open(destination)
@@ -411,54 +402,6 @@ struct HumanAllFeaturesSheet: View {
         return l.tr(zh: "不满1岁", en: "Under 1", de: "Unter 1")
     }
 
-    private var metrics: [FeatureHubMetric] {
-        [
-            FeatureHubMetric(
-                id: "weight",
-                title: l.tr(zh: "体重", en: "Weight", de: "Gewicht"),
-                value: lockedValue(.weight, visible: latestWeightText)
-            ),
-            FeatureHubMetric(
-                id: "meds",
-                title: l.tr(zh: "今日用药", en: "Meds today", de: "Medikamente"),
-                value: lockedValue(.medication, visible: medicationMetric)
-            ),
-            FeatureHubMetric(
-                id: "expense",
-                title: l.tr(zh: "本月花费", en: "This month", de: "Diesen Monat"),
-                value: lockedValue(.expense, visible: monthlyExpenseText)
-            )
-        ]
-    }
-
-    private var summaryStatusText: String {
-        if human.hasPassedAway {
-            return l.tr(zh: "纪念模式", en: "Memorial", de: "Gedenken")
-        }
-        if HumanLocalPrivacyPolicy.isEnabled,
-           isViewingOwnProfile,
-           !human.privateFields.isEmpty {
-            return l.tr(
-                zh: "\(human.privateFields.count) 项隐私保护", en: "\(human.privateFields.count) private fields", de: "\(human.privateFields.count) private Felder",
-                es: "\(human.privateFields.count) campos privados", pt: "\(human.privateFields.count) campos privados", fr: "\(human.privateFields.count) champs privés",
-                ja: "非公開項目\(human.privateFields.count)件", ko: "비공개 항목 \(human.privateFields.count)개", it: "\(human.privateFields.count) campi privati"
-            )
-        }
-        return l.tr(zh: "资料可用", en: "Profile ready", de: "Profil bereit")
-    }
-
-    private var summaryStatusTint: Color {
-        if human.hasPassedAway {
-            return Color.ohanaSecondaryText
-        }
-        if HumanLocalPrivacyPolicy.isEnabled,
-           isViewingOwnProfile,
-           !human.privateFields.isEmpty {
-            return Color.goPurple
-        }
-        return Color.goTeal
-    }
-
     private var visibleSections: [FeatureHubSectionData<HumanAllFeatureDestination>] {
         guard human.hasPassedAway else { return sections }
         return sections.compactMap { section in
@@ -490,7 +433,12 @@ struct HumanAllFeaturesSheet: View {
             FeatureHubSectionData(
                 id: "money",
                 title: l.tr(zh: "财务备注", en: "Money & Notes", de: "Geld & Notizen"),
-                subtitle: l.tr(zh: "花费、心愿和记录", en: "Expenses, wishes, notes", de: "Ausgaben, Wünsche, Notizen"),
+                subtitle: l.tr(
+                    zh: "宠物花费、心愿和记录", en: "Pet spending, wishes, notes", de: "Haustierausgaben, Wünsche, Notizen",
+                    es: "Gastos de mascotas, deseos y notas", pt: "Despesas com pets, desejos e notas",
+                    fr: "Dépenses des animaux, souhaits et notes", ja: "ペットの支出、願い、記録",
+                    ko: "반려동물 지출, 소원, 기록", it: "Spese per animali, desideri e note"
+                ),
                 items: moneyItems
             ),
             FeatureHubSectionData(
@@ -627,7 +575,11 @@ struct HumanAllFeaturesSheet: View {
         [
             item(
                 id: "expense",
-                title: l.tr(zh: "花费", en: "Expense", de: "Kosten"),
+                title: l.tr(
+                    zh: "宠物花费", en: "Pet spending", de: "Haustierausgaben",
+                    es: "Gastos de mascotas", pt: "Despesas com pets", fr: "Dépenses des animaux",
+                    ja: "ペットの支出", ko: "반려동물 지출", it: "Spese per animali"
+                ),
                 value: lockedValue(.expense, visible: monthlyExpenseText),
                 subtitle: lockedSubtitle(.expense, visible: expenseSubtitle),
                 icon: "creditcard.fill",
@@ -860,12 +812,21 @@ struct HumanAllFeaturesSheet: View {
     }
 
     private var monthlyExpenseText: String {
-        AppCurrency.format(monthlyExpenses.reduce(0) { $0 + $1.amount }, fractionDigits: 0)
+        AppCurrency.format(
+            monthlyExpenses.reduce(0) {
+                $0 + ExpenseSummaryBuilder.amountPaid(by: human.id, for: $1)
+            },
+            fractionDigits: 0
+        )
     }
 
     private var expenseSubtitle: String {
         guard let latest = myExpenses.first else {
-            return l.tr(zh: "记录这个月花了什么", en: "Track this month's spending", de: "Ausgaben dieses Monats")
+            return l.tr(
+                zh: "查看此人支付的份额", en: "View this person's share", de: "Bezahlten Anteil ansehen",
+                es: "Ver la parte pagada", pt: "Ver a parte paga", fr: "Voir la part payée",
+                ja: "この人の負担分を見る", ko: "이 사람이 낸 금액 보기", it: "Vedi la quota pagata"
+            )
         }
         return l.tr(
             zh: "上次 \(relativeDayText(latest.date))",
@@ -919,7 +880,7 @@ struct HumanAllFeaturesSheet: View {
     }
 
     private var myExpenses: [PetExpenseLog] {
-        allExpenses.filter { $0.executorId == human.id.uuidString }
+        ExpenseSummaryBuilder.paidBy(human.id, from: allExpenses)
     }
 
     private var monthlyExpenses: [PetExpenseLog] {

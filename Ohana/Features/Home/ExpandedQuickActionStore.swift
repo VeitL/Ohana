@@ -53,14 +53,12 @@ nonisolated enum ExpandedQuickActionStore {
         _ items: [QuickActionItem],
         defaultItems: [QuickActionItem]
     ) -> [QuickActionItem] {
-        guard !items.contains(where: { $0.actionType == "allFeatures" }),
-              let allFeatures = defaultItems.first(where: { $0.actionType == "allFeatures" })
-        else {
+        guard let allFeatures = items.first(where: { $0.actionType == "allFeatures" })
+            ?? defaultItems.first(where: { $0.actionType == "allFeatures" }) else {
             return items
         }
-        var merged = items
-        merged.insert(allFeatures, at: min(3, merged.count))
-        return merged
+        let nonAllFeatures = items.filter { $0.actionType != "allFeatures" }
+        return Array(nonAllFeatures.prefix(QuickActionLimit.maxItemsPerEntity - 1)) + [allFeatures]
     }
 
     static func humanItems(raw: String, human: Human, localization l: L10n) -> [QuickActionItem] {
@@ -75,7 +73,8 @@ nonisolated enum ExpandedQuickActionStore {
         let stored = decode(raw).filter {
             $0.entityId == human.id &&
                 $0.entityKind == .human &&
-                $0.actionType != "humanAllFeatures"
+                $0.actionType != "humanAllFeatures" &&
+                $0.actionType != "humanExpense"
         }
         return stored.isEmpty ? defaultItems : stored
     }
@@ -148,7 +147,10 @@ nonisolated enum ExpandedQuickActionStore {
         let currentPetItemIds = Set(currentItems.map(\.id))
         let insertionIdx = saved.firstIndex(where: { currentPetItemIds.contains($0.id) }) ?? saved.count
         saved.removeAll { ($0.petId == petID || $0.entityId == petID) && $0.entityKind != .human }
-        let cleaned = edited.filter { $0.actionType != "litterChange" }
+        let cleaned = petItemsWithRequiredAllFeatures(
+            edited.filter { $0.actionType != "litterChange" },
+            defaultItems: currentItems
+        )
         saved.insert(contentsOf: Array(cleaned.prefix(QuickActionLimit.maxItemsPerEntity)), at: min(insertionIdx, saved.count))
         return encode(saved) ?? raw
     }
@@ -191,7 +193,9 @@ nonisolated enum ExpandedQuickActionStore {
         let currentItemIds = Set(currentItems.map(\.id))
         let insertionIdx = saved.firstIndex(where: { currentItemIds.contains($0.id) }) ?? saved.count
         saved.removeAll { $0.entityId == humanID && $0.entityKind == .human }
-        let cleaned = edited.filter { $0.actionType != "humanAllFeatures" }
+        let cleaned = edited.filter {
+            $0.actionType != "humanAllFeatures" && $0.actionType != "humanExpense"
+        }
         saved.insert(contentsOf: Array(cleaned.prefix(QuickActionLimit.maxItemsPerEntity)), at: min(insertionIdx, saved.count))
         return encode(saved) ?? raw
     }

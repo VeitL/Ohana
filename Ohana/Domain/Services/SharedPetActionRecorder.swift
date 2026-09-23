@@ -81,6 +81,7 @@ struct SharedPetActionDescriptor {
     let executorId: String?
     let executorIds: [String]
     let recordedByHumanId: String?
+    let payerContributions: [ExpensePayerContribution]
     let allocationMode: SharedCareAllocationMode
     let totalAmountGrams: Double
     let totalAmountMl: Double
@@ -104,6 +105,7 @@ struct SharedPetActionDescriptor {
         executorId: String? = nil,
         executorIds: [String] = [],
         recordedByHumanId: String? = nil,
+        payerContributions: [ExpensePayerContribution] = [],
         allocationMode: SharedCareAllocationMode = .equal,
         totalAmountGrams: Double = 0,
         totalAmountMl: Double = 0,
@@ -127,6 +129,7 @@ struct SharedPetActionDescriptor {
         self.executorId = normalizedExecutorIds.first ?? executorId
         self.executorIds = normalizedExecutorIds
         self.recordedByHumanId = recordedByHumanId
+        self.payerContributions = payerContributions
         self.allocationMode = allocationMode
         self.totalAmountGrams = totalAmountGrams
         self.totalAmountMl = totalAmountMl
@@ -299,8 +302,17 @@ enum SharedPetActionRecorder {
 
         switch descriptor.childLogStrategy {
         case let .care(type):
-            let perPetGrams = distributedAmount(descriptor.totalAmountGrams, count: allocationTargetCount, fractionDigits: 0)
-            let perPetMl = distributedAmount(descriptor.totalAmountMl, count: allocationTargetCount, fractionDigits: 0)
+            guard let perPetGrams = distributedAmount(
+                descriptor.totalAmountGrams,
+                count: allocationTargetCount,
+                fractionDigits: 0
+            ), let perPetMl = distributedAmount(
+                descriptor.totalAmountMl,
+                count: allocationTargetCount,
+                fractionDigits: 0
+            ) else {
+                return .noOp()
+            }
             for (index, target) in targets.enumerated() {
                 let intent = DomainCareFactCreateIntent(
                     kind: .care(
@@ -392,33 +404,20 @@ enum SharedPetActionRecorder {
                 effectPlans.append(write)
             }
         case let .expense(category, note):
-            let visibleExpenseNote = SharedCareMetadata.userNoteForStorage(note)
-            let perPetAmounts = distributedAmount(descriptor.totalExpenseAmount, count: allocationTargetCount, fractionDigits: 2)
-            for (index, target) in targets.enumerated() {
-                let intent = DomainCareFactCreateIntent(
-                    kind: .expense(
-                        amount: perPetAmounts[index],
-                        category: category,
-                        note: visibleExpenseNote,
-                        sharedSessionId: session.id.uuidString
-                    ),
-                    occurredAt: descriptor.date,
-                    executorId: descriptor.executorId
-                )
-                guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
-                    pet: target,
-                    intent: intent,
-                    context: context,
-                    logPrefix: "SharedPetActionRecorder.record",
-                    actorOverride: actor
-                ) else {
-                    discardPendingFacts()
-                    return .noOp()
-                }
-                let log = createExpenseLog(plan: write, descriptor: descriptor, context: context)
-                expenseLogs.append((target, log))
-                effectPlans.append(write)
+            guard let facts = createExpenseFacts(
+                descriptor: descriptor,
+                targets: targets,
+                sessionID: session.id,
+                actor: actor,
+                category: category,
+                note: note,
+                context: context
+            ) else {
+                discardPendingFacts()
+                return .noOp()
             }
+            expenseLogs = facts.logs
+            effectPlans.append(contentsOf: facts.plans)
         case let .walk(distanceMeters, endDate, coconutsEarned, behaviorNotes, moodRating):
             for target in targets {
                 let intent = DomainCareFactCreateIntent(
@@ -601,14 +600,74 @@ enum SharedPetActionRecorder {
         )
     }
 
+    @MainActor
+    private static func createExpenseFacts(
+        descriptor: SharedPetActionDescriptor,
+        targets: [Pet],
+        sessionID: UUID,
+        actor: EconomyRewardOwnerResolution,
+        category: ExpenseCategory,
+        note: String,
+        context: ModelContext
+    ) -> (logs: [(Pet, PetExpenseLog)], plans: [AuthorizedDomainCareFactWrite])? {
+        guard let amounts = distributedAmount(
+            descriptor.totalExpenseAmount,
+            count: max(targets.count, 1),
+            fractionDigits: 2
+        ) else { return nil }
+        guard let contributions = try? ExpensePayerContributionPolicy.distributed(
+            descriptor.payerContributions,
+            across: amounts
+        ) else {
+            return nil
+        }
+
+        var logs: [(Pet, PetExpenseLog)] = []
+        var plans: [AuthorizedDomainCareFactWrite] = []
+        let visibleNote = SharedCareMetadata.userNoteForStorage(note)
+        for (index, target) in targets.enumerated() {
+            let intent = DomainCareFactCreateIntent(
+                kind: .expense(
+                    amount: amounts[index],
+                    category: category,
+                    note: visibleNote,
+                    sharedSessionId: sessionID.uuidString
+                ),
+                occurredAt: descriptor.date,
+                executorId: descriptor.executorId
+            )
+            guard let write = DomainCareFactWriteAuthorizer.authorizePetFact(
+                pet: target,
+                intent: intent,
+                context: context,
+                logPrefix: "SharedPetActionRecorder.record",
+                actorOverride: actor
+            ) else {
+                logs.forEach { context.delete($0.1) }
+                return nil
+            }
+            let log = createExpenseLog(
+                plan: write,
+                descriptor: descriptor,
+                payerContributions: contributions[index],
+                context: context
+            )
+            logs.append((target, log))
+            plans.append(write)
+        }
+        return (logs, plans)
+    }
+
     private static func createExpenseLog(
         plan: AuthorizedDomainCareFactWrite,
         descriptor: SharedPetActionDescriptor,
+        payerContributions: [ExpensePayerContribution],
         context: ModelContext
     ) -> PetExpenseLog {
         DomainCareFactWriter.createExpenseLog(
             plan: plan,
             recordedByHumanId: descriptor.recordedByHumanId,
+            payerContributions: payerContributions,
             context: context
         )
     }
@@ -662,7 +721,7 @@ enum SharedPetActionRecorder {
         actor: EconomyRewardOwnerResolution
     ) -> [String] {
         SharedCareParticipantIDs.normalized(
-            descriptor.executorIds,
+            descriptor.executorIds + descriptor.payerContributions.compactMap { $0.humanID?.uuidString },
             preferredFirst: actor.effectiveExecutorId ?? descriptor.executorId
         )
     }
@@ -707,14 +766,20 @@ enum SharedPetActionRecorder {
         return .other
     }
 
-    private static func distributedAmount(_ total: Double, count: Int, fractionDigits: Int) -> [Double] {
-        guard total > 0, count > 0 else { return Array(repeating: 0, count: max(count, 0)) }
+    private static func distributedAmount(_ total: Double, count: Int, fractionDigits: Int) -> [Double]? {
+        guard count > 0 else { return [] }
+        guard total > 0 else { return Array(repeating: 0, count: count) }
         let factor = pow(10, Double(fractionDigits))
-        let totalUnits = Int((total * factor).rounded())
-        let base = totalUnits / count
-        let remainder = totalUnits % count
+        let roundedUnits = (total * factor).rounded()
+        guard roundedUnits.isFinite,
+              roundedUnits >= 0,
+              roundedUnits < Double(Int64.max) else { return nil }
+        let totalUnits = Int64(roundedUnits)
+        let divisor = Int64(count)
+        let base = totalUnits / divisor
+        let remainder = totalUnits % divisor
         return (0 ..< count).map { index in
-            Double(base + (index < remainder ? 1 : 0)) / factor
+            Double(base + (Int64(index) < remainder ? 1 : 0)) / factor
         }
     }
 

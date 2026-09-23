@@ -308,7 +308,9 @@ struct ColorPickerPopup: View {
                             .frame(width: 44, height: 44)
                         Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.goCardWhite)
+                            .foregroundStyle(
+                                OhanaResolvedPrimaryAccent(customHex: preset.hex)?.actionTextColor ?? Color.ohanaPrimaryText
+                            )
                             .shadow(color: Color.arkInk.opacity(0.22), radius: 2) // ui-v4: allow checkmark readability on bright swatches.
                     }
                 }

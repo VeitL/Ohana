@@ -73,7 +73,7 @@ struct ZenStreakView: View {
     private var screenTitle: String {
         switch selectedSemantic {
         case .ownerSafety:
-            return l.tr(
+            l.tr(
                 zh: "平安日历",
                 en: "Safety calendar",
                 de: "Bestätigungskalender",
@@ -85,7 +85,7 @@ struct ZenStreakView: View {
                 it: "Calendario di conferma"
             )
         case .humanContact:
-            return l.tr(
+            l.tr(
                 zh: "联系日历",
                 en: "Contact calendar",
                 de: "Kontaktkalender",
@@ -97,7 +97,7 @@ struct ZenStreakView: View {
                 it: "Calendario dei contatti"
             )
         case .petObservation:
-            return l.tr(
+            l.tr(
                 zh: "观察日历",
                 en: "Observation calendar",
                 de: "Beobachtungskalender",
@@ -109,7 +109,7 @@ struct ZenStreakView: View {
                 it: "Calendario delle osservazioni"
             )
         case .plantObservation:
-            return l.tr(
+            l.tr(
                 zh: "陪伴日历",
                 en: "Companion calendar",
                 de: "Begleitkalender",
@@ -301,15 +301,15 @@ struct ZenStreakView: View {
     private var ownerStreakReassurance: some View {
         Label {
             Text(l.tr(
-                zh: "连续是节奏，不是惩罚；中断只会开启新一轮，最好记录会保留。",
-                en: "A streak is a rhythm, not a penalty. A missed day simply starts a new round; your best stays.",
-                de: "Eine Serie ist ein Rhythmus, keine Strafe. Eine Pause startet nur eine neue Runde; dein Bestwert bleibt.",
-                es: "La racha es un ritmo, no un castigo. Una pausa solo inicia otra ronda; tu mejor marca permanece.",
-                pt: "A sequência é um ritmo, não uma punição. Uma pausa só inicia outra rodada; seu melhor fica.",
-                fr: "Une série est un rythme, pas une punition. Une pause ouvre simplement un nouveau cycle ; votre record reste.",
-                ja: "連続はリズムであって罰ではありません。途切れても新しい一周が始まり、最高記録は残ります。",
-                ko: "연속 기록은 리듬이지 벌이 아니에요. 쉬어도 새 라운드가 시작될 뿐, 최고 기록은 남아요.",
-                it: "La serie è un ritmo, non una punizione. Una pausa apre solo un nuovo giro; il record resta."
+                zh: "中断会开启新一轮，最佳记录保留。",
+                en: "A missed day starts a new round; your best stays.",
+                de: "Eine Pause startet eine neue Runde; dein Bestwert bleibt.",
+                es: "Una pausa inicia otra ronda; tu mejor marca permanece.",
+                pt: "Uma pausa inicia outra rodada; seu melhor fica.",
+                fr: "Une pause ouvre un nouveau cycle ; votre record reste.",
+                ja: "途切れても新しい一周が始まり、最高記録は残ります。",
+                ko: "쉬어도 새 라운드가 시작되고 최고 기록은 남아요.",
+                it: "Una pausa apre un nuovo giro; il record resta."
             ))
             .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaSecondaryText)
@@ -344,7 +344,7 @@ struct ZenStreakView: View {
     private var primaryMetricTitle: String {
         switch selectedSemantic {
         case .plantObservation:
-            return l.tr(
+            l.tr(
                 zh: "已陪伴天数",
                 en: "Days together",
                 de: "Tage zusammen",
@@ -356,7 +356,7 @@ struct ZenStreakView: View {
                 it: "Giorni insieme"
             )
         case .ownerSafety:
-            return l.tr(
+            l.tr(
                 zh: "当前连续确认",
                 en: "Current confirmations",
                 de: "Aktuelle Serie",
@@ -368,7 +368,7 @@ struct ZenStreakView: View {
                 it: "Serie attuale"
             )
         case .humanContact:
-            return l.tr(
+            l.tr(
                 zh: "本月联系",
                 en: "Contacts this month",
                 de: "Kontakte diesen Monat",
@@ -380,7 +380,7 @@ struct ZenStreakView: View {
                 it: "Contatti del mese"
             )
         case .petObservation:
-            return l.tr(
+            l.tr(
                 zh: "本月观察",
                 en: "Observations this month",
                 de: "Diesen Monat",
@@ -397,7 +397,7 @@ struct ZenStreakView: View {
     private var secondaryMetricTitle: String {
         switch selectedSemantic {
         case .plantObservation, .petObservation:
-            return l.tr(
+            l.tr(
                 zh: "观察记录",
                 en: "Observations",
                 de: "Beobachtungen",
@@ -409,7 +409,7 @@ struct ZenStreakView: View {
                 it: "Osservazioni"
             )
         case .ownerSafety:
-            return l.tr(
+            l.tr(
                 zh: "最长连续确认",
                 en: "Longest confirmations",
                 de: "Längste Serie",
@@ -421,7 +421,7 @@ struct ZenStreakView: View {
                 it: "Serie più lunga"
             )
         case .humanContact:
-            return l.tr(
+            l.tr(
                 zh: "累计联系",
                 en: "All contacts",
                 de: "Alle Kontakte",
@@ -599,7 +599,7 @@ struct ZenStreakView: View {
     private var compactCalendarKeyText: String {
         switch selectedSemantic {
         case .plantObservation, .petObservation:
-            return l.tr(
+            l.tr(
                 zh: "数字为观察分数 · ◌ 补记观察 · ✓ 当天记录 · — 无观察记录",
                 en: "Number = observation score · ◌ remembered · ✓ recorded that day · — no observation",
                 de: "Zahl = Beobachtungswert · ◌ nachgetragen · ✓ an diesem Tag erfasst · — keine Beobachtung",
@@ -611,7 +611,7 @@ struct ZenStreakView: View {
                 it: "Numero = punteggio osservato · ◌ annotato · ✓ registrato quel giorno · — nessuna osservazione"
             )
         case .humanContact:
-            return l.tr(
+            l.tr(
                 zh: "数字为状态分数 · ◌ 补记状态 · ✓ 当天联系 · — 无联系记录",
                 en: "Number = score · ◌ remembered status · ✓ contact that day · — no contact",
                 de: "Zahl = Wert · ◌ Status nachgetragen · ✓ Kontakt an diesem Tag · — kein Kontakt",
@@ -623,7 +623,7 @@ struct ZenStreakView: View {
                 it: "Numero = punteggio · ◌ stato annotato · ✓ contatto del giorno · — nessun contatto"
             )
         case .ownerSafety:
-            return l.tr(
+            l.tr(
                 zh: "数字为状态分数 · ◌ 仅补记状态 · ✓ 当天平安确认 · — 未参与",
                 en: "Number = score · ◌ status note only · ✓ safety confirmed · — not participating",
                 de: "Zahl = Wert · ◌ nur Statusnotiz · ✓ bestätigt · — nicht teilgenommen",
@@ -663,19 +663,8 @@ struct ZenStreakView: View {
                     ))
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(canOpen
-                        ? l.tr(
-                            zh: "90 天、1 年与全部时间",
-                            en: "90 days, one year, and all time",
-                            de: "90 Tage, ein Jahr und Gesamtzeit",
-                            es: "90 días, un año y todo el historial",
-                            pt: "90 dias, um ano e todo o histórico",
-                            fr: "90 jours, un an et tout l’historique",
-                            ja: "90日、1年、すべての期間",
-                            ko: "90일, 1년 및 전체 기간",
-                            it: "90 giorni, un anno e tutto il periodo"
-                        )
-                        : l.tr(
+                    if !canOpen {
+                        Text(l.tr(
                             zh: "Ohana Personal 解锁",
                             en: "Unlock with Ohana Personal",
                             de: "Mit Ohana Personal freischalten",
@@ -686,9 +675,10 @@ struct ZenStreakView: View {
                             ko: "Ohana Personal로 잠금 해제",
                             it: "Sblocca con Ohana Personal"
                         ))
-                        .font(OhanaFont.footnote())
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(2)
+                            .font(OhanaFont.footnote())
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .lineLimit(2)
+                    }
                 }
 
                 Spacer(minLength: 8)
@@ -855,9 +845,16 @@ private struct ZenCalendarDayCell: View {
 
     private var textColor: Color {
         if day?.checkedIn == true {
-            return Color.ohanaPrimaryActionText
+            return checkedInForeground
         }
         return isFuture ? Color.ohanaTertiaryText : Color.ohanaPrimaryText
+    }
+
+    private var checkedInForeground: Color {
+        guard let score = day?.status?.score else { return Color.goCardWhite }
+        return OhanaResolvedPrimaryAccent(
+            customHex: ZenPresenceScorePalette.hex(for: score)
+        )?.actionTextColor ?? Color.goCardWhite
     }
 
     private var dayContent: some View {
@@ -881,13 +878,13 @@ private struct ZenCalendarDayCell: View {
             if day?.checkedIn == true, let score = day?.status?.score, !isFuture {
                 Text("\(score)")
                     .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .foregroundStyle(checkedInForeground)
                     .offset(y: 11)
                     .accessibilityHidden(true)
             } else if day?.checkedIn == true, !isFuture {
                 Image(systemName: "checkmark").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 7, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .foregroundStyle(checkedInForeground)
                     .offset(y: 11)
             } else if day?.isRetrospectiveStatus == true,
                       let score = day?.status?.score,
@@ -972,21 +969,21 @@ private struct ZenCalendarDayCell: View {
     private var recordedThatDayText: String {
         switch recordSemantic {
         case .ownerSafety:
-            return localization.tr(
+            localization.tr(
                 zh: "当天已平安确认", en: "Safety confirmed that day",
                 de: "An diesem Tag bestätigt", es: "Bienestar confirmado ese día",
                 pt: "Segurança confirmada no dia", fr: "Confirmation effectuée ce jour-là",
                 ja: "当日に無事確認済み", ko: "당일 무사 확인됨", it: "Conferma effettuata quel giorno"
             )
         case .humanContact:
-            return localization.tr(
+            localization.tr(
                 zh: "当天已联系", en: "Contact recorded that day",
                 de: "Kontakt an diesem Tag", es: "Contacto registrado ese día",
                 pt: "Contato registrado no dia", fr: "Contact noté ce jour-là",
                 ja: "当日に連絡済み", ko: "당일 연락 기록됨", it: "Contatto registrato quel giorno"
             )
         case .petObservation, .plantObservation:
-            return localization.tr(
+            localization.tr(
                 zh: "当天已观察", en: "Observed that day",
                 de: "An diesem Tag beobachtet", es: "Observado ese día",
                 pt: "Observado no dia", fr: "Observé ce jour-là",
@@ -1056,21 +1053,21 @@ private struct ZenCalendarDayCell: View {
     private var missingRecordText: String {
         switch recordSemantic {
         case .ownerSafety:
-            return localization.tr(
+            localization.tr(
                 zh: "未确认平安", en: "Safety not confirmed",
                 de: "Nicht bestätigt", es: "Bienestar sin confirmar",
                 pt: "Segurança não confirmada", fr: "Confirmation absente",
                 ja: "無事未確認", ko: "무사 미확인", it: "Conferma assente"
             )
         case .humanContact:
-            return localization.tr(
+            localization.tr(
                 zh: "无联系记录", en: "No contact recorded",
                 de: "Kein Kontakt erfasst", es: "Sin contacto registrado",
                 pt: "Nenhum contato registrado", fr: "Aucun contact noté",
                 ja: "連絡記録なし", ko: "연락 기록 없음", it: "Nessun contatto registrato"
             )
         case .petObservation, .plantObservation:
-            return localization.tr(
+            localization.tr(
                 zh: "未记录观察",
                 en: "No observation recorded",
                 de: "Keine Beobachtung erfasst",
@@ -1122,278 +1119,5 @@ private struct ZenCalendarDayCell: View {
             ko: "상태 점수를 보충 기록해도 무사 확인, 연속 기록, 보상은 복원되지 않아요",
             it: "Tocca per annotare un punteggio; conferma, serie e ricompense non verranno ripristinate"
         )
-    }
-}
-
-private struct ZenRetrospectiveStatusDraft: Identifiable, Equatable {
-    let subjectID: String
-    let subjectKind: ZenPresenceSubjectKind
-    let recordSemantic: ZenPresenceRecordSemantic
-    let subjectName: String
-    let dayKey: String
-    let date: Date
-    let initialScore: Int
-    var id: String { "\(subjectKind.rawValue):\(subjectID):\(dayKey)" }
-}
-private struct ZenRetrospectiveStatusSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let draft: ZenRetrospectiveStatusDraft
-    let localization: L10n
-    let languageCode: String
-    let onSave: (_ score: Int) async -> Void
-
-    @State private var score: Double
-    @State private var isSaving = false
-
-    init(
-        draft: ZenRetrospectiveStatusDraft,
-        localization: L10n,
-        languageCode: String,
-        onSave: @escaping (_ score: Int) async -> Void
-    ) {
-        self.draft = draft
-        self.localization = localization
-        self.languageCode = languageCode
-        self.onSave = onSave
-        _score = State(initialValue: Double(min(max(draft.initialScore, 1), 10)))
-    }
-
-    private var selectedScore: Int { Int(score.rounded()) }
-    private var selectedStatus: ZenPresenceStatus { ZenPresenceStatus(score: selectedScore) }
-    private var usesObservationCopy: Bool {
-        draft.recordSemantic == .petObservation || draft.recordSemantic == .plantObservation
-    }
-
-    private var scoreAccessibilityLabel: String {
-        if usesObservationCopy {
-            return localization.tr(
-                zh: "观察分数",
-                en: "Observation score",
-                de: "Beobachtungswert",
-                es: "Puntuación de observación",
-                pt: "Pontuação da observação",
-                fr: "Score d’observation",
-                ja: "観察スコア",
-                ko: "관찰 점수",
-                it: "Punteggio di osservazione"
-            )
-        }
-        return localization.tr(
-            zh: "状态分数",
-            en: "Status score",
-            de: "Statuswert",
-            es: "Puntuación de estado",
-            pt: "Pontuação de estado",
-            fr: "Score d’état",
-            ja: "状態スコア",
-            ko: "상태 점수",
-            it: "Punteggio di stato"
-        )
-    }
-
-    private var retrospectiveExplanation: String {
-        if usesObservationCopy {
-            return localization.tr(
-                zh: "这是补记观察，不会变成当天记录，也不会产生椰子奖励。",
-                en: "This is a remembered observation. It will not become a same-day record or earn coconut rewards.",
-                de: "Dies ist eine nachgetragene Beobachtung. Sie wird kein Tageseintrag und bringt keine Kokosnuss-Belohnung.",
-                es: "Es una observación recordada. No será un registro del mismo día ni dará recompensas de cocos.",
-                pt: "Esta é uma observação lembrada. Ela não vira um registro do mesmo dia nem gera recompensas de cocos.",
-                fr: "C’est une observation ajoutée. Elle ne deviendra pas une note du jour et ne donnera pas de noix de coco.",
-                ja: "これはあとから追加する観察です。当日の記録やココナッツ報酬にはなりません。",
-                ko: "나중에 추가하는 관찰 기록입니다. 당일 기록이나 코코넛 보상이 되지는 않아요.",
-                it: "È un’osservazione annotata in seguito. Non diventa una registrazione del giorno e non dà ricompense in cocco."
-            )
-        }
-        if draft.recordSemantic == .humanContact {
-            return localization.tr(
-                zh: "这是补记状态，不会变成当天联系记录，也不会产生椰子奖励。",
-                en: "This remembers a status. It will not become same-day contact or earn coconut rewards.",
-                de: "Dies ist ein nachgetragener Status. Er wird kein Kontakt und bringt keine Belohnung.",
-                es: "Es un estado recordado. No será contacto del mismo día ni dará cocos.",
-                pt: "Este é um status lembrado. Ele não vira contato do dia nem gera cocos.",
-                fr: "C’est un état ajouté. Il ne deviendra pas un contact du jour et ne donnera pas de récompense.",
-                ja: "状態の補記です。当日の連絡やココナッツ報酬にはなりません。",
-                ko: "상태 보충 기록입니다. 당일 연락이나 코코넛 보상이 되지는 않아요.",
-                it: "È uno stato annotato. Non diventa un contatto del giorno e non dà ricompense."
-            )
-        }
-        return localization.tr(
-            zh: "这是补记状态，不会恢复当天平安确认、连续天数或椰子奖励。",
-            en: "This remembers a status. It will not restore that day’s safety confirmation, streak, or coconut rewards.",
-            de: "Dies ist ein nachgetragener Status. Bestätigung, Serie und Belohnung werden nicht wiederhergestellt.",
-            es: "Es un estado recordado. No restaurará la confirmación, la racha ni las recompensas.",
-            pt: "Este é um status lembrado. Ele não restaura a confirmação, a sequência nem recompensas.",
-            fr: "C’est un état ajouté. Il ne restaure ni la confirmation, ni la série, ni les récompenses.",
-            ja: "状態の補記です。その日の無事確認、連続記録、報酬は戻りません。",
-            ko: "상태 보충 기록입니다. 당일 무사 확인, 연속 기록, 보상은 복원되지 않아요.",
-            it: "È uno stato annotato. Non ripristina conferma, serie o ricompense."
-        )
-    }
-
-    private var saveLabel: String {
-        if usesObservationCopy {
-            return localization.tr(
-                zh: "保存观察",
-                en: "Save observation",
-                de: "Beobachtung speichern",
-                es: "Guardar observación",
-                pt: "Salvar observação",
-                fr: "Enregistrer l’observation",
-                ja: "観察を保存",
-                ko: "관찰 저장",
-                it: "Salva osservazione"
-            )
-        }
-        return localization.tr(
-            zh: "保存补记",
-            en: "Save remembered status",
-            de: "Nachtrag speichern",
-            es: "Guardar estado recordado",
-            pt: "Salvar estado lembrado",
-            fr: "Enregistrer l’état ajouté",
-            ja: "補記を保存",
-            ko: "보충 기록 저장",
-            it: "Salva stato annotato"
-        )
-    }
-
-    private var navigationTitle: String {
-        if usesObservationCopy {
-            return localization.tr(
-                zh: "补记观察",
-                en: "Remember an observation",
-                de: "Beobachtung nachtragen",
-                es: "Recordar una observación",
-                pt: "Lembrar uma observação",
-                fr: "Ajouter une observation",
-                ja: "観察を補記",
-                ko: "관찰 보충 기록",
-                it: "Annota un’osservazione"
-            )
-        }
-        return localization.tr(
-            zh: "补记状态",
-            en: "Remember a status",
-            de: "Status nachtragen",
-            es: "Recordar un estado",
-            pt: "Lembrar um estado",
-            fr: "Ajouter un état",
-            ja: "状態を補記",
-            ko: "상태 보충 기록",
-            it: "Annota uno stato"
-        )
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 18) {
-                VStack(spacing: 5) {
-                    Text(draft.subjectName)
-                        .font(OhanaFont.headline(.bold))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(draft.date.formatted(
-                        .dateTime
-                            .year()
-                            .month(.wide)
-                            .day()
-                            .locale(Locale(identifier: languageCode))
-                    ))
-                    .font(OhanaFont.footnote(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                }
-
-                VStack(spacing: 8) {
-                    Text("\(selectedScore)/10")
-                        .font(OhanaFont.metric(size: 42, .black))
-                        .foregroundStyle(selectedStatus.zenColor)
-                        .contentTransition(.numericText())
-                    Text(selectedStatus.scoreBand.title(localization))
-                        .font(OhanaFont.callout(.bold))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-
-                    Slider(value: $score, in: 1 ... 10, step: 1)
-                        .tint(selectedStatus.zenColor)
-                        .accessibilityLabel(scoreAccessibilityLabel)
-                        .accessibilityValue("\(selectedScore)/10")
-                }
-                .animation(reduceMotion ? GoMotion.reduced : GoMotion.quick, value: selectedScore)
-
-                Label {
-                    Text(retrospectiveExplanation)
-                    .font(OhanaFont.footnote(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                } icon: {
-                    Image(systemName: "clock.arrow.circlepath").accessibilityHidden(true)
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    Color.ohanaControlFill,
-                    in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
-                )
-
-                Button {
-                    save()
-                } label: {
-                    HStack(spacing: 8) {
-                        if isSaving {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(Color.ohanaPrimaryActionText)
-                        }
-                        Text(saveLabel)
-                            .font(OhanaFont.callout(.bold))
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 50)
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: OhanaRadius.controlLarge))
-                .tint(selectedStatus.zenColor)
-                .disabled(isSaving)
-                .accessibilityIdentifier("zen-retrospective-status-save")
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 10)
-            .padding(.bottom, 18)
-            .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(localization.tr(
-                        zh: "取消",
-                        en: "Cancel",
-                        de: "Abbrechen",
-                        es: "Cancelar",
-                        pt: "Cancelar",
-                        fr: "Annuler",
-                        ja: "キャンセル",
-                        ko: "취소",
-                        it: "Annulla"
-                    )) {
-                        dismiss()
-                    }
-                    .disabled(isSaving)
-                }
-            }
-        }
-        .presentationDetents(OhanaSheetDetents.overview)
-        .presentationDragIndicator(.visible)
-        .interactiveDismissDisabled(isSaving)
-        .accessibilityIdentifier("zen-retrospective-status-sheet")
-    }
-
-    private func save() {
-        guard !isSaving else { return }
-        isSaving = true
-        let value = selectedScore
-        Task {
-            await onSave(value)
-            isSaving = false
-            dismiss()
-        }
     }
 }

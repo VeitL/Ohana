@@ -160,6 +160,11 @@ nonisolated struct TaskCenterSystemJourneyGuide: Equatable, Sendable {
               availableResolutionCheckpoints.contains(checkpoint) else {
             return []
         }
+        // A care-plan checkpoint must be completed by a persisted plan. Legacy
+        // stores can report a generated recommendation as "available", but a
+        // Task Center answer must never imply that tapping a status choice
+        // created or accepted a plan when no plan command ran.
+        guard checkpoint != .acceptedRecommendedCarePlan else { return [] }
         let stableOrder: [HouseholdStarterJourneyResolution] = [
             .reviewed,
             .unknown,

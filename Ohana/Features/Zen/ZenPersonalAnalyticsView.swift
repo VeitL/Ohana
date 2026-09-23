@@ -431,8 +431,7 @@ struct ZenPersonalAnalyticsView: View {
             .font(OhanaFont.callout(.bold))
             .frame(maxWidth: .infinity, minHeight: 48)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(Color.goPrimary)
+        .ohanaPrimaryProminentButton()
         .disabled(filteredDays.isEmpty)
         .accessibilityIdentifier("zen-analytics-export-action")
     }

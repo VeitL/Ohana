@@ -139,7 +139,7 @@ struct ProtectionCoreCard: View {
                 Button(action: onAdd) {
                     Image(systemName: "plus") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                        .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                         .frame(width: 30, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                 }
@@ -210,7 +210,7 @@ struct ProtectionEmptyState: View {
             Button(action: action) {
                 Text(actionTitle)
                     .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 18)
                     .frame(height: 38)
                     .background(Color.goPrimary, in: Capsule())

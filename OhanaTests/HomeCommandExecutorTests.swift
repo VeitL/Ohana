@@ -3257,8 +3257,11 @@ struct HomeCommandExecutorTests {
         #expect(scheduleSource.contains("let didPersist: Bool"))
         #expect(scheduleSource.contains("let persistenceErrorDescription: String?"))
         #expect(scheduleSource.contains("static func commitSideEffects("))
+        #expect(scheduleSource.contains("typealias PlantCarePlanPersistenceSave"))
+        #expect(scheduleSource.contains("persistenceSave: PlantCarePlanPersistenceSave = { context in"))
         #expect(scheduleSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
-        #expect(scheduleSource.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 2)
+        #expect(scheduleSource.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 1)
+        #expect(scheduleSource.components(separatedBy: "let saveResult = persistenceSave(context)").count - 1 == 2)
         #expect(scheduleSource.contains("context.rollback()"))
         #expect(!scheduleSource.contains("context.safeSave()"))
         #expect(!scheduleSource.contains("DomainScheduleEffectsDispatcher.dispatch(delete:"))
@@ -3470,10 +3473,8 @@ struct HomeCommandExecutorTests {
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         let plantPlanEvents = events.filter {
-            $0.isAllDay &&
-                $0.relatedEntityType == EntityKind.plant.rawValue &&
-                $0.relatedEntityId == id.uuidString &&
-                $0.title.contains("植物计划")
+            $0.relatedEntityId == id.uuidString &&
+                PlantCarePlanScheduleService.isGeneratedCalendarPlan($0)
         }
         let plantPlanReminderEventIDs = Set(plantPlanEvents.map(\.id))
         let plantPlanReminders = reminders.filter { reminder in
@@ -3510,31 +3511,19 @@ struct HomeCommandExecutorTests {
         #expect(addPlantSource.contains("plantCreationSaveFailureMessage"))
     }
 
-    @Test func memberCreationDefersDefaultPlansAndRevisionsUntilPersistence() throws {
+    @Test func memberCreationOnlyWritesExplicitSchedulesAndDefersRevisionsUntilPersistence() throws {
         let rootURL = repositoryRootURL()
         let creationSource = try source("Ohana/Features/Members/MemberCreationService.swift", rootURL: rootURL)
-        let carePlanSource = try source("Ohana/Domain/Services/CarePlanCalendarSync.swift", rootURL: rootURL)
 
         #expect(!creationSource.contains("context.safeSave()"))
-        #expect(creationSource.contains("let defaultPlanSideEffects = CarePlanCalendarSync.ensureDefaultPlans("))
-        #expect(creationSource.contains("saveChanges: false"))
+        #expect(!creationSource.contains("CarePlanCalendarSync.ensureDefaultPlans("))
+        #expect(!creationSource.contains("defaultPlanSideEffects"))
         #expect(creationSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
         #expect(creationSource.contains("context.rollback()"))
-        #expect(creationSource.contains("defaultPlanSideEffects.commit()"))
 
         let saveGuardIndex = try #require(creationSource.range(of: "guard saveResult.didSave else")?.lowerBound)
-        let commitIndex = try #require(creationSource.range(of: "defaultPlanSideEffects.commit()")?.lowerBound)
         let petRevisionIndex = try #require(creationSource.range(of: "publishMemberCreation(id: pet.id")?.lowerBound)
-        #expect(commitIndex > saveGuardIndex)
         #expect(petRevisionIndex > saveGuardIndex)
-
-        #expect(carePlanSource.contains("struct PendingSideEffects"))
-        #expect(carePlanSource.contains("func commit("))
-        #expect(carePlanSource.contains("notifications: ReminderNotificationScheduling"))
-        #expect(carePlanSource.contains("scheduleEffects.commit(notifications: notifications)"))
-        #expect(carePlanSource.contains("let saveResult = context.safeSaveResult(publishFailureEvent: true)"))
-        #expect(carePlanSource.contains("guard saveResult.didSave else"))
-        #expect(carePlanSource.contains("saveChanges: Bool = true"))
     }
 
     @Test func humanHealthCommandsGateRevisionsAndDismissalOnPersistence() throws {
@@ -4223,6 +4212,7 @@ struct HomeCommandExecutorTests {
         #expect(pet.lineageInfo == "rescue")
         #expect(pet.foodBrand == "Royal")
         #expect(pet.dailyPortionGrams == 0)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
     }
 
     @MainActor
@@ -4924,7 +4914,9 @@ struct HomeCommandExecutorTests {
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
         let events = try context.fetch(FetchDescriptor<Event>())
         let factEvents = events.filter { !$0.isAllDay }
-        let planEvents = events.filter { $0.isAllDay && $0.title.contains("植物计划") }
+        let planEvents = events.filter {
+            PlantCarePlanScheduleService.isGeneratedCalendarPlan($0)
+        }
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(logs.count == 1)
         #expect(logs.first?.plant?.id == plant.id)
@@ -4940,41 +4932,6 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.plantCare.rawValue)
         #expect(ledgerEvents.first?.legacyModelName == "PlantCareLog")
-    }
-
-    @MainActor
-    @Test func plantCareBatchByIdsWritesFactsForEachPlant() throws {
-        let container = try makeInMemoryContainer()
-        let context = container.mainContext
-        let livingRoomFern = Plant(name: "Fern")
-        let livingRoomPothos = Plant(name: "Pothos")
-        let executorHuman = insertExecutorHuman(in: context)
-        context.insert(livingRoomFern)
-        context.insert(livingRoomPothos)
-        try context.save()
-
-        let executor = HomeCommandExecutor(modelContext: context)
-
-        let recordedIDs = executor.recordPlantCare(
-            .watering,
-            plantIDs: [livingRoomFern.id, livingRoomPothos.id],
-            executorId: executorHuman.id.uuidString
-        )
-
-        let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
-        let events = try context.fetch(FetchDescriptor<Event>())
-        let factEvents = events.filter { !$0.isAllDay }
-        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
-        let expectedPlantIDs = Set([livingRoomFern.id, livingRoomPothos.id])
-        #expect(Set(recordedIDs) == expectedPlantIDs)
-        #expect(Set(logs.compactMap { $0.plant?.id }) == expectedPlantIDs)
-        #expect(logs.allSatisfy { $0.careType == .watering })
-        #expect(logs.allSatisfy { $0.executorId == executorHuman.id.uuidString })
-        #expect(livingRoomFern.lastWateredDate != nil)
-        #expect(livingRoomPothos.lastWateredDate != nil)
-        #expect(Set(factEvents.compactMap { UUID(uuidString: $0.relatedEntityId) }) == expectedPlantIDs)
-        #expect(factEvents.allSatisfy { $0.relatedEntityType == EntityKind.plant.rawValue })
-        #expect(ledgerEvents.count(where: { $0.eventKind == CareLedgerEventKind.plantCare.rawValue }) == 2)
     }
 
     @MainActor
@@ -5043,7 +5000,9 @@ struct HomeCommandExecutorTests {
         let logs = try context.fetch(FetchDescriptor<PlantCareLog>())
         let events = try context.fetch(FetchDescriptor<Event>())
         let factEvents = events.filter { !$0.isAllDay }
-        let planEvents = events.filter { $0.isAllDay && $0.title.contains("植物计划") }
+        let planEvents = events.filter {
+            PlantCarePlanScheduleService.isGeneratedCalendarPlan($0)
+        }
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(logs.count == 1)
         #expect(logs.first?.plant?.id == plant.id)
@@ -5335,7 +5294,7 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func quickHumanExpenseServiceWritesExpenseFactAndLedger() throws {
+    @Test func humanExpenseServiceRejectsHumanSubjectWithoutWritingFactsOrLedger() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
@@ -5361,39 +5320,23 @@ struct HomeCommandExecutorTests {
         }
 
         let date = Date(timeIntervalSince1970: 1_800_000_000)
-        let result = try ExpenseCommandService.recordHumanExpense(
-            human: human,
-            amount: 12.5,
-            date: date,
-            note: "coffee",
-            context: context,
-            recordedByHumanId: recorder.id.uuidString,
-            category: .medical,
-            source: .detail
-        )
+        #expect(throws: ExpenseSubjectPolicyError.humanSubjectNotSupported) {
+            _ = try ExpenseCommandService.recordHumanExpense(
+                human: human,
+                amount: 12.5,
+                date: date,
+                note: "coffee",
+                context: context,
+                recordedByHumanId: recorder.id.uuidString,
+                category: .medical,
+                source: .detail
+            )
+        }
 
         let expenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
-        #expect(expenses.count == 1)
-        #expect(expenses.first?.id == result.logID)
-        #expect(expenses.first?.pet == nil)
-        #expect(expenses.first?.executorId == human.id.uuidString)
-        #expect(expenses.first?.recordedByHumanId == recorder.id.uuidString)
-        #expect(expenses.first?.amount == 12.5)
-        #expect(expenses.first?.expenseCategory == .medical)
-        #expect(expenses.first?.note == "coffee")
-        #expect(ledgerEvents.count == 1)
-        #expect(ledgerEvents.first?.subjectKind == CareLedgerSubjectKind.human.rawValue)
-        #expect(ledgerEvents.first?.subjectId == human.id.uuidString)
-        #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.expense.rawValue)
-        #expect(ledgerEvents.first?.actionType == ExpenseCategory.medical.rawValue)
-        #expect(ledgerEvents.first?.source == CareLedgerSource.detail.rawValue)
-        #expect(ledgerEvents.first?.legacyModelName == "PetExpenseLog")
-        #expect(ledgerEvents.first?.legacyModelId == result.logID.uuidString)
-        #expect(ledgerEvents.first?.privacyFieldRaw == HumanPrivateField.expense.rawValue)
-        #expect(ledgerEvents.first?.coconutDelta == result.coconutDelta)
-        #expect(ledgerEvents.first?.id == result.ledgerEventID)
-        #expect(result.coconutDelta >= 0)
+        #expect(expenses.isEmpty)
+        #expect(ledgerEvents.isEmpty)
     }
 
     @MainActor
@@ -5460,6 +5403,106 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.first?.id == result.ledgerEventID)
         #expect(result.subjectID == pet.id)
         #expect(result.coconutDelta >= 0)
+    }
+
+    @MainActor
+    @Test func petExpenseServiceStoresMultiplePayersOnceAndRewardsPrimaryOnce() throws {
+        let container = try makeLatestInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let primaryPayer = Human(name: "Guan")
+        let coPayer = Human(name: "Mia")
+        let recorder = Human(name: "Alex")
+        context.insert(pet)
+        context.insert(primaryPayer)
+        context.insert(coPayer)
+        context.insert(recorder)
+        try context.save()
+
+        let cleanup = isolateSharedCareEconomy(activeHumanID: primaryPayer.id.uuidString)
+        defer { cleanup() }
+        let contributions = [
+            ExpensePayerContribution(humanID: primaryPayer.id, minorUnits: 6000),
+            ExpensePayerContribution(humanID: coPayer.id, minorUnits: 4000)
+        ]
+
+        let result = try ExpenseCommandService.recordPetExpense(
+            pet: pet,
+            amount: 100,
+            date: Date(timeIntervalSince1970: 1_800_000_100),
+            category: .medical,
+            note: "shared clinic bill",
+            context: context,
+            executorId: coPayer.id.uuidString,
+            recordedByHumanId: recorder.id.uuidString,
+            payerContributions: contributions,
+            source: .quickAction,
+            questManager: TestQuestManagerProjection.manager
+        )
+
+        let expense = try #require(try context.fetch(FetchDescriptor<PetExpenseLog>()).first)
+        let expenseLedgers = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            $0.eventKind == CareLedgerEventKind.expense.rawValue
+        }
+        let rewardEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).filter {
+            $0.entryKind == .reward && $0.delta > 0
+        }
+
+        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).count == 1)
+        #expect(expense.id == result.logID)
+        #expect(expense.executorId == primaryPayer.id.uuidString)
+        #expect(expense.recordedByHumanId == recorder.id.uuidString)
+        #expect(expense.payerContributions == contributions)
+        #expect(expense.amountPaid(by: primaryPayer.id.uuidString) == 60)
+        #expect(expense.amountPaid(by: coPayer.id.uuidString) == 40)
+        #expect(expenseLedgers.count == 1)
+        #expect(expenseLedgers.first?.actorId == primaryPayer.id.uuidString)
+        #expect(expenseLedgers.first?.amountValue == 100)
+        #expect(rewardEntries.count == 1)
+        #expect(rewardEntries.first?.ownerId == primaryPayer.id.uuidString)
+        #expect(rewardEntries.first?.delta == result.coconutDelta)
+        #expect(!rewardEntries.contains { $0.ownerId == coPayer.id.uuidString })
+    }
+
+    @MainActor
+    @Test func petExpenseServiceRejectsInactivePayerBeforeWritingAnyFacts() throws {
+        let container = try makeLatestInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let primaryPayer = Human(name: "Guan")
+        let inactivePayer = Human(name: "Mia")
+        inactivePayer.passedAwayDate = Date(timeIntervalSince1970: 1_700_000_000)
+        context.insert(pet)
+        context.insert(primaryPayer)
+        context.insert(inactivePayer)
+        try context.save()
+
+        let cleanup = isolateSharedCareEconomy(activeHumanID: primaryPayer.id.uuidString)
+        defer { cleanup() }
+        let contributions = [
+            ExpensePayerContribution(humanID: primaryPayer.id, minorUnits: 6000),
+            ExpensePayerContribution(humanID: inactivePayer.id, minorUnits: 4000)
+        ]
+
+        #expect(throws: ExpensePayerContributionError.inactivePayer) {
+            try ExpenseCommandService.recordPetExpense(
+                pet: pet,
+                amount: 100,
+                date: Date(timeIntervalSince1970: 1_800_000_200),
+                category: .medical,
+                note: "must not persist",
+                context: context,
+                payerContributions: contributions,
+                questManager: TestQuestManagerProjection.manager
+            )
+        }
+
+        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetDocument>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CloudSyncRecordState>()).isEmpty)
     }
 
     @MainActor
@@ -7842,7 +7885,7 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func dashboardRecordCommandExecutorPublishesWeightExpenseAndDeleteRevisions() throws {
+    @Test func dashboardRecordCommandExecutorPublishesWeightRevisionsAndRejectsHumanExpense() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -7885,21 +7928,19 @@ struct HomeCommandExecutorTests {
         #expect(weightDeleteMutation.note == "test.dashboard.weight.delete")
 
         let expenseCommand = DomainCommand.quickHumanExpense(humanID: human.id)
-        let expense = try executor.recordHumanExpense(
-            human: human,
-            amount: 12.5,
-            date: makeDate(year: 2026, month: 6, day: 11, hour: 9, minute: 0),
-            note: "Lunch",
-            command: expenseCommand,
-            revisionNote: "test.dashboard.expense"
-        )
-        let expenseMutation = try #require(revisionCenter.lastMutation)
-        #expect(expense.subjectID == human.id)
-        #expect(expenseMutation.command == expenseCommand)
-        #expect(expenseMutation.affectedEntityIDs.contains(human.id))
-        #expect(expenseMutation.affectedEntityIDs.contains(expense.logID))
-        #expect(expenseMutation.note == "test.dashboard.expense")
-        #expect(revisionCenter.homeRevision.value == beforeRevision + 3)
+        #expect(throws: ExpenseSubjectPolicyError.humanSubjectNotSupported) {
+            _ = try executor.recordHumanExpense(
+                human: human,
+                amount: 12.5,
+                date: makeDate(year: 2026, month: 6, day: 11, hour: 9, minute: 0),
+                note: "Lunch",
+                command: expenseCommand,
+                revisionNote: "test.dashboard.expense"
+            )
+        }
+        #expect(revisionCenter.lastMutation == weightDeleteMutation)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 2)
+        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).isEmpty)
     }
 
     @MainActor
@@ -9301,7 +9342,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
-        human.coconutBalance = 1_000
+        human.coconutBalance = 1000
         let legacyItem = try #require(ShopCatalog.item(id: "boost_backdate_pack"))
         context.insert(human)
         try context.save()
@@ -9319,7 +9360,7 @@ struct HomeCommandExecutorTests {
 
         #expect(!purchase.didPurchase)
         #expect(purchase.failure == .invalidItem)
-        #expect(human.coconutBalance == 1_000)
+        #expect(human.coconutBalance == 1000)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseAttempt>()).isEmpty)
@@ -9661,7 +9702,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
-        human.coconutBalance = 1_000
+        human.coconutBalance = 1000
         let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
         context.insert(human)
         try context.save()
@@ -9677,7 +9718,7 @@ struct HomeCommandExecutorTests {
 
         #expect(!result.didPurchase)
         #expect(result.failure == .applicationUnavailable(.activePet))
-        #expect(human.coconutBalance == 1_000)
+        #expect(human.coconutBalance == 1000)
         #expect(try context.fetch(FetchDescriptor<ShopPurchaseRecord>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
@@ -9688,7 +9729,7 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
-        human.coconutBalance = 1_000
+        human.coconutBalance = 1000
         let cat = Pet(name: "Momo", species: "猫")
         let item = try #require(ShopCatalog.item(id: "fx_rainbow"))
         context.insert(human)
@@ -9706,7 +9747,7 @@ struct HomeCommandExecutorTests {
 
         #expect(!blocked.didPurchase)
         #expect(blocked.failure == .applicationUnavailable(.activeDog))
-        #expect(human.coconutBalance == 1_000)
+        #expect(human.coconutBalance == 1000)
 
         context.insert(Pet(name: "Kiko", species: "狗"))
         try context.save()
@@ -9721,7 +9762,7 @@ struct HomeCommandExecutorTests {
 
         #expect(purchased.didPurchase)
         #expect(purchased.failure == nil)
-        #expect(human.coconutBalance == 1_000 - item.cost)
+        #expect(human.coconutBalance == 1000 - item.cost)
         #expect(try ShopPurchaseRecordStore.isOwned(itemID: item.id, context: context))
     }
 
@@ -11326,7 +11367,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeLatestInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV98.models)
+        let schema = Schema(ArkSchemaV99.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

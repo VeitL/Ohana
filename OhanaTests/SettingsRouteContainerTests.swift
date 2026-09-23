@@ -48,6 +48,9 @@ struct SettingsRouteContainerTests {
         #expect(sections.contains("dynamicTypeSize.isAccessibilitySize"))
         #expect(!sections.contains("settings-experience-mode-picker"))
         #expect(sections.contains("settings-zen-owner-picker"))
+        #expect(sections.contains("zh: \"打卡\", en: \"Check-ins\", de: \"Check-ins\""))
+        #expect(!sections.contains("Check-ins · Streaks · Oasis"))
+        #expect(!sections.contains("打卡 · 连续记录 · Oasis"))
     }
 
     @Test func debugSettingsExposeAdaptivePrimaryAccentLab() throws {

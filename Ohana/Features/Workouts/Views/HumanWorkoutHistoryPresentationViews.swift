@@ -14,12 +14,7 @@ struct HumanWorkoutHistoryOverviewCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HumanWorkoutSectionHeading(
                 icon: "chart.xyaxis.line",
-                title: l.tr(zh: "运动趋势与历史", en: "Trends & History", de: "Trends & Verlauf"),
-                subtitle: l.tr(
-                    zh: "区分 Ohana 本地、遛狗与 Apple Health 实时来源。",
-                    en: "Separates Ohana local, dog-walk, and live Apple Health sources.",
-                    de: "Trennt lokale Ohana-, Hundegang- und Live-Apple-Health-Quellen."
-                )
+                title: l.tr(zh: "运动趋势与历史", en: "Trends & History", de: "Trends & Verlauf")
             )
 
             Picker(
@@ -159,9 +154,9 @@ struct HumanWorkoutHistoryOverviewCard: View {
             }
 
             Text(l.tr(
-                zh: "趋势只使用这台设备内已保存的历史（Ohana、遛狗和既有 Apple Health 记录）；临时 Apple Health 行不会改变本地趋势。",
-                en: "The trend uses history saved on this device (Ohana, dog walks, and existing Apple Health records); temporary Apple Health rows do not change the local trend.",
-                de: "Der Trend nutzt auf diesem Gerät gespeicherte Verläufe (Ohana, Hundegänge und vorhandene Apple-Health-Einträge); temporäre Apple-Health-Zeilen ändern den lokalen Trend nicht."
+                zh: "趋势仅使用本机已保存记录；临时 Apple Health 数据不计入。",
+                en: "Trends use saved on-device records only; temporary Apple Health data is excluded.",
+                de: "Trends nutzen nur lokal gespeicherte Einträge; temporäre Apple-Health-Daten sind ausgenommen."
             ))
             .font(OhanaFont.caption2(.semibold))
             .foregroundStyle(Color.ohanaTertiaryText)
@@ -430,7 +425,11 @@ struct HumanWorkoutRecentWorkoutsCard: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.78)
                         if row.isHealthKit {
-                            sourceBadge(row.sourceName.isEmpty ? "Apple Health" : row.sourceName, tint: .goPrimary)
+                            sourceBadge(
+                                row.sourceName.isEmpty ? "Apple Health" : row.sourceName,
+                                tint: .goPrimary,
+                                foreground: .ohanaPrimaryActionText
+                            )
                         }
                         if row.isPetWalk {
                             sourceBadge(l.tr(zh: "遛狗", en: "Dog Walk", de: "Hundegang"), tint: .goCardCyan)
@@ -471,10 +470,10 @@ struct HumanWorkoutRecentWorkoutsCard: View {
         .padding(.vertical, 10)
     }
 
-    private func sourceBadge(_ title: String, tint: Color) -> some View {
+    private func sourceBadge(_ title: String, tint: Color, foreground: Color = .arkInk) -> some View {
         Text(title)
             .font(OhanaFont.caption2(.black))
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(foreground)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
             .padding(.horizontal, 7)

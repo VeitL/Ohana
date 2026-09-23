@@ -15,7 +15,7 @@ struct HumanHealthConditionCommandTests {
             String(describing: HumanHealthObservation.self)
         ])
         #expect(v96.subtracting(v97).isEmpty)
-        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV98.self))
+        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV99.self))
         #expect(ArkMigrationPlan.stages.isEmpty)
     }
 

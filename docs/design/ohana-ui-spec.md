@@ -107,6 +107,10 @@ then the one with the same presentation style.
   charts, and plant care should not borrow each other's semantics.
 - Never hardcode white/black for app UI; use text, surface, stroke, and action
   tokens so dark and light modes stay aligned.
+- Solid `goPrimary` surfaces pair with `ohanaPrimaryActionText`. Member themes,
+  custom hex colors, and other dynamic solid tints derive their foreground from
+  `OhanaResolvedPrimaryAccent.actionTextColor`; bright teal/orange surfaces must
+  not inherit a fixed white foreground.
 
 ### Typography
 
@@ -189,6 +193,9 @@ then the one with the same presentation style.
   dividers, or compact metric blocks.
 - Interactive cards must keep hit testing stable during expand/collapse. Users
   should not wait for animation completion before the next valid tap.
+- Starter-task cards complete short profile fields in place. A successful save
+  keeps the editor open with a persistent saved status; only structured,
+  safety-sensitive, or real-action workflows navigate to a dedicated surface.
 
 ### Chips And Segmented Controls
 

@@ -220,9 +220,9 @@ struct HumanMedicationContentView: View {
             }
         } message: {
             Text(l.tr(
-                zh: "这会停止未来日程和提醒，并影响后续依从率统计；既有服药记录会保留，也可随时恢复计划。",
-                en: "This stops future schedules and reminders and affects future adherence totals. Existing dose logs stay saved, and the plan can be resumed anytime.",
-                de: "Dadurch werden künftige Zeitpläne und Erinnerungen gestoppt und künftige Adhärenzwerte beeinflusst. Vorhandene Einnahmen bleiben gespeichert; der Plan kann jederzeit fortgesetzt werden."
+                zh: "停止未来日程和提醒；既有记录保留，可随时恢复。",
+                en: "Future schedules and reminders stop. Existing logs remain, and the plan can be resumed.",
+                de: "Künftige Pläne und Erinnerungen stoppen. Vorhandene Einträge bleiben; der Plan kann fortgesetzt werden."
             ))
         }
         .onDisappear {
@@ -407,7 +407,7 @@ private extension HumanMedicationContentView {
                         Text(l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
                             .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 28).padding(.vertical, 14)
                     .background(Color.goPrimary, in: Capsule())
                 }
@@ -467,7 +467,17 @@ private extension HumanMedicationContentView {
             if !manualMeds.isEmpty {
                 return l.tr(zh: "按需药物可在下方手动记录一次。", en: "As-needed medication can be logged below.", de: "Bedarfsmedikamente kannst du unten manuell protokollieren.")
             }
-            return l.tr(zh: "添加药物后，这里会展示今日进度和待处理剂量。", en: "Add medication to see today's progress and pending doses.", de: "Füge Medikamente hinzu, um Fortschritt und offene Dosen zu sehen.")
+            return l.tr(
+                zh: "添加药物开始记录",
+                en: "Add medication to start",
+                de: "Medikament hinzufügen",
+                es: "Añade un medicamento para empezar",
+                pt: "Adicione um medicamento para começar",
+                fr: "Ajoutez un médicament pour commencer",
+                ja: "薬を追加して記録を開始",
+                ko: "약을 추가해 기록을 시작하세요",
+                it: "Aggiungi un farmaco per iniziare"
+            )
         }
         let skipped = todaySkippedCount > 0 ? l.tr(zh: " · 跳过 \(todaySkippedCount)", en: " · skipped \(todaySkippedCount)", de: " · übersprungen \(todaySkippedCount)") : ""
         return l.tr(zh: "已服 \(todayTakenCount)/\(todayPlannedCount)\(skipped)", en: "Taken \(todayTakenCount)/\(todayPlannedCount)\(skipped)", de: "Genommen \(todayTakenCount)/\(todayPlannedCount)\(skipped)")
@@ -767,7 +777,7 @@ private extension HumanMedicationContentView {
                 } label: {
                     Text(l.tr(zh: "记录一次", en: "Log", de: "Eintragen"))
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(Color.goPrimary, in: Capsule())

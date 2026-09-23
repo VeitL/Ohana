@@ -46,6 +46,25 @@ extension MemberCardCreationContentView {
                     stroke: cardControlStroke,
                     accent: cardAccent
                 )
+                if draft.hasBirthday {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles") // a11y: allow decorative zodiac glyph hidden below
+                            .foregroundStyle(cardAccent)
+                            .accessibilityHidden(true)
+                        Text(l.tr(
+                            zh: "星座", en: "Zodiac", de: "Sternzeichen",
+                            es: "Signo", pt: "Signo", fr: "Signe",
+                            ja: "星座", ko: "별자리", it: "Segno"
+                        ))
+                        .foregroundStyle(cardSecondaryForeground)
+                        Spacer(minLength: 8)
+                        Text(Human.westernZodiacDisplay(for: draft.birthday, l: l))
+                            .foregroundStyle(cardForeground)
+                    }
+                    .font(OhanaFont.caption(.bold))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("member-human-zodiac")
+                }
             }
         }
     }

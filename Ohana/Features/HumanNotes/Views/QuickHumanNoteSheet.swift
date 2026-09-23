@@ -252,17 +252,32 @@ struct QuickHumanNoteSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 PhotosPicker(selection: $selectedItems, maxSelectionCount: 6, matching: .images) {
-                    attachmentButton(icon: "photo.on.rectangle.angled", title: l.tr(zh: "相册", en: "Album", de: "Album"), color: Color.goPrimary)
+                    attachmentButton(
+                        icon: "photo.on.rectangle.angled",
+                        title: l.tr(zh: "相册", en: "Album", de: "Album"),
+                        color: Color.goPrimary,
+                        foreground: Color.ohanaPrimaryActionText
+                    )
                 }
                 .buttonStyle(ScaleButtonStyle())
 
                 Button { presentCamera() } label: {
-                    attachmentButton(icon: "camera.fill", title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"), color: Color.goTeal)
+                    attachmentButton(
+                        icon: "camera.fill",
+                        title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"),
+                        color: Color.goTeal,
+                        foreground: Color.arkInk
+                    )
                 }
                 .buttonStyle(ScaleButtonStyle())
 
                 Button { showFileImporter = true } label: {
-                    attachmentButton(icon: "paperclip", title: l.tr(zh: "文件", en: "File", de: "Datei"), color: Color.goPurple)
+                    attachmentButton(
+                        icon: "paperclip",
+                        title: l.tr(zh: "文件", en: "File", de: "Datei"),
+                        color: Color.goPurple,
+                        foreground: OhanaResolvedPrimaryAccent(customHex: "A855F7")?.actionTextColor ?? Color.ohanaPrimaryText
+                    )
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -276,7 +291,7 @@ struct QuickHumanNoteSheet: View {
         .padding(.horizontal, 22)
     }
 
-    private func attachmentButton(icon: String, title: String, color: Color) -> some View {
+    private func attachmentButton(icon: String, title: String, color: Color, foreground: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -285,7 +300,7 @@ struct QuickHumanNoteSheet: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
         }
-        .foregroundStyle(Color.arkInk)
+        .foregroundStyle(foreground)
         .frame(maxWidth: .infinity)
         .frame(height: 40)
         .background(color, in: Capsule())
@@ -403,7 +418,7 @@ struct QuickHumanNoteSheet: View {
                 )
                 .font(OhanaFont.callout(.black))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(canSave && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(canSave && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

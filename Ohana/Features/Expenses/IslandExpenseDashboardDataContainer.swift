@@ -10,6 +10,8 @@ nonisolated struct ExpenseInsightLogSnapshot: Identifiable, Equatable, Sendable,
     let note: String
     let executorId: String?
     let expensePetID: UUID?
+    let payerContributions: [ExpensePayerContribution]
+    let hasStructuredPayerSnapshot: Bool
 
     var expenseCategory: ExpenseCategory {
         ExpenseCategory(rawValue: categoryRaw) ?? .other
@@ -51,8 +53,21 @@ actor ExpenseInsightDataActor {
         let scoped = fetch.records.filter { log in
             if let subject { return Self.matches(log, subject: subject) }
             if let petID = log.pet?.id { return activePetIDs.contains(petID) }
-            guard let executorID = log.executorId, !executorID.isEmpty else { return true }
-            return activeHumanIDs.contains(executorID)
+            let contributions = log.payerContributions
+            if !contributions.isEmpty {
+                return contributions.contains { contribution in
+                    guard let payerID = contribution.humanID else { return true }
+                    return activeHumanIDs.contains(payerID.uuidString)
+                }
+            }
+            // A structured-but-invalid snapshot has no trustworthy person to
+            // scope against; keep the household fact and project it as unknown.
+            if !log.payerContributionsJSON.isEmpty { return true }
+            guard let executorID = log.executorId,
+                  let normalizedExecutorID = UUID(uuidString: executorID)?.uuidString else {
+                return true
+            }
+            return activeHumanIDs.contains(normalizedExecutorID)
         }
 
         return ExpenseInsightSnapshot(
@@ -65,7 +80,9 @@ actor ExpenseInsightDataActor {
                     categoryRaw: log.category,
                     note: log.note,
                     executorId: log.executorId,
-                    expensePetID: log.pet?.id
+                    expensePetID: log.pet?.id,
+                    payerContributions: log.payerContributions,
+                    hasStructuredPayerSnapshot: !log.payerContributionsJSON.isEmpty
                 )
             },
             isTruncated: fetch.isTruncated,
@@ -105,16 +122,27 @@ actor ExpenseInsightDataActor {
             }
         } else if let subject, subject.kind == "human" {
             let executorID = subject.id
+            let executorIDLower = executorID.lowercased()
             if let cutoff {
                 descriptor = FetchDescriptor<PetExpenseLog>(
                     predicate: #Predicate<PetExpenseLog> { log in
-                        log.date >= cutoff && log.executorId == executorID
+                        log.date >= cutoff && (
+                            log.executorId == executorID ||
+                                log.executorId == executorIDLower ||
+                                log.payerContributionsJSON.contains(executorID) ||
+                                log.payerContributionsJSON.contains(executorIDLower)
+                        )
                     },
                     sortBy: [SortDescriptor(\.date, order: .reverse)]
                 )
             } else {
                 descriptor = FetchDescriptor<PetExpenseLog>(
-                    predicate: #Predicate<PetExpenseLog> { $0.executorId == executorID },
+                    predicate: #Predicate<PetExpenseLog> { log in
+                        log.executorId == executorID ||
+                            log.executorId == executorIDLower ||
+                            log.payerContributionsJSON.contains(executorID) ||
+                            log.payerContributionsJSON.contains(executorIDLower)
+                    },
                     sortBy: [SortDescriptor(\.date, order: .reverse)]
                 )
             }
@@ -149,9 +177,13 @@ actor ExpenseInsightDataActor {
         subject: (kind: String, id: String)
     ) -> Bool {
         switch subject.kind {
-        case "pet": log.pet?.id.uuidString == subject.id
-        case "human": log.executorId == subject.id
-        default: false
+        case "pet": return log.pet?.id.uuidString == subject.id
+        case "human":
+            guard let humanID = UUID(uuidString: subject.id)?.uuidString else { return false }
+            // Structured allocations and legacy reimbursements must use the
+            // same attribution rules as every other expense dashboard.
+            return ExpenseSummaryBuilder.amountPaid(by: humanID, for: log) != 0
+        default: return false
         }
     }
 }
@@ -179,7 +211,6 @@ struct IslandExpenseDashboard: View {
         _pets = Query(petDescriptor)
 
         var humanDescriptor = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { $0.passedAwayDate == nil },
             sortBy: [SortDescriptor(\.createdAt)]
         )
         humanDescriptor.fetchLimit = 500
@@ -218,7 +249,7 @@ struct IslandExpenseDashboard: View {
         let range = requestedRange
         let subjectKey = requestedSubjectKey
         let petIDs = Set(pets.map(\.id))
-        let humanIDs = Set(humans.map(\.id.uuidString))
+        let humanIDs = Set(humans.filter { !$0.hasPassedAway }.map(\.id.uuidString))
         loadTask = Task { @MainActor in
             await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 80)
             guard !Task.isCancelled else { return }

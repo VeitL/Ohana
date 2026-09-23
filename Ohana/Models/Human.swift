@@ -480,11 +480,79 @@ final class Human {
     }
 
     static func westernZodiacDisplay(for date: Date, l: L10n) -> String {
-        switch l.languageCode {
-        case "de":
-            westernZodiacGerman(for: date)
-        case "en":
-            westernZodiacEnglish(for: date)
+        switch westernZodiacChinese(for: date) {
+        case "摩羯座":
+            l.tr(
+                zh: "摩羯座", en: "Capricorn", de: "Steinbock",
+                es: "Capricornio", pt: "Capricórnio", fr: "Capricorne",
+                ja: "山羊座", ko: "염소자리", it: "Capricorno"
+            )
+        case "水瓶座":
+            l.tr(
+                zh: "水瓶座", en: "Aquarius", de: "Wassermann",
+                es: "Acuario", pt: "Aquário", fr: "Verseau",
+                ja: "水瓶座", ko: "물병자리", it: "Acquario"
+            )
+        case "双鱼座":
+            l.tr(
+                zh: "双鱼座", en: "Pisces", de: "Fische",
+                es: "Piscis", pt: "Peixes", fr: "Poissons",
+                ja: "魚座", ko: "물고기자리", it: "Pesci"
+            )
+        case "白羊座":
+            l.tr(
+                zh: "白羊座", en: "Aries", de: "Widder",
+                es: "Aries", pt: "Áries", fr: "Bélier",
+                ja: "牡羊座", ko: "양자리", it: "Ariete"
+            )
+        case "金牛座":
+            l.tr(
+                zh: "金牛座", en: "Taurus", de: "Stier",
+                es: "Tauro", pt: "Touro", fr: "Taureau",
+                ja: "牡牛座", ko: "황소자리", it: "Toro"
+            )
+        case "双子座":
+            l.tr(
+                zh: "双子座", en: "Gemini", de: "Zwillinge",
+                es: "Géminis", pt: "Gêmeos", fr: "Gémeaux",
+                ja: "双子座", ko: "쌍둥이자리", it: "Gemelli"
+            )
+        case "巨蟹座":
+            l.tr(
+                zh: "巨蟹座", en: "Cancer", de: "Krebs",
+                es: "Cáncer", pt: "Câncer", fr: "Cancer",
+                ja: "蟹座", ko: "게자리", it: "Cancro"
+            )
+        case "狮子座":
+            l.tr(
+                zh: "狮子座", en: "Leo", de: "Löwe",
+                es: "Leo", pt: "Leão", fr: "Lion",
+                ja: "獅子座", ko: "사자자리", it: "Leone"
+            )
+        case "处女座":
+            l.tr(
+                zh: "处女座", en: "Virgo", de: "Jungfrau",
+                es: "Virgo", pt: "Virgem", fr: "Vierge",
+                ja: "乙女座", ko: "처녀자리", it: "Vergine"
+            )
+        case "天秤座":
+            l.tr(
+                zh: "天秤座", en: "Libra", de: "Waage",
+                es: "Libra", pt: "Libra", fr: "Balance",
+                ja: "天秤座", ko: "천칭자리", it: "Bilancia"
+            )
+        case "天蝎座":
+            l.tr(
+                zh: "天蝎座", en: "Scorpio", de: "Skorpion",
+                es: "Escorpio", pt: "Escorpião", fr: "Scorpion",
+                ja: "蠍座", ko: "전갈자리", it: "Scorpione"
+            )
+        case "射手座":
+            l.tr(
+                zh: "射手座", en: "Sagittarius", de: "Schütze",
+                es: "Sagitario", pt: "Sagitário", fr: "Sagittaire",
+                ja: "射手座", ko: "사수자리", it: "Sagittario"
+            )
         default:
             westernZodiacChinese(for: date)
         }

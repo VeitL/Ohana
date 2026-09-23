@@ -11,34 +11,78 @@ enum SettingsDestination: String, CaseIterable, Hashable {
     func title(_ l: L10n) -> String {
         switch self {
         case .regionAndLanguage:
-            l.tr(zh: "地区与语言", en: "Region & Language", de: "Region & Sprache")
+            l.tr(
+                zh: "地区与语言", en: "Region & Language", de: "Region & Sprache",
+                es: "Región e idioma", pt: "Região e idioma", fr: "Région et langue",
+                ja: "地域と言語", ko: "지역 및 언어", it: "Regione e lingua"
+            )
         case .appearanceAndPerformance:
-            l.tr(zh: "外观与性能", en: "Appearance & Performance", de: "Darstellung & Leistung")
+            l.tr(
+                zh: "外观与性能", en: "Appearance & Performance", de: "Darstellung & Leistung",
+                es: "Apariencia y rendimiento", pt: "Aparência e desempenho", fr: "Apparence et performances",
+                ja: "外観とパフォーマンス", ko: "디자인 및 성능", it: "Aspetto e prestazioni"
+            )
         case .notifications:
             l.notifications
         case .privacyAndSecurity:
-            l.tr(zh: "隐私与安全", en: "Privacy & Security", de: "Datenschutz & Sicherheit")
+            l.tr(
+                zh: "隐私与安全", en: "Privacy & Security", de: "Datenschutz & Sicherheit",
+                es: "Privacidad y seguridad", pt: "Privacidade e segurança", fr: "Confidentialité et sécurité",
+                ja: "プライバシーとセキュリティ", ko: "개인정보 보호 및 보안", it: "Privacy e sicurezza"
+            )
         case .dataAndBackup:
-            l.tr(zh: "数据与备份", en: "Data & Backup", de: "Daten & Backup")
+            l.tr(
+                zh: "数据与备份", en: "Data & Backup", de: "Daten & Backup",
+                es: "Datos y copia de seguridad", pt: "Dados e backup", fr: "Données et sauvegarde",
+                ja: "データとバックアップ", ko: "데이터 및 백업", it: "Dati e backup"
+            )
         case .about:
-            l.tr(zh: "关于", en: "About", de: "Über")
+            l.tr(
+                zh: "关于", en: "About", de: "Über",
+                es: "Acerca de", pt: "Sobre", fr: "À propos",
+                ja: "このアプリについて", ko: "정보", it: "Informazioni"
+            )
         }
     }
 
     func subtitle(_ l: L10n) -> String {
         switch self {
         case .regionAndLanguage:
-            l.tr(zh: "国家、语言、单位与货币", en: "Country, language, units, and currency", de: "Land, Sprache, Einheiten und Währung")
+            l.tr(
+                zh: "国家、语言、单位与货币", en: "Country, language, units, and currency", de: "Land, Sprache, Einheiten und Währung",
+                es: "País, idioma, unidades y moneda", pt: "País, idioma, unidades e moeda", fr: "Pays, langue, unités et devise",
+                ja: "国、言語、単位、通貨", ko: "국가, 언어, 단위 및 통화", it: "Paese, lingua, unità e valuta"
+            )
         case .appearanceAndPerformance:
-            l.tr(zh: "主题、背景与省电模式", en: "Theme, background, and power saving", de: "Design, Hintergrund und Energiesparen")
+            l.tr(
+                zh: "主题、背景与省电模式", en: "Theme, background, and power saving", de: "Design, Hintergrund und Energiesparen",
+                es: "Tema, fondo y ahorro de energía", pt: "Tema, fundo e economia de energia", fr: "Thème, arrière-plan et économie d’énergie",
+                ja: "テーマ、背景、省電力", ko: "테마, 배경 및 절전", it: "Tema, sfondo e risparmio energetico"
+            )
         case .notifications:
-            l.tr(zh: "系统权限、常规与分类提醒", en: "System access, routine, and category reminders", de: "Systemzugriff und Erinnerungen")
+            l.tr(
+                zh: "系统权限、常规与分类提醒", en: "System access, routine, and category reminders", de: "Systemzugriff und Erinnerungen",
+                es: "Acceso del sistema y recordatorios", pt: "Acesso do sistema e lembretes", fr: "Accès système et rappels",
+                ja: "システム権限と通知", ko: "시스템 권한 및 알림", it: "Accesso di sistema e promemoria"
+            )
         case .privacyAndSecurity:
-            l.tr(zh: "切换器遮罩与成员生物识别", en: "Switcher masking and member biometrics", de: "Vorschau-Schutz und Biometrie")
+            l.tr(
+                zh: "切换器遮罩与成员生物识别", en: "Switcher masking and member biometrics", de: "Vorschau-Schutz und Biometrie",
+                es: "Ocultación y biometría", pt: "Ocultação e biometria", fr: "Masquage et biométrie",
+                ja: "画面の非表示と生体認証", ko: "화면 가리기 및 생체 인증", it: "Mascheramento e biometria"
+            )
         case .dataAndBackup:
-            l.tr(zh: "导出、恢复、自动备份与重置", en: "Export, restore, automatic backup, and reset", de: "Export, Wiederherstellung und Zurücksetzen")
+            l.tr(
+                zh: "导出、恢复、自动备份与重置", en: "Export, restore, automatic backup, and reset", de: "Export, Wiederherstellung und Zurücksetzen",
+                es: "Exportar, restaurar, respaldar y restablecer", pt: "Exportar, restaurar, fazer backup e redefinir", fr: "Exporter, restaurer, sauvegarder et réinitialiser",
+                ja: "書き出し、復元、バックアップ、リセット", ko: "내보내기, 복원, 백업 및 재설정", it: "Esporta, ripristina, backup e reset"
+            )
         case .about:
-            l.tr(zh: "版本、评价、隐私政策与支持", en: "Version, rating, privacy policy, and support", de: "Version, Bewertung, Datenschutz und Support")
+            l.tr(
+                zh: "版本、评价、隐私政策与支持", en: "Version, rating, privacy policy, and support", de: "Version, Bewertung, Datenschutz und Support",
+                es: "Versión, valoración, privacidad y soporte", pt: "Versão, avaliação, privacidade e suporte", fr: "Version, avis, confidentialité et assistance",
+                ja: "バージョン、評価、プライバシー、サポート", ko: "버전, 평가, 개인정보 처리방침 및 지원", it: "Versione, valutazione, privacy e supporto"
+            )
         }
     }
 

@@ -116,6 +116,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let flowStartedAt = await MainActor.run {
             AppFlowPerformance.start(AppPerformanceFlows.backupExport)
         }
+        var exportURL: URL?
         do {
             let trimmedPassword = password?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let shouldEncrypt = !trimmedPassword.isEmpty
@@ -134,6 +135,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             let suffix = shouldEncrypt ? "encrypted.\(Self.packageFileExtension)" : Self.packageFileExtension
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("\(Self.backupFilePrefix)\(stamp)_\(uniqueId).\(suffix)", isDirectory: true)
+            exportURL = url
             if FileManager.default.fileExists(atPath: url.path) {
                 try FileManager.default.removeItem(at: url)
             }
@@ -147,6 +149,9 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
                 try DataBackupEncryption.encrypt(result.manifestData, password: trimmedPassword)
             } else {
                 result.manifestData
+            }
+            guard manifestData.count <= DataBackupRestoreLimits.maximumEncryptedManifestBytes else {
+                throw BackupError.invalidRestoreData(.sizeLimit)
             }
             try manifestData.write(
                 to: url.appendingPathComponent(Self.manifestFileName, isDirectory: false),
@@ -182,6 +187,9 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             }
             return url
         } catch {
+            if let exportURL {
+                try? FileManager.default.removeItem(at: exportURL)
+            }
             await MainActor.run {
                 AppFlowPerformance.markFailure(
                     AppPerformanceFlows.backupExport,
@@ -248,63 +256,49 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         },
         settleShopPurchases: (() -> Void)? = nil
     ) async throws {
-        try ShopPurchaseBackupFence.withExclusiveAccess(
-            context: context,
-            unavailable: { throw BackupError.pendingShopPurchase },
-            operation: {
-                settleShopPurchases?()
-                try importJSONWhileFenced(
-                    from: url,
-                    context: context,
-                    projectionManager: projectionManager,
-                    password: password,
-                    schedulePlantNotifications: schedulePlantNotifications,
-                    plantNotifications: plantNotifications,
-                    restoreFaultInjector: restoreFaultInjector,
-                    restoreTransaction: restoreTransaction
-                )
-            }
-        )
+        let prepared = try await DataBackupImportPreparation.prepare(from: url, password: password)
+        do {
+            try Task.checkCancellation()
+            try ShopPurchaseBackupFence.withExclusiveAccess(
+                context: context,
+                unavailable: { throw BackupError.pendingShopPurchase },
+                operation: {
+                    settleShopPurchases?()
+                    try importJSONWhileFenced(
+                        prepared,
+                        context: context,
+                        projectionManager: projectionManager,
+                        schedulePlantNotifications: schedulePlantNotifications,
+                        plantNotifications: plantNotifications,
+                        restoreFaultInjector: restoreFaultInjector,
+                        restoreTransaction: restoreTransaction
+                    )
+                }
+            )
+        } catch {
+            await prepared.removeStagedMedia()
+            throw error
+        }
+        await prepared.removeStagedMedia()
     }
 
     @MainActor
     private func importJSONWhileFenced(
-        from url: URL,
+        _ prepared: DataBackupPreparedImport,
         context: ModelContext,
         projectionManager: CoconutProjectionManaging?,
-        password: String?,
         schedulePlantNotifications: Bool,
         plantNotifications: ReminderNotificationScheduling,
         restoreFaultInjector: DataBackupRestoreFaultInjector?,
         restoreTransaction: DataBackupRestoreTransaction
     ) throws {
-        let packageURL = try Self.packageURLIfNeeded(url)
-        let fileData: Data
-        let mediaResolver: DataBackupMediaResolving?
-        if let packageURL {
-            let manifestURL = packageURL.appendingPathComponent(Self.manifestFileName, isDirectory: false)
-            guard FileManager.default.fileExists(atPath: manifestURL.path) else {
-                throw BackupError.invalidBackupPackage
-            }
-            try DataBackupPreflightValidator.validateManifestSize(at: manifestURL)
-            fileData = try Data(contentsOf: manifestURL) // smoothness: explicit user restore file read
-            mediaResolver = DataBackupMediaPackageReader(packageURL: packageURL, password: password)
-        } else {
-            try DataBackupPreflightValidator.validateManifestSize(at: url)
-            fileData = try Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
-            mediaResolver = nil
-        }
-        let data = try DataBackupEncryption.decryptIfNeeded(fileData, password: password)
-        let decoder = JSONDecoder()
-        let backup = try decoder.decode(OhanaBackup.self, from: data)
-
         try applyBackupWhileFenced(
-            backup,
+            prepared.backup,
             context: context,
             projectionManager: projectionManager,
             schedulePlantNotifications: schedulePlantNotifications,
             plantNotifications: plantNotifications,
-            mediaResolver: mediaResolver,
+            mediaResolver: prepared.mediaResolver,
             restoreFaultInjector: restoreFaultInjector,
             restoreTransaction: restoreTransaction
         )

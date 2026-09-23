@@ -356,7 +356,7 @@ struct IslandPottyDashboardContentView: View {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
-            .foregroundStyle(isSelected ? .black : .white)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.goCardWhite)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(isSelected ? Color.goPrimary : Color.goCardWhite.opacity(0.12), in: Capsule())

@@ -335,6 +335,23 @@ private extension HumanBasicInfoDetailContentView {
 
     private var editContent: some View {
         Form {
+            if showsSavedFeedback {
+                Section {
+                    Label(
+                        l.tr(
+                            zh: "已保存", en: "Saved", de: "Gespeichert",
+                            es: "Guardado", pt: "Salvo", fr: "Enregistré",
+                            ja: "保存済み", ko: "저장됨", it: "Salvato"
+                        ),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.goTeal)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("human-basic-info-editor-saved-feedback")
+                }
+            }
+
             Section {
                 ProfileCompletionCard(
                     snapshot: draftProfileCompletion,
@@ -379,7 +396,7 @@ private extension HumanBasicInfoDetailContentView {
                     .frame(maxWidth: 180)
                 }
                 Divider().opacity(0.1)
-                HStack {
+                VStack(alignment: .leading, spacing: 10) {
                     requiredEditLabel(
                         l.tr(
                             zh: "性别/身份",
@@ -388,43 +405,68 @@ private extension HumanBasicInfoDetailContentView {
                         ),
                         isRequired: requiresStarterProfileFields
                     )
-                    Spacer()
-                    Menu {
-                        ForEach(genderOptions, id: \.key) { option in
+                    LazyVGrid(
+                        columns: [GridItem(.flexible()), GridItem(.flexible())],
+                        spacing: 8
+                    ) {
+                        ForEach(
+                            genderOptions.filter { !requiresStarterProfileFields || !$0.key.isEmpty },
+                            id: \.key
+                        ) { option in
+                            let isSelected = eGender == option.key
                             Button {
                                 eGender = option.key
+                                OhanaFeedback.selection()
                             } label: {
-                                if eGender == option.key {
-                                    Label(
-                                        localizedGenderTitle(for: option.key),
-                                        systemImage: "checkmark"
-                                    )
-                                } else {
+                                HStack(spacing: 7) {
+                                    Text(option.icon)
+                                        .accessibilityHidden(true)
                                     Text(localizedGenderTitle(for: option.key))
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                    Spacer(minLength: 0)
+                                    if isSelected {
+                                        Image(systemName: "checkmark") // a11y: allow decorative selected-state glyph hidden below
+                                            .font(OhanaFont.caption(.black))
+                                            .accessibilityHidden(true)
+                                    }
+                                }
+                                .font(OhanaFont.callout(.semibold))
+                                .foregroundStyle(isSelected ? profileEditAccent : Color.ohanaPrimaryText)
+                                .padding(.horizontal, 12)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(
+                                    isSelected ? profileEditAccent.opacity(0.14) : Color.ohanaControlFill,
+                                    in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                                        .strokeBorder(
+                                            isSelected ? profileEditAccent.opacity(0.64) : Color.ohanaCardStroke,
+                                            lineWidth: 1
+                                        )
                                 }
                             }
-                            .disabled(requiresStarterProfileFields && option.key.isEmpty)
+                            .buttonStyle(.plain)
                             .accessibilityIdentifier(
                                 "human-basic-info-gender-option-\(option.key.isEmpty ? "unset" : option.key)"
                             )
-                            .accessibilityAddTraits(eGender == option.key ? .isSelected : [])
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text(localizedGenderTitle(for: eGender))
-                                .lineLimit(1)
-                            Image(systemName: "chevron.up.chevron.down") // a11y: allow decorative menu disclosure glyph hidden below
-                                .font(.caption2.weight(.semibold))
-                                .accessibilityHidden(true)
+                            .accessibilityLabel(localizedGenderTitle(for: option.key))
+                            .accessibilityValue(isSelected
+                                ? l.tr(
+                                    zh: "已选择", en: "Selected", de: "Ausgewählt",
+                                    es: "Seleccionado", pt: "Selecionado", fr: "Sélectionné",
+                                    ja: "選択済み", ko: "선택됨", it: "Selezionato"
+                                )
+                                : l.tr(
+                                    zh: "未选择", en: "Not selected", de: "Nicht ausgewählt",
+                                    es: "No seleccionado", pt: "Não selecionado", fr: "Non sélectionné",
+                                    ja: "未選択", ko: "선택 안 됨", it: "Non selezionato"
+                                )
+                            )
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
                         }
                     }
-                    .frame(maxWidth: 180, alignment: .trailing)
-                    .accessibilityLabel(l.tr(
-                        zh: "性别/身份",
-                        en: "Gender / Identity",
-                        de: "Geschlecht / Identität"
-                    ))
-                    .accessibilityValue(localizedGenderTitle(for: eGender))
                     .accessibilityIdentifier("human-basic-info-gender-picker")
                 }
                 Divider().opacity(0.1)
@@ -465,6 +507,25 @@ private extension HumanBasicInfoDetailContentView {
                             ja: "誕生日", ko: "생일", it: "Compleanno"
                         ))
                         .accessibilityIdentifier("human-basic-info-birthday-picker")
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles") // a11y: allow decorative zodiac glyph hidden below
+                            .foregroundStyle(profileEditAccent)
+                            .accessibilityHidden(true)
+                        Text(l.tr(
+                            zh: "星座", en: "Zodiac", de: "Sternzeichen",
+                            es: "Signo", pt: "Signo", fr: "Signe",
+                            ja: "星座", ko: "별자리", it: "Segno"
+                        ))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        Spacer(minLength: 8)
+                        Text(Human.westernZodiacDisplay(for: eBirthday, l: l))
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                    }
+                    .font(OhanaFont.callout(.semibold))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("human-basic-info-zodiac")
                 }
                 if requiresStarterProfileFields {
                     Label(
@@ -1009,7 +1070,6 @@ private extension HumanBasicInfoDetailContentView {
                 return
             }
             isSaving = false
-            presentedSheet = nil
             OhanaFeedback.success()
             presentSavedFeedback()
             onSave?()

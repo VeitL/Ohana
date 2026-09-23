@@ -1079,7 +1079,7 @@ extension EditPlantSheet {
                     Spacer()
                     Text(l.tr(zh: "\(impacts.count) 项", en: "\(impacts.count) items", de: "\(impacts.count) Punkte"))
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.goPrimary, in: Capsule())

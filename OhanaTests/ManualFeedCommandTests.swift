@@ -1018,14 +1018,14 @@ struct ManualFeedCommandTests {
         let petB = Pet(name: "Nori", species: "cat")
         let oldPlanA = makeManualPlanEvent(petID: petA.id, grams: 30)
         let oldPlanB = makeManualPlanEvent(petID: petB.id, grams: 35)
-        let oldReminderA = Reminder(event: oldPlanA, scheduledAt: Date().addingTimeInterval(3_600))
-        let oldReminderB = Reminder(event: oldPlanB, scheduledAt: Date().addingTimeInterval(7_200))
+        let oldReminderA = Reminder(event: oldPlanA, scheduledAt: Date().addingTimeInterval(3600))
+        let oldReminderB = Reminder(event: oldPlanB, scheduledAt: Date().addingTimeInterval(7200))
         oldReminderA.notificationId = "old-plan-a"
         oldReminderB.notificationId = "old-plan-b"
 
         let defaultEvent = Event(
             title: "Default feed",
-            startDate: Date().addingTimeInterval(10_800),
+            startDate: Date().addingTimeInterval(10800),
             eventType: EventType.daily.rawValue,
             relatedEntityType: EntityKind.pet.rawValue,
             relatedEntityId: petA.id.uuidString
@@ -1059,7 +1059,7 @@ struct ManualFeedCommandTests {
             kind: .manualReminder,
             meals: [
                 FeedPlanMealDraft(
-                    time: Date().addingTimeInterval(14_400),
+                    time: Date().addingTimeInterval(14400),
                     foodKind: .dry,
                     grams: 45
                 )
@@ -1095,7 +1095,7 @@ struct ManualFeedCommandTests {
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
         let oldPlan = makeManualPlanEvent(petID: pet.id, grams: 30)
-        let oldReminder = Reminder(event: oldPlan, scheduledAt: Date().addingTimeInterval(3_600))
+        let oldReminder = Reminder(event: oldPlan, scheduledAt: Date().addingTimeInterval(3600))
         oldReminder.notificationId = "old-plan"
         context.insert(pet)
         context.insert(oldPlan)
@@ -1110,7 +1110,7 @@ struct ManualFeedCommandTests {
             kind: .manualReminder,
             meals: [
                 FeedPlanMealDraft(
-                    time: Date().addingTimeInterval(14_400),
+                    time: Date().addingTimeInterval(14400),
                     foodKind: .dry,
                     grams: 45
                 )
@@ -1147,7 +1147,7 @@ struct ManualFeedCommandTests {
         func stockEvent(for pet: Pet) -> Event {
             Event(
                 title: "Stock reminder",
-                startDate: Date().addingTimeInterval(86_400),
+                startDate: Date().addingTimeInterval(86400),
                 eventType: EventType.shoppingList.rawValue,
                 relatedEntityType: FeedingPlanWriter.stockReminderEntityType,
                 relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
@@ -1166,7 +1166,7 @@ struct ManualFeedCommandTests {
             kind: .manualReminder,
             meals: [
                 FeedPlanMealDraft(
-                    time: Date().addingTimeInterval(14_400),
+                    time: Date().addingTimeInterval(14400),
                     foodKind: .dry,
                     grams: 45
                 )
@@ -1362,14 +1362,14 @@ struct ManualFeedCommandTests {
         let petID = UUID()
         let ordinaryFoodChange = Event(
             title: "Diet transition",
-            startDate: Date(timeIntervalSince1970: 3_600),
+            startDate: Date(timeIntervalSince1970: 3600),
             eventType: EventType.foodChange.rawValue,
             relatedEntityType: EntityKind.pet.rawValue,
             relatedEntityId: petID.uuidString
         )
         let legacyFeedRule = Event(
             title: "早餐 干粮 45g",
-            startDate: Date(timeIntervalSince1970: 7_200),
+            startDate: Date(timeIntervalSince1970: 7200),
             eventType: EventType.foodChange.rawValue,
             relatedEntityType: EntityKind.pet.rawValue,
             relatedEntityId: petID.uuidString
@@ -1584,7 +1584,7 @@ struct ManualFeedCommandTests {
     ) -> Event {
         let event = Event(
             title: "Breakfast dry food \(Int(grams))g",
-            startDate: Date(timeIntervalSince1970: 3_600),
+            startDate: Date(timeIntervalSince1970: 3600),
             eventType: EventType.foodChange.rawValue,
             relatedEntityType: EntityKind.pet.rawValue,
             relatedEntityId: petID.uuidString
@@ -1606,7 +1606,7 @@ struct ManualFeedCommandTests {
     private func makeAutoPlanEvent(petID: UUID, grams: Double) -> Event {
         let event = Event(
             title: "Auto feeder dry food \(Int(grams))g",
-            startDate: Date(timeIntervalSince1970: 7_200),
+            startDate: Date(timeIntervalSince1970: 7200),
             eventType: EventType.foodChange.rawValue,
             relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
             relatedEntityId: petID.uuidString

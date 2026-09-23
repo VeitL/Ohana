@@ -236,6 +236,5 @@ extension AchievementWallContentView {
             + human.workoutLogs.map(\.date)
             + medications(for: human).map(\.createdAt)
             + medicationLogs(for: human).map { $0.recordedTime ?? $0.createdAt }
-            + expenses(for: human).map(\.date)
     }
 }

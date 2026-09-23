@@ -10,7 +10,7 @@ import Foundation
 import SwiftData
 
 nonisolated enum QuickFeedModelReadability {
-    nonisolated static func isReadable<Model: PersistentModel>(_ model: Model) -> Bool {
+    nonisolated static func isReadable(_ model: some PersistentModel) -> Bool {
         guard !model.isDeleted else { return false }
         return model.modelContext != nil || model.persistentModelID.storeIdentifier == nil
     }

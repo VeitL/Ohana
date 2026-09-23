@@ -177,7 +177,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     func testCloudSyncTombstoneDefaultLandsOnLatestLightweightSchema() {
-        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV98.self))
+        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV99.self))
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
     }
 
@@ -500,10 +500,10 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     @MainActor
-    func testRealV90HealthRowsBinaryStoreMigratesToV98WithoutLosingLegacyValues() throws {
+    func testRealV90HealthRowsBinaryStoreMigratesToV99WithoutLosingLegacyValues() throws {
         let fixtureURL = try v90HealthRowsFixtureStoreURL()
         let directoryURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("OhanaRealV90HealthRowsToV98MigrationTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("OhanaRealV90HealthRowsToV99MigrationTests-\(UUID().uuidString)", isDirectory: true)
         let storeURL = directoryURL.appendingPathComponent("default.store")
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directoryURL) }
@@ -552,11 +552,11 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         let scanReportID = UUID()
         let scanMetricID = UUID()
         let recordedAt = Date(timeIntervalSince1970: 1_901_000_000)
-        let schema = Schema(ArkSchemaV98.models)
+        let schema = Schema(ArkSchemaV99.models)
 
         do {
             let configuration = ModelConfiguration(
-                "RealV90HealthRowsToV98Migration",
+                "RealV90HealthRowsToV99Migration",
                 schema: schema,
                 url: storeURL,
                 cloudKitDatabase: .none
@@ -600,7 +600,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
 
         do {
             let configuration = ModelConfiguration(
-                "RealV90HealthRowsToV98Migration",
+                "RealV90HealthRowsToV99Migration",
                 schema: schema,
                 url: storeURL,
                 cloudKitDatabase: .none
@@ -705,9 +705,9 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     @MainActor
-    func testV87EventOpensThroughLatestWithEmptyTaskCareKindDefault() throws {
+    func testCurrentEventModelReopensFromV87LabeledContainerWithEmptyTaskCareKind() throws {
         let directoryURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("OhanaEventV88MigrationTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("OhanaEventCurrentModelReopenTests-\(UUID().uuidString)", isDirectory: true)
         let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directoryURL) }
@@ -733,7 +733,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV94.models)
+            let schema = Schema(ArkSchemaV99.models)
             let config = ModelConfiguration("EventLatestTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -750,9 +750,9 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     @MainActor
-    func testV88ReminderOpensThroughLatestWithLegacyOccurrenceFallback() throws {
+    func testCurrentReminderModelReopensFromV88LabeledContainerWithOccurrenceFallback() throws {
         let directoryURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("OhanaReminderV89MigrationTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("OhanaReminderCurrentModelReopenTests-\(UUID().uuidString)", isDirectory: true)
         let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directoryURL) }
@@ -776,7 +776,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV94.models)
+            let schema = Schema(ArkSchemaV99.models)
             let config = ModelConfiguration("ReminderLatestTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,
@@ -1151,6 +1151,72 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
             XCTAssertEqual(migratedPlant.avatarAttachmentState, .absent)
         }
     }
+
+    @MainActor
+    func testRealV90ExpenseMigratesToV99WithLegacyPayerFallback() throws {
+        let fixtureURL = try v90FixtureStoreURL()
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaRealV90ExpenseToV99MigrationTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = directoryURL.appendingPathComponent("default.store")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        try FileManager.default.copyItem(at: fixtureURL, to: storeURL)
+
+        let expenseID = try XCTUnwrap(UUID(uuidString: "E87E9A6B-90B4-4B84-AEF3-000000000090"))
+        let payerID = try XCTUnwrap(UUID(uuidString: "58B6F77F-1913-4951-BBBF-C08B56858D97"))
+        try sqliteExecute(
+            at: storeURL,
+            sql: """
+            BEGIN IMMEDIATE;
+            INSERT INTO ZPETEXPENSELOG (
+                Z_PK, Z_ENT, Z_OPT, ZAMOUNT, ZDATE, ZCATEGORY, ZEXECUTORID, ZNOTE,
+                ZSHAREDSESSIONID, ZTRASHBATCHID, ZTRASHEDBYHUMANID, ZID
+            ) VALUES (
+                1, 30, 1, 125.5, 805807800, '医疗', '\(payerID.uuidString)',
+                'Legacy split migration proof', '', '', '', X'E87E9A6B90B44B84AEF3000000000090'
+            );
+            UPDATE Z_PRIMARYKEY SET Z_MAX = 1 WHERE Z_NAME = 'PetExpenseLog';
+            COMMIT;
+            """
+        )
+
+        XCTAssertEqual(
+            try sqliteScalar(
+                at: storeURL,
+                sql: "SELECT COUNT(*) FROM pragma_table_info('ZPETEXPENSELOG') "
+                    + "WHERE name = 'ZPAYERCONTRIBUTIONSJSON'"
+            ),
+            0
+        )
+
+        let schema = Schema(ArkSchemaV99.models)
+        let configuration = ModelConfiguration(
+            "RealV90ExpenseToV99Migration",
+            schema: schema,
+            url: storeURL,
+            cloudKitDatabase: .none
+        )
+        let container = try ModelContainer(
+            for: schema,
+            migrationPlan: ArkMigrationPlan.self,
+            configurations: [configuration]
+        )
+        var descriptor = FetchDescriptor<PetExpenseLog>(
+            predicate: #Predicate<PetExpenseLog> { $0.id == expenseID }
+        )
+        descriptor.fetchLimit = 1
+        let migrated = try XCTUnwrap(container.mainContext.fetch(descriptor).first)
+
+        XCTAssertEqual(migrated.amount, 125.5, accuracy: 0.000_001)
+        XCTAssertEqual(migrated.executorId, payerID.uuidString)
+        XCTAssertNil(migrated.recordedByHumanId)
+        XCTAssertEqual(migrated.payerContributionsJSON, "")
+        XCTAssertEqual(
+            migrated.payerContributions,
+            [ExpensePayerContribution(humanID: payerID, minorUnits: 12550)]
+        )
+        XCTAssertEqual(migrated.amountPaid(by: payerID.uuidString), 125.5, accuracy: 0.000_001)
+    }
 }
 
 private extension SharedModelContainerRecoveryTests {
@@ -1301,6 +1367,32 @@ private extension SharedModelContainerRecoveryTests {
             )
         }
         return sqlite3_column_int64(statement, 0)
+    }
+
+    func sqliteExecute(at storeURL: URL, sql: String) throws {
+        var database: OpaquePointer?
+        let openResult = sqlite3_open_v2(
+            storeURL.path,
+            &database,
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX,
+            nil
+        )
+        guard openResult == SQLITE_OK, let database else {
+            let message = database.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown SQLite open error"
+            if let database {
+                sqlite3_close(database)
+            }
+            throw migrationFixtureError("Unable to open a writable V90 fixture copy: \(message)")
+        }
+        defer { sqlite3_close(database) }
+
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        guard sqlite3_exec(database, sql, nil, nil, &errorMessage) == SQLITE_OK else {
+            let message = errorMessage.map { String(cString: $0) }
+                ?? String(cString: sqlite3_errmsg(database))
+            sqlite3_free(errorMessage)
+            throw migrationFixtureError("Unable to seed the V90 fixture copy: \(message)")
+        }
     }
 
     func migrationFixtureError(_ description: String) -> NSError {

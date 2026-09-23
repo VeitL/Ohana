@@ -599,6 +599,41 @@ struct HomeSnapshotBuilderTests {
         #expect(afterPortion != afterFoodKind)
     }
 
+    @Test func verticalPlantSignatureTracksPlannerAndRenderedInputs() {
+        let hadExistingPlantData = PlantUnlockPolicy.hasExistingPlantData()
+        PlantUnlockPolicy.noteExistingPlantData()
+        defer {
+            if hadExistingPlantData {
+                PlantUnlockPolicy.noteExistingPlantData()
+            } else {
+                PlantUnlockPolicy.clearExistingPlantData()
+            }
+        }
+
+        let now = Date(timeIntervalSince1970: 1_786_291_200)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 7)
+        plant.createdAt = now.addingTimeInterval(-10 * 86400)
+        let source = makeVerticalSource(
+            plants: [plant],
+            plantPlanningHistories: [plant.id: .empty]
+        )
+        let initial = VerticalSolidHomeSnapshotBuilder.signature(for: source, now: now)
+
+        plant.createdAt = now.addingTimeInterval(-2 * 86400)
+        let afterCreatedAt = VerticalSolidHomeSnapshotBuilder.signature(for: source, now: now)
+        plant.roomNameRaw = "Sunroom"
+        let afterRoom = VerticalSolidHomeSnapshotBuilder.signature(for: source, now: now)
+        plant.healthStatus = .stressed
+        let afterHealth = VerticalSolidHomeSnapshotBuilder.signature(for: source, now: now)
+        plant.isHydroponic = true
+        let afterEnvironment = VerticalSolidHomeSnapshotBuilder.signature(for: source, now: now)
+
+        #expect(initial != afterCreatedAt)
+        #expect(afterCreatedAt != afterRoom)
+        #expect(afterRoom != afterHealth)
+        #expect(afterHealth != afterEnvironment)
+    }
+
     @Test func verticalSnapshotCardsCarryPetBondAppearanceFlags() throws {
         let pet = Pet(name: "Momo", species: "猫")
         PetBondVaultStore.unlock(.cardBorder, for: pet.id)
@@ -771,6 +806,7 @@ struct HomeSnapshotBuilderTests {
         pets: [Pet] = [],
         humans: [Human] = [],
         plants: [Plant] = [],
+        plantPlanningHistories: [UUID: PlantCarePlanningHistory] = [:],
         electronicPets: [OasisElectronicPet] = [],
         events: [Event] = [],
         hiddenPetIDsRaw: String = "",
@@ -783,6 +819,7 @@ struct HomeSnapshotBuilderTests {
             pets: pets,
             humans: humans,
             plants: plants,
+            plantPlanningHistories: plantPlanningHistories,
             electronicPets: electronicPets,
             events: events,
             pendingReminders: [],

@@ -41,9 +41,9 @@ struct HumanWorkoutAppleHealthBindingCard: View {
             bindingControl
 
             Text(l.tr(
-                zh: "绑定只保存在这台设备上，不会进入 Ohana 备份。解绑不会删除手动运动或遛狗记录，也不会更改 Apple Health 的系统权限。",
-                en: "The binding stays only on this device and is not included in Ohana backups. Unbinding does not delete manual workouts or dog walks, or change Apple Health system access.",
-                de: "Die Bindung bleibt nur auf diesem Gerät und ist nicht in Ohana-Backups enthalten. Beim Trennen bleiben manuelle Trainings und Hundegänge erhalten; der Apple-Health-Systemzugriff ändert sich nicht."
+                zh: "绑定仅保存在本机；解绑不删除记录或更改系统权限。",
+                en: "The binding stays on this device. Unbinding does not delete logs or change system access.",
+                de: "Die Bindung bleibt auf diesem Gerät. Trennen löscht keine Einträge und ändert keine Systemrechte."
             ))
             .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaTertiaryText)
@@ -110,7 +110,7 @@ struct HumanWorkoutAppleHealthBindingCard: View {
         Button(action: action) {
             Label(title, systemImage: icon)
                 .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
                 .background(Color.goPrimary, in: Capsule())
@@ -136,28 +136,28 @@ struct HumanWorkoutAppleHealthBindingCard: View {
         switch state {
         case .unbound:
             return l.tr(
-                zh: "在明确绑定前，不会读取或显示这台设备上的活动环、步数和 HealthKit 运动。",
-                en: "Activity rings, steps, and HealthKit workouts on this device stay unread until you bind one Human.",
-                de: "Aktivitätsringe, Schritte und HealthKit-Trainings dieses Geräts werden erst nach einer eindeutigen Bindung gelesen."
+                zh: "绑定前不读取 Apple Health 数据。",
+                en: "Apple Health data is not read before binding.",
+                de: "Apple-Health-Daten werden vor der Bindung nicht gelesen."
             )
         case .boundToViewedHuman:
             return l.tr(
-                zh: "这台设备允许读取的 Apple Health 数据只会显示在 \(humanName) 的本地运动页。",
-                en: "Apple Health data readable on this device appears only on \(humanName)’s local workout screen.",
-                de: "Lesbare Apple-Health-Daten dieses Geräts erscheinen nur in \(humanName)s lokaler Trainingsansicht."
+                zh: "仅显示在 \(humanName) 的本机运动页。",
+                en: "Shown only on \(humanName)’s on-device workout screen.",
+                de: "Nur in \(humanName)s lokaler Trainingsansicht sichtbar."
             )
         case .boundToOtherHuman:
             let owner = boundHumanName ?? l.tr(zh: "另一位成员", en: "another Human", de: "eine andere Person")
             return l.tr(
-                zh: "当前绑定：\(owner)。实时 Apple Health 数据不会显示在 \(humanName) 名下；改绑需要再次确认。",
-                en: "Currently bound to \(owner). Live Apple Health data is hidden from \(humanName); rebinding requires confirmation.",
-                de: "Derzeit mit \(owner) verbunden. Live-Apple-Health-Daten bleiben bei \(humanName) ausgeblendet; eine neue Bindung muss bestätigt werden."
+                zh: "当前绑定：\(owner) · 改绑需确认",
+                en: "Currently bound to \(owner) · confirmation required to rebind",
+                de: "Aktuell mit \(owner) verbunden · neue Bindung bestätigen"
             )
         case .viewedHumanUnavailable:
             return l.tr(
-                zh: "纪念档案只保留既有历史，不会读取这台设备上的实时 Apple Health 数据。",
-                en: "Memorial profiles retain existing history but never read live Apple Health data from this device.",
-                de: "Gedenkprofile behalten vorhandene Verläufe, lesen aber keine Live-Apple-Health-Daten dieses Geräts."
+                zh: "仅保留历史，不读取实时数据。",
+                en: "History only; live data is not read.",
+                de: "Nur Verlauf; Live-Daten werden nicht gelesen."
             )
         }
     }
@@ -183,7 +183,7 @@ struct HumanWorkoutAppleHealthBindingCard: View {
 struct HumanWorkoutSectionHeading: View {
     let icon: String
     let title: String
-    let subtitle: String
+    var subtitle: String? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -197,10 +197,12 @@ struct HumanWorkoutSectionHeading: View {
                 Text(title)
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(subtitle)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 0)
         }

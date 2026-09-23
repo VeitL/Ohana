@@ -396,11 +396,11 @@ while IFS= read -r localized_strings; do
     "Localized resources must not retain the obsolete claim that backups include all Human health records."
 done < <(find Ohana -name Localizable.strings -type f -print)
 
-require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 33' \
-  "OhanaBackup.schemaVersion should be 33 after adding achievement unlock and reward-receipt data."
+require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 34' \
+  "OhanaBackup.schemaVersion should be 34 after adding structured expense payer contributions."
 
-require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 33' \
-  "Restore preflight should accept supported backup schema versions through 33."
+require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 34' \
+  "Restore preflight should accept supported backup schema versions through 34."
 
 require_pattern "$data_backup_dtos" 'struct BackupMediaPackageInfo' \
   "OhanaBackup should describe the out-of-line backup media package."

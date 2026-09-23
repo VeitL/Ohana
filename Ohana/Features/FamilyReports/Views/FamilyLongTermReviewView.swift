@@ -81,7 +81,7 @@ struct FamilyLongTermReviewView: View {
                 ShareLink(item: preparedCSV) {
                     Label(l.tr(zh: "导出", en: "Export", de: "Exportieren"), systemImage: "square.and.arrow.up")
                         .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 14)
                         .frame(minHeight: 44)
                         .background(Color.goPrimary, in: Capsule())

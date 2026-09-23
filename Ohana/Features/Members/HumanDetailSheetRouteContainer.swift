@@ -221,10 +221,9 @@ struct AppHumanDetailSheetRouteContainer: View {
             case .report:
                 NavigationStack { HumanHealthReportView(human: human) }
             case .expenseQuick:
-                QuickHumanExpenseSheet(
-                    human: human,
-                    onDismiss: onDismiss
-                )
+                // Kept as a compatibility route for restored navigation state.
+                // Human expense creation is retired; this surface is payer history only.
+                NavigationStack { HumanExpenseDetailView(human: human) }
             case .expense:
                 NavigationStack { HumanExpenseDetailView(human: human) }
             case .wishlist:
@@ -294,13 +293,23 @@ private struct HumanAllFeaturesRouteData {
             context: context,
             name: "HumanHealthReport"
         )
-        let allExpenses = fetch(
-            FetchDescriptor<PetExpenseLog>(
-                predicate: #Predicate<PetExpenseLog> { $0.executorId == humanKey },
-                sortBy: [SortDescriptor(\.date, order: .reverse)]
-            ),
-            context: context,
-            name: "PetExpenseLog"
+        var expenseDescriptor = FetchDescriptor<PetExpenseLog>(
+            predicate: #Predicate<PetExpenseLog> { log in
+                log.executorId == humanKey ||
+                    log.executorId == humanKeyLower ||
+                    log.payerContributionsJSON.contains(humanKey) ||
+                    log.payerContributionsJSON.contains(humanKeyLower)
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        expenseDescriptor.fetchLimit = 20000
+        let allExpenses = ExpenseSummaryBuilder.paidBy(
+            id,
+            from: fetch(
+                expenseDescriptor,
+                context: context,
+                name: "PetExpenseLog"
+            )
         )
         let weightLogs = fetch(
             FetchDescriptor<HumanWeightLog>(

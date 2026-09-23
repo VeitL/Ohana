@@ -146,9 +146,9 @@ struct HumanHealthConditionEditorSheet: View {
                     Text(l.tr(zh: "基本信息", en: "Basics", de: "Grundlagen"))
                 } footer: {
                     Text(l.tr(
-                        zh: "名称和状态由你记录，不代表 Ohana 作出的诊断。",
-                        en: "Names and states are your records, not diagnoses made by Ohana.",
-                        de: "Name und Status sind deine Einträge, keine Diagnose von Ohana."
+                        zh: "你的记录不代表诊断。",
+                        en: "Your records are not a diagnosis.",
+                        de: "Deine Einträge sind keine Diagnose."
                     ))
                 }
 
@@ -181,7 +181,7 @@ struct HumanHealthConditionEditorSheet: View {
                         )
                         .foregroundStyle(Color.ohanaSecondaryText)
                     } else if selectableMedications.isEmpty {
-                        Text(l.tr(zh: "暂无可关联药物。可先在用药模块添加计划。", en: "No medication plans to link. Add one in Medication first.", de: "Keine Medikamentenpläne zum Verknüpfen. Lege zuerst einen Plan an."))
+                        Text(l.tr(zh: "暂无可关联用药", en: "No medication to link", de: "Keine Medikamente zum Verknüpfen"))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     } else {
                         ForEach(selectableMedications) { medication in
@@ -196,8 +196,6 @@ struct HumanHealthConditionEditorSheet: View {
                     }
                 } header: {
                     Text(l.tr(zh: "关联用药", en: "Linked medication", de: "Verknüpfte Medikamente"))
-                } footer: {
-                    Text(l.tr(zh: "关联只用于同页查看计划完成情况和主观反应。", en: "Links only place plan completion and self-reported responses on the same page.", de: "Verknüpfungen zeigen nur Planerfüllung und selbst berichtete Reaktionen auf derselben Seite."))
                 }
 
                 Section {
@@ -207,7 +205,7 @@ struct HumanHealthConditionEditorSheet: View {
                             UISelectionFeedbackGenerator().selectionChanged()
                         } label: {
                             Label(
-                                l.tr(zh: "选择该类别的常用指标", en: "Select common metrics for this category", de: "Übliche Werte dieser Kategorie auswählen"),
+                                l.tr(zh: "选择常用指标", en: "Select common metrics", de: "Übliche Werte auswählen"),
                                 systemImage: "wand.and.stars"
                             )
                         }
@@ -227,7 +225,7 @@ struct HumanHealthConditionEditorSheet: View {
                 } header: {
                     Text(l.tr(zh: "关联体检指标", en: "Linked checkup metrics", de: "Verknüpfte Check-up-Werte"))
                 } footer: {
-                    Text(l.tr(zh: "关联不会判断指标和症状是否相关。", en: "Linking does not decide whether a metric and symptom are related.", de: "Die Verknüpfung bewertet keinen Zusammenhang zwischen Wert und Symptom."))
+                    Text(l.tr(zh: "关联不代表相关。", en: "A link does not imply a relationship.", de: "Eine Verknüpfung bedeutet keinen Zusammenhang."))
                 }
 
                 Section(l.tr(zh: "备注", en: "Notes", de: "Notizen")) {

@@ -122,6 +122,13 @@ policy projections, and sync outbox records are excluded from backup, manual
 export, logs and current CloudSync; restore cannot recreate an invitation or
 trigger a guardian notification.
 
+BR-015. Restricted backup schema v34 adds the optional, versioned payer
+contribution snapshot for each pet expense. Its amounts use integer minor units,
+must exactly equal the expense total, and may reference each Human at most once.
+Older backups without the snapshot remain decodable and attribute the full amount
+to the legacy primary payer. Restore rejects malformed, non-conserving, duplicate,
+or dangling known-payer contributions before mutating the live store.
+
 ## Validation
 
 Required launch evidence:
@@ -145,7 +152,7 @@ Required launch evidence:
 - Fault injection at every restore phase, transaction-save failure,
   cancellation, and repeated-restore idempotency with original-store,
   UserDefaults, and notification assertions.
-- v31/v32/v33 presence and achievement compatibility, repeated upsert
+- v31/v32/v33/v34 presence, achievement, and expense-contribution compatibility; repeated upsert
   idempotency, restore-without-reward, and explicit proof that legacy contacts,
   phone numbers, templates, mode settings, guardian projections, account/device
   tokens, and guardian outbox records are absent.

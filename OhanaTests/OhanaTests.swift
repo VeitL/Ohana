@@ -397,6 +397,53 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func oasisTreePreservesZenPresenceGrowthWhenEstablishingLegacyBaseline() async throws {
+        OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
+        OasisTreePreferenceStore.clearLedgerEnergyCache()
+        defer {
+            OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
+            OasisTreePreferenceStore.clearLedgerEnergyCache()
+        }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        context.insert(CareLedgerEvent(
+            actorKind: .human,
+            actorId: "legacy-human",
+            subjectKind: .pet,
+            subjectId: "legacy-pet",
+            eventKind: .care,
+            actionType: "feeding",
+            metadataJSON: "{\"economyVersion\":2,\"growthXP\":500}"
+        ))
+        for (actionType, growthXP) in [
+            (PresenceTreeGrowthPolicy.ownerDailyActionType, PresenceTreeGrowthPolicy.ownerDailyGrowthXP),
+            (PresenceTreeGrowthPolicy.dailyStatusActionType, PresenceTreeGrowthPolicy.dailyStatusGrowthXP)
+        ] {
+            context.insert(CareLedgerEvent(
+                actorKind: .human,
+                actorId: "zen-owner",
+                subjectKind: .household,
+                eventKind: .milestone,
+                actionType: actionType,
+                metadataJSON: "{\"economyVersion\":3,\"growthXP\":\(growthXP),\"careGrowthBaselineExempt\":true}"
+            ))
+        }
+        try context.save()
+
+        let manager = OasisTreeManager()
+        manager.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
+
+        #expect(OasisTreePreferenceStore.careGrowthBaseline() == 500)
+        #expect(manager.careGrowthEnergy == PresenceTreeGrowthPolicy.dailyGrowthXPCap)
+        #expect(manager.totalEnergy == PresenceTreeGrowthPolicy.dailyGrowthXPCap)
+        #expect(manager.treeLevel == .lv0)
+    }
+
+    @MainActor
     @Test func oasisLegacyActivityBaselineDoesNotAdvanceTreeLevel() async throws {
         OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")

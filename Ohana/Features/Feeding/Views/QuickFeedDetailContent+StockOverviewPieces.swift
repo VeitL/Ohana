@@ -122,7 +122,7 @@ extension QuickFeedDetailContent {
             if stockOverviewRecords.isEmpty {
                 emptyInlineState(
                     icon: "shippingbox",
-                    text: l.tr(zh: "补粮后会显示每袋粮的购买、开袋和使用状态", en: "Restocks show purchase, open date, and status.", de: "Nachfüllungen zeigen Kauf, Öffnung und Status.")
+                    text: l.tr(zh: "暂无补粮记录", en: "No restocks yet", de: "Noch keine Nachfüllungen")
                 )
             } else {
                 ForEach(stockOverviewRecords.prefix(6)) { record in

@@ -230,7 +230,7 @@ struct QuickHumanExpenseSheet: View {
                         } label: {
                             Text("\(AppCurrency.symbol)\(displayAmount(amount))")
                                 .font(OhanaFont.caption(.black))
-                                .foregroundStyle(isQuickAmountSelected(amount) ? Color.arkInk : Color.ohanaPrimaryText)
+                                .foregroundStyle(isQuickAmountSelected(amount) ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                 .padding(.horizontal, 13)
                                 .frame(height: 34)
                                 .background(
@@ -319,7 +319,7 @@ struct QuickHumanExpenseSheet: View {
                 )
                 .font(OhanaFont.callout(.black))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(isValid && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(isValid && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -346,7 +346,7 @@ struct QuickHumanExpenseSheet: View {
                 Text(l.expenseCategoryTitle(category))
                     .font(OhanaFont.caption(.black))
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 12)
             .frame(height: 34)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

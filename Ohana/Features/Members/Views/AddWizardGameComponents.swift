@@ -29,7 +29,6 @@ enum AddWizardThemePalette {
 
 struct AddWizardJoinCelebrationOverlay: View {
     let title: String
-    let subtitle: String
     let systemImage: String
     var accent: Color = .goPrimary
 
@@ -47,25 +46,20 @@ struct AddWizardJoinCelebrationOverlay: View {
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.arkInk)
                 }
-                VStack(spacing: 5) {
-                    Text(title)
-                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .multilineTextAlignment(.center)
-                    Text(subtitle)
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .multilineTextAlignment(.center)
-                }
+                Text(title)
+                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .multilineTextAlignment(.center)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 26)
-            .frame(maxWidth: min(ScreenCompat.width - 42, 360))
+            .frame(maxWidth: 360)
             .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous)
                     .strokeBorder(accent.opacity(0.22), lineWidth: 1)
             )
+            .padding(.horizontal, 21)
             .transition(.scale(scale: 0.92).combined(with: .opacity))
         }
         .allowsHitTesting(false)

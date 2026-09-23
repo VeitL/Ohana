@@ -29,8 +29,9 @@ struct ExpenseSplitterCard: View {
         let average = totalExpense / Double(humans.count)
         return humans.map { human in
             let paid = filteredLogs
-                .filter { $0.executorId == human.id.uuidString }
-                .reduce(0.0) { $0 + $1.amount }
+                .reduce(0.0) {
+                    $0 + ExpenseSummaryBuilder.amountPaid(by: human.id, for: $1)
+                }
             let balance = paid - average
             let hex: String = human.themeColor
             return SplitResult(id: human.id, name: human.name,
@@ -69,7 +70,7 @@ struct ExpenseSplitterCard: View {
             .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 14)
 
             if results.isEmpty {
-                Text(l.tr(zh: "添加花费记录并指定支付人后，这里会自动计算谁欠谁多少钱。", en: "Add expenses with payers to calculate who owes whom.", de: "Erfasse Ausgaben mit zahlender Person, um Ausgleich zu berechnen."))
+                Text(l.tr(zh: "暂无可结算记录", en: "Nothing to settle", de: "Nichts abzurechnen"))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .padding(.horizontal, 20).padding(.bottom, 18)
@@ -116,9 +117,6 @@ struct ExpenseSplitterCard: View {
                 Text(isPositive ? l.tr(zh: "应收 \(AppCurrency.format(r.balance, fractionDigits: 0))", en: "Receives \(AppCurrency.format(r.balance, fractionDigits: 0))", de: "Erhält \(AppCurrency.format(r.balance, fractionDigits: 0))") : l.tr(zh: "应付 \(AppCurrency.format(abs(r.balance), fractionDigits: 0))", en: "Owes \(AppCurrency.format(abs(r.balance), fractionDigits: 0))", de: "Zahlt \(AppCurrency.format(abs(r.balance), fractionDigits: 0))"))
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(isPositive ? Color.goPrimary : Color.goRed)
-                Text(isPositive ? l.tr(zh: "垫付较多", en: "Paid more", de: "Mehr bezahlt") : l.tr(zh: "少付了", en: "Paid less", de: "Weniger bezahlt"))
-                    .font(OhanaFont.adaptive(size: 9, weight: .medium))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             }
         }
         .padding(12)

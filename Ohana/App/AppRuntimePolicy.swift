@@ -328,6 +328,12 @@ final class AppWorkloadPolicy: ObservableObject {
         isVisible && isForeground
     }
 
+    /// The first bounded snapshot is required to make a visible surface usable.
+    /// Once it exists, the normal thermal and power refresh budget takes over.
+    func allowsEssentialInitialSnapshotRead(isVisible: Bool, isLive: Bool, hasSnapshot: Bool) -> Bool {
+        isVisible && isLive && !hasSnapshot
+    }
+
     func shouldRunRepeatingAnimation(isVisible: Bool = true) -> Bool {
         ambientMotionBudget(isVisible: isVisible).allowsMotion
     }

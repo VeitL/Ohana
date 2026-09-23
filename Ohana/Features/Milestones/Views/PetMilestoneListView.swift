@@ -66,7 +66,7 @@ struct PetMilestoneListContentView: View {
                     Text(l.tr(zh: "记录里程碑", en: "Record milestone", de: "Meilenstein erfassen"))
                         .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 24).padding(.vertical, 14)
                 .background(Color.goPrimary, in: Capsule())
             }
@@ -228,10 +228,6 @@ struct PetMilestoneListContentView: View {
             Text(l.tr(zh: "还没有里程碑记录", en: "No milestones yet", de: "Noch keine Meilensteine"))
                 .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(zh: "记录 \(pet.name) 的每一个重要时刻", en: "Capture every important moment with \(pet.name)", de: "Halte jeden wichtigen Moment mit \(pet.name) fest"))
-                .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                .multilineTextAlignment(.center)
         }
     }
 
@@ -454,15 +450,10 @@ struct PetMilestoneListContentView: View {
                     Image(systemName: "checkmark").font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(l.tr(zh: "保存里程碑", en: "Save milestone", de: "Meilenstein speichern")).font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
-                .foregroundStyle(newTitle.isEmpty ? .primary.opacity(0.4) : Color.arkInk)
+                .foregroundStyle(newTitle.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText)
                 .frame(maxWidth: .infinity).padding(.vertical, 16)
                 .background(
-                    LinearGradient(
-                        colors: newTitle.isEmpty
-                            ? [Color.goPrimary.opacity(0.25), Color.goPrimary.opacity(0.15)]
-                            : [Color.goPrimary, Color(hex: "A8E44A")],
-                        startPoint: .leading, endPoint: .trailing
-                    ),
+                    newTitle.isEmpty ? Color.ohanaControlFill : Color.goPrimary,
                     in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge)
                 )
             }

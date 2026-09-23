@@ -35,11 +35,17 @@ struct ZenExperienceContainer: View {
     @State private var avatarLoadTask: Task<Void, Never>?
     @State private var didLoadStreak = false
     @State private var didLoadOasis = false
+    @State private var didReportInitialHomeSnapshotReady = false
     @State private var errorMessage: String?
 
+    let onInitialHomeSnapshotReady: () -> Void
     let onRequestModeSwitch: () -> Void
 
-    init(onRequestModeSwitch: @escaping () -> Void) {
+    init(
+        onInitialHomeSnapshotReady: @escaping () -> Void = {},
+        onRequestModeSwitch: @escaping () -> Void
+    ) {
+        self.onInitialHomeSnapshotReady = onInitialHomeSnapshotReady
         self.onRequestModeSwitch = onRequestModeSwitch
     }
 
@@ -113,6 +119,7 @@ private extension ZenExperienceContainer {
         PresenceCheckInCommandService(
             context: modelContext,
             wallet: appServices.coconutWallet,
+            careLedger: appServices.careLedger,
             projectionManager: appServices.questManager
         )
     }
@@ -207,6 +214,9 @@ private extension ZenExperienceContainer {
             onOpenGrowthRoadmap: {
                 presentedRoute = .growthRoadmap
             },
+            onOpenOasisReward: {
+                presentedRoute = .oasisReward
+            },
             onInjectEnergy: {
                 _ = appServices.oasisTree.injectEnergy(
                     cost: OasisTreeEnergyInjectionPolicy.starterPackageCost,
@@ -242,14 +252,13 @@ private extension ZenExperienceContainer {
     }
 
     private func prepareExperience() async {
-        guard persistentBootstrapReady,
-              UUID(uuidString: experienceController.zenOwnerHumanID) != nil else {
+        guard UUID(uuidString: experienceController.zenOwnerHumanID) != nil else {
             snapshot = .empty
             oasisSnapshot = .empty
             starterJourney = .empty
             return
         }
-        refresh(streak: didLoadStreak)
+        refresh(streak: didLoadStreak, allowsBootstrapPendingHomeRead: true)
     }
 
     private func runPresenceCommand(
@@ -339,15 +348,22 @@ private extension ZenExperienceContainer {
         }
     }
 
-    private func refresh(streak shouldLoadStreak: Bool) {
-        guard persistentBootstrapReady,
-              let ownerID = UUID(uuidString: experienceController.zenOwnerHumanID) else {
+    private func refresh(
+        streak shouldLoadStreak: Bool,
+        allowsBootstrapPendingHomeRead: Bool = false
+    ) {
+        guard let ownerID = UUID(uuidString: experienceController.zenOwnerHumanID) else {
             snapshot = .empty
             oasisSnapshot = .empty
             starterJourney = .empty
             return
         }
-        refreshStarterJourney(ownerID: ownerID)
+        guard persistentBootstrapReady || allowsBootstrapPendingHomeRead else { return }
+
+        let loadsPersistentProjections = persistentBootstrapReady
+        if loadsPersistentProjections {
+            refreshStarterJourney(ownerID: ownerID)
+        }
         do {
             let home = try PresenceCheckInReadService.homeSnapshot(
                 context: modelContext,
@@ -363,7 +379,7 @@ private extension ZenExperienceContainer {
             var longestStreak = shouldLoadStreak ? 0 : snapshot.longestStreak
             var days = shouldLoadStreak ? [] : snapshot.days
             var streakSubjects = shouldLoadStreak ? [] : snapshot.streakSubjects
-            if shouldLoadStreak {
+            if shouldLoadStreak, loadsPersistentProjections {
                 let historicalSubjects = try PresenceCheckInReadService.streakSubjects(
                     context: modelContext,
                     ownerHumanId: ownerID
@@ -411,7 +427,9 @@ private extension ZenExperienceContainer {
                 }
             }
 
-            let balance = appServices.coconutWallet.totalBalance(context: modelContext)
+            let balance = loadsPersistentProjections
+                ? appServices.coconutWallet.totalBalance(context: modelContext)
+                : snapshot.coconutBalance
             snapshot = ZenPresenceSnapshot(
                 isReady: true,
                 subjects: home.subjects.enumerated().map { index, subject in
@@ -446,13 +464,22 @@ private extension ZenExperienceContainer {
                 personalAccessLevel: appServices.commerce.personalAccessLevel,
                 avatarCacheRevision: snapshot.avatarCacheRevision
             )
-            scheduleAvatarPreload(for: home.subjects)
-            if didLoadOasis {
+            reportInitialHomeSnapshotReadyIfNeeded()
+            if loadsPersistentProjections {
+                scheduleAvatarPreload(for: home.subjects)
+            }
+            if didLoadOasis, loadsPersistentProjections {
                 refreshOasis(balance: balance)
             }
         } catch {
             present(error)
         }
+    }
+
+    private func reportInitialHomeSnapshotReadyIfNeeded() {
+        guard snapshot.isReady, !didReportInitialHomeSnapshotReady else { return }
+        didReportInitialHomeSnapshotReady = true
+        onInitialHomeSnapshotReady()
     }
 
     private func refreshStarterJourney(ownerID: UUID) {
@@ -658,6 +685,10 @@ private extension ZenExperienceContainer {
             }
         case .growthRoadmap:
             FunctionMenuSheet(initialDestination: .growthRoadmap)
+        case .oasisReward:
+            OasisRewardView(onPresentCoconutLog: { _ in
+                openCoconutLogAfterClosingOasis()
+            })
         case .analytics:
             NavigationStack { ZenPersonalAnalyticsView(snapshot: snapshot) }
         case .personalPlan:
@@ -695,6 +726,13 @@ private extension ZenExperienceContainer {
     private func closeAndRefreshRoute() {
         presentedRoute = nil
         scheduleRefresh(delayMilliseconds: 80)
+    }
+
+    private func openCoconutLogAfterClosingOasis() {
+        presentedRoute = nil
+        OhanaFrameScheduler.runAfterNextFrame {
+            presentedRoute = .coconutLog
+        }
     }
 
     private func claimZenStarterGift() -> TaskCenterSystemJourneyMutationOutcome {
@@ -880,6 +918,7 @@ private enum ZenExperienceRoute: Identifiable, Equatable {
     case gacha
     case critters
     case growthRoadmap
+    case oasisReward
     case analytics
     case personalPlan
     case members
@@ -897,6 +936,7 @@ private enum ZenExperienceRoute: Identifiable, Equatable {
         case .gacha: "gacha"
         case .critters: "critters"
         case .growthRoadmap: "growth-roadmap"
+        case .oasisReward: "oasis-reward"
         case .analytics: "analytics"
         case .personalPlan: "personal-plan"
         case .members: "members"
@@ -910,7 +950,7 @@ private enum ZenExperienceRoute: Identifiable, Equatable {
         case let .human(id): "profile:human:\(id.uuidString)"
         case let .pet(id): "profile:pet:\(id.uuidString)"
         case let .plant(id): "profile:plant:\(id.uuidString)"
-        case .add, .shop, .achievements, .gacha, .critters, .growthRoadmap,
+        case .add, .shop, .achievements, .gacha, .critters, .growthRoadmap, .oasisReward,
              .analytics, .personalPlan, .members, .coconutLog, .starterJourney:
             nil
         }

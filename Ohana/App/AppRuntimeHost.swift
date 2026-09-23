@@ -508,6 +508,7 @@ struct AppRuntimeHost<Content: View>: View {
         PresenceCheckInCommandService(
             context: modelContext,
             wallet: appServices.coconutWallet,
+            careLedger: appServices.careLedger,
             projectionManager: appServices.questManager
         )
     }

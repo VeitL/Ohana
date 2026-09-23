@@ -290,11 +290,13 @@ extension PlantDashboardView {
         let executorId = executorID?.uuidString
         let retryCareType = batchCareInitialType
         let retryRoomID = batchCareRoomFilter
+        let operationID = UUID()
         Task { @MainActor in
             await OhanaFrameScheduler.waitAfterNextFrame()
             let result = commandExecutor.completePlantBatchCare(
                 selections: selections,
-                executorId: executorId
+                executorId: executorId,
+                operationID: operationID
             )
             guard result.didPersist else {
                 showBatchCarePersistenceFailure(result.persistenceErrorDescription)
@@ -319,10 +321,12 @@ extension PlantDashboardView {
         guard !selections.isEmpty else { return false }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let executorId = executorID?.uuidString
+        let operationID = UUID()
         await OhanaFrameScheduler.waitAfterNextFrame()
         let result = commandExecutor.recordPlantBatchQuickCare(
             selections: selections,
-            executorId: executorId
+            executorId: executorId,
+            operationID: operationID
         )
         guard result.didPersist else {
             showBatchCarePersistenceFailure(result.persistenceErrorDescription)

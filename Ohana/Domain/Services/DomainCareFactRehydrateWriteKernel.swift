@@ -96,6 +96,31 @@ nonisolated struct DomainPetExpenseLogRehydrateSnapshot: Equatable {
     let executorId: String?
     let recordedByHumanId: String?
     let sharedSessionId: String
+    let payerContributionsJSON: String
+
+    init(
+        id: UUID,
+        date: Date,
+        amount: Double,
+        categoryRaw: String,
+        note: String,
+        petId: UUID?,
+        executorId: String?,
+        recordedByHumanId: String?,
+        sharedSessionId: String,
+        payerContributionsJSON: String = ""
+    ) {
+        self.id = id
+        self.date = date
+        self.amount = amount
+        self.categoryRaw = categoryRaw
+        self.note = note
+        self.petId = petId
+        self.executorId = executorId
+        self.recordedByHumanId = recordedByHumanId
+        self.sharedSessionId = sharedSessionId
+        self.payerContributionsJSON = payerContributionsJSON
+    }
 }
 
 nonisolated struct DomainPetFoodRecordRehydrateSnapshot: Equatable {
@@ -340,6 +365,10 @@ nonisolated enum DomainCareFactRehydrateWriter {
             categoryRaw: snapshot.categoryRaw,
             note: snapshot.note
         )
+        _ = try ExpensePayerContributionPolicy.validatedDecoded(
+            snapshot.payerContributionsJSON,
+            total: snapshot.amount
+        )
         let plan = authorize(petId: snapshot.petId, source: source, context: context)
         guard plan.disposition.allowsPersistence else { return DomainCareFactRehydrateResult(inserted: false, plan: plan) }
         guard try fetchPetExpenseLog(id: snapshot.id, context: context) == nil else {
@@ -354,6 +383,7 @@ nonisolated enum DomainCareFactRehydrateWriter {
             pet: try petReference(id: snapshot.petId, context: context),
             executorId: snapshot.executorId,
             recordedByHumanId: snapshot.recordedByHumanId,
+            payerContributionsJSON: snapshot.payerContributionsJSON,
             sharedSessionId: snapshot.sharedSessionId
         )
         log.id = snapshot.id

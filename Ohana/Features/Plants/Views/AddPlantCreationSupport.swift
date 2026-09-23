@@ -378,7 +378,7 @@ struct PlantCreationMetricPill: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)
         }
-        .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaSecondaryText)
+        .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
         .padding(.horizontal, 7)
         .frame(height: 24)
         .background(

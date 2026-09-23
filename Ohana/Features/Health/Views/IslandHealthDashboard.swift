@@ -334,7 +334,7 @@ struct IslandHealthDashboardContentView: View {
             if dayPoints.allSatisfy({ $0.count == 0 }) {
                 emptyState(
                     icon: "cross.case",
-                    text: l.tr(zh: "添加疫苗、体检或用药后会显示趋势", en: "Vaccines, checkups, or meds will show here", de: "Impfungen, Checks oder Medikamente erscheinen hier")
+                    text: l.tr(zh: "暂无健康趋势", en: "No health trend yet", de: "Noch kein Gesundheitstrend")
                 )
             } else {
                 OhanaMinimalBarChart(
@@ -423,7 +423,7 @@ struct IslandHealthDashboardContentView: View {
             if petSummaries.isEmpty {
                 emptyState(
                     icon: "pawprint",
-                    text: l.tr(zh: "添加宠物后会显示健康档案", en: "Add pets to see health files", de: "Füge Tiere hinzu, um Akten zu sehen")
+                    text: l.tr(zh: "暂无宠物健康档案", en: "No pet health files", de: "Keine Tiergesundheitsakten")
                 )
             } else {
                 VStack(spacing: 0) {
@@ -516,7 +516,7 @@ struct IslandHealthDashboardContentView: View {
                 Text(title)
                     .font(OhanaFont.caption(.black))
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 12)
             .frame(height: 36)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

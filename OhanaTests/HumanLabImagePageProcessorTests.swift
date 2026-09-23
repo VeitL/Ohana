@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 struct HumanLabImagePageProcessorTests {
     @Test("Large photo pages are normalized inside both pixel budgets")
     func largePhotoIsDownsampled() async throws {
-        let sourceImage = try Self.makeGrayscaleImage(width: 4_000, height: 3_000)
+        let sourceImage = try Self.makeGrayscaleImage(width: 4000, height: 3000)
         let sourceData = try Self.jpegData(from: sourceImage)
         let sourceURL = try Self.makeTemporaryFile(contents: sourceData, pathExtension: "jpg")
         defer { Self.removeTemporaryFile(at: sourceURL) }
@@ -33,7 +33,7 @@ struct HumanLabImagePageProcessorTests {
 
     @Test("Camera orientation is applied before the bounded output is encoded")
     func cameraOrientationIsNormalized() async throws {
-        let sourceImage = try Self.makeGrayscaleImage(width: 4_000, height: 3_000)
+        let sourceImage = try Self.makeGrayscaleImage(width: 4000, height: 3000)
         let source = HumanLabCameraPageImage(image: sourceImage, orientation: .right)
 
         let normalizedData = try await HumanLabImagePageProcessingClient.live

@@ -229,7 +229,7 @@ struct HumanWeightHistoryView: View {
             HStack(spacing: 12) {
                 Image(systemName: "scalemass.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
@@ -355,7 +355,7 @@ struct HumanWeightHistoryView: View {
                     Text(l.tr(zh: "保存体重", en: "Save weight", de: "Gewicht sichern"))
                 }
                 .font(OhanaFont.body(.black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(canSaveInlineWeight ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 15)
                 .background(canSaveInlineWeight ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

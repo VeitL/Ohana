@@ -200,14 +200,14 @@ struct SwipeableEventRow: View {
                     if leftProgress > 0.3 {
                         Image(systemName: "checkmark").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 16, weight: .black))
-                            .foregroundStyle(Color.goCardWhite)
+                            .foregroundStyle(Color.arkInk)
                             .opacity(Double((leftProgress - 0.3) / 0.7))
                             .scaleEffect(0.5 + leftProgress * 0.5)
                     } else {
                         Image(systemName: event.silhouetteListSymbol)
                             .font(OhanaFont.adaptive(size: 17, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(Color.goCardWhite)
+                            .foregroundStyle(Color.arkInk)
                             .opacity(1 - Double(leftProgress / 0.3))
                     }
                 }
@@ -230,7 +230,7 @@ struct SwipeableEventRow: View {
                     if leftProgress > 0.4 {
                         Image(systemName: "checkmark").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 16, weight: .black))
-                            .foregroundStyle(Color.goCardWhite)
+                            .foregroundStyle(Color.arkInk)
                             .opacity(Double((leftProgress - 0.4) / 0.6))
                             .scaleEffect(0.5 + leftProgress * 0.5)
                     } else {
@@ -707,7 +707,8 @@ struct CalendarEventDetailPage: View {
                 actionButton(
                     title: l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"),
                     systemImage: "pencil",
-                    fill: Color.goPrimary
+                    fill: Color.goPrimary,
+                    foreground: Color.ohanaPrimaryActionText
                 ) {
                     showEditEvent = true
                 }
@@ -720,7 +721,8 @@ struct CalendarEventDetailPage: View {
                         ? l.tr(zh: "标记未完成", en: "Mark incomplete", de: "Als offen markieren")
                         : l.tr(zh: "标记完成", en: "Mark complete", de: "Als erledigt markieren"),
                     systemImage: isOccurrenceComplete ? "xmark.circle" : "checkmark.circle.fill",
-                    fill: Color.goTeal
+                    fill: Color.goTeal,
+                    foreground: Color.arkInk
                 ) {
                     requestCompletion()
                 }
@@ -731,7 +733,8 @@ struct CalendarEventDetailPage: View {
                 actionButton(
                     title: l.tr(zh: "删除", en: "Delete", de: "Loeschen"),
                     systemImage: "trash.fill",
-                    fill: Color.goRed
+                    fill: Color.goRed,
+                    foreground: Color.arkInk
                 ) {
                     showDeleteConfirm = true
                 }
@@ -763,12 +766,13 @@ struct CalendarEventDetailPage: View {
         title: String,
         systemImage: String,
         fill: Color,
+        foreground: Color,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(foreground)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 52)
                 .background(fill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))

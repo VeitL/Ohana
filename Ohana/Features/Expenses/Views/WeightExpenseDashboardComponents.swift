@@ -156,10 +156,14 @@ nonisolated struct ExpenseDashboardRange: CaseIterable, Hashable, Sendable {
 }
 
 struct ExpenseTimeBucket: Identifiable, Hashable {
-    let id = UUID()
     let date: Date
     let label: String
     let amount: Double
+
+    /// A bucket represents one fixed calendar interval. Keep its identity tied
+    /// to that interval so ordinary SwiftUI invalidations do not look like a
+    /// brand-new chart data set and restart the entrance animation.
+    var id: Date { date }
 }
 
 struct ExpenseBarDashboardChart: View {
@@ -171,7 +175,12 @@ struct ExpenseBarDashboardChart: View {
     var body: some View {
         OhanaMinimalBarChart(
             points: buckets.map {
-                OhanaMinimalChartPoint(date: $0.date, value: max(0, $0.amount), label: $0.label)
+                OhanaMinimalChartPoint(
+                    date: $0.date,
+                    value: max(0, $0.amount),
+                    label: $0.label,
+                    id: "expense-bucket-\($0.date.timeIntervalSinceReferenceDate)"
+                )
             },
             tint: accent,
             progress: chartProgress,
@@ -219,7 +228,7 @@ struct DashboardRangePicker<Range: Hashable>: View {
                             }
                         }
                         .font(OhanaFont.caption(.black))
-                        .foregroundStyle(selected ? Color.arkInk : Color.ohanaSecondaryText)
+                        .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .padding(.horizontal, 12)
                         .frame(height: 32)
                         .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -236,12 +245,15 @@ struct DashboardRangePicker<Range: Hashable>: View {
 
 func makeExpenseBuckets(
     from logs: [some ExpenseSummaryRecord],
-    range: ExpenseDashboardRange
+    range: ExpenseDashboardRange,
+    now: Date = Date(),
+    calendar: Calendar = .current,
+    locale: Locale = AppLanguage.effectiveLocale
 ) -> [ExpenseTimeBucket] {
-    let calendar = Calendar.current
-    let now = Date()
     let dateFormatter = DateFormatter()
-    dateFormatter.locale = AppLanguage.effectiveLocale
+    dateFormatter.calendar = calendar
+    dateFormatter.locale = locale
+    dateFormatter.timeZone = calendar.timeZone
 
     switch range.kind {
     case .week:
@@ -275,20 +287,37 @@ func makeExpenseBuckets(
         }
     case .year:
         dateFormatter.setLocalizedDateFormatFromTemplate("MMM")
+        guard let currentMonthStart = calendar.dateInterval(of: .month, for: now)?.start else {
+            return []
+        }
         return (0 ..< 12).compactMap { offset in
-            guard let date = calendar.date(byAdding: .month, value: offset - 11, to: now) else { return nil }
+            guard let date = calendar.date(
+                byAdding: .month,
+                value: offset - 11,
+                to: currentMonthStart
+            ) else { return nil }
             let amount = logs
                 .filter { calendar.isDate($0.date, equalTo: date, toGranularity: .month) }
                 .reduce(0) { $0 + max(0, $1.amount) }
             return ExpenseTimeBucket(date: date, label: dateFormatter.string(from: date), amount: amount)
         }
     case .all:
-        guard let firstDate = logs.map(\.date).min() else { return [] }
-        let monthSpan = max(0, calendar.dateComponents([.month], from: firstDate, to: now).month ?? 0)
+        guard let firstDate = logs.map(\.date).min(),
+              let firstMonthStart = calendar.dateInterval(of: .month, for: firstDate)?.start,
+              let currentMonthStart = calendar.dateInterval(of: .month, for: now)?.start
+        else { return [] }
+        let monthSpan = max(
+            0,
+            calendar.dateComponents([.month], from: firstMonthStart, to: currentMonthStart).month ?? 0
+        )
         if monthSpan <= 24 {
             dateFormatter.setLocalizedDateFormatFromTemplate("MMM")
             return (0 ... monthSpan).compactMap { offset in
-                guard let date = calendar.date(byAdding: .month, value: offset, to: firstDate) else { return nil }
+                guard let date = calendar.date(
+                    byAdding: .month,
+                    value: offset,
+                    to: firstMonthStart
+                ) else { return nil }
                 let amount = logs
                     .filter { calendar.isDate($0.date, equalTo: date, toGranularity: .month) }
                     .reduce(0) { $0 + max(0, $1.amount) }
@@ -296,9 +325,19 @@ func makeExpenseBuckets(
             }
         }
         dateFormatter.setLocalizedDateFormatFromTemplate("yyyy")
-        let yearSpan = max(0, calendar.dateComponents([.year], from: firstDate, to: now).year ?? 0)
+        guard let firstYearStart = calendar.dateInterval(of: .year, for: firstDate)?.start,
+              let currentYearStart = calendar.dateInterval(of: .year, for: now)?.start
+        else { return [] }
+        let yearSpan = max(
+            0,
+            calendar.dateComponents([.year], from: firstYearStart, to: currentYearStart).year ?? 0
+        )
         return (0 ... yearSpan).compactMap { offset in
-            guard let date = calendar.date(byAdding: .year, value: offset, to: firstDate) else { return nil }
+            guard let date = calendar.date(
+                byAdding: .year,
+                value: offset,
+                to: firstYearStart
+            ) else { return nil }
             let amount = logs
                 .filter { calendar.isDate($0.date, equalTo: date, toGranularity: .year) }
                 .reduce(0) { $0 + max(0, $1.amount) }

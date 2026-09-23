@@ -121,9 +121,9 @@ struct HumanHealthObservationHistoryView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .fixedSize(horizontal: false, vertical: true)
             Text(l.tr(
-                zh: "按时间查看全部原始记录；趋势仍只使用对应的近期窗口。",
-                en: "Browse every raw log by time; trends still use their stated recent windows.",
-                de: "Alle Rohdaten nach Zeit ansehen; Trends verwenden weiterhin die angegebenen aktuellen Zeiträume."
+                zh: "完整原始记录 · 趋势按近期窗口",
+                en: "Full raw history · trends use recent windows",
+                de: "Vollständiger Rohverlauf · Trends nutzen aktuelle Zeiträume"
             ))
             .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaSecondaryText)
@@ -160,7 +160,7 @@ struct HumanHealthObservationHistoryView: View {
                 Button(l.tr(zh: "重试", en: "Try Again", de: "Erneut versuchen")) {
                     loadPage(olderThan: nil, targetIndex: 0, replacingHistory: true)
                 }
-                .buttonStyle(.borderedProminent)
+                .ohanaPrimaryProminentButton()
             }
 
         case .loaded:

@@ -22,27 +22,12 @@ extension CalendarView {
     }
 
     var classicCalendarHeader: some View {
-        let l = L10n(AppLanguage.code)
-        return HStack(spacing: 12) {
+        HStack(spacing: 12) {
             calendarHeaderTitle(fontSize: 20)
 
             Spacer()
 
             calendarViewModePicker
-
-            // 添加事件按钮
-            Button { requestAddEventPresentation() } label: {
-                Label(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"), systemImage: "plus")
-                    .labelStyle(.iconOnly)
-                    .font(OhanaFont.headline(.bold))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 44, height: 44)
-                    .background(Color.goPrimary, in: Circle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"))
-            .accessibilityIdentifier("calendar-add-event-action")
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -70,24 +55,7 @@ extension CalendarView {
     // MARK: - Sticky Calendar Header (Material)
     var calStickyHeader: some View {
         let bg: Color = colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C")
-        let accent = Color(hex: "FF5A00")
-        let l = L10n(AppLanguage.code)
         return HStack(spacing: 10) {
-            // Add event
-            Button { requestAddEventPresentation() } label: {
-                Label(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"), systemImage: "calendar.badge.plus")
-                    .labelStyle(.iconOnly)
-                    .font(OhanaFont.title3(.semibold))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 44, height: 44)
-                    .background(accent, in: Circle())
-                    .shadow(color: accent.opacity(0.35), radius: 8, x: 0, y: 2) // ui-v4: allow legacy material calendar floating action depth
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"))
-            .accessibilityIdentifier("calendar-add-event-action")
-
             calendarViewModePicker
 
             Spacer()
@@ -230,7 +198,7 @@ extension CalendarView {
             .accessibilityIdentifier("calendar-view-mode-list")
         }
         .labelsHidden()
-        .pickerStyle(.segmented)
+        .ohanaContentTabsPickerStyle()
         .tint(chipAccent)
         .frame(width: 112)
     }

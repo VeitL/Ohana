@@ -17,7 +17,7 @@ struct PresenceCheckInCommandServiceTests {
             String(describing: SafetyContact.self)
         ])
         #expect(v92.subtracting(v93).isEmpty)
-        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV98.self))
+        #expect(ObjectIdentifier(ArkMigrationPlan.schemas.last!) == ObjectIdentifier(ArkSchemaV99.self))
     }
 
     @Test func explicitSubjectCheckInsAndStatusRewardsAreIdempotentWithoutAllCompleteBonus() throws {
@@ -843,6 +843,9 @@ struct PresenceCheckInCommandServiceTests {
         let ledger = try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).filter {
             $0.sourceModelName == "PresenceRewardReceipt"
         }
+        let treeGrowthLedger = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            $0.sourceEventId == PresenceCheckInCommandService.ownerDailyReceiptKey(dayKey: "2026-07-18")
+        }
 
         #expect(first.awardedCoconuts == 1)
         #expect(replay.awardedCoconuts == 0)
@@ -851,6 +854,69 @@ struct PresenceCheckInCommandServiceTests {
         #expect(receipts.first?.walletTransactionKey == ledger.first?.transactionKey)
         #expect(ledger.count == 1)
         #expect(wallet.balance(for: owner, context: context) == 1)
+        #expect(treeGrowthLedger.count == 1)
+        #expect(treeGrowthLedger.first?.actionType == PresenceTreeGrowthPolicy.ownerDailyActionType)
+        #expect(treeGrowthLedger.first.map {
+            CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: $0.metadataJSON)
+        } == PresenceTreeGrowthPolicy.ownerDailyGrowthXP)
+    }
+
+    @Test func zenPresenceTreeGrowthCapsAtEightAndSurvivesUndoEditsAndRecheck() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let owner = Human(name: "Owner")
+        let pet = Pet(name: "Miso", species: "cat")
+        context.insert(owner)
+        context.insert(pet)
+        try context.save()
+        let now = date(2026, 7, 19)
+        let wallet = SwiftDataCoconutWalletManager()
+        let service = PresenceCheckInCommandService(
+            context: context,
+            ownerSelection: FixedPresenceOwnerSelection(ownerHumanId: owner.id),
+            wallet: wallet,
+            migratesLegacyBeforeCommands: false,
+            timeZoneProvider: { TimeZone(secondsFromGMT: 0)! }
+        )
+        try service.startParticipation(ownerHumanId: owner.id, source: .settings, now: now)
+
+        _ = try service.checkInOwner(source: .card, now: now)
+        _ = try service.updateTodayStatus(
+            subject: .init(kind: .human, id: owner.id),
+            status: .score8,
+            now: now.addingTimeInterval(30)
+        )
+        _ = try service.updateTodayStatus(
+            subject: .init(kind: .human, id: owner.id),
+            status: .score3,
+            now: now.addingTimeInterval(60)
+        )
+        _ = try service.checkIn(
+            subject: .init(kind: .pet, id: pet.id),
+            status: .score10,
+            now: now.addingTimeInterval(90)
+        )
+        _ = try service.undoTodayCheckIn(
+            subject: .init(kind: .human, id: owner.id),
+            now: now.addingTimeInterval(120)
+        )
+        _ = try service.checkInOwner(source: .card, now: now.addingTimeInterval(150))
+
+        let growthEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            PresenceTreeGrowthPolicy.isBaselineExemptActionType($0.actionType)
+        }
+        let totalGrowthXP = growthEvents.reduce(0) {
+            $0 + CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: $1.metadataJSON)
+        }
+
+        #expect(growthEvents.count == 2)
+        #expect(Set(growthEvents.map(\.actionType)) == [
+            PresenceTreeGrowthPolicy.ownerDailyActionType,
+            PresenceTreeGrowthPolicy.dailyStatusActionType
+        ])
+        #expect(totalGrowthXP == PresenceTreeGrowthPolicy.dailyGrowthXPCap)
+        #expect(try context.fetchCount(FetchDescriptor<PresenceRewardReceipt>()) == 2)
+        #expect(wallet.balance(for: owner, context: context) == 2)
     }
 
     @Test func notificationCheckInBeforeRootBootstrapPreservesLegacyBalanceDuringProjectionReplay() throws {
@@ -1068,6 +1134,9 @@ struct PresenceCheckInCommandServiceTests {
         let presenceLedger = try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).filter {
             $0.sourceModelName == "PresenceRewardReceipt"
         }
+        let treeGrowthLedger = try context.fetch(FetchDescriptor<CareLedgerEvent>()).filter {
+            PresenceTreeGrowthPolicy.isBaselineExemptActionType($0.actionType)
+        }
 
         #expect(initialBudget.remainingFatigueCoconuts > 0)
         #expect(result.didCreateCheckIn)
@@ -1077,6 +1146,10 @@ struct PresenceCheckInCommandServiceTests {
         #expect(receipt.walletTransactionKey == nil)
         #expect(presenceLedger.isEmpty)
         #expect(wallet.balance(for: owner, context: context) == 0)
+        #expect(treeGrowthLedger.count == 1)
+        #expect(treeGrowthLedger.first.map {
+            CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: $0.metadataJSON)
+        } == PresenceTreeGrowthPolicy.ownerDailyGrowthXP)
     }
 
     @Test func legacyMigrationUpsertsDatesMakeupAndClaimedMilestonesWithoutAwards() throws {

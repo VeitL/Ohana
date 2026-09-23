@@ -463,9 +463,6 @@ extension GachaView {
                     Text(l.tr(zh: "Ohana 盲盒", en: "Ohana Blind Box", de: "Ohana Blindbox"))
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(series.localizedName(l))
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 balancePill
@@ -613,7 +610,7 @@ extension GachaView {
                 Image(systemName: isUnlocked ? seriesIconName(entry) : "lock.fill")
                     .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .foregroundStyle(isSelected && isUnlocked ? Color.arkInk : Color.ohanaPrimaryText)
+                    .foregroundStyle(isSelected && isUnlocked ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                     .background(
                         isSelected && isUnlocked ? Color.goPrimary : Color.ohanaControlFill,
                         in: Circle()
@@ -753,7 +750,7 @@ extension GachaView {
                     if outcome.log.isNew, outcome.item != nil {
                         Text("NEW")
                             .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(Color.goPrimary, in: Capsule())
@@ -811,8 +808,7 @@ extension GachaView {
             Label(l.tr(zh: "再来一次", en: "Open another", de: "Noch einmal"), systemImage: "sparkles")
                 .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(Color.goPrimary)
+        .ohanaPrimaryProminentButton()
     }
 
     private func outcomeTitle(_ outcome: GachaDrawOutcome) -> String {
@@ -845,11 +841,11 @@ extension GachaView {
                 Text(drawButtonTitle)
                 if canDraw {
                     Text("-\(appServices.gacha.costPerDraw)🥥")
-                        .foregroundStyle(Color.arkInk.opacity(0.58))
+                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                 }
             }
             .font(OhanaFont.headline(.black))
-            .foregroundStyle(canDraw ? Color.arkInk : Color.ohanaSecondaryText)
+            .foregroundStyle(canDraw ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(canDraw ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -986,7 +982,7 @@ extension GachaView {
                 if ownedCount > 1 {
                     Text("x\(ownedCount)")
                         .font(OhanaFont.caption2(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(Color.goPrimary, in: Capsule())
@@ -1156,7 +1152,7 @@ extension GachaView {
                             Spacer()
                             Text(row.badge)
                                 .font(OhanaFont.caption2(.black))
-                                .foregroundStyle(row.isEmphasized ? Color.arkInk : Color.ohanaTertiaryText)
+                                .foregroundStyle(row.isEmphasized ? Color.ohanaPrimaryActionText : Color.ohanaTertiaryText)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
                                 .background(row.isEmphasized ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

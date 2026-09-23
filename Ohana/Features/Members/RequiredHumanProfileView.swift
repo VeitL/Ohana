@@ -3,13 +3,10 @@ import UIKit
 
 private enum RequiredHumanIntroPalette {
     static let primaryText = Color.goCardWhite.opacity(0.94)
-    static let secondaryText = Color.goCardWhite.opacity(0.64)
-    static let tertiaryText = Color.goCardWhite.opacity(0.42)
     static let panelFill = Color.goCardWhite.opacity(0.08)
     static let panelStroke = Color.goCardWhite.opacity(0.12)
     static let mutedFill = Color.goCardWhite.opacity(0.08)
     static let cardShadow = Color.arkInk.opacity(0.28)
-    static let selectedText = Color.arkInk
 }
 
 struct RequiredHumanProfileView: View {
@@ -175,26 +172,14 @@ struct RequiredHumanProfileView: View {
             .frame(width: 44, height: 44)
             .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(localized(
-                    zh: "欢迎来到 Ohana",
-                    en: "Welcome to Ohana",
-                    de: "Willkommen bei Ohana"
-                ))
-                .font(OhanaFont.headline(.black))
-                .foregroundStyle(RequiredHumanIntroPalette.primaryText)
-                .lineLimit(1)
-
-                Text(localized(
-                    zh: "左右滑动了解核心体验",
-                    en: "Swipe through the essentials",
-                    de: "Wische durch die Grundlagen"
-                ))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(RequiredHumanIntroPalette.tertiaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-            }
+            Text(localized(
+                zh: "欢迎来到 Ohana",
+                en: "Welcome to Ohana",
+                de: "Willkommen bei Ohana"
+            ))
+            .font(OhanaFont.headline(.black))
+            .foregroundStyle(RequiredHumanIntroPalette.primaryText)
+            .lineLimit(1)
             Spacer(minLength: 0)
         }
     }
@@ -228,7 +213,7 @@ struct RequiredHumanProfileView: View {
                         .accessibilityHidden(true)
                 }
                 .font(OhanaFont.callout(.black))
-                .foregroundStyle(RequiredHumanIntroPalette.selectedText)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: width, height: 54)
                 .background(Color.goPrimary, in: Capsule())
             }
@@ -292,6 +277,7 @@ struct RequiredHumanProfileView: View {
                 ),
                 heroIcon: "tree.fill",
                 tint: Color.goPrimary,
+                tintForeground: Color.ohanaPrimaryActionText,
                 badges: [
                     (icon: "bolt.fill", title: localized(zh: "椰子", en: "Coconuts", de: "Kokos")),
                     (icon: "arrow.up.forward.circle.fill", title: localized(zh: "等级", en: "Levels", de: "Level")),
@@ -308,6 +294,7 @@ struct RequiredHumanProfileView: View {
                 ),
                 heroIcon: "heart.text.square.fill",
                 tint: Color.goTeal,
+                tintForeground: OhanaResolvedPrimaryAccent(customHex: "00D4AA")?.actionTextColor ?? Color.ohanaPrimaryText,
                 badges: [
                     (icon: "scalemass.fill", title: localized(zh: "体重", en: "Weight", de: "Gewicht")),
                     (icon: "pills.fill", title: localized(zh: "用药", en: "Meds", de: "Medis")),
@@ -324,6 +311,7 @@ struct RequiredHumanProfileView: View {
                 ),
                 heroIcon: "house.fill",
                 tint: Color.goBlue,
+                tintForeground: OhanaResolvedPrimaryAccent(customHex: "2563EB")?.actionTextColor ?? Color.ohanaPrimaryText,
                 badges: [
                     (icon: "person.fill", title: localized(zh: "人类", en: "Humans", de: "Menschen")),
                     (icon: "pawprint.fill", title: localized(zh: "宠物", en: "Pets", de: "Tiere")),
@@ -338,28 +326,26 @@ struct RequiredHumanProfileView: View {
         subtitle: String,
         heroIcon: String,
         tint: Color,
+        tintForeground: Color,
         badges: [(icon: String, title: String)]
     ) -> some View {
         VStack(spacing: 24) {
-            heroGlyphCluster(primaryIcon: heroIcon, tint: tint, badges: badges)
+            heroGlyphCluster(
+                primaryIcon: heroIcon,
+                tint: tint,
+                tintForeground: tintForeground,
+                badges: badges
+            )
                 .frame(height: 218)
 
-            VStack(spacing: 10) {
-                Text(title)
-                    .font(OhanaFont.largeTitle(.black))
-                    .foregroundStyle(RequiredHumanIntroPalette.primaryText)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.72)
-
-                Text(subtitle)
-                    .font(OhanaFont.body(.semibold))
-                    .foregroundStyle(RequiredHumanIntroPalette.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, 14)
+            Text(title)
+                .font(OhanaFont.largeTitle(.black))
+                .foregroundStyle(RequiredHumanIntroPalette.primaryText)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+                .padding(.horizontal, 14)
+                .accessibilityHint(subtitle)
 
             HStack(spacing: 8) {
                 ForEach(Array(badges.enumerated()), id: \.offset) { _, badge in
@@ -375,6 +361,7 @@ struct RequiredHumanProfileView: View {
     private func heroGlyphCluster(
         primaryIcon: String,
         tint: Color,
+        tintForeground: Color,
         badges: [(icon: String, title: String)]
     ) -> some View {
         GeometryReader { proxy in
@@ -399,7 +386,7 @@ struct RequiredHumanProfileView: View {
 
                 Image(systemName: primaryIcon)
                     .font(OhanaFont.adaptive(size: 54, weight: .black))
-                    .foregroundStyle(RequiredHumanIntroPalette.selectedText)
+                    .foregroundStyle(tintForeground)
                     .symbolRenderingMode(.monochrome)
                     .accessibilityHidden(true)
 

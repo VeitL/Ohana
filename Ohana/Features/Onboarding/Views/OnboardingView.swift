@@ -18,6 +18,7 @@ private enum OnboardingPalette {
     static let controlFill = Color.goCardWhite.opacity(0.10)
     static let controlStroke = Color.goCardWhite.opacity(0.18)
     static let selectedText = Color.arkInk
+    static var primaryActionText: Color { Color.ohanaPrimaryActionText }
 }
 
 struct OnboardingView: View {
@@ -33,6 +34,7 @@ struct OnboardingView: View {
     var experienceMode: AppExperienceMode = .standard
     var onReplayFinished: (() -> Void)?
     var onFirstHumanSaved: ((UUID) -> Void)?
+    var onZenCompletionRequested: (() -> Void)?
     var onPetDeferred: (() -> Void)?
     var onPetCreationStarted: (() -> Void)?
     var onCompletionRequested: ((UUID) -> Void)?
@@ -204,8 +206,7 @@ struct OnboardingView: View {
                                 .font(.headline)
                                 .frame(maxWidth: .infinity, minHeight: 44)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Color.goPrimary)
+                        .ohanaPrimaryProminentButton()
                         .accessibilityIdentifier("onboarding-home-preparation-retry")
                     }
                     .padding(24)
@@ -245,38 +246,20 @@ struct OnboardingView: View {
             VStack(spacing: 26) {
                 onboardingGlyph(systemName: "person.fill", tint: Color.goBlue)
 
-                VStack(spacing: 9) {
-                    Text(localized(
-                        zh: "你希望我们怎么称呼你？",
-                        en: "What should we call you?",
-                        de: "Wie dürfen wir dich nennen?",
-                        es: "¿Cómo quieres que te llamemos?",
-                        pt: "Como você gostaria que chamássemos você?",
-                        fr: "Comment souhaitez-vous que nous vous appelions ?",
-                        ja: "何とお呼びすればよいですか？",
-                        ko: "어떻게 불러 드릴까요?",
-                        it: "Come vuoi che ti chiamiamo?"
-                    ))
-                    .font(OhanaFont.title(.black))
-                    .foregroundStyle(OnboardingPalette.primaryText)
-                    .multilineTextAlignment(.center)
-
-                    Text(localized(
-                        zh: "先建立这台设备上的第一位家庭成员。",
-                        en: "Start with the first family member on this device.",
-                        de: "Beginne mit dem ersten Familienmitglied auf diesem Gerät.",
-                        es: "Empieza con el primer miembro de la familia en este dispositivo.",
-                        pt: "Comece com o primeiro membro da família neste dispositivo.",
-                        fr: "Commencez par le premier membre de la famille sur cet appareil.",
-                        ja: "まず、この端末に最初の家族メンバーを作成します。",
-                        ko: "먼저 이 기기에 첫 가족 구성원을 만들어 주세요.",
-                        it: "Inizia con il primo membro della famiglia su questo dispositivo."
-                    ))
-                    .font(OhanaFont.body(.semibold))
-                    .foregroundStyle(OnboardingPalette.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(localized(
+                    zh: "你希望我们怎么称呼你？",
+                    en: "What should we call you?",
+                    de: "Wie dürfen wir dich nennen?",
+                    es: "¿Cómo quieres que te llamemos?",
+                    pt: "Como você gostaria que chamássemos você?",
+                    fr: "Comment souhaitez-vous que nous vous appelions ?",
+                    ja: "何とお呼びすればよいですか？",
+                    ko: "어떻게 불러 드릴까요?",
+                    it: "Come vuoi che ti chiamiamo?"
+                ))
+                .font(OhanaFont.title(.black))
+                .foregroundStyle(OnboardingPalette.primaryText)
+                .multilineTextAlignment(.center)
 
                 TextField(
                     localized(
@@ -344,38 +327,20 @@ struct OnboardingView: View {
             VStack(spacing: 26) {
                 onboardingGlyph(systemName: "pawprint.fill", tint: Color.goOrange)
 
-                VStack(spacing: 9) {
-                    Text(localized(
-                        zh: "现在建立宠物吗？",
-                        en: "Add a pet now?",
-                        de: "Jetzt ein Tier hinzufügen?",
-                        es: "¿Añadir una mascota ahora?",
-                        pt: "Adicionar um pet agora?",
-                        fr: "Ajouter un animal maintenant ?",
-                        ja: "今ペットを追加しますか？",
-                        ko: "지금 반려동물을 추가할까요?",
-                        it: "Aggiungere un animale ora?"
-                    ))
-                    .font(OhanaFont.title(.black))
-                    .foregroundStyle(OnboardingPalette.primaryText)
-                    .multilineTextAlignment(.center)
-
-                    Text(localized(
-                        zh: "只需名字和物种，其他资料可以以后再补充。",
-                        en: "You only need a name and species. Everything else can wait.",
-                        de: "Name und Art genügen. Alles Weitere kann warten.",
-                        es: "Solo necesitas un nombre y la especie. El resto puede esperar.",
-                        pt: "Você só precisa do nome e da espécie. O restante pode esperar.",
-                        fr: "Il suffit d’un nom et de l’espèce. Le reste peut attendre.",
-                        ja: "必要なのは名前と種類だけです。ほかの情報は後から追加できます。",
-                        ko: "이름과 종만 입력하면 돼요. 나머지는 나중에 추가할 수 있어요.",
-                        it: "Bastano nome e specie. Il resto può aspettare."
-                    ))
-                    .font(OhanaFont.body(.semibold))
-                    .foregroundStyle(OnboardingPalette.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(localized(
+                    zh: "现在建立宠物吗？",
+                    en: "Add a pet now?",
+                    de: "Jetzt ein Tier hinzufügen?",
+                    es: "¿Añadir una mascota ahora?",
+                    pt: "Adicionar um pet agora?",
+                    fr: "Ajouter un animal maintenant ?",
+                    ja: "今ペットを追加しますか？",
+                    ko: "지금 반려동물을 추가할까요?",
+                    it: "Aggiungere un animale ora?"
+                ))
+                .font(OhanaFont.title(.black))
+                .foregroundStyle(OnboardingPalette.primaryText)
+                .multilineTextAlignment(.center)
 
                 VStack(spacing: 10) {
                     primaryButton(
@@ -554,7 +519,7 @@ struct OnboardingView: View {
             HStack(spacing: 8) {
                 if isLoading {
                     ProgressView()
-                        .tint(OnboardingPalette.selectedText)
+                        .tint(OnboardingPalette.primaryActionText)
                 } else {
                     Image(systemName: systemImage)
                         .accessibilityHidden(true)
@@ -564,7 +529,7 @@ struct OnboardingView: View {
                     .minimumScaleFactor(0.78)
             }
             .font(OhanaFont.callout(.black))
-            .foregroundStyle(isEnabled ? OnboardingPalette.selectedText : OnboardingPalette.tertiaryText)
+            .foregroundStyle(isEnabled ? OnboardingPalette.primaryActionText : OnboardingPalette.tertiaryText)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 54)
             .background(isEnabled ? Color.goPrimary : OnboardingPalette.controlFill, in: Capsule())
@@ -598,12 +563,12 @@ struct OnboardingView: View {
 
             currentActiveHumanId = human.id.uuidString
             onFirstHumanSaved?(human.id)
-            isSavingHuman = false
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             if experienceMode == .zen {
-                finishOnboarding(playsFeedback: false)
+                requestZenOnboardingCompletion()
                 return
             }
+            isSavingHuman = false
             withAnimation(GoMotion.page) {
                 step = .petChoice
             }
@@ -682,7 +647,7 @@ struct OnboardingView: View {
            let humanID = appServices.humanRequirements.firstLivingHumanID(context: modelContext) {
             currentActiveHumanId = humanID.uuidString
             onFirstHumanSaved?(humanID)
-            finishOnboarding(playsFeedback: false)
+            requestZenOnboardingCompletion()
             return
         }
         if let firstPetID = appServices.onboardingJourney.interruptedOnboardingFirstPetID(
@@ -763,6 +728,15 @@ struct OnboardingView: View {
         withTransaction(transaction) {
             hasOnboarded = true
         }
+    }
+
+    private func requestZenOnboardingCompletion() {
+        guard let onZenCompletionRequested else {
+            isSavingHuman = false
+            finishOnboarding(playsFeedback: false)
+            return
+        }
+        onZenCompletionRequested()
     }
 
     private func requestPetOnboardingCompletion() {

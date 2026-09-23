@@ -529,7 +529,6 @@ enum MemberProfileCommandService {
             pet.dailyPortionGrams = max(0, dailyPortionGrams)
         }
         let personalityChangedFields = applyPersonalityTags(input.personalityTagIDs, to: pet)
-        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context)
         CloudSyncMutationRecorder.markModified(pet, context: context)
 
         var changedFields: Set<String> = [

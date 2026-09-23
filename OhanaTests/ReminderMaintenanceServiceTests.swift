@@ -39,7 +39,10 @@ struct ReminderMaintenanceServiceTests {
         context.insert(futurePending)
         try context.save()
 
-        let result = await ReminderMaintenanceService.runPendingReminderMaintenance(context: context)
+        let result = await ReminderMaintenanceService.runPendingReminderMaintenance(
+            context: context,
+            reminderScheduling: ReminderSchedulingManager()
+        )
 
         #expect(result.completed)
         #expect(result.pendingCount == 2)

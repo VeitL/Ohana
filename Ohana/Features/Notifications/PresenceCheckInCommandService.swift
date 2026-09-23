@@ -146,6 +146,50 @@ nonisolated struct PresenceRewardRequest: Equatable, Sendable {
     let isBudgeted: Bool
 }
 
+/// Zen presence uses the same Life Tree ledger as Standard mode. Durable
+/// reward receipts enforce the household/day cap: one owner confirmation and
+/// one first status can contribute at most eight nourishment XP per day.
+nonisolated enum PresenceTreeGrowthPolicy {
+    static let ownerDailyGrowthXP = 6
+    static let dailyStatusGrowthXP = 2
+    static let dailyGrowthXPCap = ownerDailyGrowthXP + dailyStatusGrowthXP
+
+    static let ownerDailyActionType = "presenceOwnerDailyTreeGrowth"
+    static let dailyStatusActionType = "presenceDailyStatusTreeGrowth"
+
+    static func growthXP(for kind: PresenceRewardKind) -> Int {
+        switch kind {
+        case .ownerDaily:
+            ownerDailyGrowthXP
+        case .dailyStatus:
+            dailyStatusGrowthXP
+        case .allComplete, .streakMilestone:
+            0
+        }
+    }
+
+    static func actionType(for kind: PresenceRewardKind) -> String? {
+        switch kind {
+        case .ownerDaily:
+            ownerDailyActionType
+        case .dailyStatus:
+            dailyStatusActionType
+        case .allComplete, .streakMilestone:
+            nil
+        }
+    }
+
+    static func isBaselineExemptActionType(_ actionType: String) -> Bool {
+        actionType == ownerDailyActionType || actionType == dailyStatusActionType
+    }
+
+    static func metadataJSON(for request: PresenceRewardRequest) -> String {
+        let growthXP = growthXP(for: request.kind)
+        let dayKey = request.dayKey ?? ""
+        return "{\"economyVersion\":3,\"growthXP\":\(growthXP),\"presenceReward\":\"\(request.kind.rawValue)\",\"dayKey\":\"\(dayKey)\",\"dailyGrowthXPCap\":\(dailyGrowthXPCap),\"careGrowthBaselineExempt\":true}"
+    }
+}
+
 struct PresenceStagedReward {
     let request: PresenceRewardRequest
     let awardedAmount: Int
@@ -169,14 +213,17 @@ protocol PresenceRewardAwarding {
 @MainActor
 final class PresenceEconomyRewardAdapter: PresenceRewardAwarding {
     private let wallet: CoconutWalletManaging
+    private let careLedger: CareLedgerRecording
     private weak var projectionManager: CoconutProjectionManaging?
     private var hasStagedLegacyWalletBootstrap = false
 
     init(
         wallet: CoconutWalletManaging? = nil,
+        careLedger: CareLedgerRecording? = nil,
         projectionManager: CoconutProjectionManaging? = nil
     ) {
         self.wallet = wallet ?? SwiftDataCoconutWalletManager()
+        self.careLedger = careLedger ?? CareLedgerService()
         self.projectionManager = projectionManager
     }
 
@@ -270,6 +317,7 @@ final class PresenceEconomyRewardAdapter: PresenceRewardAwarding {
                 projectionManager: nil
             )
         }
+        try stageTreeGrowth(for: request, owner: owner, context: context, now: now)
         return PresenceStagedReward(
             request: request,
             awardedAmount: awardedAmount,
@@ -296,6 +344,51 @@ final class PresenceEconomyRewardAdapter: PresenceRewardAwarding {
 
     func didRollback(context _: ModelContext) {
         hasStagedLegacyWalletBootstrap = false
+    }
+
+    private func stageTreeGrowth(
+        for request: PresenceRewardRequest,
+        owner: Human,
+        context: ModelContext,
+        now: Date
+    ) throws {
+        let growthXP = PresenceTreeGrowthPolicy.growthXP(for: request.kind)
+        guard growthXP > 0,
+              let actionType = PresenceTreeGrowthPolicy.actionType(for: request.kind)
+        else { return }
+
+        let receiptKey = request.receiptKey
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate { event in
+                event.sourceEventId == receiptKey
+            }
+        )
+        descriptor.fetchLimit = 1
+        guard try context.fetch(descriptor).isEmpty else { return }
+
+        careLedger.record(
+            occurredAt: now,
+            actorKind: .human,
+            actorId: owner.id.uuidString,
+            subjectKind: .household,
+            subjectId: nil,
+            eventKind: .milestone,
+            actionType: actionType,
+            amountValue: Double(growthXP),
+            amountUnit: "growthXP",
+            note: "Zen presence nourishment",
+            source: .economy,
+            sourceEventId: receiptKey,
+            sourceReminderId: nil,
+            legacyModelName: nil,
+            legacyModelId: nil,
+            coconutDelta: 0,
+            rewardLogId: nil,
+            privacyFieldRaw: nil,
+            metadataJSON: PresenceTreeGrowthPolicy.metadataJSON(for: request),
+            context: context,
+            save: false
+        )
     }
 
     private func rewardTitle(for request: PresenceRewardRequest) -> String {
@@ -330,6 +423,7 @@ final class PresenceCheckInCommandService {
         ownerSelection: PresenceOwnerSelecting = UserDefaultsPresenceOwnerSelection(),
         rewardAwarder: PresenceRewardAwarding? = nil,
         wallet: CoconutWalletManaging? = nil,
+        careLedger: CareLedgerRecording? = nil,
         projectionManager: CoconutProjectionManaging? = nil,
         guardianSafetyOutbox: GuardianSafetyOutboxStaging? = nil,
         migratesLegacyBeforeCommands: Bool = true,
@@ -339,6 +433,7 @@ final class PresenceCheckInCommandService {
         self.ownerSelection = ownerSelection
         self.rewardAwarder = rewardAwarder ?? PresenceEconomyRewardAdapter(
             wallet: wallet,
+            careLedger: careLedger,
             projectionManager: projectionManager
         )
         if let guardianSafetyOutbox {
@@ -1008,5 +1103,4 @@ final class PresenceCheckInCommandService {
             isBudgeted: true
         )
     }
-
 }

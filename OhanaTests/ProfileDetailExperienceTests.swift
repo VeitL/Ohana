@@ -133,21 +133,58 @@ final class ProfileDetailExperienceTests: XCTestCase {
         XCTAssertFalse(petSettings.contains("EditPetSheet(pet: pet)"))
     }
 
-    func testStarterProfileEntrypointsEnforceTheSharedRequiredFields() throws {
+    func testStarterHumanProfileEntrypointsEditInsideTheFourStepCards() throws {
         let taskRoute = try source(
             "Ohana/Features/Tasks/TaskCenterRouteContainer.swift"
+        )
+        let journeySheet = try source(
+            "Ohana/Features/Tasks/TaskCenterSystemJourneySheet.swift"
+        )
+        let inlineEditor = try source(
+            "Ohana/Features/Tasks/TaskCenterHumanProfileInlineEditing.swift"
         )
         let zenJourney = try source(
             "Ohana/Features/Zen/ZenStarterJourneySheet.swift"
         )
-        let zenJourneyDataContainer = try source(
-            "Ohana/Features/Zen/ZenStarterJourneyDataContainer.swift"
+
+        XCTAssertTrue(taskRoute.contains("humanProfileTarget: humanProfileTarget(for: item)"))
+        XCTAssertTrue(taskRoute.contains("updateStarterHumanProfile(for: item, applying: update)"))
+        XCTAssertTrue(journeySheet.contains("TaskCenterHumanProfileInlineEditor("))
+        XCTAssertTrue(journeySheet.contains("guide.task != .humanProfile"))
+        XCTAssertTrue(journeySheet.contains("expandedHumanCheckpoint != nil"))
+        XCTAssertTrue(inlineEditor.contains("TaskCenterHumanProfileInlineInputBuilder"))
+        XCTAssertTrue(inlineEditor.contains("task-center-human-profile-inline-saved-"))
+        XCTAssertTrue(inlineEditor.contains("Human.westernZodiacDisplay(for: birthday, l: l)"))
+        XCTAssertTrue(inlineEditor.contains("genderSelectionButtons"))
+        XCTAssertTrue(inlineEditor.contains("task-center-human-profile-inline-gender-\\(option.key)"))
+        XCTAssertTrue(zenJourney.contains("onUpdateHumanProfile: updateZenHumanProfile"))
+        XCTAssertFalse(zenJourney.contains("ZenStarterHumanProfileEditorDataContainer("))
+        XCTAssertFalse(zenJourney.contains("humanEditorRoute"))
+    }
+
+    func testHumanProfileBirthdayAndGenderEditingStaysDirectAndVisible() throws {
+        let mainEditor = try source(
+            "Ohana/Features/Members/Views/HumanBasicInfoDetailView.swift"
+        )
+        let memberCreation = try source(
+            "Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift"
+        )
+        let crewEditor = try source(
+            "Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift"
+        )
+        let legacyEditor = try source(
+            "Ohana/Features/Members/Views/EditHumanSheet.swift"
         )
 
-        for source in [taskRoute, zenJourneyDataContainer] {
-            XCTAssertTrue(source.contains("requiresStarterProfileFields: true"))
-        }
-        XCTAssertTrue(zenJourney.contains("ZenStarterHumanProfileEditorDataContainer("))
+        XCTAssertTrue(mainEditor.contains("human-basic-info-gender-option-"))
+        XCTAssertFalse(mainEditor.contains("Image(systemName: \"chevron.up.chevron.down\")"))
+        XCTAssertTrue(mainEditor.contains("Human.westernZodiacDisplay(for: eBirthday, l: l)"))
+        XCTAssertTrue(mainEditor.contains("human-basic-info-editor-saved-feedback"))
+        XCTAssertTrue(memberCreation.contains("Human.westernZodiacDisplay(for: draft.birthday, l: l)"))
+        XCTAssertTrue(crewEditor.contains("CrewRosterHumanGenderGrid("))
+        XCTAssertTrue(crewEditor.contains("CrewRosterZodiacRow(date: birthday, l: l)"))
+        XCTAssertTrue(crewEditor.contains("withAnimation(GoMotion.feedback) { showsSavedFeedback = true }"))
+        XCTAssertTrue(legacyEditor.contains("Human.westernZodiacDisplay(for: birthday, l: l)"))
     }
 
     func testProfileAvatarCropUsesCanonicalPortraitGeometry() throws {
@@ -177,6 +214,59 @@ final class ProfileDetailExperienceTests: XCTestCase {
         XCTAssertTrue(cropView.contains("return max(fw, fh)"))
         XCTAssertFalse(cropView.contains("cardAspectRatio"))
         XCTAssertFalse(cropView.contains("targetW / cardAspectRatio"))
+    }
+
+    func testAvatarCropTransformKeepsTheImageCoveringTheViewport() {
+        let offset = MemberAvatarImageProcessor.clampedCropOffset(
+            CGSize(width: 180, height: -300),
+            displayedImageSize: CGSize(width: 500, height: 800),
+            cropSize: CGSize(width: 300, height: 600)
+        )
+        XCTAssertEqual(offset.width, 100, accuracy: 0.0001)
+        XCTAssertEqual(offset.height, -100, accuracy: 0.0001)
+
+        let narrowOffset = MemberAvatarImageProcessor.clampedCropOffset(
+            CGSize(width: 80, height: 80),
+            displayedImageSize: CGSize(width: 300, height: 800),
+            cropSize: CGSize(width: 300, height: 600)
+        )
+        XCTAssertEqual(narrowOffset.width, 0, accuracy: 0.0001)
+        XCTAssertEqual(narrowOffset.height, 80, accuracy: 0.0001)
+
+        XCTAssertEqual(
+            MemberAvatarImageProcessor.clampedCropScale(8, minimum: 1, maximum: 6),
+            6,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            MemberAvatarImageProcessor.clampedCropScale(1, minimum: 7, maximum: 6),
+            7,
+            accuracy: 0.0001
+        )
+    }
+
+    func testAvatarCropOutputUsesTheActualDisplayViewport() {
+        let outputOffset = MemberAvatarImageProcessor.outputCropOffset(
+            CGSize(width: 36, height: -56.88),
+            displayCropSize: CGSize(width: 360, height: 568.8),
+            outputSize: CGSize(width: 900, height: 1422)
+        )
+        XCTAssertEqual(outputOffset.width, 90, accuracy: 0.0001)
+        XCTAssertEqual(outputOffset.height, -142.2, accuracy: 0.0001)
+    }
+
+    func testAvatarCroppersPrioritizePanOverSheetDismissal() throws {
+        let profileCrop = try source("Ohana/Features/Members/Views/PetImageCropView.swift")
+        let creationCrop = try source("Ohana/Features/Members/Views/MemberCardCreationMediaComponents.swift")
+
+        for cropper in [profileCrop, creationCrop] {
+            XCTAssertTrue(cropper.contains("@GestureState private var gestureTranslation"))
+            XCTAssertTrue(cropper.contains("DragGesture(minimumDistance: 1, coordinateSpace: .local)"))
+            XCTAssertTrue(cropper.contains(".highPriorityGesture(cropGesture("))
+            XCTAssertTrue(cropper.contains(".interactiveDismissDisabled()"))
+        }
+
+        XCTAssertTrue(creationCrop.contains("displayCropSize: displayCropSizeSnapshot"))
     }
 
     func testMBTISelectionUsesFourValidatedBinaryDimensions() throws {

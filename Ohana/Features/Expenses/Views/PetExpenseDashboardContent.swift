@@ -18,6 +18,7 @@ struct PetExpenseDashboardContent: View {
     var onClose: () -> Void
     var onAdd: () -> Void
     var onRemove: (() -> Void)?
+    var onDataChanged: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -26,6 +27,7 @@ struct PetExpenseDashboardContent: View {
     @State private var selectedRange: ExpenseDashboardRange = .month
     @State private var showingPersonalPlan = false
     @State private var selectedCategory: ExpenseCategory?
+    @State private var editingExpense: PetExpenseLog?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
@@ -78,6 +80,14 @@ struct PetExpenseDashboardContent: View {
         .sheet(isPresented: $showingPersonalPlan) {
             PersonalPlanView()
                 .ohanaSheetPagePresentation()
+        }
+        .sheet(item: $editingExpense) { log in
+            EditPetExpenseSheet(
+                pet: pet,
+                log: log,
+                humans: allHumans,
+                onSaved: onDataChanged
+            )
         }
         .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
             if selectedRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
@@ -167,7 +177,7 @@ struct PetExpenseDashboardContent: View {
         Button(action: onAdd) {
             Image(systemName: "plus").accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 18, weight: .black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 56, height: 56)
                 .background(Color.goPrimary, in: Circle())
         }
@@ -190,7 +200,7 @@ struct PetExpenseDashboardContent: View {
                 Text(title)
                     .font(OhanaFont.caption(.black))
             }
-            .foregroundStyle(selected ? Color.arkInk : Color.ohanaSecondaryText)
+            .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .padding(.horizontal, 12)
             .frame(height: 34)
             .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -202,24 +212,39 @@ struct PetExpenseDashboardContent: View {
         let visibleNote = SharedCareMetadata.visibleNote(log.note)
         let title = expenseTitle(log, visibleNote: visibleNote)
         return HStack(spacing: 12) {
-            Image(systemName: log.expenseCategory.systemIconName)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
-                .foregroundStyle(Color.goPrimary)
-                .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                Text(rowSubtitle(log))
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
+            Button {
+                editingExpense = log
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: log.expenseCategory.systemIconName)
+                        .font(OhanaFont.adaptive(size: 14, weight: .black))
+                        .foregroundStyle(Color.goPrimary)
+                        .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title)
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                        Text(rowSubtitle(log))
+                            .font(OhanaFont.caption(.semibold))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Text(AppCurrency.format(log.amount, fractionDigits: 2))
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(log.amount >= 0 ? Color.ohanaPrimaryText : Color.goTeal)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            Spacer()
-            Text(AppCurrency.format(log.amount, fractionDigits: 2))
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(log.amount >= 0 ? Color.ohanaPrimaryText : Color.goTeal)
+            .buttonStyle(.plain)
+            .accessibilityHint(l.tr(
+                zh: "轻点编辑这条花费",
+                en: "Tap to edit this expense",
+                de: "Tippen, um diese Ausgabe zu bearbeiten"
+            ))
+            .accessibilityIdentifier("pet-expense-recent-edit-\(log.id.uuidString)")
             Button {
                 commandQueue.enqueue(
                     .expenseDelete(entityID: pet.id, entityKind: EntityKind.pet.rawValue, recordID: log.id)
@@ -244,6 +269,7 @@ struct PetExpenseDashboardContent: View {
                     .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "删除花费", en: "Delete expense", de: "Ausgabe löschen"))
         }
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
@@ -265,10 +291,18 @@ struct PetExpenseDashboardContent: View {
     }
 
     private func rowSubtitle(_ log: PetExpenseLog) -> String {
-        let payer = log.executorId.flatMap { id in allHumans.first { $0.id.uuidString == id }?.name }
+        let payerNames = log.payerContributions.map { contribution in
+            contribution.humanID.flatMap { humanID in
+                allHumans.first { $0.id == humanID }?.name
+            } ?? l.tr(
+                zh: "未指定", en: "Unassigned", de: "Nicht zugeordnet",
+                es: "Sin asignar", pt: "Não atribuído", fr: "Non attribué",
+                ja: "未指定", ko: "미지정", it: "Non assegnato"
+            )
+        }.joined(separator: " · ")
         let dateText = log.date.formatted(date: .abbreviated, time: .omitted)
-        guard let payer else { return dateText }
-        return "\(dateText) · \(payer)"
+        guard !payerNames.isEmpty else { return dateText }
+        return "\(dateText) · \(payerNames)"
     }
 
     private func emptyState(icon: String, text: String) -> some View {

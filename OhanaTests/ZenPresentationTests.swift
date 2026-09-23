@@ -199,6 +199,29 @@ struct ZenPresentationTests {
         #expect(ZenPresenceCardTapIntent.resolve(checkedToday: true) == .bringToFront)
     }
 
+    @Test func zenHomeKeepsTheScoreGestureHintVisibleBeforeAndAfterOwnerConfirmation() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let home = try String(
+            contentsOf: root.appending(path: "Ohana/Features/Zen/ZenHomeView.swift"),
+            encoding: .utf8
+        )
+        let hint = try #require(
+            home.components(separatedBy: "private func ownerCardInteractionHint").last?
+                .components(separatedBy: "private func loadingCards").first
+        )
+
+        #expect(home.contains("} else if let ownerSubject {"))
+        #expect(hint.contains("owner.checkedToday"))
+        #expect(hint.contains("长按卡片，上下滑动选择 1–10 分，松手保存"))
+        #expect(hint.contains("轻点 \\(owner.name) 的卡片确认今天平安；长按后上下滑动选择 1–10 分，松手保存"))
+        #expect(hint.contains("zen-home-card-score-hint"))
+        for languageArgument in ["zh:", "en:", "de:", "es:", "pt:", "fr:", "ja:", "ko:", "it:"] {
+            #expect(hint.components(separatedBy: languageArgument).count == 3)
+        }
+    }
+
     @Test func scoreSelectionAndFocusedCardAlwaysRiseAboveTheStableDeck() {
         let base = ZenPresenceCardDeckLayout.interactiveZIndex(
             subjectID: "base",
@@ -575,6 +598,10 @@ struct ZenPresentationTests {
             contentsOf: root.appending(path: "Ohana/Features/Zen/ZenOasisView.swift"),
             encoding: .utf8
         )
+        let experienceContainer = try String(
+            contentsOf: root.appending(path: "Ohana/Features/Zen/ZenExperienceContainer.swift"),
+            encoding: .utf8
+        )
         let members = try String(
             contentsOf: root.appending(path: "Ohana/Features/Zen/ZenMembersView.swift"),
             encoding: .utf8
@@ -600,6 +627,9 @@ struct ZenPresentationTests {
         #expect(shell.contains("zen-toolbar-coconut-log"))
         #expect(shell.contains("zen-toolbar-members"))
         #expect(shell.contains("zen-toolbar-settings"))
+        #expect(shell.contains("Text(activeHumanInitial)"))
+        #expect(shell.contains("$0.kind == .human && $0.id == ownerID"))
+        #expect(shell.contains("Members, current user \\(activeHumanDisplayName)"))
         #expect(home.contains("zen-home-screen"))
         #expect(home.contains("zen-home-expand-"))
         #expect(home.contains("zen-home-collapse-"))
@@ -624,6 +654,10 @@ struct ZenPresentationTests {
         #expect(oasis.contains("treeLayoutStyle: .zen"))
         #expect(oasis.contains("onOpenAchievements: actions.onOpenAchievements"))
         #expect(oasis.contains("onOpenGrowthRoadmap: actions.onOpenGrowthRoadmap"))
+        #expect(oasis.contains("onOpenFullOasis: actions.onOpenOasisReward"))
+        #expect(experienceContainer.contains("onOpenOasisReward:"))
+        #expect(experienceContainer.contains("case .oasisReward:"))
+        #expect(experienceContainer.contains("OasisRewardView("))
         #expect(!oasis.contains("ZenOasisTreeStageLayout"))
         #expect(!oasis.contains("private var routeGrid"))
         #expect(members.contains("zen-members-screen"))
@@ -647,7 +681,7 @@ struct ZenPresentationTests {
         #expect(!home.contains("Up · better"))
         #expect(!home.contains("Down · attention"))
         #expect(home.contains("accessibilityAdjustableAction(action)"))
-        #expect(home.contains("zen-home-owner-confirmation-hint"))
+        #expect(home.contains("zen-home-card-score-hint"))
         #expect(!home.contains("requestedAutoCheckInToast"))
         #expect(!home.contains("checkInAll"))
         #expect(!shell.contains("autoCheckInOwner"))

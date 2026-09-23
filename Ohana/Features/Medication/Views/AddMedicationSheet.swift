@@ -384,7 +384,7 @@ struct AddMedicationSheet: View {
                                     } label: {
                                         Text(label)
                                             .font(OhanaFont.caption(.bold))
-                                            .foregroundStyle(weeklyWeekday == weekday ? Color.arkInk : primaryText)
+                                            .foregroundStyle(weeklyWeekday == weekday ? Color.ohanaPrimaryActionText : primaryText)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
                                             .background(weeklyWeekday == weekday ? Color.goPrimary : controlFill, in: Capsule())
@@ -429,10 +429,10 @@ struct AddMedicationSheet: View {
                 Text(l.tr(zh: "手动记录", en: "Manual logging", de: "Manuell eintragen"))
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(primaryText)
-                Text(l.tr(zh: "按需和自定义药物不会自动生成固定提醒，可在管理页记录一次。", en: "As-needed and custom medications do not create fixed reminders. Log them from the management page.", de: "Bedarfs- und eigene Medikamente erzeugen keine festen Erinnerungen. Trage sie auf der Verwaltungsseite ein."))
+                Text(l.tr(zh: "无固定提醒 · 在管理页记录", en: "No fixed reminders · log from Medication", de: "Keine festen Erinnerungen · unter Medikamente eintragen"))
                     .font(OhanaFont.caption())
                     .foregroundStyle(secondaryText)
-                    .lineLimit(3)
+                    .lineLimit(2)
             }
             Spacer()
         }
@@ -549,10 +549,10 @@ struct AddMedicationSheet: View {
                     Text(isSaving ? l.tr(zh: "保存中", en: "Saving", de: "Speichert") : (isEditing ? l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen sichern") : l.tr(zh: "保存药物", en: "Save medication", de: "Medikament sichern")))
                         .font(OhanaFont.headline(.bold))
                 }
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(canSave ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(canSave ? Color.goPrimary : Color.goPrimary.opacity(0.35), in: Capsule())
+                .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(!canSave)

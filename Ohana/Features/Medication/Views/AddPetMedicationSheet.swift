@@ -240,9 +240,6 @@ struct AddPetMedicationSheet: View {
                     Text(existing == nil ? l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen") : l.tr(zh: "编辑药物", en: "Edit medication", de: "Medikament bearbeiten"))
                         .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "名称、剂量、频次", en: "Name, dose, schedule", de: "Name, Dosis, Rhythmus"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
 
                 Spacer()
@@ -314,6 +311,7 @@ struct AddPetMedicationSheet: View {
                     countryCode: AppCountry.code,
                     maxFractionDigits: 2,
                     accent: chromeAccent,
+                    accentForeground: Color.ohanaPrimaryActionText,
                     step: 0.5,
                     valueFont: .system(size: 18, weight: .black, design: .rounded),
                     valueAlignment: .center,
@@ -390,10 +388,6 @@ struct AddPetMedicationSheet: View {
                     .onChange(of: customCourseDays) { _, new in
                         syncCoursePreset(from: new)
                     }
-                } else {
-                    Text(l.tr(zh: "长期用药：不设置结束日期", en: "Long-term medication: no end date", de: "Langzeitmedikation: kein Enddatum"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
         }
@@ -420,33 +414,25 @@ struct AddPetMedicationSheet: View {
         }
 
         labeledField(l.tr(zh: "剩余药量（可选）", en: "Remaining amount (optional)", de: "Restmenge (optional)")) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    InlineNumericInput(
-                        text: $remainingText,
-                        placeholder: l.tr(zh: "数量", en: "Amount", de: "Menge"),
-                        unit: PetMedicationDoseUnitOption.displayTitle(for: doseUnit, l: l),
-                        countryCode: AppCountry.code,
-                        maxFractionDigits: 2,
-                        accent: chromeAccent,
-                        step: 1,
-                        valueFont: .system(size: 15, weight: .black, design: .rounded),
-                        unitFont: .system(size: 12, weight: .black, design: .rounded),
-                        valueAlignment: .leading,
-                        fill: Color.ohanaControlFill,
-                        cornerRadius: OhanaRadius.chip,
-                        horizontalPadding: 10,
-                        verticalPadding: 8,
-                        usesMiniKeypad: true
-                    )
-                }
-                Text(l.tr(
-                    zh: "填写后可在详情页查看余量与预估天数",
-                    en: "Add this to see remaining amount and estimated days in details.",
-                    de: "Damit werden Restmenge und geschaetzte Tage in den Details angezeigt."
-                ))
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.tertiary)
+            HStack {
+                InlineNumericInput(
+                    text: $remainingText,
+                    placeholder: l.tr(zh: "数量", en: "Amount", de: "Menge"),
+                    unit: PetMedicationDoseUnitOption.displayTitle(for: doseUnit, l: l),
+                    countryCode: AppCountry.code,
+                    maxFractionDigits: 2,
+                    accent: chromeAccent,
+                    accentForeground: Color.ohanaPrimaryActionText,
+                    step: 1,
+                    valueFont: .system(size: 15, weight: .black, design: .rounded),
+                    unitFont: .system(size: 12, weight: .black, design: .rounded),
+                    valueAlignment: .leading,
+                    fill: Color.ohanaControlFill,
+                    cornerRadius: OhanaRadius.chip,
+                    horizontalPadding: 10,
+                    verticalPadding: 8,
+                    usesMiniKeypad: true
+                )
             }
         }
 

@@ -247,10 +247,11 @@ struct MemberPortraitCropView: View {
     @State private var loadedImage: UIImage?
     @State private var loadErrorText = ""
     @State private var scale: CGFloat = 1
-    @State private var lastScale: CGFloat = 1
     @State private var offset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
+    @State private var displayCropSize: CGSize = .zero
     @State private var isProcessing = false
+    @GestureState private var gestureMagnification: CGFloat = 1
+    @GestureState private var gestureTranslation: CGSize = .zero
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -284,12 +285,14 @@ struct MemberPortraitCropView: View {
                             HStack(spacing: 8) {
                                 if isProcessing {
                                     ProgressView()
-                                        .tint(Color.arkInk)
+                                        .tint(Color.ohanaPrimaryActionText)
                                 }
                                 Text(primaryButtonTitle)
                             }
                             .font(OhanaFont.callout(.black))
-                            .foregroundStyle(loadedImage == nil ? Color.ohanaSecondaryText : Color.arkInk)
+                            .foregroundStyle(
+                                loadedImage == nil ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText
+                            )
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .background(loadedImage == nil ? Color.ohanaControlFill : Color.goPrimary, in: Capsule())
@@ -303,7 +306,7 @@ struct MemberPortraitCropView: View {
                 .padding(.bottom, 16)
             }
             .toolbar(.hidden, for: .navigationBar)
-            .interactiveDismissDisabled(isProcessing)
+            .interactiveDismissDisabled()
             .task(id: item.id) {
                 await loadImageIfNeeded()
             }
@@ -375,13 +378,27 @@ struct MemberPortraitCropView: View {
                 height: cropHeight
             )
             let baseScale = max(cropWidth / image.size.width, cropHeight / image.size.height)
+            let displayedScale = MemberAvatarImageProcessor.clampedCropScale(
+                scale * gestureMagnification,
+                minimum: 1,
+                maximum: 4
+            )
             let renderedSize = CGSize(
-                width: image.size.width * baseScale * scale,
-                height: image.size.height * baseScale * scale
+                width: image.size.width * baseScale * displayedScale,
+                height: image.size.height * baseScale * displayedScale
+            )
+            let displayedOffset = clampedOffset(
+                CGSize(
+                    width: offset.width + gestureTranslation.width,
+                    height: offset.height + gestureTranslation.height
+                ),
+                imageSize: image.size,
+                cropSize: cropRect.size,
+                scale: displayedScale
             )
             let imageFrame = CGRect(
-                x: cropRect.midX - renderedSize.width / 2 + offset.width,
-                y: cropRect.midY - renderedSize.height / 2 + offset.height,
+                x: cropRect.midX - renderedSize.width / 2 + displayedOffset.width,
+                y: cropRect.midY - renderedSize.height / 2 + displayedOffset.height,
                 width: renderedSize.width,
                 height: renderedSize.height
             )
@@ -392,8 +409,7 @@ struct MemberPortraitCropView: View {
                     .scaledToFill()
                     .frame(width: renderedSize.width, height: renderedSize.height)
                     .position(x: imageFrame.midX, y: imageFrame.midY)
-                    .gesture(dragGesture)
-                    .simultaneousGesture(magnificationGesture)
+                    .allowsHitTesting(false)
 
                 Color.arkInk.opacity(0.54)
                     .mask {
@@ -411,50 +427,71 @@ struct MemberPortraitCropView: View {
                     .frame(width: cropWidth, height: cropHeight)
                     .allowsHitTesting(false)
             }
-            .coordinateSpace(name: "MemberPortraitCropSpace")
-            .onChange(of: cropRect) { _, _ in
-                clampOffset(cropRect: cropRect, imageFrame: imageFrame)
+            .contentShape(Rectangle())
+            .highPriorityGesture(cropGesture(imageSize: image.size, cropSize: cropRect.size))
+            .onAppear {
+                updateCropGeometry(imageSize: image.size, cropSize: cropRect.size)
+            }
+            .onChange(of: cropRect.size) { _, newValue in
+                updateCropGeometry(imageSize: image.size, cropSize: newValue)
             }
         }
     }
 
-    private var dragGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                offset = CGSize(width: lastOffset.width + value.translation.width, height: lastOffset.height + value.translation.height)
-            }
-            .onEnded { _ in
-                lastOffset = offset
-            }
+    private func cropGesture(imageSize: CGSize, cropSize: CGSize) -> some Gesture {
+        SimultaneousGesture(
+            MagnifyGesture()
+                .updating($gestureMagnification) { value, state, _ in
+                    state = value.magnification
+                },
+            DragGesture(minimumDistance: 1, coordinateSpace: .local)
+                .updating($gestureTranslation) { value, state, _ in
+                    state = value.translation
+                }
+        )
+        .onEnded { value in
+            let committedScale = MemberAvatarImageProcessor.clampedCropScale(
+                scale * (value.first?.magnification ?? 1),
+                minimum: 1,
+                maximum: 4
+            )
+            let translation = value.second?.translation ?? .zero
+            let proposedOffset = CGSize(
+                width: offset.width + translation.width,
+                height: offset.height + translation.height
+            )
+            scale = committedScale
+            offset = clampedOffset(
+                proposedOffset,
+                imageSize: imageSize,
+                cropSize: cropSize,
+                scale: committedScale
+            )
+        }
     }
 
-    private var magnificationGesture: some Gesture {
-        MagnificationGesture()
-            .onChanged { value in
-                scale = min(max(lastScale * value, 1), 4)
-            }
-            .onEnded { _ in
-                lastScale = scale
-                lastOffset = offset
-            }
+    private func clampedOffset(
+        _ proposed: CGSize,
+        imageSize: CGSize,
+        cropSize: CGSize,
+        scale: CGFloat
+    ) -> CGSize {
+        guard imageSize.width > 0, imageSize.height > 0 else { return .zero }
+        let baseScale = max(cropSize.width / imageSize.width, cropSize.height / imageSize.height)
+        return MemberAvatarImageProcessor.clampedCropOffset(
+            proposed,
+            displayedImageSize: CGSize(
+                width: imageSize.width * baseScale * scale,
+                height: imageSize.height * baseScale * scale
+            ),
+            cropSize: cropSize
+        )
     }
 
-    private func clampOffset(cropRect: CGRect, imageFrame: CGRect) {
-        var newOffset = offset
-        if imageFrame.width <= cropRect.width {
-            newOffset.width = 0
-        } else {
-            let overflow = (imageFrame.width - cropRect.width) / 2
-            newOffset.width = min(max(newOffset.width, -overflow), overflow)
-        }
-        if imageFrame.height <= cropRect.height {
-            newOffset.height = 0
-        } else {
-            let overflow = (imageFrame.height - cropRect.height) / 2
-            newOffset.height = min(max(newOffset.height, -overflow), overflow)
-        }
-        offset = newOffset
-        lastOffset = newOffset
+    private func updateCropGeometry(imageSize: CGSize, cropSize: CGSize) {
+        guard cropSize.width > 0, cropSize.height > 0 else { return }
+        displayCropSize = cropSize
+        offset = clampedOffset(offset, imageSize: imageSize, cropSize: cropSize, scale: scale)
     }
 
     private func finishCrop() {
@@ -462,12 +499,16 @@ struct MemberPortraitCropView: View {
         isProcessing = true
         let scaleSnapshot = scale
         let offsetSnapshot = offset
+        let displayCropSizeSnapshot = displayCropSize.width > 0 && displayCropSize.height > 0
+            ? displayCropSize
+            : CGSize(width: 320, height: 320 * MemberAvatarImageProcessor.portraitAspect)
         DispatchQueue.global(qos: .userInitiated).async {
             let signpostID = MemberCreationPerformance.begin("Avatar Crop Encode")
             let data = MemberAvatarImageProcessor.encodedCroppedAvatarData(
                 image: sourceImage,
                 scale: scaleSnapshot,
-                offset: offsetSnapshot
+                offset: offsetSnapshot,
+                displayCropSize: displayCropSizeSnapshot
             )
             MemberCreationPerformance.end("Avatar Crop Encode", signpostID)
             DispatchQueue.main.async {
@@ -484,9 +525,8 @@ struct MemberPortraitCropView: View {
         guard loadedImage == nil else { return }
         loadErrorText = ""
         scale = 1
-        lastScale = 1
         offset = .zero
-        lastOffset = .zero
+        displayCropSize = .zero
         await Task.yield()
 
         switch item.source {

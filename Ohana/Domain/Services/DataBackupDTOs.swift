@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - 顶层备份结构
 nonisolated struct OhanaBackup: Codable {
-    var schemaVersion: Int = 33
+    var schemaVersion: Int = 34
     var exportedAt: String
     /// Records the destination policy for auditability. Older backups decode as
     /// `nil`; both current user-visible export paths are restricted, while
@@ -542,6 +542,8 @@ nonisolated struct PetExpenseLogBackup: Codable {
     var executorId: String?
     var recordedByHumanId: String? = nil
     var sharedSessionId: String?
+    /// V34 contribution snapshot. Older backups omit this and use `executorId`.
+    var payerContributionsJSON: String? = nil
 }
 
 nonisolated struct PetHealthLogBackup: Codable {

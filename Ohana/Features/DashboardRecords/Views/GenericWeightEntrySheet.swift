@@ -438,7 +438,7 @@ struct GenericWeightEntrySheet: View {
                 )
                 .font(OhanaFont.callout(.black))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(isValid && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(isValid && !isSaving ? accentColor : accentColor.opacity(0.38), in: Capsule())

@@ -111,7 +111,6 @@ struct PetMedicationContentView: View {
                             if !activeMeds.isEmpty {
                                 medicationSection(
                                     title: l.tr(zh: "当前用药", en: "Current medication", de: "Aktuelle Medikamente"),
-                                    subtitle: l.tr(zh: "今天需要处理的剂量", en: "Doses to handle today", de: "Heutige Dosen"),
                                     meds: activeMeds
                                 )
                             }
@@ -119,7 +118,6 @@ struct PetMedicationContentView: View {
                             if !inactiveMeds.isEmpty {
                                 medicationSection(
                                     title: l.tr(zh: "历史用药", en: "History", de: "Verlauf"),
-                                    subtitle: l.tr(zh: "已结束或未开始的疗程", en: "Stopped or not started", de: "Beendet oder noch nicht begonnen"),
                                     meds: inactiveMeds
                                 )
                             }
@@ -431,9 +429,9 @@ struct PetMedicationContentView: View {
     private var todayPanelSubtitle: String {
         guard let pendingMedication else {
             if todayRequired == 0 {
-                return l.tr(zh: "按需药物可在药物卡片里手动记录。", en: "As-needed medication can be logged from each card.", de: "Bedarfsmedikamente kannst du über die Karte eintragen.")
+                return l.tr(zh: "按需药物可在卡片中记录", en: "Log as-needed medication from its card", de: "Bedarfsmedikamente über die Karte eintragen")
             }
-            return l.tr(zh: "今日所有固定用药都已经记录。", en: "All scheduled doses are recorded today.", de: "Alle geplanten Dosen sind heute erledigt.")
+            return l.tr(zh: "固定用药已记录", en: "Scheduled doses logged", de: "Geplante Dosen erfasst")
         }
         let name = pendingMedication.name.isEmpty ? l.tr(zh: "未命名药物", en: "Unnamed medication", de: "Unbenanntes Medikament") : pendingMedication.name
         return l.tr(
@@ -443,16 +441,11 @@ struct PetMedicationContentView: View {
         )
     }
 
-    private func medicationSection(title: String, subtitle: String, meds: [PetMedication]) -> some View {
+    private func medicationSection(title: String, meds: [PetMedication]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(OhanaFont.headline(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(subtitle)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
+            Text(title)
+                .font(OhanaFont.headline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
 
             ForEach(meds) { med in
                 medicationCard(med)
@@ -560,12 +553,16 @@ struct PetMedicationContentView: View {
     }
 
     private func medicationCheckInButton(for med: PetMedication, remaining: Int, tint: Color) -> some View {
-        Button {
+        let actionForeground = remaining > 0
+            ? Color.ohanaPrimaryActionText
+            : (OhanaResolvedPrimaryAccent(customHex: med.colorHex)?.actionTextColor ?? Color.ohanaPrimaryText)
+
+        return Button {
             recordDose(for: med)
         } label: {
             Text(remaining > 0 ? l.tr(zh: "打卡", en: "Check in", de: "Abhaken") : l.tr(zh: "加记一次", en: "Extra dose", de: "Extra"))
                 .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .foregroundStyle(actionForeground)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(remaining > 0 ? chromeAccent : tint, in: Capsule())
@@ -601,7 +598,17 @@ struct PetMedicationContentView: View {
             Text(l.tr(zh: "还没有用药计划", en: "No medication yet", de: "Noch keine Medikamente"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(zh: "添加药物后，可直接在待办中打卡，不需要再跳进用药页。", en: "After adding medication, you can check it off directly in Tasks.", de: "Nach dem Hinzufügen kannst du die Einnahme direkt in Aufgaben abhaken."))
+            Text(l.tr(
+                zh: "点按 + 添加药物",
+                en: "Tap + to add medication",
+                de: "Tippe auf +, um ein Medikament hinzuzufügen",
+                es: "Toca + para añadir un medicamento",
+                pt: "Toque em + para adicionar um medicamento",
+                fr: "Touchez + pour ajouter un médicament",
+                ja: "＋をタップして薬を追加",
+                ko: "+를 탭해 약을 추가하세요",
+                it: "Tocca + per aggiungere un farmaco"
+            ))
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)

@@ -99,9 +99,9 @@ extension QuickFeedDetailContent {
             compactNotice(
                 icon: "hand.tap.fill",
                 text: l.tr(
-                    zh: "设置默认粮种和克数；关闭默认后，手动模式会回到需要先设置克数的状态。",
-                    en: "Set the default food and grams. Turning the default off makes manual mode ask for an amount first.",
-                    de: "Standardfutter und Gramm festlegen. Ohne Standard fragt der manuelle Modus zuerst nach der Menge."
+                    zh: "默认粮种与克数",
+                    en: "Default food and amount",
+                    de: "Standardfutter und -menge"
                 ),
                 tint: mainFoodTint
             )
@@ -148,8 +148,8 @@ extension QuickFeedDetailContent {
             compactNotice(
                 icon: kind.iconName,
                 text: kind == .manualReminder
-                    ? l.tr(zh: "每餐可独立设置时间、粮种和克数；到点后提醒你确认打卡。", en: "Each meal has its own time, food type, and grams. You will be reminded to confirm it.", de: "Jede Mahlzeit hat Zeit, Sorte und Gramm. Du wirst ans Bestätigen erinnert.")
-                    : l.tr(zh: "每餐可独立设置时间、粮种和克数；到点后自动补记并扣余粮。", en: "Each meal has its own time, food type, and grams. Due meals are logged automatically.", de: "Jede Mahlzeit hat Zeit, Sorte und Gramm. Fällige Mahlzeiten werden automatisch erfasst."),
+                    ? l.tr(zh: "到点提醒，手动确认", en: "Reminder, then manual confirmation", de: "Erinnerung, dann manuell bestätigen")
+                    : l.tr(zh: "到点自动记录并扣余粮", en: "Auto-log and deduct stock when due", de: "Bei Fälligkeit automatisch erfassen und Vorrat abziehen"),
                 tint: tint
             )
             if sameSpeciesFeedPets.count > 1 {

@@ -1,7 +1,43 @@
 import Foundation
 import XCTest
+@testable import Ohana
 
 final class MediaBlobBoundaryTests: XCTestCase {
+    func testDocumentImportKeepsSmallFilesAndRejectsOversizeBeforeRead() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ohana-document-import-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let smallURL = directory.appendingPathComponent("record.pdf")
+        let source = Data("%PDF-1.4".utf8)
+        try source.write(to: smallURL)
+        let payload = try await AttachmentImageDecoder.readSanitizedDocument(
+            smallURL,
+            isImage: false,
+            fallbackFilename: "fallback.jpg"
+        )
+        XCTAssertEqual(payload.data, source)
+        XCTAssertEqual(payload.filename, "record.pdf")
+        XCTAssertFalse(payload.isImage)
+
+        let oversizeURL = directory.appendingPathComponent("oversize.pdf")
+        try Data().write(to: oversizeURL)
+        let handle = try FileHandle(forWritingTo: oversizeURL)
+        try handle.truncate(atOffset: UInt64(AttachmentImageDecoder.maximumDocumentAttachmentBytes + 1))
+        try handle.close()
+        do {
+            _ = try await AttachmentImageDecoder.readSanitizedDocument(
+                oversizeURL,
+                isImage: false,
+                fallbackFilename: "fallback.jpg"
+            )
+            XCTFail("Oversize document should be rejected before allocation")
+        } catch AttachmentImageDecoder.DocumentImportError.tooLarge {
+            // Expected: the metadata boundary rejects this sparse file.
+        }
+    }
+
     func testExternalStorageModelFieldsAreExplicitlyAccountedFor() throws {
         let rootURL = repositoryRootURL()
         let modelPaths = [
@@ -63,6 +99,10 @@ final class MediaBlobBoundaryTests: XCTestCase {
             "Ohana/Features/Plants/Views/PlantDetailView+HealthGrowthSections.swift",
             rootURL: rootURL
         )
+        let plantShareSheetSource = try source(
+            "Ohana/Features/Plants/Views/PlantGrowthDiaryShareSheet.swift",
+            rootURL: rootURL
+        )
         let settingsBackupSource = try source(
             "Ohana/Features/Settings/Views/SettingsView+Backup.swift",
             rootURL: rootURL
@@ -76,6 +116,7 @@ final class MediaBlobBoundaryTests: XCTestCase {
             petBasicInfoSource,
             petHealthSummarySource,
             plantGrowthSource,
+            plantShareSheetSource,
             settingsBackupSource,
             pdfShareSource
         ].joined(separator: "\n")
@@ -93,8 +134,10 @@ final class MediaBlobBoundaryTests: XCTestCase {
         XCTAssertTrue(petHealthSummarySource.contains("ShareLink(item: preparedVetVisitSummaryText)"))
         XCTAssertFalse(petHealthSummarySource.contains("ShareLink(item: vetVisitSummaryText)"))
 
-        XCTAssertTrue(plantGrowthSource.contains("ShareLink(item: growthDiaryMarkdown)"))
-        XCTAssertTrue(plantGrowthSource.contains("cached render-data export string"))
+        XCTAssertTrue(plantGrowthSource.contains("prepareGrowthDiaryExport()"))
+        XCTAssertTrue(plantGrowthSource.contains("appServices.plantGrowthDiaryExports.markdown("))
+        XCTAssertFalse(plantGrowthSource.contains("ShareLink(item: growthDiaryMarkdown)"))
+        XCTAssertTrue(plantShareSheetSource.contains("UIActivityViewController(activityItems: [markdown]"))
         XCTAssertTrue(settingsBackupSource.contains("else if let url = exportedJSONURL"))
         XCTAssertTrue(settingsBackupSource.contains("showingBackupSavePicker = true"))
         XCTAssertTrue(settingsBackupSource.contains("BackupPackageFileExporter"))

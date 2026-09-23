@@ -32,6 +32,7 @@ struct VerticalSolidHomeDashboardPage: View {
     let onExpandedCardCollapseIntent: () -> Bool
     let onWalkCardMinimizeToFloatingControl: () -> Void
     let onAddFirstPet: () -> Void
+    let onOpenAllMembers: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedCardId: UUID?
@@ -100,6 +101,31 @@ struct VerticalSolidHomeDashboardPage: View {
 
         return ScrollView(.vertical, showsIndicators: true) {
             LazyVStack(spacing: 0) {
+                if snapshot.hasMoreMembers {
+                    Button {
+                        OhanaFeedback.light()
+                        onOpenAllMembers()
+                    } label: {
+                        Label(localization.tr(
+                            zh: "首页仅展示部分成员 · 查看全部",
+                            en: "Home shows a member preview · View all",
+                            de: "Startseite zeigt eine Auswahl · Alle Mitglieder",
+                            es: "Inicio muestra una selección · Ver todos",
+                            pt: "Início mostra uma seleção · Ver todos",
+                            fr: "L’accueil montre un aperçu · Tout voir",
+                            ja: "ホームには一部のみ表示・すべて見る",
+                            ko: "홈에는 일부만 표시 · 모두 보기",
+                            it: "Home mostra un’anteprima · Mostra tutti"
+                        ), systemImage: "person.3.fill")
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.goPrimary)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .accessibilityIdentifier("home-member-preview-open-all")
+                }
                 memberCardScene(
                     collapsedLayoutMode: .scrollExtended,
                     expandedVerticalPlacement: .viewportTop(
@@ -558,6 +584,7 @@ struct VerticalSolidHomePreparedPlaceholder: View {
 }
 
 struct OasisTreeRenderSnapshot: Equatable {
+    let revision: Int
     let level: Int
     let progressToNextLevel: Double
     let totalEnergy: Int
@@ -572,6 +599,7 @@ struct OasisTreeRenderSnapshot: Equatable {
     var coconutBalance: Int? { availableCoconutBalance }
 
     init(
+        revision: Int = 0,
         level: Int,
         progressToNextLevel: Double,
         totalEnergy: Int = 0,
@@ -583,6 +611,7 @@ struct OasisTreeRenderSnapshot: Equatable {
         crittersLockedLevel: Int? = nil,
         gachaLockedLevel: Int? = nil
     ) {
+        self.revision = revision
         self.level = min(max(level, 0), 10)
         self.progressToNextLevel = Self.clampedProgress(progressToNextLevel)
         self.totalEnergy = max(0, totalEnergy)
@@ -608,12 +637,14 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
     var allowsInteractionMotion = false
     var usesFullVisualEffects = true
     var layoutStyle: OasisHomeTreeLayoutStyle = .standard
+    var showsInjectEnergyButton = true
     var onInjectEnergy: () -> Void = {}
     var onOpenShop: (ShopItem.ShopCategory) -> Void = { _ in }
     var onOpenAchievements: () -> Void = {}
     var onOpenCritters: () -> Void = {}
     var onOpenGacha: () -> Void = {}
     var onOpenGrowthRoadmap: () -> Void = {}
+    var onOpenFullOasis: () -> Void = {}
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
@@ -636,7 +667,6 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("oasis-screen")
     }
 
     private func frozenTreeCard(metrics: OasisEmbeddedLayoutMetrics) -> some View {
@@ -666,9 +696,11 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
                             .padding(.horizontal, 18)
                             .padding(.bottom, 8)
 
-                        frozenInjectEnergyButton
-                            .padding(.horizontal, 18)
-                            .padding(.bottom, 12)
+                        if showsInjectEnergyButton {
+                            frozenInjectEnergyButton
+                                .padding(.horizontal, 18)
+                                .padding(.bottom, 12)
+                        }
                     }
                     .offset(y: -28)
                 } else {
@@ -678,9 +710,11 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
                         .padding(.horizontal, 18)
                         .padding(.bottom, 5)
 
-                    frozenInjectEnergyButton
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, 8)
+                    if showsInjectEnergyButton {
+                        frozenInjectEnergyButton
+                            .padding(.horizontal, 18)
+                            .padding(.bottom, 8)
+                    }
 
                     frozenProgressRail
                         .padding(.horizontal, 18)
@@ -841,25 +875,69 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
     }
 
     private var frozenUpgradeCoconutDock: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles") // a11y: allow decorative frozen Oasis hint icon
-                    .accessibilityHidden(true)
-                Text(nextStageHint)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-            }
-            .font(OhanaFont.caption(.black))
-            .foregroundStyle(Color.ohanaSecondaryText)
+        Button {
+            OhanaFeedback.light()
+            onOpenFullOasis()
+        } label: {
+            HStack(spacing: 10) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles") // a11y: allow decorative reward-entry sparkle; the button has a complete label
+                        .accessibilityHidden(true)
+                    Text(nextStageHint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                }
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaSecondaryText)
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 4)
+
+                HStack(spacing: 3) {
+                    Text(l.tr(
+                        zh: "奖励",
+                        en: "Rewards",
+                        de: "Belohnungen",
+                        es: "Premios",
+                        pt: "Prêmios",
+                        fr: "Récompenses",
+                        ja: "報酬",
+                        ko: "보상",
+                        it: "Premi"
+                    ))
+                    Image(systemName: "chevron.right") // a11y: allow decorative disclosure chevron; the button has a complete label
+                        .accessibilityHidden(true)
+                }
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(Color.goPrimary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
         }
-        .frame(minHeight: 28)
+        .buttonStyle(.plain)
+        .accessibilityLabel(l.tr(
+            zh: "打开完整 Oasis，领取升级与每日奖励",
+            en: "Open the full Oasis for upgrade and daily rewards",
+            de: "Vollständige Oasis für Aufstiegs- und Tagesbelohnungen öffnen"
+        ))
+        .accessibilityIdentifier("oasis-open-reward-action")
     }
 
     private var nextStageHint: String {
         if snapshot.level >= TreeLevel.lv10.rawValue {
             return l.tr(zh: "树冠已觉醒", en: "Tree awakened", de: "Baum erwacht")
+        }
+        if layoutStyle == .zen {
+            return l.tr(
+                zh: "每日确认 +6，首次状态 +2 养分",
+                en: "Daily check-in +6; first status +2 nutrients",
+                de: "Täglicher Check-in +6; erster Status +2 Nährstoffe",
+                es: "Check-in diario +6; primer estado +2 nutrientes",
+                pt: "Check-in diário +6; primeiro estado +2 nutrientes",
+                fr: "Check-in quotidien +6 ; premier état +2 nutriments",
+                ja: "毎日の確認 +6、最初の状態 +2 栄養",
+                ko: "매일 확인 +6, 첫 상태 +2 영양분",
+                it: "Check-in giornaliero +6; primo stato +2 nutrienti"
+            )
         }
         return l.tr(
             zh: "完成照护，生命树会自然成长",

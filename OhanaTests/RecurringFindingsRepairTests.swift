@@ -273,9 +273,11 @@ struct RecurringFindingsRepairTests {
 
         let state = EconomyDefaultsState.capture()
         defer { state.restore() }
+        let questManager = makeQuestManager()
+        let economy = StaticCareEventEconomyAwarder(questManager: questManager)
         prepareEconomyDefaults(
             activeHumanID: human.id.uuidString,
-            questManager: makeQuestManager(),
+            questManager: questManager,
             memberIDs: [human.id.uuidString],
             petID: pet.id
         )
@@ -286,7 +288,10 @@ struct RecurringFindingsRepairTests {
             pets: [pet],
             context: context,
             executorId: human.id.uuidString,
-            now: now
+            now: now,
+            options: CalendarEventCompletionOptions(
+                economy: economy
+            )
         )
 
         let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
@@ -308,7 +313,10 @@ struct RecurringFindingsRepairTests {
             pets: [pet],
             context: context,
             executorId: human.id.uuidString,
-            now: now
+            now: now,
+            options: CalendarEventCompletionOptions(
+                economy: economy
+            )
         )
 
         let allEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
@@ -675,9 +683,10 @@ struct RecurringFindingsRepairTests {
 
         let state = EconomyDefaultsState.capture()
         defer { state.restore() }
+        let questManager = makeQuestManager()
         prepareEconomyDefaults(
             activeHumanID: human.id.uuidString,
-            questManager: makeQuestManager(),
+            questManager: questManager,
             memberIDs: [human.id.uuidString],
             petID: pet.id
         )
@@ -688,7 +697,8 @@ struct RecurringFindingsRepairTests {
                 "reminderId": reminder.id.uuidString
             ],
             currentActiveHumanId: human.id.uuidString,
-            context: context
+            context: context,
+            economy: StaticCareEventEconomyAwarder(questManager: questManager)
         )
 
         let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)

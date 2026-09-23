@@ -94,8 +94,8 @@ struct AppRoutePresentationHost: ViewModifier {
                         route: route,
                         coordinator: coordinator,
                         onDismiss: { coordinator.dismissSheet(route) },
-                        onPetSavedFromAddEntity: onPetSavedFromAddEntity,
-                        onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
+                        onPetSavedFromAddEntity: handlePetSavedFromAddEntity,
+                        onHumanSavedFromAddEntity: handleHumanSavedFromAddEntity,
                         onRequestStarterGiftClaim: onRequestStarterGiftClaim,
                         onCalendarEventDestination: handleCalendarEventDestination,
                         onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
@@ -130,6 +130,16 @@ struct AppRoutePresentationHost: ViewModifier {
                 .appPresentationSheet(AppPresentationPolicyProvider.policy(for: route))
                 .globalCoconutRewardFeedbackOverlay()
             }
+    }
+
+    private func handlePetSavedFromAddEntity(_ pet: Pet) {
+        coordinator.completeMemberCreation()
+        onPetSavedFromAddEntity(pet)
+    }
+
+    private func handleHumanSavedFromAddEntity(_ human: Human) {
+        coordinator.completeMemberCreation()
+        onHumanSavedFromAddEntity(human)
     }
 
     private func handleSheetDismissed() {
@@ -414,11 +424,9 @@ private struct AppSheetRouteDestination: View {
                         coordinator.openHuman(human.id)
                     },
                     onInlinePetSaved: { pet in
-                        onDismiss()
                         onPetSavedFromAddEntity(pet)
                     },
                     onInlineHumanSaved: { human in
-                        onDismiss()
                         onHumanSavedFromAddEntity(human)
                     },
                     onClose: onDismiss,

@@ -31,6 +31,10 @@ struct PlantDetailContentView: View {
     @State var showingDeleteConfirm = false
     @State var showingPhotoGallery = false
     @State var careLogDraftType: PlantCareType?
+    @State var careHistoryRoute: PlantCareHistoryRoute?
+    @State var growthDiaryShareItem: PlantGrowthDiaryShareItem?
+    @State var growthDiaryExportTask: Task<Void, Never>?
+    @State var isPreparingGrowthDiaryExport = false
     @State var careFeatureDraft: PlantDetailCareFeatureDraft?
     @State var quickCareConfirmDraft: PlantQuickCareConfirmDraft?
     @State var quickCareExecutorID: UUID?
@@ -291,9 +295,6 @@ struct PlantDetailContentView: View {
     }
     var galleryPhotoItems: [PlantDetailPhotoItem] {
         renderData?.galleryPhotoItems ?? []
-    }
-    var growthDiaryMarkdown: String {
-        renderData?.growthDiaryMarkdown ?? ""
     }
     var growthDiaryDateRangeText: String {
         guard let first = logSummary?.firstLogDate else {
@@ -882,6 +883,14 @@ struct PlantDetailContentView: View {
                 onSave: savePlantCareLog
             )
         }
+        .sheet(item: $careHistoryRoute) { route in
+            PlantCareHistoryEditSheet(route: route) { _ in
+                schedulePlantDetailRenderDataRebuild(delayMilliseconds: 0)
+            }
+        }
+        .sheet(item: $growthDiaryShareItem) { item in
+            PlantGrowthDiaryShareSheet(markdown: item.markdown)
+        }
         .sheet(item: $careFeatureDraft) { draft in
             PlantCareFeatureDetailView(
                 plants: [plant],
@@ -955,6 +964,7 @@ struct PlantDetailContentView: View {
         .onDisappear {
             renderDataRefreshTask?.cancel()
             mediaAttachmentIndexRepairTask?.cancel()
+            growthDiaryExportTask?.cancel()
             quickCareToastClearTask?.cancel()
             deleteUndoTask?.cancel()
             pendingBatchCareRewardTask?.cancel()

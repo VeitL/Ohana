@@ -366,7 +366,7 @@ private struct GuardianSafetyDashboardContentView: View {
                 Button(t("订阅年度 Family", "Subscribe to Family yearly", "Family jährlich abonnieren")) {
                     purchaseFamily()
                 }
-                .buttonStyle(.borderedProminent)
+                .ohanaPrimaryProminentButton()
                 .disabled(appServices.commerce.isPurchasing || appServices.commerce.familyDisplayPrice == nil)
                 Button(t("恢复购买", "Restore purchases", "Käufe wiederherstellen")) {
                     restorePurchases()
@@ -535,7 +535,7 @@ private struct GuardianSafetyDashboardContentView: View {
             Button(t("保存守护计划", "Save guardian schedule", "Schutzplan speichern")) {
                 savePolicy()
             }
-            .buttonStyle(.borderedProminent)
+            .ohanaPrimaryProminentButton()
             .disabled(selectedWeekdays.isEmpty || !ownerIsAvailable || (policyEnabled && reachableGuardianCount == 0))
         } header: {
             Text(t("我的守护计划", "My guardian schedule", "Mein Schutzplan"))
@@ -640,7 +640,7 @@ private struct GuardianSafetyDashboardContentView: View {
                             Button(t("已联系到本人", "I reached them", "Kontakt hergestellt")) {
                                 Task { await guardian.acknowledgeIncident(id: incident.id) }
                             }
-                            .buttonStyle(.borderedProminent)
+                            .ohanaPrimaryProminentButton()
                         }
                     }
                     .padding(.vertical, 4)

@@ -88,7 +88,7 @@ struct QuickFeedHomePresenter {
                 title = localization.tr(zh: "先设置喂食量", en: "Set feeding amount", de: "Futtermenge festlegen")
                 metricTitle = FeedFoodKind.dry.title(localization) + " / " + FeedFoodKind.wet.title(localization)
                 metricValue = "50g"
-                detail = localization.tr(zh: "保存一次默认克数后，就能一键打卡。", en: "Save a default amount for one-tap logging.", de: "Standardmenge speichern.")
+                detail = localization.tr(zh: "未设置默认克数", en: "No default amount", de: "Keine Standardmenge")
                 primaryTitle = localization.tr(zh: "设置", en: "Set", de: "Festlegen")
                 primaryIcon = "slider.horizontal.3"
                 isPrimaryEnabled = true
@@ -198,7 +198,7 @@ struct QuickFeedHomePresenter {
         return FeedGuidedChartState(
             title: localization.tr(zh: "7日进食", en: "7-day food", de: "7 Tage Futter"),
             value: total > 0 ? formattedFoodCardWeight(total) : "--",
-            subtitle: localization.tr(zh: "只看趋势，详情进总览。", en: "A quiet trend. Details in overview.", de: "Ruhiger Trend. Details im Überblick."),
+            subtitle: localization.tr(zh: "近 7 天", en: "Last 7 days", de: "Letzte 7 Tage"),
             points: points,
             tint: mainFoodOverviewTint,
             progress: overviewChartProgress,

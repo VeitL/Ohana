@@ -44,8 +44,11 @@ struct FunctionMenuRootView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionHeader(
                             icon: "square.grid.2x2.fill",
-                            title: l.tr(zh: "功能", en: "Features", de: "Funktionen"),
-                            label: "CORE"
+                            title: l.tr(
+                                zh: "功能", en: "Features", de: "Funktionen",
+                                es: "Funciones", pt: "Funcionalidades", fr: "Fonctionnalités",
+                                ja: "機能", ko: "기능", it: "Funzioni"
+                            )
                         )
 
                         LazyVGrid(columns: columns, spacing: 10) {
@@ -68,8 +71,11 @@ struct FunctionMenuRootView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             sectionHeader(
                                 icon: "wrench.and.screwdriver.fill",
-                                title: l.tr(zh: "工具", en: "Tools", de: "Tools"),
-                                label: "TOOLS"
+                                title: l.tr(
+                                    zh: "工具", en: "Tools", de: "Tools",
+                                    es: "Herramientas", pt: "Ferramentas", fr: "Outils",
+                                    ja: "ツール", ko: "도구", it: "Strumenti"
+                                )
                             )
 
                             LazyVGrid(columns: columns, spacing: 10) {
@@ -103,16 +109,13 @@ struct FunctionMenuRootView: View {
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
-            Text(l.tr(zh: "更多功能", en: "More", de: "Mehr"))
+            Text(l.tr(
+                zh: "更多功能", en: "More", de: "Mehr",
+                es: "Más", pt: "Mais", fr: "Plus",
+                ja: "その他", ko: "더보기", it: "Altro"
+            ))
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-
-            Text("Lv.\(currentTreeLevel)")
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.arkInk)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(Color.goPrimary, in: Capsule())
 
             Spacer()
 
@@ -288,7 +291,7 @@ struct FunctionMenuRootView: View {
         .accessibilityIdentifier(accessibilityIdentifier ?? "function-menu-tile-\(title)")
     }
 
-    private func sectionHeader(icon: String, title: String, label: String) -> some View {
+    private func sectionHeader(icon: String, title: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 10, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -297,10 +300,6 @@ struct FunctionMenuRootView: View {
                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
-            Text(label)
-                .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.goPrimary.opacity(0.6))
-                .tracking(2)
         }
         .padding(.bottom, 2)
     }

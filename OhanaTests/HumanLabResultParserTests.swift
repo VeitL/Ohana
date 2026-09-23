@@ -319,7 +319,7 @@ struct HumanLabResultParserTests {
         #expect(mchc.value == 30.6)
         #expect(mchc.reportedFlag == .low)
         #expect(mpv.value == 10.4)
-        #expect(results.first { $0.metricKey == "rbc" } == nil)
+        #expect(!results.contains { $0.metricKey == "rbc" })
     }
 
     @Test func lineGeometryRetainsUnknownStructuredMetrics() throws {

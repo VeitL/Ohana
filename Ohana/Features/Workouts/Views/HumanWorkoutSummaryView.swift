@@ -137,11 +137,7 @@ struct HumanWorkoutSummaryView: View {
                 HumanModulePageHeader(
                     human: human,
                     title: l.tr(zh: "运动摘要", en: "Workout Summary", de: "Trainingsübersicht"),
-                    subtitle: l.tr(
-                        zh: "今天的活动与区间历史",
-                        en: "Today’s activity and period history",
-                        de: "Heutige Aktivität und Zeitraumverlauf"
-                    ),
+                    subtitle: human.name,
                     onClose: { dismiss() }
                 ) {
                     HumanPrivacyToggleButton(human: human, field: .workout)
@@ -177,9 +173,9 @@ struct HumanWorkoutSummaryView: View {
                                         de: "Apple Health heute"
                                     ),
                                     subtitle: l.tr(
-                                        zh: "来自本机当前可读数据；活动环仅表示今天的设备快照。",
-                                        en: "Currently readable on this device; Activity Rings show only today’s device snapshot.",
-                                        de: "Aktuell auf diesem Gerät lesbar; die Aktivitätsringe zeigen nur den heutigen Gerätestand."
+                                        zh: "本机今日可读数据",
+                                        en: "Today’s readable on-device data",
+                                        de: "Heute lesbare lokale Daten"
                                     )
                                 )
                                 HumanWorkoutHealthSnapshotCards(

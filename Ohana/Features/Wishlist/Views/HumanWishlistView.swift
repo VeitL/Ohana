@@ -216,10 +216,6 @@ struct HumanWishlistContentView: View {
             Text(l.tr(zh: "还没有心愿", en: "No wishes yet", de: "Noch keine Wünsche"))
                 .font(OhanaFont.headline(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(zh: "许下你想要的礼物\n让家人帮你兑换！", en: "Add a gift you want\nand let family help redeem it.", de: "Speichere ein Geschenk\nund lass die Familie beim Einlösen helfen."))
-                .font(OhanaFont.callout())
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                .multilineTextAlignment(.center)
         }
     }
 
@@ -292,7 +288,7 @@ struct HumanWishlistContentView: View {
                 } label: {
                     Text(l.tr(zh: "保存心愿", en: "Save Wish", de: "Wunsch speichern"))
                         .font(OhanaFont.headline(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(newTitle.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity).padding(.vertical, 18)
                         .background(newTitle.isEmpty ? Color.goPrimary.opacity(0.4) : Color.goPrimary,
                                     in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))

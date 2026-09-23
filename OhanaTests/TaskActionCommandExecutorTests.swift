@@ -308,13 +308,15 @@ struct TaskActionCommandExecutorTests {
         let plant = Plant(name: "Fern", wateringIntervalDays: 3)
         let dueAt = Date()
         let event = Event(
-            title: "Water fern 植物计划",
+            title: "Water fern",
             startDate: dueAt,
             isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
+            relatedEntityId: plant.id.uuidString,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
         )
+        event.id = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .watering)
         event.recurrenceDays = 3
         let reminder = Reminder(
             event: event,
@@ -396,13 +398,15 @@ struct TaskActionCommandExecutorTests {
         let dueAt = Date()
         let missingPlantID = UUID()
         let event = Event(
-            title: "Water missing fern 植物计划",
+            title: "Water missing fern",
             startDate: dueAt,
             isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: missingPlantID.uuidString
+            relatedEntityId: missingPlantID.uuidString,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
         )
+        event.id = PlantCarePlanIdentity.expectedEventID(plantID: missingPlantID, careType: .watering)
         event.recurrenceDays = 3
         let reminder = Reminder(event: event, scheduledAt: dueAt)
         let task = FamilyCollaborationTask(

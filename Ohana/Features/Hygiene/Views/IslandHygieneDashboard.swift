@@ -453,7 +453,7 @@ struct IslandHygieneDashboardContentView: View {
                 Text(title)
                     .font(OhanaFont.caption(.black))
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 12)
             .frame(height: 36)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

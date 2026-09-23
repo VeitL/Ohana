@@ -99,9 +99,10 @@ struct AchievementWallContentView: View {
             medicationLogs: [HumanMedicationLog],
             expenses: [PetExpenseLog]
         ) -> AchievementHumanActivityIndex {
+            let petExpenses = expenses.filter { $0.pet != nil && $0.amount > 0 }
             let groupedExpenses = Dictionary(
-                grouping: expenses.compactMap { expense in
-                    expense.executorId.map { ($0, expense) }
+                grouping: petExpenses.flatMap { expense in
+                    expense.payerIDs.map { ($0, expense) }
                 },
                 by: \.0
             )

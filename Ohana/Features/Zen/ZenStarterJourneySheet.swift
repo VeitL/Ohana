@@ -5,16 +5,8 @@
 //  Lightweight two-milestone starter journey for the Zen shell.
 //
 
+import SwiftData
 import SwiftUI
-
-private struct ZenStarterHumanEditorRoute: Identifiable, Equatable {
-    let humanID: UUID
-    let checkpoint: HouseholdStarterJourneyCheckpoint?
-
-    var id: String {
-        "\(humanID.uuidString)-\(checkpoint?.rawValue ?? "profile")"
-    }
-}
 
 @MainActor
 struct ZenStarterJourneySheet: View {
@@ -28,11 +20,13 @@ struct ZenStarterJourneySheet: View {
     let onRefresh: () -> Void
     let onClose: () -> Void
 
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var isClaimingGift = false
     @State private var isClaimingProfile = false
     @State private var humanGuideItem: TaskCenterItemSnapshot?
-    @State private var humanEditorRoute: ZenStarterHumanEditorRoute?
+    @State private var humanProfileTarget: Human?
     @State private var errorMessage: String?
 
     private var l: L10n { L10n(appLanguage) }
@@ -86,12 +80,16 @@ struct ZenStarterJourneySheet: View {
             TaskCenterSystemJourneySheet(
                 item: item,
                 taskState: projection.humanProfileState,
-                onOpenDestination: { checkpoint in
-                    guard let humanID = projection.humanProfileState?.targetID else { return }
-                    humanEditorRoute = ZenStarterHumanEditorRoute(
-                        humanID: humanID,
-                        checkpoint: checkpoint
-                    )
+                humanProfileTarget: humanProfileTarget,
+                petProfileTarget: nil,
+                onOpenDestination: { _ in },
+                onUpdateHumanProfile: updateZenHumanProfile,
+                onUpdatePetProfile: { _ in
+                    .failure(l.tr(
+                        zh: "当前没有宠物资料任务。",
+                        en: "No Pet profile task is available here.",
+                        de: "Hier ist keine Tierprofil-Aufgabe verfügbar."
+                    ))
                 },
                 onClaim: {
                     let outcome = onClaimHumanProfile()
@@ -109,20 +107,10 @@ struct ZenStarterJourneySheet: View {
                 },
                 onClose: {
                     humanGuideItem = nil
+                    humanProfileTarget = nil
                     onRefresh()
                 }
             )
-            .sheet(item: $humanEditorRoute, onDismiss: onRefresh) { route in
-                ZenStarterHumanProfileEditor(
-                    humanID: route.humanID,
-                    onSaved: {
-                        humanEditorRoute = nil
-                        onRefresh()
-                    }
-                )
-                .presentationDetents([.large])
-                .presentationContentInteraction(.scrolls)
-            }
             .presentationDetents([.large])
             .presentationContentInteraction(.scrolls)
         }
@@ -175,21 +163,6 @@ struct ZenStarterJourneySheet: View {
                 ))
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-
-                Text(l.tr(
-                    zh: "只需要本人。宠物和植物以后想加再加。",
-                    en: "Only your Human profile is required. Pets and plants can wait.",
-                    de: "Nur dein Personenprofil ist nötig. Tiere und Pflanzen können warten.",
-                    es: "Solo necesitas tu perfil. Las mascotas y plantas pueden esperar.",
-                    pt: "Só seu perfil é necessário. Pets e plantas podem esperar.",
-                    fr: "Seul votre profil est requis. Animaux et plantes peuvent attendre.",
-                    ja: "必要なのは自分のプロフィールだけ。ペットや植物は後から追加できます。",
-                    ko: "본인 프로필만 필요해요. 반려동물과 식물은 나중에 추가해도 돼요.",
-                    it: "Serve solo il tuo profilo. Animali e piante possono aspettare."
-                ))
-                .font(OhanaFont.callout())
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -322,20 +295,6 @@ struct ZenStarterJourneySheet: View {
             ))
             .font(OhanaFont.title3(.black))
             .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(
-                zh: "椰子树已经启程，接下来按自己的节奏使用就好。",
-                en: "Your coconut tree is awake. Continue at your own pace.",
-                de: "Dein Kokosbaum ist erwacht. Mach in deinem Tempo weiter.",
-                es: "Tu cocotero está despierto. Continúa a tu ritmo.",
-                pt: "Seu coqueiro despertou. Continue no seu ritmo.",
-                fr: "Votre cocotier est éveillé. Continuez à votre rythme.",
-                ja: "ココナッツツリーが目覚めました。自分のペースで続けましょう。",
-                ko: "코코넛 나무가 깨어났어요. 이제 내 속도로 이어가세요.",
-                it: "Il tuo albero si è risvegliato. Continua al tuo ritmo."
-            ))
-            .font(OhanaFont.callout())
-            .foregroundStyle(Color.ohanaSecondaryText)
-            .multilineTextAlignment(.center)
         }
         .padding(22)
         .frame(maxWidth: .infinity)
@@ -417,6 +376,7 @@ struct ZenStarterJourneySheet: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(isClaimable ? Color.goTeal : Color.goPrimary)
+                .foregroundStyle(isClaimable ? Color.arkInk : Color.ohanaPrimaryActionText)
                 .disabled(isWorking)
                 .accessibilityIdentifier(actionIdentifier)
             }
@@ -463,6 +423,22 @@ struct ZenStarterJourneySheet: View {
         guard let state = projection.humanProfileState,
               state.status != .locked,
               !state.isClaimed else { return }
+        guard let humanID = state.targetID,
+              let human = loadHumanProfileTarget(humanID) else {
+            errorMessage = l.tr(
+                zh: "未找到本人资料。",
+                en: "Your profile is unavailable.",
+                de: "Dein Profil ist nicht verfügbar.",
+                es: "Tu perfil no está disponible.",
+                pt: "Seu perfil não está disponível.",
+                fr: "Votre profil n’est pas disponible.",
+                ja: "プロフィールが見つかりません。",
+                ko: "본인 프로필을 찾을 수 없어요.",
+                it: "Il tuo profilo non è disponibile."
+            )
+            return
+        }
+        humanProfileTarget = human
         humanGuideItem = TaskCenterItemSnapshot(
             id: state.task.id,
             eventID: nil,
@@ -502,17 +478,62 @@ struct ZenStarterJourneySheet: View {
             rewardCoconuts: state.rewardCoconuts
         )
     }
-}
 
-@MainActor
-private struct ZenStarterHumanProfileEditor: View {
-    let humanID: UUID
-    let onSaved: () -> Void
-
-    var body: some View {
-        ZenStarterHumanProfileEditorDataContainer(
-            humanID: humanID,
-            onSaved: onSaved
+    private func loadHumanProfileTarget(_ humanID: UUID) -> Human? {
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == humanID
+            }
         )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func updateZenHumanProfile(
+        _ update: TaskCenterHumanProfileInlineUpdate
+    ) -> TaskCenterSystemJourneyMutationOutcome {
+        guard let humanProfileTarget,
+              HumanProfileEditPolicy.canEdit(
+                  hasPassedAway: humanProfileTarget.hasPassedAway
+              ) else {
+            return .failure(l.tr(
+                zh: "未找到本人资料。",
+                en: "Your profile is unavailable.",
+                de: "Dein Profil ist nicht verfügbar.",
+                es: "Tu perfil no está disponible.",
+                pt: "Seu perfil não está disponível.",
+                fr: "Votre profil n’est pas disponible.",
+                ja: "プロフィールが見つかりません。",
+                ko: "본인 프로필을 찾을 수 없어요.",
+                it: "Il tuo profilo non è disponibile."
+            ))
+        }
+        let input = TaskCenterHumanProfileInlineInputBuilder.input(
+            for: humanProfileTarget,
+            applying: update
+        )
+        let result = MemberCommandExecutor(
+            context: modelContext,
+            services: appServices
+        ).updateHumanProfile(
+            humanProfileTarget,
+            input: input,
+            note: "zen.starterJourney.inlineHumanProfile"
+        )
+        guard result.didPersist else {
+            return .failure(l.tr(
+                zh: "资料没有保存，请重试。",
+                en: "The profile was not saved. Try again.",
+                de: "Das Profil wurde nicht gespeichert. Bitte erneut versuchen.",
+                es: "El perfil no se guardó. Inténtalo de nuevo.",
+                pt: "O perfil não foi salvo. Tente novamente.",
+                fr: "Le profil n’a pas été enregistré. Réessayez.",
+                ja: "プロフィールを保存できませんでした。もう一度お試しください。",
+                ko: "프로필이 저장되지 않았어요. 다시 시도해 주세요.",
+                it: "Il profilo non è stato salvato. Riprova."
+            ))
+        }
+        onRefresh()
+        return .success
     }
 }

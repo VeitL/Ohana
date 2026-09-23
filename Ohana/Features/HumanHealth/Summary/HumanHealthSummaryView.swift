@@ -95,14 +95,6 @@ struct HumanHealthSummaryView: View {
                     .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(l.tr(
-                    zh: "今天先看待处理、需复核和复查安排",
-                    en: "Start with what is due, needs review, and comes next",
-                    de: "Zuerst Fälliges, zu Prüfendes und nächste Kontrollen"
-                ))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 8)
@@ -128,7 +120,6 @@ struct HumanHealthSummaryView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeading(
                 l.tr(zh: "今天", en: "Today", de: "Heute"),
-                subtitle: l.tr(zh: "当前需要处理的事项", en: "What needs attention now", de: "Was jetzt wichtig ist"),
                 identifier: "human-health-summary-today-section"
             )
 
@@ -210,7 +201,6 @@ struct HumanHealthSummaryView: View {
             HStack(alignment: .firstTextBaseline) {
                 sectionHeading(
                     l.tr(zh: "重点项目", en: "Pinned", de: "Fixiert"),
-                    subtitle: l.tr(zh: "按自己的顺序快速进入", en: "Your shortcuts, in your order", de: "Deine Kurzbefehle in eigener Reihenfolge"),
                     identifier: "human-health-summary-pinned-section"
                 )
                 Spacer(minLength: 8)
@@ -302,7 +292,6 @@ struct HumanHealthSummaryView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeading(
                 l.tr(zh: "摘要", en: "Highlights", de: "Highlights"),
-                subtitle: l.tr(zh: "只描述已记录事实，不作诊断", en: "Recorded facts, not a diagnosis", de: "Erfasste Fakten, keine Diagnose"),
                 identifier: "human-health-summary-highlights-section"
             )
 
@@ -310,9 +299,9 @@ struct HumanHealthSummaryView: View {
                 inlineEmptyState(
                     icon: "sparkles",
                     text: l.tr(
-                        zh: "记录用药、指标或状态后，这里会出现简短摘要。",
-                        en: "Short highlights appear after you log medication, metrics, or a condition state.",
-                        de: "Kurze Highlights erscheinen nach Einträgen zu Medikamenten, Werten oder Zuständen."
+                        zh: "暂无摘要",
+                        en: "No highlights yet",
+                        de: "Noch keine Highlights"
                     )
                 )
             } else {
@@ -346,7 +335,6 @@ struct HumanHealthSummaryView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeading(
                 l.tr(zh: "趋势", en: "Trends", de: "Trends"),
-                subtitle: l.tr(zh: "最新两次同单位记录的变化", en: "Change between the latest two logs in the same unit", de: "Änderung zwischen den letzten zwei Einträgen derselben Einheit"),
                 identifier: "human-health-summary-trends-section"
             )
 
@@ -360,9 +348,9 @@ struct HumanHealthSummaryView: View {
                             .foregroundStyle(Color.goTeal)
                             .accessibilityHidden(true)
                         Text(l.tr(
-                            zh: "同一指标记录至少两次后显示趋势",
-                            en: "Log the same metric twice to see a trend",
-                            de: "Denselben Wert zweimal erfassen, um einen Trend zu sehen"
+                            zh: "至少需要两条同单位记录",
+                            en: "Two same-unit logs required",
+                            de: "Zwei Einträge derselben Einheit nötig"
                         ))
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
@@ -389,9 +377,9 @@ struct HumanHealthSummaryView: View {
             }
 
             Text(l.tr(
-                zh: "数值变化只表示记录差异，不代表原因或诊断。",
-                en: "A value change describes recorded difference only; it does not explain a cause or diagnosis.",
-                de: "Eine Wertänderung beschreibt nur den Unterschied der Einträge, nicht Ursache oder Diagnose."
+                zh: "仅表示记录差异，不作诊断。",
+                en: "Recorded differences only, not a diagnosis.",
+                de: "Nur Eintragsunterschiede, keine Diagnose."
             ))
             .font(OhanaFont.caption2(.semibold))
             .foregroundStyle(Color.ohanaTertiaryText)
@@ -454,7 +442,6 @@ struct HumanHealthSummaryView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeading(
                 l.tr(zh: "记录与来源", en: "Records & Sources", de: "Einträge & Quellen"),
-                subtitle: l.tr(zh: "查看完整历史和数据归属", en: "Open full history and data ownership", de: "Verlauf und Datenzuordnung öffnen"),
                 identifier: "human-health-summary-records-section"
             )
 
@@ -514,9 +501,9 @@ struct HumanHealthSummaryView: View {
                     .foregroundStyle(Color.goBlue)
                     .accessibilityHidden(true)
                 Text(l.tr(
-                    zh: "身体指标、健康报告和健康状况目前沿用本机“身体与健康记录（原体重）”隐私开关。此说明不改变数据模型或既有记录。",
-                    en: "Metrics, health reports, and conditions currently use the on-device “Body & Health Records (formerly Weight)” privacy setting. This does not change the data model or existing records.",
-                    de: "Messwerte, Gesundheitsberichte und Zustände verwenden derzeit die lokale Datenschutzeinstellung „Körper- & Gesundheitsdaten (früher Gewicht)“. Datenmodell und vorhandene Einträge bleiben unverändert."
+                    zh: "指标、报告和健康状况受本机“身体与健康记录”隐私开关保护。",
+                    en: "Metrics, reports, and conditions follow the on-device Body & Health Records privacy setting.",
+                    de: "Werte, Berichte und Zustände folgen der lokalen Datenschutzeinstellung für Körper- und Gesundheitsdaten."
                 ))
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -536,9 +523,9 @@ struct HumanHealthSummaryView: View {
                     .foregroundStyle(Color.goTeal)
                     .accessibilityHidden(true)
                 Text(l.tr(
-                    zh: "Ohana 外部备份不包含人类健康、用药或 Apple Health 记录。重要医疗资料请另行妥善保存。",
-                    en: "Ohana external backups exclude Human health, medication, and Apple Health records. Keep important medical documents separately.",
-                    de: "Externe Ohana-Backups enthalten keine Gesundheits-, Medikamenten- oder Apple-Health-Daten. Wichtige medizinische Unterlagen separat aufbewahren."
+                    zh: "外部备份不含人类健康、用药或 Apple Health 记录。重要资料请另行保存。",
+                    en: "External backups exclude Human health, medication, and Apple Health records. Keep important documents separately.",
+                    de: "Externe Backups enthalten keine Gesundheits-, Medikamenten- oder Apple-Health-Daten. Wichtige Unterlagen separat sichern."
                 ))
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -664,17 +651,19 @@ struct HumanHealthSummaryView: View {
 
     private func sectionHeading(
         _ title: String,
-        subtitle: String,
+        subtitle: String? = nil,
         identifier: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(subtitle)
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
+            if let subtitle {
+                Text(subtitle)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(identifier)
@@ -763,14 +752,6 @@ struct HumanHealthSummaryCompactCard: View {
                         Text(l.tr(zh: "健康摘要", en: "Health Summary", de: "Gesundheitsübersicht"))
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(l.tr(
-                            zh: "今天、重点、趋势与记录",
-                            en: "Today, pinned items, trends, and records",
-                            de: "Heute, Fixiertes, Trends und Einträge"
-                        ))
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right") // a11y: allow decorative navigation affordance; button text supplies the label

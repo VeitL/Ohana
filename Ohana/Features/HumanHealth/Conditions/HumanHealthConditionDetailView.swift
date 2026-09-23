@@ -354,7 +354,7 @@ private extension HumanHealthConditionDetailView {
             }
 
             if snapshot.severityChartPoints.isEmpty {
-                Text(l.tr(zh: "记录状态后会在这里生成趋势。", en: "Log a state to build this trend.", de: "Erfasse einen Status, um den Verlauf zu sehen."))
+                Text(l.tr(zh: "暂无趋势", en: "No trend yet", de: "Noch kein Verlauf"))
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity, minHeight: 74)
@@ -362,9 +362,9 @@ private extension HumanHealthConditionDetailView {
                 if currentAnalysisIsLimited {
                     Label(
                         l.tr(
-                            zh: "趋势分析使用近 12 个月最新 1,024 条记录；完整原始历史仍可分页查看。",
-                            en: "Trend analysis uses the latest 1,024 logs from 12 months; the full raw history remains available by page.",
-                            de: "Die Trendanalyse nutzt die neuesten 1.024 Einträge aus 12 Monaten; der vollständige Rohverlauf bleibt seitenweise verfügbar."
+                            zh: "趋势最多使用近 12 个月 1,024 条；完整历史可分页查看。",
+                            en: "Trends use up to 1,024 logs from 12 months; full history remains paged.",
+                            de: "Trends nutzen bis zu 1.024 Einträge aus 12 Monaten; der vollständige Verlauf bleibt seitenweise verfügbar."
                         ),
                         systemImage: "info.circle"
                     )
@@ -374,9 +374,9 @@ private extension HumanHealthConditionDetailView {
                 }
 
                 Text(l.tr(
-                    zh: "折线显示最近 14 条有效记录；方向比较近 30 天前后两段。",
-                    en: "The line shows the latest 14 eligible logs; direction compares the two halves of the last 30 days.",
-                    de: "Die Linie zeigt die letzten 14 gültigen Einträge; die Richtung vergleicht die beiden Hälften der letzten 30 Tage."
+                    zh: "折线 14 条 · 方向对比近 30 天",
+                    en: "14-point line · direction compares 30 days",
+                    de: "14-Punkte-Linie · Richtung vergleicht 30 Tage"
                 ))
                 .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -585,9 +585,9 @@ private extension HumanHealthConditionDetailView {
                 }
 
                 Text(l.tr(
-                    zh: "完成率仅统计近 7 天已到时间的当前计划与已记录剂量；修改或停用计划可能改变历史回看。主观反应不表示疗效或因果。",
-                    en: "Completion uses doses due so far under the current plan plus recorded doses; changing or stopping a plan can alter the lookback. Responses do not prove effectiveness or cause.",
-                    de: "Die Erfüllung nutzt bisher fällige Dosen des aktuellen Plans und erfasste Dosen; Planänderungen können den Rückblick ändern. Reaktionen belegen weder Wirkung noch Ursache."
+                    zh: "完成率按近 7 天当前计划估算；计划改动会影响回看，主观反应不代表疗效或因果。",
+                    en: "Completion is estimated from the current 7-day plan. Plan changes affect the lookback; responses do not prove effect or cause.",
+                    de: "Die Erfüllung wird aus dem aktuellen 7-Tage-Plan geschätzt. Planänderungen beeinflussen den Rückblick; Reaktionen belegen weder Wirkung noch Ursache."
                 ))
                 .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)

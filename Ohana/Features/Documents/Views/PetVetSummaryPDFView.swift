@@ -630,7 +630,7 @@ struct PetVetPDFShareSheet: View {
                             Text(l.tr(zh: "分享 / 保存 PDF", en: "Share / save PDF", de: "PDF teilen / sichern"))
                                 .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                         }
-                        .foregroundStyle(.black) // ui-v4: allow ink on PDF action preview
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))

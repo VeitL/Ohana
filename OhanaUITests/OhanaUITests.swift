@@ -396,25 +396,24 @@ final class OhanaUITests: XCTestCase {
         assertMemberCardProgress("0%", in: app)
 
         tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-open-humanAppearance"], in: app)
-        let nameField = app.textFields["human-basic-info-name-input"]
-        XCTAssertTrue(nameField.waitForExistence(timeout: 12), "The member-card editor did not start in edit mode.")
+        let appearanceEditor = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-editor-humanAppearance"
+        ]
+        XCTAssertTrue(
+            appearanceEditor.waitForExistence(timeout: 12),
+            "The Appearance card did not expand its inline editor."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["human-basic-info-screen"].exists,
+            "The Task Center Appearance action must not open the standalone Human profile page."
+        )
         XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].exists)
         XCTAssertTrue(app.buttons["profile-avatar-photos-action"].exists)
-        XCTAssertFalse(app.textFields["human-basic-info-avatar-emoji-input"].exists)
-        let originalName = String(describing: nameField.value ?? "")
-        nameField.tap()
-        nameField.typeText(" Unsaved")
-        discardHumanBasicInfoChanges(in: app)
-
-        tapWhenHittable(app.buttons["human-basic-info-edit-action"], timeout: 8)
-        XCTAssertTrue(nameField.waitForExistence(timeout: 8))
-        XCTAssertEqual(
-            String(describing: nameField.value ?? ""),
-            originalName,
-            "Cancel persisted an unrelated profile edit."
+        cancelHumanProfileInlineEditor(checkpoint: "humanAppearance", in: app)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !appearanceEditor.exists },
+            "Cancelling the Appearance draft did not collapse the current card."
         )
-        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
-        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
         XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("0%", in: app)
 
@@ -422,6 +421,7 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-resolution-humanAppearance-reviewed"],
             in: app
         )
+        navigateHumanProfileJourney(to: "humanLifeStage", in: app)
         XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("25%", in: app)
 
@@ -457,25 +457,28 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-journey-open-humanAppearance"],
             timeout: 8
         )
-        let editor = app.descendants(matching: .any)["human-basic-info-screen"]
+        let editor = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-editor-humanAppearance"
+        ]
         XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        XCTAssertFalse(
+            app.descendants(matching: .any)["human-basic-info-screen"].exists,
+            "The Task Center Appearance card must edit inline instead of opening Human Basic Info."
+        )
         XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["profile-avatar-paste-action"].exists)
         XCTAssertTrue(app.buttons["profile-avatar-photos-action"].exists)
         XCTAssertTrue(app.buttons["profile-avatar-camera-action"].exists)
-        XCTAssertFalse(
-            app.textFields["human-basic-info-avatar-emoji-input"].exists,
-            "The internal fallback emoji must not be exposed as editable profile data."
-        )
 
-        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
-        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+        cancelHumanProfileInlineEditor(checkpoint: "humanAppearance", in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { !editor.exists })
         XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 8))
 
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-resolution-humanAppearance-reviewed"],
             in: app
         )
+        navigateHumanProfileJourney(to: "humanLifeStage", in: app)
         XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("25%", in: app)
         completeRequiredHumanProfileFields(in: app)
@@ -512,6 +515,7 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-resolution-humanAppearance-preferNotToSay"],
             in: app
         )
+        navigateHumanProfileJourney(to: "humanLifeStage", in: app)
         XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("25%", in: app)
         tapGuidedJourneyControlAfterSemanticScroll(
@@ -528,12 +532,13 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-journey-open-humanAppearance"],
             in: app
         )
-        let editor = app.descendants(matching: .any)["human-basic-info-screen"]
+        let editor = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-editor-humanAppearance"
+        ]
         XCTAssertTrue(editor.waitForExistence(timeout: 12))
         XCTAssertTrue(app.descendants(matching: .any)["profile-avatar-current-preview"].waitForExistence(timeout: 8))
-        XCTAssertFalse(app.textFields["human-basic-info-avatar-emoji-input"].exists)
-        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
-        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+        cancelHumanProfileInlineEditor(checkpoint: "humanAppearance", in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { !editor.exists })
 
         XCTAssertTrue(appearanceQuestion.waitForExistence(timeout: 12))
         XCTAssertTrue(completedAppearance.waitForExistence(timeout: 8))
@@ -702,15 +707,17 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-resolution-humanPersonalityContext-reviewed"],
             in: app
         )
+        navigateHumanProfileJourney(to: "humanAppearance", in: app)
         XCTAssertTrue(
             appearanceQuestion.waitForExistence(timeout: 8),
-            "Reviewing Personality & context did not return to the first incomplete question."
+            "Reviewing Personality & context did not remain navigable to the first incomplete question."
         )
 
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-resolution-humanAppearance-preferNotToSay"],
             in: app
         )
+        navigateHumanProfileJourney(to: "humanLifeStage", in: app)
         XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("50%", in: app)
         tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
@@ -773,8 +780,18 @@ final class OhanaUITests: XCTestCase {
         let lifeStageQuestion = app.descendants(matching: .any)[
             "task-center-starter-question-checkpoint-humanLifeStage"
         ]
-        let editor = app.descendants(matching: .any)["human-basic-info-editor"]
-        let birthdayToggle = app.switches["human-basic-info-birthday-toggle"]
+        let editor = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-editor-humanLifeStage"
+        ]
+        let birthdayPicker = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-birthday"
+        ]
+        let zodiac = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-zodiac"
+        ]
+        let saveBirthday = app.buttons[
+            "task-center-human-profile-inline-save-humanLifeStage"
+        ]
 
         XCTAssertTrue(coconutBalance.waitForExistence(timeout: 20))
         XCTAssertTrue(waitUntil(timeout: 12) { coconutBalance.label == "Coconut balance 7" })
@@ -783,29 +800,32 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-resolution-humanAppearance-reviewed"],
             in: app
         )
-        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("25%", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
 
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-journey-open-humanLifeStage"],
             in: app
         )
         XCTAssertTrue(editor.waitForExistence(timeout: 12))
-        scrollTowardElement(birthdayToggle, in: app, maxSwipes: 6)
-        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
-        XCTAssertFalse(isToggleOn(birthdayToggle), "The sparse Human unexpectedly started with a birthday.")
-        tapGuidedJourneyControlAfterSemanticScroll(birthdayToggle, in: app)
-        if !waitUntil(timeout: 2, condition: { self.isToggleOn(birthdayToggle) }) {
-            birthdayToggle.coordinate(
-                withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)
-            ).tap()
-        }
+        XCTAssertTrue(birthdayPicker.waitForExistence(timeout: 8))
+        XCTAssertTrue(zodiac.waitForExistence(timeout: 8))
         XCTAssertTrue(
-            waitUntil(timeout: 8) { self.isToggleOn(birthdayToggle) },
-            "The birthday draft toggle did not turn on."
+            waitUntil(timeout: 8) { saveBirthday.exists && saveBirthday.isEnabled },
+            "A sparse Human did not expose a savable birthday draft."
         )
-        discardHumanBasicInfoChanges(in: app)
-        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+        tapWhenHittable(
+            app.buttons["task-center-human-profile-inline-cancel-humanLifeStage"],
+            timeout: 8
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !editor.exists },
+            "Cancelling the birthday draft did not collapse the inline editor."
+        )
         XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("25%", in: app)
         tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
@@ -823,11 +843,23 @@ final class OhanaUITests: XCTestCase {
             in: app
         )
         XCTAssertTrue(editor.waitForExistence(timeout: 12))
-        scrollTowardElement(birthdayToggle, in: app, maxSwipes: 6)
-        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
-        XCTAssertFalse(isToggleOn(birthdayToggle), "Cancelling the birthday draft persisted it.")
-        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
-        tapWhenHittable(app.buttons["human-basic-info-close-action"], timeout: 8)
+        XCTAssertTrue(birthdayPicker.waitForExistence(timeout: 8))
+        XCTAssertTrue(zodiac.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { saveBirthday.exists && saveBirthday.isEnabled },
+            "Cancelling the birthday draft unexpectedly persisted it across relaunch."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)[
+                "task-center-human-profile-inline-saved-humanLifeStage"
+            ].exists,
+            "The reopened unsaved birthday card incorrectly reported Saved."
+        )
+        tapWhenHittable(
+            app.buttons["task-center-human-profile-inline-cancel-humanLifeStage"],
+            timeout: 8
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !editor.exists })
         XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
 
         completeRequiredHumanProfileFields(in: app)
@@ -873,6 +905,7 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-resolution-humanPersonalityContext-unknown"],
             in: app
         )
+        navigateHumanProfileJourney(to: "humanLifeStage", in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)[
                 "task-center-starter-question-checkpoint-humanLifeStage"
@@ -925,6 +958,7 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-resolution-humanAppearance-preferNotToSay"],
             in: app
         )
+        navigateHumanProfileJourney(to: "humanLifeStage", in: app)
         XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("25%", in: app)
         tapWhenHittable(app.buttons["task-center-starter-journey-close"], timeout: 8)
@@ -1003,10 +1037,16 @@ final class OhanaUITests: XCTestCase {
             "task-center-starter-answer-complete-checkpoint-petDailyCare"
         ]
         let openDailyCare = app.buttons["task-center-starter-journey-open-petDailyCare"]
-        let feedDetail = app.descendants(matching: .any)["quick-feed-detail-screen"]
-        let saveManualSettings = app.buttons["quick-feed-manual-settings-save"]
-        let primaryFeedAction = app.buttons["quick-feed-primary-action"]
-        let closeFeed = app.buttons["quick-feed-detail-close-action"]
+        let dailyCareEditor = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-editor-petDailyCare"
+        ]
+        let foodBrand = app.textFields["task-center-pet-profile-inline-food-brand"]
+        let saveDailyCare = app.buttons["task-center-pet-profile-inline-save-petDailyCare"]
+        let savedDailyCare = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-saved-petDailyCare"
+        ]
+        let cancelledDraftBrand = "Unsaved Daily Food"
+        let savedBrand = "Codex Daily Food"
 
         XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
         XCTAssertTrue(coconutBalance.waitForExistence(timeout: 8))
@@ -1069,57 +1109,66 @@ final class OhanaUITests: XCTestCase {
         )
 
         tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
-        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12), "Daily Care did not open Quick Feed.")
-        if !saveManualSettings.waitForExistence(timeout: 4) {
-            tapWhenHittable(primaryFeedAction, timeout: 8)
-        }
+        XCTAssertTrue(dailyCareEditor.waitForExistence(timeout: 12), "Daily Care did not expand inline.")
         XCTAssertTrue(
-            saveManualSettings.waitForExistence(timeout: 12),
-            "Choosing Not sure yet fabricated a feed setup for the sparse Pet."
+            foodBrand.waitForExistence(timeout: 8),
+            "The inline Daily Care card did not expose food brand."
         )
-        tapWhenHittable(app.buttons["quick-feed-sheet-cancel-action"], timeout: 8)
+        tapWhenHittable(foodBrand, timeout: 8)
+        foodBrand.typeText(cancelledDraftBrand)
+        dismissKeyboardIfPresent(in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-cancel-petDailyCare"],
+            in: app
+        )
         XCTAssertTrue(
-            waitUntil(timeout: 8) { !saveManualSettings.exists && feedDetail.exists },
-            "Cancelling feed setup did not keep the unchanged Daily Care screen open."
+            waitUntil(timeout: 8) { !dailyCareEditor.exists },
+            "Cancelling Daily Care did not collapse the inline draft."
         )
-        tapWhenHittable(closeFeed, timeout: 8)
-        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
         XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 12))
         XCTAssertTrue(
             accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not sure yet"),
-            "Cancelling feed setup changed the completed Daily Care answer."
+            "Cancelling the inline draft changed the completed Daily Care answer."
         )
         assertMemberCardProgress("1/3", in: app)
 
         tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
-        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12))
-        if !saveManualSettings.waitForExistence(timeout: 4) {
-            tapWhenHittable(primaryFeedAction, timeout: 8)
-        }
-        XCTAssertTrue(saveManualSettings.waitForExistence(timeout: 12))
-        tapWhenHittable(saveManualSettings, timeout: 8)
+        XCTAssertTrue(dailyCareEditor.waitForExistence(timeout: 12))
         XCTAssertTrue(
-            waitUntil(timeout: 12) {
-                !saveManualSettings.exists && primaryFeedAction.exists
+            waitUntil(timeout: 8) {
+                !String(describing: foodBrand.value ?? "")
+                    .localizedCaseInsensitiveContains(cancelledDraftBrand)
             },
-            "Saving a real feed default did not return to the configured Feed screen."
+            "Cancelling Daily Care retained the unsaved food brand."
         )
-        assertManualFeedPrimaryReady(in: app)
-        tapWhenHittable(closeFeed, timeout: 8)
-        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
-        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 12))
+        tapWhenHittable(foodBrand, timeout: 8)
+        foodBrand.typeText(savedBrand)
+        dismissKeyboardIfPresent(in: app)
         XCTAssertTrue(
-            waitUntil(timeout: 12) {
-                self.accessibilityText(for: completedDailyCare)
-                    .localizedCaseInsensitiveContains("existing information")
+            waitUntil(timeout: 8) {
+                saveDailyCare.exists && saveDailyCare.isEnabled
             },
-            "The real feed setup did not replace the same-session unknown answer."
+            "The real Daily Care draft was not savable."
         )
-        XCTAssertFalse(
-            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not sure yet"),
-            "The stale Daily Care unknown answer still overrode the real setup."
+        tapGuidedJourneyControlAfterSemanticScroll(saveDailyCare, in: app)
+        XCTAssertTrue(
+            dailyCareEditor.waitForExistence(timeout: 12),
+            "Saving Daily Care unexpectedly collapsed the inline editor."
+        )
+        XCTAssertTrue(
+            savedDailyCare.waitForExistence(timeout: 12),
+            "Saving Daily Care did not leave visible Saved feedback."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { !completedDailyCare.exists },
+            "The real inline Daily Care save left the same-session unknown answer visible."
         )
         assertMemberCardProgress("1/3", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !dailyCareEditor.exists },
+            "Explicitly collapsing the saved Daily Care card did not close its editor."
+        )
 
         relaunchPreservingPersistentState(in: app)
         XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
@@ -1152,22 +1201,24 @@ final class OhanaUITests: XCTestCase {
             in: app
         )
         XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 8))
-        XCTAssertTrue(completedDailyCare.waitForExistence(timeout: 8))
-        XCTAssertTrue(
-            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("existing information"),
-            "The real Daily Care setup resumed as an unknown answer after relaunch."
-        )
         XCTAssertFalse(
-            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not sure yet"),
-            "The obsolete Daily Care unknown answer returned after relaunch."
+            completedDailyCare.exists,
+            "The real inline Daily Care value resumed as a skip answer after relaunch."
         )
 
         tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
-        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12))
-        assertManualFeedPrimaryReady(in: app)
-        XCTAssertFalse(saveManualSettings.exists, "The saved feed default was lost after relaunch.")
-        tapWhenHittable(closeFeed, timeout: 8)
-        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
+        XCTAssertTrue(dailyCareEditor.waitForExistence(timeout: 12))
+        XCTAssertTrue(foodBrand.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            String(describing: foodBrand.value ?? "")
+                .localizedCaseInsensitiveContains(savedBrand),
+            "The saved inline food brand was lost after relaunch."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-cancel-petDailyCare"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !dailyCareEditor.exists })
         XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 12))
 
         tapGuidedJourneyControlAfterSemanticScroll(
@@ -1279,37 +1330,55 @@ final class OhanaUITests: XCTestCase {
         assertMemberCardProgress("2/3", in: app)
 
         tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-open-petLifeStage"], in: app)
-        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The pet date editor did not open.")
-        let birthdayToggle = app.switches["pet-basic-info-birthday-toggle"]
+        let editor = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-editor-petLifeStage"
+        ]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The Pet date card did not expand.")
+        XCTAssertFalse(
+            app.descendants(matching: .any)["pet-basic-info-screen"].exists,
+            "The Pet date task must not open the standalone profile page."
+        )
+        let birthdayToggle = app.switches["task-center-pet-profile-inline-birthday-toggle"]
         scrollToElement(birthdayToggle, in: app, maxSwipes: 6)
-        let birthdayPicker = app.descendants(matching: .any)["pet-basic-info-birthday-date-picker"]
+        let birthdayPicker = app.descendants(matching: .any)["task-center-pet-profile-inline-birthday"]
         XCTAssertTrue(
             enableToggle(birthdayToggle, revealing: birthdayPicker, in: app),
             "Enabling the birthday did not reveal its date picker."
         )
 
-        discardPetBasicInfoChanges(in: app)
-        let close = app.buttons["pet-basic-info-close-action"]
-        XCTAssertTrue(close.waitForExistence(timeout: 8), "Cancel did not expose a clear return action.")
-        tapWhenHittable(close, timeout: 8)
-        XCTAssertTrue(waitUntil(timeout: 8) { !editor.exists }, "Close did not return to the guided question.")
+        tapWhenHittable(
+            app.buttons["task-center-pet-profile-inline-cancel-petLifeStage"],
+            timeout: 8
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !editor.exists }, "Cancel did not collapse the inline editor.")
         XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("2/3", in: app)
 
         tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-open-petLifeStage"], in: app)
         XCTAssertTrue(editor.waitForExistence(timeout: 12))
-        let homeDateToggle = app.switches["pet-basic-info-home-date-toggle"]
+        let homeDateToggle = app.switches["task-center-pet-profile-inline-home-date-toggle"]
         scrollToElement(homeDateToggle, in: app, maxSwipes: 6)
-        let homeDatePicker = app.descendants(matching: .any)["pet-basic-info-home-date-picker"]
+        let homeDatePicker = app.descendants(matching: .any)["task-center-pet-profile-inline-home-date"]
         XCTAssertTrue(
             enableToggle(homeDateToggle, revealing: homeDatePicker, in: app),
             "Enabling the home date did not reveal its date picker."
         )
-        tapWhenHittable(app.buttons["pet-basic-info-save-action"], timeout: 8)
+        tapWhenHittable(
+            app.buttons["task-center-pet-profile-inline-save-petLifeStage"],
+            timeout: 8
+        )
 
-        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists }, "Saving did not return to the guided question.")
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "Saving unexpectedly collapsed the Pet date card.")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["task-center-pet-profile-inline-saved-petLifeStage"]
+                .waitForExistence(timeout: 8),
+            "Saving did not leave visible confirmation in the card."
+        )
         assertMemberCardProgress("3/3", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petLifeStage"],
+            in: app
+        )
         XCTAssertTrue(
             app.descendants(matching: .any)["task-center-starter-journey-complete"]
                 .waitForExistence(timeout: 12),
@@ -1486,7 +1555,6 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testPetProfileReviewedThenRealAnswersPersistAcrossRelaunch() throws {
-        let petName = "Codex Sparse Pet Profile"
         let app = launchEnglishApp(
             seedMemberCardBaseline: true,
             enableProductionOverlays: true,
@@ -1510,8 +1578,23 @@ final class OhanaUITests: XCTestCase {
         let personalityQuestion = app.descendants(matching: .any)[
             "task-center-starter-question-checkpoint-petPersonalityAppearance"
         ]
-        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
-        let boyLabels = ["♂ Boy", "♂ 男孩", "♂ Junge"]
+        let bodyEditor = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-editor-petBodyProfile"
+        ]
+        let boyInline = app.buttons["task-center-pet-profile-inline-gender-boy"]
+        let saveBody = app.buttons["task-center-pet-profile-inline-save-petBodyProfile"]
+        let savedBody = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-saved-petBodyProfile"
+        ]
+        let lifeStageEditor = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-editor-petLifeStage"
+        ]
+        let inlineBirthdayToggle = app.switches["task-center-pet-profile-inline-birthday-toggle"]
+        let inlineHomeDateToggle = app.switches["task-center-pet-profile-inline-home-date-toggle"]
+        let saveLifeStage = app.buttons["task-center-pet-profile-inline-save-petLifeStage"]
+        let savedLifeStage = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-saved-petLifeStage"
+        ]
         let coconutBalance = app.buttons["home-coconut-action"]
 
         XCTAssertTrue(coconutBalance.waitForExistence(timeout: 20))
@@ -1569,42 +1652,34 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-journey-open-petBodyProfile"],
             in: app
         )
-        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The completed Body editor did not reopen.")
-        guard let boy = revealButton(labels: boyLabels, in: app, maxSwipes: 8) else {
-            return XCTFail("The Boy segment was not semantically tappable.")
-        }
-        XCTAssertFalse(boy.isSelected, "The sparse Body fixture unexpectedly started with Boy selected.")
-        let genderControl = app.segmentedControls.firstMatch
+        XCTAssertTrue(bodyEditor.waitForExistence(timeout: 12), "The completed Body card did not expand.")
         XCTAssertTrue(
-            genderControl.waitForExistence(timeout: 8) &&
-                hasVisibleFrame(genderControl, in: app),
-            "The Gender segmented control did not become visible."
+            boyInline.waitForExistence(timeout: 8),
+            "The inline Body card did not expose the Boy choice."
         )
-        for _ in 0 ..< 2 where !boy.isSelected {
-            genderControl.coordinate(
-                withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)
-            ).tap()
-            _ = waitUntil(timeout: 3) { boy.isSelected }
-        }
-        XCTAssertTrue(boy.isSelected, "The Boy segment did not accept a stable coordinate tap.")
-        tapWhenHittable(app.buttons["pet-basic-info-save-action"], timeout: 8)
+        XCTAssertFalse(boyInline.isSelected, "The sparse Body fixture unexpectedly started with Boy selected.")
+        tapGuidedJourneyControlAfterSemanticScroll(boyInline, in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { boyInline.isSelected })
+        tapGuidedJourneyControlAfterSemanticScroll(saveBody, in: app)
         XCTAssertTrue(
-            waitUntil(timeout: 12) { !editor.exists },
-            "Saving a fact for an already completed Body checkpoint did not return to its guide."
+            bodyEditor.waitForExistence(timeout: 12),
+            "Saving Body unexpectedly collapsed the inline editor."
+        )
+        XCTAssertTrue(
+            savedBody.waitForExistence(timeout: 12),
+            "Saving Body did not leave visible Saved feedback."
         )
         XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
         XCTAssertTrue(
-            waitUntil(timeout: 12) {
-                self.accessibilityText(for: persistedUnknown)
-                    .localizedCaseInsensitiveContains("existing information")
-            },
-            "The real Body fact did not replace the same-checkpoint unknown answer."
-        )
-        XCTAssertFalse(
-            accessibilityText(for: persistedUnknown).localizedCaseInsensitiveContains("Not sure yet"),
-            "The old unknown Body answer still overrode the saved fact."
+            waitUntil(timeout: 12) { !persistedUnknown.exists },
+            "The real Body fact left the same-checkpoint unknown answer visible."
         )
         assertMemberCardProgress("2/3", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petBodyProfile"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !bodyEditor.exists })
 
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-question-previous"],
@@ -1624,34 +1699,91 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-journey-open-petLifeStage"],
             in: app
         )
-        let birthdayToggle = app.switches["pet-basic-info-birthday-toggle"]
-        let homeDateToggle = app.switches["pet-basic-info-home-date-toggle"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 12))
-        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
-        XCTAssertTrue(homeDateToggle.waitForExistence(timeout: 8))
-        XCTAssertFalse(isToggleOn(birthdayToggle), "Reviewing Life Stage fabricated a birthday before editing.")
-        XCTAssertFalse(isToggleOn(homeDateToggle), "Reviewing Life Stage fabricated a home date before editing.")
-        let homeDatePicker = app.descendants(matching: .any)["pet-basic-info-home-date-picker"]
+        XCTAssertTrue(lifeStageEditor.waitForExistence(timeout: 12))
+        XCTAssertTrue(inlineBirthdayToggle.waitForExistence(timeout: 8))
+        XCTAssertTrue(inlineHomeDateToggle.waitForExistence(timeout: 8))
+        XCTAssertFalse(isToggleOn(inlineBirthdayToggle), "Reviewing Life Stage fabricated a birthday before editing.")
+        XCTAssertFalse(isToggleOn(inlineHomeDateToggle), "Reviewing Life Stage fabricated a home date before editing.")
+        let homeDatePicker = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-home-date"
+        ]
         XCTAssertTrue(
-            enableToggle(homeDateToggle, revealing: homeDatePicker, in: app),
+            enableToggle(inlineHomeDateToggle, revealing: homeDatePicker, in: app),
             "Enabling the home date did not reveal its date picker."
         )
-        tapWhenHittable(app.buttons["pet-basic-info-save-action"], timeout: 8)
+        tapGuidedJourneyControlAfterSemanticScroll(saveLifeStage, in: app)
 
-        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists })
+        XCTAssertTrue(
+            lifeStageEditor.waitForExistence(timeout: 12),
+            "Saving Life Stage unexpectedly collapsed the inline editor."
+        )
+        XCTAssertTrue(
+            savedLifeStage.waitForExistence(timeout: 12),
+            "Saving Life Stage did not leave visible Saved feedback."
+        )
         XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
         XCTAssertTrue(
-            waitUntil(timeout: 12) {
-                self.accessibilityText(for: lifeStageAnswer)
-                    .localizedCaseInsensitiveContains("existing information")
-            },
-            "The real home date did not replace the reviewed Life Stage answer."
-        )
-        XCTAssertFalse(
-            accessibilityText(for: lifeStageAnswer).localizedCaseInsensitiveContains("Current status reviewed"),
-            "The reviewed Life Stage answer still overrode the saved home date."
+            waitUntil(timeout: 12) { !lifeStageAnswer.exists },
+            "The real home date left the reviewed Life Stage answer visible."
         )
         assertMemberCardProgress("2/3", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petLifeStage"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !lifeStageEditor.exists })
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
+        tapWhenHittable(tasksTab, timeout: 8)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12))
+        XCTAssertTrue(action.waitForExistence(timeout: 15), "The real inline Pet saves did not survive relaunch.")
+        tapWhenHittable(action, timeout: 8)
+        XCTAssertTrue(sheet.waitForExistence(timeout: 12))
+        XCTAssertTrue(personalityQuestion.waitForExistence(timeout: 8))
+        assertMemberCardProgress("2/3", in: app)
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(bodyQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petBodyProfile"],
+            in: app
+        )
+        XCTAssertTrue(bodyEditor.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { boyInline.isSelected },
+            "The real Body value was lost after relaunch."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-cancel-petBodyProfile"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !bodyEditor.exists })
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-previous"],
+            in: app
+        )
+        XCTAssertTrue(lifeStageQuestion.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petLifeStage"],
+            in: app
+        )
+        XCTAssertTrue(lifeStageEditor.waitForExistence(timeout: 12))
+        XCTAssertTrue(inlineBirthdayToggle.waitForExistence(timeout: 8))
+        XCTAssertTrue(inlineHomeDateToggle.waitForExistence(timeout: 8))
+        XCTAssertFalse(isToggleOn(inlineBirthdayToggle), "The reviewed birthday was fabricated after relaunch.")
+        XCTAssertTrue(isToggleOn(inlineHomeDateToggle), "The real saved home date was lost after relaunch.")
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-cancel-petLifeStage"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !lifeStageEditor.exists })
+
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-question-next"],
             in: app
@@ -1704,19 +1836,6 @@ final class OhanaUITests: XCTestCase {
             },
             "Relaunch duplicated or lost the sparse Pet profile reward."
         )
-        openPetBasicInfoFromHome(in: app, petName: petName)
-        openPetBasicInfoEditMode(in: app)
-        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
-        XCTAssertTrue(homeDateToggle.waitForExistence(timeout: 8))
-        XCTAssertFalse(isToggleOn(birthdayToggle), "The reviewed birthday was fabricated after relaunch.")
-        XCTAssertTrue(isToggleOn(homeDateToggle), "The real saved home date was lost after relaunch.")
-        XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                app.buttons.matching(NSPredicate(format: "label IN %@", boyLabels)).firstMatch.isSelected
-            },
-            "The real Body value that replaced unknown was lost after relaunch."
-        )
-        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
     }
 
     @MainActor
@@ -1747,11 +1866,24 @@ final class OhanaUITests: XCTestCase {
         let dailyCareQuestion = app.descendants(matching: .any)[
             "task-center-starter-question-checkpoint-petDailyCare"
         ]
-        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
-        let saveAction = app.buttons["pet-basic-info-save-action"]
-        let boyLabels = ["♂ Boy", "♂ 男孩", "♂ Junge"]
-        let curiousLabels = ["Curious soul", "好奇宝宝", "Neugierig"]
-        let curiousOption = app.buttons["pet-basic-info-primary-personality-option-curious"]
+        let bodyEditor = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-editor-petBodyProfile"
+        ]
+        let saveBody = app.buttons["task-center-pet-profile-inline-save-petBodyProfile"]
+        let savedBody = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-saved-petBodyProfile"
+        ]
+        let boyOption = app.buttons["task-center-pet-profile-inline-gender-boy"]
+        let personalityEditor = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-editor-petPersonalityAppearance"
+        ]
+        let savePersonality = app.buttons[
+            "task-center-pet-profile-inline-save-petPersonalityAppearance"
+        ]
+        let savedPersonality = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-saved-petPersonalityAppearance"
+        ]
+        let curiousOption = app.buttons["task-center-pet-profile-inline-personality-curious"]
 
         XCTAssertTrue(homeTab.waitForExistence(timeout: 20), "The sparse Pet baseline did not reach Home.")
         XCTAssertTrue(waitUntil(timeout: 8) { tasksTab.exists && tasksTab.isEnabled && tasksTab.isHittable })
@@ -1772,28 +1904,40 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-journey-open-petBodyProfile"],
             in: app
         )
-        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The Pet body editor did not open.")
-        guard let boy = revealButton(labels: boyLabels, in: app, maxSwipes: 8) else {
-            return XCTFail("The Boy segment was not semantically tappable.")
-        }
-        XCTAssertFalse(boy.isSelected, "The sparse Pet fixture unexpectedly started with Boy selected.")
-        boy.tap()
-        XCTAssertTrue(waitUntil(timeout: 8) { boy.isSelected }, "Selecting Boy did not update the segment state.")
-        XCTAssertTrue(waitUntil(timeout: 8) { saveAction.exists && saveAction.isEnabled && saveAction.isHittable })
-        saveAction.tap()
-
-        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists }, "Saving Body did not return to the guided card.")
+        XCTAssertTrue(bodyEditor.waitForExistence(timeout: 12), "The Pet Body card did not expand.")
+        XCTAssertTrue(boyOption.waitForExistence(timeout: 8))
+        XCTAssertFalse(boyOption.isSelected, "The sparse Pet fixture unexpectedly started with Boy selected.")
+        tapGuidedJourneyControlAfterSemanticScroll(boyOption, in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { boyOption.isSelected })
+        tapGuidedJourneyControlAfterSemanticScroll(saveBody, in: app)
         XCTAssertTrue(
-            personalityQuestion.waitForExistence(timeout: 12),
-            "Saving a real Body answer did not advance to Personality."
+            bodyEditor.waitForExistence(timeout: 12),
+            "Saving Body unexpectedly collapsed the inline editor."
+        )
+        XCTAssertTrue(
+            savedBody.waitForExistence(timeout: 12),
+            "Saving Body did not leave visible Saved feedback."
         )
         assertMemberCardProgress("1/3", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petBodyProfile"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !bodyEditor.exists })
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(
+            personalityQuestion.waitForExistence(timeout: 12),
+            "Next did not advance from the saved Body card to Personality."
+        )
 
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-journey-open-petPersonalityAppearance"],
             in: app
         )
-        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The Pet personality editor did not open.")
+        XCTAssertTrue(personalityEditor.waitForExistence(timeout: 12), "The Pet Personality card did not expand.")
         XCTAssertTrue(
             curiousOption.waitForExistence(timeout: 8),
             "The primary personality choices did not appear."
@@ -1807,15 +1951,29 @@ final class OhanaUITests: XCTestCase {
             },
             "Selecting Curious soul did not update the personality choices."
         )
-        XCTAssertTrue(waitUntil(timeout: 8) { saveAction.exists && saveAction.isEnabled && saveAction.isHittable })
-        saveAction.tap()
-
-        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists }, "Saving Personality did not return to the guided card.")
+        tapGuidedJourneyControlAfterSemanticScroll(savePersonality, in: app)
         XCTAssertTrue(
-            dailyCareQuestion.waitForExistence(timeout: 12),
-            "Saving a real Personality answer did not advance to Daily Care."
+            personalityEditor.waitForExistence(timeout: 12),
+            "Saving Personality unexpectedly collapsed the inline editor."
+        )
+        XCTAssertTrue(
+            savedPersonality.waitForExistence(timeout: 12),
+            "Saving Personality did not leave visible Saved feedback."
         )
         assertMemberCardProgress("2/3", in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petPersonalityAppearance"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !personalityEditor.exists })
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        XCTAssertTrue(
+            dailyCareQuestion.waitForExistence(timeout: 12),
+            "Next did not advance from the saved Personality card to Daily Care."
+        )
 
         relaunchPreservingPersistentState(in: app)
         XCTAssertTrue(homeTab.waitForExistence(timeout: 20), "Home was not reachable after relaunch.")
@@ -1836,11 +1994,24 @@ final class OhanaUITests: XCTestCase {
         let bodyAnswer = app.descendants(matching: .any)[
             "task-center-starter-answer-complete-checkpoint-petBodyProfile"
         ]
-        XCTAssertTrue(bodyAnswer.waitForExistence(timeout: 8), "The real Body answer was lost after relaunch.")
-        XCTAssertTrue(
-            accessibilityText(for: bodyAnswer).localizedCaseInsensitiveContains("existing information"),
+        XCTAssertFalse(
+            bodyAnswer.exists,
             "Body resumed as a skip resolution instead of persisted profile data."
         )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-journey-open-petBodyProfile"],
+            in: app
+        )
+        XCTAssertTrue(bodyEditor.waitForExistence(timeout: 12))
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { boyOption.isSelected },
+            "The saved Boy choice was not projected after relaunch."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-cancel-petBodyProfile"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !bodyEditor.exists })
 
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-question-next"],
@@ -1850,12 +2021,8 @@ final class OhanaUITests: XCTestCase {
         let personalityAnswer = app.descendants(matching: .any)[
             "task-center-starter-answer-complete-checkpoint-petPersonalityAppearance"
         ]
-        XCTAssertTrue(
-            personalityAnswer.waitForExistence(timeout: 8),
-            "The real Personality answer was lost after relaunch."
-        )
-        XCTAssertTrue(
-            accessibilityText(for: personalityAnswer).localizedCaseInsensitiveContains("existing information"),
+        XCTAssertFalse(
+            personalityAnswer.exists,
             "Personality resumed as a skip resolution instead of persisted profile data."
         )
 
@@ -1863,26 +2030,19 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-journey-open-petPersonalityAppearance"],
             in: app
         )
-        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+        XCTAssertTrue(personalityEditor.waitForExistence(timeout: 12))
         XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                app.buttons.matching(NSPredicate(format: "label IN %@", boyLabels)).firstMatch.isSelected
-            },
-            "The saved Boy segment was not projected after relaunch."
-        )
-        XCTAssertTrue(
-            curiousOption.waitForExistence(timeout: 8)
-                && curiousLabels.contains { curiousOption.label.localizedCaseInsensitiveContains($0) }
-                && (curiousOption.isSelected
+            curiousOption.waitForExistence(timeout: 8) &&
+                (curiousOption.isSelected
                     || String(describing: curiousOption.value ?? "")
                     .localizedCaseInsensitiveCompare("Selected") == .orderedSame),
             "The saved Curious soul value was not projected after relaunch."
         )
-        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
-        let closeAction = app.buttons["pet-basic-info-close-action"]
-        XCTAssertTrue(closeAction.waitForExistence(timeout: 8))
-        tapWhenHittable(closeAction, timeout: 8)
-        XCTAssertTrue(waitUntil(timeout: 8) { !editor.exists })
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-cancel-petPersonalityAppearance"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !personalityEditor.exists })
     }
 
     @MainActor
@@ -1917,10 +2077,15 @@ final class OhanaUITests: XCTestCase {
             "task-center-starter-answer-complete-checkpoint-petDailyCare"
         ]
         let openDailyCare = app.buttons["task-center-starter-journey-open-petDailyCare"]
-        let feedDetail = app.descendants(matching: .any)["quick-feed-detail-screen"]
-        let saveManualSettings = app.buttons["quick-feed-manual-settings-save"]
-        let primaryFeedAction = app.buttons["quick-feed-primary-action"]
-        let closeFeed = app.buttons["quick-feed-detail-close-action"]
+        let dailyCareEditor = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-editor-petDailyCare"
+        ]
+        let foodBrand = app.textFields["task-center-pet-profile-inline-food-brand"]
+        let saveDailyCare = app.buttons["task-center-pet-profile-inline-save-petDailyCare"]
+        let savedDailyCare = app.descendants(matching: .any)[
+            "task-center-pet-profile-inline-saved-petDailyCare"
+        ]
+        let savedBrand = "Codex Care Food"
 
         XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
         XCTAssertTrue(waitUntil(timeout: 8) {
@@ -1982,58 +2147,34 @@ final class OhanaUITests: XCTestCase {
         )
 
         tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
-        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12), "Daily Care did not open Quick Feed.")
-        if !saveManualSettings.waitForExistence(timeout: 4) {
-            tapWhenHittable(primaryFeedAction, timeout: 8)
-        }
-        XCTAssertTrue(saveManualSettings.waitForExistence(timeout: 12), "The sparse Pet did not request feed setup.")
-        tapWhenHittable(app.buttons["quick-feed-sheet-cancel-action"], timeout: 8)
+        XCTAssertTrue(dailyCareEditor.waitForExistence(timeout: 12), "Daily Care did not expand inline.")
+        XCTAssertTrue(foodBrand.waitForExistence(timeout: 8))
+        tapWhenHittable(foodBrand, timeout: 8)
+        foodBrand.typeText(savedBrand)
+        dismissKeyboardIfPresent(in: app)
         XCTAssertTrue(
-            waitUntil(timeout: 8) { !saveManualSettings.exists && feedDetail.exists },
-            "Cancelling feed setup did not keep the unchanged Daily Care screen open."
+            waitUntil(timeout: 8) {
+                saveDailyCare.exists && saveDailyCare.isEnabled
+            },
+            "The inline Daily Care draft was not savable."
         )
-        tapWhenHittable(closeFeed, timeout: 8)
-        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
+        tapGuidedJourneyControlAfterSemanticScroll(saveDailyCare, in: app)
+        XCTAssertTrue(
+            dailyCareEditor.waitForExistence(timeout: 12),
+            "Saving Daily Care unexpectedly collapsed the inline editor."
+        )
+        XCTAssertTrue(
+            savedDailyCare.waitForExistence(timeout: 12),
+            "Saving Daily Care did not leave visible Saved feedback."
+        )
         XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 12))
         XCTAssertTrue(
-            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not applicable"),
-            "Cancelling feed setup changed the completed Daily Care answer."
+            waitUntil(timeout: 12) { !completedDailyCare.exists },
+            "The real inline save left the same-session Not applicable answer visible."
         )
         assertMemberCardProgress("1/3", in: app)
-
         tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
-        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12))
-        if !saveManualSettings.waitForExistence(timeout: 4) {
-            tapWhenHittable(primaryFeedAction, timeout: 8)
-        }
-        XCTAssertTrue(saveManualSettings.waitForExistence(timeout: 12))
-        tapWhenHittable(saveManualSettings, timeout: 8)
-        XCTAssertTrue(
-            waitUntil(timeout: 12) {
-                !saveManualSettings.exists && primaryFeedAction.exists
-            },
-            "Saving a real feed default did not return to the configured Feed screen."
-        )
-        assertManualFeedPrimaryReady(in: app)
-        XCTAssertTrue(
-            feedDetail.exists,
-            "Saving an already completed Daily Care checkpoint unexpectedly closed its review screen."
-        )
-        tapWhenHittable(closeFeed, timeout: 8)
-        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
-        XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 12))
-        XCTAssertTrue(
-            waitUntil(timeout: 12) {
-                self.accessibilityText(for: completedDailyCare)
-                    .localizedCaseInsensitiveContains("existing information")
-            },
-            "The real feed setup did not replace the same-session Not applicable answer."
-        )
-        XCTAssertFalse(
-            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not applicable"),
-            "The stale Daily Care resolution still overrode the real setup."
-        )
-        assertMemberCardProgress("1/3", in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { !dailyCareEditor.exists })
 
         relaunchPreservingPersistentState(in: app)
         XCTAssertTrue(homeTab.waitForExistence(timeout: 20))
@@ -2063,22 +2204,24 @@ final class OhanaUITests: XCTestCase {
             in: app
         )
         XCTAssertTrue(dailyCareQuestion.waitForExistence(timeout: 8))
-        XCTAssertTrue(completedDailyCare.waitForExistence(timeout: 8))
-        XCTAssertTrue(
-            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("existing information"),
-            "The real Daily Care setup resumed as a skip resolution after relaunch."
-        )
         XCTAssertFalse(
-            accessibilityText(for: completedDailyCare).localizedCaseInsensitiveContains("Not applicable"),
-            "The obsolete Daily Care resolution returned after relaunch."
+            completedDailyCare.exists,
+            "The real inline Daily Care value resumed as a skip resolution after relaunch."
         )
 
         tapGuidedJourneyControlAfterSemanticScroll(openDailyCare, in: app)
-        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12))
-        assertManualFeedPrimaryReady(in: app)
-        XCTAssertFalse(saveManualSettings.exists, "The saved feed default was lost after relaunch.")
-        tapWhenHittable(closeFeed, timeout: 8)
-        XCTAssertTrue(waitUntil(timeout: 12) { !feedDetail.exists })
+        XCTAssertTrue(dailyCareEditor.waitForExistence(timeout: 12))
+        XCTAssertTrue(foodBrand.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            String(describing: foodBrand.value ?? "")
+                .localizedCaseInsensitiveContains(savedBrand),
+            "The saved inline food brand was lost after relaunch."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-cancel-petDailyCare"],
+            in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 8) { !dailyCareEditor.exists })
     }
 
     @MainActor
@@ -3850,7 +3993,7 @@ final class OhanaUITests: XCTestCase {
         let openEditor = app.buttons[
             "task-center-starter-journey-open-acceptedRecommendedCarePlan"
         ]
-        let recommendedResponse = app.buttons[
+        let carePlanShortcut = app.buttons[
             "task-center-starter-resolution-acceptedRecommendedCarePlan-reviewed"
         ]
         let feedDetail = app.descendants(matching: .any)["quick-feed-detail-screen"]
@@ -3861,9 +4004,9 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(action, timeout: 8)
         XCTAssertTrue(sheet.waitForExistence(timeout: 12), "The care-plan guided sheet did not open.")
         XCTAssertTrue(question.waitForExistence(timeout: 8))
-        XCTAssertTrue(
-            recommendedResponse.waitForExistence(timeout: 8),
-            "The recommended response was unavailable before choosing the custom-plan branch."
+        XCTAssertFalse(
+            carePlanShortcut.exists,
+            "The care-plan card offered a status shortcut that would not persist a plan."
         )
         assertMemberCardProgress("0/1", in: app)
 
@@ -3908,9 +4051,9 @@ final class OhanaUITests: XCTestCase {
             question.waitForExistence(timeout: 8),
             "Relaunch did not resume the incomplete care-plan question."
         )
-        XCTAssertTrue(
-            recommendedResponse.waitForExistence(timeout: 8),
-            "Relaunch lost the unselected recommended-plan alternative."
+        XCTAssertFalse(
+            carePlanShortcut.exists,
+            "Relaunch restored a care-plan shortcut that would not persist a plan."
         )
         assertMemberCardProgress("0/1", in: app)
 
@@ -4008,6 +4151,12 @@ final class OhanaUITests: XCTestCase {
         let carePlanSheet = app.descendants(matching: .any)[
             "task-center-starter-journey-sheet-configureFirstCarePlan"
         ]
+        let openCarePlanEditor = app.buttons[
+            "task-center-starter-journey-open-acceptedRecommendedCarePlan"
+        ]
+        let feedDetail = app.descendants(matching: .any)["quick-feed-detail-screen"]
+        let manualReminderMode = app.buttons["quick-feed-mode-manualReminder"]
+        let planSave = app.buttons["quick-feed-plan-save"]
 
         XCTAssertTrue(carePlanAction.waitForExistence(timeout: 12), "The starter care-plan task did not appear.")
         tapWhenHittable(carePlanAction, timeout: 8)
@@ -4018,15 +4167,22 @@ final class OhanaUITests: XCTestCase {
             ].waitForExistence(timeout: 8)
         )
         assertMemberCardProgress("0/1", in: app)
-        tapGuidedJourneyControlAfterSemanticScroll(
-            app.buttons["task-center-starter-resolution-acceptedRecommendedCarePlan-reviewed"],
-            in: app
+        XCTAssertFalse(
+            app.buttons["task-center-starter-resolution-acceptedRecommendedCarePlan-reviewed"].exists,
+            "The care-plan card offered a shortcut that did not persist a plan."
         )
+        tapGuidedJourneyControlAfterSemanticScroll(openCarePlanEditor, in: app)
+        XCTAssertTrue(feedDetail.waitForExistence(timeout: 12), "Care Plan did not open Quick Feed.")
+        XCTAssertTrue(manualReminderMode.waitForExistence(timeout: 12))
+        tapWhenHittable(manualReminderMode, timeout: 8)
+        XCTAssertTrue(planSave.waitForExistence(timeout: 12))
+        tapWhenHittable(planSave, timeout: 8)
         XCTAssertTrue(
             app.descendants(matching: .any)["task-center-starter-journey-complete"]
-                .waitForExistence(timeout: 12),
-            "Accepting the recommended care plan did not complete its guided card."
+                .waitForExistence(timeout: 18),
+            "Saving a real care plan did not complete its guided card."
         )
+        XCTAssertTrue(waitUntil(timeout: 8) { !feedDetail.exists })
         assertMemberCardProgress("1/1", in: app)
         tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
         XCTAssertTrue(waitUntil(timeout: 12) { !carePlanSheet.exists }, "Care-plan Finish did not return to Tasks.")
@@ -4034,7 +4190,7 @@ final class OhanaUITests: XCTestCase {
             waitUntil(timeout: 12) {
                 carePlanAction.exists && carePlanAction.label.localizedCaseInsensitiveContains("Claim")
             },
-            "Accepting the care plan claimed its reward automatically instead of exposing Claim."
+            "Saving the care plan claimed its reward automatically instead of exposing Claim."
         )
         tapWhenHittable(carePlanAction, timeout: 8)
         XCTAssertTrue(carePlanSheet.waitForExistence(timeout: 12))
@@ -4158,21 +4314,34 @@ final class OhanaUITests: XCTestCase {
         let carePlanQuestion = app.descendants(matching: .any)[
             "task-center-starter-question-checkpoint-acceptedRecommendedCarePlan"
         ]
+        let openCarePlanEditor = app.buttons[
+            "task-center-starter-journey-open-acceptedRecommendedCarePlan"
+        ]
+        let carePlanFeedDetail = app.descendants(matching: .any)["quick-feed-detail-screen"]
+        let manualReminderMode = app.buttons["quick-feed-mode-manualReminder"]
+        let planSave = app.buttons["quick-feed-plan-save"]
 
         XCTAssertTrue(carePlanAction.waitForExistence(timeout: 12), "The starter care-plan task did not appear.")
         tapWhenHittable(carePlanAction, timeout: 8)
         XCTAssertTrue(carePlanSheet.waitForExistence(timeout: 12), "The care-plan guided sheet did not open.")
         XCTAssertTrue(carePlanQuestion.waitForExistence(timeout: 8))
         assertMemberCardProgress("0/1", in: app)
-        tapGuidedJourneyControlAfterSemanticScroll(
-            app.buttons["task-center-starter-resolution-acceptedRecommendedCarePlan-reviewed"],
-            in: app
+        XCTAssertFalse(
+            app.buttons["task-center-starter-resolution-acceptedRecommendedCarePlan-reviewed"].exists,
+            "The care-plan card offered a shortcut that did not persist a plan."
         )
+        tapGuidedJourneyControlAfterSemanticScroll(openCarePlanEditor, in: app)
+        XCTAssertTrue(carePlanFeedDetail.waitForExistence(timeout: 12), "Care Plan did not open Quick Feed.")
+        XCTAssertTrue(manualReminderMode.waitForExistence(timeout: 12))
+        tapWhenHittable(manualReminderMode, timeout: 8)
+        XCTAssertTrue(planSave.waitForExistence(timeout: 12))
+        tapWhenHittable(planSave, timeout: 8)
         XCTAssertTrue(
             app.descendants(matching: .any)["task-center-starter-journey-complete"]
-                .waitForExistence(timeout: 12),
-            "Accepting the recommended care plan did not complete its guided card."
+                .waitForExistence(timeout: 18),
+            "Saving a real care plan did not complete its guided card."
         )
+        XCTAssertTrue(waitUntil(timeout: 8) { !carePlanFeedDetail.exists })
         assertMemberCardProgress("1/1", in: app)
         tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
         XCTAssertTrue(waitUntil(timeout: 12) { !carePlanSheet.exists }, "Care-plan Finish did not return to Tasks.")
@@ -4180,7 +4349,7 @@ final class OhanaUITests: XCTestCase {
             waitUntil(timeout: 12) {
                 carePlanAction.exists && carePlanAction.label.localizedCaseInsensitiveContains("Claim")
             },
-            "Accepting the care plan claimed its reward automatically instead of exposing Claim."
+            "Saving the care plan claimed its reward automatically instead of exposing Claim."
         )
         tapWhenHittable(carePlanAction, timeout: 8)
         XCTAssertTrue(carePlanSheet.waitForExistence(timeout: 12))
@@ -4571,79 +4740,8 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-resolution-humanAppearance-preferNotToSay"],
             in: app
         )
-        let birthdayQuestion = app.descendants(matching: .any)[
-            "task-center-starter-question-checkpoint-humanLifeStage"
-        ]
-        XCTAssertTrue(birthdayQuestion.waitForExistence(timeout: 8))
-        tapGuidedJourneyControlAfterSemanticScroll(
-            app.buttons["task-center-starter-journey-open-humanLifeStage"],
-            in: app
-        )
-        let profileEditor = app.descendants(matching: .any)["human-basic-info-editor"]
-        XCTAssertTrue(profileEditor.waitForExistence(timeout: 12))
-        let liveProgress = app.descendants(matching: .any)[
-            "human-basic-info-live-profile-progress"
-        ]
-        XCTAssertTrue(
-            liveProgress.waitForExistence(timeout: 8),
-            "The required Human editor did not expose live profile progress."
-        )
-        XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                self.accessibilityText(for: liveProgress).contains("25")
-            },
-            "The live profile progress did not include the completed appearance step."
-        )
-        let birthdayToggle = app.switches["human-basic-info-birthday-toggle"]
-        XCTAssertTrue(birthdayToggle.waitForExistence(timeout: 8))
-        tapGuidedJourneyControlAfterSemanticScroll(birthdayToggle, in: app)
-        if !waitUntil(timeout: 2, condition: { self.isToggleOn(birthdayToggle) }) {
-            // Keep a thumb-coordinate fallback for iOS 26 Simulator activation drift.
-            birthdayToggle.coordinate(
-                withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)
-            ).tap()
-        }
-        XCTAssertTrue(waitUntil(timeout: 8) { self.isToggleOn(birthdayToggle) })
-        let profileForm = app.collectionViews.firstMatch
-        for _ in 0 ..< 3 where !liveProgress.exists {
-            profileForm.swipeDown()
-        }
-        XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                liveProgress.exists &&
-                    self.accessibilityText(for: liveProgress).contains("50")
-            },
-            "Selecting a birthday did not update live profile progress."
-        )
-
-        let genderPicker = app.descendants(matching: .any)[
-            "human-basic-info-gender-picker"
-        ]
-        selectPrivateHumanGender(
-            in: app,
-            picker: genderPicker,
-            failureMessage: "The private gender/identity choice was not applied."
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any)["human-basic-info-required-fields-status"]
-                .waitForExistence(timeout: 8)
-        )
-        for _ in 0 ..< 3 where !liveProgress.exists {
-            profileForm.swipeDown()
-        }
-        XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                liveProgress.exists &&
-                    self.accessibilityText(for: liveProgress).contains("75")
-            },
-            "Selecting gender/identity did not update live profile progress."
-        )
-        tapWhenHittable(app.buttons["human-basic-info-save-action"], timeout: 8)
-        XCTAssertTrue(
-            app.descendants(matching: .any)["task-center-starter-journey-complete"]
-                .waitForExistence(timeout: 12),
-            "Birthday, gender/identity, and one optional profile step did not reach 75%."
-        )
+        completeRequiredHumanProfileFields(in: app)
+        assertMemberCardJourneyComplete(in: app)
         tapGuidedJourneyControlAfterSemanticScroll(
             app.buttons["task-center-starter-journey-finish"],
             in: app
@@ -5879,8 +5977,8 @@ final class OhanaUITests: XCTestCase {
         openPetFeatureHubFromHome(in: app, petName: petName, humanName: humanName)
 
         XCTAssertTrue(
-            app.descendants(matching: .any)["pet-all-features-summary-panel"].waitForExistence(timeout: 12),
-            "The Pet feature hub did not remain open for a one-human one-pet household."
+            app.descendants(matching: .any)["feature-hub-section-daily"].waitForExistence(timeout: 12),
+            "The Pet feature hub did not expose its Daily Care section for a one-human one-pet household."
         )
         XCTAssertTrue(
             app.buttons["feature-hub-daily-food"].waitForExistence(timeout: 8),
@@ -6003,7 +6101,6 @@ final class OhanaUITests: XCTestCase {
             ("feature-hub-body-weight", "human-weight-add-action", "ohana-sheet-close-action"),
             ("feature-hub-body-workout", "human-workout-summary-view", "human-module-close-action"),
             ("feature-hub-care-medication", "human-medication-add-action", "human-module-close-action"),
-            ("feature-hub-money-expense", "human-expense-add-action", "ohana-sheet-close-action"),
             ("feature-hub-money-notes", "human-note-add-action", "human-module-close-action")
         ]
         for route in quickRoutes {
@@ -6037,7 +6134,6 @@ final class OhanaUITests: XCTestCase {
         completeFirstDayStarterFunnel(in: app)
 
         let timestamp = Int(Date().timeIntervalSince1970)
-        let expenseNote = "Codex human expense \(timestamp)"
         let medicationName = "Vitamin D"
         let noteText = "Codex human note \(timestamp)"
 
@@ -6045,14 +6141,6 @@ final class OhanaUITests: XCTestCase {
         assertHumanModuleRouteContains(
             "feature-hub-body-weight",
             markers: ["70.0", "70 kg", "70kg"],
-            in: app,
-            humanName: humanName
-        )
-
-        saveHumanExpenseFromCurrentUI(in: app, humanName: humanName, note: expenseNote)
-        assertHumanModuleRouteContains(
-            "feature-hub-money-expense",
-            markers: [expenseNote],
             in: app,
             humanName: humanName
         )
@@ -6080,12 +6168,13 @@ final class OhanaUITests: XCTestCase {
             in: app,
             humanName: humanName
         )
-        assertHumanHomeQuickActionOpensSheet(
-            actionIdentifier: "home-quick-action-humanExpense",
-            sheetIdentifier: "quick-human-expense-sheet",
-            in: app,
-            humanName: humanName
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        expandHumanCardFromHome(in: app, humanName: humanName)
+        XCTAssertFalse(
+            app.buttons["home-quick-action-humanExpense"].exists,
+            "Human cards must not expose an expense creation shortcut; expenses belong to pets."
         )
+        collapseExpandedHumanCardIfNeeded(in: app, humanName: humanName)
         assertHumanHomeQuickActionOpensSheet(
             actionIdentifier: "home-quick-action-humanMedication",
             sheetIdentifier: "quick-human-medication-sheet",
@@ -6926,10 +7015,13 @@ final class OhanaUITests: XCTestCase {
             waitUntil(timeout: 6) {
                 app.buttons["home-expanded-detail-human"].exists ||
                     app.buttons["home-quick-action-humanWeight"].exists ||
-                    app.buttons["home-quick-action-humanMedication"].exists ||
-                    app.buttons["home-quick-action-humanExpense"].exists
+                    app.buttons["home-quick-action-humanMedication"].exists
             },
             "Expanded human card did not expose human quick actions without a second tap."
+        )
+        XCTAssertFalse(
+            app.buttons["home-quick-action-humanExpense"].exists,
+            "Expanded Human cards must not restore the retired expense creation action."
         )
     }
 
@@ -9078,8 +9170,8 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(limeGlow, timeout: 8)
         if !app.descendants(matching: .any)["coconut-shop-purchase-popup-fx_lime_glow"].waitForExistence(timeout: 2) {
             XCTAssertTrue(
-                tapWhenFrameReady(limeGlow, offset: CGVector(dx: 0.5, dy: 0.82), timeout: 5),
-                "Coconut Shop Lime Glow item did not expose a stable tappable frame."
+                tapWhenSemanticallyHittable(limeGlow, timeout: 5),
+                "Coconut Shop Lime Glow item did not become semantically tappable for a retry."
             )
         }
 
@@ -9837,7 +9929,7 @@ final class OhanaUITests: XCTestCase {
                 if actual.contains(expected) {
                     return true
                 }
-                guard actual.localizedCaseInsensitiveContains("Profile completion"),
+                guard actual.localizedCaseInsensitiveContains("Profile"),
                       let profileExpected = self.profilePercentExpectation(for: expected) else {
                     return false
                 }
@@ -9857,6 +9949,21 @@ final class OhanaUITests: XCTestCase {
         case "2/2", "3/3": "75%"
         default: nil
         }
+    }
+
+    @MainActor
+    private func cancelHumanProfileInlineEditor(
+        checkpoint: String,
+        in app: XCUIApplication
+    ) {
+        let cancel = app.buttons[
+            "task-center-human-profile-inline-cancel-\(checkpoint)"
+        ]
+        // The inline editor can extend below the fold. Reveal its semantic
+        // control before attempting the interaction; never depend on an AX
+        // snapshot containing an off-screen Cancel button.
+        scrollTowardElement(cancel, in: app, maxSwipes: 8)
+        tapGuidedJourneyControlAfterSemanticScroll(cancel, in: app)
     }
 
     @MainActor
@@ -10027,6 +10134,9 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func completeRequiredHumanProfileFields(in app: XCUIApplication) {
+        // Resolutions intentionally leave the current card in place. Use the
+        // guide's semantic navigation rather than asserting an auto-advance.
+        navigateHumanProfileJourney(to: "humanLifeStage", in: app)
         let lifeStageQuestion = app.descendants(matching: .any)[
             "task-center-starter-question-checkpoint-humanLifeStage"
         ]
@@ -10039,124 +10149,118 @@ final class OhanaUITests: XCTestCase {
         ]
         tapGuidedJourneyControlAfterSemanticScroll(openLifeStageAction, in: app)
 
-        let editor = app.descendants(matching: .any)["human-basic-info-editor"]
-        if !editor.waitForExistence(timeout: 3),
+        let lifeStageEditor = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-editor-humanLifeStage"
+        ]
+        if !lifeStageEditor.waitForExistence(timeout: 3),
            lifeStageQuestion.exists,
            openLifeStageAction.exists,
            openLifeStageAction.isEnabled {
             tapGuidedJourneyControlAfterSemanticScroll(openLifeStageAction, in: app)
         }
         XCTAssertTrue(
-            editor.waitForExistence(timeout: 12),
-            "The required Human profile editor did not open."
+            lifeStageEditor.waitForExistence(timeout: 12),
+            "The birthday card did not expand its inline editor."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["human-basic-info-screen"].exists,
+            "Completing the Human profile task must stay inside Task Center."
         )
 
-        let birthdayToggle = app.switches["human-basic-info-birthday-toggle"]
-        scrollTowardElement(birthdayToggle, in: app, maxSwipes: 6)
-        XCTAssertTrue(
-            birthdayToggle.waitForExistence(timeout: 8),
-            "The required Human profile editor did not expose birthday."
-        )
-        XCTAssertTrue(
-            setToggle(birthdayToggle, enabled: true, in: app),
-            "The required birthday selection was not applied."
-        )
-
-        let genderPicker = app.descendants(matching: .any)[
-            "human-basic-info-gender-picker"
+        let birthdayPicker = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-birthday"
         ]
-        scrollTowardElement(genderPicker, in: app, maxSwipes: 6)
         XCTAssertTrue(
-            genderPicker.waitForExistence(timeout: 8),
-            "The required Human profile editor did not expose gender or identity."
+            birthdayPicker.waitForExistence(timeout: 8),
+            "The inline Life Stage card did not expose birthday."
         )
-        selectPrivateHumanGender(
-            in: app,
-            picker: genderPicker,
-            failureMessage: "The required gender or identity selection was not applied."
-        )
-
-        tapWhenHittable(app.buttons["human-basic-info-save-action"], timeout: 8)
         XCTAssertTrue(
-            waitUntil(timeout: 12) { !editor.exists },
-            "Saving the required Human profile fields did not return to the guide."
+            app.descendants(matching: .any)["task-center-human-profile-inline-zodiac"]
+                .waitForExistence(timeout: 8),
+            "Selecting a birthday did not expose its zodiac readback."
         )
-    }
-
-    @MainActor
-    private func selectPrivateHumanGender(
-        in app: XCUIApplication,
-        picker: XCUIElement,
-        failureMessage: String
-    ) {
-        let expectedChoice = "Prefer not to say"
-        let privateChoiceIdentifier = "human-basic-info-gender-option-private"
-        guard !accessibilityText(for: picker)
-            .localizedCaseInsensitiveContains(expectedChoice) else { return }
-
-        for _ in 0 ..< 3 {
-            var privateChoice = firstHittableButton(
-                identifier: privateChoiceIdentifier,
-                in: app
-            ) ?? firstHittableButton(labels: [expectedChoice], in: app)
-            if privateChoice == nil {
-                for _ in 0 ... 6 {
-                    if hasSafelyTappableFrame(picker, in: app) {
-                        break
-                    }
-                    if picker.exists, picker.frame.midY < app.frame.midY {
-                        app.swipeDown()
-                    } else {
-                        swipeUpInPrimaryScrollArea(in: app)
-                    }
-                    RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-                }
-                guard waitUntil(timeout: 5, condition: {
-                    app.state == .runningForeground &&
-                        picker.exists &&
-                        picker.isEnabled &&
-                        self.hasSafelyTappableFrame(picker, in: app)
-                }), tapStableNativeMenuButton(
-                    picker,
-                    in: app,
-                    timeout: 2,
-                    usesPointerClick: false
-                ) else {
-                    continue
-                }
-            }
-
-            guard waitUntil(timeout: 5, condition: {
-                privateChoice = self.firstHittableButton(
-                    identifier: privateChoiceIdentifier,
-                    in: app
-                ) ?? self.firstHittableButton(labels: [expectedChoice], in: app)
-                return app.state == .runningForeground && privateChoice != nil
-            }), let privateChoice else { continue }
-
-            // Native SwiftUI menu rows are short-lived AX nodes. Capture a
-            // stable frame and send a touch event. Pointer clicks can leave a
-            // Menu item visually present without committing its Button action.
-            let didTapChoice = tapStableNativeMenuButton(
-                privateChoice,
-                in: app,
-                timeout: 2,
-                usesPointerClick: false
-            )
-            guard didTapChoice else { continue }
-
-            if waitUntil(timeout: 3, condition: {
-                self.accessibilityText(for: picker)
-                    .localizedCaseInsensitiveContains(expectedChoice)
-            }) {
-                return
-            }
-        }
-
+        let saveBirthday = app.buttons[
+            "task-center-human-profile-inline-save-humanLifeStage"
+        ]
         XCTAssertTrue(
-            accessibilityText(for: picker)
-                .localizedCaseInsensitiveContains(expectedChoice),
-            "\(failureMessage) The gender or identity menu did not expose a selectable private choice after three attempts."
+            waitUntil(timeout: 8) { saveBirthday.exists && saveBirthday.isEnabled },
+            "The sparse birthday draft was not savable."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(saveBirthday, in: app)
+        let birthdaySaved = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-saved-humanLifeStage"
+        ]
+        XCTAssertTrue(
+            birthdaySaved.waitForExistence(timeout: 12),
+            "Saving birthday did not show the inline Saved confirmation."
+        )
+        XCTAssertTrue(
+            lifeStageEditor.exists,
+            "Saving birthday unexpectedly collapsed the Life Stage card."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(openLifeStageAction, in: app)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !lifeStageEditor.exists },
+            "Explicitly collapsing the saved Life Stage card did not close its editor."
+        )
+
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-starter-question-next"],
+            in: app
+        )
+        let bodyProfileQuestion = app.descendants(matching: .any)[
+            "task-center-starter-question-checkpoint-humanBodyProfile"
+        ]
+        XCTAssertTrue(
+            bodyProfileQuestion.waitForExistence(timeout: 8),
+            "The Human profile guide did not advance to gender or identity."
+        )
+        let openBodyProfileAction = app.buttons[
+            "task-center-starter-journey-open-humanBodyProfile"
+        ]
+        tapGuidedJourneyControlAfterSemanticScroll(openBodyProfileAction, in: app)
+        let bodyProfileEditor = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-editor-humanBodyProfile"
+        ]
+        XCTAssertTrue(
+            bodyProfileEditor.waitForExistence(timeout: 12),
+            "The Body Profile card did not expand its inline editor."
+        )
+
+        let privateGender = app.buttons[
+            "task-center-human-profile-inline-gender-private"
+        ]
+        XCTAssertTrue(
+            privateGender.waitForExistence(timeout: 8),
+            "The inline gender buttons did not expose Prefer not to say."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(privateGender, in: app)
+        let saveBodyProfile = app.buttons[
+            "task-center-human-profile-inline-save-humanBodyProfile"
+        ]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { saveBodyProfile.exists && saveBodyProfile.isEnabled },
+            "The selected gender or identity was not savable."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(saveBodyProfile, in: app)
+        let bodyProfileSaved = app.descendants(matching: .any)[
+            "task-center-human-profile-inline-saved-humanBodyProfile"
+        ]
+        XCTAssertTrue(
+            bodyProfileSaved.waitForExistence(timeout: 12),
+            "Saving gender or identity did not show the inline Saved confirmation."
+        )
+        XCTAssertTrue(
+            bodyProfileEditor.exists,
+            "Saving gender or identity unexpectedly collapsed the Body Profile card."
+        )
+        tapGuidedJourneyControlAfterSemanticScroll(openBodyProfileAction, in: app)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !bodyProfileEditor.exists &&
+                    app.descendants(matching: .any)["task-center-starter-journey-complete"].exists
+            },
+            "Collapsing the saved Body Profile card did not reveal the completed journey."
         )
     }
 
@@ -10387,7 +10491,7 @@ final class OhanaUITests: XCTestCase {
             },
             "The Home coconut balance did not refresh to the expected post-gift balance \(expectedHomeBalance) before the ceremony closed."
         )
-        let homeTab = app.tabBars.buttons["home-tab-home"]
+        let homeTab = app.buttons["home-tab-home"]
         XCTAssertTrue(homeTab.waitForExistence(timeout: 8), "Home tab did not remain available after starter gift.")
         XCTAssertTrue(
             tapWhenSemanticallyHittable(homeTab, timeout: 8),
@@ -10456,7 +10560,11 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(treeLevel.waitForExistence(timeout: 12), "Oasis tree level control did not become visible.")
         XCTAssertTrue(treeLevel.label.contains("level 0"), "Fresh starter tree should begin at Lv0 before injection.")
 
-        let injectEnergy = app.buttons["oasis-inject-energy-action"]
+        let injectEnergy = app.buttons["home-primary-action"]
+        XCTAssertTrue(
+            injectEnergy.waitForExistence(timeout: 8),
+            "Oasis did not expose the split-island energy action."
+        )
         for attempt in 1 ... 4 {
             XCTAssertTrue(
                 tapWhenFrameReady(injectEnergy, timeout: 8),
@@ -10684,12 +10792,20 @@ final class OhanaUITests: XCTestCase {
             tapWhenSemanticallyHittable(quickSwitch, timeout: 8),
             "Human identity switch did not become semantically tappable for \(humanName)."
         )
-        let selectedSummary = app.staticTexts["settings-human-identity-selected-summary"]
+
+        let closeSettings = app.buttons["settings-close-action"]
         XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                selectedSummary.exists && selectedSummary.label.contains(humanName)
+            tapWhenSemanticallyHittable(closeSettings, timeout: 8),
+            "Settings did not expose a semantic close action after switching to \(humanName)."
+        )
+        let preRelaunchSettings = app.buttons["home-settings-action"]
+        XCTAssertTrue(
+            waitUntil(timeout: 14) {
+                preRelaunchSettings.exists &&
+                    preRelaunchSettings.label.contains(humanName) &&
+                    isHomeSurfaceResponsive(in: app)
             },
-            "Settings did not confirm the active Human switch to \(humanName) before relaunch."
+            "Home did not reflect the active Human switch to \(humanName) before relaunch."
         )
 
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
@@ -10700,10 +10816,10 @@ final class OhanaUITests: XCTestCase {
         app.launch()
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
 
-        let settings = app.buttons["home-settings-action"]
+        let relaunchedSettings = app.buttons["home-settings-action"]
         XCTAssertTrue(
             waitUntil(timeout: 14) {
-                settings.exists && settings.label.contains(humanName)
+                relaunchedSettings.exists && relaunchedSettings.label.contains(humanName)
             },
             "Relaunch did not restore the active Human switch to \(humanName)."
         )
@@ -10927,8 +11043,6 @@ final class OhanaUITests: XCTestCase {
             openHumanQuickActionDetailFromHome("humanWorkout", in: app, humanName: humanName)
         case "feature-hub-care-medication":
             openHumanQuickActionDetailFromHome("humanMedication", in: app, humanName: humanName)
-        case "feature-hub-money-expense":
-            openHumanQuickActionDetailFromHome("humanExpense", in: app, humanName: humanName)
         case "feature-hub-money-notes":
             openHumanQuickActionDetailFromHome("humanNote", in: app, humanName: humanName)
         case "feature-hub-body-metrics":
@@ -11086,8 +11200,7 @@ final class OhanaUITests: XCTestCase {
             app.buttons["home-expanded-detail-human"],
             app.buttons["home-expanded-shortcut-humanAllFeatures"],
             app.buttons["home-quick-action-humanWeight"],
-            app.buttons["home-quick-action-humanMedication"],
-            app.buttons["home-quick-action-humanExpense"]
+            app.buttons["home-quick-action-humanMedication"]
         ]
         guard expandedMarkers.contains(where: \.exists) else { return }
 
@@ -11097,11 +11210,10 @@ final class OhanaUITests: XCTestCase {
         guard tapWhenFrameReady(targetCard, timeout: 5) else { return }
 
         _ = waitUntil(timeout: 8) {
-            !app.buttons["home-expanded-detail-human"].exists &&
-                !app.buttons["home-expanded-shortcut-humanAllFeatures"].exists &&
-                !app.buttons["home-quick-action-humanWeight"].exists &&
-                !app.buttons["home-quick-action-humanMedication"].exists &&
-                !app.buttons["home-quick-action-humanExpense"].exists
+                !app.buttons["home-expanded-detail-human"].exists &&
+                    !app.buttons["home-expanded-shortcut-humanAllFeatures"].exists &&
+                    !app.buttons["home-quick-action-humanWeight"].exists &&
+                    !app.buttons["home-quick-action-humanMedication"].exists
         }
     }
 
@@ -11194,29 +11306,6 @@ final class OhanaUITests: XCTestCase {
                 !weightEntrySheet.exists
             },
             "Human weight entry sheet did not dismiss after saving."
-        )
-        closeCurrentSheetToHome(in: app, humanName: humanName)
-    }
-
-    @MainActor
-    private func saveHumanExpenseFromCurrentUI(in app: XCUIApplication, humanName: String, note: String) {
-        openHumanModuleFromHome("feature-hub-money-expense", in: app, humanName: humanName)
-        tapWhenHittable(app.buttons["human-expense-add-action"], timeout: 8)
-
-        let expenseSheet = app.descendants(matching: .any)["quick-human-expense-sheet"]
-        XCTAssertTrue(
-            expenseSheet.waitForExistence(timeout: 10),
-            "Human quick expense sheet did not open."
-        )
-        tapWhenHittable(app.buttons["quick-human-expense-amount-0"], timeout: 8)
-        typeText(note, intoTextField: "quick-human-expense-note-input", in: app)
-        dismissKeyboardIfPresent(in: app)
-        tapWhenHittable(app.buttons["quick-human-expense-save-action"], timeout: 8)
-        XCTAssertTrue(
-            waitUntil(timeout: 14) {
-                !expenseSheet.exists
-            },
-            "Human expense sheet did not dismiss after saving."
         )
         closeCurrentSheetToHome(in: app, humanName: humanName)
     }
@@ -12116,6 +12205,11 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func stopWalkFromVisibleHomeControls(in app: XCUIApplication, petName: String) {
+        let summaryCloseActions = [
+            "walk-summary-close-action",
+            "global-walk-summary-close-action",
+            "walk-tracking-summary-close-action"
+        ]
         let embeddedStop = app.buttons["walk-tracking-stop-action"]
         if embeddedStop.waitForExistence(timeout: 3) {
             tapWhenHittable(embeddedStop, timeout: 8)
@@ -12145,9 +12239,19 @@ final class OhanaUITests: XCTestCase {
 
         XCTAssertTrue(
             waitUntil(timeout: 14) {
-                app.buttons["home-card-pet-\(petName)"].exists || app.buttons["home-primary-action"].exists
+                let summaryIsInactive = summaryCloseActions.allSatisfy { identifier in
+                    let action = app.buttons[identifier]
+                    return !action.exists || !action.isHittable
+                }
+                let homeTab = app.buttons["home-tab-home"]
+                let homeIsUsable = homeTab.exists && homeTab.isEnabled && homeTab.isHittable
+                let petCardIsCollapsed = app.buttons["home-card-pet-\(petName)"].exists
+                let petCardIsExpanded = app.buttons["home-expanded-detail-pet"].exists ||
+                    app.buttons["home-expanded-collapse-pet"].exists
+                return summaryIsInactive && homeIsUsable &&
+                    (petCardIsCollapsed || petCardIsExpanded)
             },
-            "Closing the walk summary did not return to the Home pet card."
+            "Closing the walk summary left its route active or did not restore a usable Home pet surface."
         )
     }
 
@@ -12226,7 +12330,7 @@ final class OhanaUITests: XCTestCase {
             let targetCard = petCard.exists ? petCard : fallbackPetCard
             if targetCard.exists {
                 scrollTowardElement(targetCard, in: app, maxSwipes: 2)
-                _ = tapWhenFrameReady(targetCard, offset: CGVector(dx: 0.5, dy: 0.24), timeout: 8)
+                _ = tapWhenFrameReady(targetCard, timeout: 8)
             }
             if waitUntil(timeout: 3, condition: { petAllFeaturesShortcutExists(in: app) }) {
                 break
@@ -12636,14 +12740,6 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func discardHumanBasicInfoChanges(in app: XCUIApplication) {
-        tapWhenHittable(app.buttons["human-basic-info-cancel-edit-action"], timeout: 8)
-        let discard = app.buttons["human-basic-info-discard-changes-action"].firstMatch
-        XCTAssertTrue(discard.waitForExistence(timeout: 8), "Dirty Human profile cancel did not ask for confirmation.")
-        tapWhenHittable(discard, timeout: 8)
-    }
-
-    @MainActor
     private func enterPetBasicInfoNote(_ note: String, in app: XCUIApplication) {
         let notesInput = app.textFields["pet-basic-info-notes-input"]
         scrollToElement(notesInput, in: app, maxSwipes: 8)
@@ -12659,15 +12755,37 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func clearTextField(_ textField: XCUIElement, in app: XCUIApplication) {
         XCTAssertTrue(waitForFrameReady(textField, timeout: 8), "Text field was not frame-ready for clearing.")
-        tapWhenHittable(textField, timeout: 8)
-        textField.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.5)).tap()
+        let selectAllControls = [
+            app.buttons["Select All"].firstMatch,
+            app.menuItems["Select All"].firstMatch,
+            app.buttons["全选"].firstMatch,
+            app.menuItems["全选"].firstMatch,
+            app.buttons["Alle auswählen"].firstMatch,
+            app.menuItems["Alle auswählen"].firstMatch
+        ]
 
-        for _ in 0 ..< 4 {
+        for _ in 0 ..< 3 {
+            tapWhenHittable(textField, timeout: 8)
             let currentValue = (textField.value as? String) ?? ""
             if isEmptyTextFieldValue(currentValue) { return }
-            textField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count + 4))
+
+            // UIKit exposes Select All through the edit menu. Use that
+            // semantic control first; triple-tap is a native fallback rather
+            // than a coordinate guess when a menu is transiently unavailable.
+            textField.press(forDuration: 0.8)
+            let didSelectAll = selectAllControls.contains { control in
+                tapWhenSemanticallyHittable(control, timeout: 2)
+            }
+            if !didSelectAll {
+                textField.tap(withNumberOfTaps: 3, numberOfTouches: 1)
+            }
+            textField.typeText(XCUIKeyboardKey.delete.rawValue)
             _ = waitUntil(timeout: 1) {
                 isEmptyTextFieldValue((textField.value as? String) ?? "")
+            }
+
+            if !isEmptyTextFieldValue((textField.value as? String) ?? "") {
+                textField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count + 4))
             }
         }
 
@@ -12831,9 +12949,7 @@ final class OhanaUITests: XCTestCase {
             if isToggleOn(reminderToggle) {
                 tapWhenHittable(reminderToggle, timeout: 8)
                 if !waitUntil(timeout: 2, condition: { !self.isToggleOn(reminderToggle) }) {
-                    reminderToggle.coordinate(
-                        withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)
-                    ).tap()
+                    _ = tapWhenSemanticallyHittable(reminderToggle, timeout: 2)
                 }
                 XCTAssertTrue(
                     waitUntil(timeout: 4) { !isToggleOn(reminderToggle) },
@@ -13027,20 +13143,20 @@ final class OhanaUITests: XCTestCase {
         guard healthDetailScreen.exists else { return }
 
         let close = app.buttons["pet-health-detail-close-action"]
-        if close.exists && close.isEnabled && close.isHittable {
-            tapWhenHittable(close, timeout: 5)
-        } else {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.86, dy: 0.12)).tap()
-        }
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(close, timeout: 5),
+            "Pet health detail did not expose a semantically tappable close action."
+        )
 
-        _ = waitUntil(timeout: 8) {
-            !healthDetailScreen.exists
-        }
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !healthDetailScreen.exists },
+            "Pet health detail did not close after tapping its close action."
+        )
     }
 
     private func livePetRouteIdentifiers() -> [String] {
         [
-            "quick-feed-detail-sheet",
+            "quick-feed-detail-screen",
             "quick-water-detail-sheet",
             "quick-potty-detail-sheet",
             "quick-play-detail-sheet",
@@ -13119,9 +13235,7 @@ final class OhanaUITests: XCTestCase {
         if !waitUntil(timeout: 2, condition: {
             markAction.exists || undoAction.exists || deleteAction.exists
         }) {
-            disclosure.coordinate(
-                withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5)
-            ).tap()
+            _ = tapWhenSemanticallyHittable(disclosure, timeout: 2)
         }
         scrollTowardElement(deleteAction, in: app, maxSwipes: 6)
         XCTAssertTrue(
@@ -13227,10 +13341,56 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func dismissCurrentSheetByDrag(in app: XCUIApplication) {
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.86))
-        start.press(forDuration: 0.12, thenDragTo: end)
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        let semanticCloseIdentifiers = [
+            "ohana-sheet-close-action",
+            "settings-close-action",
+            "human-module-close-action",
+            "human-basic-info-close-action",
+            "crew-roster-close-action",
+            "quick-feed-detail-close-action",
+            "quick-water-detail-close-action",
+            "quick-potty-detail-close-action",
+            "quick-play-detail-close-action",
+            "pet-hygiene-detail-close-action",
+            "pet-health-detail-close-action",
+            "walk-summary-close-action",
+            "walk-tracking-summary-close-action",
+            "global-walk-summary-close-action",
+            "pet-bond-vault-close-action"
+        ]
+        for identifier in semanticCloseIdentifiers {
+            if let close = firstHittableButton(identifier: identifier, in: app) {
+                close.tap()
+                return
+            }
+        }
+        if let close = firstHittableButton(
+            labels: ["Close", "Done", "Cancel", "关闭", "完成", "取消", "Schließen", "Fertig", "Abbrechen"],
+            in: app
+        ) {
+            close.tap()
+            return
+        }
+
+        let routeRoots = livePetRouteIdentifiers() + [
+            "settings-screen",
+            "human-detail-screen",
+            "human-basic-info-screen",
+            "human-health-summary-screen",
+            "crew-roster-screen",
+            "quick-human-workout-sheet",
+            "quick-human-note-sheet",
+            "quick-human-medication-sheet"
+        ]
+        for identifier in routeRoots {
+            let routeRoot = app.descendants(matching: .any)[identifier]
+            guard hasVisibleFrame(routeRoot, in: app) else { continue }
+            routeRoot.swipeDown()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            return
+        }
+
+        XCTFail("No semantic close control or live route root was available for dismissal.")
     }
 
     @MainActor
@@ -13331,7 +13491,6 @@ final class OhanaUITests: XCTestCase {
             "add-human-workout-sheet",
             "generic-weight-entry-sheet-human",
             "human-detail-screen",
-            "human-expense-add-action",
             "human-basic-info-screen",
             "human-health-summary-screen",
             "human-conditions-screen",
@@ -13350,7 +13509,6 @@ final class OhanaUITests: XCTestCase {
             "human-workout-summary-view",
             "human-workout-delete-action",
             "human-wishlist-add-action",
-            "quick-human-expense-sheet",
             "quick-human-medication-sheet",
             "quick-human-workout-sheet",
             "quick-human-note-sheet"
@@ -14189,19 +14347,7 @@ final class OhanaUITests: XCTestCase {
         if !waitUntil(timeout: 3, condition: {
             picker.exists || self.isToggleOn(toggle)
         }) {
-            let frame = actionTarget.frame
-            guard isFiniteFrame(frame),
-                  frame.width > 1,
-                  frame.height > 1,
-                  !frame.intersection(app.frame).isNull else {
-                return false
-            }
-            actionTarget.coordinate(
-                withNormalizedOffset: CGVector(
-                    dx: usesNestedSwitch ? 0.5 : 0.85,
-                    dy: 0.5
-                )
-            ).tap()
+            _ = tapWhenSemanticallyHittable(actionTarget, timeout: 2)
         }
         guard waitUntil(timeout: 4, condition: {
             picker.exists || self.isToggleOn(toggle)
@@ -14278,16 +14424,8 @@ final class OhanaUITests: XCTestCase {
                   hasSafelyTappableFrame(control, in: app) else {
                 continue
             }
-            if control.isHittable {
-                control.tap()
-            } else {
-                control.coordinate(
-                    withNormalizedOffset: CGVector(
-                        dx: control.elementType == .switch ? 0.5 : 0.85,
-                        dy: 0.5
-                    )
-                ).tap()
-            }
+            guard control.isHittable else { continue }
+            control.tap()
             if waitUntil(timeout: 3, condition: hasExpectedState) {
                 return true
             }

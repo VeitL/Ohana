@@ -70,7 +70,6 @@ extension AddPlantView {
             if didShowSuccess {
                 AddWizardJoinCelebrationOverlay(
                     title: l.tr(zh: "\(resolvedPlantName) 已加入植物页", en: "\(resolvedPlantName) joined Plants", de: "\(resolvedPlantName) ist bei Pflanzen"),
-                    subtitle: l.tr(zh: "植物卡片正在进入卡片堆", en: "The plant card is joining the stack", de: "Die Pflanzenkarte wird in den Stapel eingefügt"),
                     systemImage: "leaf.fill",
                     accent: Color.goTeal
                 )

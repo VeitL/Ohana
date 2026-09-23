@@ -362,7 +362,9 @@ extension MemberCardCreationContentView {
             )
         } else {
             isSaving = true
-            performSave(showsHomeJoinHandoff: false)
+            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
+                performSave(showsHomeJoinHandoff: false)
+            }
         }
     }
 
@@ -379,15 +381,7 @@ extension MemberCardCreationContentView {
     }
 
     var homeJoinHandoffSaveDelayMilliseconds: UInt64 {
-        reduceMotion ? 70 : 140
-    }
-
-    var homeJoinHandoffResetDelayMilliseconds: UInt64 {
-        reduceMotion ? 60 : 160
-    }
-
-    var standardSaveSuccessDelayMilliseconds: UInt64 {
-        reduceMotion ? 120 : 280
+        reduceMotion ? 100 : 180
     }
 
     func scheduleHomeJoinHandoffPreflightIfNeeded() {
@@ -432,7 +426,7 @@ extension MemberCardCreationContentView {
         let startDelay = waitForColdHomePreflight ? homeJoinHandoffColdPreflightDelayMilliseconds : homeJoinHandoffStartDelayMilliseconds
         joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: startDelay) {
             guard isJoinHandoffRunning else { return }
-            withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.zStackHero) {
+            withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
                 joinHandoffProgress = 1
             }
             joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffSaveDelayMilliseconds) {
@@ -473,20 +467,7 @@ extension MemberCardCreationContentView {
                 finishSaveAfterHomeJoinHandoff(pet: result.pet, human: result.human)
                 return
             }
-            withAnimation(GoMotion.sheet) {
-                didShowSuccess = true
-            }
-            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: standardSaveSuccessDelayMilliseconds) {
-                didShowSuccess = false
-                isSaving = false
-                clearMediaReturnStepStorage()
-                joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
-                    notifySavedMembers(pet: result.pet, human: result.human)
-                    joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
-                        onComplete()
-                    }
-                }
-            }
+            completeSuccessfulMemberCreation(pet: result.pet, human: result.human)
         } catch MemberCreationError.duplicateName {
             handleSaveFailure(l.tr(zh: "这个名字已经被使用。", en: "This name is already in use.", de: "Dieser Name wird bereits verwendet."))
         } catch MemberCreationError.emptyName {
@@ -503,15 +484,14 @@ extension MemberCardCreationContentView {
 
     func finishSaveAfterHomeJoinHandoff(pet: Pet?, human: Human?) {
         guard isJoinHandoffRunning else { return }
-        clearMediaReturnStepStorage()
         OnboardingHomeJoinHandoffGate.markCompleted()
+        completeSuccessfulMemberCreation(pet: pet, human: human)
+    }
+
+    func completeSuccessfulMemberCreation(pet: Pet?, human: Human?) {
+        clearMediaReturnStepStorage()
         notifySavedMembers(pet: pet, human: human)
-        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
-            onComplete()
-            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffResetDelayMilliseconds) {
-                resetHomeJoinHandoffState()
-            }
-        }
+        onComplete()
     }
 
     func notifySavedMembers(pet: Pet?, human: Human?) {

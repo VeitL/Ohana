@@ -256,7 +256,7 @@ extension AddPlantView {
                 Spacer(minLength: 4)
                 Image(systemName: isSelected ? "checkmark" : "chevron.right")
                     .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(isSelected ? Color.goCardWhite : Color.ohanaTertiaryText)
+                    .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaTertiaryText)
                     .frame(width: 30, height: 30) // a11y: allow glyph sits inside the full-width row button
                     .background(isSelected ? Color.goTeal : Color.goCardWhite.opacity(0.48), in: Circle())
                     .accessibilityHidden(true)
@@ -289,9 +289,9 @@ extension AddPlantView {
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(l.tr(
-                zh: "先选择资料库里的相近植物，添加后可以在详情里继续改品种备注。",
-                en: "Choose the closest catalog plant first; the species note can be edited later.",
-                de: "Wähle zuerst den nächsten Katalogtreffer; die Artnotiz lässt sich später bearbeiten."
+                zh: "可先选择最相近的植物。", en: "Choose the closest plant.", de: "Wähle die ähnlichste Pflanze.",
+                es: "Elige la planta más parecida.", pt: "Escolha a planta mais parecida.", fr: "Choisissez la plante la plus proche.",
+                ja: "最も近い植物を選べます。", ko: "가장 비슷한 식물을 선택하세요.", it: "Scegli la pianta più simile."
             ))
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)

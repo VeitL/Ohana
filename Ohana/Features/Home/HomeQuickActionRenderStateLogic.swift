@@ -39,7 +39,7 @@ nonisolated enum HomeQuickActionRenderStateLogic {
         localization l: L10n,
         now: Date
     ) -> HomeQuickActionRenderSnapshot {
-        let optionsArePresent = hasMenuOptions(actionType: item.actionType)
+        let optionsArePresent = HomeQuickActionOptionCatalog.hasOptions(for: item.actionType)
         let basePolicy = ExpandedQuickActionLogic.petMenuPolicy(
             for: item,
             pet: pet,
@@ -156,15 +156,6 @@ nonisolated enum HomeQuickActionRenderStateLogic {
             isLocked: isLocked,
             menuPolicy: HomeQuickActionMenuPolicySnapshot(ExpandedQuickActionLogic.humanMenuPolicy(actionType: item.actionType))
         )
-    }
-
-    private static func hasMenuOptions(actionType: String) -> Bool {
-        switch actionType {
-        case "groom", "potty", "health":
-            true
-        default:
-            false
-        }
     }
 
     private static func isHumanQuickActionLocked(_ item: QuickActionItem, human: Human, viewedBy viewerID: UUID?) -> Bool {

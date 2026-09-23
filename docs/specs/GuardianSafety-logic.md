@@ -123,7 +123,7 @@ APNS_SANDBOX。服务端只保存匿名账号 ID、守护关系、时区与计�
 费用、备注或其他家庭资料。
 
 账号 token 与安装 ID 使用 Keychain `ThisDeviceOnly`。APNs token、账号 token、守护本机
-投影和 outbox 不进入受限备份、用户导出或现有 CloudSync。当前备份格式仍为 v33，V96
+投影和 outbox 不进入受限备份、用户导出或现有 CloudSync。当前备份格式为 v34，V96
 不改变备份格式。
 
 默认保留：邀请 48 小时、守护日信号 35 天、最小通知审计 90 天。撤销或账号删除立即

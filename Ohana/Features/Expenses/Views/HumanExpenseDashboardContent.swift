@@ -13,9 +13,7 @@ struct HumanExpenseDashboardContent: View {
     let human: Human
     let allExpenses: [PetExpenseLog]
     var onClose: () -> Void
-    var onAdd: () -> Void
 
-    @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -23,7 +21,6 @@ struct HumanExpenseDashboardContent: View {
     @State private var selectedRange: ExpenseDashboardRange = .month
     @State private var showingPersonalPlan = false
     @State private var selectedCategory: ExpenseCategory?
-    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -40,21 +37,33 @@ struct HumanExpenseDashboardContent: View {
         )
     }
 
-    private var positiveLogs: [PetExpenseLog] { ExpenseSummaryBuilder.positiveLogs(filteredLogs) }
+    private var attributedBaseLogs: [ExpenseSummarySlice] {
+        ExpenseSummaryBuilder.summarySlices(from: baseLogs, attributedTo: human.id.uuidString)
+    }
+
+    private var attributedFilteredLogs: [ExpenseSummarySlice] {
+        ExpenseSummaryBuilder.summarySlices(from: filteredLogs, attributedTo: human.id.uuidString)
+    }
+
+    private var positiveLogs: [ExpenseSummarySlice] {
+        ExpenseSummaryBuilder.positiveLogs(attributedFilteredLogs)
+    }
     /// Personal controls aggregate depth, never access to the underlying
     /// expense records.
     private var historyLogs: [PetExpenseLog] {
         ExpenseSummaryBuilder.logs(baseLogs, category: selectedCategory)
     }
-    private var totals: ExpenseTotals { ExpenseSummaryBuilder.totals(from: filteredLogs) }
-    private var baseTotals: ExpenseTotals { ExpenseSummaryBuilder.totals(from: baseLogs) }
-    private var directTotals: ExpenseTotals {
-        ExpenseSummaryBuilder.totals(from: ExpenseSummaryBuilder.humanDirectExpenses(human.id, from: filteredLogs))
-    }
-
+    private var totals: ExpenseTotals { ExpenseSummaryBuilder.totals(from: attributedFilteredLogs) }
+    private var baseTotals: ExpenseTotals { ExpenseSummaryBuilder.totals(from: attributedBaseLogs) }
     var body: some View {
         OhanaSheetPageScaffold(
-            title: l.tr(zh: "花费记录", en: "Expenses", de: "Kosten"),
+            title: l.tr(
+                zh: "宠物花费",
+                en: "Pet spending",
+                de: "Haustierausgaben",
+                es: "Gastos de mascotas", pt: "Despesas com pets", fr: "Dépenses des animaux",
+                ja: "ペットの支出", ko: "반려동물 지출", it: "Spese per animali"
+            ),
             subtitle: human.name,
             onClose: onClose,
             leading: {
@@ -90,11 +99,7 @@ struct HumanExpenseDashboardContent: View {
                     }
                 }
             },
-            floating: {
-                if !isPrivacyLocked {
-                    addButton
-                }
-            }
+            floating: { EmptyView() }
         )
         .sheet(isPresented: $showingPersonalPlan) {
             PersonalPlanView()
@@ -111,9 +116,9 @@ struct HumanExpenseDashboardContent: View {
         FeatureHubMetricStrip(metrics: [
             FeatureHubMetric(id: "range", title: l.tr(zh: "本期", en: "Period", de: "Zeitraum"), value: AppCurrency.format(totals.spent, fractionDigits: 0)),
             FeatureHubMetric(
-                id: totals.reimbursed > 0 ? "net" : "direct",
-                title: totals.reimbursed > 0 ? l.tr(zh: "净额", en: "Net", de: "Netto") : l.tr(zh: "个人", en: "Personal", de: "Persönlich"),
-                value: totals.reimbursed > 0 ? AppCurrency.format(totals.net, fractionDigits: 0) : AppCurrency.format(directTotals.spent, fractionDigits: 0)
+                id: "net",
+                title: l.tr(zh: "净额", en: "Net", de: "Netto"),
+                value: AppCurrency.format(totals.net, fractionDigits: 0)
             ),
             FeatureHubMetric(id: "total", title: l.tr(zh: "累计", en: "Total", de: "Gesamt"), value: AppCurrency.format(baseTotals.spent, fractionDigits: 0))
         ])
@@ -195,42 +200,10 @@ struct HumanExpenseDashboardContent: View {
                                     .lineLimit(1)
                             }
                             Spacer()
-                            Text(AppCurrency.format(log.amount, fractionDigits: 2))
+                            let attributedAmount = ExpenseSummaryBuilder.amountPaid(by: human.id, for: log)
+                            Text(AppCurrency.format(attributedAmount, fractionDigits: 2))
                                 .font(OhanaFont.callout(.black))
-                                .foregroundStyle(log.amount >= 0 ? Color.ohanaPrimaryText : Color.goTeal)
-                            Button {
-                                commandQueue.enqueue(
-                                    .expenseDelete(
-                                        entityID: human.id,
-                                        entityKind: EntityKind.human.rawValue,
-                                        recordID: log.id
-                                    )
-                                ) {
-                                    do {
-                                        try DashboardRecordCommandExecutor(context: modelContext, services: appServices).deleteHumanExpense(
-                                            log,
-                                            human: human,
-                                            note: "dashboard.expense.delete.\(EntityKind.human.rawValue)"
-                                        )
-                                    } catch {
-                                        appServices.domainRevisions.publishFailure(
-                                            command: .expenseDelete(
-                                                entityID: human.id,
-                                                entityKind: EntityKind.human.rawValue,
-                                                recordID: log.id
-                                            ),
-                                            error: error
-                                        )
-                                    }
-                                }
-                            } label: {
-                                Image(systemName: "trash").accessibilityHidden(true)
-                                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                            .accessibilityLabel(l.tr(zh: "删除花费", en: "Delete expense", de: "Ausgabe löschen"))
+                                .foregroundStyle(attributedAmount >= 0 ? Color.ohanaPrimaryText : Color.goTeal)
                         }
                         .padding(14)
                         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
@@ -238,19 +211,6 @@ struct HumanExpenseDashboardContent: View {
                 }
             }
         }
-    }
-
-    private var addButton: some View {
-        Button(action: onAdd) {
-            Image(systemName: "plus").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
-                .foregroundStyle(Color.arkInk)
-                .frame(width: 56, height: 56)
-                .background(Color.goPrimary, in: Circle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(l.tr(zh: "添加花费", en: "Add expense", de: "Kosten hinzufügen"))
-        .accessibilityIdentifier("human-expense-add-action")
     }
 
     private var chartBuckets: [ExpenseTimeBucket] {
@@ -267,7 +227,14 @@ struct HumanExpenseDashboardContent: View {
     private func rowSubtitle(_ log: PetExpenseLog) -> String {
         let dateText = log.date.formatted(date: .abbreviated, time: .omitted)
         guard let pet = log.pet else {
-            return "\(dateText) · \(l.tr(zh: "个人花费", en: "Personal expense", de: "Persönliche Ausgabe"))"
+            let legacyLabel = l.tr(
+                zh: "历史记录",
+                en: "Legacy record",
+                de: "Früherer Eintrag",
+                es: "Registro anterior", pt: "Registo anterior", fr: "Ancienne entrée",
+                ja: "以前の記録", ko: "이전 기록", it: "Voce precedente"
+            )
+            return "\(dateText) · \(legacyLabel)"
         }
         return "\(dateText) · \(pet.name)"
     }
@@ -283,7 +250,7 @@ struct HumanExpenseDashboardContent: View {
                 Text(title)
                     .font(OhanaFont.caption(.black))
             }
-            .foregroundStyle(selected ? Color.arkInk : Color.ohanaSecondaryText)
+            .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .padding(.horizontal, 12)
             .frame(height: 34)
             .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

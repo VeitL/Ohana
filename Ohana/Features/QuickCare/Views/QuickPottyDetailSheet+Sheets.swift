@@ -141,7 +141,7 @@ extension QuickPottyDetailSheet {
                 }
                 poopOverviewLineChart(
                     title: l.tr(zh: "噗噗趋势", en: "Poop trend", de: "Häufchen-Trend"),
-                    subtitle: l.tr(zh: "按天统计次数。", en: "Daily count.", de: "Tageszahlen."),
+                    subtitle: nil,
                     points: pottyChartPoints,
                     tint: pottyTint,
                     emptyText: l.tr(zh: "记录噗噗后会出现趋势", en: "Log poop to see the trend", de: "Logge Häufchen für den Trend")
@@ -183,7 +183,7 @@ extension QuickPottyDetailSheet {
                 poopProgressBlock(title: l.tr(zh: "铲砂周期", en: "Scoop rhythm", de: "Klo-Rhythmus"), elapsed: scoopElapsedDays, interval: scoopIntervalDays, tint: scoopTint)
                 poopOverviewLineChart(
                     title: l.tr(zh: "铲砂记录", en: "Scoop logs", de: "Klo-Einträge"),
-                    subtitle: l.tr(zh: "按天统计铲砂次数。", en: "Daily scoop count.", de: "Reinigungen pro Tag."),
+                    subtitle: nil,
                     points: scoopChartPoints,
                     tint: scoopTint,
                     emptyText: l.tr(zh: "铲砂后会出现趋势", en: "Scoop to see the trend", de: "Reinigen zeigt den Trend")
@@ -416,14 +416,16 @@ extension QuickPottyDetailSheet {
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
-    func poopOverviewLineChart(title: String, subtitle: String, points: [PoopChartPoint], tint: Color, emptyText: String) -> some View {
+    func poopOverviewLineChart(title: String, subtitle: String?, points: [PoopChartPoint], tint: Color, emptyText: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(subtitle)
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.ohanaSecondaryText)
+            if let subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
 
             if points.allSatisfy({ $0.value <= 0 }) {
                 emptyInlineState(icon: "chart.line.uptrend.xyaxis", text: emptyText)

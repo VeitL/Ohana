@@ -156,7 +156,6 @@ struct CrewRosterOverlay: View {
             rosterTaskCenterAction
             if !isEmpty {
                 rosterMemberTools
-                rosterMemberSummaryRow
             }
         }
         .padding(.horizontal, 18)
@@ -228,7 +227,7 @@ struct CrewRosterOverlay: View {
             l.tr(zh: "搜索姓名、品种或城市", en: "Search names, breeds, or cities", de: "Name, Rasse oder Ort suchen"),
             text: $memberSearchText
         )
-        .textFieldStyle(.roundedBorder)
+        .ohanaRoundedTextFieldStyle()
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
         .focused($isMemberSearchFocused)
@@ -248,56 +247,6 @@ struct CrewRosterOverlay: View {
         .pickerStyle(.menu)
         .frame(minWidth: 44, minHeight: 44)
         .accessibilityIdentifier("crew-roster-member-filter")
-    }
-
-    @ViewBuilder
-    private var rosterMemberSummaryRow: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 6) {
-                rosterSummaryMetric(value: humans.count, title: l.tr(zh: "人类", en: "People", de: "Menschen"), icon: "person.fill")
-                Divider()
-                rosterSummaryMetric(value: pets.count, title: l.tr(zh: "宠物", en: "Pets", de: "Tiere"), icon: "pawprint.fill")
-                Divider()
-                rosterSummaryMetric(value: totalMemberCoconuts, title: l.tr(zh: "椰子", en: "Coconuts", de: "Kokos"), icon: "circle.hexagongrid.fill")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityIdentifier("crew-roster-member-summary")
-        } else {
-            HStack(spacing: 12) {
-                rosterSummaryMetric(value: humans.count, title: l.tr(zh: "人类", en: "People", de: "Menschen"), icon: "person.fill")
-                Divider().frame(height: 30)
-                rosterSummaryMetric(value: pets.count, title: l.tr(zh: "宠物", en: "Pets", de: "Tiere"), icon: "pawprint.fill")
-                Divider().frame(height: 30)
-                rosterSummaryMetric(value: totalMemberCoconuts, title: l.tr(zh: "椰子", en: "Coconuts", de: "Kokos"), icon: "circle.hexagongrid.fill")
-            }
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("crew-roster-member-summary")
-        }
-    }
-
-    private func rosterSummaryMetric(value: Int, title: String, icon: String) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: icon)
-                .foregroundStyle(Color.goPrimary)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("\(value)")
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                Text(title)
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var totalMemberCoconuts: Int {
-        humans.reduce(0) { $0 + max(0, $1.coconutBalance) }
-            + pets.reduce(0) { $0 + max(0, $1.coconutBalance) }
     }
 
     private func memberFilterTitle(_ filter: CrewRosterMemberFilter) -> String {
@@ -325,21 +274,14 @@ struct CrewRosterOverlay: View {
                 .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "家庭成员", en: "Family Members", de: "Familienmitglieder"))
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .accessibilityIdentifier("crew-roster-\(resolvedInitialMode.rawValue)")
-                Text(l.tr(
-                    zh: "档案、钱包与成员管理",
-                    en: "Profiles, wallets, and member management",
-                    de: "Profile, Wallets und Mitgliederverwaltung"
-                ))
-                    .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-            }
+            Text(l.tr(
+                zh: "家庭成员", en: "Family Members", de: "Familienmitglieder",
+                es: "Familia", pt: "Família", fr: "Famille",
+                ja: "家族メンバー", ko: "가족 구성원", it: "Famiglia"
+            ))
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .accessibilityIdentifier("crew-roster-\(resolvedInitialMode.rawValue)")
 
             Spacer()
 
@@ -384,21 +326,18 @@ struct CrewRosterOverlay: View {
         pendingInlineSavedPet = nil
         pendingInlineSavedHuman = nil
 
-        withAnimation(GoMotion.sheet) {
+        guard let savedTarget else {
             activeFullScreenRoute = nil
+            return
         }
 
-        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
-            switch savedTarget {
-            case .pet:
-                guard let savedPet else { return }
-                onInlinePetSaved(savedPet)
-            case .human:
-                guard let savedHuman else { return }
-                onInlineHumanSaved(savedHuman)
-            case nil:
-                break
-            }
+        switch savedTarget {
+        case .pet:
+            guard let savedPet else { return }
+            onInlinePetSaved(savedPet)
+        case .human:
+            guard let savedHuman else { return }
+            onInlineHumanSaved(savedHuman)
         }
     }
 
@@ -538,12 +477,7 @@ struct CrewRosterOverlay: View {
     private var memberSearchEmptyState: some View {
         ContentUnavailableView(
             l.tr(zh: "没有匹配的成员", en: "No matching members", de: "Keine passenden Mitglieder"),
-            systemImage: "magnifyingglass",
-            description: Text(l.tr(
-                zh: "请更换搜索内容或成员类型。",
-                en: "Try another search or member type.",
-                de: "Versuche eine andere Suche oder einen anderen Typ."
-            ))
+            systemImage: "magnifyingglass"
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -559,8 +493,12 @@ struct CrewRosterOverlay: View {
             Text(l.tr(zh: "还没有成员", en: "No members yet", de: "Noch keine Mitglieder"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(zh: "添加宠物或人类成员开始照顾。", en: "Add a pet or human member to begin.", de: "Füge ein Tier oder einen Menschen hinzu."))
-                .font(OhanaFont.caption(.bold))
+            Text(l.tr(
+                zh: "用右上角 + 添加人类或宠物",
+                en: "Use + above to add a person or pet",
+                de: "Mit + oben Person oder Tier hinzufügen"
+            ))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
         }

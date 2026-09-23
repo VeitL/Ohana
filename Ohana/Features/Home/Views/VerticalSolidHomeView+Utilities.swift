@@ -34,6 +34,7 @@ extension VerticalSolidHomeView {
         return OasisHomeTabHost(
             lifecycle: lifecycle,
             treeSnapshot: OasisTreeRenderSnapshot(
+                revision: oasisTreeRenderRevision,
                 level: treeLevel,
                 progressToNextLevel: treeManager.progressToNextLevel,
                 totalEnergy: treeManager.totalEnergy,
@@ -71,13 +72,15 @@ extension VerticalSolidHomeView {
             },
             onOpenGrowthRoadmap: {
                 openFunctionMenu(destination: .growthRoadmap)
-            }
+            },
+            onOpenFullOasis: onPresentOasisReward
         )
     }
 
     func embeddedPlantsPage(topChromeHeight: CGFloat) -> some View {
         VerticalSolidHomePlantsPage(
             plants: controller.snapshot.plants,
+            hasMorePlants: controller.snapshot.hasMorePlants,
             localization: l,
             plantQuickActionItemsRaw: $plantQuickActionItemsRaw,
             pendingQuickCareKeys: pendingPlantQuickCareKeys,
@@ -99,7 +102,8 @@ extension VerticalSolidHomeView {
                     destination: .plantsBatchCare,
                     currentLevel: treeManager.treeLevel.rawValue
                 )
-            }
+            },
+            onOpenAllPlants: { openFunctionMenu(destination: .plantsList) }
         )
     }
 
@@ -191,6 +195,7 @@ extension VerticalSolidHomeView {
     }
 
     func preloadFirstScreenAvatars() async {
+        guard canRunAvatarPreload else { return }
         let requests = payload.mediaPreloadRequests
         let legacyPayloads = avatarPreloadPayloads()
         let legacyPopoutPayloads = popoutPreloadPayloads()

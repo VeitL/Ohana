@@ -26,10 +26,10 @@ extension SettingsView {
                 NavigationLink(value: destination) {
                     SettingsNavigationLabel(
                         icon: destination.icon,
-                        title: destination.title(l),
-                        subtitle: destination.subtitle(l)
+                        title: destination.title(l)
                     )
                 }
+                .accessibilityHint(destination.subtitle(l))
                 .accessibilityIdentifier(destination.accessibilityIdentifier)
             }
         } header: {
@@ -250,15 +250,15 @@ private struct SettingsExperienceModeSelector: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(l.tr(
-                zh: "选择 Ohana 的使用方式；资料、椰子与 Oasis 都会原样保留。",
-                en: "Choose how Ohana feels. Your records, coconuts, and Oasis stay unchanged.",
-                de: "Wähle, wie sich Ohana anfühlt. Daten, Kokosnüsse und Oasis bleiben unverändert.",
-                es: "Elige cómo usar Ohana. Tus datos, cocos y Oasis no cambian.",
-                pt: "Escolha como usar o Ohana. Seus dados, cocos e Oasis não mudam.",
-                fr: "Choisissez votre façon d’utiliser Ohana. Vos données, cocos et Oasis restent intacts.",
-                ja: "Ohanaの使い方を選べます。記録、ココナッツ、Oasisはそのままです。",
-                ko: "Ohana 사용 방식을 선택하세요. 기록, 코코넛과 Oasis는 그대로 유지됩니다.",
-                it: "Scegli come usare Ohana. Dati, cocco e Oasis restano invariati."
+                zh: "切换模式不会改变资料、椰子或 Oasis。",
+                en: "Switching modes keeps your records, coconuts, and Oasis.",
+                de: "Beim Moduswechsel bleiben Daten, Kokosnüsse und Oasis erhalten.",
+                es: "Cambiar de modo conserva tus datos, cocos y Oasis.",
+                pt: "Mudar de modo mantém dados, cocos e Oasis.",
+                fr: "Changer de mode conserve vos données, cocos et Oasis.",
+                ja: "モードを変えても記録、ココナッツ、Oasisは残ります。",
+                ko: "모드를 바꿔도 기록, 코코넛과 Oasis는 유지됩니다.",
+                it: "Cambiare modalità conserva dati, cocco e Oasis."
             ))
             .font(OhanaFont.footnote(.semibold))
             .foregroundStyle(Color.ohanaSecondaryText)
@@ -310,12 +310,12 @@ private struct SettingsExperienceModeSelector: View {
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
 
-                Text(mode.subtitle(l))
+                Text(compactScope(for: mode))
                     .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, minHeight: 126, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
             .padding(14)
             .background(
                 isSelected ? Color.goPrimary.opacity(0.10) : Color.ohanaControlFill.opacity(0.72),
@@ -334,5 +334,22 @@ private struct SettingsExperienceModeSelector: View {
             : l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt", es: "No seleccionado", pt: "Não selecionado", fr: "Non sélectionné", ja: "未選択", ko: "선택 안 됨", it: "Non selezionato"))
         .accessibilityHint(mode.subtitle(l))
         .accessibilityIdentifier("settings-experience-mode-\(mode.rawValue)")
+    }
+
+    private func compactScope(for mode: AppExperienceMode) -> String {
+        switch mode {
+        case .standard:
+            l.tr(
+                zh: "完整功能", en: "Full experience", de: "Alle Funktionen",
+                es: "Experiencia completa", pt: "Experiência completa", fr: "Expérience complète",
+                ja: "すべての機能", ko: "전체 기능", it: "Esperienza completa"
+            )
+        case .zen:
+            l.tr(
+                zh: "打卡", en: "Check-ins", de: "Check-ins",
+                es: "Check-ins", pt: "Check-ins", fr: "Check-ins",
+                ja: "チェックイン", ko: "체크인", it: "Check-in"
+            )
+        }
     }
 }

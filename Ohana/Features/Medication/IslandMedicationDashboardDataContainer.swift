@@ -16,6 +16,7 @@ struct IslandMedicationDashboard: View {
             onOpenPet: onOpenPet,
             pets: routeData.pets,
             medicationsByPetID: routeData.medicationsByPetID,
+            todayDoseCounts: routeData.todayDoseCounts,
             onMedicationDataChanged: {
                 scheduleRouteDataLoad(delayMilliseconds: 24, force: true)
             }

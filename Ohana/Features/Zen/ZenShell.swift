@@ -87,19 +87,11 @@ struct ZenShell: View {
             .accessibilityIdentifier("zen-toolbar-coconut-log")
 
             Button(action: actions.onOpenMembers) {
-                Image(systemName: "person.2.fill").accessibilityHidden(true)
+                Text(activeHumanInitial)
+                    .font(OhanaFont.callout(.black))
+                    .frame(minWidth: 24)
             }
-            .accessibilityLabel(l.tr(
-                zh: "成员",
-                en: "Members",
-                de: "Mitglieder",
-                es: "Miembros",
-                pt: "Membros",
-                fr: "Membres",
-                ja: "メンバー",
-                ko: "구성원",
-                it: "Membri"
-            ))
+            .accessibilityLabel(memberAccessibilityLabel)
             .accessibilityIdentifier("zen-toolbar-members")
 
             Button(action: actions.onOpenSettings) {
@@ -118,6 +110,51 @@ struct ZenShell: View {
             ))
             .accessibilityIdentifier("zen-toolbar-settings")
         }
+    }
+
+    private var activeHumanDisplayName: String? {
+        if let ownerID = snapshot.ownerID,
+           let owner = snapshot.subjects.first(where: {
+               $0.kind == .human && $0.id == ownerID
+           }) {
+            return owner.name
+        }
+        return snapshot.subjects.first(where: {
+            $0.kind == .human && $0.isOwner
+        })?.name
+    }
+
+    private var activeHumanInitial: String {
+        let name = activeHumanDisplayName?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.first.map { String($0).uppercased() } ?? "?"
+    }
+
+    private var memberAccessibilityLabel: String {
+        guard let activeHumanDisplayName else {
+            return l.tr(
+                zh: "成员",
+                en: "Members",
+                de: "Mitglieder",
+                es: "Miembros",
+                pt: "Membros",
+                fr: "Membres",
+                ja: "メンバー",
+                ko: "구성원",
+                it: "Membri"
+            )
+        }
+        return l.tr(
+            zh: "成员，当前用户 \(activeHumanDisplayName)",
+            en: "Members, current user \(activeHumanDisplayName)",
+            de: "Mitglieder, aktueller Nutzer \(activeHumanDisplayName)",
+            es: "Miembros, usuario actual \(activeHumanDisplayName)",
+            pt: "Membros, utilizador atual \(activeHumanDisplayName)",
+            fr: "Membres, profil actuel \(activeHumanDisplayName)",
+            ja: "メンバー、現在のユーザー \(activeHumanDisplayName)",
+            ko: "구성원, 현재 사용자 \(activeHumanDisplayName)",
+            it: "Membri, utente attuale \(activeHumanDisplayName)"
+        )
     }
 }
 

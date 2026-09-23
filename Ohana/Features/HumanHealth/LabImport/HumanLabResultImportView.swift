@@ -822,9 +822,7 @@ private extension HumanLabResultImportView {
             defer { finishRecognitionOperation(operationID) }
             await Task.yield()
             do {
-                let pages = try await pageLoader.mapRenderedPages(from: url) {
-                    pageIndex,
-                    imageData in
+                let pages = try await pageLoader.mapRenderedPages(from: url) { pageIndex, imageData in
                     try Task.checkCancellation()
                     return try await documentRecognizer.recognizePage(
                         imageData,

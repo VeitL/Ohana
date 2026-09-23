@@ -48,13 +48,9 @@ struct ReminderObservabilityContentView: View {
         let score = reminderHealthScore
         return VStack(alignment: .leading, spacing: 14) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(l.tr(zh: "提醒系统可观测面板", en: "Reminder observability panel", de: "Reminder-Beobachtung"))
-                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
-                    Text(score.message)
-                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
+                Text(score.message)
+                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(score.value)")
                     .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
@@ -91,9 +87,9 @@ struct ReminderObservabilityContentView: View {
             }
             if authorizationStatus != .authorized, authorizationStatus != .provisional {
                 Text(l.tr(
-                    zh: "通知权限未开启或状态异常，提醒可能只能在 App 内补偿。",
-                    en: "Notifications are disabled or in an unusual state, so reminders may only be recovered inside the app.",
-                    de: "Mitteilungen sind deaktiviert oder in einem ungewoehnlichen Zustand; Erinnerungen koennen nur in der App kompensiert werden."
+                    zh: "通知未开启，系统提醒可能无法送达。",
+                    en: "Notifications are off; system reminders may not arrive.",
+                    de: "Mitteilungen sind aus; Systemerinnerungen kommen möglicherweise nicht an."
                 ))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.goOrange)
@@ -147,7 +143,7 @@ struct ReminderObservabilityContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(l.tr(zh: "需要处理", en: "Needs attention", de: "Benötigt Aufmerksamkeit"), icon: "exclamationmark.triangle.fill")
             if snapshot.riskItems.isEmpty {
-                emptyText(l.tr(zh: "当前没有过期或失败提醒", en: "No overdue or failed reminders right now", de: "Derzeit keine ueberfaelligen oder fehlgeschlagenen Reminder"))
+                emptyText(l.tr(zh: "暂无过期或失败提醒", en: "No overdue or failed reminders", de: "Keine überfälligen oder fehlgeschlagenen Erinnerungen"))
             } else {
                 ForEach(snapshot.riskItems) { reminder in
                     HStack(spacing: 10) {

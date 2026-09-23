@@ -53,7 +53,8 @@ struct ZenOasisView: View {
                     onOpenAchievements: actions.onOpenAchievements,
                     onOpenCritters: actions.onOpenCritters,
                     onOpenGacha: actions.onOpenGacha,
-                    onOpenGrowthRoadmap: actions.onOpenGrowthRoadmap
+                    onOpenGrowthRoadmap: actions.onOpenGrowthRoadmap,
+                    onOpenFullOasis: actions.onOpenOasisReward
                 )
             } else if snapshot.isReady {
                 dormantTree
@@ -131,15 +132,15 @@ struct ZenOasisView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
 
                 Text(l.tr(
-                    zh: "领取新人礼包后，Lv.0 椰子树会在这里醒来。",
-                    en: "Claim the welcome gift and your Lv.0 coconut tree will wake here.",
-                    de: "Nach dem Willkommensgeschenk erwacht hier dein Kokosbaum auf Lv. 0.",
-                    es: "Reclama el regalo y tu cocotero de Nv. 0 despertará aquí.",
-                    pt: "Resgate o presente e seu coqueiro Nv. 0 despertará aqui.",
-                    fr: "Récupérez le cadeau et votre cocotier niv. 0 s’éveillera ici.",
-                    ja: "ウェルカムギフトを受け取ると、Lv.0の木がここで目覚めます。",
-                    ko: "환영 선물을 받으면 Lv.0 코코넛 나무가 여기서 깨어나요.",
-                    it: "Riscatta il regalo e l’albero di Lv. 0 si risveglierà qui."
+                    zh: "领取新人礼包以唤醒椰子树。",
+                    en: "Claim the welcome gift to wake your coconut tree.",
+                    de: "Hole das Willkommensgeschenk, um den Kokosbaum zu wecken.",
+                    es: "Reclama el regalo para despertar tu cocotero.",
+                    pt: "Resgate o presente para despertar seu coqueiro.",
+                    fr: "Récupérez le cadeau pour éveiller votre cocotier.",
+                    ja: "ウェルカムギフトでココナッツの木を目覚めさせます。",
+                    ko: "환영 선물로 코코넛 나무를 깨우세요.",
+                    it: "Riscatta il regalo per risvegliare il cocco."
                 ))
                 .font(OhanaFont.callout())
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -168,8 +169,7 @@ struct ZenOasisView: View {
                 .font(OhanaFont.callout(.black))
                 .frame(maxWidth: .infinity, minHeight: 52)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.goPrimary)
+            .ohanaPrimaryProminentButton()
             .accessibilityIdentifier("zen-oasis-open-starter-journey")
         }
         .padding(24)

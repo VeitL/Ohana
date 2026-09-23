@@ -11,6 +11,7 @@ import SwiftUI
 
 struct VerticalSolidHomePlantsPage: View {
     let plants: [VerticalSolidHomePlantSnapshot]
+    let hasMorePlants: Bool
     let localization: L10n
     @Binding var plantQuickActionItemsRaw: String
     let pendingQuickCareKeys: Set<String>
@@ -24,6 +25,7 @@ struct VerticalSolidHomePlantsPage: View {
     let onCareQuickAction: (VerticalSolidHomePlantSnapshot, PlantCareType) -> Void
     let onAddPlant: () -> Void
     let onOpenBatchCare: () -> Void
+    let onOpenAllPlants: () -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -205,27 +207,38 @@ struct VerticalSolidHomePlantsPage: View {
             HStack(spacing: 10) {
                 Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon; button label names the batch-care action.
                     .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 34, height: 34) // a11y: allow decorative glyph inside a 50pt labeled batch-care button.
                     .background(Color.goYellow, in: Circle())
                     .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(l.tr(
+                Text(hasMorePlants
+                    ? l.tr(
+                        zh: "预览中 \(dueCarePlantCount) 株待照护",
+                        en: "\(dueCarePlantCount) preview plants need care",
+                        de: "\(dueCarePlantCount) Pflanzen der Vorschau brauchen Pflege",
+                        es: "\(dueCarePlantCount) plantas de la vista previa necesitan cuidados",
+                        pt: "\(dueCarePlantCount) plantas da prévia precisam de cuidados",
+                        fr: "\(dueCarePlantCount) plantes de l’aperçu à entretenir",
+                        ja: "プレビュー内でお手入れが必要：\(dueCarePlantCount)株",
+                        ko: "미리보기에서 관리가 필요한 식물 \(dueCarePlantCount)개",
+                        it: "\(dueCarePlantCount) piante nell’anteprima da curare"
+                    )
+                    : l.tr(
                         zh: "今日 \(dueCarePlantCount) 株待照护",
                         en: "\(dueCarePlantCount) plants need care today",
-                        de: "\(dueCarePlantCount) Pflanzen brauchen heute Pflege"
+                        de: "\(dueCarePlantCount) Pflanzen brauchen heute Pflege",
+                        es: "\(dueCarePlantCount) plantas necesitan cuidados hoy",
+                        pt: "\(dueCarePlantCount) plantas precisam de cuidados hoje",
+                        fr: "\(dueCarePlantCount) plantes à entretenir aujourd’hui",
+                        ja: "今日のお手入れ：\(dueCarePlantCount)株",
+                        ko: "오늘 관리가 필요한 식물 \(dueCarePlantCount)개",
+                        it: "\(dueCarePlantCount) piante da curare oggi"
                     ))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-
-                    Text(l.tr(zh: "批量处理", en: "Open batch care", de: "Batch-Pflege öffnen"))
-                        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(1)
-                }
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
 
                 Spacer(minLength: 6)
 
@@ -243,11 +256,17 @@ struct VerticalSolidHomePlantsPage: View {
             .overlay(Capsule().strokeBorder(Color.ohanaCardStroke.opacity(0.66), lineWidth: 1))
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(l.tr(
-            zh: "今日 \(dueCarePlantCount) 株植物待照护，打开批量照护",
-            en: "\(dueCarePlantCount) plants need care today, open batch care",
-            de: "\(dueCarePlantCount) Pflanzen brauchen heute Pflege, Batch-Pflege öffnen"
-        ))
+        .accessibilityLabel(hasMorePlants
+            ? l.tr(
+                zh: "预览中 \(dueCarePlantCount) 株植物待照护，打开批量照护",
+                en: "\(dueCarePlantCount) preview plants need care, open batch care",
+                de: "\(dueCarePlantCount) Pflanzen der Vorschau brauchen Pflege, Batch-Pflege öffnen"
+            )
+            : l.tr(
+                zh: "今日 \(dueCarePlantCount) 株植物待照护，打开批量照护",
+                en: "\(dueCarePlantCount) plants need care today, open batch care",
+                de: "\(dueCarePlantCount) Pflanzen brauchen heute Pflege, Batch-Pflege öffnen"
+            ))
         .accessibilityIdentifier("home-plants-due-care-banner")
     }
 
@@ -414,8 +433,12 @@ struct VerticalSolidHomePlantsPage: View {
         var options = [VerticalSolidHomePlantRoomDialOption(
             id: "all",
             roomID: nil,
-            title: l.tr(zh: "全部", en: "All", de: "Alle"),
-            shortTitle: l.tr(zh: "全部", en: "ALL", de: "ALLE"),
+            title: hasMorePlants
+                ? l.tr(zh: "预览", en: "Preview", de: "Vorschau")
+                : l.tr(zh: "全部", en: "All", de: "Alle"),
+            shortTitle: hasMorePlants
+                ? l.tr(zh: "预览", en: "PREVIEW", de: "VORSCHAU")
+                : l.tr(zh: "全部", en: "ALL", de: "ALLE"),
             count: plants.count,
             dueCount: plants.count(where: \.needsCare)
         )]
@@ -449,24 +472,31 @@ struct VerticalSolidHomePlantsPage: View {
         )
 
         return ScrollView(.vertical, showsIndicators: true) {
-            LazyVGrid(
-                columns: columns,
-                spacing: VerticalSolidHomePlantRoomStackLayout.overviewSpacing
-            ) {
-                ForEach(roomGroups) { group in
-                    VerticalSolidHomePlantRoomStack(
-                        summary: group.summary,
-                        cards: group.plants.map { plantCard(for: $0) },
-                        containerWidth: cellWidth,
-                        localization: localization,
-                        reduceMotion: reduceMotion,
-                        avatarCacheRevision: plantAvatarCacheRevision,
-                        onOpen: { selectRoom(group.id) }
-                    )
+            LazyVStack(spacing: 0) {
+                if hasMorePlants {
+                    plantPreviewLimitButton
+                        .padding(.horizontal, 16)
+                        .padding(.top, showsDueCareBanner ? 56 : 12)
                 }
+                LazyVGrid(
+                    columns: columns,
+                    spacing: VerticalSolidHomePlantRoomStackLayout.overviewSpacing
+                ) {
+                    ForEach(roomGroups) { group in
+                        VerticalSolidHomePlantRoomStack(
+                            summary: group.summary,
+                            cards: group.plants.map { plantCard(for: $0) },
+                            containerWidth: cellWidth,
+                            localization: localization,
+                            reduceMotion: reduceMotion,
+                            avatarCacheRevision: plantAvatarCacheRevision,
+                            onOpen: { selectRoom(group.id) }
+                        )
+                    }
+                }
+                .padding(.horizontal, VerticalSolidHomePlantRoomStackLayout.overviewHorizontalPadding)
+                .padding(.top, VerticalSolidHomePlantRoomStackLayout.overviewTopInset)
             }
-            .padding(.horizontal, VerticalSolidHomePlantRoomStackLayout.overviewHorizontalPadding)
-            .padding(.top, VerticalSolidHomePlantRoomStackLayout.overviewTopInset)
             .padding(
                 .bottom,
                 bottomChromeHeight + VerticalSolidHomePlantRoomStackLayout.overviewBottomInset
@@ -607,6 +637,10 @@ struct VerticalSolidHomePlantsPage: View {
                 alignment: .leading,
                 spacing: VerticalSolidHomePlantExpandedGridLayout.roomSpacing
             ) {
+                if hasMorePlants {
+                    plantPreviewLimitButton
+                        .padding(.top, showsDueCareBanner ? 56 : 12)
+                }
                 ForEach(roomGroups) { group in
                     plantAllExpandedRoomSection(group, columns: columns)
                 }
@@ -621,6 +655,30 @@ struct VerticalSolidHomePlantsPage: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .transition(.opacity.combined(with: .move(edge: .trailing)))
+    }
+
+    private var plantPreviewLimitButton: some View {
+        Button {
+            OhanaFeedback.light()
+            onOpenAllPlants()
+        } label: {
+            Label(l.tr(
+                zh: "首页仅展示部分植物 · 查看全部",
+                en: "Home shows a plant preview · View all",
+                de: "Startseite zeigt eine Auswahl · Alle Pflanzen",
+                es: "Inicio muestra una selección · Ver todas",
+                pt: "Início mostra uma seleção · Ver todas",
+                fr: "L’accueil montre un aperçu · Tout voir",
+                ja: "ホームには一部のみ表示・すべて見る",
+                ko: "홈에는 일부만 표시 · 모두 보기",
+                it: "Home mostra un’anteprima · Mostra tutte"
+            ), systemImage: "leaf.fill")
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold))
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.bordered)
+        .tint(Color.goPrimary)
+        .accessibilityIdentifier("home-plant-preview-open-all")
     }
 
     private func plantAllExpandedRoomSection(
@@ -639,7 +697,7 @@ struct VerticalSolidHomePlantsPage: View {
 
                 Text("\(summary.plantCount)")
                     .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 8)
                     .frame(minHeight: 22)
                     .background(Color.goPrimary, in: Capsule())

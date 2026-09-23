@@ -552,8 +552,10 @@ final class NotificationManager: NSObject, @unchecked Sendable {
     }
 
     private func plantCareNotificationBody(for event: Event, fallbackTitle: String) -> String {
+        // Rows created before structured plant-plan identity embedded this
+        // compatibility marker in their visible title.
         let title = fallbackTitle
-            .replacingOccurrences(of: "植物计划", with: "")
+            .replacingOccurrences(of: PlantCarePlanIdentity.legacyTitleMarker, with: "")
             .replacingOccurrences(of: "  ", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return "\(event.emoji) \(title)"

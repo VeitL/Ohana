@@ -49,17 +49,19 @@ extension OasisCritterCodexView {
                     }
 
                     VStack(spacing: 6) {
-                        Text(entry.name(l))
-                            .font(OhanaFont.adaptive(size: 25, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                        Text(entry.tagline(l))
-                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .padding(.horizontal, 8)
+                        if mode != .codex {
+                            Text(entry.name(l))
+                                .font(OhanaFont.adaptive(size: 25, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .foregroundStyle(Color.ohanaPrimaryText)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                            Text(entry.tagline(l))
+                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .foregroundStyle(Color.ohanaSecondaryText)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .padding(.horizontal, 8)
+                        }
                         HStack(spacing: 7) {
                             codexMetric(value: "\(fragmentCount)◇", label: l.tr(zh: "碎片", en: "Fragments", de: "Fragmente"))
                             if critter == nil {
@@ -350,7 +352,7 @@ extension OasisCritterCodexView {
                         )
                 }
             }
-            .foregroundStyle(highlighted ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(highlighted ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 70)
             .background(highlighted ? Color.goPrimary : Color.ohanaCardSurface.opacity(0.96), in: shape)
             .overlay(
@@ -437,7 +439,7 @@ extension OasisCritterCodexView {
                     .font(OhanaFont.footnote(.black))
                     .monospacedDigit()
             }
-            .foregroundStyle(availability.isAvailable ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(availability.isAvailable ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(
@@ -600,7 +602,7 @@ extension OasisCritterCodexView {
                     .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .monospacedDigit()
             }
-            .foregroundStyle(canUpgrade ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(canUpgrade ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(canUpgrade ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

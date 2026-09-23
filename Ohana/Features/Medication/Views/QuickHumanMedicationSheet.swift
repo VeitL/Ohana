@@ -296,7 +296,7 @@ struct QuickHumanMedicationSheet: View {
                         } label: {
                             Text(option)
                                 .font(OhanaFont.caption(.black))
-                                .foregroundStyle(medicationName == option ? Color.arkInk : Color.ohanaPrimaryText)
+                                .foregroundStyle(medicationName == option ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .background(medicationName == option ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -329,7 +329,7 @@ struct QuickHumanMedicationSheet: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                         }
-                        .foregroundStyle(form == item ? Color.arkInk : Color.ohanaPrimaryText)
+                        .foregroundStyle(form == item ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(form == item ? Color.goPrimary : Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
@@ -344,6 +344,7 @@ struct QuickHumanMedicationSheet: View {
                     placeholder: "1",
                     maxFractionDigits: 2,
                     accent: Color.goPrimary,
+                    accentForeground: Color.ohanaPrimaryActionText,
                     step: 0.5,
                     valueFont: OhanaFont.title3(.black),
                     fill: Color.ohanaCardSurface,
@@ -361,7 +362,7 @@ struct QuickHumanMedicationSheet: View {
                             } label: {
                                 Text(unit)
                                     .font(OhanaFont.caption(.black))
-                                    .foregroundStyle(doseUnit == unit ? Color.arkInk : Color.ohanaPrimaryText)
+                                    .foregroundStyle(doseUnit == unit ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                     .padding(.horizontal, 14)
                                     .frame(height: 36)
                                     .background(doseUnit == unit ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -393,7 +394,7 @@ struct QuickHumanMedicationSheet: View {
                             } label: {
                                 Text(option.displayTitle(l: l))
                                     .font(OhanaFont.caption(.black))
-                                    .foregroundStyle(frequency == option ? Color.arkInk : Color.ohanaPrimaryText)
+                                    .foregroundStyle(frequency == option ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                     .padding(.horizontal, 12)
                                     .frame(height: 36)
                                     .background(frequency == option ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -447,7 +448,7 @@ struct QuickHumanMedicationSheet: View {
                 )
                 .font(OhanaFont.callout(.black))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(canSave && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(canSave && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

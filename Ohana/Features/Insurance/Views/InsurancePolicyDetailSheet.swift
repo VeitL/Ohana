@@ -191,7 +191,7 @@ struct InsurancePolicyDetailSheet: View {
                 Button { withAnimation(GoMotion.page) { showAddClaim = true } } label: {
                     Image(systemName: "plus").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 13, weight: .black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(width: 38, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .background(Color.goPrimary, in: Capsule())
                 }
@@ -275,7 +275,7 @@ struct InsurancePolicyDetailSheet: View {
             Button { withAnimation(GoMotion.page) { showEdit = true } } label: {
                 Label(l.tr(zh: "编辑保单", en: "Edit", de: "Bearbeiten"), systemImage: "pencil")
                     .font(OhanaFont.subheadline(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
                     .background(Color.goPrimary, in: Capsule())
@@ -505,7 +505,7 @@ private struct InsuranceClaimPopup: View {
                                 .font(OhanaFont.caption(.black))
                                 .lineLimit(1)
                         }
-                        .foregroundStyle(initialStatus == status ? Color.arkInk : Color.ohanaPrimaryText)
+                        .foregroundStyle(initialStatus == status ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
                         .background(initialStatus == status ? Color.goPrimary : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))

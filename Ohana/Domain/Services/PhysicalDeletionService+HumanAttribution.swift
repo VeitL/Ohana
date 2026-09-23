@@ -71,9 +71,9 @@ extension PhysicalDeletionService {
         let retainedHealthConditions = allHealthConditions.filter {
             !idsMatch($0.humanId, humanId) && idsMatch($0.recordedByHumanId, humanId)
         }
-        retainedHealthConditions.forEach {
-            $0.recordedByHumanId = nil
-            $0.updatedAt = deletedAt
+        for retainedHealthCondition in retainedHealthConditions {
+            retainedHealthCondition.recordedByHumanId = nil
+            retainedHealthCondition.updatedAt = deletedAt
         }
         for retainedHealthCondition in retainedHealthConditions {
             CloudSyncMutationRecorder.markModified(retainedHealthCondition, context: context, modifiedAt: deletedAt)
@@ -84,9 +84,9 @@ extension PhysicalDeletionService {
         let retainedHealthObservations = allHealthObservations.filter {
             !idsMatch($0.humanId, humanId) && idsMatch($0.recordedByHumanId, humanId)
         }
-        retainedHealthObservations.forEach {
-            $0.recordedByHumanId = nil
-            $0.updatedAt = deletedAt
+        for retainedHealthObservation in retainedHealthObservations {
+            retainedHealthObservation.recordedByHumanId = nil
+            retainedHealthObservation.updatedAt = deletedAt
         }
         for retainedHealthObservation in retainedHealthObservations {
             CloudSyncMutationRecorder.markModified(retainedHealthObservation, context: context, modifiedAt: deletedAt)

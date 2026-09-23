@@ -173,8 +173,12 @@ actor DataBackupActor {
             mediaPackageEncrypted: encryptMedia,
             scope: scope
         )
+        let manifestData = try manager.encode(backup)
+        guard manifestData.count <= DataBackupRestoreLimits.maximumManifestBytes else {
+            throw BackupError.invalidRestoreData(.sizeLimit)
+        }
         return DataBackupPackageBuildResult(
-            manifestData: try manager.encode(backup),
+            manifestData: manifestData,
             mediaCount: mediaWriter.mediaCount,
             mediaBytes: mediaWriter.mediaBytes
         )

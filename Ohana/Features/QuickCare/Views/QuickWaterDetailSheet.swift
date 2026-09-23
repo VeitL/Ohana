@@ -827,7 +827,7 @@ extension QuickWaterDetailSheet {
     var toastView: some View {
         Text(saveToastMessage)
             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(chromeTint, in: Capsule())

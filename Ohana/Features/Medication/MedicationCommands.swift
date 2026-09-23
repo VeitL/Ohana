@@ -960,7 +960,8 @@ struct PetMedicationCommandExecutor {
         decrementRemaining: Bool = true,
         awardCoconut: Bool = true,
         executorId: String?,
-        note: String
+        note: String,
+        scheduledOccurrence: PetMedicationDoseLogging.ScheduledOccurrence? = nil
     ) -> PetMedicationDoseCommandResult {
         let recorded = PetMedicationDoseLogging.recordDoseResult(
             medication: medication,
@@ -970,7 +971,8 @@ struct PetMedicationCommandExecutor {
             awardCoconut: awardCoconut,
             economy: StaticCareEventEconomyAwarder(questManager: questManager),
             executorId: executorId,
-            medicationReminders: medicationReminders
+            medicationReminders: medicationReminders,
+            scheduledOccurrence: scheduledOccurrence
         )
         let result = PetMedicationDoseCommandResult(
             subjectID: pet.id,

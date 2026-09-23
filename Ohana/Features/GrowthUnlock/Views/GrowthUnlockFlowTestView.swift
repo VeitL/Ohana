@@ -125,7 +125,7 @@ struct OhanaGrowthOnboardingOverlay: View {
                         ? localized(zh: "开始", en: "Start", de: "Start")
                         : localized(zh: "下一步", en: "Next", de: "Weiter"))
                         .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(Color.goPrimary, in: Capsule())
                 }
@@ -292,7 +292,7 @@ struct GrowthUnlockFlowTestView: View {
                 Spacer()
                 Text("Lv.\(simulatedLevel)")
                     .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(Color.goPrimary, in: Capsule())
@@ -312,7 +312,7 @@ struct GrowthUnlockFlowTestView: View {
                         systemImage: "arrow.up.circle.fill"
                     )
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color.goPrimary, in: Capsule())
                 }
@@ -411,7 +411,7 @@ struct GrowthUnlockFlowTestView: View {
 
                 Text("Lv.\(openedRecommendationStep.requiredLevel)")
                     .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
                     .background(Color.goPrimary, in: Capsule())

@@ -287,7 +287,8 @@ nonisolated extension DataBackupManager {
                             petId: l.pet?.id.uuidString,
                             executorId: l.executorId,
                             recordedByHumanId: l.recordedByHumanId,
-                            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
+                            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId,
+                            payerContributionsJSON: l.payerContributionsJSON.isEmpty ? nil : l.payerContributionsJSON)
     }
 
     func encodeHealthLog(_ l: PetHealthLog) -> PetHealthLogBackup {

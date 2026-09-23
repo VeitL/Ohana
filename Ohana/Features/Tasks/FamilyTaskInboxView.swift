@@ -114,12 +114,6 @@ struct FamilyTaskInboxView: View {
                             l.tr(zh: "没有协作消息", en: "No collaboration messages", de: "Keine Nachrichten"),
                             systemImage: "tray"
                         )
-                    } description: {
-                        Text(l.tr(
-                            zh: "分配、完成、拒绝、延期和备注会按家庭成员显示在这里。",
-                            en: "Assignments, completions, declines, postponements, and notes appear here for each household member.",
-                            de: "Zuweisungen, Abschlüsse, Ablehnungen, Verschiebungen und Notizen erscheinen hier pro Familienmitglied."
-                        ))
                     }
                     .accessibilityIdentifier("family-task-inbox-empty")
                 } else {

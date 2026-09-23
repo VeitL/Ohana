@@ -664,16 +664,7 @@ extension OasisRewardView {
                 .background(Color.ohanaControlFill, in: Capsule())
             }
 
-            if pendingUpgradeCoconuts.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles") // a11y: allow decorative empty-state sparkle
-                        .accessibilityHidden(true)
-                    Text(nextStageHint)
-                        .lineLimit(1)
-                }
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            } else {
+            if !pendingUpgradeCoconuts.isEmpty {
                 ForEach(Array(pendingUpgradeCoconuts.prefix(3)), id: \.id) { coconut in
                     stageUpgradeCoconutButton(coconut)
                 }
@@ -848,24 +839,6 @@ extension OasisRewardView {
         .padding(.top, 60)
         .transition(.scale.combined(with: .opacity))
         .allowsHitTesting(false)
-    }
-
-    var nextStageHint: String {
-        if treeVisualLevel == .lv10 {
-            return l.tr(zh: "树冠已觉醒", en: "Tree awakened", de: "Baum erwacht")
-        }
-        if plantAmbienceSnapshot.lushnessLevel > 0 {
-            return l.tr(
-                zh: "植物照护让岛屿更繁茂",
-                en: "Plant care is making the island lusher",
-                de: "Pflanzenpflege macht die Insel grüner"
-            )
-        }
-        return l.tr(
-            zh: "完成照护，生命树会自然成长",
-            en: "Care grows the Life Tree naturally",
-            de: "Pflege lässt den Lebensbaum natürlich wachsen"
-        )
     }
 
     var nextCritterTargetCatalogId: String {

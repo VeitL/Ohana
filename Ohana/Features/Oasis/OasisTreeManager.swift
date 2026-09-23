@@ -102,11 +102,19 @@ final class OasisTreeManager {
     private(set) var islandEnergy: Int = 0
     // 照护养分累计能量(照护打卡自然获得,迁移基线之后的新增计入)
     private(set) var careGrowthEnergy: Int = 0 {
-        didSet { OasisTreePreferenceStore.careGrowthEnergy = careGrowthEnergy }
+        didSet {
+            OasisTreePreferenceStore.careGrowthEnergy = careGrowthEnergy
+            if careGrowthEnergy != oldValue {
+                OasisTreePreferenceStore.advanceRenderRevision()
+            }
+        }
     }
     // 额外注入经验（消耗椰子所得）
     private(set) var injectedEnergy: Int = 0 {
         didSet {
+            if injectedEnergy != oldValue {
+                OasisTreePreferenceStore.advanceRenderRevision()
+            }
             guard persistsInjectedEnergyChanges else { return }
             OasisTreePreferenceStore.injectedEnergy = injectedEnergy
         }
@@ -409,7 +417,11 @@ extension OasisTreeManager {
         )
         islandEnergy = 0
         refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
-        refreshCareGrowthEnergy(ledgerGrowthXP: snapshot.growthXP, legacyXP: snapshot.legacyXP)
+        refreshCareGrowthEnergy(
+            ledgerGrowthXP: snapshot.growthXP,
+            legacyXP: snapshot.legacyXP,
+            baselineExemptGrowthXP: Self.baselineExemptGrowthXPIfNeeded(modelContext: modelContext)
+        )
     }
 
     func refreshEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant] = []) {
@@ -421,7 +433,11 @@ extension OasisTreeManager {
         )
         islandEnergy = 0
         refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
-        refreshCareGrowthEnergy(ledgerGrowthXP: snapshot.growthXP, legacyXP: snapshot.legacyXP)
+        refreshCareGrowthEnergy(
+            ledgerGrowthXP: snapshot.growthXP,
+            legacyXP: snapshot.legacyXP,
+            baselineExemptGrowthXP: Self.baselineExemptGrowthXPIfNeeded(modelContext: modelContext)
+        )
         checkAndRewardLevelUp(modelContext: modelContext)
     }
 
@@ -435,7 +451,11 @@ extension OasisTreeManager {
         )
         islandEnergy = 0
         refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
-        refreshCareGrowthEnergy(ledgerGrowthXP: snapshot.growthXP, legacyXP: snapshot.legacyXP)
+        refreshCareGrowthEnergy(
+            ledgerGrowthXP: snapshot.growthXP,
+            legacyXP: snapshot.legacyXP,
+            baselineExemptGrowthXP: Self.baselineExemptGrowthXPIfNeeded(modelContext: modelContext)
+        )
         checkAndRewardLevelUp(modelContext: modelContext)
         return treeLevel
     }
@@ -635,6 +655,31 @@ extension OasisTreeManager {
         }
     }
 
+    /// Presence nourishment is created only after the Zen growth rule ships,
+    /// so it must survive first-time legacy baselining even when Oasis was not
+    /// opened before several explicit check-ins accumulated.
+    private static func baselineExemptGrowthXPIfNeeded(modelContext: ModelContext) -> Int {
+        guard OasisTreePreferenceStore.careGrowthBaseline() == nil else { return 0 }
+        let ownerAction = PresenceTreeGrowthPolicy.ownerDailyActionType
+        let statusAction = PresenceTreeGrowthPolicy.dailyStatusActionType
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate { event in
+                event.actionType == ownerAction || event.actionType == statusAction
+            }
+        )
+        do {
+            return try modelContext.fetch(descriptor).reduce(0) { partial, event in
+                partial + CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: event.metadataJSON)
+            }
+        } catch {
+            OhanaLog.warning(
+                "[OasisTreeManager] failed to preserve Zen presence nourishment during baseline: \(error.localizedDescription)",
+                category: "Oasis"
+            )
+            return 0
+        }
+    }
+
     private static func isManualTreeInjectionLedger(_ event: CareLedgerEvent) -> Bool {
         guard event.eventKindEnum == .coconut else { return false }
         guard event.actionType == "treeInjection" || event.actionType == "treeInjectionLarge" else { return false }
@@ -648,15 +693,20 @@ extension OasisTreeManager {
         }
     }
 
-    private func refreshCareGrowthEnergy(ledgerGrowthXP: Int, legacyXP: Int) {
+    private func refreshCareGrowthEnergy(
+        ledgerGrowthXP: Int,
+        legacyXP: Int,
+        baselineExemptGrowthXP: Int
+    ) {
         let historicalTotal = max(0, ledgerGrowthXP) + max(0, legacyXP)
         let baseline: Int
         if let stored = OasisTreePreferenceStore.careGrowthBaseline() {
             baseline = stored
         } else {
             // 首次接入"照护养树":以当前历史养分为基线,只有之后的新增计入树,
-            // 避免既有存档因历史照护一次性爆级(新用户此值为 0,照护全额计入)。
-            baseline = historicalTotal
+            // 避免既有存档因历史照护一次性爆级。新规则明确标记的 Zen 打卡养分
+            // 不属于旧历史，即使用户首次打开 Oasis 较晚也必须完整保留。
+            baseline = max(0, historicalTotal - max(0, baselineExemptGrowthXP))
             OasisTreePreferenceStore.storeCareGrowthBaseline(baseline)
         }
         let recovered = max(0, historicalTotal - baseline)

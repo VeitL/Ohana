@@ -210,7 +210,7 @@ struct HumanWeightDashboardContent: View {
         Button(action: onAdd) {
             Image(systemName: "plus").accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 18, weight: .black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 56, height: 56)
                 .background(Color.goPrimary, in: Circle())
         }

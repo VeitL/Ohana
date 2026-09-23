@@ -1090,6 +1090,32 @@ struct HomeExpensePreviewStoreTests {
         #expect(menuSource.contains(#".allowsHitTesting(!isEditMode && (!hasOpenActionMenu || openActionId == item.id))"#))
         #expect(menuSource.contains(#""home-quick-action-menu-\(item.id)-\(option.id)""#))
         #expect(menuSource.contains(#""home-quick-action-menu-\(item.id)-detail""#))
+        #expect(menuSource.contains("VerticalHomeQuickActionSecondaryMenuSurface()"))
+        #expect(menuSource.contains(".glassEffect(.regular, in: Capsule())"))
+        #expect(menuSource.contains(".background(Color.ohanaCardSurfaceElevated, in: Capsule())"))
+        #expect(!menuSource.contains("Color.arkInk.opacity(0.34)"))
+    }
+
+    @Test func quickActionSecondaryMenuUsesEditAndChartSymbols() throws {
+        let rootURL = repositoryRootURL()
+        let menuSource = try source(
+            "Ohana/Features/Home/Views/VerticalHomeEmbeddedQuickActions.swift",
+            rootURL: rootURL
+        )
+
+        #expect(VerticalHomeQuickActionSecondaryMenuStyle.editSystemName == "square.and.pencil")
+        #expect(VerticalHomeQuickActionSecondaryMenuStyle.chartSystemName == "chart.line.uptrend.xyaxis")
+        #expect(OhanaQuickActionGlyphKind.resolve(
+            actionType: VerticalHomeQuickActionSecondaryMenuStyle.editActionType,
+            fallbackSystemName: VerticalHomeQuickActionSecondaryMenuStyle.editSystemName
+        ) == nil)
+        #expect(OhanaQuickActionGlyphKind.resolve(
+            actionType: VerticalHomeQuickActionSecondaryMenuStyle.chartActionType,
+            fallbackSystemName: VerticalHomeQuickActionSecondaryMenuStyle.chartSystemName
+        ) == nil)
+        #expect(menuSource.contains("actionType: VerticalHomeQuickActionSecondaryMenuStyle.editActionType"))
+        #expect(menuSource.contains("actionType: VerticalHomeQuickActionSecondaryMenuStyle.chartActionType"))
+        #expect(menuSource.contains("icon: option.icon"))
     }
 
     @Test func quickWeightPopupUsesDirectInlineRouteWithoutFirstFrameBlank() throws {

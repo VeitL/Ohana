@@ -339,7 +339,7 @@ struct HumanHealthMetricEntrySheet: View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: metric.category.systemImage)
                 .font(OhanaFont.adaptive(size: 18, weight: .black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(metric.category.colorToken.actionTextColor)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: Circle())
 
@@ -520,13 +520,12 @@ struct HumanHealthMetricEntrySheet: View {
                 )
                 .font(OhanaFont.callout(.black))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(isValid && !presentationState.isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 52)
             .contentShape(Rectangle())
             .padding(.vertical, 14)
-            .background(isValid && !presentationState.isSaving ? Color.goPrimary : Color.goPrimary.opacity(0.38), in: Capsule())
-            .opacity(isValid && !presentationState.isSaving ? 1 : 0.62)
+            .background(isValid && !presentationState.isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(!isValid || presentationState.isSaving || requiresRecorderSelection || human.hasPassedAway)

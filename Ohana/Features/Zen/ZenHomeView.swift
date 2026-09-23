@@ -41,8 +41,8 @@ struct ZenHomeView: View {
                         if snapshot.isReady, ownerSubject == nil {
                             ownerBindingPrompt
                                 .padding(.horizontal, 16)
-                        } else if let ownerSubject, !ownerSubject.checkedToday {
-                            ownerConfirmationHint(ownerSubject)
+                        } else if let ownerSubject {
+                            ownerCardInteractionHint(ownerSubject)
                                 .padding(.horizontal, 16)
                         }
 
@@ -103,11 +103,7 @@ struct ZenHomeView: View {
         }
         .confirmationDialog(
             undoConfirmationTitle,
-            isPresented: Binding(
-                get: { undoConfirmationSubject != nil },
-                set: { if !$0 { undoConfirmationSubject = nil } }
-            ),
-            presenting: undoConfirmationSubject
+            item: $undoConfirmationSubject
         ) { subject in
             Button(undoConfirmationActionTitle, role: .destructive) {
                 undoConfirmationSubject = nil
@@ -352,24 +348,36 @@ struct ZenHomeView: View {
         .accessibilityIdentifier("zen-home-owner-status")
     }
 
-    private func ownerConfirmationHint(_ owner: ZenPresenceSubjectDTO) -> some View {
+    private func ownerCardInteractionHint(_ owner: ZenPresenceSubjectDTO) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "hand.tap.fill") // a11y: allow decorative icon; adjacent localized text provides the full instruction
+            Image(systemName: owner.checkedToday ? "hand.draw.fill" : "hand.tap.fill")
                 .accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 17, weight: .bold))
                 .foregroundStyle(Color.goPrimary)
 
-            Text(l.tr(
-                zh: "轻点 \(owner.name) 的卡片，确认今天平安",
-                en: "Tap \(owner.name)'s card to confirm you're safe today",
-                de: "Tippe auf \(owner.name), um dich heute zu bestätigen",
-                es: "Toca la tarjeta de \(owner.name) para confirmar que estás bien",
-                pt: "Toque no cartão de \(owner.name) para confirmar que está tudo bem",
-                fr: "Touchez la carte de \(owner.name) pour confirmer que tout va bien",
-                ja: "\(owner.name)のカードをタップして今日の無事を確認",
-                ko: "\(owner.name) 카드를 탭해 오늘의 무사를 확인하세요",
-                it: "Tocca la scheda di \(owner.name) per confermare che oggi stai bene"
-            ))
+            Text(owner.checkedToday
+                ? l.tr(
+                    zh: "长按卡片，上下滑动选择 1–10 分，松手保存",
+                    en: "Press and hold a card, slide up or down to choose 1–10, then release to save",
+                    de: "Karte gedrückt halten, für 1–10 nach oben oder unten ziehen und zum Speichern loslassen",
+                    es: "Mantén pulsada una tarjeta, desliza arriba o abajo para elegir 1–10 y suelta para guardar",
+                    pt: "Mantenha um cartão pressionado, deslize para escolher de 1 a 10 e solte para salvar",
+                    fr: "Maintenez une carte, glissez pour choisir de 1 à 10, puis relâchez pour enregistrer",
+                    ja: "カードを長押しし、上下に動かして1〜10を選び、離して保存",
+                    ko: "카드를 길게 누르고 위아래로 움직여 1–10점을 고른 뒤 놓아서 저장하세요",
+                    it: "Tieni premuta una scheda, scorri per scegliere 1–10 e rilascia per salvare"
+                )
+                : l.tr(
+                    zh: "轻点 \(owner.name) 的卡片确认今天平安；长按后上下滑动选择 1–10 分，松手保存",
+                    en: "Tap \(owner.name)'s card to confirm you're safe; press and hold, slide to choose 1–10, then release to save",
+                    de: "Tippe auf \(owner.name) zur Bestätigung; halte dann gedrückt, ziehe für 1–10 und lasse zum Speichern los",
+                    es: "Toca la tarjeta de \(owner.name) para confirmar; mantén, desliza para elegir 1–10 y suelta para guardar",
+                    pt: "Toque no cartão de \(owner.name) para confirmar; mantenha, deslize para escolher de 1 a 10 e solte para salvar",
+                    fr: "Touchez la carte de \(owner.name) pour confirmer ; maintenez, choisissez de 1 à 10, puis relâchez",
+                    ja: "\(owner.name)のカードをタップして無事を確認。長押しして上下に動かし1〜10を選び、離して保存",
+                    ko: "\(owner.name) 카드를 탭해 무사를 확인하고, 길게 눌러 위아래로 움직여 1–10점을 고른 뒤 놓아 저장하세요",
+                    it: "Tocca la scheda di \(owner.name) per confermare; tieni premuto, scegli 1–10 e rilascia per salvare"
+                ))
             .font(OhanaFont.footnote(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .fixedSize(horizontal: false, vertical: true)
@@ -380,7 +388,7 @@ struct ZenHomeView: View {
         .frame(minHeight: 44)
         .background(Color.ohanaCardSurface, in: Capsule())
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("zen-home-owner-confirmation-hint")
+        .accessibilityIdentifier("zen-home-card-score-hint")
     }
 
     private func loadingCards(
@@ -412,17 +420,7 @@ struct ZenHomeView: View {
                 systemImage: "person.2.slash"
             )
         } description: {
-            Text(l.tr(
-                zh: "添加家人、宠物或植物后，就能在这里确认、观察并留下今天的状态。",
-                en: "Add a person, pet, or plant to confirm, observe, and remember today.",
-                de: "Füge eine Person, ein Tier oder eine Pflanze hinzu.",
-                es: "Añade una persona, mascota o planta para empezar.",
-                pt: "Adicione uma pessoa, um pet ou uma planta para começar.",
-                fr: "Ajoutez une personne, un animal ou une plante pour commencer.",
-                ja: "家族、ペット、または植物を追加すると、すぐにチェックインできます。",
-                ko: "가족, 반려동물 또는 식물을 추가해 체크인을 시작하세요.",
-                it: "Aggiungi una persona, un animale o una pianta per iniziare."
-            ))
+            EmptyView()
         } actions: {
             Button(l.tr(
                 zh: "打开成员页",
@@ -435,7 +433,7 @@ struct ZenHomeView: View {
                 ko: "구성원 열기",
                 it: "Apri membri"
             ), action: actions.onOpenMembers)
-            .buttonStyle(.borderedProminent)
+            .ohanaPrimaryProminentButton()
             .accessibilityIdentifier("zen-home-empty-members-action")
         }
         .frame(maxWidth: .infinity)

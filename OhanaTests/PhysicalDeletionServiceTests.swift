@@ -1305,6 +1305,55 @@ struct PhysicalDeletionServiceTests {
         #expect((backup.coconutLedgerEntries ?? []).allSatisfy { $0.actorId != humanId })
     }
 
+    @Test func deleteHumanAnonymizesExpenseContributionAndPromotesSurvivingPayer() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let deletedPayer = Human(name: "Guan")
+        let survivingPayer = Human(name: "Alex")
+        let pet = Pet(name: "Momo")
+        let deletedPayerID = deletedPayer.id
+        let survivingPayerID = survivingPayer.id
+        let contributions = [
+            ExpensePayerContribution(humanID: deletedPayerID, minorUnits: 6000),
+            ExpensePayerContribution(humanID: survivingPayerID, minorUnits: 4000)
+        ]
+        let expense = PetExpenseLog(
+            amount: 100,
+            category: .medical,
+            pet: pet,
+            executorId: deletedPayerID.uuidString,
+            recordedByHumanId: deletedPayerID.uuidString,
+            payerContributionsJSON: ExpensePayerContributionPolicy.encode(contributions)
+        )
+        context.insert(deletedPayer)
+        context.insert(survivingPayer)
+        context.insert(pet)
+        context.insert(expense)
+        try context.save()
+
+        PhysicalDeletionService.deleteHuman(
+            deletedPayer,
+            context: context,
+            deletedByHumanId: survivingPayerID.uuidString
+        )
+        try context.save()
+
+        let retained = try #require(try context.fetch(FetchDescriptor<PetExpenseLog>()).first)
+        #expect(retained.id == expense.id)
+        #expect(retained.executorId == survivingPayerID.uuidString)
+        #expect(retained.recordedByHumanId == nil)
+        #expect(retained.amountPaid(by: deletedPayerID.uuidString) == 0)
+        #expect(retained.amountPaid(by: survivingPayerID.uuidString) == 40)
+        #expect(retained.payerContributions.contains {
+            $0.humanID == nil && $0.minorUnits == 6000
+        })
+        #expect(retained.payerContributions.contains {
+            $0.humanID == survivingPayerID && $0.minorUnits == 4000
+        })
+        #expect(retained.payerContributions.reduce(Int64(0)) { $0 + $1.minorUnits } == 10000)
+        #expect(!retained.payerContributionsJSON.lowercased().contains(deletedPayerID.uuidString.lowercased()))
+    }
+
     @Test func deleteHumanScrubsSharedCareChildrenWhenSessionKeepsOtherExecutors() throws {
         let container = try makeContainer()
         let context = container.mainContext

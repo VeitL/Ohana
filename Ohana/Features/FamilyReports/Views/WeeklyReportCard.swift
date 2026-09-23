@@ -104,7 +104,7 @@ struct WeeklyReportCard: View {
                             Text(l.tr(zh: "分享", en: "Share", de: "Teilen"))
                                 .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         }
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 10).padding(.vertical, 5)
                         .background(Color.goPrimary, in: Capsule())
                         .scaleEffect(shouldPulseShare && pulseShare ? 1.06 : 1.0)

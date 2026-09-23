@@ -120,6 +120,7 @@ nonisolated enum CloudSyncEntityRegistry {
         mutable(OasisUnlock.self),
         mutable(GachaOwnedItem.self, fieldPolicies: ["ownedCount": .maxValue]),
         mutable(ShopPurchaseRecord.self),
+        mutable(PlantCareLog.self),
 
         appendOnly(WaterLog.self),
         appendOnly(PetCareLog.self),
@@ -132,7 +133,6 @@ nonisolated enum CloudSyncEntityRegistry {
         appendOnly(PetFoodRecord.self),
         appendOnly(PetMilestone.self),
         appendOnly(PetPhotoLog.self),
-        appendOnly(PlantCareLog.self),
         appendOnly(SymptomLog.self),
         appendOnly(HeatCycleLog.self),
         appendOnly(HumanWeightLog.self),

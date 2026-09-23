@@ -23,6 +23,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
     private static let maintenanceStepNames: Set<String> = [
         "input_warmup",
         "shop_purchase_recovery",
+        "plant_care_reward_reconciliation",
         "companion_lifecycle_compatibility",
         "auto_feeder_materialization",
         "reminder_refill",
@@ -74,47 +75,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
     }
 
     private func runMaintenanceSequence(context: ModelContext, services: AppServices) async {
-        guard await runStep("input_warmup", delayMilliseconds: 700, operation: {
-                InputLatencyWarmupService.warmUpOnce()
-            }) else {
-                return
-            }
-
-            guard await runStep("shop_purchase_recovery", delayMilliseconds: 120, operation: {
-                let results = ShopPurchaseRecoveryService.settleRecoverable(
-                    context: context,
-                    services: services
-                )
-                guard !results.isEmpty else { return }
-                AppPerformanceMonitor.shared.record(
-                    "startup_shop_purchase_recovery",
-                    valueMS: 0,
-                    note: "settled=\(results.count)"
-                )
-            }) else {
-                return
-            }
-
-            guard await runStep("companion_lifecycle_compatibility", delayMilliseconds: 120, operation: {
-                do {
-                    let result = try OasisCompanionLifecycleCompatibilityService.reconcile(
-                        context: context
-                    )
-                    guard result.repairedCount > 0 || result.hasMoreWork else { return }
-                    AppPerformanceMonitor.shared.record(
-                        "startup_companion_lifecycle_compatibility",
-                        valueMS: 0,
-                        note: "inspected=\(result.inspectedCount), repaired=\(result.repairedCount), more=\(result.hasMoreWork)"
-                    )
-                } catch {
-                    OhanaLog.error(
-                        "Companion lifecycle compatibility failed: \(error.localizedDescription)",
-                        category: "StartupMaintenance"
-                    )
-                }
-            }) else {
-                return
-            }
+        guard await runCoreMaintenance(context: context, services: services) else { return }
 
             guard await runStep("auto_feeder_materialization", delayMilliseconds: 2500, operation: {
                 await self.materializeAutoFeederLogsIfNeeded(context: context)
@@ -193,6 +154,107 @@ final class StartupMaintenanceCoordinator: ObservableObject {
             }) else {
                 return
             }
+    }
+
+    private func runCoreMaintenance(context: ModelContext, services: AppServices) async -> Bool {
+        guard await runStep("input_warmup", delayMilliseconds: 700, operation: {
+                InputLatencyWarmupService.warmUpOnce()
+            }) else {
+                return false
+            }
+
+            guard await runStep("shop_purchase_recovery", delayMilliseconds: 120, operation: {
+                let results = ShopPurchaseRecoveryService.settleRecoverable(
+                    context: context,
+                    services: services
+                )
+                guard !results.isEmpty else { return }
+                AppPerformanceMonitor.shared.record(
+                    "startup_shop_purchase_recovery",
+                    valueMS: 0,
+                    note: "settled=\(results.count)"
+                )
+            }) else {
+                return false
+            }
+
+            guard await runStep("plant_care_reward_reconciliation", delayMilliseconds: 120, operation: {
+                let economy = StaticCareEventEconomyAwarder(
+                    questManager: services.questManager,
+                    oasisRewards: services.oasisRewards
+                )
+                let cursor = PlantCareRewardReconciliationCursorStore.cursor(defaults: self.defaults)
+                var inspectedCount = 0
+                var settledCount = 0
+                var pendingCount = 0
+                var skippedCount = 0
+                var hasMoreWork = false
+                var didCompleteSweep = false
+                var checkpointPersisted = true
+                // Four bounded pages match this startup step's 64-item workload
+                // budget. A durable ledger marker advances the sweep across
+                // launches without allowing transient failures to pin a prefix.
+                for _ in 0 ..< 4 {
+                    guard !Task.isCancelled else { return }
+                    let result = PlantCareRewardReconciliationService.reconcile(
+                        context: context,
+                        economy: economy,
+                        maximumCount: 16,
+                        options: PlantCareRewardReconciliationOptions(
+                            sweepID: cursor.sweepID,
+                            now: Date(),
+                            defaults: self.defaults
+                        )
+                    )
+                    inspectedCount += result.inspectedCount
+                    settledCount += result.settledCount
+                    pendingCount += result.pendingCount
+                    skippedCount += result.skippedCount
+                    hasMoreWork = result.hasMoreWork
+                    didCompleteSweep = result.didCompleteSweep
+                    checkpointPersisted = result.checkpointPersisted
+                    guard checkpointPersisted,
+                          result.inspectedCount > 0,
+                          result.hasMoreWork else { break }
+                    await Task.yield()
+                }
+                PlantCareRewardReconciliationCursorStore.advance(
+                    checkpointPersisted: checkpointPersisted,
+                    didCompleteSweep: didCompleteSweep,
+                    defaults: self.defaults
+                )
+                guard inspectedCount > 0 else { return }
+                AppPerformanceMonitor.shared.record(
+                    "startup_plant_care_reward_reconciliation",
+                    valueMS: 0,
+                    note: "inspected=\(inspectedCount), settled=\(settledCount), pending=\(pendingCount), skipped=\(skippedCount), more=\(hasMoreWork), complete=\(didCompleteSweep), checkpoint=\(checkpointPersisted)"
+                )
+            }) else {
+                return false
+            }
+
+            guard await runStep("companion_lifecycle_compatibility", delayMilliseconds: 120, operation: {
+                do {
+                    let result = try OasisCompanionLifecycleCompatibilityService.reconcile(
+                        context: context
+                    )
+                    guard result.repairedCount > 0 || result.hasMoreWork else { return }
+                    AppPerformanceMonitor.shared.record(
+                        "startup_companion_lifecycle_compatibility",
+                        valueMS: 0,
+                        note: "inspected=\(result.inspectedCount), repaired=\(result.repairedCount), more=\(result.hasMoreWork)"
+                    )
+                } catch {
+                    OhanaLog.error(
+                        "Companion lifecycle compatibility failed: \(error.localizedDescription)",
+                        category: "StartupMaintenance"
+                    )
+                }
+            }) else {
+                return false
+            }
+
+        return true
     }
 
     func cancel() {
@@ -654,6 +716,47 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         static let memberThemeColorNormalizationCompleted = "ohana_member_theme_color_normalization_v1_completed"
         static let maintenanceCursor = "ohana_startup_maintenance_cursor"
         static let maintenanceCursorUpdatedAt = "ohana_startup_maintenance_cursor_updated_at"
+    }
+}
+
+enum PlantCareRewardReconciliationCursorStore {
+    private static let key = "ohana_plant_care_reward_reconciliation_cursor_v1"
+
+    static func cursor(defaults: UserDefaults) -> PlantCareRewardReconciliationCursor {
+        if let data = defaults.data(forKey: key),
+           let cursor = try? JSONDecoder().decode(PlantCareRewardReconciliationCursor.self, from: data) {
+            return cursor
+        }
+        let cursor = PlantCareRewardReconciliationCursor.fresh()
+        store(cursor, defaults: defaults)
+        return cursor
+    }
+
+    static func store(_ cursor: PlantCareRewardReconciliationCursor, defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(cursor) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    @discardableResult
+    static func advance(
+        checkpointPersisted: Bool,
+        didCompleteSweep: Bool,
+        defaults: UserDefaults
+    ) -> PlantCareRewardReconciliationCursor {
+        let current = cursor(defaults: defaults)
+        guard checkpointPersisted, didCompleteSweep else { return current }
+        return rotate(defaults: defaults)
+    }
+
+    @discardableResult
+    static func rotate(defaults: UserDefaults) -> PlantCareRewardReconciliationCursor {
+        let cursor = PlantCareRewardReconciliationCursor.fresh()
+        store(cursor, defaults: defaults)
+        return cursor
+    }
+
+    static func clear(defaults: UserDefaults) {
+        defaults.removeObject(forKey: key)
     }
 }
 

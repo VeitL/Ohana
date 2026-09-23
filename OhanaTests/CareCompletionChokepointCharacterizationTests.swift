@@ -269,7 +269,7 @@ struct CareCompletionChokepointCharacterizationTests {
         #expect(budgetEvents.count { $0.actionKey == "walk" && $0.scopeRaw == EconomyBudgetUsageScope.careObject.rawValue } == 2)
     }
 
-    @Test func familyTwoPetAndHumanExpensesKeepExpenseFactsLedgerAndRewardDiscipline() throws {
+    @Test func petExpenseWritesOnceWhileHumanSubjectExpenseIsRejected() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
@@ -294,29 +294,31 @@ struct CareCompletionChokepointCharacterizationTests {
             questManager: questManager
         )
         UserDefaults.standard.removeObject(forKey: QuestManager.Keys.cooldownLogs)
-        _ = try ExpenseCommandService.recordHumanExpense(
-            human: human,
-            amount: 12,
-            date: Date(timeIntervalSince1970: 2200),
-            note: "medicine",
-            context: context,
-            category: .medical,
-            questManager: questManager
-        )
+        #expect(throws: ExpenseSubjectPolicyError.humanSubjectNotSupported) {
+            _ = try ExpenseCommandService.recordHumanExpense(
+                human: human,
+                amount: 12,
+                date: Date(timeIntervalSince1970: 2200),
+                note: "medicine",
+                context: context,
+                category: .medical,
+                questManager: questManager
+            )
+        }
 
         let expenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
         let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
 
-        #expect(expenses.count == 2)
+        #expect(expenses.count == 1)
         #expect(expenses.contains { $0.pet?.id == pet.id && $0.amount == 42 })
-        #expect(expenses.contains { $0.pet == nil && $0.executorId == human.id.uuidString && $0.amount == 12 })
-        #expect(ledgers.count { $0.eventKind == CareLedgerEventKind.expense.rawValue } == 2)
+        #expect(!expenses.contains { $0.pet == nil })
+        #expect(ledgers.count { $0.eventKind == CareLedgerEventKind.expense.rawValue } == 1)
         #expect(ledgers.allSatisfy { $0.legacyModelName == "PetExpenseLog" })
         #expect(walletEntries.contains { $0.ownerId == human.id.uuidString && $0.delta > 0 })
-        #expect(budgetEvents.count { $0.actionKey == "expense" && $0.scopeRaw == EconomyBudgetUsageScope.household.rawValue } == 2)
-        #expect(budgetEvents.count { $0.actionKey == "expense" && $0.scopeRaw == EconomyBudgetUsageScope.member.rawValue } == 2)
+        #expect(budgetEvents.count { $0.actionKey == "expense" && $0.scopeRaw == EconomyBudgetUsageScope.household.rawValue } == 1)
+        #expect(budgetEvents.count { $0.actionKey == "expense" && $0.scopeRaw == EconomyBudgetUsageScope.member.rawValue } == 1)
         #expect(budgetEvents.count { $0.actionKey == "expense" && $0.scopeRaw == EconomyBudgetUsageScope.careObject.rawValue } == 1)
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
     }

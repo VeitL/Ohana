@@ -88,6 +88,11 @@ struct QuickPottyDetailSheet: View {
     var scoopTint: Color { isDark ? Color.goPrimary : Color(hex: CareType.litter.accentColorHex) }
     var litterTint: Color { Color(hex: "D4A574") }
     var chromeTint: Color { isDark ? Color.goPrimary : themeColor }
+    var chromeActionForeground: Color {
+        isDark
+            ? Color.ohanaPrimaryActionText
+            : (OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText)
+    }
     var pottyCommandExecutor: QuickPottyCommandExecutor {
         QuickPottyCommandExecutor(
             context: modelContext,
@@ -571,7 +576,7 @@ struct QuickPottyDetailSheet: View {
                 Text(focus.title(l))
                     .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
-            .foregroundStyle(selected ? Color.arkInk : tint)
+            .foregroundStyle(selected ? actionForeground(for: focus) : tint)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(selected ? tint : Color.ohanaCardSurfaceElevated, in: Capsule())
@@ -605,6 +610,16 @@ struct QuickPottyDetailSheet: View {
         case .litter:
             litterTint
         }
+    }
+
+    func actionForeground(for focus: PottyFocus) -> Color {
+        let hex = switch focus {
+        case .potty: "A66A3F"
+        case .scoop: isDark ? nil : CareType.litter.accentColorHex
+        case .litter: "D4A574"
+        }
+        return hex.flatMap { OhanaResolvedPrimaryAccent(customHex: $0)?.actionTextColor }
+            ?? Color.ohanaPrimaryActionText
     }
 
     var coreCards: some View {
@@ -777,7 +792,7 @@ struct QuickPottyDetailSheet: View {
     var toastView: some View {
         Text(saveToastMessage)
             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(chromeActionForeground)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(chromeTint, in: Capsule())

@@ -115,4 +115,55 @@ struct HomeSurfaceInvalidationTests {
             )
         )
     }
+
+    @Test func visibleInitialSnapshotRemainsAvailableWhenRoutineRefreshIsPaused() {
+        let policy = AppWorkloadPolicy()
+
+        #expect(policy.allowsEssentialInitialSnapshotRead(isVisible: true, isLive: true, hasSnapshot: false))
+        #expect(!policy.allowsEssentialInitialSnapshotRead(isVisible: false, isLive: true, hasSnapshot: false))
+        #expect(!policy.allowsEssentialInitialSnapshotRead(isVisible: true, isLive: false, hasSnapshot: false))
+        #expect(!policy.allowsEssentialInitialSnapshotRead(isVisible: true, isLive: true, hasSnapshot: true))
+    }
+
+    @Test func suspendingAnUnresolvedHomeSnapshotRetainsAForcedRefresh() {
+        #expect(
+            HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+                snapshotIsReady: false,
+                wasPending: false
+            )
+        )
+        #expect(
+            HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+                snapshotIsReady: true,
+                wasPending: true
+            )
+        )
+        #expect(
+            !HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+                snapshotIsReady: true,
+                wasPending: false
+            )
+        )
+    }
+
+    @Test func suppressedRefreshRequestAlwaysQueuesAForcedRefreshForResume() {
+        #expect(
+            HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuppressedRequest(
+                requestWasSuppressed: true,
+                wasPending: false
+            )
+        )
+        #expect(
+            HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuppressedRequest(
+                requestWasSuppressed: true,
+                wasPending: true
+            )
+        )
+        #expect(
+            !HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuppressedRequest(
+                requestWasSuppressed: false,
+                wasPending: false
+            )
+        )
+    }
 }

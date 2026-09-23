@@ -352,7 +352,7 @@ extension PetHealthDetailContentView {
                 } label: {
                     Text(isPast ? l.tr(zh: "补记", en: "Catch up", de: "Nachtragen") : l.tr(zh: "提前", en: "Early", de: "Früh"))
                         .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
+                        .foregroundStyle(medicationActionForeground)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(medicationTint, in: Capsule())

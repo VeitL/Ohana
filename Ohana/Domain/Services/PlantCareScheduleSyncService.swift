@@ -390,8 +390,29 @@ enum PlantCareScheduleSyncService {
         let recordedPreviousDate = ledgers.lazy.compactMap {
             recordedPreviousCareDate(in: $0.metadataJSON)
         }.first
+        let generatedLogs: [PlantCareLog]
+        let fallbackDate: Date?
+        do {
+            generatedLogs = try fetchPlantCareLogs(ids: generatedLogIDs, context: context)
+            fallbackDate = if recordedPreviousDate == nil {
+                try latestRemainingCareDate(
+                    type: type,
+                    plantID: plantID,
+                    excludingLogIDs: generatedLogIDs,
+                    context: context
+                )
+            } else {
+                nil
+            }
+        } catch {
+            return .persistenceFailed(
+                plantID: plantID,
+                careType: type,
+                errorDescription: error.localizedDescription
+            )
+        }
         var removedLogID: UUID?
-        for log in fetchPlantCareLogs(ids: generatedLogIDs, context: context) {
+        for log in generatedLogs {
             removedLogID = removedLogID ?? log.id
             CloudSyncMutationRecorder.markDeleted(
                 log,
@@ -412,12 +433,6 @@ enum PlantCareScheduleSyncService {
             context.delete(ledger)
         }
 
-        let fallbackDate = latestRemainingCareDate(
-            type: type,
-            plantID: plantID,
-            excludingLogIDs: generatedLogIDs,
-            context: context
-        )
         applyCareDate(recordedPreviousDate ?? fallbackDate, type: type, to: plant)
         CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
         if saveChanges {
@@ -710,10 +725,14 @@ enum PlantCareScheduleSyncService {
     private static func fetchPlantCareLogs(
         ids: Set<UUID>,
         context: ModelContext
-    ) -> [PlantCareLog] {
+    ) throws -> [PlantCareLog] {
         guard !ids.isEmpty else { return [] }
-        return ((try? context.fetch(FetchDescriptor<PlantCareLog>())) ?? []).filter {
-            ids.contains($0.id)
+        return try ids.compactMap { id in
+            var descriptor = FetchDescriptor<PlantCareLog>(
+                predicate: #Predicate<PlantCareLog> { log in log.id == id }
+            )
+            descriptor.fetchLimit = 1
+            return try context.fetch(descriptor).first
         }
     }
 
@@ -722,15 +741,20 @@ enum PlantCareScheduleSyncService {
         plantID: UUID,
         excludingLogIDs: Set<UUID>,
         context: ModelContext
-    ) -> Date? {
-        ((try? context.fetch(FetchDescriptor<PlantCareLog>())) ?? [])
-            .filter { log in
-                log.plant?.id == plantID &&
-                    !excludingLogIDs.contains(log.id) &&
-                    careTypesSharingSummaryDate(with: type).contains(log.careType)
-            }
-            .map(\.date)
-            .max()
+    ) throws -> Date? {
+        try careTypesSharingSummaryDate(with: type).compactMap { careType -> Date? in
+            let typeRaw = careType.rawValue
+            var descriptor = FetchDescriptor<PlantCareLog>(
+                predicate: #Predicate<PlantCareLog> { log in
+                    log.plant?.id == plantID && log.careTypeRaw == typeRaw
+                },
+                sortBy: [SortDescriptor(\PlantCareLog.date, order: .reverse)]
+            )
+            descriptor.fetchLimit = excludingLogIDs.count + 1
+            return try context.fetch(descriptor).first { log in
+                !excludingLogIDs.contains(log.id)
+            }?.date
+        }.max()
     }
 
     private static func careTypesSharingSummaryDate(with type: PlantCareType) -> Set<PlantCareType> {

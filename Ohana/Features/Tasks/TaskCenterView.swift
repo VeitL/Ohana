@@ -485,9 +485,9 @@ private extension TaskCenterView {
         let title = memberFilterTitle(filter)
         let count = snapshot.memberFilterSummary.count(for: filter)
         return l.tr(
-            zh: "\(title)，\(count) 项",
-            en: "\(title), \(count) items",
-            de: "\(title), \(count) Einträge"
+            zh: "\(title)：\(count)", en: "\(title): \(count)", de: "\(title): \(count)",
+            es: "\(title): \(count)", pt: "\(title): \(count)", fr: "\(title) : \(count)",
+            ja: "\(title)：\(count)", ko: "\(title): \(count)", it: "\(title): \(count)"
         )
     }
 
@@ -517,9 +517,15 @@ private extension TaskCenterView {
             .frame(width: 78, height: 78)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(l.tr(
-                zh: "今天完成 \(displayedSnapshot.todayCompletedCount) 项，共 \(displayedSnapshot.todayTotalCount) 项",
-                en: "\(displayedSnapshot.todayCompletedCount) of \(displayedSnapshot.todayTotalCount) tasks complete today",
-                de: "Heute \(displayedSnapshot.todayCompletedCount) von \(displayedSnapshot.todayTotalCount) Aufgaben erledigt"
+                zh: "今天：完成 \(displayedSnapshot.todayCompletedCount)/\(displayedSnapshot.todayTotalCount)",
+                en: "Today: \(displayedSnapshot.todayCompletedCount) of \(displayedSnapshot.todayTotalCount) complete",
+                de: "Heute: \(displayedSnapshot.todayCompletedCount) von \(displayedSnapshot.todayTotalCount) erledigt",
+                es: "Hoy: \(displayedSnapshot.todayCompletedCount) de \(displayedSnapshot.todayTotalCount) completadas",
+                pt: "Hoje: \(displayedSnapshot.todayCompletedCount) de \(displayedSnapshot.todayTotalCount) concluídas",
+                fr: "Aujourd’hui : \(displayedSnapshot.todayCompletedCount) sur \(displayedSnapshot.todayTotalCount) terminées",
+                ja: "今日：\(displayedSnapshot.todayCompletedCount)/\(displayedSnapshot.todayTotalCount) 完了",
+                ko: "오늘: \(displayedSnapshot.todayCompletedCount)/\(displayedSnapshot.todayTotalCount) 완료",
+                it: "Oggi: \(displayedSnapshot.todayCompletedCount) di \(displayedSnapshot.todayTotalCount) completate"
             ))
 
             VStack(alignment: .leading, spacing: 10) {
@@ -595,7 +601,7 @@ private extension TaskCenterView {
                     Spacer()
                 }
 
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         taskRow(item)
                             .id(item.id)
@@ -746,24 +752,18 @@ private extension TaskCenterView {
         VStack(spacing: 16) {
             Image(systemName: "checkmark") // a11y: allow decorative empty-state symbol combined with the explanatory copy
                 .font(OhanaFont.adaptive(size: 26, weight: .black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .foregroundStyle(Color.arkInk)
                 .frame(width: 64, height: 64)
                 .background(Color.goTeal, in: Circle())
                 .accessibilityHidden(true)
 
-            VStack(spacing: 7) {
-                Text(l.tr(zh: "都处理好了", en: "All caught up", de: "Alles erledigt"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(
-                    zh: "新的照护、用药和提醒事项会出现在这里。",
-                    en: "New care, medication, and reminder tasks will appear here.",
-                    de: "Neue Pflege-, Medikamenten- und Erinnerungsaufgaben erscheinen hier."
-                ))
-                .font(OhanaFont.callout())
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
-            }
+            Text(l.tr(
+                zh: "都处理好了", en: "All caught up", de: "Alles erledigt",
+                es: "Todo al día", pt: "Tudo em dia", fr: "Tout est à jour",
+                ja: "すべて完了", ko: "모두 완료했어요", it: "Tutto fatto"
+            ))
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 58)

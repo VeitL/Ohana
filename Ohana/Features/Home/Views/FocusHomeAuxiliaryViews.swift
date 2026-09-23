@@ -238,7 +238,8 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
                 pets: pets,
                 plants: visiblePlants,
                 healthAlerts: healthAlerts,
-                careLedgerEntries: negativeCareLedgerEntries(from: careLedgerEntries)
+                careLedgerEntries: negativeCareLedgerEntries(from: careLedgerEntries),
+                doseEvents: events
             ),
             dayToken: dayToken(for: now)
         )
@@ -316,7 +317,8 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
                 pets: pets,
                 plants: visiblePlants,
                 clinicalAlerts: clinicalAlerts,
-                careLedgerEntries: negativeCareLedgerEntries(from: careLedgerEntries)
+                careLedgerEntries: negativeCareLedgerEntries(from: careLedgerEntries),
+                doseEvents: events
             ),
             dayToken: dayToken(for: now)
         )

@@ -310,7 +310,7 @@ extension PetHealthDetailContentView {
                 value: nextPreventiveStatusText,
                 detail: preventiveDashboardDetail,
                 icon: "shield.checkered",
-                tint: preventionTint,
+                accent: (preventionTint, preventionActionForeground),
                 primaryTitle: l.tr(zh: "记录", en: "Log", de: "Eintragen"),
                 secondaryTitle: l.tr(zh: "疫苗本", en: "Passport", de: "Impfpass"),
                 primaryIdentifier: "pet-health-tool-preventive-action",
@@ -326,7 +326,7 @@ extension PetHealthDetailContentView {
                 value: medicationStatusText,
                 detail: nextMedicationDoseText,
                 icon: "pill.fill",
-                tint: medicationTint,
+                accent: (medicationTint, medicationActionForeground),
                 primaryTitle: medicationPrimaryButtonTitle,
                 secondaryTitle: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
                 primaryAction: handleMedicationPrimaryAction,
@@ -341,7 +341,7 @@ extension PetHealthDetailContentView {
                 value: symptomStatusText,
                 detail: symptomVisitDashboardDetail,
                 icon: "waveform.path.ecg",
-                tint: symptomVisitTint,
+                accent: (symptomVisitTint, symptomVisitActionForeground),
                 primaryTitle: l.tr(zh: "症状", en: "Symptom", de: "Symptom"),
                 secondaryTitle: l.tr(zh: "就诊", en: "Visit", de: "Besuch"),
                 secondaryIdentifier: "pet-health-tool-visit-action",
@@ -357,7 +357,7 @@ extension PetHealthDetailContentView {
         value: String,
         detail: String,
         icon: String,
-        tint: Color,
+        accent: (tint: Color, foreground: Color),
         primaryTitle: String,
         secondaryTitle: String,
         primaryIdentifier: String? = nil,
@@ -369,11 +369,11 @@ extension PetHealthDetailContentView {
         HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
-                    .fill(tint.opacity(isDark ? 0.20 : 0.13))
+                    .fill(accent.tint.opacity(isDark ? 0.20 : 0.13))
                     .frame(width: 58, height: 58)
                 Image(systemName: icon)
                     .font(OhanaFont.adaptive(size: 22, weight: .black))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(accent.tint)
             }
 
             VStack(alignment: .leading, spacing: 5) {
@@ -399,9 +399,9 @@ extension PetHealthDetailContentView {
                 } label: {
                     Text(primaryTitle)
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
+                        .foregroundStyle(accent.foreground)
                         .frame(width: 64, height: 34)
-                        .background(tint, in: Capsule())
+                        .background(accent.tint, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityIdentifier(primaryIdentifier ?? "")

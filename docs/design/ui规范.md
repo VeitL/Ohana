@@ -38,10 +38,10 @@
 - **卡片与输入**：卡片使用 `solidFlat`，输入框使用 `flat`。业务卡片默认是实色 token surface 或实色语义色块，不使用低透明度磨砂/半透明填充；整体密度使用 `compact`。
 - **表面节奏与阴影预算**：默认靠背景层级、间距、分组标题和轻 hairline 建立结构，而不是不断增加边框、玻璃、阴影或卡片套卡片。普通卡片、按钮、文字、chip、列表行和弹窗内容不使用装饰阴影；系统呈现自行管理 elevation，自定义阴影只留给 toast、关键浮层、重要角色/头像/产品视觉和明确 allowlist 的预览。
 - **控件**：有语义化系统控件时必须使用原生 SwiftUI：`Button`、`Toggle`、`Picker`、`Menu`、`List`、`Form`、`DisclosureGroup`、`searchable`、`Sheet`、`Alert`、`confirmationDialog` 与 SF Symbols。品牌 token 只负责 tint、排版、间距与自定义内容表面，不重画系统控件。
-- **实色控件**：高频按钮、chip、快捷金额/克数、内嵌数字键盘优先使用实色填充，减少低透明度和磨砂表面。选中态使用实色 `goPrimary` / 业务 tint + `Color.arkInk` 文本；未选态使用实色 elevated surface，不使用低透明度 tint。
+- **实色控件**：高频按钮、chip、快捷金额/克数、内嵌数字键盘优先使用实色填充，减少低透明度和磨砂表面。`goPrimary` 选中态必须配对 `Color.ohanaPrimaryActionText`；业务 tint 使用经验证的语义前景，或从其 hex 通过 `OhanaResolvedPrimaryAccent.actionTextColor` 解析。未选态使用实色 elevated surface，不使用低透明度 tint。
 - **按钮语法**：一个页面只保留一个主 pill；次级操作视觉降噪；危险操作使用语义红并二次确认；icon-only 控件必须有 44pt 实际触控区和本地化 accessibility label。
 - **功能 Icon**：全局功能 icon 使用 `monochromePrimary`。导航、按钮、设置行、快捷操作、列表和状态入口里的 icon 必须是 SF Symbol 或 template vector，统一使用 `goPrimary`，不使用彩色仿真 icon、emoji、多色插画或拟物图标。
-- **导航与设置行**：根导航使用原生 `TabView`，底部 tab 只显示 SF Symbol，可见文字隐藏但保留本地化 accessibility label；层级导航使用 `NavigationStack`。首页 FAB 使用原生圆形 `borderedProminent` Button 并贴右下安全区，应用只负责位置与快捷菜单；系统负责 tab bar、navigation bar、返回按钮、标题、toolbar 和按钮状态。设置项左 icon 使用 `plainGlyph`，不加彩色底块。
+- **导航与设置行**：普通模式保留原生 `TabView` 作为四页生命周期容器，但隐藏系统 tab chrome；可见根导航使用同一行双岛：左侧为四个 SF Symbol 的 Liquid Glass 胶囊，右侧为随页面变化的圆形主操作。首页/植物为快速记录，待办为添加事件，Oasis 为注入能量。应用负责选中态、badge、44pt 触控区、本地化 accessibility、底部安全区和 Reduce Transparency 实色回退；层级导航继续使用 `NavigationStack`，系统仍负责 navigation bar、返回按钮、标题、toolbar、Menu、Sheet 与 Alert。设置项左 icon 使用 `plainGlyph`，不加彩色底块。
 - **弹窗**：记录与编辑使用原生 `.sheet`，确认与破坏性操作使用 `Alert` / `confirmationDialog`，短选项使用 `Menu`。尺寸、圆角、拖拽关闭、键盘避让、过渡和无障碍均由系统呈现容器负责；内容内部继续使用 Ohana 品牌 token。
 - **图表与日历**：图表使用 `area` 趋势 + `quiet` 坐标；日历使用 `agendaHybrid`、`minimalNumber` 日期格、`dots` 事件标记、`timeRail` 日程列表。
 - **反馈与动效**：toast 使用 `icon`，banner 使用 `inline`，触感 `soft`；自定义内容可使用克制的 shared motion，系统导航、呈现和控件保持原生动画，奖励视觉可保留 `bouncy`。
@@ -164,7 +164,7 @@
 - 分区优先级：先用页面背景与卡片 surface 的明度差，再用空白、标题和轻 hairline；只有内容本身需要可点击、可进入、可展开或可编辑时才增加卡片 surface。
 - 大面积内容使用 `sectionCard`，但仍保持实色 surface，不做半透明磨砂卡片。
 - 卡片内子区域使用 `cardSurface`。
-- 原生 `.glassEffect()` 只用于系统拥有语义的 TabView、顶部 toolbar、返回/关闭和浮动系统控件，以及上文身份主卡例外；Sheet、Alert、Menu 与原生控件的材质由系统负责。禁止用单纯降低透明度冒充玻璃。
+- 原生 `.glassEffect()` 只用于语义导航 chrome（含普通模式已批准的双岛根导航）、顶部 toolbar、返回/关闭和浮动系统控件，以及上文身份主卡例外；需要融合或形变的玻璃组才置于同一个 `GlassEffectContainer`。普通模式的两个根导航岛必须保持独立，不共享 container，每个岛只有一层玻璃。Sheet、Alert、Menu 与原生控件的材质由系统负责。禁止用单纯降低透明度冒充玻璃。
 - 普通页面和业务详情页不要新增长驻 `.glassEffect()` 卡片。不得为 Sheet 或 popup 内容再画一层玻璃外壳、遮罩、圆角或 drag handle。
 - `Toggle` 必须委托原生 `.switch`；`Slider`、`.segmented` Picker 和 `DatePicker` 保持 SwiftUI 系统组件，由系统负责静止、按下、拖动、选中、禁用、折射与 Reduce Motion。Figma 记录状态和 Smart Animate 时长，不用自绘低透明胶囊替代运行时行为。
 - 状态提示使用 `tint.opacity(0.10)` 背景 + `tint.opacity(0.25-0.30)` 描边。
@@ -176,7 +176,7 @@
 ### 按钮
 
 - Primary CTA：实色 `goPrimary` 胶囊，每屏最多一个，文字用 `Color.ohanaPrimaryActionText`。
-- 底部导航、顶部工具栏的返回/关闭按钮使用原生 `.glass`；浮动主操作使用 `.glassProminent`。Reduce Transparency 时回退为 `ohanaCardSurfaceElevated` 实色，不保留伪磨砂。
+- 普通模式双岛底部导航使用系统 `.glassEffect`：左侧导航胶囊为 regular，右侧上下文主操作为 goPrimary tint 的 interactive glass；顶部工具栏的返回/关闭按钮使用原生 `.glass`。Reduce Transparency 时两个岛都回退为 `ohanaCardSurfaceElevated` / goPrimary 实色，不保留伪磨砂。
 - Secondary：`primaryText.opacity(0.08)` 背景，适合取消、稍后、查看详情。
 - Destructive：红色文字、浅红背景、红色描边，必须配二次确认。
 - Ghost：无背景或轻背景，只用于卡片内轻量动作。
@@ -324,8 +324,9 @@
 
 实色语义按钮可以保持 tint，但文字必须保持高对比：
 
-- `goPrimary` 背景 → `Color.arkInk`
-- `goRed` 背景 → `Color.arkInk` 或白色，取决于对比
+- `goPrimary` 背景 → `Color.ohanaPrimaryActionText`（浅色 Go Blue 与深色 Go Lime 自适应）
+- 成员主题色、自定义 hex 或动态业务 tint → `OhanaResolvedPrimaryAccent.actionTextColor`
+- `goTeal` / `goOrange` / `goRed` 等固定语义背景 → 使用对应的已验证前景，不固定继承白色
 - 浅色卡片上不要使用低透明度彩色文字作为正文
 
 ## 6. 实现检查清单

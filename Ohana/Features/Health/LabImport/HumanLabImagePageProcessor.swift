@@ -129,7 +129,7 @@ nonisolated struct HumanLabImagePageProcessingClient: Sendable {
 
     static let live = HumanLabImagePageProcessingClient(
         normalizePhotoPageFile: { sourceURL, pageIndex in
-            return try await HumanLabImagePageNormalizer.offMain {
+            try await HumanLabImagePageNormalizer.offMain {
                 try HumanLabImagePageNormalizer.normalize(
                     sourceURL: sourceURL,
                     pageIndex: pageIndex
@@ -137,7 +137,7 @@ nonisolated struct HumanLabImagePageProcessingClient: Sendable {
             }
         },
         normalizeCameraPage: { sourceImage, pageIndex in
-            return try await HumanLabImagePageNormalizer.offMain {
+            try await HumanLabImagePageNormalizer.offMain {
                 try HumanLabImagePageNormalizer.normalize(
                     cameraImage: sourceImage,
                     pageIndex: pageIndex

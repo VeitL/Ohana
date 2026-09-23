@@ -36,6 +36,7 @@ may override the active sources below.
 | Physical-device acceptance | `docs/release-true-device-test-plan.md` and `docs/planning/gap-acceptance-track-list.md` |
 | Architecture/runtime/privacy gates | `docs/*-governance.md`, `docs/*-policy.md`, and `docs/release-quality-gates.md` |
 | Feature behavior | `docs/specs/*-logic.md` |
+| Plant care facts, history, plans, and acceptance | `docs/specs/PlantCare-logic.md` |
 | First-run Human/Pet journey | `docs/specs/Onboarding-logic.md` |
 | Unified tasks / Task Center | `docs/specs/TaskCenter-logic.md` |
 | Starter gift and household starter plan | `docs/specs/Economy-logic.md` plus D17/D28 in `docs/specs/product-foundation.md` |

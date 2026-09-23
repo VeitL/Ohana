@@ -5151,7 +5151,7 @@ struct MemberLifecycleGateTests {
     }
 
     private func makeLatestInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV98.models)
+        let schema = Schema(ArkSchemaV99.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

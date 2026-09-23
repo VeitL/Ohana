@@ -144,7 +144,7 @@ struct HumanModuleFloatingActionButton: View {
                     .font(OhanaFont.callout(.black))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 22)
             .padding(.vertical, 12)
             .frame(minHeight: 54)

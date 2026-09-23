@@ -572,7 +572,7 @@ struct OhanaNotificationsSchedulingTests {
         }
         let reminders = plants.map { plant in
             makePlantCareReminder(
-                title: "给\(plant.name)浇水植物计划",
+                title: "给\(plant.name)浇水",
                 plant: plant,
                 careType: .watering,
                 scheduledAt: scheduledAt,
@@ -1086,8 +1086,10 @@ struct OhanaNotificationsSchedulingTests {
             isAllDay: true,
             eventType: careType.eventType.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
+            relatedEntityId: plant.id.uuidString,
+            taskCareKindRaw: TaskCareKind(plantCareType: careType)?.rawValue ?? ""
         )
+        event.id = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: careType)
         event.recurrenceDays = 1
         let reminder = Reminder(event: event, scheduledAt: scheduledAt)
         context.insert(event)

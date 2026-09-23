@@ -243,15 +243,6 @@ struct AddPlantView: View {
                 .textCase(.uppercase)
                 .tracking(0.6)
 
-            Text(l.tr(
-                zh: "先选大类，再选品种。选中后会自动填写名称、浇水、施肥和基础环境。",
-                en: "Pick a group, then a species. Ohana fills the name, watering, fertilizer, and basic care defaults.",
-                de: "Wähle erst eine Gruppe, dann eine Art. Ohana füllt Name, Gießen, Düngen und Basiswerte."
-            ))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(PlantCatalogBrowsingGroup.allCases) { group in
@@ -297,7 +288,7 @@ struct AddPlantView: View {
         } label: {
             Text(group.title(l))
                 .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 34)
                 .background(isSelected ? Color.goPrimary : Color.ohanaControlFill.opacity(0.62), in: Capsule())
@@ -538,19 +529,13 @@ struct AddPlantView: View {
                         .background(Color.goTeal.opacity(0.14), in: Circle())
                         .accessibilityHidden(true)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(l.tr(zh: "可选细节", en: "Optional details", de: "Optionale Details"))
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(l.tr(
-                            zh: "调整品种备注、头像、照护周期、盆器、来源、光照和健康状态。",
-                            en: "Adjust species notes, avatar, care cadence, pot, source, light, and health.",
-                            de: "Artnotiz, Symbol, Pflegezyklus, Topf, Quelle, Licht und Zustand anpassen."
-                        ))
-                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    Text(l.tr(
+                        zh: "可选细节", en: "Optional details", de: "Optionale Details",
+                        es: "Detalles opcionales", pt: "Detalhes opcionais", fr: "Détails facultatifs",
+                        ja: "任意の詳細", ko: "선택 세부 정보", it: "Dettagli facoltativi"
+                    ))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
 
                     Spacer(minLength: 8)
 

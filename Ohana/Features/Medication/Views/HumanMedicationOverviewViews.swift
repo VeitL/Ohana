@@ -33,9 +33,9 @@ struct HumanMedicationBoundedReadNotice: View {
     var body: some View {
         Label {
             Text(l.tr(
-                zh: "记录已超过本页显示上限。当前计划会优先保留；今日进度和七日趋势仅代表已载入数据，不能据此判断全部剂量已完成。更早数据仍保存在本机。",
-                en: "Records exceed this page's display limit. Current plans are prioritized; today's progress and the 7-day trend describe loaded data only and must not be used to infer that every dose is complete. Older data remains on this device.",
-                de: "Die Einträge überschreiten das Anzeigelimit. Aktuelle Pläne haben Vorrang; Tagesfortschritt und 7-Tage-Verlauf beziehen sich nur auf geladene Daten und bestätigen nicht, dass alle Dosen erledigt sind. Ältere Daten bleiben auf diesem Gerät."
+                zh: "已达显示上限；进度仅代表已载入数据，较早记录仍在本机。",
+                en: "Display limit reached. Progress covers loaded data only; older records remain on this device.",
+                de: "Anzeigelimit erreicht. Der Fortschritt umfasst nur geladene Daten; ältere Einträge bleiben auf diesem Gerät."
             ))
             .font(OhanaFont.caption(.semibold))
             .fixedSize(horizontal: false, vertical: true)
@@ -363,14 +363,14 @@ struct HumanMedicationAdherenceCard: View {
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(isSevenDayReadComplete
                             ? l.tr(
-                                zh: "按当前计划估算截至目前的到期剂量与已服剂量",
-                                en: "Estimated from the current plan: doses due vs taken through now",
-                                de: "Aus dem aktuellen Plan geschätzt: fällige und eingenommene Dosen"
+                                zh: "按当前计划估算",
+                                en: "Estimated from the current plan",
+                                de: "Aus dem aktuellen Plan geschätzt"
                             )
                             : l.tr(
-                                zh: "仅展示已载入记录，不计算完整完成率",
-                                en: "Loaded records only; no complete adherence rate is calculated",
-                                de: "Nur geladene Einträge; keine vollständige Adhärenzrate"
+                                zh: "仅显示已载入记录",
+                                en: "Loaded records only",
+                                de: "Nur geladene Einträge"
                             ))
                             .font(OhanaFont.caption())
                             .foregroundStyle(Color.ohanaSecondaryText)
@@ -412,9 +412,9 @@ struct HumanMedicationAdherenceCard: View {
                     )
                     Spacer()
                     Text(l.tr(
-                        zh: "编辑或停用计划会改变历史估算；按需记录不计入",
-                        en: "Editing or stopping a plan changes this estimate; as-needed logs are excluded",
-                        de: "Änderungen oder Stoppen eines Plans verändern die Schätzung; Bedarfsprotokolle zählen nicht"
+                        zh: "按需记录不计入 · 计划改动会影响估算",
+                        en: "As-needed logs excluded · plan changes affect estimates",
+                        de: "Bedarfsprotokolle ausgenommen · Planänderungen beeinflussen Schätzungen"
                     ))
                         .font(OhanaFont.caption2())
                         .foregroundStyle(Color.ohanaTertiaryText)
@@ -462,13 +462,6 @@ struct HumanMedicationEmptyState: View {
                 ))
                     .font(OhanaFont.title3(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(
-                    zh: "添加第一个服药提醒，今天的待处理剂量会显示在这里。",
-                    en: "Add the first medication reminder to see today's doses here.",
-                    de: "Füge die erste Erinnerung hinzu, um heutige Dosen hier zu sehen."
-                ))
-                    .font(OhanaFont.callout())
-                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 32)
