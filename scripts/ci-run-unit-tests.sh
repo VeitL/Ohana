@@ -25,6 +25,8 @@ common_args=(
   -disableAutomaticPackageResolution
   -skipPackagePluginValidation
   -enableCodeCoverage NO
+  -parallel-testing-enabled NO
+  -maximum-parallel-testing-workers 1
   -quiet
 )
 

@@ -409,7 +409,7 @@ struct ReminderActionCoordinatorTests {
         let questManager = QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: revisions)
         let human = Human(name: "Guan")
         let pet = Pet(name: "Momo", species: "狗")
-        let scheduledAt = Date().addingTimeInterval(-60)
+        let scheduledAt = Date(timeIntervalSince1970: floor(Date().addingTimeInterval(-60).timeIntervalSince1970))
         let medication = PetMedication(
             name: "Apoquel",
             frequency: .daily,

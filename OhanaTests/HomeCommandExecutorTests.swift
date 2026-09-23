@@ -3151,13 +3151,14 @@ struct HomeCommandExecutorTests {
     @Test func plantBatchCareCommandsStopFeedbackWhenPersistenceFails() throws {
         let rootURL = repositoryRootURL()
         let commandSource = try source("Ohana/Features/Plants/PlantBatchCareCommands.swift", rootURL: rootURL)
+        let supportSource = try source("Ohana/Features/Plants/PlantBatchCareSupport.swift", rootURL: rootURL)
         let dashboardSource = try source(
             "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift",
             rootURL: rootURL
         )
 
-        #expect(commandSource.contains("let didPersist: Bool"))
-        #expect(commandSource.contains("let persistenceErrorDescription: String?"))
+        #expect(supportSource.contains("let didPersist: Bool"))
+        #expect(supportSource.contains("let persistenceErrorDescription: String?"))
         #expect(commandSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
         #expect(commandSource.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 3)
         #expect(commandSource.contains("context.rollback()"))
@@ -3253,6 +3254,7 @@ struct HomeCommandExecutorTests {
         let scheduleSource = try source("Ohana/Domain/Services/PlantCarePlanScheduleService.swift", rootURL: rootURL)
         let lifecycleSource = try source("Ohana/Domain/Services/PlantLifecycleService.swift", rootURL: rootURL)
         let batchSource = try source("Ohana/Features/Plants/PlantBatchCareCommands.swift", rootURL: rootURL)
+        let batchSupportSource = try source("Ohana/Features/Plants/PlantBatchCareSupport.swift", rootURL: rootURL)
 
         #expect(scheduleSource.contains("let didPersist: Bool"))
         #expect(scheduleSource.contains("let persistenceErrorDescription: String?"))
@@ -3272,8 +3274,9 @@ struct HomeCommandExecutorTests {
         #expect(lifecycleSource.components(separatedBy: "PlantCarePlanScheduleService.commitSideEffects(").count - 1 == 2)
         #expect(batchSource.contains("var scheduleResults: [PlantCarePlanScheduleResult]"))
         #expect(batchSource.components(separatedBy: "context.safeSaveResult(publishFailureEvent: true)").count - 1 == 3)
-        #expect(batchSource.components(separatedBy: "PlantCarePlanScheduleService.commitSideEffects(for: scheduleResult").count - 1 == 2)
-        #expect(batchSource.contains("DomainRehydrateEffectsDispatcher.cancelNotifications(notificationIDsToCancel)"))
+        #expect(batchSource.components(separatedBy: "PlantCarePlanScheduleService.commitSideEffects(for: scheduleResult").count - 1 == 1)
+        #expect(batchSource.contains("commitUndoSideEffects(notificationIDs: notificationIDsToCancel"))
+        #expect(batchSupportSource.contains("DomainRehydrateEffectsDispatcher.cancelNotifications(notificationIDs)"))
     }
 
     @Test func plantReminderControlsDoNotPublishSuccessBeforePersistence() throws {
@@ -3502,11 +3505,11 @@ struct HomeCommandExecutorTests {
         #expect(commandsSource.contains("context.safeSaveResult(publishFailureEvent: true)"))
         #expect(commandsSource.contains("context.rollback()"))
         #expect(commandsSource.contains("saveChanges: false"))
-        #expect(commandsSource.contains("if result.didPersist"))
         let unlockMarkIndex = try #require(commandsSource.range(of: "PlantUnlockPolicy.noteExistingPlantData()")?.lowerBound)
         let saveGuardIndex = try #require(commandsSource.range(of: "guard saveResult.didSave else")?.lowerBound)
         #expect(unlockMarkIndex > saveGuardIndex)
-        #expect(commandsSource.contains("PlantCarePlanScheduleService.commitSideEffects("))
+        let scheduleEffectsIndex = try #require(commandsSource.range(of: "PlantCarePlanScheduleService.commitSideEffects(")?.lowerBound)
+        #expect(scheduleEffectsIndex > saveGuardIndex)
         #expect(addPlantSource.contains("guard result.didPersist else"))
         #expect(addPlantSource.contains("plantCreationSaveFailureMessage"))
     }
