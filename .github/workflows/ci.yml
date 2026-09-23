@@ -287,11 +287,11 @@ jobs:
     timeout-minutes: 360
     env:
       COPYFILE_DISABLE: 1
-      OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
-      OHANA_UI_NIGHTLY_RECEIPT_PATH: ${{ runner.temp }}/ohana-ui-nightly.json
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode and prepare disposable Simulator
+        env:
+          OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
         run: |
           sudo xcode-select -s /Applications/Xcode_26.6.app
           xcodebuild -version
@@ -301,6 +301,9 @@ jobs:
           printf '%s\n' '00000000-0000-0000-0000-000000000001' > .build/dogfood-simulator.udid
           scripts/prepare-test-simulator.sh
       - name: Audit UI coverage and run every shard
+        env:
+          OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
+          OHANA_UI_NIGHTLY_RECEIPT_PATH: ${{ runner.temp }}/ohana-ui-nightly.json
         run: scripts/test-ui-nightly.sh
       - name: Upload UI run receipt
         if: always()
