@@ -123,9 +123,17 @@ jobs:
           fetch-depth: 0
       - name: Install tools
         run: |
-          brew update
-          brew install swiftlint swiftformat
-          brew upgrade swiftlint swiftformat
+          brew install swiftlint
+          # Homebrew's latest SwiftFormat can drift from the reviewed CI pin.
+          curl -fsSL --retry 3 \
+            -o "$RUNNER_TEMP/swiftformat.zip" \
+            https://github.com/nicklockwood/SwiftFormat/releases/download/0.62.0/swiftformat.zip
+          printf '%s  %s\n' \
+            '256be3f71e1b271a52b8bcbf44cf0d122b354c133e15dc9242cce9c97be5ac83' \
+            "$RUNNER_TEMP/swiftformat.zip" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/ohana-tools"
+          unzip -q "$RUNNER_TEMP/swiftformat.zip" -d "$RUNNER_TEMP/ohana-tools"
+          echo "$RUNNER_TEMP/ohana-tools" >> "$GITHUB_PATH"
       - name: Tool version pins
         run: scripts/check-tool-versions.sh swiftlint swiftformat
       - name: Complexity audit self-tests

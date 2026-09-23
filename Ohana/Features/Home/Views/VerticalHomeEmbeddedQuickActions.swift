@@ -246,26 +246,35 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
     @ViewBuilder
     private var actionGrid: some View {
+        #if compiler(>=6.4)
         if #available(iOS 27.0, *) {
             actionGridContent
                 .reorderContainer(for: VerticalHomeEmbeddedAction.self, isEnabled: isEditMode) { difference in
                     applyNativeReorder(difference)
                 }
         } else {
-            actionGridContent
-                .onDrop(
-                    of: [.plainText, .utf8PlainText],
-                    delegate: VerticalHomeEmbeddedActionDropResetDelegate(
-                        isEnabled: isEditMode,
-                        draggingItemId: draggingItemId,
-                        lastDropTargetId: $lastDropTargetId
-                    )
-                )
+            legacyDropGrid
         }
+        #else
+        legacyDropGrid
+        #endif
+    }
+
+    private var legacyDropGrid: some View {
+        actionGridContent
+            .onDrop(
+                of: [.plainText, .utf8PlainText],
+                delegate: VerticalHomeEmbeddedActionDropResetDelegate(
+                    isEnabled: isEditMode,
+                    draggingItemId: draggingItemId,
+                    lastDropTargetId: $lastDropTargetId
+                )
+            )
     }
 
     private var actionGridContent: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4), spacing: 8) {
+            #if compiler(>=6.4)
             if #available(iOS 27.0, *) {
                 ForEach(visibleItems) { item in
                     let index = visibleItems.firstIndex(where: { $0.id == item.id }) ?? 0
@@ -274,11 +283,11 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 }
                 .reorderable()
             } else {
-                ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
-                    actionCell(item, index: index)
-                        .zIndex(openActionId == item.id ? 40 : Double(visibleItems.count - index))
-                }
+                legacyActionCells
             }
+            #else
+            legacyActionCells
+            #endif
 
             if showsAddLauncher {
                 addLauncherCell
@@ -290,6 +299,14 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .animation(GoMotion.selection, value: availableAddItemsRevision)
     }
 
+    private var legacyActionCells: some View {
+        ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+            actionCell(item, index: index)
+                .zIndex(openActionId == item.id ? 40 : Double(visibleItems.count - index))
+        }
+    }
+
+    #if compiler(>=6.4)
     @available(iOS 27.0, *)
     private func applyNativeReorder(
         _ difference: ReorderDifference<String, ReorderableSingleCollectionIdentifier>
@@ -307,6 +324,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         OhanaFeedback.light()
         onMove(fromID, targetID)
     }
+    #endif
 
     private var header: some View {
         HStack {
@@ -376,9 +394,15 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .zIndex(80)
             }
 
+            #if compiler(>=6.4)
             if isEditMode, #unavailable(iOS 27.0) {
                 editDragLayer(for: item)
             }
+            #else
+            if isEditMode {
+                editDragLayer(for: item)
+            }
+            #endif
         }
         .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .scaleEffect(isDragging(item) ? 1.035 : 1)
@@ -392,20 +416,28 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 removeButton(for: item)
             }
         }
+        #if compiler(>=6.4)
         if #available(iOS 27.0, *) {
             cell
         } else {
-            cell.onDrop(
-                of: [.plainText, .utf8PlainText],
-                delegate: VerticalHomeEmbeddedActionDropDelegate(
-                    isEnabled: isEditMode,
-                    targetId: item.id,
-                    draggingItemId: draggingItemId,
-                    lastDropTargetId: $lastDropTargetId,
-                    onMove: onMove
-                )
-            )
+            legacyDropCell(cell, targetID: item.id)
         }
+        #else
+        legacyDropCell(cell, targetID: item.id)
+        #endif
+    }
+
+    private func legacyDropCell(_ content: some View, targetID: String) -> some View {
+        content.onDrop(
+            of: [.plainText, .utf8PlainText],
+            delegate: VerticalHomeEmbeddedActionDropDelegate(
+                isEnabled: isEditMode,
+                targetId: targetID,
+                draggingItemId: draggingItemId,
+                lastDropTargetId: $lastDropTargetId,
+                onMove: onMove
+            )
+        )
     }
 
     private func actionCellContent(_ item: VerticalHomeEmbeddedAction) -> some View {
