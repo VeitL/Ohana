@@ -653,9 +653,13 @@ struct SupporterPackEntitlementTests {
             lifetime: "49,99 \u{20AC}"
         )
         await storefront.sendStorefrontUpdate()
-        await waitUntil {
-            service.displayPrice == "49,99 \u{20AC}"
+        let didRevalidateStorefront = await waitUntilAsync {
+            guard service.displayPrice == "49,99 \u{20AC}",
+                  service.entitlementStatus == .ownedVerified
+            else { return false }
+            return await storefront.entitlementInvocationCount() == entitlementCallsBeforeChange + 1
         }
+        #expect(didRevalidateStorefront)
 
         #expect(service.displayPrice(for: .monthly) == "2,99 \u{20AC}")
         #expect(service.displayPrice(for: .yearly) == "14,99 \u{20AC}")
@@ -759,11 +763,11 @@ struct SupporterPackEntitlementTests {
     }
 
     private func waitUntilAsync(_ condition: () async -> Bool) async -> Bool {
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< 300 {
             if await condition() { return true }
-            await Task.yield()
+            try? await Task.sleep(nanoseconds: 10_000_000)
         }
-        return false
+        return await condition()
     }
 }
 
