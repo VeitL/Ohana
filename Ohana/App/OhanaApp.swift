@@ -69,18 +69,45 @@ struct OhanaApp: App {
 
     var body: some Scene {
         WindowGroup {
-            OhanaBootstrapRootView(
-                cloudSharingAppDelegate: cloudSharingAppDelegate,
-                preferredScheme: preferredScheme,
-                appLanguage: appLanguage,
-                primaryAccent: primaryAccent
-            )
-            .onChange(of: appCountry) { _, _ in }
-            .onChange(of: appCurrency) { _, _ in }
-            .onChange(of: appMeasurementSystem) { _, _ in }
+            #if DEBUG
+                if OhanaUnitTestHost.isActive {
+                    Color.clear
+                } else {
+                    bootstrapContent
+                }
+            #else
+                bootstrapContent
+            #endif
         }
     }
+
+    private var bootstrapContent: some View {
+        OhanaBootstrapRootView(
+            cloudSharingAppDelegate: cloudSharingAppDelegate,
+            preferredScheme: preferredScheme,
+            appLanguage: appLanguage,
+            primaryAccent: primaryAccent
+        )
+        .onChange(of: appCountry) { _, _ in }
+        .onChange(of: appCurrency) { _, _ in }
+        .onChange(of: appMeasurementSystem) { _, _ in }
+    }
 }
+
+#if DEBUG
+    enum OhanaUnitTestHost {
+        static var isActive: Bool {
+            isActive(arguments: ProcessInfo.processInfo.arguments, environment: ProcessInfo.processInfo.environment)
+        }
+
+        static func isActive(arguments: [String], environment: [String: String]) -> Bool {
+            guard !arguments.contains("-OHANA_UI_TESTS") else { return false }
+            return environment["XCTestConfigurationFilePath"] != nil
+                || environment["XCTestBundlePath"] != nil
+                || environment["XCTestSessionIdentifier"] != nil
+        }
+    }
+#endif
 
 private struct OhanaBootstrapPayload {
     let modelContainer: ModelContainer

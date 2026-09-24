@@ -5,6 +5,15 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct AppExperienceControllerTests {
+    @Test func hostedUnitTestsDoNotStartTheInteractiveAppShell() {
+        let testEnvironment = ["XCTestConfigurationFilePath": "/tmp/OhanaTests.xctestconfiguration"]
+
+        #expect(OhanaUnitTestHost.isActive)
+        #expect(OhanaUnitTestHost.isActive(arguments: [], environment: testEnvironment))
+        #expect(!OhanaUnitTestHost.isActive(arguments: ["-OHANA_UI_TESTS"], environment: testEnvironment))
+        #expect(!OhanaUnitTestHost.isActive(arguments: [], environment: [:]))
+    }
+
     @Test func freshInstallRequiresAChoiceBeforeOnboarding() throws {
         let (suite, defaults) = try makeDefaults()
         defer { defaults.removePersistentDomain(forName: suite) }
