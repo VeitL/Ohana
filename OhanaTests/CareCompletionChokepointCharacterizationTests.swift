@@ -247,7 +247,8 @@ struct CareCompletionChokepointCharacterizationTests {
             endDate: Date(timeIntervalSince1970: 2000),
             context: context,
             executorId: human.id.uuidString,
-            startDate: Date(timeIntervalSince1970: 1800)
+            startDate: Date(timeIntervalSince1970: 1800),
+            dependencies: .live()
         )
 
         let session = try #require(try context.fetch(FetchDescriptor<SharedCareSession>()).first)
@@ -675,7 +676,8 @@ struct CareCompletionChokepointCharacterizationTests {
             totalMl: 120,
             context: context,
             executorId: missingExecutorID,
-            date: Date(timeIntervalSince1970: 2000)
+            date: Date(timeIntervalSince1970: 2000),
+            dependencies: .live()
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
@@ -769,7 +771,10 @@ struct CareCompletionChokepointCharacterizationTests {
             pets: [pet],
             context: context,
             executorId: missingExecutorID,
-            now: Date(timeIntervalSince1970: 4000)
+            now: Date(timeIntervalSince1970: 4000),
+            options: CalendarEventCompletionOptions(
+                economy: StaticCareEventEconomyAwarder(questManager: makeQuestManager())
+            )
         )
 
         let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
