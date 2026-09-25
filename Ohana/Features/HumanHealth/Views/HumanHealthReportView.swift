@@ -825,6 +825,7 @@ struct AddHumanHealthReportSheet: View {
     @State private var reportType: HealthReportType = .physical
     @State private var conclusion: ReportConclusion = .normal
     @State private var hospitalName = ""
+    @FocusState private var isHospitalNameFocused: Bool
     @State private var doctorName = ""
     @State private var reportDate = Date()
     @State private var hasNextCheck = false
@@ -982,6 +983,9 @@ struct AddHumanHealthReportSheet: View {
                                 TextField(l.tr(zh: "如：北京协和医院", en: "e.g. City Hospital", de: "z. B. Stadtklinik"), text: $hospitalName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.body())
                                     .foregroundStyle(Color.ohanaPrimaryText)
+                                    .focused($isHospitalNameFocused)
+                                    .submitLabel(.done)
+                                    .onSubmit { isHospitalNameFocused = false }
                                     .accessibilityLabel(l.tr(zh: "医院名称", en: "Hospital", de: "Klinik"))
                                     .accessibilityIdentifier("add-human-health-report-hospital-input")
                             }

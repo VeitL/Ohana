@@ -11158,6 +11158,10 @@ final class OhanaUITests: XCTestCase {
         for (index, routedActionIdentifier) in actionPath.enumerated() {
             let action = app.buttons[routedActionIdentifier]
             scrollToElement(action, in: app, maxSwipes: 8)
+            for _ in 0 ..< 8 where !action.isHittable {
+                swipeUpInPrimaryScrollArea(in: app)
+                RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+            }
             XCTAssertTrue(
                 waitForFrameReady(action, timeout: 10),
                 "Human detail did not expose the current module action: \(routedActionIdentifier)"
@@ -11206,26 +11210,30 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func expandHumanCardFromHome(in app: XCUIApplication, humanName: String) {
         let detailButton = app.buttons["home-expanded-detail-human"]
+        let collapseAction = app.descendants(matching: .any)["home-expanded-collapse-human"]
         if detailButton.exists,
            detailButton.isEnabled,
-           detailButton.isHittable,
            hasSafelyTappableFrame(detailButton, in: app) {
             return
         }
 
-        let humanCard = app.buttons["home-card-human-\(humanName)"]
-        let humanCardByLabel = app.buttons.matching(NSPredicate(format: "label == %@", humanName)).firstMatch
-        let targetCard = humanCard.exists ? humanCard : humanCardByLabel
-        XCTAssertTrue(targetCard.waitForExistence(timeout: 20), "Human home card did not appear before opening its routes.")
-        XCTAssertTrue(
-            tapWhenSemanticallyHittable(targetCard, timeout: 8),
-            "Human home card existed but did not become semantically tappable."
-        )
+        // A card that is already expanded can still be completing its reveal
+        // transition after a route dismissal. Tapping its card surface again
+        // would collapse it; use the collapse marker to distinguish that state.
+        if !detailButton.exists && !collapseAction.exists {
+            let humanCard = app.buttons["home-card-human-\(humanName)"]
+            let humanCardByLabel = app.buttons.matching(NSPredicate(format: "label == %@", humanName)).firstMatch
+            let targetCard = humanCard.exists ? humanCard : humanCardByLabel
+            XCTAssertTrue(targetCard.waitForExistence(timeout: 20), "Human home card did not appear before opening its routes.")
+            XCTAssertTrue(
+                tapWhenSemanticallyHittable(targetCard, timeout: 8),
+                "Human home card existed but did not become semantically tappable."
+            )
+        }
 
         let didExpand = waitUntil(timeout: 12) {
             detailButton.exists &&
                 detailButton.isEnabled &&
-                detailButton.isHittable &&
                 self.hasSafelyTappableFrame(detailButton, in: app)
         }
         XCTAssertTrue(
@@ -11529,10 +11537,11 @@ final class OhanaUITests: XCTestCase {
             "Human health report add sheet did not open."
         )
         typeText(hospital, intoTextField: "add-human-health-report-hospital-input", in: app)
-        dismissKeyboardIfPresent(in: app, returnKeyIsSafe: true)
+        let hospitalInput = app.textFields["add-human-health-report-hospital-input"]
+        hospitalInput.typeText("\n")
         XCTAssertTrue(
             waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists },
-            "Human health report hospital keyboard did not dismiss."
+            "Human health report hospital Done action did not dismiss the keyboard."
         )
         typeText(summary, intoTextView: "add-human-health-report-summary-input", in: app)
         // TextEditor Return inserts a newline instead of resigning focus. A
@@ -11817,7 +11826,12 @@ final class OhanaUITests: XCTestCase {
             "Human wishlist add sheet did not open."
         )
         typeText(title, intoTextField: "add-human-wishlist-title-input", in: app)
-        dismissKeyboardIfPresent(in: app)
+        let titleInput = app.textFields["add-human-wishlist-title-input"]
+        titleInput.typeText("\n")
+        XCTAssertTrue(
+            waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists },
+            "Human wishlist title Done action did not dismiss the keyboard."
+        )
         XCTAssertTrue(
             tapWhenSemanticallyHittable(app.buttons["add-human-wishlist-save-action"], timeout: 8),
             "Human wishlist save action did not become semantically tappable."
@@ -14015,7 +14029,7 @@ final class OhanaUITests: XCTestCase {
                 _ = waitUntil(timeout: 3) { !app.keyboards.firstMatch.exists }
                 return
             }
-            let doneLabels = ["Done", "done", "完成", "隐藏键盘", "Hide keyboard"]
+            let doneLabels = ["Done", "done", "完成", "Fertig", "隐藏键盘", "Hide keyboard"]
             if let done = doneLabels
                 .map({ app.keyboards.buttons[$0].firstMatch })
                 .first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {

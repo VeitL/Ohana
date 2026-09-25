@@ -267,6 +267,14 @@ struct HumanLabReportImportCommandTests {
         let revisionCenter = ReadModelRevisionCenter()
         let human = Human(name: "Rollback Lab")
         context.insert(human)
+        let existingLog = HumanHealthMetricLog(
+            metricKey: "tsh",
+            unitCode: "mIU_L",
+            value: 1.7,
+            human: human
+        )
+        context.insert(existingLog)
+        human.healthMetricLogs.append(existingLog)
         try context.save()
         let input = HumanLabReportImportInput(
             reportDate: Date(timeIntervalSinceReferenceDate: 800_000_000),
@@ -300,9 +308,9 @@ struct HumanLabReportImportCommandTests {
         #expect(!result.isIdempotentReplay)
         #expect(result.persistenceErrorDescription != nil)
         #expect(try context.fetchCount(FetchDescriptor<HumanHealthReport>()) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<HumanHealthMetricLog>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<HumanHealthMetricLog>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<CloudSyncRecordState>()) == 0)
-        #expect(human.healthMetricLogs.isEmpty)
+        #expect(human.healthMetricLogs.map(\.id) == [existingLog.id])
         #expect(!context.hasChanges)
         #expect(revisionCenter.homeRevision.value == revisionBeforeImport)
         #expect(revisionCenter.lastMutation == nil)

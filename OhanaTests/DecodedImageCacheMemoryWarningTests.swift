@@ -88,6 +88,15 @@ struct DecodedImageCacheMemoryWarningTests {
         FocusWalletAvatarCache.resetForTesting()
         FocusPopoutImageCache.resetForTesting()
         MediaThumbnailProvider.resetForTesting()
+        defer { MediaThumbnailProvider.setWorkloadPolicyForTesting(nil) }
+        MediaThumbnailProvider.setWorkloadPolicyForTesting(
+            AppWorkloadPolicy(
+                lowPowerModeProvider: { false },
+                reduceMotionProvider: { false },
+                userPowerSavingProvider: { false },
+                thermalStateProvider: { .nominal }
+            )
+        )
 
         let probe = DecodeCancellationProbe()
         let key = MediaThumbnailKey(id: "cancel-test", sourceSignature: "pending", maxPixel: 48)

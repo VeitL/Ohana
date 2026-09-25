@@ -561,7 +561,8 @@ private struct AppSheetRouteDestination: View {
             AppPetDetailSheetRouteContainer(
                 id: id,
                 destination: .health(initialSection),
-                onMissing: onDismiss
+                onMissing: onDismiss,
+                onDismiss: onDismiss
             )
             .ohanaSheetPagePresentation()
         case let .petMedication(id):

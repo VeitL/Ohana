@@ -20,6 +20,7 @@ struct HumanWishlistContentView: View {
     @State private var showAddSheet = false
     @State private var showConfetti = false
     @State private var newTitle = ""
+    @FocusState private var isNewTitleFocused: Bool
     @State private var newCost = 10
     @State private var redeemingItemIDs: Set<UUID> = []
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
@@ -245,6 +246,9 @@ struct HumanWishlistContentView: View {
                 TextField(l.tr(zh: "心愿内容（例如：新耳机）", en: "Wish item, e.g. new headphones", de: "Wunsch, z. B. neue Kopfhörer"), text: $newTitle) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .focused($isNewTitleFocused)
+                    .submitLabel(.done)
+                    .onSubmit { isNewTitleFocused = false }
                     .accessibilityIdentifier("add-human-wishlist-title-input")
             }
                     .padding(.horizontal, 16).padding(.vertical, 14)

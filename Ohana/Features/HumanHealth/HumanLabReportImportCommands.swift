@@ -143,6 +143,8 @@ enum HumanLabReportImportCommandService {
             return failure(human: human, input: normalizedInput)
         }
 
+        let originalHealthMetricLogs = human.healthMetricLogs
+
         let report = DomainMemberFactWriter.createHumanHealthReport(
             plan: writes.report,
             human: human,
@@ -187,6 +189,7 @@ enum HumanLabReportImportCommandService {
             rollbackInsertedBatch(
                 human: human,
                 logs: logs,
+                originalHealthMetricLogs: originalHealthMetricLogs,
                 context: context
             )
             return failure(
@@ -209,12 +212,21 @@ enum HumanLabReportImportCommandService {
     private static func rollbackInsertedBatch(
         human: Human,
         logs: [HumanHealthMetricLog],
+        originalHealthMetricLogs: [HumanHealthMetricLog],
         context: ModelContext
     ) {
-        let insertedLogIDs = Set(logs.map(\.id))
-        human.healthMetricLogs.removeAll { insertedLogIDs.contains($0.id) }
-        logs.forEach { $0.human = nil }
         context.rollback()
+        // SwiftData on newer runtimes can restore the unsaved relationship cache
+        // while rolling back inserted rows. Restore the exact pre-import snapshot
+        // after rollback so failed batches cannot leak through an in-memory read.
+        human.healthMetricLogs = originalHealthMetricLogs
+        logs.forEach { $0.human = nil }
+        if context.hasChanges {
+            let repairSave = context.safeSaveResult(publishFailureEvent: false)
+            if !repairSave.didSave {
+                context.rollback()
+            }
+        }
     }
 
     private static func preflight(
