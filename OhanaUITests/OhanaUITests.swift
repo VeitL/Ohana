@@ -6611,7 +6611,11 @@ final class OhanaUITests: XCTestCase {
         scrollTowardElement(hospitalInput, in: app, maxSwipes: 6)
         clearTextField(hospitalInput, in: app)
         hospitalInput.typeText(editedHospital)
-        dismissKeyboardIfPresent(in: app, returnKeyIsSafe: true)
+        hospitalInput.typeText("\n")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !app.keyboards.firstMatch.exists },
+            "Submitting the hospital name did not uncover the report save action."
+        )
         let reportSave = app.buttons["add-human-health-report-save-action"]
         scrollToElement(reportSave, in: app, maxSwipes: 10)
         tapWhenHittable(reportSave, timeout: 8)
@@ -8678,7 +8682,9 @@ final class OhanaUITests: XCTestCase {
             },
             "Active Human delete action did not enable after entering the exact name."
         )
-        tapWhenHittable(finalDelete, timeout: 8)
+        // The keyboard's Done action submits this exact-name confirmation
+        // without relying on a button tap while the input remains focused.
+        nameInput.typeText("\n")
 
         let switcher = app.descendants(matching: .any)["human-account-switcher-sheet"]
         XCTAssertTrue(
@@ -11420,7 +11426,13 @@ final class OhanaUITests: XCTestCase {
             "Human medication add sheet did not open."
         )
         typeText(medicationName, intoTextField: "add-human-medication-name-input", in: app)
-        dismissKeyboardIfPresent(in: app)
+        let nameInput = app.textFields["add-human-medication-name-input"]
+        XCTAssertTrue(nameInput.exists, "Human medication name input disappeared before submission.")
+        nameInput.typeText("\n")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !app.keyboards.firstMatch.exists },
+            "Submitting the medication name did not dismiss its keyboard."
+        )
         tapWhenHittable(app.buttons["add-human-medication-save-action"], timeout: 8)
         XCTAssertTrue(
             waitUntil(timeout: 14) {
@@ -14585,22 +14597,16 @@ final class OhanaUITests: XCTestCase {
             return false
         }
         scrollTowardElement(toggle, in: app, maxSwipes: 8)
-        guard hasVisibleFrame(toggle, in: app) else {
-            return false
-        }
         let nestedSwitch = toggle.descendants(matching: .switch).firstMatch
-        let usesNestedSwitch = nestedSwitch.exists
-        let actionTarget = usesNestedSwitch ? nestedSwitch : toggle
-        if !isToggleOn(toggle) {
-            _ = tapWhenSemanticallyHittable(actionTarget, timeout: 4)
+        let actionTarget = nestedSwitch.exists ? nestedSwitch : toggle
+        guard actionTarget.exists && actionTarget.isEnabled else { return false }
+        if !isToggleOn(actionTarget) {
+            guard tapWhenSemanticallyHittable(actionTarget, timeout: 4) else {
+                return false
+            }
         }
-        if !waitUntil(timeout: 3, condition: {
-            picker.exists || self.isToggleOn(toggle)
-        }) {
-            _ = tapWhenSemanticallyHittable(actionTarget, timeout: 2)
-        }
-        guard waitUntil(timeout: 4, condition: {
-            picker.exists || self.isToggleOn(toggle)
+        guard waitUntil(timeout: 5, condition: {
+            picker.exists || self.isToggleOn(actionTarget)
         }) else {
             return false
         }
