@@ -47,6 +47,7 @@ struct MemberCardCreationContentView: View {
     @SceneStorage("memberCreation.human.mediaRecovery") var humanMediaRecoveryRaw = ""
 
     @State var draft: MemberCreationDraft
+    @FocusState var petCustomValueFieldFocused: Bool
     @State var decodedAvatar: UIImage?
     @State var decodedAvatarTransparent = false
     @State var decodeTask: Task<Void, Never>?

@@ -5456,7 +5456,15 @@ final class OhanaUITests: XCTestCase {
             otherSpecies.waitForExistence(timeout: 8),
             "The current Species grid did not expose its Other selector."
         )
-        tapGuidedJourneyControlAfterSemanticScroll(otherSpecies, in: app)
+        scrollTowardElement(otherSpecies, in: app, maxSwipes: 8)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(otherSpecies, timeout: 8),
+            "The Other Species accessibility button did not become tappable after scrolling."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 4) { otherSpecies.isSelected },
+            "Selecting Other Species did not update its selected accessibility state."
+        )
 
         let customSpecies = app.textFields["member-pet-custom-species-input"]
         XCTAssertTrue(
@@ -5465,7 +5473,7 @@ final class OhanaUITests: XCTestCase {
         )
         tapWhenHittable(customSpecies, timeout: 8)
         customSpecies.typeText("Axolotl")
-        dismissKeyboardIfPresent(in: app, returnKeyIsSafe: true)
+        customSpecies.typeText("\n")
         XCTAssertTrue(
             waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists },
             "The custom Species keyboard did not dismiss before opening Breed."
@@ -5513,7 +5521,7 @@ final class OhanaUITests: XCTestCase {
         )
         tapWhenHittable(customBreed, timeout: 8)
         customBreed.typeText("Golden Albino")
-        dismissKeyboardIfPresent(in: app, returnKeyIsSafe: true)
+        customBreed.typeText("\n")
         XCTAssertTrue(
             waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists },
             "The custom Breed keyboard did not dismiss before leaving the step."
@@ -10419,7 +10427,17 @@ final class OhanaUITests: XCTestCase {
         nameField.typeText(name)
         let continueAction = app.buttons["onboarding-human-continue"]
         XCTAssertTrue(waitUntil(timeout: 8) { continueAction.exists && continueAction.isEnabled })
-        tapWhenHittable(continueAction, timeout: 8)
+        let continueKey = app.keyboards.buttons.matching(
+            NSPredicate(format: "label IN %@", ["Continue", "continue"])
+        ).firstMatch
+        XCTAssertTrue(
+            continueKey.waitForExistence(timeout: 8),
+            "The Human name keyboard did not expose its semantic Continue key."
+        )
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(continueKey, timeout: 8),
+            "The Human name keyboard's Continue key was not tappable."
+        )
         XCTAssertTrue(
             app.buttons["onboarding-create-pet-now"].waitForExistence(timeout: 12),
             "Saving the first Human did not reach the Pet choice."

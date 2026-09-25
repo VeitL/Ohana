@@ -347,7 +347,10 @@ extension MemberCardCreationContentView {
 
     func flatTextField(_ title: String, text: Binding<String>) -> some View { // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            .focused($petCustomValueFieldFocused)
             .textInputAutocapitalization(.words)
+            .submitLabel(.done)
+            .onSubmit { petCustomValueFieldFocused = false }
             .font(OhanaFont.caption(.bold))
             .foregroundStyle(cardForeground)
             .padding(.horizontal, 12)
