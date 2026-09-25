@@ -1070,6 +1070,7 @@ private extension HumanBasicInfoDetailContentView {
                 return
             }
             isSaving = false
+            presentedSheet = nil
             OhanaFeedback.success()
             presentSavedFeedback()
             onSave?()

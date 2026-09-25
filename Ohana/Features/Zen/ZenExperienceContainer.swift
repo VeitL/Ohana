@@ -74,7 +74,9 @@ struct ZenExperienceContainer: View {
             starterJourneyRefreshTask?.cancel()
             starterJourneyRefreshTask = nil
         }
-        .sheet(item: $presentedRoute) { route in
+        .sheet(item: $presentedRoute, onDismiss: {
+            scheduleRefresh(delayMilliseconds: 80)
+        }) { route in
             transitionedRouteDestination(route)
                 .ohanaSheetPagePresentation()
         }
@@ -725,7 +727,6 @@ private extension ZenExperienceContainer {
 
     private func closeAndRefreshRoute() {
         presentedRoute = nil
-        scheduleRefresh(delayMilliseconds: 80)
     }
 
     private func openCoconutLogAfterClosingOasis() {

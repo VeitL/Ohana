@@ -13,11 +13,13 @@ struct DocumentsListView: View {
 
     let pet: Pet
     var showsCloseButton: Bool = true
+    var onClose: (() -> Void)?
     @State private var routeRevision = HomeRevision()
 
-    init(pet: Pet, showsCloseButton: Bool = true) {
+    init(pet: Pet, showsCloseButton: Bool = true, onClose: (() -> Void)? = nil) {
         self.pet = pet
         self.showsCloseButton = showsCloseButton
+        self.onClose = onClose
     }
 
     var body: some View {
@@ -33,7 +35,8 @@ struct DocumentsListView: View {
                 pet: pet,
                 showsCloseButton: showsCloseButton,
                 routeDocuments: data.documents,
-                routeInsurances: data.insurances
+                routeInsurances: data.insurances,
+                onClose: onClose
             )
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates.dropFirst()) { revision in

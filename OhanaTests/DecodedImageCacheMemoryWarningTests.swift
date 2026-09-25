@@ -97,17 +97,11 @@ struct DecodedImageCacheMemoryWarningTests {
             })
         }
 
-        for _ in 0 ..< 100 {
-            if await probe.didStart() {
-                break
-            }
-            await Task.yield()
-        }
-        #expect(await probe.didStart())
+        let workerStarted = await probe.waitUntilStarted(timeout: .seconds(10))
+        #expect(workerStarted)
 
         request.cancel()
-        try? await Task.sleep(nanoseconds: 100_000_000)
-        let cancelledWorker = await probe.wasCancelled()
+        let cancelledWorker = await probe.waitUntilCancelled(timeout: .seconds(3))
         await probe.finish()
         _ = await request.value
 
@@ -157,19 +151,26 @@ private actor DecodeCancellationProbe {
     private var cancelled = false
     private var continuation: CheckedContinuation<Data?, Never>?
 
-    func didStart() -> Bool {
-        started
+    func waitUntilStarted(timeout: Duration) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while !started, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return started
     }
 
-    func wasCancelled() -> Bool {
-        cancelled
+    func waitUntilCancelled(timeout: Duration) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while !cancelled, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return cancelled
     }
 
     func value() async -> Data? {
-        started = true
-
-        return await withTaskCancellationHandler(operation: {
+        await withTaskCancellationHandler(operation: {
             await withCheckedContinuation { continuation in
+                started = true
                 if self.cancelled {
                     continuation.resume(returning: nil)
                 } else {

@@ -11,6 +11,7 @@ import SwiftUI
 struct DocumentsListContentView: View {
     let pet: Pet
     var showsCloseButton: Bool = true
+    var onClose: (() -> Void)?
 
     let routeDocuments: [PetDocument]
     let routeInsurances: [PetInsurance]
@@ -35,10 +36,12 @@ struct DocumentsListContentView: View {
         pet: Pet,
         showsCloseButton: Bool = true,
         routeDocuments: [PetDocument],
-        routeInsurances: [PetInsurance]
+        routeInsurances: [PetInsurance],
+        onClose: (() -> Void)? = nil
     ) {
         self.pet = pet
         self.showsCloseButton = showsCloseButton
+        self.onClose = onClose
         self.routeDocuments = routeDocuments
         self.routeInsurances = routeInsurances
     }
@@ -154,7 +157,13 @@ struct DocumentsListContentView: View {
             }
             Spacer()
             if showsCloseButton {
-                Button { dismiss() } label: {
+                Button {
+                    if let onClose {
+                        onClose()
+                    } else {
+                        dismiss()
+                    }
+                } label: {
                     Image(systemName: "xmark").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 14, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)

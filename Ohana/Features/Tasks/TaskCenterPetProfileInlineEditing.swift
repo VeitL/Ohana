@@ -179,6 +179,12 @@ enum TaskCenterPetProfileInlineInputBuilder {
 }
 
 struct TaskCenterPetProfileInlineEditor: View {
+    private enum FocusedField: Hashable {
+        case coatColor
+        case foodBrand
+        case dailyPortion
+    }
+
     let checkpoint: HouseholdStarterJourneyCheckpoint
     let pet: Pet
     let onSave: (TaskCenterPetProfileInlineUpdate) -> TaskCenterSystemJourneyMutationOutcome
@@ -197,6 +203,7 @@ struct TaskCenterPetProfileInlineEditor: View {
     @State private var isSaving = false
     @State private var didSaveSuccessfully = false
     @State private var saveErrorMessage: String?
+    @FocusState private var focusedField: FocusedField?
 
     init(
         checkpoint: HouseholdStarterJourneyCheckpoint,
@@ -245,6 +252,15 @@ struct TaskCenterPetProfileInlineEditor: View {
                 didSaveSuccessfully = false
             }
             saveErrorMessage = nil
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button(l.done) {
+                    focusedField = nil
+                }
+                .accessibilityIdentifier("task-center-pet-profile-inline-keyboard-done")
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("task-center-pet-profile-inline-editor-\(checkpoint.rawValue)")
@@ -312,6 +328,7 @@ struct TaskCenterPetProfileInlineEditor: View {
                 text: $coatColor
             )
             .ohanaRoundedTextFieldStyle()
+            .focused($focusedField, equals: .coatColor)
             .accessibilityIdentifier("task-center-pet-profile-inline-coat-color")
         }
     }
@@ -409,6 +426,7 @@ struct TaskCenterPetProfileInlineEditor: View {
                 text: $foodBrand
             )
             .ohanaRoundedTextFieldStyle()
+            .focused($focusedField, equals: .foodBrand)
             .accessibilityIdentifier("task-center-pet-profile-inline-food-brand")
 
             TextField(
@@ -417,6 +435,7 @@ struct TaskCenterPetProfileInlineEditor: View {
             )
             .keyboardType(.decimalPad)
             .ohanaRoundedTextFieldStyle()
+            .focused($focusedField, equals: .dailyPortion)
             .accessibilityIdentifier("task-center-pet-profile-inline-daily-portion")
 
             if !dailyPortionIsValid {

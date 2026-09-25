@@ -13,18 +13,6 @@ enum TaskCenterPresentation: Equatable {
     case sheet
 }
 
-private struct TaskCenterSystemJourneyEditorRoute: Identifiable, Equatable {
-    let targetID: UUID
-    let task: HouseholdStarterJourneyTask
-    let destination: TaskCenterSystemDestination
-    let checkpoint: HouseholdStarterJourneyCheckpoint?
-    let completionWasSatisfiedAtPresentation: Bool
-
-    var id: String {
-        "\(targetID.uuidString)-\(task.rawValue)-\(destination.rawValue)-\(checkpoint?.rawValue ?? "action")"
-    }
-}
-
 struct TaskCenterFamilyTaskDetailRoute: Identifiable {
     let snapshot: TaskCenterFamilyTaskDetailSnapshot
 
@@ -61,7 +49,6 @@ struct TaskCenterRouteContainer: View {
     @State private var selectedMemberFilter: TaskCenterMemberFilter?
     @State private var pendingActionHumanConfirmation: ActionHumanConfirmationDraft?
     @State private var systemJourneyItemPresentation: TaskCenterItemSnapshot?
-    @State private var systemJourneyEditorPresentation: TaskCenterSystemJourneyEditorRoute?
 
     let presentation: TaskCenterPresentation
     let routeContext: TaskCenterRouteContext
@@ -291,8 +278,14 @@ struct TaskCenterRouteContainer: View {
                 taskState: starterJourneyState(for: item),
                 humanProfileTarget: humanProfileTarget(for: item),
                 petProfileTarget: petProfileTarget(for: item),
-                onOpenDestination: { checkpoint in
-                    presentSystemJourneyEditor(item, checkpoint: checkpoint)
+                onPrepareEditorRoute: { checkpoint in
+                    makeSystemJourneyEditorRoute(item, checkpoint: checkpoint)
+                },
+                editorContent: { route, onDismiss in
+                    AnyView(systemJourneyEditor(route, onDismiss: onDismiss))
+                },
+                onEditorDismiss: {
+                    scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
                 },
                 onUpdateHumanProfile: { update in
                     updateStarterHumanProfile(for: item, applying: update)
@@ -309,20 +302,9 @@ struct TaskCenterRouteContainer: View {
                     )
                 },
                 onClose: {
-                    systemJourneyEditorPresentation = nil
                     systemJourneyItemPresentation = nil
                 }
             )
-            .sheet(
-                item: $systemJourneyEditorPresentation,
-                onDismiss: {
-                    scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
-                }
-            ) { route in
-                systemJourneyEditor(route)
-                    .presentationDetents([.large])
-                    .presentationContentInteraction(.scrolls)
-            }
             .presentationDetents([.large])
             .presentationContentInteraction(.scrolls)
         }
@@ -371,9 +353,6 @@ struct TaskCenterRouteContainer: View {
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
             scheduleRevisionReload()
-        }
-        .onChange(of: routeData.snapshot.starterJourney) { _, _ in
-            dismissCompletedSystemJourneyEditorIfNeeded()
         }
         .onChange(of: starterGiftCeremonySeen) { _, didSeeCeremony in
             if didSeeCeremony {
@@ -810,11 +789,11 @@ struct TaskCenterRouteContainer: View {
 // MARK: - System journey
 
 private extension TaskCenterRouteContainer {
-    private func presentSystemJourneyEditor(
+    private func makeSystemJourneyEditorRoute(
         _ item: TaskCenterItemSnapshot,
         checkpoint: HouseholdStarterJourneyCheckpoint?
-    ) {
-        guard item.systemDestination != .completeHumanProfile else { return }
+    ) -> TaskCenterSystemJourneyEditorRoute? {
+        guard item.systemDestination != .completeHumanProfile else { return nil }
         let routedItem = systemJourneyDestinationItem(item, checkpoint: checkpoint)
         guard let task = starterJourneyTask(for: item),
               let targetID = routedItem.subject.id,
@@ -823,9 +802,9 @@ private extension TaskCenterRouteContainer {
             OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
                 onOpenSystemDestination?(routedItem)
             }
-            return
+            return nil
         }
-        systemJourneyEditorPresentation = TaskCenterSystemJourneyEditorRoute(
+        return TaskCenterSystemJourneyEditorRoute(
             targetID: targetID,
             task: task,
             destination: destination,
@@ -880,7 +859,10 @@ private extension TaskCenterRouteContainer {
     }
 
     @ViewBuilder
-    private func systemJourneyEditor(_ route: TaskCenterSystemJourneyEditorRoute) -> some View {
+    private func systemJourneyEditor(
+        _ route: TaskCenterSystemJourneyEditorRoute,
+        onDismiss: @escaping () -> Void
+    ) -> some View {
         switch route.destination {
         case .completeHumanProfile:
             if let human = routeData.humans.first(where: { $0.id == route.targetID }) {
@@ -889,12 +871,12 @@ private extension TaskCenterRouteContainer {
                         human: human,
                         startsEditing: true,
                         requiresStarterProfileFields: true,
-                        onSave: dismissSystemJourneyEditor,
-                        onClose: dismissSystemJourneyEditor
+                        onSave: onDismiss,
+                        onClose: onDismiss
                     )
                 }
             } else {
-                missingSystemJourneyEditorTarget()
+                missingSystemJourneyEditorTarget(onDismiss: onDismiss)
             }
         case .completeFirstPetProfile:
             if let pet = routeData.pets.first(where: { $0.id == route.targetID }) {
@@ -902,64 +884,50 @@ private extension TaskCenterRouteContainer {
                     PetBasicInfoDetailView(
                         pet: pet,
                         startsEditing: true,
-                        onSave: dismissSystemJourneyEditor,
-                        onClose: dismissSystemJourneyEditor
+                        onSave: onDismiss,
+                        onClose: onDismiss
                     )
                 }
             } else {
-                missingSystemJourneyEditorTarget()
+                missingSystemJourneyEditorTarget(onDismiss: onDismiss)
             }
         case .confirmPetIdentityProtection:
-            petSystemJourneyEditor(route, destination: .documents)
+            petSystemJourneyEditor(route, destination: .documents, onDismiss: onDismiss)
         case .confirmPetPreventiveCare:
-            petSystemJourneyEditor(route, destination: .health(.preventive))
+            petSystemJourneyEditor(route, destination: .health(.preventive), onDismiss: onDismiss)
         case .configureFirstCarePlan:
             petSystemJourneyEditor(
                 route,
                 destination: .food,
-                showsFoodCloseButton: true
+                showsFoodCloseButton: true,
+                onDismiss: onDismiss
             )
         case .recordFirstCare:
-            petSystemJourneyEditor(route, destination: .feed(true))
+            petSystemJourneyEditor(route, destination: .feed(true), onDismiss: onDismiss)
         case .createFirstPet, .claimStarterGift:
-            missingSystemJourneyEditorTarget()
+            missingSystemJourneyEditorTarget(onDismiss: onDismiss)
         }
     }
 
     private func petSystemJourneyEditor(
         _ route: TaskCenterSystemJourneyEditorRoute,
         destination: AppPetDetailSheetDestination,
-        showsFoodCloseButton: Bool = false
+        showsFoodCloseButton: Bool = false,
+        onDismiss: @escaping () -> Void
     ) -> some View {
         AppPetDetailSheetRouteContainer(
             id: route.targetID,
             destination: destination,
-            onMissing: dismissSystemJourneyEditor,
-            onDismiss: dismissSystemJourneyEditor,
+            onMissing: onDismiss,
+            onDismiss: onDismiss,
             showsFoodCloseButton: showsFoodCloseButton
         )
     }
 
-    private func missingSystemJourneyEditorTarget() -> some View {
+    private func missingSystemJourneyEditorTarget(onDismiss: @escaping () -> Void) -> some View {
         Color.clear
-            .onAppear(perform: dismissSystemJourneyEditor)
+            .onAppear(perform: onDismiss)
             .accessibilityHidden(true)
-    }
-
-    private func dismissSystemJourneyEditor() {
-        systemJourneyEditorPresentation = nil
-    }
-
-    private func dismissCompletedSystemJourneyEditorIfNeeded() {
-        guard let route = systemJourneyEditorPresentation else { return }
-        guard !route.completionWasSatisfiedAtPresentation else { return }
-        let state = routeData.snapshot.starterJourney?.state(for: route.task)
-        guard TaskCenterSystemJourneyEditorCompletionPolicy.shouldDismissEditor(
-            task: route.task,
-            checkpoint: route.checkpoint,
-            state: state
-        ) else { return }
-        dismissSystemJourneyEditor()
     }
 
     private func claimStarterJourneyReward(

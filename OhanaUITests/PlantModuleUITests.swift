@@ -472,6 +472,18 @@ final class PlantModuleUITests: XCTestCase {
             ]
         }
         app.launch()
+        if app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 3) {
+            tapWhenHittable(app.buttons["zen-toolbar-settings"], timeout: 8)
+            XCTAssertTrue(
+                app.descendants(matching: .any)["settings-screen"].waitForExistence(timeout: 12),
+                "Settings did not open to restore the Standard experience for the plant test."
+            )
+            tapWhenHittable(app.buttons["settings-experience-mode-standard"], timeout: 8)
+            XCTAssertTrue(
+                app.buttons["home-tab-home"].waitForExistence(timeout: 20),
+                "Switching from Zen to Standard did not restore the plant-test shell."
+            )
+        }
         let standardMode = app.buttons["app-experience-standard"]
         if standardMode.waitForExistence(timeout: 3) {
             standardMode.tap()
@@ -1383,13 +1395,29 @@ final class PlantModuleUITests: XCTestCase {
             )
         }
 
-        let saveAction = app.buttons["add-event-save-action"]
-        scrollToElement(saveAction, in: app, maxSwipes: 4)
+        let saveAction = app.buttons["add-event-navigation-save-action"]
         XCTAssertTrue(tapWhenFrameReady(saveAction, timeout: 8), "Calendar add-event save action did not become tappable.")
+        allowPendingNotificationAuthorization(in: app)
         XCTAssertTrue(
             waitUntil(timeout: 14) { !app.textFields["add-event-title-input"].exists },
             "Calendar add-event sheet did not close after saving \(title)."
         )
+    }
+
+    @MainActor
+    private func allowPendingNotificationAuthorization(in app: XCUIApplication) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let labels = ["Allow", "Zulassen", "允许"]
+        let appButtons = labels.map { app.alerts.buttons[$0].firstMatch }
+        let springboardButtons = labels.map { springboard.alerts.buttons[$0].firstMatch }
+        guard waitUntil(timeout: 3, condition: {
+            appButtons.contains(where: \.exists) || springboardButtons.contains(where: \.exists)
+        }) else { return }
+
+        if let button = appButtons.first(where: { $0.exists && $0.isEnabled }) ??
+            springboardButtons.first(where: { $0.exists && $0.isEnabled }) {
+            button.tap()
+        }
     }
 
     @MainActor
@@ -1464,7 +1492,9 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(detailScreen.waitForExistence(timeout: 8), "Plant detail screen did not exist before deletion.")
         guard detailScreen.exists else { return }
 
-        let deleteActions = detailScreen.buttons.matching(
+        // Navigation-bar toolbar items are exposed as application buttons,
+        // not descendants of the identified scroll/detail container.
+        let deleteActions = app.buttons.matching(
             NSPredicate(format: "identifier == %@", "plant-detail-delete-action")
         )
         guard let deleteAction = firstVisibleEnabledHittableButton(

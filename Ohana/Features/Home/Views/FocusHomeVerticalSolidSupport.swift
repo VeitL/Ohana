@@ -14,6 +14,7 @@ struct FocusHomeVerticalSolidQuickActionLayer<Content: View>: View {
     let height: CGFloat
     let reveal: CGFloat
     let isReady: Bool
+    @State private var hitTestOverflow: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -24,13 +25,25 @@ struct FocusHomeVerticalSolidQuickActionLayer<Content: View>: View {
                 }
         }
             .frame(width: width, alignment: .top)
-            .frame(height: height, alignment: .top)
+            .frame(height: height + hitTestOverflow, alignment: .top)
             .contentShape(Rectangle())
             .clipShape(WalletHeroRevealShape(reveal: reveal))
             .contentShape(Rectangle())
             .opacity(Double(reveal))
             .allowsHitTesting(isReady)
             .accessibilityHidden(!isReady)
+            // The card scene aligns this layer to its bottom edge. Offset the
+            // added menu space back down so the dock stays put while the
+            // parent hit-test and reveal bounds grow around an open submenu.
+            .offset(y: hitTestOverflow)
+            .onPreferenceChange(VerticalHomeEmbeddedQuickActionHitOverflowPreferenceKey.self) { newValue in
+                guard hitTestOverflow != newValue else { return }
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    hitTestOverflow = newValue
+                }
+            }
     }
 }
 

@@ -143,7 +143,11 @@ struct SettingsRegionLanguagePage: View {
                 }
             }
         }
-        .settingsDestinationChrome(title: SettingsDestination.regionAndLanguage.title(l), closeLabel: l.tr(zh: "关闭", en: "Close", de: "Schließen"), onClose: onClose)
+        .settingsDestinationChrome(
+            title: SettingsDestination.regionAndLanguage.title(l),
+            closeLabel: l.tr(zh: "关闭", en: "Close", de: "Schließen"),
+            onClose: closeAfterCommittingLanguageChange
+        )
         .onAppear {
             syncStoredDefaultsIfNeeded()
             languageSelectionCode = AppLanguage.normalize(appLanguage)
@@ -204,8 +208,9 @@ struct SettingsRegionLanguagePage: View {
                 }
             }
             .pickerStyle(.menu)
+            .accessibilityLabel(l.language)
+            .accessibilityValue(AppLanguage.option(for: languageSelectionCode).displayName)
             .accessibilityIdentifier("settings-language-picker")
-            .disabled(isLanguageCommitInFlight)
             .onChange(of: languageSelectionCode) { _, newValue in
                 scheduleLanguageCommit(newValue)
             }
@@ -318,6 +323,11 @@ struct SettingsRegionLanguagePage: View {
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) { onCommitLanguage(normalized) }
+    }
+
+    private func closeAfterCommittingLanguageChange() {
+        commitPendingLanguageChangeBeforeDismissal()
+        onClose()
     }
 }
 

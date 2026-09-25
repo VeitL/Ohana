@@ -162,7 +162,8 @@ struct AppPetDetailSheetRouteContainer: View {
                     PetHealthDetailView(
                         pet: pet,
                         isModal: true,
-                        initialSection: initialSection
+                        initialSection: initialSection,
+                        onFullDismiss: onDismiss
                     )
                 }
             case .medication:
@@ -170,7 +171,11 @@ struct AppPetDetailSheetRouteContainer: View {
             case .momentHistory:
                 PetMomentsHubRouteContainer(pet: pet)
             case .documents:
-                DocumentsListView(pet: pet, showsCloseButton: true)
+                DocumentsListView(
+                    pet: pet,
+                    showsCloseButton: true,
+                    onClose: onDismiss
+                )
             case .achievements:
                 NavigationStack {
                     AchievementWallView(

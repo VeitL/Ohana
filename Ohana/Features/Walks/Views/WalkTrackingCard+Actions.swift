@@ -277,7 +277,14 @@ extension WalkTrackingCard {
         isClosingSummaryBack = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         if let onCloseSummaryToPetCard {
+            showSummaryBack = false
+            withAnimation(GoMotion.page) {
+                summaryRotation = 0
+            }
             onCloseSummaryToPetCard()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                isClosingSummaryBack = false
+            }
             return
         }
         withAnimation(GoMotion.page) {

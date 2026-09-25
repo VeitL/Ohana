@@ -82,7 +82,9 @@ struct ZenStarterJourneySheet: View {
                 taskState: projection.humanProfileState,
                 humanProfileTarget: humanProfileTarget,
                 petProfileTarget: nil,
-                onOpenDestination: { _ in },
+                onPrepareEditorRoute: { _ in nil },
+                editorContent: { _, _ in AnyView(EmptyView()) },
+                onEditorDismiss: {},
                 onUpdateHumanProfile: updateZenHumanProfile,
                 onUpdatePetProfile: { _ in
                     .failure(l.tr(

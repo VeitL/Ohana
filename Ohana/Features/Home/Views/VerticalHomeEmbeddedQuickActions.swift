@@ -115,6 +115,22 @@ nonisolated enum VerticalHomeQuickActionSecondaryMenuStyle {
     static let chartSystemName = "chart.line.uptrend.xyaxis"
 }
 
+private struct VerticalHomeQuickActionCellBoundsPreferenceKey: PreferenceKey {
+    static var defaultValue: [String: Anchor<CGRect>] = [:]
+
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
+    }
+}
+
+struct VerticalHomeEmbeddedQuickActionHitOverflowPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 nonisolated enum VerticalHomeQuickActionReorderPolicy {
     /// The existing move command inserts at the target's original index.
     /// Convert the system's "before" destination to that command's target ID.
@@ -203,6 +219,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+        // Menus float below the dock cell. Give their semantic hit targets
+        // real layout space so the host card's hit-test bounds include them.
+        .padding(.bottom, openMenuHitTestOverflow)
+        .preference(
+            key: VerticalHomeEmbeddedQuickActionHitOverflowPreferenceKey.self,
+            value: openMenuHitTestOverflow
+        )
         .overlay(alignment: .bottom) {
             if isEditMode, showingAddPanel {
                 addOptionsPanel
@@ -220,6 +243,9 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     )
                     .zIndex(120)
             }
+        }
+        .overlayPreferenceValue(VerticalHomeQuickActionCellBoundsPreferenceKey.self) { anchors in
+            quickActionMenuOverlay(anchors: anchors)
         }
         .onChange(of: visibleItemsRevision) { _, _ in
             if let openActionId,
@@ -374,25 +400,12 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
             ) // ui-v4: allow invisible quick-action hit surface so the full 72pt cell activates, including label/icon gaps.
             .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-            .allowsHitTesting(!isEditMode && (!hasOpenActionMenu || openActionId == item.id))
             .accessibilityLabel(accessibilityLabel(for: item, statusText: statusText(for: item)))
             .accessibilityIdentifier("home-quick-action-\(item.actionType)")
             .highPriorityGesture(detailLongPressGesture(for: item))
-
-            if openActionId == item.id {
-                inlineMenu(item: item, detailAction: item.detailAction, index: index)
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity
-                                .combined(with: .scale(scale: 0.82, anchor: menuTransitionAnchor(index: index)))
-                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 10))),
-                            removal: .opacity
-                                .combined(with: .scale(scale: 0.92, anchor: menuTransitionAnchor(index: index)))
-                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 4)))
-                        )
-                    )
-                    .zIndex(80)
-            }
+            // Apply hit-testing to the composed button, including its long-press
+            // recognizer, so it cannot intercept the overlapping inline menu.
+            .allowsHitTesting(!isEditMode && !hasOpenActionMenu)
 
             #if compiler(>=6.4)
             if isEditMode, #unavailable(iOS 27.0) {
@@ -410,11 +423,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .rotationEffect(.degrees(editJiggleAngle(for: item)))
         .animation(editJiggleAnimation, value: jiggle)
         .animation(GoMotion.selection, value: activeDraggingItemId)
-        .animation(motion, value: openActionId)
         .overlay(alignment: .topLeading) {
             if isEditMode {
                 removeButton(for: item)
             }
+        }
+        .anchorPreference(key: VerticalHomeQuickActionCellBoundsPreferenceKey.self, value: .bounds) {
+            [item.id: $0]
         }
         #if compiler(>=6.4)
         if #available(iOS 27.0, *) {
@@ -567,10 +582,6 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .modifier(VerticalHomeQuickActionSecondaryMenuSurface())
         .shadow(color: Color.arkInk.opacity(0.24), radius: 14, x: 0, y: 8) // ui-v4: allow embedded quick action submenu lift
         .fixedSize()
-        .offset(
-            x: menuOffsetX(index: index, buttonCount: buttonCount),
-            y: menuOffsetY(index: index)
-        )
     }
 
     private func shouldOpenMenu(for item: VerticalHomeEmbeddedAction) -> Bool {
@@ -887,8 +898,11 @@ struct VerticalHomeEmbeddedQuickActions: View {
         }
     }
 
-    private func opensMenuAbove(index: Int) -> Bool {
-        !forcesSubmenusBelow && index >= 4
+    private func opensMenuAbove(index _: Int) -> Bool {
+        // These docks sit along the bottom edge of the Home surface. When a
+        // caller permits upward menus, keep every submenu in the visible area;
+        // otherwise the first row's menu is clipped below the bottom tabs.
+        !forcesSubmenusBelow
     }
 
     private func menuTransitionAnchor(index: Int) -> UnitPoint {
@@ -989,6 +1003,49 @@ struct VerticalHomeEmbeddedQuickActions: View {
     private func accessibilityLabel(for item: VerticalHomeEmbeddedAction, statusText: String) -> String {
         let trimmed = statusText.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? item.quickAccessibilityLabel : "\(item.quickAccessibilityLabel), \(trimmed)"
+    }
+}
+
+private extension VerticalHomeEmbeddedQuickActions {
+    var openMenuHitTestOverflow: CGFloat {
+        guard let openActionId,
+              let index = visibleItems.firstIndex(where: { $0.id == openActionId }),
+              let item = visibleItems.first(where: { $0.id == openActionId }),
+              shouldOpenMenu(for: item),
+              !opensMenuAbove(index: index) else {
+            return 0
+        }
+        return VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize + 8
+    }
+
+    @ViewBuilder
+    func quickActionMenuOverlay(anchors: [String: Anchor<CGRect>]) -> some View {
+        GeometryReader { proxy in
+            if let openActionId,
+               let index = visibleItems.firstIndex(where: { $0.id == openActionId }),
+               let item = visibleItems.first(where: { $0.id == openActionId }),
+               let anchor = anchors[openActionId],
+               shouldOpenMenu(for: item) {
+                let buttonCount = menuButtonCount(for: item)
+                inlineMenu(item: item, detailAction: item.detailAction, index: index)
+                    .position(
+                        x: proxy[anchor].midX + menuOffsetX(index: index, buttonCount: buttonCount),
+                        y: proxy[anchor].midY + menuOffsetY(index: index)
+                    )
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity
+                                .combined(with: .scale(scale: 0.82, anchor: menuTransitionAnchor(index: index)))
+                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 10))),
+                            removal: .opacity
+                                .combined(with: .scale(scale: 0.92, anchor: menuTransitionAnchor(index: index)))
+                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 4)))
+                        )
+                    )
+                    .animation(motion, value: openActionId)
+                    .zIndex(120)
+            }
+        }
     }
 }
 

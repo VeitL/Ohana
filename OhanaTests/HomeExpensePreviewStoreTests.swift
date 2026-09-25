@@ -1087,7 +1087,8 @@ struct HomeExpensePreviewStoreTests {
         )
 
         #expect(menuSource.contains("private var hasOpenActionMenu"))
-        #expect(menuSource.contains(#".allowsHitTesting(!isEditMode && (!hasOpenActionMenu || openActionId == item.id))"#))
+        #expect(menuSource.contains(#".allowsHitTesting(!isEditMode && !hasOpenActionMenu)"#))
+        #expect(!menuSource.contains(#".allowsHitTesting(!isEditMode && (!hasOpenActionMenu || openActionId == item.id))"#))
         #expect(menuSource.contains(#""home-quick-action-menu-\(item.id)-\(option.id)""#))
         #expect(menuSource.contains(#""home-quick-action-menu-\(item.id)-detail""#))
         #expect(menuSource.contains("VerticalHomeQuickActionSecondaryMenuSurface()"))

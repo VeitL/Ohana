@@ -31,8 +31,11 @@ extension PetHealthDetailContentView {
 
             Button {
                 OhanaFeedback.light()
-                dismiss()
-                onFullDismiss?()
+                if let onFullDismiss {
+                    onFullDismiss()
+                } else {
+                    dismiss()
+                }
             } label: {
                 Image(systemName: "xmark").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 15, weight: .black))

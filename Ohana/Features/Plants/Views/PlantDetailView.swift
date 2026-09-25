@@ -788,7 +788,6 @@ struct PlantDetailContentView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
-                    #if DEBUG
                     Button {
                         showingDeleteConfirm = true
                     } label: {
@@ -798,7 +797,6 @@ struct PlantDetailContentView: View {
                     }
                     .accessibilityLabel(l.tr(zh: "删除植物", en: "Delete plant", de: "Pflanze löschen"))
                     .accessibilityIdentifier("plant-detail-delete-action")
-                    #endif
 
                     if !plant.isArchived, let onCreateCareTask {
                         Menu {

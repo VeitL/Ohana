@@ -441,7 +441,21 @@ extension AddEventContentView {
                         saveEvent()
                     }
                     .disabled(!canSave)
-                    .accessibilityIdentifier("add-event-save-action")
+                    .accessibilityIdentifier("add-event-navigation-save-action")
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
+                        titleFocused = false
+                        GoKeyboard.dismiss()
+                    }
+                    if canSave {
+                        Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
+                            saveEvent()
+                        }
+                        .fontWeight(.bold)
+                        .accessibilityIdentifier("add-event-keyboard-save-action")
+                    }
                 }
             }
         }
@@ -450,22 +464,6 @@ extension AddEventContentView {
         .sheet(item: $personalUpgradePrompt) { prompt in
             PersonalPlanView(prompt: prompt)
                 .ohanaSheetPagePresentation()
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
-                    titleFocused = false
-                    GoKeyboard.dismiss()
-                }
-                if canSave {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
-                        saveEvent()
-                    }
-                    .fontWeight(.bold)
-                    .accessibilityIdentifier("add-event-save-action")
-                }
-            }
         }
         .onChange(of: startDate) { _, newValue in
             keepDependentDatesAfter(newValue)

@@ -12,6 +12,18 @@ enum TaskCenterSystemJourneyMutationOutcome {
     case failure(String)
 }
 
+struct TaskCenterSystemJourneyEditorRoute: Identifiable, Equatable {
+    let targetID: UUID
+    let task: HouseholdStarterJourneyTask
+    let destination: TaskCenterSystemDestination
+    let checkpoint: HouseholdStarterJourneyCheckpoint?
+    let completionWasSatisfiedAtPresentation: Bool
+
+    var id: String {
+        "\(targetID.uuidString)-\(task.rawValue)-\(destination.rawValue)-\(checkpoint?.rawValue ?? "action")"
+    }
+}
+
 nonisolated enum TaskCenterSystemJourneyCopy {
     static func profile(_ l: L10n) -> String {
         l.tr(
@@ -105,7 +117,9 @@ struct TaskCenterSystemJourneySheet: View {
     let taskState: HouseholdStarterJourneyTaskState?
     let humanProfileTarget: Human?
     let petProfileTarget: Pet?
-    let onOpenDestination: (HouseholdStarterJourneyCheckpoint?) -> Void
+    let onPrepareEditorRoute: (HouseholdStarterJourneyCheckpoint?) -> TaskCenterSystemJourneyEditorRoute?
+    let editorContent: (TaskCenterSystemJourneyEditorRoute, @escaping () -> Void) -> AnyView
+    let onEditorDismiss: () -> Void
     let onUpdateHumanProfile: (
         TaskCenterHumanProfileInlineUpdate
     ) -> TaskCenterSystemJourneyMutationOutcome
@@ -121,6 +135,7 @@ struct TaskCenterSystemJourneySheet: View {
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AccessibilityFocusState private var focusedQuestionIndex: Int?
+    @State private var editorPresentation: TaskCenterSystemJourneyEditorRoute?
     @State private var recordedResolutions: [HouseholdStarterJourneyCheckpoint: HouseholdStarterJourneyResolution] = [:]
     @State private var locallySavedHumanCheckpoints: Set<HouseholdStarterJourneyCheckpoint> = []
     @State private var locallySavedPetCheckpoints: Set<HouseholdStarterJourneyCheckpoint> = []
@@ -133,65 +148,91 @@ struct TaskCenterSystemJourneySheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { scrollProxy in
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        hero
-                            .id("task-center-starter-journey-top")
+            if let route = editorPresentation {
+                editorContent(route, dismissSystemJourneyEditor)
+            } else {
+                ScrollViewReader { scrollProxy in
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 20) {
+                            hero
+                                .id("task-center-starter-journey-top")
 
-                        if let guide {
-                            progress(guide)
+                            if let guide {
+                                progress(guide)
+                            }
+
+                            if let errorMessage {
+                                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                                    .font(OhanaFont.footnote(.semibold))
+                                    .foregroundStyle(Color.goRed)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("task-center-starter-journey-error")
+                            }
+
+                            if sheetMode == .rewardClaim {
+                                rewardReadyContent
+                            } else if sheetMode == .completedThisSession {
+                                localCompletionCard
+                            } else if let guide, let question = currentQuestion(in: guide) {
+                                questionCard(question, guide: guide)
+                                questionNavigation(guide)
+                            } else {
+                                openButton(checkpoint: nil, title: openActionTitle)
+                            }
                         }
-
-                        if let errorMessage {
-                            Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                                .font(OhanaFont.footnote(.semibold))
-                                .foregroundStyle(Color.goRed)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier("task-center-starter-journey-error")
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+                        .padding(.bottom, 34)
+                    }
+                    .accessibilityIdentifier("task-center-starter-journey-scroll")
+                    .onChange(of: questionIndex) { _, newIndex in
+                        expandedHumanCheckpoint = nil
+                        expandedPetCheckpoint = nil
+                        withAnimation(GoMotion.selection) {
+                            scrollProxy.scrollTo("task-center-starter-journey-top", anchor: .top)
                         }
-
-                        if sheetMode == .rewardClaim {
-                            rewardReadyContent
-                        } else if sheetMode == .completedThisSession {
-                            localCompletionCard
-                        } else if let guide, let question = currentQuestion(in: guide) {
-                            questionCard(question, guide: guide)
-                            questionNavigation(guide)
-                        } else {
-                            openButton(checkpoint: nil, title: openActionTitle)
+                        focusQuestion(newIndex)
+                    }
+                    .onChange(of: expandedHumanCheckpoint) { _, checkpoint in
+                        guard let checkpoint else { return }
+                        withAnimation(GoMotion.selection) {
+                            scrollProxy.scrollTo(
+                                "task-center-starter-journey-human-editor-\(checkpoint.rawValue)",
+                                anchor: .bottom
+                            )
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
-                    .padding(.bottom, 34)
+                    .onChange(of: expandedPetCheckpoint) { _, checkpoint in
+                        guard let checkpoint else { return }
+                        withAnimation(GoMotion.selection) {
+                            scrollProxy.scrollTo(
+                                "task-center-starter-journey-pet-editor-\(checkpoint.rawValue)",
+                                anchor: .bottom
+                            )
+                        }
+                    }
                 }
-                .onChange(of: questionIndex) { _, newIndex in
-                    expandedHumanCheckpoint = nil
-                    expandedPetCheckpoint = nil
-                    withAnimation(GoMotion.selection) {
-                        scrollProxy.scrollTo("task-center-starter-journey-top", anchor: .top)
+                .background(OhanaAppBackground().ignoresSafeArea())
+                .navigationTitle(l.tr(zh: "引导完成", en: "Guided setup", de: "Geführte Einrichtung"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(action: onClose) {
+                            Image(systemName: "xmark") // a11y: allow decorative close glyph is hidden and the parent Button is labeled
+                                .frame(width: 44, height: 44)
+                                .accessibilityHidden(true)
+                        }
+                        .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                        .accessibilityIdentifier("task-center-starter-journey-close")
                     }
-                    focusQuestion(newIndex)
-                }
-            }
-            .background(OhanaAppBackground().ignoresSafeArea())
-            .navigationTitle(l.tr(zh: "引导完成", en: "Guided setup", de: "Geführte Einrichtung"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: onClose) {
-                        Image(systemName: "xmark") // a11y: allow decorative close glyph is hidden and the parent Button is labeled
-                            .frame(width: 44, height: 44)
-                            .accessibilityHidden(true)
-                    }
-                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                    .accessibilityIdentifier("task-center-starter-journey-close")
                 }
             }
         }
         .onAppear {
             questionIndex = guide?.initialQuestionIndex ?? 0
+        }
+        .onChange(of: taskState) { _, state in
+            dismissCompletedSystemJourneyEditorIfNeeded(state: state)
         }
         .onChange(of: guide?.completedCheckpointCount) { oldCount, newCount in
             guard let oldCount,
@@ -401,7 +442,7 @@ struct TaskCenterSystemJourneySheet: View {
     ) -> some View {
         Button {
             OhanaFeedback.light()
-            onOpenDestination(checkpoint)
+            prepareEditorRoute(checkpoint)
         } label: {
             Label(title, systemImage: openActionSymbol)
                 .font(OhanaFont.callout(.black))
@@ -425,7 +466,7 @@ struct TaskCenterSystemJourneySheet: View {
     ) -> some View {
         Button {
             OhanaFeedback.light()
-            onOpenDestination(checkpoint)
+            prepareEditorRoute(checkpoint)
         } label: {
             Label(title, systemImage: "arrow.up.right")
                 .font(OhanaFont.callout(.semibold))
@@ -435,6 +476,31 @@ struct TaskCenterSystemJourneySheet: View {
         .buttonStyle(.bordered)
         .tint(Color.goPrimary)
         .accessibilityIdentifier("\(identifierPrefix)-\(checkpoint?.rawValue ?? item.systemDestination?.rawValue ?? "unknown")")
+    }
+
+    private func prepareEditorRoute(_ checkpoint: HouseholdStarterJourneyCheckpoint?) {
+        guard let route = onPrepareEditorRoute(checkpoint) else { return }
+        editorPresentation = route
+    }
+
+    private func dismissCompletedSystemJourneyEditorIfNeeded(
+        state: HouseholdStarterJourneyTaskState?
+    ) {
+        guard let route = editorPresentation,
+              !route.completionWasSatisfiedAtPresentation,
+              TaskCenterSystemJourneyEditorCompletionPolicy.shouldDismissEditor(
+                  task: route.task,
+                  checkpoint: route.checkpoint,
+                  state: state
+              ) else { return }
+        onEditorDismiss()
+        editorPresentation = nil
+    }
+
+    private func dismissSystemJourneyEditor() {
+        guard editorPresentation != nil else { return }
+        editorPresentation = nil
+        onEditorDismiss()
     }
 
     private func resolutionButton(
@@ -929,6 +995,7 @@ private extension TaskCenterSystemJourneySheet {
                         }
                     }
                 )
+                .id("task-center-starter-journey-human-editor-\(checkpoint.rawValue)")
                 .transition(.opacity.combined(with: .move(edge: .top)))
             } else {
                 Text(l.tr(
@@ -1011,6 +1078,7 @@ private extension TaskCenterSystemJourneySheet {
                         }
                     }
                 )
+                .id("task-center-starter-journey-pet-editor-\(checkpoint.rawValue)")
                 .transition(.opacity.combined(with: .move(edge: .top)))
             } else {
                 Text(l.tr(

@@ -305,13 +305,14 @@ struct RootView: View {
             if hasOnboarded,
                experienceController.mode == .standard,
                experienceController.shouldOfferZenIntroduction {
-                VStack {
+                ZStack(alignment: .top) {
+                    Color.clear
+                        .allowsHitTesting(false)
                     AppExperienceIntroductionBanner(appLanguage: appLanguage) {
                         experienceController.dismissZenIntroduction()
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
-                    Spacer(minLength: 0)
                 }
                 .zIndex(850)
             }
