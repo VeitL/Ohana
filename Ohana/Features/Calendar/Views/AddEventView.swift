@@ -449,6 +449,7 @@ extension AddEventContentView {
                         titleFocused = false
                         GoKeyboard.dismiss()
                     }
+                    .accessibilityIdentifier("add-event-keyboard-dismiss-action")
                     if canSave {
                         Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
                             saveEvent()

@@ -9563,8 +9563,8 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(titleField.waitForExistence(timeout: 10), "Calendar event edit sheet did not expose title input.")
         clearTextField(titleField, in: app)
         titleField.typeText(editedTitle)
-        dismissKeyboardIfPresent(in: app)
-        tapFirstHittableButton(identifier: "add-event-save-action", in: app, timeout: 8, context: "calendar event edit save")
+        dismissCalendarTitleKeyboard(in: app)
+        tapFirstHittableButton(identifier: "add-event-navigation-save-action", in: app, timeout: 8, context: "calendar event edit save")
 
         XCTAssertTrue(
             waitUntil(timeout: 14) {
@@ -10437,17 +10437,9 @@ final class OhanaUITests: XCTestCase {
         nameField.typeText(name)
         let continueAction = app.buttons["onboarding-human-continue"]
         XCTAssertTrue(waitUntil(timeout: 8) { continueAction.exists && continueAction.isEnabled })
-        let continueKey = app.keyboards.buttons.matching(
-            NSPredicate(format: "label IN %@", ["Continue", "continue"])
-        ).firstMatch
-        XCTAssertTrue(
-            continueKey.waitForExistence(timeout: 8),
-            "The Human name keyboard did not expose its semantic Continue key."
-        )
-        XCTAssertTrue(
-            tapWhenSemanticallyHittable(continueKey, timeout: 8),
-            "The Human name keyboard's Continue key was not tappable."
-        )
+        // Invoke the field's onSubmit action without depending on the system
+        // keyboard's localized key label or its accessibility hit-test frame.
+        nameField.typeText("\n")
         XCTAssertTrue(
             app.buttons["onboarding-create-pet-now"].waitForExistence(timeout: 12),
             "Saving the first Human did not reach the Pet choice."
@@ -13116,6 +13108,23 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func dismissCalendarTitleKeyboard(in app: XCUIApplication) {
+        // A downward app swipe can dismiss this sheet along with the keyboard.
+        // Use the editor's own Done action and prove that the draft stays open.
+        let done = app.buttons["add-event-keyboard-dismiss-action"]
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(done, timeout: 8),
+            "Calendar title editing did not expose its keyboard Done action."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 4) {
+                !app.keyboards.firstMatch.exists && app.textFields["add-event-title-input"].exists
+            },
+            "Finishing Calendar title editing must dismiss the keyboard and keep the draft open."
+        )
+    }
+
+    @MainActor
     private func addCalendarEvent(
         title: String,
         linkedPetName: String?,
@@ -13129,11 +13138,7 @@ final class OhanaUITests: XCTestCase {
             "Calendar add-event sheet did not open."
         )
         typeText(title, intoTextField: "add-event-title-input", in: app)
-        dismissKeyboardIfPresent(in: app, returnKeyIsSafe: true)
-        XCTAssertTrue(
-            waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists },
-            "Calendar event title keyboard did not dismiss."
-        )
+        dismissCalendarTitleKeyboard(in: app)
         if let linkedPetName {
             let relatedEntityPicker = app.descendants(matching: .any)["add-event-related-entity-picker"]
             scrollTowardElement(relatedEntityPicker, in: app, maxSwipes: 6)
