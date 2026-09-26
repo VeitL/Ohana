@@ -321,3 +321,12 @@ jobs:
           path: ${{ runner.temp }}/ohana-ui-nightly.json
           if-no-files-found: warn
           retention-days: 7
+      - name: Upload failed UI test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-failure-results
+          path: ${{ runner.temp }}/OhanaLocalBuild/*/TestResults/failed/*.xcresult
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7

@@ -617,12 +617,16 @@ final class OhanaUITests: XCTestCase {
             },
             "Relaunch lost the owner check-in or changed its reward."
         )
+        print("Zen repeat activation before: value=\(accessibilityText(for: relaunchedOwnerCard)), balance=\(app.buttons["zen-toolbar-coconut-log"].label)")
         tapWhenHittable(relaunchedOwnerCard, timeout: 8)
+        print("Zen repeat activation after: value=\(accessibilityText(for: relaunchedOwnerCard)), balance=\(app.buttons["zen-toolbar-coconut-log"].label)")
         XCTAssertTrue(
             waitUntil(timeout: 4) {
-                Int(self.numericLabel(app.buttons["zen-toolbar-coconut-log"].label)) == balanceAfterCheckIn
+                let value = relaunchedOwnerCard.value as? String ?? ""
+                let balance = Int(self.numericLabel(app.buttons["zen-toolbar-coconut-log"].label))
+                return value.contains("Neutral status background") && balance == balanceAfterCheckIn
             },
-            "Repeated owner-card activation duplicated the daily reward."
+            "A repeated owner-card tap created a score or changed the check-in reward."
         )
 
         tapWhenHittable(app.buttons["zen-toolbar-settings"], timeout: 8)
@@ -656,14 +660,19 @@ final class OhanaUITests: XCTestCase {
         )
         let roundTripOwnerCard = app.buttons[ownerCard.identifier]
         XCTAssertTrue(roundTripOwnerCard.waitForExistence(timeout: 12))
-        XCTAssertTrue(
-            waitUntil(timeout: 12) {
-                let value = roundTripOwnerCard.value as? String ?? ""
-                return value.contains("Neutral status background")
-                    && Int(self.numericLabel(app.buttons["zen-toolbar-coconut-log"].label)) == balanceAfterCheckIn
-            },
-            "The Standard–Zen round trip lost the owner fact or duplicated its reward."
-        )
+        var roundTripValue = ""
+        var roundTripBalance: Int?
+        let preservedRoundTrip = waitUntil(timeout: 12) {
+            roundTripValue = roundTripOwnerCard.value as? String ?? ""
+            roundTripBalance = Int(self.numericLabel(app.buttons["zen-toolbar-coconut-log"].label))
+            return roundTripValue.contains("Neutral status background") && roundTripBalance == balanceAfterCheckIn
+        }
+        let roundTripEvidence = "Zen round trip: value=\(roundTripValue), balance=\(String(describing: roundTripBalance)), expectedBalance=\(balanceAfterCheckIn)"
+        print(roundTripEvidence)
+        if !preservedRoundTrip {
+            captureRouteFailureEvidence(roundTripEvidence, in: app)
+        }
+        XCTAssertTrue(preservedRoundTrip, "The Standard–Zen round trip lost the owner fact or duplicated its reward. \(roundTripEvidence)")
     }
     @MainActor
     func testMemberCardReviewedPersonalityThenRequiredFieldsSurviveRelaunchAndRewardOnce() throws {
@@ -5783,6 +5792,18 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func captureRouteFailureEvidence(_ context: String, in app: XCUIApplication) {
+        let hierarchy = XCTAttachment(string: "\(context)\n\(app.debugDescription)")
+        hierarchy.name = "Route failure hierarchy"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Route failure screenshot"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    @MainActor
     func testPersistentStoreFailureFailsClosedAndRetryRecovers() throws {
         let app = launchEnglishApp(
             seedHumanBaseline: false,
@@ -5900,7 +5921,8 @@ final class OhanaUITests: XCTestCase {
         let app = launchEnglishApp(
             appLanguageOverride: nil,
             seedHumanBaseline: true,
-            enableProductionOverlays: true
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
         )
         let deferPet = app.buttons["onboarding-defer-pet"]
         XCTAssertTrue(
@@ -10765,12 +10787,42 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func openSettingsCategory(_ identifier: String, in app: XCUIApplication) {
-        let category = app.buttons[identifier]
-        scrollToElement(category, in: app, maxSwipes: 8)
-        XCTAssertTrue(category.waitForExistence(timeout: 12), "Settings category \(identifier) did not appear.")
-        tapWhenHittable(category, timeout: 8)
+        let form = app.descendants(matching: .any)["settings-main-scroll"]
         XCTAssertTrue(
-            waitUntil(timeout: 8) { !category.exists || !category.isHittable },
+            waitUntil(timeout: 12) { form.exists && form.isHittable },
+            "Settings form did not become interactive before category navigation."
+        )
+        let category = app.buttons[identifier]
+        for _ in 0 ..< 8 {
+            if category.exists, category.isHittable { break }
+            if category.exists, category.frame.midY < form.frame.midY {
+                form.swipeDown()
+            } else {
+                form.swipeUp()
+            }
+        }
+        XCTAssertTrue(category.waitForExistence(timeout: 12), "Settings category \(identifier) did not appear.")
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(category, timeout: 8),
+            "Settings category \(identifier) did not become semantically tappable."
+        )
+        let destinationIdentifier: String = switch identifier {
+        case "settings-destination-notifications": "settings-notifications-screen"
+        case "settings-destination-dataAndBackup": "settings-data-backup-screen"
+        default: "settings-destination-screen"
+        }
+        let destination = app.descendants(matching: .any)[destinationIdentifier]
+        let didNavigate = destination.waitForExistence(timeout: 8)
+        if !didNavigate {
+            let languagePicker = app.descendants(matching: .any)["settings-language-picker"]
+            let categoryFrame = category.exists ? String(describing: category.frame) : "absent"
+            let destinationHittable = destination.exists && destination.isHittable
+            let evidence = "Settings route \(identifier): categoryFrame=\(categoryFrame), destination=\(destinationIdentifier), destinationExists=\(destination.exists), destinationHittable=\(destinationHittable), languagePickerExists=\(languagePicker.exists), introductionExists=\(app.buttons["zen-introduction-banner"].exists)"
+            print(evidence)
+            captureRouteFailureEvidence(evidence, in: app)
+        }
+        XCTAssertTrue(
+            didNavigate,
             "Settings category \(identifier) did not navigate."
         )
     }
@@ -11199,11 +11251,22 @@ final class OhanaUITests: XCTestCase {
         _ actionPath: [String],
         in app: XCUIApplication
     ) {
+        dismissZenIntroductionIfNeeded(in: app)
         for (index, routedActionIdentifier) in actionPath.enumerated() {
             let action = app.buttons[routedActionIdentifier]
-            scrollToElement(action, in: app, maxSwipes: 8)
+            // The route container appears before its data finishes loading.
+            // Scrolling that placeholder can skip the first module once it mounts.
+            XCTAssertTrue(
+                action.waitForExistence(timeout: 12),
+                "Human detail did not load the current module action: \(routedActionIdentifier)"
+            )
             for _ in 0 ..< 8 where !action.isHittable {
-                swipeUpInPrimaryScrollArea(in: app)
+                guard let scrollView = largestVisibleScrollView(in: app) else { break }
+                if action.frame.midY < scrollView.frame.midY {
+                    scrollView.swipeDown()
+                } else {
+                    scrollView.swipeUp()
+                }
                 RunLoop.current.run(until: Date().addingTimeInterval(0.25))
             }
             XCTAssertTrue(

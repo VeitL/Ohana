@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import SwiftUI
 import Testing
 @testable import Ohana
 
@@ -179,18 +180,19 @@ struct ZenPresentationTests {
         ))
     }
 
-    @Test func scoreGestureRequiresAConfirmedSelectionWindowBeforeCommit() {
+    @Test func scoreGestureRequiresTheRecognizedLongPressPhaseBeforeCommit() {
         #expect(!ZenCardScoreSelectionPolicy.permitsScoreCommit(
-            startedAtUptime: nil,
-            endedAtUptime: 100
+            for: .first(false)
+        ))
+        // A short tap enters this phase too; a delayed callback must never turn it into a score.
+        #expect(!ZenCardScoreSelectionPolicy.permitsScoreCommit(
+            for: .first(true)
         ))
         #expect(!ZenCardScoreSelectionPolicy.permitsScoreCommit(
-            startedAtUptime: 100,
-            endedAtUptime: 100.07
+            for: .second(false, nil)
         ))
         #expect(ZenCardScoreSelectionPolicy.permitsScoreCommit(
-            startedAtUptime: 100,
-            endedAtUptime: 100.081
+            for: .second(true, nil)
         ))
     }
 

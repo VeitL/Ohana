@@ -756,7 +756,6 @@ nonisolated enum ZenCardScoreSelectionPolicy {
     static let pointsPerStep: CGFloat = 18
     static let defaultScore = 5
     static let quickTapSuppressionDuration: TimeInterval = 0.18
-    static let minimumConfirmedSelectionDuration: TimeInterval = 0.08
 
     static func initialScore(currentScore: Int?) -> Int {
         min(max(currentScore ?? defaultScore, 1), 10)
@@ -776,11 +775,11 @@ nonisolated enum ZenCardScoreSelectionPolicy {
     }
 
     static func permitsScoreCommit(
-        startedAtUptime: TimeInterval?,
-        endedAtUptime: TimeInterval
+        for value: SequenceGesture<LongPressGesture, DragGesture>.Value
     ) -> Bool {
-        guard let startedAtUptime else { return false }
-        return endedAtUptime - startedAtUptime >= minimumConfirmedSelectionDuration
+        // The first phase only means the finger is down, not that the long press succeeded.
+        guard case .second(true, _) = value else { return false }
+        return true
     }
 }
 
@@ -805,7 +804,6 @@ private struct ZenPresenceWalletCard: View {
     @GestureState private var isScoreGestureActive = false
     @State private var gestureStartScore = ZenCardScoreSelectionPolicy.defaultScore
     @State private var gesturePreviewScore: Int?
-    @State private var scoreSelectionStartedAtUptime: TimeInterval?
     @State private var quickTapSuppressionDeadline = Date.distantPast
     @State private var displayedBackgroundState: ZenPresencePresentation.CardBackgroundState
     @State private var outgoingBackgroundState: ZenPresencePresentation.CardBackgroundState?
@@ -940,8 +938,9 @@ private struct ZenPresenceWalletCard: View {
             }
         }
         .onChange(of: isScoreGestureActive) { wasActive, isActive in
-            guard wasActive, !isActive, gesturePreviewScore != nil else { return }
-            commitScoreSelection()
+            guard wasActive, !isActive else { return }
+            // GestureState also resets on cancellation. Only onEnded may save a score.
+            cancelScoreSelection()
         }
         .onDisappear {
             backgroundTransitionTask?.cancel()
@@ -1393,7 +1392,7 @@ private struct ZenPresenceWalletCard: View {
         .onChanged { value in
             switch value {
             case .first(true):
-                beginScoreSelection()
+                onScoreSelectionActivityChanged(true)
             case let .second(true, dragValue):
                 beginScoreSelection()
                 if let dragValue {
@@ -1404,17 +1403,14 @@ private struct ZenPresenceWalletCard: View {
             }
         }
         .onEnded { value in
-            switch value {
-            case .first(true):
-                commitScoreSelection()
-            case let .second(true, dragValue):
-                if let dragValue {
-                    updateScoreSelection(translationY: dragValue.translation.height)
-                }
-                commitScoreSelection()
-            default:
+            guard ZenCardScoreSelectionPolicy.permitsScoreCommit(for: value) else {
                 cancelScoreSelection()
+                return
             }
+            if case let .second(true, dragValue?) = value {
+                updateScoreSelection(translationY: dragValue.translation.height)
+            }
+            commitScoreSelection()
         }
     }
 
@@ -1428,7 +1424,6 @@ private struct ZenPresenceWalletCard: View {
 
     private func beginScoreSelection() {
         guard !isPending, gesturePreviewScore == nil else { return }
-        scoreSelectionStartedAtUptime = ProcessInfo.processInfo.systemUptime
         let initialScore = ZenCardScoreSelectionPolicy.initialScore(
             currentScore: subject.status?.score
         )
@@ -1458,14 +1453,6 @@ private struct ZenPresenceWalletCard: View {
 
     private func commitScoreSelection() {
         guard let score = gesturePreviewScore else { return }
-        guard ZenCardScoreSelectionPolicy.permitsScoreCommit(
-            startedAtUptime: scoreSelectionStartedAtUptime,
-            endedAtUptime: ProcessInfo.processInfo.systemUptime
-        ) else {
-            cancelScoreSelection()
-            return
-        }
-        scoreSelectionStartedAtUptime = nil
         armQuickTapSuppression()
         onSelectScore(score)
         withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
@@ -1475,13 +1462,12 @@ private struct ZenPresenceWalletCard: View {
     }
 
     private func cancelScoreSelection() {
-        scoreSelectionStartedAtUptime = nil
+        onScoreSelectionActivityChanged(false)
         guard gesturePreviewScore != nil else { return }
         armQuickTapSuppression()
         withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.quick) {
             gesturePreviewScore = nil
         }
-        onScoreSelectionActivityChanged(false)
     }
 
     private func armQuickTapSuppression() {
