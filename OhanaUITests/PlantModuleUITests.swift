@@ -1007,7 +1007,7 @@ final class PlantModuleUITests: XCTestCase {
         let cancelledName = "\(originalName) Cancelled"
         openPlantEditSheet(in: app)
         replaceText(cancelledName, inTextField: "plant-edit-name-input", in: app)
-        dismissKeyboardIfPresent(in: app)
+        submitPlantEditName(cancelledName, in: app)
         if !tapWhenFrameReady(app.buttons["ohana-sheet-close-action"], timeout: 4) {
             dismissCurrentSheetByDrag(in: app)
         }
@@ -1018,11 +1018,23 @@ final class PlantModuleUITests: XCTestCase {
         let savedName = "\(originalName) Edited"
         openPlantEditSheet(in: app)
         replaceText(savedName, inTextField: "plant-edit-name-input", in: app)
-        dismissKeyboardIfPresent(in: app)
+        submitPlantEditName(savedName, in: app)
         scrollToElement(app.buttons["plant-edit-save-action"], in: app, maxSwipes: 6)
         tapWhenFrameReady(app.buttons["plant-edit-save-action"], timeout: 8)
         XCTAssertTrue(waitUntil(timeout: 12) { !app.descendants(matching: .any)["plant-edit-sheet"].exists }, "Plant edit sheet did not close after saving.")
         assertPlantDetailName(savedName, in: app, timeout: 12, context: "after saving edit")
+    }
+
+    @MainActor
+    private func submitPlantEditName(_ expectedName: String, in app: XCUIApplication) {
+        let nameInput = app.textFields["plant-edit-name-input"]
+        nameInput.typeText("\n")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !app.keyboards.firstMatch.exists },
+            "Submitting the plant name did not dismiss the keyboard."
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["plant-edit-sheet"].exists, "Submitting the plant name unexpectedly closed its draft.")
+        XCTAssertEqual(nameInput.value as? String, expectedName, "Completing name entry changed the plant draft.")
     }
 
     @MainActor
@@ -1370,7 +1382,14 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(addEventAction.waitForExistence(timeout: 10), "Calendar add-event action did not appear.")
         XCTAssertTrue(tapWhenFrameReady(addEventAction, timeout: 8), "Calendar add-event action did not become tappable.")
         typeText(title, intoTextField: "add-event-title-input", in: app)
-        dismissKeyboardIfPresent(in: app)
+        let keyboardDone = app.buttons["add-event-keyboard-dismiss-action"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { keyboardDone.exists && keyboardDone.isHittable },
+            "Calendar keyboard Done did not become tappable."
+        )
+        keyboardDone.tap()
+        XCTAssertTrue(waitUntil(timeout: 8) { !app.keyboards.firstMatch.exists }, "Calendar Done did not dismiss the keyboard.")
+        XCTAssertEqual(app.textFields["add-event-title-input"].value as? String, title, "Calendar Done changed or closed the event draft.")
 
         if let linkedPlantName {
             let relatedEntityPicker = app.descendants(matching: .any)["add-event-related-entity-picker"]

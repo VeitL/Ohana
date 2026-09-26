@@ -617,9 +617,9 @@ final class OhanaUITests: XCTestCase {
             },
             "Relaunch lost the owner check-in or changed its reward."
         )
-        print("Zen repeat activation before: value=\(accessibilityText(for: relaunchedOwnerCard)), balance=\(app.buttons["zen-toolbar-coconut-log"].label)")
+        recordDiagnosticEvidence("Zen repeat activation before: value=\(accessibilityText(for: relaunchedOwnerCard)), balance=\(app.buttons["zen-toolbar-coconut-log"].label)")
         tapWhenHittable(relaunchedOwnerCard, timeout: 8)
-        print("Zen repeat activation after: value=\(accessibilityText(for: relaunchedOwnerCard)), balance=\(app.buttons["zen-toolbar-coconut-log"].label)")
+        recordDiagnosticEvidence("Zen repeat activation after: value=\(accessibilityText(for: relaunchedOwnerCard)), balance=\(app.buttons["zen-toolbar-coconut-log"].label)")
         XCTAssertTrue(
             waitUntil(timeout: 4) {
                 let value = relaunchedOwnerCard.value as? String ?? ""
@@ -668,7 +668,7 @@ final class OhanaUITests: XCTestCase {
             return roundTripValue.contains("Neutral status background") && roundTripBalance == balanceAfterCheckIn
         }
         let roundTripEvidence = "Zen round trip: value=\(roundTripValue), balance=\(String(describing: roundTripBalance)), expectedBalance=\(balanceAfterCheckIn)"
-        print(roundTripEvidence)
+        recordDiagnosticEvidence(roundTripEvidence)
         if !preservedRoundTrip {
             captureRouteFailureEvidence(roundTripEvidence, in: app)
         }
@@ -5792,6 +5792,16 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func recordDiagnosticEvidence(_ context: String) {
+        XCTContext.runActivity(named: context) { activity in
+            let evidence = XCTAttachment(string: context)
+            evidence.name = "UI state"
+            evidence.lifetime = .keepAlways
+            activity.add(evidence)
+        }
+    }
+
+    @MainActor
     private func captureRouteFailureEvidence(_ context: String, in app: XCUIApplication) {
         let hierarchy = XCTAttachment(string: "\(context)\n\(app.debugDescription)")
         hierarchy.name = "Route failure hierarchy"
@@ -10818,7 +10828,7 @@ final class OhanaUITests: XCTestCase {
             let categoryFrame = category.exists ? String(describing: category.frame) : "absent"
             let destinationHittable = destination.exists && destination.isHittable
             let evidence = "Settings route \(identifier): categoryFrame=\(categoryFrame), destination=\(destinationIdentifier), destinationExists=\(destination.exists), destinationHittable=\(destinationHittable), languagePickerExists=\(languagePicker.exists), introductionExists=\(app.buttons["zen-introduction-banner"].exists)"
-            print(evidence)
+            recordDiagnosticEvidence(evidence)
             captureRouteFailureEvidence(evidence, in: app)
         }
         XCTAssertTrue(
