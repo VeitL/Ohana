@@ -8439,7 +8439,7 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     func testPetPermanentDeleteFromBasicInfoSmoke() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
-        createFirstHuman(from: app)
+        let humanName = createFirstHuman(from: app)
         let petName = "Codex Delete Pet \(Int(Date().timeIntervalSince1970))"
         completeFirstDayStarterFunnel(
             in: app,
@@ -8470,6 +8470,19 @@ final class OhanaUITests: XCTestCase {
         }
         XCTAssertTrue(didReturnResponsive, "Permanent pet deletion did not return to a responsive Home surface.")
         XCTAssertFalse(deletedPetCard.exists, "Deleted pet card is still visible on Home.")
+
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(waitUntil(timeout: 20) {
+            app.state == .runningForeground && isHomeSurfaceResponsive(in: app)
+        }, "Home did not remain responsive after relaunching the saved pet deletion.")
+        XCTAssertTrue(
+            app.buttons["home-card-human-\(humanName)"].waitForExistence(timeout: 15),
+            "Relaunch did not read back the surviving household before verifying pet deletion."
+        )
+        XCTAssertFalse(
+            app.buttons["home-card-pet-\(petName)"].exists,
+            "Relaunch restored a permanently deleted pet."
+        )
     }
 
     @MainActor
@@ -8490,9 +8503,12 @@ final class OhanaUITests: XCTestCase {
 
         let closeAction = app.buttons["pet-delete-confirm-close"]
         XCTAssertTrue(closeAction.waitForExistence(timeout: 8), "Pet delete confirmation did not expose its top close action.")
-        tapWhenHittable(closeAction, timeout: 8)
-        XCTAssertFalse(
-            app.textFields["pet-delete-confirm-name-input"].waitForExistence(timeout: 2),
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(closeAction, timeout: 8),
+            "Pet delete confirmation close action did not become semantically tappable."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !app.textFields["pet-delete-confirm-name-input"].exists },
             "Pet delete confirmation sheet stayed visible after its top close action."
         )
         XCTAssertTrue(
@@ -8517,8 +8533,23 @@ final class OhanaUITests: XCTestCase {
         nameInput.typeText("wrong \(petName)")
         XCTAssertFalse(finalDelete.isEnabled, "Pet delete action became enabled for a mismatched pet name.")
 
-        tapWhenHittable(app.buttons["pet-delete-confirm-cancel"], timeout: 8)
-        XCTAssertFalse(nameInput.waitForExistence(timeout: 2), "Pet delete confirmation sheet stayed visible after cancel.")
+        // Keyboard expansion can leave XCTest using the action's previous
+        // hit point. Finish input and verify the name guard before Cancel.
+        nameInput.typeText("\n")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !app.keyboards.firstMatch.exists },
+            "Submitting a mismatched name did not dismiss the Pet confirmation keyboard."
+        )
+        XCTAssertTrue(nameInput.exists, "Submitting a mismatched name dismissed the Pet delete confirmation.")
+        XCTAssertFalse(finalDelete.isEnabled, "Submitting a mismatched name enabled Pet deletion.")
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(app.buttons["pet-delete-confirm-cancel"], timeout: 8),
+            "Pet delete confirmation Cancel did not become semantically tappable."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !nameInput.exists },
+            "Pet delete confirmation sheet stayed visible after cancel."
+        )
         XCTAssertTrue(app.descendants(matching: .any)["pet-basic-info-screen"].waitForExistence(timeout: 8), "Canceling pet delete did not return to Basic Info.")
         XCTAssertTrue(
             waitUntil(timeout: 8) { containsAnyMarker([petName], in: app) },

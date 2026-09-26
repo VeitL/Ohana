@@ -8,6 +8,15 @@
 import SwiftData
 import SwiftUI
 
+nonisolated enum PetDetailModelReadability {
+    static func isReadable(_ pet: Pet) -> Bool {
+        guard !pet.isDeleted else { return false }
+        // A saved deletion detaches the model before retained views and queries
+        // necessarily refresh. Unsaved preview/editor drafts remain readable.
+        return pet.modelContext != nil || pet.persistentModelID.storeIdentifier == nil
+    }
+}
+
 enum AppPetDetailSheetDestination: Hashable {
     case allFeatures
     case basicInfo
@@ -79,7 +88,7 @@ struct AppPetDetailSheetRouteContainer: View {
     }
 
     var body: some View {
-        if let pet = pets.first {
+        if let pet = pets.first, PetDetailModelReadability.isReadable(pet) {
             petDestination(for: pet)
         } else {
             PetRouteMissingEntityView(kind: "pet")

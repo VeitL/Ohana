@@ -385,7 +385,7 @@ extension PetBasicInfoDetailView {
     func prepareVetVisitSummaryText() async {
         preparedVetVisitSummaryText = nil
         await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, PetDetailModelReadability.isReadable(pet) else { return }
         preparedVetVisitSummaryText = vetVisitSummaryText
     }
 

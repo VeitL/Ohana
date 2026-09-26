@@ -94,6 +94,12 @@ struct PetBasicInfoDetailView: View {
     }
 
     var body: some View {
+        if PetDetailModelReadability.isReadable(pet) {
+            profileContent
+        }
+    }
+
+    private var profileContent: some View {
         ProfileDetailScaffold(
             title: l.tr(zh: "基础资料", en: "Profile", de: "Profil"),
             closeTitle: l.tr(zh: "关闭", en: "Close", de: "Schließen"),
@@ -116,6 +122,7 @@ struct PetBasicInfoDetailView: View {
             }
         }
         .onAppear {
+            guard PetDetailModelReadability.isReadable(pet) else { return }
             scheduleHealthSummaryLoad()
             guard startsEditing,
                   !didApplyInitialEditing,
@@ -129,6 +136,7 @@ struct PetBasicInfoDetailView: View {
             await prepareVetVisitSummaryText()
         }
         .task(id: pet.id) {
+            guard PetDetailModelReadability.isReadable(pet) else { return }
             profileCompletionResolutions = MemberProfileCompletenessReadService
                 .explicitlyResolvedCategories(
                     kind: .pet,
@@ -141,16 +149,18 @@ struct PetBasicInfoDetailView: View {
                 .ohanaSheetPagePresentation()
         }
         .sheet(item: $presentedSheet) { sheet in
-            switch sheet {
-            case .editor:
-                petEditorSheet
-            case .avatarPreview:
-                if let imageData = pet.avatarImageData {
-                    ProfileAvatarPreviewSheet(
-                        name: pet.name,
-                        imageData: imageData,
-                        closeTitle: l.tr(zh: "关闭", en: "Close", de: "Schließen")
-                    )
+            if PetDetailModelReadability.isReadable(pet) {
+                switch sheet {
+                case .editor:
+                    petEditorSheet
+                case .avatarPreview:
+                    if let imageData = pet.avatarImageData {
+                        ProfileAvatarPreviewSheet(
+                            name: pet.name,
+                            imageData: imageData,
+                            closeTitle: l.tr(zh: "关闭", en: "Close", de: "Schließen")
+                        )
+                    }
                 }
             }
         }
