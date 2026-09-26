@@ -8529,8 +8529,23 @@ final class OhanaUITests: XCTestCase {
         nameInput.typeText("wrong \(humanName)")
         XCTAssertFalse(finalDelete.isEnabled, "Human delete action became enabled for a mismatched human name.")
 
-        tapWhenHittable(app.buttons["human-delete-confirm-cancel"], timeout: 8)
-        XCTAssertFalse(nameInput.waitForExistence(timeout: 2), "Human delete confirmation sheet stayed visible after cancel.")
+        // Keyboard expansion can leave XCTest reporting the Cancel button's
+        // pre-keyboard hit point. Finish input before targeting the action.
+        nameInput.typeText("\n")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !app.keyboards.firstMatch.exists },
+            "Submitting a mismatched name did not dismiss the confirmation keyboard."
+        )
+        XCTAssertTrue(nameInput.exists, "Submitting a mismatched name dismissed the delete confirmation.")
+        XCTAssertFalse(finalDelete.isEnabled, "Submitting a mismatched name enabled Human deletion.")
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(app.buttons["human-delete-confirm-cancel"], timeout: 8),
+            "Human delete confirmation Cancel did not become semantically tappable."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !nameInput.exists },
+            "Human delete confirmation sheet stayed visible after cancel."
+        )
         XCTAssertTrue(
             app.descendants(matching: .any)["human-detail-screen"].waitForExistence(timeout: 8),
             "Canceling human delete did not return to Human details."
@@ -11658,9 +11673,13 @@ final class OhanaUITests: XCTestCase {
     private func deleteHumanHealthMetricFromCurrentUI(in app: XCUIApplication, humanName: String) {
         openHumanModuleFromHome("feature-hub-body-metrics", in: app, humanName: humanName)
         let metricCard = app.buttons["human-health-metric-chart-tsh"]
-        scrollTowardElement(metricCard, in: app, maxSwipes: 5)
+        // The tracked card is visible on this one-metric fixture's initial
+        // viewport. Scrolling before navigation settles can move past it.
         XCTAssertTrue(metricCard.waitForExistence(timeout: 10), "Human health metric card did not appear before delete.")
-        tapWhenHittable(metricCard, timeout: 8)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(metricCard, timeout: 12),
+            "Human health metric card did not become semantically tappable before delete."
+        )
 
         let detailScreen = app.descendants(matching: .any)["human-health-metric-detail-tsh"]
         XCTAssertTrue(detailScreen.waitForExistence(timeout: 10), "Human health metric detail did not open before delete.")
@@ -11673,15 +11692,20 @@ final class OhanaUITests: XCTestCase {
             "Human health metric log actions did not expose a delete action."
         )
         XCTAssertTrue(
-            tapNativeMenuButton(identifier: "human-health-metric-delete-action", in: app),
-            "Human health metric delete action could not be activated."
+            tapWhenSemanticallyHittable(deleteAction, timeout: 8),
+            "Human health metric delete menu item did not become semantically tappable."
         )
         let confirmDelete = app.buttons["Delete Log"]
         XCTAssertTrue(
-            confirmDelete.waitForExistence(timeout: 8),
-            "Human health metric delete did not require confirmation."
+            waitUntil(timeout: 8) {
+                !deleteAction.exists && confirmDelete.exists && confirmDelete.isHittable
+            },
+            "Human health metric delete menu action did not open its separate confirmation."
         )
-        tapWhenHittable(confirmDelete, timeout: 8)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(confirmDelete, timeout: 8),
+            "Human health metric delete confirmation did not become semantically tappable."
+        )
         XCTAssertTrue(
             waitUntil(timeout: 12) {
                 !deleteAction.exists &&
